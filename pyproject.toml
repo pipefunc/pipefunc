@@ -41,6 +41,8 @@ docs = [
     "furo",
     "myst-parser",
     "emoji",
+    "jupytext",
+    "pandas",  # used in example.ipynb
 ]
 dev = ["black", "pre-commit", "ruff", "mypy"]
 [project.urls]
