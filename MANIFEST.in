@@ -1,0 +1,3 @@
+recursive-include pipefunc *.py
+include LICENSE
+include README.md
