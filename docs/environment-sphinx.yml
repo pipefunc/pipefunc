@@ -1,5 +1,5 @@
 # This file is generated from pyproject.toml using .github/update-environment.py
-name: pipefunc
+name: pipefunc-sphinx
 
 channels:
 - conda-forge

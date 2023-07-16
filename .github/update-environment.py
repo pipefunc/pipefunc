@@ -13,50 +13,66 @@ def clean_deps(deps: Iterable[str]) -> list[str]:
     return [dep.split(";", 1)[0] for dep in deps]
 
 
+def generate_pip_deps(deps: list[str]) -> list[str]:
+    """Generate pip only dependencies from a list."""
+    return [dep for dep in deps if dep in PIP_ONLY_DEPS]
+
+
+def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
+    """Write dependencies with optional label."""
+    deps_str = ""
+    space = " " * indent
+    if label:
+        deps_str += f"  # {label}\n"
+    for dep in deps:
+        deps_str += f"{space}- {dep}\n"
+    return deps_str
+
+
 def generate_environment_yml(
     data: dict,
+    name: str,
     sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "pip"),
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
+    pip_deps = []
+
+    dependencies = clean_deps(data["project"]["dependencies"])
+    pip_deps += generate_pip_deps(dependencies)
+
     env_yaml = (
         "# This file is generated from pyproject.toml"
         " using .github/update-environment.py\n"
     )
-    env_yaml += "name: pipefunc\n\n"
+    env_yaml += f"name: {name}\n\n"
     env_yaml += "channels:\n- conda-forge\n\n"
     env_yaml += "dependencies:\n"
 
     # Default packages
-    for dep in clean_deps(default_packages):
-        env_yaml += f"  - {dep}\n"
-
-    pip_deps = []
+    env_yaml += write_deps(default_packages)
 
     # Required deps from pyproject.toml
-    env_yaml += "  # from pyproject.toml\n"
-    for dep in clean_deps(data["project"]["dependencies"]):
-        if dep in PIP_ONLY_DEPS:
-            pip_deps.append(dep)
-        else:
-            env_yaml += f"  - {dep}\n"
+    env_yaml += write_deps(
+        [dep for dep in dependencies if dep not in PIP_ONLY_DEPS],
+        "from pyproject.toml",
+    )
 
     # Optional dependencies
     for group in data["project"]["optional-dependencies"]:
-        if group not in sections:
-            continue
-        env_yaml += f"  # optional-dependencies: {group}\n"
-        for dep in clean_deps(data["project"]["optional-dependencies"][group]):
-            if dep in PIP_ONLY_DEPS:
-                pip_deps.append(dep)
-            else:
-                env_yaml += f"  - {dep}\n"
+        if group in sections:
+            group_deps = clean_deps(data["project"]["optional-dependencies"][group])
+            pip_deps += generate_pip_deps(group_deps)
+            env_yaml += write_deps(
+                [dep for dep in group_deps if dep not in PIP_ONLY_DEPS],
+                f"optional-dependencies: {group}",
+            )
 
     # PIP only dependencies
     if pip_deps:
         env_yaml += "  - pip:\n"
-        for pip_dep in set(pip_deps):  # remove duplicates
-            env_yaml += f"    - {pip_dep}\n"
+        # remove duplicates and no label for pip deps
+        env_yaml += write_deps(set(pip_deps), "", indent=4)
 
     return env_yaml
 
@@ -67,18 +83,23 @@ if __name__ == "__main__":
         data = tomllib.loads(f.read())
 
     # Generate environment.yml
-    environment_yml = generate_environment_yml(data, sections=("test", "plotting"))
+    environment_yml = generate_environment_yml(
+        data,
+        name="pipefunc",
+        sections=("test", "plotting"),
+    )
 
     # Save environment.yml
     with open("environment.yml", "w") as f:  # noqa: PTH123
         f.write(environment_yml)
 
     # Generate environment-sphinx
-    environment_yml = generate_environment_yml(
+    environment_sphinx_yml = generate_environment_yml(
         data,
+        name="pipefunc-sphinx",
         sections=("test", "docs", "plotting"),
     )
 
     # Save environment-sphinx
     with open("docs/environment-sphinx.yml", "w") as f:  # noqa: PTH123
-        f.write(environment_yml)
+        f.write(environment_sphinx_yml)
