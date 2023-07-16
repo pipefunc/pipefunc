@@ -31,6 +31,20 @@ For example, imagine you have a set of functions where `function B` needs the ou
 
 The library is designed to be an efficient and flexible tool for managing complex function dependencies in an intuitive and clear way. Whether you're dealing with data processing tasks, scientific computations, machine learning (AI) workflows, or other scenarios where functions depend on one another, `pipefunc` can help streamline your code and improve your productivity.
 
+## :rocket: Key Features
+
+Some of the key features of `pipefunc` include:
+
+1. 🚀 **Function Composition and Pipelining:** The core functionality of `pipefunc` is to create a pipeline of functions, allowing you to feed the output of one function into another, and execute them in the right order.
+1. 📊 **Visualizing Pipelines:** `pipefunc` can generate a visual graph of the function pipeline, making it easier to understand the flow of data.
+1. 💡 **Flexible Function Arguments:** `pipefunc` lets you call a function with different combinations of arguments, automatically determining which other functions to call based on the arguments you provide.
+1. 👥 **Multiple Outputs:** `pipefunc` supports functions that return multiple results, allowing each result to be used as input to other functions.
+1. ➡️ **Reducing Pipelines:** `pipefunc` can simplify a complex pipeline by merging nodes, improving computational efficiency at the cost of losing visibility into some intermediate steps.
+1. 🎛️ **Resources Report:** `pipefunc` provides a report on the performance of your pipeline, including CPU usage, memory usage, and execution time, helping you identify bottlenecks and optimize your code.
+1. 🔄 **Parallel Execution and Caching:** `pipefunc` supports parallel execution of functions, and caching of results to avoid redundant computation.
+1. 🔍 **Parameter Sweeps:** `pipefunc` provides a utility for generating combinations of parameters to use in a parameter sweep, along with the ability to cache results to optimize the sweep.
+1. 🛠️ **Flexibility and Ease of Use:** `pipefunc` is a lightweight, flexible, and powerful tool for managing complex function dependencies in a clear and intuitive way, designed to improve your productivity in any scenario where functions depend on one another.
+
 ## :dart: Design Goals
 
 pipefunc is designed with the following goals in mind:
