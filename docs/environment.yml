@@ -24,3 +24,5 @@ dependencies:
   - furo
   - myst-parser
   - emoji
+  - jupytext
+  - pandas
