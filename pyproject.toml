@@ -52,8 +52,8 @@ documentation = "https://pipefunc.readthedocs.io/"
 repository = "https://github.com/basnijholt/pipefunc"
 
 [project.readme]
-content-type = "text/x-rst"
-file = "README.rst"
+content-type = "text/markdown"
+file = "README.md"
 
 [project.scripts]
 pipefunc-launcher = "pipefunc._server_support.launcher:main"
