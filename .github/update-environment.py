@@ -58,7 +58,10 @@ if __name__ == "__main__":
         f.write(environment_yml)
 
     # Generate environment.yml
-    environment_yml = generate_environment_yml(data, sections=("test", "docs"))
+    environment_yml = generate_environment_yml(
+        data,
+        sections=("test", "docs", "plotting"),
+    )
 
     # Save environment.yml
     with open("docs/environment.yml", "w") as f:  # noqa: PTH123

@@ -13,6 +13,11 @@ dependencies:
   - versioningit
   - typing_extensions
   - cloudpickle
+  # optional-dependencies: plotting
+  - matplotlib
+  - pygraphviz
+  - holoviews
+  - bokeh
   # optional-dependencies: test
   - pytest
   - coverage
