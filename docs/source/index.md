@@ -11,14 +11,15 @@ start-after: <!-- toc-end -->
 
 ```{toctree}
 :hidden: true
+:maxdepth: 2
 
-self
-tutorial
+🏠 Home <self>
+🚀 Usage tutorial <tutorial>
 ```
 
 ```{toctree}
 :hidden: true
 :maxdepth: 2
 
-reference/pipefunc
+🛠️ API reference <reference/pipefunc>
 ```
