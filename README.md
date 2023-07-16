@@ -46,17 +46,6 @@ Some of the key features of `pipefunc` include:
 1. 🔍 **Parameter Sweeps:** `pipefunc` provides a utility for generating combinations of parameters to use in a parameter sweep, along with the ability to cache results to optimize the sweep.
 1. 🛠️ **Flexibility and Ease of Use:** `pipefunc` is a lightweight, flexible, and powerful tool for managing complex function dependencies in a clear and intuitive way, designed to improve your productivity in any scenario where functions depend on one another.
 
-## :dart: Design Goals
-
-pipefunc is designed with the following goals in mind:
-
-1. **Easy Dependency Management:** Each function can declare its dependencies on other functions, and pipefunc automatically manages the execution order to satisfy these dependencies.
-
-2. **Efficiency:** Function results are cached, so if a function is called multiple times with the same arguments, it doesn't need to recompute its result.
-
-3. **Pipeline Simplification:** Provides methods for reducing the complexity of the pipeline graph by combining functions with the same root arguments into single function nodes
-
-4. **Debugging and Profiling:** The pipeline class provides methods for visualizing the pipeline as a directed graph and profiling the resource usage of the pipeline functions.
 
 ## :test_tube: How does it work?
 
