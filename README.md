@@ -1,6 +1,6 @@
 # pipefunc: function composition magic for Python
 
-> Simplify your functions with PipeFunc: 📚 Less Bookkeeping, 🎯 More Doing
+> Lightweight function pipeline creation: 📚 Less Bookkeeping, 🎯 More Doing
 
 <!-- toc-start -->
 ## :books: Table of Contents
