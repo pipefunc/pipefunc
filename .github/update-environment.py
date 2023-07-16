@@ -100,5 +100,5 @@ if __name__ == "__main__":
         data,
         name="pipefunc-sphinx",
         sections=("test", "docs", "plotting"),
-        filename="docs/environment.yml",
+        filename="docs/environment-sphinx.yml",
     )
