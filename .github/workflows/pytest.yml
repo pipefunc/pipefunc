@@ -1,0 +1,51 @@
+name: pytest
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Update Python version in environment.yml
+        run: |
+          sed -i 's/- python/- python=${{ matrix.python-version }}/g' environment.yml
+          echo "Updated environment.yml content:"
+          cat environment.yml
+
+      - name: Install Conda environment with micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: Install pipefunc
+        shell: bash -l {0}
+        run: |
+          pip install -e ".[test,all]"
+
+      # Linux and macOS
+      - name: Run Python
+        shell: bash -l {0}
+        run: |
+          python -c "import pipefunc; print(pipefunc.__version__)"
+          pytest
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
