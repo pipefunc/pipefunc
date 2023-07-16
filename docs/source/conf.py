@@ -56,7 +56,7 @@ html_static_path = ["_static"]
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
-htmlhelp_basename = "adaptivedoc"
+htmlhelp_basename = "pipefuncdoc"
 
 # -- Extension configuration -------------------------------------------------
 
@@ -64,7 +64,10 @@ default_role = "autolink"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "networkx": ("https://networkx.org/documentation/stable/", None),
 }
+
+autodoc_member_order = "bysource"
 
 # myst-nb configuration
 nb_execution_mode = "cache"
