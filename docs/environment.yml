@@ -1,4 +1,5 @@
-# This file is generated from pyproject.toml using .github/update-environment.py
+# This file is used for the jupyterlite-sphinx extension
+# See https://pipefunc.readthedocs.io/en/latest/lite/
 name: pipefunc
 
 channels:
@@ -14,3 +15,5 @@ dependencies:
   - cloudpickle
   # optional-dependencies: plotting
   - matplotlib
+  - pip:
+    - jupyterlite-xeus-python
