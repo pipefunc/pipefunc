@@ -15,5 +15,3 @@ dependencies:
   - cloudpickle
   # optional-dependencies: plotting
   - matplotlib
-  - pip:
-    - jupyterlite-xeus-python

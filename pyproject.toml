@@ -36,13 +36,13 @@ plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
 test = ["pytest", "coverage", "pytest-cov"]
 docs = [
     "myst-nb",
-    "sphinx_fontawesome",
     "sphinx",
     "furo",
     "myst-parser",
     "emoji",
     "jupytext",
     "jupyterlite-sphinx",
+    "jupyterlite-xeus-python",
     "pandas",  # used in example.ipynb
 ]
 dev = ["black", "pre-commit", "ruff", "mypy"]

@@ -6,6 +6,7 @@ channels:
 
 dependencies:
   - python
+  - pip
   # from pyproject.toml
   - networkx
   - psutil
@@ -23,7 +24,6 @@ dependencies:
   - pytest-cov
   # optional-dependencies: docs
   - myst-nb
-  - sphinx_fontawesome
   - sphinx
   - furo
   - myst-parser
@@ -31,3 +31,5 @@ dependencies:
   - jupytext
   - jupyterlite-sphinx
   - pandas
+  - pip:
+    - jupyterlite-xeus-python

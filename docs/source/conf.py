@@ -39,7 +39,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "jupyterlite_sphinx",
     "myst_nb",
-    "sphinx_fontawesome",
 ]
 
 templates_path = ["_templates"]

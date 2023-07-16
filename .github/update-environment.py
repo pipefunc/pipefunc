@@ -5,6 +5,8 @@ from typing import Iterable
 
 import tomllib
 
+PIP_ONLY_DEPS = {"jupyterlite-xeus-python"}
+
 
 def clean_deps(deps: Iterable[str]) -> list[str]:
     """Remove version constraints from dependencies."""
@@ -14,7 +16,7 @@ def clean_deps(deps: Iterable[str]) -> list[str]:
 def generate_environment_yml(
     data: dict,
     sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
-    default_packages: tuple[str, ...] = ("python",),
+    default_packages: tuple[str, ...] = ("python", "pip"),
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
     env_yaml = (
@@ -29,10 +31,15 @@ def generate_environment_yml(
     for dep in clean_deps(default_packages):
         env_yaml += f"  - {dep}\n"
 
+    pip_deps = []
+
     # Required deps from pyproject.toml
     env_yaml += "  # from pyproject.toml\n"
     for dep in clean_deps(data["project"]["dependencies"]):
-        env_yaml += f"  - {dep}\n"
+        if dep in PIP_ONLY_DEPS:
+            pip_deps.append(dep)
+        else:
+            env_yaml += f"  - {dep}\n"
 
     # Optional dependencies
     for group in data["project"]["optional-dependencies"]:
@@ -40,7 +47,16 @@ def generate_environment_yml(
             continue
         env_yaml += f"  # optional-dependencies: {group}\n"
         for dep in clean_deps(data["project"]["optional-dependencies"][group]):
-            env_yaml += f"  - {dep}\n"
+            if dep in PIP_ONLY_DEPS:
+                pip_deps.append(dep)
+            else:
+                env_yaml += f"  - {dep}\n"
+
+    # PIP only dependencies
+    if pip_deps:
+        env_yaml += "  - pip:\n"
+        for pip_dep in set(pip_deps):  # remove duplicates
+            env_yaml += f"    - {pip_dep}\n"
 
     return env_yaml
 
