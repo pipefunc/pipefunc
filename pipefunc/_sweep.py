@@ -48,10 +48,12 @@ class Sweep:
      {'a': 2, 'b': 3, 'c': 5}, {'a': 2, 'b': 3, 'c': 6}, {'a': 2, 'b': 4, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
 
     Which is equivalent to the following:
+
     >>> Sweep(items, dims=["a", "b", "c"]).list()
     >>> Sweep(items, dims=[("a",), ("b",), ("c",)]).list()
 
     Or zip together dimensions:
+
     >>> Sweep(items, dims=[('a', 'b'), ('c',)]).list()
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}].list()
     """
@@ -230,10 +232,12 @@ def generate_sweep(
      {'a': 2, 'b': 3, 'c': 5}, {'a': 2, 'b': 3, 'c': 6}, {'a': 2, 'b': 4, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
 
     Which is equivalent to the following:
+
     >>> generate_sweep(items, dims=["a", "b", "c"])
     >>> generate_sweep(items, dims=[("a",), ("b",), ("c",)])
 
     Or zip together dimensions:
+
     >>> generate_sweep(items, dims=[('a', 'b'), ('c',)])
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
     """
