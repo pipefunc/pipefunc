@@ -34,6 +34,7 @@ def generate_environment_yml(
     name: str,
     sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "pip"),
+    filename: str | None = "environment.yml",
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
     pip_deps = []
@@ -74,6 +75,10 @@ def generate_environment_yml(
         # remove duplicates and no label for pip deps
         env_yaml += write_deps(set(pip_deps), "", indent=4)
 
+    if filename is not None:
+        with open(filename, "w") as f:  # noqa: PTH123
+            f.write(env_yaml)
+
     return env_yaml
 
 
@@ -83,23 +88,17 @@ if __name__ == "__main__":
         data = tomllib.loads(f.read())
 
     # Generate environment.yml
-    environment_yml = generate_environment_yml(
+    generate_environment_yml(
         data,
         name="pipefunc",
         sections=("test", "plotting"),
+        filename="environment.yml",
     )
 
-    # Save environment.yml
-    with open("environment.yml", "w") as f:  # noqa: PTH123
-        f.write(environment_yml)
-
-    # Generate environment-sphinx
-    environment_sphinx_yml = generate_environment_yml(
+    # Generate environment for Sphinx
+    generate_environment_yml(
         data,
         name="pipefunc-sphinx",
         sections=("test", "docs", "plotting"),
+        filename="docs/environment.yml",
     )
-
-    # Save environment-sphinx
-    with open("docs/environment-sphinx.yml", "w") as f:  # noqa: PTH123
-        f.write(environment_sphinx_yml)
