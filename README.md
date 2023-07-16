@@ -10,6 +10,7 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [:thinking: What is this?](#thinking-what-is-this)
+- [:rocket: Key Features](#rocket-key-features)
 - [:dart: Design Goals](#dart-design-goals)
 - [:test_tube: How does it work?](#test_tube-how-does-it-work)
 - [:notebook: Jupyter Notebook Example](#notebook-jupyter-notebook-example)
