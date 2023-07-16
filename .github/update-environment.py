@@ -13,7 +13,7 @@ def clean_deps(deps: Iterable[str]) -> list[str]:
 
 def generate_environment_yml(
     data: dict,
-    sections: tuple[str, ...] = ("all", "test", "docs"),
+    sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "mpich"),
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
