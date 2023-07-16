@@ -49,6 +49,8 @@ else:
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import holoviews as hv
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -933,15 +935,21 @@ class Pipeline:
                 mapping[node.output_name] = arg_combinations
         return mapping
 
-    def visualize(self, figsize: tuple[int, int] = (10, 10)) -> None:
+    def visualize(
+        self,
+        figsize: tuple[int, int] = (10, 10),
+        filename: str | Path | None = None,
+    ) -> None:
         """Visualize the pipeline as a directed graph.
 
         Parameters
         ----------
         figsize
             The width and height of the figure in inches, by default (10, 10).
+        filename
+            The filename to save the figure to, by default None.
         """
-        visualize(self.graph, figsize=figsize)
+        visualize(self.graph, figsize=figsize, filename=filename)
 
     def visualize_holoviews(self) -> hv.Graph:
         """Visualize the pipeline as a directed graph using HoloViews."""
