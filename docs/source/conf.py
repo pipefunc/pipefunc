@@ -84,11 +84,25 @@ def replace_named_emojis(input_file: Path, output_file: Path) -> None:
             outfile.write(content_with_emojis)
 
 
+def convert_notebook_to_md(input_file: Path, output_file: Path) -> None:
+    """Convert a notebook to markdown."""
+    import jupytext
+
+    notebook = jupytext.read(input_file)
+    notebook.metadata["jupytext"] = {"formats": "md:myst"}
+    jupytext.write(notebook, output_file)
+
+
 # Call the function to replace emojis in the README.md file
 
 input_file = package_path / "README.md"
 output_file = docs_path / "source" / "README.md"
 replace_named_emojis(input_file, output_file)
+
+# Add the example notebook to the docs
+convert_notebook_to_md(
+    package_path / "example.ipynb", docs_path / "source" / "tutorial.md"
+)
 
 
 def setup(app):

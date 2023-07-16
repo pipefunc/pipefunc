@@ -13,6 +13,7 @@ start-after: <!-- toc-end -->
 :hidden: true
 
 self
+tutorial
 ```
 
 ```{toctree}
