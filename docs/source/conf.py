@@ -37,6 +37,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
+    "jupyterlite_sphinx",
     "myst_nb",
     "sphinx_fontawesome",
 ]
@@ -73,6 +74,9 @@ nb_execution_mode = "cache"
 nb_execution_timeout = 180
 nb_execution_raise_on_error = True
 myst_heading_anchors = 3
+
+# Jupyterlite configuration
+jupyterlite_contents = ["notebooks/"]
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:

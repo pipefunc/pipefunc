@@ -42,6 +42,7 @@ docs = [
     "myst-parser",
     "emoji",
     "jupytext",
+    "jupyterlite_sphinx",
     "pandas",  # used in example.ipynb
 ]
 dev = ["black", "pre-commit", "ruff", "mypy"]
