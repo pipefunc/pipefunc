@@ -2,6 +2,8 @@
 
 > Lightweight function pipeline creation: 📚 Less Bookkeeping, 🎯 More Doing
 
+![](https://user-images.githubusercontent.com/6897215/253785642-cf2a6941-2ea6-41b0-8225-b3e52e94c4de.png)
+
 <!-- toc-start -->
 ## :books: Table of Contents
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
