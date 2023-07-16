@@ -5,6 +5,7 @@
 import os
 import sys
 from pathlib import Path
+import shutil
 
 package_path = Path("../..").resolve()
 sys.path.insert(0, str(package_path))
@@ -102,9 +103,13 @@ output_file = docs_path / "source" / "README.md"
 replace_named_emojis(input_file, output_file)
 
 # Add the example notebook to the docs
-convert_notebook_to_md(
-    package_path / "example.ipynb", docs_path / "source" / "tutorial.md"
-)
+nb = package_path / "example.ipynb"
+convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
+
+# Copy nb to docs/source/notebooks
+nb_docs_folder = docs_path / "source" / "notebooks"
+nb_docs_folder.mkdir(exist_ok=True)
+shutil.copy(nb, nb_docs_folder)
 
 
 def setup(app):
