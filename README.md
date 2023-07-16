@@ -103,7 +103,7 @@ See the detailed usage example and more in our [example.ipynb](https://github.co
 Install the **latest stable** version from conda (recommended):
 
 ```bash
-conda install pipefunc
+conda install "pipefunc[plotting]"
 ```
 
 or from PyPI:
@@ -123,7 +123,7 @@ or clone the repository and do a dev install (recommended for dev):
 ```bash
 git clone git@github.com:basnijholt/pipefunc.git
 cd pipefunc
-pip install -e .
+pip install -e ".[dev,test,plotting]"
 ```
 
 ## :hammer_and_wrench: Development
