@@ -11,7 +11,6 @@ dependencies:
   - networkx
   - psutil
   - versioningit
-  - typing_extensions
   - cloudpickle
   # optional-dependencies: plotting
-  - matplotlib
+  - matplotlib-base
