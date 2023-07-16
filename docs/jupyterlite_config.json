@@ -1,0 +1,5 @@
+{
+  "XeusPythonEnv": {
+      "packages": ["pipefunc", "matplotlib"]
+  }
+}
