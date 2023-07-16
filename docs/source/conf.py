@@ -40,12 +40,10 @@ extensions = [
     "sphinx_fontawesome",
 ]
 
-source_parsers = {}
 templates_path = ["_templates"]
 source_suffix = [".rst", ".md"]
 master_doc = "index"
 language = "en"
-exclude_patterns = []
 pygments_style = "sphinx"
 
 
@@ -73,6 +71,7 @@ autodoc_member_order = "bysource"
 nb_execution_mode = "cache"
 nb_execution_timeout = 180
 nb_execution_raise_on_error = True
+myst_heading_anchors = 3
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
