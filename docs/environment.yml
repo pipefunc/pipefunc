@@ -9,6 +9,7 @@ dependencies:
   - pip
   # from pyproject.toml
   - networkx
+  - psutil
   - versioningit
   - typing_extensions
   - cloudpickle
