@@ -5,8 +5,6 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import psutil
-
 if TYPE_CHECKING:
     from types import TracebackType
 
@@ -137,6 +135,8 @@ class ResourceProfiler:
 
     def measure_resources(self) -> None:
         """Measure resource usage (CPU and memory) for the specified process."""
+        import psutil
+
         process = psutil.Process(self.pid)
         while not self.stop_event.is_set():
             try:
