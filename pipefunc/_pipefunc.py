@@ -334,7 +334,17 @@ def pipefunc(
 
 
 class _Function:
-    """Wrapper class for a pipeline function."""
+    """Wrapper class for a pipeline function.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to which the function belongs.
+    output_name
+        The identifier for the return value of the pipeline function.
+    root_args
+        The names of the pipeline function's root inputs.
+    """
 
     def __init__(
         self,
@@ -342,17 +352,7 @@ class _Function:
         output_name: _OUTPUT_TYPE,
         root_args: tuple[str, ...],
     ) -> None:
-        """Initialize the function wrapper.
-
-        Parameters
-        ----------
-        pipeline
-            The pipeline to which the function belongs.
-        output_name
-            The identifier for the return value of the pipeline function.
-        root_args
-            The names of the pipeline function's root inputs.
-        """
+        """Initialize the function wrapper."""
         self.pipeline = pipeline
         self.output_name = output_name
         self.root_args = root_args
@@ -465,7 +465,21 @@ def _next_root_args(
 
 
 class Pipeline:
-    """Pipeline class for managing and executing a sequence of functions."""
+    """Pipeline class for managing and executing a sequence of functions.
+
+    Parameters
+    ----------
+    functions
+        A list of functions that form the pipeline.
+    debug
+        Flag indicating whether debug information should be printed.
+        If None, the value of each PipelineFunction's debug attribute is used.
+    profile
+        Flag indicating whether profiling information should be collected.
+        If None, the value of each PipelineFunction's profile attribute is used.
+    cache
+        The type of cache to use.
+    """
 
     def __init__(
         self,
@@ -475,21 +489,7 @@ class Pipeline:
         profile: bool | None = None,
         cache: Literal["shared", "hybrid", "disk"] | None = "hybrid",
     ) -> None:
-        """Pipeline class for managing and executing a sequence of functions.
-
-        Parameters
-        ----------
-        functions
-            A list of functions that form the pipeline.
-        debug
-            Flag indicating whether debug information should be printed.
-            If None, the value of each PipelineFunction's debug attribute is used.
-        profile
-            Flag indicating whether profiling information should be collected.
-            If None, the value of each PipelineFunction's profile attribute is used.
-        cache
-            The type of cache to use.
-        """
+        """Pipeline class for managing and executing a sequence of functions."""
         # TODO: add support for disk cache
         # TODO: check https://joblib.readthedocs.io/en/latest/memory.html
         # TODO: add caching kwargs

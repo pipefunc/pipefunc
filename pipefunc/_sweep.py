@@ -64,6 +64,7 @@ class Sweep:
         dims: list[Any] | None = None,
         exclude: Callable[[dict[str, Any]], bool] | None = None,
     ) -> None:
+        """Initialize the sweep."""
         self.items = items
         self.dims = dims
         self.exclude = exclude

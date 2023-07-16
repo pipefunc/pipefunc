@@ -68,7 +68,18 @@ class ProfilingStats:
 
 
 class ResourceProfiler:
-    """A class for profiling the resource usage of a process."""
+    """A class for profiling the resource usage of a process.
+
+    Parameters
+    ----------
+    pid
+        The process ID for which resource profiling will be performed.
+    stats
+        The ProfilingStats instance in which the profiling data will be stored.
+    interval
+        The time interval between resource measurements, in
+        seconds (default is 0.1).
+    """
 
     def __init__(
         self,
@@ -77,18 +88,7 @@ class ResourceProfiler:
         *,
         interval: float = 10,
     ) -> None:
-        """Initialize the ResourceProfiler instance.
-
-        Parameters
-        ----------
-        pid
-            The process ID for which resource profiling will be performed.
-        stats
-            The ProfilingStats instance in which the profiling data will be stored.
-        interval
-            The time interval between resource measurements, in
-            seconds (default is 0.1).
-        """
+        """Initialize the ResourceProfiler instance."""
         self.pid = pid
         self.stats = stats
         self.interval = interval
