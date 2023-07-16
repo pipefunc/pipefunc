@@ -55,9 +55,6 @@ repository = "https://github.com/basnijholt/pipefunc"
 content-type = "text/markdown"
 file = "README.md"
 
-[project.scripts]
-pipefunc-launcher = "pipefunc._server_support.launcher:main"
-
 [tool.versioningit]
 default-version = "0.0.0"
 
