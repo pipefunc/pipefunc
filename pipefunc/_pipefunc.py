@@ -76,7 +76,43 @@ def _default_output_picker(
 
 
 class PipelineFunction(Generic[T]):
-    """Function wrapper class for pipeline functions with additional attributes."""
+    """Function wrapper class for pipeline functions with additional attributes.
+
+    Parameters
+    ----------
+    func
+        The original function to be wrapped.
+    output_name
+        The identifier for the output of the wrapped function.
+    output_picker
+        A function that takes the output of the wrapped function as first argument
+        and the output_name (str) as second argument, and returns the desired output.
+        If None, the output of the wrapped function is returned as is.
+    renames
+        A dictionary mapping from original argument names to new argument names.
+    profile
+        Flag indicating whether the wrapped function should be profiled.
+    debug
+        Flag indicating whether debug information should be printed.
+    cache
+        Flag indicating whether the wrapped function should be cached.
+
+    Returns
+    -------
+        The identifier for the output of the wrapped function.
+
+    Examples
+    --------
+    >>> def add_one(a, b):
+    ...     return a + 1, b + 1
+    >>> add_one_func = PipelineFunction(
+    ...     add_one,
+    ...     output_name="a_plus_one",
+    ...     renames={"a": "x", "b": "y"},
+    ... )
+    >>> add_one_func(x=1, y=2)
+    (2, 3)
+    """
 
     def __init__(
         self,
@@ -89,31 +125,7 @@ class PipelineFunction(Generic[T]):
         debug: bool = False,
         cache: bool = False,
     ) -> None:
-        """Function wrapper class for pipeline functions with additional attributes.
-
-        Parameters
-        ----------
-        func
-            The original function to be wrapped.
-        output_name
-            The identifier for the output of the wrapped function.
-        output_picker
-            A function that takes the output of the wrapped function as first argument
-            and the output_name (str) as second argument, and returns the desired output.
-            If None, the output of the wrapped function is returned as is.
-        renames
-            A dictionary mapping from original argument names to new argument names.
-        profile
-            Flag indicating whether the wrapped function should be profiled.
-        debug
-            Flag indicating whether debug information should be printed.
-        cache
-            Flag indicating whether the wrapped function should be cached.
-
-        Returns
-        -------
-            The identifier for the output of the wrapped function.
-        """
+        """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
