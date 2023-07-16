@@ -1,0 +1,26 @@
+# This file is generated from pyproject.toml using .github/update-environment.py
+name: pipefunc
+
+channels:
+- conda-forge
+
+dependencies:
+  - python
+  - mpich
+  # from pyproject.toml
+  - networkx
+  - psutil
+  - versioningit
+  - typing_extensions
+  - cloudpickle
+  # optional-dependencies: test
+  - pytest
+  - coverage
+  - pytest-cov
+  # optional-dependencies: docs
+  - myst-nb
+  - sphinx_fontawesome
+  - sphinx
+  - furo
+  - myst-parser
+  - emoji
