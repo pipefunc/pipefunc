@@ -21,3 +21,13 @@ dependencies:
   - pytest
   - coverage
   - pytest-cov
+  # optional-dependencies: docs
+  - myst-nb
+  - sphinx_fontawesome
+  - sphinx
+  - furo
+  - myst-parser
+  - emoji
+  - jupytext
+  - jupyterlite-sphinx
+  - pandas

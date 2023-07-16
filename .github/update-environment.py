@@ -14,7 +14,7 @@ def clean_deps(deps: Iterable[str]) -> list[str]:
 def generate_environment_yml(
     data: dict,
     sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
-    default_packages: tuple[str, ...] = ("python", "mpich"),
+    default_packages: tuple[str, ...] = ("python",),
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
     env_yaml = (
@@ -57,12 +57,12 @@ if __name__ == "__main__":
     with open("environment.yml", "w") as f:  # noqa: PTH123
         f.write(environment_yml)
 
-    # Generate environment.yml
+    # Generate environment-sphinx
     environment_yml = generate_environment_yml(
         data,
         sections=("test", "docs", "plotting"),
     )
 
-    # Save environment.yml
-    with open("docs/environment.yml", "w") as f:  # noqa: PTH123
+    # Save environment-sphinx
+    with open("docs/environment-sphinx.yml", "w") as f:  # noqa: PTH123
         f.write(environment_yml)
