@@ -9,7 +9,6 @@ dependencies:
   - python
   # from pyproject.toml
   - networkx
-  - psutil
   - versioningit
   - cloudpickle
   # optional-dependencies: plotting

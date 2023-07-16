@@ -76,7 +76,6 @@ myst_heading_anchors = 3
 
 # Jupyterlite configuration
 jupyterlite_contents = ["notebooks/"]
-jupyterlite_config = "jupyterlite_config.json"
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
