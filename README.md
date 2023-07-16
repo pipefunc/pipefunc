@@ -7,6 +7,12 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [:thinking: What is this?](#thinking-what-is-this)
+- [:dart: Design Goals](#dart-design-goals)
+- [:test_tube: How does it work?](#test_tube-how-does-it-work)
+- [:notebook: Jupyter Notebook Example](#notebook-jupyter-notebook-example)
+- [:computer: Installation](#computer-installation)
+- [:hammer_and_wrench: Development](#hammer_and_wrench-development)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 <!-- toc-end -->
