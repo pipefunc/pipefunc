@@ -138,7 +138,7 @@ class Sweep:
             raise TypeError(msg)
         return MultiSweep(self, other)
 
-    def add(self, other: Sweep) -> MultiSweep:
+    def combine(self, other: Sweep) -> MultiSweep:
         """Add another sweep to this MultiSweep."""
         return other + self
 
@@ -188,9 +188,9 @@ class MultiSweep(Sweep):
         if not isinstance(other, Sweep):
             msg = "Other object must be a Sweep or a MultiSweep instance."
             raise TypeError(msg)
-        return self.add(other)
+        return self.combine(other)
 
-    def add(self, other: Sweep) -> MultiSweep:
+    def combine(self, other: Sweep) -> MultiSweep:
         """Add another sweep to this MultiSweep."""
         if isinstance(other, MultiSweep):
             self.sweeps.extend(other.sweeps)
