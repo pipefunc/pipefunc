@@ -261,8 +261,8 @@ class PipelineFunction(Generic[T]):
     def __setstate__(self, state: dict) -> None:
         """Restore the state of the current object from the provided state.
 
-        It also
-        handles restoring non-picklable instance variable into their original form.
+        It also handles restoring non-picklable instance variable
+        into their original form.
 
         Parameters
         ----------
@@ -663,14 +663,14 @@ class Pipeline:
         """Compute the cache key for a specific output name.
 
         The cache key is a tuple consisting of the output name and a tuple of
-        root input keys and their corresponding values. Root inputs are
-        the inputs that are not derived from any other function in the pipeline.
+        root input keys and their corresponding values. Root inputs are the
+        inputs that are not derived from any other function in the pipeline.
 
-        If any of the root inputs required for the output_name are not
-        available in kwargs, the cache key computation is skipped, and
-        the method returns None. This can happen when a non-root
-        input is directly provided as an input to another function, in which case
-        the result should not be cached.
+        If any of the root inputs required for the output_name are not available
+        in kwargs, the cache key computation is skipped, and the method returns
+        None. This can happen when a non-root input is directly provided as an
+        input to another function, in which case the result should not be
+        cached.
 
         Parameters
         ----------
@@ -683,8 +683,8 @@ class Pipeline:
         -------
         _CACHE_KEY_TYPE | None
             A tuple containing the output name and a tuple of root input keys
-            and their corresponding values, or None if the cache
-            key computation is skipped.
+            and their corresponding values, or None if the cache key computation
+            is skipped.
         """
         root_args = self.arg_combinations(output_name, root_args_only=True)
         assert isinstance(root_args, tuple)
@@ -990,45 +990,48 @@ class Pipeline:
     ) -> dict[PipelineFunction, set[PipelineFunction]]:
         """Identify which function nodes can be combined into a single function.
 
-        This method identifies the PipelineFunctions in the execution graph that can be
-        combined into a single function. The criterion for combinability is that the
-        functions share the same root arguments.
+        This method identifies the PipelineFunctions in the execution graph that
+        can be combined into a single function. The criterion for combinability
+        is that the functions share the same root arguments.
 
         Parameters
         ----------
         output_name
-            The name of the output from the pipeline function we are starting the search
-            from. It is used to get the starting function in the pipeline.
+            The name of the output from the pipeline function we are starting
+            the search from. It is used to get the starting function in the
+            pipeline.
         conservatively_combine
-            Only combine function nodes if all of their predecessors have
-            the same root arguments. If False, combine function nodes if
-            any of their predecessors have the same root arguments.
+            Only combine function nodes if all of their predecessors have the
+            same root arguments. If False, combine function nodes if any of
+            their predecessors have the same root arguments.
 
         Returns
         -------
         dict[PipelineFunction, set[PipelineFunction]]
-            A dictionary where each key is a PipelineFunction that can be combined with
-            others. The value associated with each key is a set of PipelineFunctions that
-            can be combined with the key function.
+            A dictionary where each key is a PipelineFunction that can be
+            combined with others. The value associated with each key is a set of
+            PipelineFunctions that can be combined with the key function.
 
         Notes
         -----
-        This function works by performing a depth-first search through the pipeline's
-        execution graph. Starting from the PipelineFunction corresponding to the
-        `output_name`, it goes through each predecessor in the graph (functions that need
-        to be executed before the current one). For each predecessor function, it recursively
-        checks if it can be combined with others by comparing their root arguments.
+        This function works by performing a depth-first search through the
+        pipeline's execution graph. Starting from the PipelineFunction
+        corresponding to the `output_name`, it goes through each predecessor in
+        the graph (functions that need to be executed before the current one).
+        For each predecessor function, it recursively checks if it can be
+        combined with others by comparing their root arguments.
 
-        If a function's root arguments are identical to the head function's root arguments,
-        it is considered combinable and added to the set of combinable functions for the head.
-        If `conservatively_combine=True` and all predecessor functions are combinable,
-        the head function and its set of combinable functions are added to
-        the `combinable_nodes` dictionary. If `conservatively_combine=False` and any
-        predecessor function is combinable, the head function and its set of combinable
-        functions are added to the `combinable_nodes` dictionary.
+        If a function's root arguments are identical to the head function's root
+        arguments, it is considered combinable and added to the set of
+        combinable functions for the head. If `conservatively_combine=True` and
+        all predecessor functions are combinable, the head function and its set
+        of combinable functions are added to the `combinable_nodes` dictionary.
+        If `conservatively_combine=False` and any predecessor function is
+        combinable, the head function and its set of combinable functions are
+        added to the `combinable_nodes` dictionary.
 
-        The function 'head' in the nested function `_recurse` represents the current function
-        being checked in the execution graph.
+        The function 'head' in the nested function `_recurse` represents the
+        current function being checked in the execution graph.
         """
         # Nested function _recurse performs the depth-first search and updates the
         # `combinable_nodes` dictionary.
@@ -1057,19 +1060,21 @@ class Pipeline:
     def reduced_pipeline(self, output_name: str) -> Pipeline:
         """Reduced pipeline with combined function nodes.
 
-        Generate a reduced version of the pipeline where combinable function nodes have
-        been merged into single function nodes.
+        Generate a reduced version of the pipeline where combinable function
+        nodes have been merged into single function nodes.
 
-        This method identifies combinable nodes in the pipeline's execution graph (i.e.,
-        functions that share the same root arguments) and merges them into single function
-        nodes. This results in a simplified pipeline where each key function only depends
-        on nodes that cannot be further combined.
+        This method identifies combinable nodes in the pipeline's execution
+        graph (i.e., functions that share the same root arguments) and merges
+        them into single function nodes. This results in a simplified pipeline
+        where each key function only depends on nodes that cannot be further
+        combined.
 
         Parameters
         ----------
         output_name
-            The name of the output from the pipeline function we are starting the reduction
-            from. It is used to get the starting function in the pipeline.
+            The name of the output from the pipeline function we are starting
+            the reduction from. It is used to get the starting function in the
+            pipeline.
 
         Returns
         -------
@@ -1080,19 +1085,21 @@ class Pipeline:
         -----
         The pipeline reduction process works in the following way:
 
-        1.  Identify combinable function nodes in the execution graph by checking
-            if they share the same root arguments.
+        1.  Identify combinable function nodes in the execution graph by
+            checking if they share the same root arguments.
         2.  Simplify the dictionary of combinable nodes by replacing any nodes
             that can be combined with their dependencies.
         3.  Generate the set of nodes to be skipped (those that will be merged).
         4.  Get the input and output signatures for the combined nodes.
-        5.  Create new pipeline functions for the combined nodes, and add
-            them to the list of new functions.
-        6.  Add the remaining (non-combinable) functions to the list of new functions.
+        5.  Create new pipeline functions for the combined nodes, and add them
+            to the list of new functions.
+        6.  Add the remaining (non-combinable) functions to the list of new
+            functions.
         7.  Generate a new pipeline with the new functions.
 
-        This process can significantly simplify complex pipelines, making them easier
-        to understand and potentially improving performance by reducing function calls.
+        This process can significantly simplify complex pipelines, making them
+        easier to understand and potentially improving performance by reducing
+        function calls.
         """
         combinable_nodes = self._identify_combinable_nodes(output_name)
         if not combinable_nodes:
