@@ -22,6 +22,7 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
+    Generator,
     Generic,
     Iterable,
     Literal,
@@ -1126,6 +1127,58 @@ class Pipeline:
             elif f not in skip:
                 new_functions.append(f)
         return Pipeline(new_functions)
+
+    def all_execution_orders(
+        self,
+        output_name: str,
+    ) -> Generator[list[PipelineFunction], None, None]:
+        """Generate all possible execution orders for the functions in the pipeline.
+
+        This method generates all possible topological sorts (execution orders)
+        of the functions in the pipeline's execution graph. It first reduces the
+        pipeline to a version where combinable function nodes have been merged
+        into single function nodes, and then generates all topological sorts of
+        the functions in the reduced graph.
+
+        The method only considers the functions in the graph and ignores the
+        root arguments.
+
+        Parameters
+        ----------
+        output_name
+            The name of the output from the pipeline function we are starting
+            from. It is used to get the starting function in the pipeline and to
+            determine the reduced pipeline.
+
+        Returns
+        -------
+        Generator[list[str], None, None]
+            A generator that yields lists of function names, each list
+            representing a possible execution order of the functions in the
+            pipeline.
+
+        Notes
+        -----
+        A topological sort of a directed graph is a linear ordering of its
+        vertices such that for every directed edge U -> V from vertex U to
+        vertex V, U comes before V in the ordering. For a pipeline, this means
+        that each function only gets executed after all its dependencies have
+        been executed.
+
+        The method uses the NetworkX function `all_topological_sorts` to
+        generate all possible topological sorts. If there are cycles in the
+        graph (i.e., there's a circular dependency between functions), the
+        method will raise a NetworkXUnfeasible exception.
+
+        The function 'head' in the nested function `_recurse` represents the
+        current function being checked in the execution graph.
+        """
+        reduced_pipeline = self.reduced_pipeline(output_name)
+        func_only_graph = reduced_pipeline.graph.copy()
+        root_args = reduced_pipeline.arg_combinations(output_name, root_args_only=True)
+        for arg in root_args:
+            func_only_graph.remove_node(arg)
+        return nx.all_topological_sorts(func_only_graph)
 
     @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
