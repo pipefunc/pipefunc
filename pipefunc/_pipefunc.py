@@ -984,6 +984,8 @@ class Pipeline:
     def _identify_combinable_nodes(
         self,
         output_name: str,
+        *,
+        conservatively_combine: bool = False,
     ) -> dict[PipelineFunction, set[PipelineFunction]]:
         """Identify which function nodes can be combined into a single function.
 
@@ -996,6 +998,10 @@ class Pipeline:
         output_name
             The name of the output from the pipeline function we are starting the search
             from. It is used to get the starting function in the pipeline.
+        conservatively_combine
+            Only combine function nodes if all of their predecessors have
+            the same root arguments. If False, combine function nodes if
+            any of their predecessors have the same root arguments.
 
         Returns
         -------
@@ -1014,27 +1020,31 @@ class Pipeline:
 
         If a function's root arguments are identical to the head function's root arguments,
         it is considered combinable and added to the set of combinable functions for the head.
-        If all predecessor functions are combinable, the head function and its set of
-        combinable functions are added to the `combinable_nodes` dictionary.
+        If `conservatively_combine=True` and all predecessor functions are combinable,
+        the head function and its set of combinable functions are added to
+        the `combinable_nodes` dictionary. If `conservatively_combine=False` and any
+        predecessor function is combinable, the head function and its set of combinable
+        functions are added to the `combinable_nodes` dictionary.
 
         The function 'head' in the nested function `_recurse` represents the current function
         being checked in the execution graph.
         """
-
         # Nested function _recurse performs the depth-first search and updates the
         # `combinable_nodes` dictionary.
+
         def _recurse(head: PipelineFunction) -> None:
             head_args = self.arg_combinations(head.output_name, root_args_only=True)
-            can_combine = []
             funcs = set()
+            i = 0
             for node in self.graph.predecessors(head):
                 if isinstance(node, (tuple, str)):  # node is root_arg
                     continue
+                i += 1
                 _recurse(node)
-                funcs.add(node)
                 node_args = self.arg_combinations(node.output_name, root_args_only=True)
-                can_combine.append(node_args == head_args)
-            if len(can_combine) > 0 and all(can_combine):
+                if node_args == head_args:
+                    funcs.add(node)
+            if funcs and (not conservatively_combine or i == len(funcs)):
                 combinable_nodes[head] = funcs
 
         combinable_nodes: dict[PipelineFunction, set[PipelineFunction]] = {}
@@ -1230,7 +1240,7 @@ def _get_signature(
     for node, to_replace in combinable_nodes.items():
         outputs = set(_at_least_tuple(node.output_name))
         parameters = set(node.parameters)
-        additional_outputs = set()
+        additional_outputs = set()  # parameters that are outputs to other functions
         for f in to_replace:
             outputs |= set(_at_least_tuple(f.output_name))
             parameters |= set(f.parameters)

@@ -410,11 +410,22 @@ def test_identify_combinable_nodes():
         pass
 
     pipeline = Pipeline([f_d, f_e, f_i, f_gg])
-    combinable_nodes = pipeline._identify_combinable_nodes("i")
+    combinable_nodes = pipeline._identify_combinable_nodes(
+        "i",
+        conservatively_combine=True,
+    )
     assert combinable_nodes == {f_gg: {f_e}}
     sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
     assert sig_in == {f_gg: {"a", "x"}}
     assert sig_out == {f_gg: {"gg", "h", "g"}}
+    combinable_nodes = pipeline._identify_combinable_nodes(
+        "i",
+        conservatively_combine=False,
+    )
+    assert combinable_nodes == {f_gg: {f_e}, f_i: {f_d}}
+    sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
+    assert sig_in == {f_gg: {"a", "x"}, f_i: {"g", "b", "gg", "x"}}
+    assert sig_out == {f_gg: {"gg", "h", "g"}, f_i: {"d", "i"}}
 
 
 def test_identify_combinable_nodes2():
