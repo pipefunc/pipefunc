@@ -421,20 +421,20 @@ def _count_nested_dict_items(d: dict) -> int:
 
 
 def _assert_valid_sweep_dict(
-    nested: dict,
-    args: list[tuple[str, ...]],
+    sweep_dict: dict,
+    left_overs: list[tuple[str, ...]],
     keys: defaultdict[tuple[str, ...], set] | None = None,
     level: int = 0,
 ) -> defaultdict[tuple[str, ...], set]:
-    """Checks that the keys are unique and that the number of keys matches the number of args."""
+    """Checks that the keys are unique and that the number of keys matches the number of left_overs."""
     if keys is None:
         keys = defaultdict(set)
-    for k, v in nested.items():
-        assert len(k) == len(args[level])
-        assert k not in keys[args[level]]
-        keys[args[level]].add(k)
+    for k, v in sweep_dict.items():
+        assert len(k) == len(left_overs[level])
+        assert k not in keys[tuple(left_overs[level])]
+        keys[left_overs[level]].add(k)
         if isinstance(v, dict):
-            _assert_valid_sweep_dict(v, args, keys, level + 1)
+            _assert_valid_sweep_dict(v, left_overs, keys, level + 1)
     return keys
 
 
@@ -443,7 +443,7 @@ def get_min_sweep_sets(
     pipeline: Pipeline,
     sweep: Sweep,
     output_name: str,
-) -> tuple[list[list[str]], dict]:
+) -> tuple[list[tuple[str, ...]], dict]:
     """Create sweep combinations for each function in the execution order.
 
     This function iterates through the execution order of the pipeline functions
@@ -476,18 +476,16 @@ def get_min_sweep_sets(
     root_args_set = set(root_args)
     left_over = root_args_set.copy()
 
-    left_overs: list[list[str]] = []
-    all_f_root_args = []
+    left_overs: list[tuple[str, ...]] = []
     for f in execution_order:
         f_root_args = pipeline.arg_combinations(f.output_name, root_args_only=True)
         assert isinstance(f_root_args, tuple)
         left_over = left_over - set(f_root_args)
         if not left_over:
             break
-        args = sorted(root_args_set - left_over)
+        args = tuple(sorted(root_args_set - left_over))
         if args not in left_overs:
             left_overs.append(args)
-            all_f_root_args.append(f_root_args)
 
     sweep_dict = _nested_defaultdict(len(left_overs), inner_default_factory=list)
     for combo in sweep.generate():
@@ -495,5 +493,5 @@ def get_min_sweep_sets(
         _get_nested_value(sweep_dict, keys).append(combo)
 
     assert _count_nested_dict_items(sweep_dict) == len(sweep)
-    _assert_valid_sweep_dict(sweep_dict, all_f_root_args)
+    _assert_valid_sweep_dict(sweep_dict, left_overs)
     return left_overs, sweep_dict
