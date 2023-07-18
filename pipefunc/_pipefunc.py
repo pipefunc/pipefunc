@@ -1197,6 +1197,53 @@ class Pipeline:
         """Return the root nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
 
+    def all_transitive_paths(
+        self,
+        output_name: str,
+        *,
+        reduce: bool = False,
+    ) -> list[list[list[PipelineFunction]]]:
+        """Get all possible transitive paths for a specified output.
+
+        This method retrieves all the possible ways the functions in the
+        pipeline can be ordered (transitive paths) to produce a specified
+        output.
+
+        Parameters
+        ----------
+        output_name
+            The name of the output variable to find paths for.
+        reduce
+            A flag indicating whether to reduce the pipeline before computing
+            the paths. If True, the pipeline is first reduced to a sub-pipeline
+            that is necessary for producing the output_name. If False, the paths
+            are computed on the full pipeline. Default is False.
+
+        Returns
+        -------
+        list[list[list[str]]]
+            A list of lists of lists of `PipelineFunction`s. Each list of lists
+            represents an independent chain of computation in the pipeline that
+            can produce the output. Each list of strings represents a possible
+            ordering of functions in that chain.
+
+        """
+        pipeline = self.reduced_pipeline(output_name) if reduce else self
+
+        func_only_graph = pipeline.graph.copy()
+        root_args = pipeline.arg_combinations(output_name, root_args_only=True)
+        for arg in root_args:
+            func_only_graph.remove_node(arg)
+
+        leaf = next(
+            n
+            for n in func_only_graph.nodes
+            if output_name in _at_least_tuple(n.output_name)
+        )
+        roots = [n for n, d in func_only_graph.in_degree() if d == 0]
+        graph = nx.transitive_reduction(func_only_graph)
+        return [list(nx.all_simple_paths(graph, root, leaf)) for root in roots]
+
     @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
         """Return the profiling data for each function in the pipeline."""
