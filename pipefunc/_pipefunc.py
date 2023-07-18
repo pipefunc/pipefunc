@@ -1221,7 +1221,7 @@ class Pipeline:
 
         Returns
         -------
-        list[list[list[str]]]
+        list[list[list[PipelineFunction]]]
             A list of lists of lists of `PipelineFunction`s. Each list of lists
             represents an independent chain of computation in the pipeline that
             can produce the output. Each list of strings represents a possible
