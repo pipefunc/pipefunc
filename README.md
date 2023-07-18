@@ -2,6 +2,17 @@
 
 > Lightweight function pipeline creation: 📚 Less Bookkeeping, 🎯 More Doing
 
+[![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
+[![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![pytest](https://github.com/basnijholt/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/basnijholt/pipefunc/actions/workflows/pytest.yml)
+[![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
+[![Coverage](https://img.shields.io/codecov/c/github/basnijholt/pipefunc)](https://codecov.io/gh/basnijholt/pipefunc)
+[![Documentation](https://readthedocs.org/projects/pipefunc/badge/?version=latest)](https://pipefunc.readthedocs.io/en/latest/?badge=latest)
+[![Downloads](https://img.shields.io/conda/dn/conda-forge/pipefunc.svg)](https://anaconda.org/conda-forge/pipefunc)
+[![GitHub](https://img.shields.io/github/stars/basnijholt/pipefunc.svg?style=social)](https://github.com/basnijholt/pipefunc/stargazers)
+
+
 ![](https://user-images.githubusercontent.com/6897215/253785642-cf2a6941-2ea6-41b0-8225-b3e52e94c4de.png)
 
 <!-- toc-start -->
