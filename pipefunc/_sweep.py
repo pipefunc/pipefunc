@@ -439,7 +439,7 @@ def _assert_valid_sweep_dict(
 
 
 def get_min_sweep_sets(
-    execution_order: list[Any],
+    execution_order: list[PipelineFunction],
     pipeline: Pipeline,
     sweep: Sweep,
     output_name: str,
