@@ -1224,8 +1224,8 @@ class Pipeline:
         list[list[list[PipelineFunction]]]
             A list of lists of lists of `PipelineFunction`s. Each list of lists
             represents an independent chain of computation in the pipeline that
-            can produce the output. Each list of strings represents a possible
-            ordering of functions in that chain.
+            can produce the output. Each list of `PipelineFunction` represents a
+            possible ordering of functions in that chain.
 
         """
         pipeline = self.reduced_pipeline(output_name) if reduce else self
