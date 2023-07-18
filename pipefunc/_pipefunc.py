@@ -1188,6 +1188,16 @@ class Pipeline:
         return nx.all_topological_sorts(func_only_graph)
 
     @property
+    def leaf_nodes(self) -> list[PipelineFunction]:
+        """Return the leaf nodes in the pipeline's execution graph."""
+        return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
+
+    @property
+    def root_nodes(self) -> list[PipelineFunction]:
+        """Return the root nodes in the pipeline's execution graph."""
+        return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
+
+    @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
         """Return the profiling data for each function in the pipeline."""
         return {
