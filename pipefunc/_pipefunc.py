@@ -12,13 +12,16 @@ the resource usage of the pipeline functions.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import inspect
+import json
 import os
 import sys
 import time
 import warnings
 from collections import OrderedDict, defaultdict
 from functools import partial
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -50,8 +53,6 @@ else:
 
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import holoviews as hv
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -97,6 +98,11 @@ class PipelineFunction(Generic[T]):
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
+    save
+        Flag indicating whether the output of the wrapped function should be saved.
+    save_function
+        A function that takes a dict with input (root) arguments and the output
+        of the wrapped function as arguments and saves the output to a file.
 
     Returns
     -------
@@ -125,12 +131,16 @@ class PipelineFunction(Generic[T]):
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
+        save: bool | None = None,
+        save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
+        self.save_function = save_function
+        self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
             self.output_picker = partial(
@@ -281,6 +291,8 @@ def pipefunc(
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
+    save: bool | None = None,
+    save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
 ) -> Callable[[Callable[..., Any]], PipelineFunction]:
     """A decorator for tagging pipeline functions with a return identifier.
 
@@ -300,6 +312,11 @@ def pipefunc(
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the decorated function should be cached.
+    save
+        Flag indicating whether the output of the wrapped function should be saved.
+    save_function
+        A function that takes a dict with input (root) arguments and the output
+        of the wrapped function as arguments and saves the output to a file.
 
     Returns
     -------
@@ -329,6 +346,8 @@ def pipefunc(
             profile=profile,
             debug=debug,
             cache=cache,
+            save=save,
+            save_function=save_function,
         )
 
     return decorator
@@ -699,7 +718,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _run_pipeline(
+    def _run_pipeline(  # noqa: PLR0915
         self,
         output_name: _OUTPUT_TYPE,
         *,
@@ -724,6 +743,7 @@ class Pipeline:
             The return value of the pipeline or a dictionary mapping function
             names to their return values if full_output is True.
         """
+        print(f"output_name={output_name}, kwargs={kwargs}")
 
         def _update_all_results(
             func: PipelineFunction,
@@ -790,6 +810,14 @@ class Pipeline:
                     self.cache.put(cache_key, r)
 
             _update_all_results(func, r, output_name, all_results)
+            if func.save and not result_from_cache:
+                root_args = self.arg_combinations(output_name, root_args_only=True)
+                to_save = {k: all_results[k] for k in root_args if k in all_results}
+                filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
+                filename = func.__name__ / filename
+                to_save[output_name] = all_results[output_name]
+                assert func.save_function is not None
+                func.save_function(filename, to_save)  # type: ignore[arg-type]
             return all_results[output_name]
 
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
@@ -1126,10 +1154,23 @@ class Pipeline:
                 outputs = tuple(sorted(out_sig[f]))
                 if len(outputs) == 1:
                     outputs = outputs[0]  # type: ignore[assignment]
-                func = self.func(f.output_name)
-                f_combined = func._create_call_with_parameters_method(inputs, outputs)
+                funcs = [f, *combinable_nodes[f]]
+                mini_pipeline = Pipeline(funcs, debug=False, profile=False)
+                func = mini_pipeline.func(f.output_name).call_full_output
+                f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
                 f_combined.__name__ = f"combined_{f.__name__}"
-                f_pipefunc = PipelineFunction(f_combined, outputs)
+                f_pipefunc = PipelineFunction(
+                    f_combined,
+                    outputs,
+                    profile=f.profile,
+                    save=f.save,
+                    cache=f.cache,
+                    save_function=f.save_function,
+                )
+                # Disable saving for all functions that are being combined
+                for f_ in funcs:
+                    f_.save = False
+                f_pipefunc.parameters = list(inputs)
                 new_functions.append(f_pipefunc)
             elif f not in skip:
                 new_functions.append(f)
@@ -1265,6 +1306,32 @@ class Pipeline:
         return pipeline_str
 
 
+def _wrap_dict_to_tuple(
+    func: Callable[..., Any],
+    inputs: tuple[str, ...],
+    output_name: str | tuple[str, ...],
+) -> Callable[..., Any]:
+    sig = inspect.signature(func)
+    new_params = [
+        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for name in inputs
+    ]
+    new_sig = sig.replace(parameters=new_params)
+
+    def call(*args: Any, **kwargs: Any) -> Any:
+        """Call the pipeline function with the root arguments."""
+        bound = new_sig.bind(*args, **kwargs)
+        bound.apply_defaults()
+        r = func(**bound.arguments)
+        if isinstance(output_name, tuple):
+            return tuple(r[k] for k in output_name)
+        return r[output_name]
+
+    call.__signature__ = new_sig  # type: ignore[attr-defined]
+
+    return call
+
+
 def _reduce_combinable_nodes(
     combinable_nodes: dict[PipelineFunction, set[PipelineFunction]],
 ) -> dict[PipelineFunction, set[PipelineFunction]]:
@@ -1368,3 +1435,19 @@ def _get_signature(
         all_outputs[node] = (outputs - parameters) | additional_outputs
         all_inputs[node] = parameters - outputs
     return all_inputs, all_outputs
+
+
+def generate_filename_from_dict(obj: dict[str, Any], suffix: str = ".pickle") -> Path:
+    """Generate a filename from a dictionary."""
+    keys = "_".join(obj.keys())
+    obj_string = json.dumps(
+        obj,
+        sort_keys=True,
+    )  # Convert the dictionary to a sorted string
+    obj_bytes = obj_string.encode()  # Convert the string to bytes
+
+    sha256_hash = hashlib.sha256()
+    sha256_hash.update(obj_bytes)
+    # Convert the hash to a hexadecimal string for the filename
+    str_hash = sha256_hash.hexdigest()
+    return Path(f"{keys}__{str_hash}{suffix}")
