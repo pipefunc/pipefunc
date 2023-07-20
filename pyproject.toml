@@ -45,7 +45,7 @@ docs = [
     "jupyterlite-xeus-python",
     "pandas",  # used in example.ipynb
 ]
-dev = ["black", "pre-commit", "ruff", "mypy"]
+dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
