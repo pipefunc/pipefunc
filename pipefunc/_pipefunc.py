@@ -718,7 +718,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _run_pipeline(  # noqa: PLR0915
+    def _run_pipeline(
         self,
         output_name: _OUTPUT_TYPE,
         *,
@@ -743,7 +743,6 @@ class Pipeline:
             The return value of the pipeline or a dictionary mapping function
             names to their return values if full_output is True.
         """
-        print(f"output_name={output_name}, kwargs={kwargs}")
 
         def _update_all_results(
             func: PipelineFunction,
