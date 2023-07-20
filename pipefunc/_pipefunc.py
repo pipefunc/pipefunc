@@ -101,8 +101,7 @@ class PipelineFunction(Generic[T]):
     save
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
-        A function that takes a dict with input (root) arguments and the output
-        of the wrapped function as arguments and saves the output to a file.
+        A function that takes the filename and a dict containing the inputs and output.
 
     Returns
     -------
@@ -315,8 +314,7 @@ def pipefunc(
     save
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
-        A function that takes a dict with input (root) arguments and the output
-        of the wrapped function as arguments and saves the output to a file.
+        A function that takes the filename and a dict containing the inputs and output.
 
     Returns
     -------
