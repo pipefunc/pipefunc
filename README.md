@@ -117,13 +117,13 @@ See the detailed usage example and more in our [example.ipynb](https://github.co
 Install the **latest stable** version from conda (recommended):
 
 ```bash
-conda install "pipefunc[plotting]"
+conda install pipefunc
 ```
 
 or from PyPI:
 
 ```bash
-pip install pipefunc
+pip install "pipefunc[plotting]"
 ```
 
 or install **main** with:
