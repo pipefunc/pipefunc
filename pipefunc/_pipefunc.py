@@ -9,6 +9,7 @@ for adding functions to the pipeline, executing the pipeline for specific
 output values, visualizing the pipeline as a directed graph, and profiling
 the resource usage of the pipeline functions.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -118,6 +119,7 @@ class PipelineFunction(Generic[T]):
     ... )
     >>> add_one_func(x=1, y=2)
     (2, 3)
+
     """
 
     def __init__(
@@ -167,6 +169,7 @@ class PipelineFunction(Generic[T]):
         -------
         Any
             The return value of the wrapped function.
+
         """
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         with self._maybe_profiler():
@@ -209,6 +212,7 @@ class PipelineFunction(Generic[T]):
         AbstractContextManager
             A ResourceProfiler instance if profiling is enabled, or a
             nullcontext if disabled.
+
         """
         if self.profiling_stats is not None:
             return ResourceProfiler(os.getpid(), self.profiling_stats)
@@ -226,6 +230,7 @@ class PipelineFunction(Generic[T]):
         -------
         Any
             The value of the attribute.
+
         """
         return getattr(self.func, name)
 
@@ -236,6 +241,7 @@ class PipelineFunction(Generic[T]):
         -------
         str
             A string representation of the PipelineFunction instance.
+
         """
         params = ", ".join(self.parameters)
         outputs = ", ".join(_at_least_tuple(self.output_name))
@@ -248,6 +254,7 @@ class PipelineFunction(Generic[T]):
         -------
         str
             A string representation of the PipelineFunction instance.
+
         """
         return f"PipelineFunction({self.func.__name__})"
 
@@ -262,6 +269,7 @@ class PipelineFunction(Generic[T]):
         -------
         state : dict
             A dictionary containing the picklable state of the object.
+
         """
         state = self.__dict__.copy()
         state["func"] = cloudpickle.dumps(state.pop("func"))
@@ -277,6 +285,7 @@ class PipelineFunction(Generic[T]):
         ----------
         state : dict
             A dictionary containing the picklable state of the object.
+
         """
         self.__dict__.update(state)
         self.func = cloudpickle.loads(self.func)
@@ -321,6 +330,7 @@ def pipefunc(
     Callable[[Callable[..., Any]], PipelineFunction]
         A decorator function that takes the original function and output_name a
         PipelineFunction instance with the specified return identifier.
+
     """
 
     def decorator(f: Callable[..., Any]) -> PipelineFunction:
@@ -335,6 +345,7 @@ def pipefunc(
         -------
         PipelineFunction
             The wrapped function with the specified return identifier.
+
         """
         return PipelineFunction(
             f,
@@ -362,6 +373,7 @@ class _Function:
         The identifier for the return value of the pipeline function.
     root_args
         The names of the pipeline function's root inputs.
+
     """
 
     def __init__(
@@ -388,6 +400,7 @@ class _Function:
         -------
         Any
             The return value of the pipeline function.
+
         """
         return self.pipeline._run_pipeline(output_name=self.output_name, **kwargs)
 
@@ -403,6 +416,7 @@ class _Function:
         -------
         Any
             The return value of the pipeline function.
+
         """
         return self.pipeline._run_pipeline(
             output_name=self.output_name,
@@ -422,6 +436,7 @@ class _Function:
         -------
         Any
             The return value of the pipeline function.
+
         """
         return self(**kwargs)
 
@@ -497,6 +512,7 @@ class Pipeline:
         If None, the value of each PipelineFunction's profile attribute is used.
     cache
         The type of cache to use.
+
     """
 
     def __init__(
@@ -568,6 +584,7 @@ class Pipeline:
             The function to add to the pipeline.
         profile
             Flag indicating whether profiling information should be collected.
+
         """
         if not isinstance(f, PipelineFunction):
             f = PipelineFunction(f, output_name=f.__name__)
@@ -614,6 +631,7 @@ class Pipeline:
         nx.DiGraph
             A directed graph with nodes representing functions and edges
             representing dependencies between functions.
+
         """
         self._check_consistent_defaults()
         g = nx.DiGraph()
@@ -650,6 +668,7 @@ class Pipeline:
         -------
         Callable[..., Any]
             The composed function that can be called with keyword arguments.
+
         """
         root_args = self.arg_combinations(output_name, root_args_only=True)
         assert isinstance(root_args, tuple)
@@ -669,6 +688,7 @@ class Pipeline:
         -------
         Any
             The return value of the pipeline.
+
         """
         return self.func(output_name)(**kwargs)
 
@@ -702,6 +722,7 @@ class Pipeline:
             A tuple containing the output name and a tuple of root input keys
             and their corresponding values, or None if the cache key computation
             is skipped.
+
         """
         root_args = self.arg_combinations(output_name, root_args_only=True)
         assert isinstance(root_args, tuple)
@@ -740,6 +761,7 @@ class Pipeline:
         Any
             The return value of the pipeline or a dictionary mapping function
             names to their return values if full_output is True.
+
         """
 
         def _update_all_results(
@@ -829,6 +851,7 @@ class Pipeline:
         -------
         Dict[_OUTPUT_TYPE, PipelineFunction | str]
             A mapping from node names to nodes.
+
         """
         mapping: dict[_OUTPUT_TYPE, PipelineFunction | str] = {}
         for node in self.graph.nodes:
@@ -863,6 +886,7 @@ class Pipeline:
         -------
         Set[Tuple[str, ...]]
             A set of tuples containing possible argument combinations.
+
         """
         if r := self._arg_combinations.get(output_name):
             if root_args_only:
@@ -960,6 +984,7 @@ class Pipeline:
         Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
             A dictionary mapping function names to sets of tuples containing
             possible argument combinations.
+
         """
         mapping: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = defaultdict(set)
         for node in self.graph.nodes:
@@ -986,6 +1011,7 @@ class Pipeline:
             The width and height of the figure in inches, by default (10, 10).
         filename
             The filename to save the figure to, by default None.
+
         """
         visualize(self.graph, figsize=figsize, filename=filename)
 
@@ -1057,6 +1083,7 @@ class Pipeline:
 
         The function 'head' in the nested function `_recurse` represents the
         current function being checked in the execution graph.
+
         """
         # Nested function _recurse performs the depth-first search and updates the
         # `combinable_nodes` dictionary.
@@ -1125,6 +1152,7 @@ class Pipeline:
         This process can significantly simplify complex pipelines, making them
         easier to understand and potentially improving performance by reducing
         function calls.
+
         """
         combinable_nodes = self._identify_combinable_nodes(output_name)
         if not combinable_nodes:
@@ -1217,6 +1245,7 @@ class Pipeline:
 
         The function 'head' in the nested function `_recurse` represents the
         current function being checked in the execution graph.
+
         """
         reduced_pipeline = self.reduced_pipeline(output_name)
         func_only_graph = reduced_pipeline.graph.copy()
@@ -1367,6 +1396,7 @@ def _reduce_combinable_nodes(
     Dict[PipelineFunction, Set[PipelineFunction]]
         A reduced dictionary where each node only depends on nodes
         that cannot be further combined.
+
     """
     combinable_nodes = OrderedDict(combinable_nodes)
     for _ in range(len(combinable_nodes)):
@@ -1415,6 +1445,7 @@ def _get_signature(
         Dictionary where keys are nodes and values are sets of output names
         that the node and its dependent nodes produce, plus additional output
         names based on the dependency relationships in the graph.
+
     """
     all_inputs = {}
     all_outputs = {}

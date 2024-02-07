@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -26,6 +26,7 @@ class ResourceStats:
         ----------
         execution_time
             The execution time of the new function call.
+
         """
         self.num_executions += 1
         delta = execution_time - self.average
@@ -42,6 +43,7 @@ class ResourceStats:
         -------
         float
             The standard deviation of the execution times.
+
         """
         if self.num_executions < 2:  # noqa: PLR2004
             return 0.0
@@ -77,6 +79,7 @@ class ResourceProfiler:
     interval
         The time interval between resource measurements, in
         seconds (default is 0.1).
+
     """
 
     def __init__(
@@ -95,13 +98,14 @@ class ResourceProfiler:
         self.execution_time: float | None = None
         self.start_time: float | None = None
 
-    def __enter__(self) -> ResourceProfiler:
+    def __enter__(self) -> Self:
         """Enter, start the measurement thread, and return the profiler instance.
 
         Returns
         -------
         ResourceProfiler
             The profiler instance.
+
         """
         self.thread = threading.Thread(target=self.measure_resources)
         assert self.thread is not None
@@ -125,6 +129,7 @@ class ResourceProfiler:
             The exception instance, if an exception occurred, otherwise None.
         traceback
             A traceback object, if an exception occurred, otherwise None.
+
         """
         assert self.start_time is not None
         self.stop_event.set()
@@ -143,7 +148,7 @@ class ResourceProfiler:
                 mem_info = process.memory_info()
                 memory = mem_info.rss
                 cpu_percent = process.cpu_percent()
-            except psutil.NoSuchProcess:  # noqa: PERF203  # pragma: no cover
+            except psutil.NoSuchProcess:  # pragma: no cover
                 break
 
             self.stats.memory.update(memory)

@@ -31,6 +31,7 @@ class HybridCache:
         The weight given to the access frequency in the score calculation.
     duration_weight
         The weight given to the computation duration in the score calculation.
+
     """
 
     def __init__(
@@ -100,6 +101,7 @@ class HybridCache:
         Any
             The value associated with the key if the key is present in the cache,
             otherwise None.
+
         """
         with self.lock:
             if key in self._cache:
@@ -121,6 +123,7 @@ class HybridCache:
             The value to store in the cache.
         duration
             The duration of the computation that generated the value.
+
         """
         with self.lock:
             if len(self._cache) >= self.max_size:
@@ -166,6 +169,7 @@ class HybridCache:
         -------
         bool
             True if the key is present in the cache, otherwise False.
+
         """
         return key in self._cache
 
@@ -179,6 +183,7 @@ class HybridCache:
         -------
         str
             A string representation of the HybridCache.
+
         """
         cache_str = f"Cache: {self._cache}\n"
         access_counts_str = f"Access Counts: {self._access_counts}\n"
@@ -199,6 +204,7 @@ class LRUCache:
         Use cloudpickle for storing the data in memory.
     shared
         Whether the cache should be shared between multiple processes.
+
     """
 
     def __init__(

@@ -40,6 +40,7 @@ def visualize(
         The width and height of the figure in inches, by default (10, 10).
     filename
         The filename to save the figure to, by default None.
+
     """
     import matplotlib.pyplot as plt
 

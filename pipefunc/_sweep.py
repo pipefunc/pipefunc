@@ -57,6 +57,7 @@ class Sweep:
 
     >>> Sweep(items, dims=[('a', 'b'), ('c',)]).list()
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}].list()
+
     """
 
     def __init__(
@@ -91,7 +92,7 @@ class Sweep:
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
 
-    def list(self) -> list[dict[str, Any]]:  # noqa: A003
+    def list(self) -> list[dict[str, Any]]:
         """Return the sweep as a list."""
         return list(self.generate())
 
@@ -162,6 +163,7 @@ class MultiSweep(Sweep):
     >>> sweep1 = Sweep({'a': [1, 2], 'b': [3, 4]})
     >>> sweep2 = Sweep({'x': [5, 6], 'y': [7, 8]})
     >>> multi_sweep = MultiSweep(sweep1, sweep2)
+
     """
 
     def __init__(self, *sweeps: Sweep) -> None:
@@ -175,7 +177,7 @@ class MultiSweep(Sweep):
     def __len__(self) -> int:
         return sum(len(sweep) for sweep in self.sweeps)
 
-    def list(self) -> list[dict[str, Any]]:  # noqa: A003
+    def list(self) -> list[dict[str, Any]]:
         """Return the sweep as a list."""
         return list(self.generate())
 
@@ -242,6 +244,7 @@ def generate_sweep(
 
     >>> generate_sweep(items, dims=[('a', 'b'), ('c',)])
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
+
     """
     return Sweep(items, dims).list()
 
@@ -277,6 +280,7 @@ def count_sweep(
         A dictionary where the keys are the names of the arguments and the
         values are dictionaries where the keys are the argument combinations
         and the values are the number of times that combination is used.
+
     """
     if isinstance(sweep, Sweep):
         # TODO: we can likely special case this to be faster.
@@ -350,6 +354,7 @@ def get_precalculation_order(
     -------
     list[PipelineFunction]
         The ordered list of functions to be precalculated and cached.
+
     """
 
     def key_func(node: PipelineFunction) -> int:
@@ -396,6 +401,7 @@ def _get_nested_value(d: dict, keys: list) -> Any:
     >>> keys = ['a', 'b', 'c']
     >>> _get_nested_value(d, keys)
     1
+
     """
     for key in keys:
         d = d[key]
@@ -470,6 +476,7 @@ def get_min_sweep_sets(
         A tuple where the first element is a list of the minimal set of argument
         combinations for each function in the execution order and the second
         element is a nested dictionary that represents the sweep combinations.
+
     """
     root_args = pipeline.arg_combinations(output_name, root_args_only=True)
     assert isinstance(root_args, tuple)

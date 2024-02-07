@@ -1,4 +1,5 @@
 """Tests for pipefunc.py."""
+
 import inspect
 
 import pytest
