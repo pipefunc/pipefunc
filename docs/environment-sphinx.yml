@@ -22,6 +22,7 @@ dependencies:
   - pytest
   - coverage
   - pytest-cov
+  - pandas
   # optional-dependencies: docs
   - myst-nb
   - sphinx
