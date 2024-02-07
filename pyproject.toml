@@ -44,7 +44,7 @@ docs = [
     "jupytext",
     "jupyterlite-sphinx",
     "jupyterlite-xeus-python",
-    "pandas",  # used in example.ipynb
+    "pandas",                  # used in example.ipynb
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
@@ -83,6 +83,9 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
 ]
+
+[tool.coverage.run]
+omit = ["pipefunc/_plotting.py"]
 
 [tool.black]
 line_length = 88
