@@ -3,9 +3,15 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import sys
+
+    if sys.version_info >= (3, 11):
+        from typing import Self
+    else:
+        from typing import Any as Self
     from types import TracebackType
 
 
@@ -51,11 +57,7 @@ class ResourceStats:
 
     def __repr__(self) -> str:
         """Return a string representation of the execution statistics."""
-        return (
-            f"ResourceStats(num_executions={self.num_executions}, "
-            f"average={self.average:.4e}, max={self.max:.4e}, "
-            f"std={self.std:.4e})"
-        )
+        return f"ResourceStats(num_executions={self.num_executions}, average={self.average:.4e}, max={self.max:.4e}, std={self.std:.4e})"
 
 
 @dataclass

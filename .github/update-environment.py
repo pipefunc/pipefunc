@@ -43,10 +43,7 @@ def generate_environment_yml(
     dependencies = clean_deps(data["project"]["dependencies"])
     pip_deps += generate_pip_deps(dependencies)
 
-    env_yaml = (
-        "# This file is generated from pyproject.toml"
-        " using .github/update-environment.py\n"
-    )
+    env_yaml = "# This file is generated from pyproject.toml using .github/update-environment.py\n"
     env_yaml += f"name: {name}\n\n"
     env_yaml += "channels:\n- conda-forge\n\n"
     env_yaml += "dependencies:\n"

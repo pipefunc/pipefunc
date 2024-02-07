@@ -29,9 +29,7 @@ def test_resource_stats_std():
     for time in execution_times:
         stats.update(time)
 
-    variance = sum((xi - stats.average) ** 2 for xi in execution_times) / (
-        len(execution_times) - 1
-    )
+    variance = sum((xi - stats.average) ** 2 for xi in execution_times) / (len(execution_times) - 1)
     std_dev = variance**0.5
 
     assert stats.std == std_dev
@@ -45,7 +43,5 @@ def test_resource_stats_repr():
         stats.update(time)
 
     assert repr(stats) == (
-        f"ResourceStats(num_executions={stats.num_executions}, "
-        f"average={stats.average:.4e}, max={stats.max:.4e}, "
-        f"std={stats.std:.4e})"
+        f"ResourceStats(num_executions={stats.num_executions}, average={stats.average:.4e}, max={stats.max:.4e}, std={stats.std:.4e})"
     )

@@ -362,11 +362,7 @@ def get_precalculation_order(
 
     m = pipeline.node_mapping
     # Get nodes with counts ≥min_executions
-    nodes_with_counts = [
-        m[node]
-        for node, count_dict in counts.items()
-        if any(val >= min_executions for val in count_dict.values())
-    ]
+    nodes_with_counts = [m[node] for node, count_dict in counts.items() if any(val >= min_executions for val in count_dict.values())]
     # Create a subgraph with only the nodes with sufficient counts
     subgraph = pipeline.graph.subgraph(nodes_with_counts)
     # Return the ordered list of nodes

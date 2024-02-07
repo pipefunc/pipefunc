@@ -137,19 +137,11 @@ class HybridCache:
         # Calculate normalized access frequencies and computation durations
         total_access_count = sum(self._access_counts.values())
         total_duration = sum(self._computation_durations.values())
-        normalized_access_counts = {
-            k: v / total_access_count for k, v in self._access_counts.items()
-        }
-        normalized_durations = {
-            k: v / total_duration for k, v in self._computation_durations.items()
-        }
+        normalized_access_counts = {k: v / total_access_count for k, v in self._access_counts.items()}
+        normalized_durations = {k: v / total_duration for k, v in self._computation_durations.items()}
 
         # Calculate scores using a weighted sum
-        scores = {
-            k: self.access_weight * normalized_access_counts[k]
-            + self.duration_weight * normalized_durations[k]
-            for k in self._access_counts
-        }
+        scores = {k: self.access_weight * normalized_access_counts[k] + self.duration_weight * normalized_durations[k] for k in self._access_counts}
 
         # Find the key with the lowest score
         lowest_score_key = min(scores, key=lambda k: scores[k])
@@ -187,9 +179,7 @@ class HybridCache:
         """
         cache_str = f"Cache: {self._cache}\n"
         access_counts_str = f"Access Counts: {self._access_counts}\n"
-        computation_durations_str = (
-            f"Computation Durations: {self._computation_durations}\n"
-        )
+        computation_durations_str = f"Computation Durations: {self._computation_durations}\n"
         return cache_str + access_counts_str + computation_durations_str
 
 
