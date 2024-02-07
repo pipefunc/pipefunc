@@ -12,7 +12,7 @@ from pipefunc import (
     get_precalculation_order,
     pipefunc,
 )
-from pipefunc._pipefunc import _get_signature, _reduce_combinable_nodes
+from pipefunc._pipefunc import _combine_nodes, _get_signature
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -447,10 +447,10 @@ def test_identify_combinable_nodes2():
     m = pipeline.node_mapping
     expected = {m["f6"]: {m["f1"], m["f3"], m["f4"], m["f5"]}}
     combinable_nodes = pipeline._identify_combinable_nodes("f7")
-    reduced_combinable_nodes = _reduce_combinable_nodes(combinable_nodes)
-    assert reduced_combinable_nodes == expected
+    simplified_combinable_nodes = _combine_nodes(combinable_nodes)
+    assert simplified_combinable_nodes == expected
 
-    sig_in, sig_out = _get_signature(reduced_combinable_nodes, pipeline.graph)
+    sig_in, sig_out = _get_signature(simplified_combinable_nodes, pipeline.graph)
     assert sig_in == {m["f6"]: {"a", "b", "c", "d"}}
     assert sig_out == {m["f6"]: {"f6"}}
 

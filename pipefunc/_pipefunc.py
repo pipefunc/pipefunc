@@ -1095,10 +1095,10 @@ class Pipeline:
         _recurse(func)
         return combinable_nodes
 
-    def reduced_pipeline(self, output_name: str) -> Pipeline:
-        """Reduced pipeline with combined function nodes.
+    def simplified_pipeline(self, output_name: str) -> Pipeline:
+        """Simplify pipeline with combined function nodes.
 
-        Generate a reduced version of the pipeline where combinable function
+        Generate a simplified version of the pipeline where combinable function
         nodes have been merged into single function nodes.
 
         This method identifies combinable nodes in the pipeline's execution
@@ -1111,17 +1111,17 @@ class Pipeline:
         ----------
         output_name
             The name of the output from the pipeline function we are starting
-            the reduction from. It is used to get the starting function in the
+            the simplification from. It is used to get the starting function in the
             pipeline.
 
         Returns
         -------
         Pipeline
-            The reduced version of the pipeline.
+            The simplified version of the pipeline.
 
         Notes
         -----
-        The pipeline reduction process works in the following way:
+        The pipeline simplification process works in the following way:
 
         1.  Identify combinable function nodes in the execution graph by
             checking if they share the same root arguments.
@@ -1136,21 +1136,21 @@ class Pipeline:
         7.  Generate a new pipeline with the new functions.
 
         This process can significantly simplify complex pipelines, making them
-        easier to understand and potentially improving performance by reducing
+        easier to understand and potentially improving performance by simplifying
         function calls.
 
         """
         combinable_nodes = self._identify_combinable_nodes(output_name)
         if not combinable_nodes:
             warnings.warn(
-                "No combinable nodes found, the pipeline cannot be reduced.",
+                "No combinable nodes found, the pipeline cannot be simplified.",
                 UserWarning,
                 stacklevel=2,
             )
         # Simplify the combinable_nodes dictionary by replacing any nodes that
         # can be combined with their own dependencies, so that each key in the
         # dictionary only depends on nodes that cannot be further combined.
-        combinable_nodes = _reduce_combinable_nodes(combinable_nodes)
+        combinable_nodes = _combine_nodes(combinable_nodes)
         skip = set.union(*combinable_nodes.values()) if combinable_nodes else set()
         in_sig, out_sig = _get_signature(combinable_nodes, self.graph)
         m = self.node_mapping
@@ -1194,10 +1194,10 @@ class Pipeline:
         """Generate all possible execution orders for the functions in the pipeline.
 
         This method generates all possible topological sorts (execution orders)
-        of the functions in the pipeline's execution graph. It first reduces the
+        of the functions in the pipeline's execution graph. It first simplifies the
         pipeline to a version where combinable function nodes have been merged
         into single function nodes, and then generates all topological sorts of
-        the functions in the reduced graph.
+        the functions in the simplified graph.
 
         The method only considers the functions in the graph and ignores the
         root arguments.
@@ -1207,7 +1207,7 @@ class Pipeline:
         output_name
             The name of the output from the pipeline function we are starting
             from. It is used to get the starting function in the pipeline and to
-            determine the reduced pipeline.
+            determine the simplified pipeline.
 
         Returns
         -------
@@ -1233,9 +1233,9 @@ class Pipeline:
         current function being checked in the execution graph.
 
         """
-        reduced_pipeline = self.reduced_pipeline(output_name)
-        func_only_graph = reduced_pipeline.graph.copy()
-        root_args = reduced_pipeline.arg_combinations(output_name, root_args_only=True)
+        simplified_pipeline = self.simplified_pipeline(output_name)
+        func_only_graph = simplified_pipeline.graph.copy()
+        root_args = simplified_pipeline.arg_combinations(output_name, root_args_only=True)
         for arg in root_args:
             func_only_graph.remove_node(arg)
         return nx.all_topological_sorts(func_only_graph)
@@ -1254,7 +1254,7 @@ class Pipeline:
         self,
         output_name: str,
         *,
-        reduce: bool = False,
+        simplify: bool = False,
     ) -> list[list[list[PipelineFunction]]]:
         """Get all possible transitive paths for a specified output.
 
@@ -1266,9 +1266,9 @@ class Pipeline:
         ----------
         output_name
             The name of the output variable to find paths for.
-        reduce
-            A flag indicating whether to reduce the pipeline before computing
-            the paths. If True, the pipeline is first reduced to a sub-pipeline
+        simplify
+            A flag indicating whether to simplify the pipeline before computing
+            the paths. If True, the pipeline is first simplified to a sub-pipeline
             that is necessary for producing the output_name. If False, the paths
             are computed on the full pipeline. Default is False.
 
@@ -1281,7 +1281,7 @@ class Pipeline:
             possible ordering of functions in that chain.
 
         """
-        pipeline = self.reduced_pipeline(output_name) if reduce else self
+        pipeline = self.simplified_pipeline(output_name) if simplify else self
 
         func_only_graph = pipeline.graph.copy()
         root_args = pipeline.arg_combinations(output_name, root_args_only=True)
@@ -1333,7 +1333,7 @@ def _wrap_dict_to_tuple(
     return call
 
 
-def _reduce_combinable_nodes(
+def _combine_nodes(
     combinable_nodes: dict[PipelineFunction, set[PipelineFunction]],
 ) -> dict[PipelineFunction, set[PipelineFunction]]:
     """Reduce the dictionary of combinable nodes to a minimal set.
@@ -1346,7 +1346,7 @@ def _reduce_combinable_nodes(
     if `combinable_nodes = {f6: {f5}, f5: {f1, f4}}`, it means that `f6`
     can be combined with `f5`, and `f5` can be combined with `f1` and `f4`.
 
-    This method reduces the input dictionary by iteratively checking each
+    This method simplifies the input dictionary by iteratively checking each
     node in the dictionary to see if it is a dependency of any other nodes.
     If it is, the method replaces that dependency with the node's own
     dependencies and removes the node from the dictionary. For example, if
@@ -1356,7 +1356,7 @@ def _reduce_combinable_nodes(
     dictionary, `{f6: {f1, f4}}`.
 
     The aim is to get a dictionary where each node only depends on nodes
-    that cannot be further combined. This reduced dictionary is useful for
+    that cannot be further combined. This simplified dictionary is useful for
     constructing a simplified graph of the computation.
 
     Parameters
@@ -1369,7 +1369,7 @@ def _reduce_combinable_nodes(
     Returns
     -------
     Dict[PipelineFunction, Set[PipelineFunction]]
-        A reduced dictionary where each node only depends on nodes
+        A simplified dictionary where each node only depends on nodes
         that cannot be further combined.
 
     """

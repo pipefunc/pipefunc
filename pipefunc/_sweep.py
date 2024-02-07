@@ -464,7 +464,7 @@ def get_min_sweep_sets(
         The sweep object containing the sweep parameter values and combinations.
     output_name
         The name of the output from the pipeline function we are starting the
-        reduction from. It is used to get the starting function in the pipeline.
+        simplification from. It is used to get the starting function in the pipeline.
 
     Returns
     -------
