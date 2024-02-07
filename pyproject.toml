@@ -34,7 +34,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov"]
+test = ["pytest", "coverage", "pytest-cov", "pandas"]
 docs = [
     "myst-nb",
     "sphinx",
