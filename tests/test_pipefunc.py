@@ -421,6 +421,29 @@ def test_identify_combinable_nodes():
     assert sig_out == {f_gg: {"gg", "h", "g"}, f_i: {"d", "i"}}
 
 
+def test_conservatively_combine():
+    @pipefunc(output_name="x")
+    def f1(a):
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(b, x):
+        return x * b
+
+    @pipefunc(output_name="z")
+    def f3(b, x, y):
+        return x * y * b
+
+    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
+
+    root_args = pipeline.all_arg_combinations(root_args_only=True)
+    assert root_args == {"x": {("a",)}, "y": {("a", "b")}, "z": {("a", "b")}}
+    combinable_nodes = pipeline._identify_combinable_nodes("z", conservatively_combine=True)
+    assert combinable_nodes == {}
+    combinable_nodes2 = pipeline._identify_combinable_nodes("z", conservatively_combine=False)
+    assert combinable_nodes2 == {f3: {f2}}
+
+
 def test_identify_combinable_nodes2():
     def f1(a, b, c, d):
         return a + b + c + d

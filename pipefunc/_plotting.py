@@ -29,6 +29,7 @@ def visualize(
     graph: nx.DiGraph,
     figsize: tuple[int, int] = (10, 10),
     filename: str | Path | None = None,
+    func_node_colors: str | list[str] | None = None,
 ) -> None:
     """Visualize the pipeline as a directed graph.
 
@@ -37,15 +38,16 @@ def visualize(
     graph
         The directed graph representing the pipeline.
     figsize
-        The width and height of the figure in inches, by default (10, 10).
+        The width and height of the figure in inches.
     filename
-        The filename to save the figure to, by default None.
+        The filename to save the figure to.
+    func_node_colors
+        The color of the nodes.
 
     """
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
-
     arg_nodes = []
     func_nodes = []
     for node in graph.nodes:
@@ -59,7 +61,7 @@ def visualize(
         graph,
         pos,
         nodelist=arg_nodes,
-        node_size=2000,
+        node_size=4000,
         node_color="lightgreen",
         node_shape="s",
     )
@@ -68,7 +70,7 @@ def visualize(
         pos,
         nodelist=func_nodes,
         node_size=4000,
-        node_color="skyblue",
+        node_color=func_node_colors or "skyblue",
         node_shape="o",
     )
 
@@ -85,7 +87,7 @@ def visualize(
         font_size=12,
     )
 
-    nx.draw_networkx_edges(graph, pos, arrows=True)
+    nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
     # Add edge labels with function outputs
     outputs = {}

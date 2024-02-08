@@ -984,22 +984,48 @@ class Pipeline:
                 mapping[node.output_name] = arg_combinations
         return mapping
 
+    def _func_node_colors(
+        self,
+        *,
+        conservatively_combine: bool = False,
+        default_color: str = "skyblue",
+    ) -> list[str]:
+        func_node_colors = []
+        combinable_nodes = self._identify_combinable_nodes(
+            output_name=self.functions[-1].output_name,
+            conservatively_combine=conservatively_combine,
+        )
+        node_sets = [{k, *v} for k, v in combinable_nodes.items()]
+        for node in self.graph.nodes:
+            if isinstance(node, PipelineFunction):
+                i = next((i for i, nodes in enumerate(node_sets) if node in nodes), None)
+                if i is not None:
+                    func_node_colors.append(f"C{i}")
+                else:
+                    func_node_colors.append(default_color)
+        return func_node_colors
+
     def visualize(
         self,
         figsize: tuple[int, int] = (10, 10),
         filename: str | Path | None = None,
+        *,
+        color_combinable: bool = False,
     ) -> None:
         """Visualize the pipeline as a directed graph.
 
         Parameters
         ----------
         figsize
-            The width and height of the figure in inches, by default (10, 10).
+            The width and height of the figure in inches.
         filename
-            The filename to save the figure to, by default None.
+            The filename to save the figure to.
+        color_combinable
+            Whether to color combinable nodes differently.
 
         """
-        visualize(self.graph, figsize=figsize, filename=filename)
+        func_node_colors = self._func_node_colors() if color_combinable else None
+        visualize(self.graph, figsize=figsize, filename=filename, func_node_colors=func_node_colors)
 
     def visualize_holoviews(self) -> hv.Graph:
         """Visualize the pipeline as a directed graph using HoloViews."""
@@ -1021,7 +1047,7 @@ class Pipeline:
 
     def _identify_combinable_nodes(
         self,
-        output_name: str,
+        output_name: _OUTPUT_TYPE,
         *,
         conservatively_combine: bool = False,
     ) -> dict[PipelineFunction, set[PipelineFunction]]:
@@ -1095,7 +1121,12 @@ class Pipeline:
         _recurse(func)
         return combinable_nodes
 
-    def simplified_pipeline(self, output_name: str) -> Pipeline:
+    def simplified_pipeline(
+        self,
+        output_name: _OUTPUT_TYPE,
+        *,
+        conservatively_combine: bool = False,
+    ) -> Pipeline:
         """Simplify pipeline with combined function nodes.
 
         Generate a simplified version of the pipeline where combinable function
@@ -1113,6 +1144,10 @@ class Pipeline:
             The name of the output from the pipeline function we are starting
             the simplification from. It is used to get the starting function in the
             pipeline.
+        conservatively_combine
+            Only combine function nodes if all of their predecessors have the
+            same root arguments. If False, combine function nodes if any of
+            their predecessors have the same root arguments.
 
         Returns
         -------
@@ -1140,7 +1175,7 @@ class Pipeline:
         function calls.
 
         """
-        combinable_nodes = self._identify_combinable_nodes(output_name)
+        combinable_nodes = self._identify_combinable_nodes(output_name, conservatively_combine=conservatively_combine)
         if not combinable_nodes:
             warnings.warn(
                 "No combinable nodes found, the pipeline cannot be simplified.",
