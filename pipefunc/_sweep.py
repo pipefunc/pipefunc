@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from itertools import product
 from typing import TYPE_CHECKING, Any, Callable, Generator, Sequence
 
@@ -64,10 +64,10 @@ class Sweep:
 
     def __init__(
         self,
-        items: dict[str, Sequence[Any]],
-        dims: list[Any] | None = None,
-        exclude: Callable[[dict[str, Any]], bool] | None = None,
-        constants: dict[str, Any] | None = None,
+        items: Mapping[str, Sequence[Any]],
+        dims: list[str | tuple[str, ...]] | None = None,
+        exclude: Callable[[Mapping[str, Any]], bool] | None = None,
+        constants: Mapping[str, Any] | None = None,
     ) -> None:
         """Initialize the sweep."""
         self.items = items
@@ -95,6 +95,8 @@ class Sweep:
                 product_parts.append([dict(zip(dims, res)) for res in zip(*dim_seqs)])
             for combo in product(*product_parts):
                 combination = {k: v for item in combo for k, v in item.items()}
+                if self.constants is not None:
+                    combination.update(self.constants)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
 
@@ -119,7 +121,12 @@ class Sweep:
                             dims.append(_dims[0])
                         else:
                             dims.append(_dims)
-        return Sweep(self.items, dims=dims, exclude=self.exclude, constants=self.constants)
+        return Sweep(
+            self.items,
+            dims=dims,
+            exclude=self.exclude,
+            constants=self.constants,
+        )
 
     def __len__(self) -> int:
         """Return the number of unique combinations in the sweep."""
@@ -368,7 +375,11 @@ def get_precalculation_order(
 
     m = pipeline.node_mapping
     # Get nodes with counts ≥min_executions
-    nodes_with_counts = [m[node] for node, count_dict in counts.items() if any(val >= min_executions for val in count_dict.values())]
+    nodes_with_counts = [
+        m[node]
+        for node, count_dict in counts.items()
+        if any(val >= min_executions for val in count_dict.values())
+    ]
     # Create a subgraph with only the nodes with sufficient counts
     subgraph = pipeline.graph.subgraph(nodes_with_counts)
     # Return the ordered list of nodes

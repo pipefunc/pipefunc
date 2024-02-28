@@ -154,7 +154,11 @@ class PipelineFunction(Generic[T]):
         self._inverse_renames: dict[str, str] = {v: k for k, v in self.renames.items()}
         parameters = inspect.signature(func).parameters
         self.parameters: list[str] = [self.renames.get(k, k) for k in parameters]
-        self.defaults: dict[str, Any] = {self.renames.get(k, k): v.default for k, v in parameters.items() if v.default is not inspect.Parameter.empty}
+        self.defaults: dict[str, Any] = {
+            self.renames.get(k, k): v.default
+            for k, v in parameters.items()
+            if v.default is not inspect.Parameter.empty
+        }
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
 
@@ -174,7 +178,8 @@ class PipelineFunction(Generic[T]):
         if self.debug and self.profiling_stats is not None:
             dt = self.profiling_stats.time.average
             print(
-                f"Function {self.func.__name__} called with args={args}, kwargs={kwargs}, took {dt:.2e} seconds to execute.",
+                f"Function {self.func.__name__} called with args={args},"
+                f" kwargs={kwargs}, took {dt:.2e} seconds to execute.",
             )
         return result
 
@@ -452,7 +457,10 @@ class _Function:
         output_name: _OUTPUT_TYPE | None = None,
     ) -> Callable[..., Any]:
         sig = inspect.signature(self.__call__)
-        new_params = [inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in parameters]
+        new_params = [
+            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            for name in parameters
+        ]
         new_sig = sig.replace(parameters=new_params)
 
         def call(*args: Any, **kwargs: Any) -> Any:
@@ -482,7 +490,11 @@ def _next_root_args(
     arg_set: set[tuple[str, ...]],
 ) -> tuple[str, ...]:
     """Find the tuple of root arguments."""
-    return next(args for args in arg_set if all(isinstance(pipeline.node_mapping[n], str) for n in args))
+    return next(
+        args
+        for args in arg_set
+        if all(isinstance(pipeline.node_mapping[n], str) for n in args)
+    )
 
 
 class Pipeline:
@@ -778,7 +790,9 @@ class Pipeline:
             func = self.output_to_func[output_name]
 
             if func is None:
-                msg = f"Argument {output_name} is not in kwargs and has no default value."
+                msg = (
+                    f"Argument {output_name} is not in kwargs and has no default value."
+                )
                 raise ValueError(msg)
 
             assert func.parameters is not None
@@ -998,7 +1012,10 @@ class Pipeline:
         node_sets = [{k, *v} for k, v in combinable_nodes.items()]
         for node in self.graph.nodes:
             if isinstance(node, PipelineFunction):
-                i = next((i for i, nodes in enumerate(node_sets) if node in nodes), None)
+                i = next(
+                    (i for i, nodes in enumerate(node_sets) if node in nodes),
+                    None,
+                )
                 if i is not None:
                     func_node_colors.append(f"C{i}")
                 else:
@@ -1025,7 +1042,12 @@ class Pipeline:
 
         """
         func_node_colors = self._func_node_colors() if color_combinable else None
-        visualize(self.graph, figsize=figsize, filename=filename, func_node_colors=func_node_colors)
+        visualize(
+            self.graph,
+            figsize=figsize,
+            filename=filename,
+            func_node_colors=func_node_colors,
+        )
 
     def visualize_holoviews(self) -> hv.Graph:
         """Visualize the pipeline as a directed graph using HoloViews."""
@@ -1175,7 +1197,10 @@ class Pipeline:
         function calls.
 
         """
-        combinable_nodes = self._identify_combinable_nodes(output_name, conservatively_combine=conservatively_combine)
+        combinable_nodes = self._identify_combinable_nodes(
+            output_name,
+            conservatively_combine=conservatively_combine,
+        )
         if not combinable_nodes:
             warnings.warn(
                 "No combinable nodes found, the pipeline cannot be simplified.",
@@ -1270,7 +1295,10 @@ class Pipeline:
         """
         simplified_pipeline = self.simplified_pipeline(output_name)
         func_only_graph = simplified_pipeline.graph.copy()
-        root_args = simplified_pipeline.arg_combinations(output_name, root_args_only=True)
+        root_args = simplified_pipeline.arg_combinations(
+            output_name,
+            root_args_only=True,
+        )
         for arg in root_args:
             func_only_graph.remove_node(arg)
         return nx.all_topological_sorts(func_only_graph)
@@ -1323,7 +1351,11 @@ class Pipeline:
         for arg in root_args:
             func_only_graph.remove_node(arg)
 
-        leaf = next(n for n in func_only_graph.nodes if output_name in _at_least_tuple(n.output_name))
+        leaf = next(
+            n
+            for n in func_only_graph.nodes
+            if output_name in _at_least_tuple(n.output_name)
+        )
         roots = [n for n, d in func_only_graph.in_degree() if d == 0]
         graph = nx.transitive_reduction(func_only_graph)
         return [list(nx.all_simple_paths(graph, root, leaf)) for root in roots]
@@ -1331,7 +1363,9 @@ class Pipeline:
     @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
         """Return the profiling data for each function in the pipeline."""
-        return {f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats}
+        return {
+            f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats
+        }
 
     def __str__(self) -> str:
         """Return a string representation of the pipeline."""
@@ -1340,7 +1374,9 @@ class Pipeline:
             if isinstance(node, PipelineFunction):
                 fn = node
                 input_args = self.all_arg_combinations()[fn.output_name]
-                pipeline_str += f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
+                pipeline_str += (
+                    f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
+                )
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
@@ -1351,7 +1387,10 @@ def _wrap_dict_to_tuple(
     output_name: str | tuple[str, ...],
 ) -> Callable[..., Any]:
     sig = inspect.signature(func)
-    new_params = [inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in inputs]
+    new_params = [
+        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for name in inputs
+    ]
     new_sig = sig.replace(parameters=new_params)
 
     def call(*args: Any, **kwargs: Any) -> Any:
