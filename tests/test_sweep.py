@@ -83,7 +83,10 @@ def test_count_sweep(pipeline, use_pandas):
     ]
     output_name = "e"
     expected_result = {"c": {(1, 2): 2, (2, 3): 1}, "d": {(1, 2, 3): 2, (2, 3, 4): 1}}
-    assert count_sweep(output_name, sweep, pipeline, use_pandas=use_pandas) == expected_result
+    assert (
+        count_sweep(output_name, sweep, pipeline, use_pandas=use_pandas)
+        == expected_result
+    )
 
 
 def test_set_cache_for_sweep(pipeline):
@@ -136,7 +139,9 @@ def test_filtered_sweep():
 
     sweep = Sweep(combos)
     filtered = sweep.filtered_sweep(("a", "b", "c"))
-    assert len(sweep) == len(sweep.list()) == len(filtered.list()) * 2 == len(filtered) * 2
+    assert (
+        len(sweep) == len(sweep.list()) == len(filtered.list()) * 2 == len(filtered) * 2
+    )
 
     sweep = Sweep(combos, dims=[("a", "b"), "c", "d"])
     filtered = sweep.filtered_sweep(("a", "c", "d"))

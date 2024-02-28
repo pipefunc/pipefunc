@@ -89,7 +89,12 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
     assert fd(a=2, b=3, xx=1) == f2(b=3, c=c, xx=1) == fd(b=3, c=c, xx=1) == 15
 
     fe = pipeline.func("e")
-    assert fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1, xx=1) == f3(c=c, d=15, x=1) == 75
+    assert (
+        fe(a=2, b=3, x=1, xx=1)
+        == fe(a=2, b=3, d=15, x=1, xx=1)
+        == f3(c=c, d=15, x=1)
+        == 75
+    )
 
     all_args = pipeline.all_arg_combinations()
     assert all_args == {
@@ -329,7 +334,10 @@ def test_tuple_outputs():
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
 
     assert (
-        pipeline.func_dependencies("g") == pipeline.func_dependencies("h") == pipeline.func_dependencies(("g", "h")) == [("c", "_throw"), ("d", "e")]
+        pipeline.func_dependencies("g")
+        == pipeline.func_dependencies("h")
+        == pipeline.func_dependencies(("g", "h"))
+        == [("c", "_throw"), ("d", "e")]
     )
 
     f = pipeline.func(("g", "h"))
@@ -438,9 +446,15 @@ def test_conservatively_combine():
 
     root_args = pipeline.all_arg_combinations(root_args_only=True)
     assert root_args == {"x": {("a",)}, "y": {("a", "b")}, "z": {("a", "b")}}
-    combinable_nodes = pipeline._identify_combinable_nodes("z", conservatively_combine=True)
+    combinable_nodes = pipeline._identify_combinable_nodes(
+        "z",
+        conservatively_combine=True,
+    )
     assert combinable_nodes == {}
-    combinable_nodes2 = pipeline._identify_combinable_nodes("z", conservatively_combine=False)
+    combinable_nodes2 = pipeline._identify_combinable_nodes(
+        "z",
+        conservatively_combine=False,
+    )
     assert combinable_nodes2 == {f3: {f2}}
 
 
