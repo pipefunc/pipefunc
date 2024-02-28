@@ -34,6 +34,8 @@ class Sweep:
     exclude
         A function that takes a dictionary of dimension values and returns
         True if the combination should be excluded from the sweep.
+    constants
+        A dictionary of constant values to be included in each combination.
 
     Returns
     -------
@@ -65,11 +67,13 @@ class Sweep:
         items: dict[str, Sequence[Any]],
         dims: list[Any] | None = None,
         exclude: Callable[[dict[str, Any]], bool] | None = None,
+        constants: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the sweep."""
         self.items = items
         self.dims = dims
         self.exclude = exclude
+        self.constants = constants
 
     def generate(self) -> Generator[dict[str, Any], None, None]:
         if self.dims is None or set(self.dims) == self.items.keys():
@@ -78,6 +82,8 @@ class Sweep:
             vals = self.items.values()
             for res in product(*vals):
                 combination = dict(zip(names, res))
+                if self.constants is not None:
+                    combination.update(self.constants)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
         else:
@@ -113,7 +119,7 @@ class Sweep:
                             dims.append(_dims[0])
                         else:
                             dims.append(_dims)
-        return Sweep(self.items, dims=dims, exclude=self.exclude)
+        return Sweep(self.items, dims=dims, exclude=self.exclude, constants=self.constants)
 
     def __len__(self) -> int:
         """Return the number of unique combinations in the sweep."""
