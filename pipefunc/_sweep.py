@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from itertools import product
 from typing import TYPE_CHECKING, Any, Callable, Generator, Sequence
 
@@ -34,6 +34,8 @@ class Sweep:
     exclude
         A function that takes a dictionary of dimension values and returns
         True if the combination should be excluded from the sweep.
+    constants
+        A dictionary of constant values to be included in each combination.
 
     Returns
     -------
@@ -62,14 +64,16 @@ class Sweep:
 
     def __init__(
         self,
-        items: dict[str, Sequence[Any]],
-        dims: list[Any] | None = None,
-        exclude: Callable[[dict[str, Any]], bool] | None = None,
+        items: Mapping[str, Sequence[Any]],
+        dims: list[str | tuple[str, ...]] | None = None,
+        exclude: Callable[[Mapping[str, Any]], bool] | None = None,
+        constants: Mapping[str, Any] | None = None,
     ) -> None:
         """Initialize the sweep."""
         self.items = items
         self.dims = dims
         self.exclude = exclude
+        self.constants = constants
 
     def generate(self) -> Generator[dict[str, Any], None, None]:
         if self.dims is None or set(self.dims) == self.items.keys():
@@ -78,6 +82,8 @@ class Sweep:
             vals = self.items.values()
             for res in product(*vals):
                 combination = dict(zip(names, res))
+                if self.constants is not None:
+                    combination.update(self.constants)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
         else:
@@ -89,6 +95,8 @@ class Sweep:
                 product_parts.append([dict(zip(dims, res)) for res in zip(*dim_seqs)])
             for combo in product(*product_parts):
                 combination = {k: v for item in combo for k, v in item.items()}
+                if self.constants is not None:
+                    combination.update(self.constants)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
 
@@ -113,7 +121,12 @@ class Sweep:
                             dims.append(_dims[0])
                         else:
                             dims.append(_dims)
-        return Sweep(self.items, dims=dims, exclude=self.exclude)
+        return Sweep(
+            self.items,
+            dims=dims,
+            exclude=self.exclude,
+            constants=self.constants,
+        )
 
     def __len__(self) -> int:
         """Return the number of unique combinations in the sweep."""
