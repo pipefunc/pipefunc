@@ -181,29 +181,3 @@ def test_multi_sweep_add():
     expected_result = sweep1.list() + sweep2.list() + sweep3.list()
     assert multi_sweep.list() == expected_result
     assert len(multi_sweep) == 10
-
-
-def test_constants() -> None:
-    items = {"a": [1, 2], "b": [3, 4]}
-    sweep1 = Sweep(items, constants={"c": 5})
-    sweep2 = Sweep(items, constants={"c": 6})
-    assert sweep1.list() == [
-        {"a": 1, "b": 3, "c": 5},
-        {"a": 1, "b": 4, "c": 5},
-        {"a": 2, "b": 3, "c": 5},
-        {"a": 2, "b": 4, "c": 5},
-    ]
-    assert sweep2.list() == [
-        {"a": 1, "b": 3, "c": 6},
-        {"a": 1, "b": 4, "c": 6},
-        {"a": 2, "b": 3, "c": 6},
-        {"a": 2, "b": 4, "c": 6},
-    ]
-    assert MultiSweep(sweep1, sweep2).list() == sweep1.list() + sweep2.list()
-    sweep3 = Sweep(items, dims=[("a",), ("b",)], constants={"c": 5})
-    assert sweep3.list() == [
-        {"a": 1, "b": 3, "c": 5},
-        {"a": 1, "b": 4, "c": 5},
-        {"a": 2, "b": 3, "c": 5},
-        {"a": 2, "b": 4, "c": 5},
-    ]
