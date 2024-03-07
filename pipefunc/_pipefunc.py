@@ -1009,6 +1009,7 @@ class Pipeline:
             output_name=self.functions[-1].output_name,
             conservatively_combine=conservatively_combine,
         )
+        combinable_nodes = _combine_nodes(combinable_nodes)
         node_sets = [{k, *v} for k, v in combinable_nodes.items()]
         for node in self.graph.nodes:
             if isinstance(node, PipelineFunction):
