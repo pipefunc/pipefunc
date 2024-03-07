@@ -534,7 +534,12 @@ def test_identify_combinable_nodes2():
     assert sig_out == {m["f6"]: {"f6"}}
 
     # Test simplified_pipeline
-    simplified_pipeline = pipeline.simplified_pipeline("f7")
+    simplified_pipeline = pipeline.simplified_pipeline()
+    assert (
+        pipeline._unique_tip().output_name
+        == simplified_pipeline._unique_tip().output_name
+        == "f7"
+    )
     simplified_functions = simplified_pipeline.functions
 
     # Check that the simplified pipeline has the expected number of functions
