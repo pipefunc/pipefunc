@@ -1214,11 +1214,11 @@ class Pipeline:
         skip = set.union(*combinable_nodes.values()) if combinable_nodes else set()
         in_sig, out_sig = _get_signature(combinable_nodes, self.graph)
         m = self.node_mapping
-        predessors = [m[o] for o in self.func_dependencies(output_name)]
+        predecessors = [m[o] for o in self.func_dependencies(output_name)]
         head = self.node_mapping[output_name]
         new_functions = []
         for f in self.functions:
-            if f != head and f not in predessors:
+            if f != head and f not in predecessors:
                 continue
             if f in combinable_nodes:
                 inputs = tuple(sorted(in_sig[f]))

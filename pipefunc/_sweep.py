@@ -216,8 +216,9 @@ class MultiSweep(Sweep):
 
 
 def generate_sweep(
-    items: dict[str, Sequence[Any]],
-    dims: list[Any] | None = None,
+    items: Mapping[str, Sequence[Any]],
+    dims: list[str | tuple[str, ...]] | None = None,
+    constants: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Create a sweep of a pipeline.
 
@@ -230,10 +231,12 @@ def generate_sweep(
     items
         A dictionary where the key is the name of the dimension and the
         value is a sequence of values for that dimension.
-
     dims
         A list of tuples. Each tuple contains names of dimensions that are
         linked together. If not provided, a Cartesian product is formed.
+    constants
+        A dictionary with constant values that should be added to each
+        combination.
 
     Returns
     -------
@@ -259,7 +262,7 @@ def generate_sweep(
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
 
     """
-    return Sweep(items, dims).list()
+    return Sweep(items, dims, constants=constants).list()
 
 
 def count_sweep(
