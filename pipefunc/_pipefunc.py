@@ -945,10 +945,10 @@ class Pipeline:
             return _next_root_args(self, arg_set)
         return arg_set
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[str]:
+    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output."""
 
-        def _predecessors(x: _OUTPUT_TYPE | PipelineFunction) -> list[str]:
+        def _predecessors(x: _OUTPUT_TYPE | PipelineFunction) -> list[_OUTPUT_TYPE]:
             preds = set()
             if isinstance(x, (str, tuple)):
                 x = self.node_mapping[x]
