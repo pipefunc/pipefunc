@@ -1005,7 +1005,7 @@ class Pipeline:
     def _unique_tip(self) -> PipelineFunction:
         """Return the unique tip of the pipeline graph."""
         tips = self._graph_tips()
-        if len(tips) != 1:
+        if len(tips) != 1:  # pragma: no cover
             msg = (
                 "The pipeline has multiple tips. Please specify the output_name"
                 " argument to disambiguate.",
