@@ -498,6 +498,8 @@ def test_conservatively_combine():
     simplified_output_false = simplified_pipeline_false("z", **input_data)
     assert original_output == simplified_output_true == simplified_output_false
 
+    assert pipeline._func_node_colors() == ["C1", "C0", "C0"]
+
 
 def test_identify_combinable_nodes2():
     def f1(a, b, c, d):
