@@ -945,10 +945,10 @@ class Pipeline:
             return _next_root_args(self, arg_set)
         return arg_set
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[str]:
+    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output."""
 
-        def _predecessors(x: _OUTPUT_TYPE | PipelineFunction) -> list[str]:
+        def _predecessors(x: _OUTPUT_TYPE | PipelineFunction) -> list[_OUTPUT_TYPE]:
             preds = set()
             if isinstance(x, (str, tuple)):
                 x = self.node_mapping[x]
@@ -998,14 +998,33 @@ class Pipeline:
                 mapping[node.output_name] = arg_combinations
         return mapping
 
+    def _graph_tips(self) -> set[PipelineFunction]:
+        """Return the tips of the pipeline graph."""
+        return {n[-1] for n in nx.all_topological_sorts(self.graph)}
+
+    def _unique_tip(self) -> PipelineFunction:
+        """Return the unique tip of the pipeline graph."""
+        tips = self._graph_tips()
+        if len(tips) != 1:  # pragma: no cover
+            msg = (
+                "The pipeline has multiple tips. Please specify the output_name"
+                " argument to disambiguate.",
+            )
+            raise ValueError(msg)
+        return next(iter(tips))
+
     def _func_node_colors(
         self,
         *,
         conservatively_combine: bool = False,
+        output_name: _OUTPUT_TYPE | None = None,
     ) -> list[str]:
+        if output_name is None:
+            output_name = self._unique_tip().output_name
+
         func_node_colors = []
         combinable_nodes = self._identify_combinable_nodes(
-            output_name=self.functions[-1].output_name,
+            output_name=output_name,
             conservatively_combine=conservatively_combine,
         )
         combinable_nodes = _combine_nodes(combinable_nodes)
@@ -1030,6 +1049,8 @@ class Pipeline:
         filename: str | Path | None = None,
         *,
         color_combinable: bool = False,
+        conservatively_combine: bool = False,
+        output_name: _OUTPUT_TYPE | None = None,
     ) -> None:
         """Visualize the pipeline as a directed graph.
 
@@ -1041,9 +1062,19 @@ class Pipeline:
             The filename to save the figure to.
         color_combinable
             Whether to color combinable nodes differently.
+        conservatively_combine
+            Argument as passed to `Pipeline.simply_pipeline`.
+        output_name
+            Argument as passed to `Pipeline.simply_pipeline`.
 
         """
-        func_node_colors = self._func_node_colors() if color_combinable else None
+        if color_combinable:
+            func_node_colors = self._func_node_colors(
+                conservatively_combine=conservatively_combine,
+                output_name=output_name,
+            )
+        else:
+            func_node_colors = None
         visualize(
             self.graph,
             figsize=figsize,
@@ -1149,7 +1180,7 @@ class Pipeline:
 
     def simplified_pipeline(
         self,
-        output_name: _OUTPUT_TYPE,
+        output_name: _OUTPUT_TYPE | None = None,
         *,
         conservatively_combine: bool = False,
     ) -> Pipeline:
@@ -1169,7 +1200,8 @@ class Pipeline:
         output_name
             The name of the output from the pipeline function we are starting
             the simplification from. It is used to get the starting function in the
-            pipeline.
+            pipeline. If None, the unique tip of the pipeline graph is used (if
+            there is one).
         conservatively_combine
             If True, only combine a function node with its predecessors if all
             of its predecessors have the same root arguments as the function
@@ -1203,6 +1235,8 @@ class Pipeline:
         function calls.
 
         """
+        if output_name is None:
+            output_name = self._unique_tip().output_name
         combinable_nodes = self._identify_combinable_nodes(
             output_name,
             conservatively_combine=conservatively_combine,

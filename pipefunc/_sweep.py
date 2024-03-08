@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Sequence
 import networkx as nx
 
 if TYPE_CHECKING:
-    from pipefunc import Pipeline, PipelineFunction
+    from pipefunc._pipefunc import _OUTPUT_TYPE, Pipeline, PipelineFunction
 
 
 def _at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -306,7 +306,7 @@ def count_sweep(
         # TODO: we can likely special case this to be faster.
         sweep = sweep.list()  # type: ignore[assignment]
     assert isinstance(sweep, Iterable)
-    counts: dict[str | tuple[str, ...], dict[tuple[Any, ...], int]] = {}
+    counts: dict[_OUTPUT_TYPE, dict[tuple[Any, ...], int]] = {}
     deps = pipeline.func_dependencies(output_name)
     for _output_name in deps:
         arg_combination = pipeline.arg_combinations(_output_name, root_args_only=True)
@@ -316,7 +316,7 @@ def count_sweep(
 
             df = pd.DataFrame(list(sweep))
             cols = list(arg_combination)
-            counts[_output_name] = df[cols].groupby(cols).size().to_dict()
+            counts[_output_name] = df[cols].groupby(cols).size().to_dict()  # type: ignore[assignment]
         else:
             _cnt: dict[tuple[Any, ...], int] = {}
             for combo in sweep:
