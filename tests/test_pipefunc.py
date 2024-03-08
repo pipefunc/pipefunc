@@ -538,8 +538,8 @@ def test_identify_combinable_nodes2():
     # Test simplified_pipeline
     simplified_pipeline = pipeline.simplified_pipeline()
     assert (
-        pipeline._unique_tip().output_name
-        == simplified_pipeline._unique_tip().output_name
+        pipeline._unique_leaf_node().output_name
+        == simplified_pipeline._unique_leaf_node().output_name
         == "f7"
     )
     simplified_functions = simplified_pipeline.functions
