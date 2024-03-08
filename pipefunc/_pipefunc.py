@@ -136,6 +136,7 @@ class PipelineFunction(Generic[T]):
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
+        update_wrapper(self, func)
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
@@ -160,8 +161,8 @@ class PipelineFunction(Generic[T]):
             if v.default is not inspect.Parameter.empty
         }
         self.profiling_stats: ProfilingStats | None
+
         self.set_profiling(enable=profile)
-        update_wrapper(self, func)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
