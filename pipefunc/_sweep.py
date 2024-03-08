@@ -316,7 +316,7 @@ def count_sweep(
 
             df = pd.DataFrame(list(sweep))
             cols = list(arg_combination)
-            counts[_output_name] = df[cols].groupby(cols).size().to_dict()
+            counts[_output_name] = df[cols].groupby(cols).size().to_dict()  # type: ignore[assignment]
         else:
             _cnt: dict[tuple[Any, ...], int] = {}
             for combo in sweep:
