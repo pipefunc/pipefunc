@@ -161,7 +161,6 @@ class PipelineFunction(Generic[T]):
             if v.default is not inspect.Parameter.empty
         }
         self.profiling_stats: ProfilingStats | None
-
         self.set_profiling(enable=profile)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
