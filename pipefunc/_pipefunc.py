@@ -21,7 +21,7 @@ import sys
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from functools import partial
+from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -136,6 +136,7 @@ class PipelineFunction(Generic[T]):
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
+        update_wrapper(self, func)
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
