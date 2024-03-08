@@ -998,20 +998,16 @@ class Pipeline:
                 mapping[node.output_name] = arg_combinations
         return mapping
 
-    def _graph_tips(self) -> set[PipelineFunction]:
-        """Return the tips of the pipeline graph."""
-        return {n[-1] for n in nx.all_topological_sorts(self.graph)}
-
-    def _unique_tip(self) -> PipelineFunction:
-        """Return the unique tip of the pipeline graph."""
-        tips = self._graph_tips()
-        if len(tips) != 1:  # pragma: no cover
+    def _unique_leaf_node(self) -> PipelineFunction:
+        """Return the unique leaf node of the pipeline graph."""
+        leaf_nodes = self.leaf_nodes
+        if len(leaf_nodes) != 1:  # pragma: no cover
             msg = (
-                "The pipeline has multiple tips. Please specify the output_name"
+                "The pipeline has multiple leaf nodes. Please specify the output_name"
                 " argument to disambiguate.",
             )
             raise ValueError(msg)
-        return next(iter(tips))
+        return leaf_nodes[0]
 
     def _func_node_colors(
         self,
@@ -1020,7 +1016,7 @@ class Pipeline:
         output_name: _OUTPUT_TYPE | None = None,
     ) -> list[str]:
         if output_name is None:
-            output_name = self._unique_tip().output_name
+            output_name = self._unique_leaf_node().output_name
 
         func_node_colors = []
         combinable_nodes = self._identify_combinable_nodes(
@@ -1236,7 +1232,7 @@ class Pipeline:
 
         """
         if output_name is None:
-            output_name = self._unique_tip().output_name
+            output_name = self._unique_leaf_node().output_name
         combinable_nodes = self._identify_combinable_nodes(
             output_name,
             conservatively_combine=conservatively_combine,
