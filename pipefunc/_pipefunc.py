@@ -21,7 +21,7 @@ import sys
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from functools import partial
+from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -161,6 +161,7 @@ class PipelineFunction(Generic[T]):
         }
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
+        update_wrapper(self, func)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
