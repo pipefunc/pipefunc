@@ -380,6 +380,18 @@ def test_sweep_product_with_exclude() -> None:
         {"a": 2, "b": 4, "c": 5},
     ]
 
+    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]}, exclude=exclude1)
+    sweep2 = Sweep({"c": [5, 6]}, exclude=None)
+    sweep3 = sweep1.product(sweep2)
+    assert sweep3.list() == [
+        {"a": 1, "b": 4, "c": 5},
+        {"a": 1, "b": 4, "c": 6},
+        {"a": 2, "b": 3, "c": 5},
+        {"a": 2, "b": 3, "c": 6},
+        {"a": 2, "b": 4, "c": 5},
+        {"a": 2, "b": 4, "c": 6},
+    ]
+
 
 def test_sweep_product_with_callables() -> None:
     sweep1 = Sweep({"a": [1, 2]}, callables={"x": lambda combo: combo["a"] * 10})
