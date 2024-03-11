@@ -19,7 +19,7 @@ def _at_least_tuple(x: Any) -> tuple[Any, ...]:
 def _combined_exclude(
     *func: Callable[[Mapping[str, Any]], bool] | None,
 ) -> Callable[[Mapping[str, Any]], bool] | None:
-    """Combine multiple derivers into one."""
+    """Combine multiple exclude functions into one."""
     funcs = [f for f in func if f is not None]
     if len(funcs) == 0:
         return None
