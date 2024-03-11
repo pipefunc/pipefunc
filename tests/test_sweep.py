@@ -381,15 +381,15 @@ def test_sweep_product_with_exclude() -> None:
     ]
 
     sweep1 = Sweep({"a": [1, 2], "b": [3, 4]}, exclude=exclude1)
-    sweep2 = Sweep({"c": [5, 6]}, exclude=None)
+    sweep2 = Sweep({"c": [5, 6]}, exclude=None, constants={"x": 1})
     sweep3 = sweep1.product(sweep2)
     assert sweep3.list() == [
-        {"a": 1, "b": 4, "c": 5},
-        {"a": 1, "b": 4, "c": 6},
-        {"a": 2, "b": 3, "c": 5},
-        {"a": 2, "b": 3, "c": 6},
-        {"a": 2, "b": 4, "c": 5},
-        {"a": 2, "b": 4, "c": 6},
+        {"a": 1, "b": 4, "c": 5, "x": 1},
+        {"a": 1, "b": 4, "c": 6, "x": 1},
+        {"a": 2, "b": 3, "c": 5, "x": 1},
+        {"a": 2, "b": 3, "c": 6, "x": 1},
+        {"a": 2, "b": 4, "c": 5, "x": 1},
+        {"a": 2, "b": 4, "c": 6, "x": 1},
     ]
 
 
