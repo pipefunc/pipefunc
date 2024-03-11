@@ -268,7 +268,7 @@ class Sweep:
 
     def add_derivers(
         self,
-        derivers: dict[str, Callable[[dict[str, Any]], Any]],
+        **derivers: Callable[[dict[str, Any]], Any],
     ) -> Sweep:
         """Add derivers to the sweep, which are functions that modify the sweep items.
 
@@ -280,6 +280,18 @@ class Sweep:
             values are functions that take a dict as input and return
             a new attribute value. The keys might be a subset of the
             items keys, which means the values will be overwritten.
+
+        Returns
+        -------
+        Sweep
+            A new Sweep object with the added derivers.
+
+        Examples
+        --------
+        >>> sweep = Sweep({'a': [1], 'b': [2, 3]})
+        >>> sweep = sweep.add_derivers(c=lambda x: x['a'] + x['b'])
+        >>> sweep.list()
+        [{'a': 1, 'b': 2, 'c': 3}, {'a': 1, 'b': 3, 'c': 4}]
 
         """
         return Sweep(

@@ -246,7 +246,7 @@ def test_derivers() -> None:
     assert sweep1.list() == expected
 
     sweep2 = Sweep(items, dims=[("a",), ("b",)])  # type: ignore[arg-type]
-    sweep3 = sweep2.add_derivers(derivers)
+    sweep3 = sweep2.add_derivers(**derivers)
     assert sweep3.list() == expected
 
 
