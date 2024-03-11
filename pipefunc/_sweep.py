@@ -158,6 +158,7 @@ class Sweep:
             dims=dims,
             exclude=self.exclude,
             constants=self.constants,
+            callables=None,
         )
 
     def __len__(self) -> int:
