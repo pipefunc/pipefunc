@@ -36,6 +36,12 @@ class Sweep:
         True if the combination should be excluded from the sweep.
     constants
         A dictionary of constant values to be included in each combination.
+    callables
+        A dictionary of functions to be applied to each
+        dict. The dictionary keys are attribute names and the
+        values are functions that take a dict as input and return
+        a new attribute value. The keys might be a subset of the
+        items keys, which means the values will be overwritten.
 
     Returns
     -------
@@ -64,18 +70,20 @@ class Sweep:
 
     def __init__(
         self,
-        items: Mapping[str, Sequence[Any]],
+        items: dict[str, Sequence[Any]],
         dims: list[str | tuple[str, ...]] | None = None,
         exclude: Callable[[Mapping[str, Any]], bool] | None = None,
         constants: Mapping[str, Any] | None = None,
+        callables: dict[str, Callable[[dict[str, Any]], Any]] | None = None,
     ) -> None:
         """Initialize the sweep."""
         self.items = items
         self.dims = dims
         self.exclude = exclude
         self.constants = constants
+        self.callables = callables
 
-    def generate(self) -> Generator[dict[str, Any], None, None]:
+    def generate(self) -> Generator[dict[str, Any], None, None]:  # noqa: PLR0912
         if self.dims is None or set(self.dims) == self.items.keys():
             # Create the full Cartesian product if no dimensions are provided.
             names = self.items.keys()
@@ -84,6 +92,9 @@ class Sweep:
                 combination = dict(zip(names, res))
                 if self.constants is not None:
                     combination.update(self.constants)
+                if self.callables is not None:
+                    for key, func in self.callables.items():
+                        combination[key] = func(combination)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
         else:
@@ -97,6 +108,9 @@ class Sweep:
                 combination = {k: v for item in combo for k, v in item.items()}
                 if self.constants is not None:
                     combination.update(self.constants)
+                if self.callables is not None:
+                    for key, func in self.callables.items():
+                        combination[key] = func(combination)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
 
@@ -157,6 +171,53 @@ class Sweep:
         """Add another sweep to this MultiSweep."""
         return other + self
 
+    def product(self, *others: Sweep) -> Sweep:
+        """Create a Cartesian product of this Sweep with other Sweeps.
+
+        Parameters
+        ----------
+        *others
+            One or more Sweep objects to create a Cartesian product with.
+
+        Returns
+        -------
+        Sweep
+            A new Sweep object representing the Cartesian product of the sweeps.
+
+        Examples
+        --------
+        >>> sweep1 = Sweep({'a': [1, 2], 'b': [3, 4]})
+        >>> sweep2 = Sweep({'c': [5, 6]})
+        >>> sweep3 = sweep1.product(sweep2)
+        >>> sweep3.list()
+        [{'a': 1, 'b': 3, 'c': 5}, {'a': 1, 'b': 3, 'c': 6},
+         {'a': 1, 'b': 4, 'c': 5}, {'a': 1, 'b': 4, 'c': 6},
+         {'a': 2, 'b': 3, 'c': 5}, {'a': 2, 'b': 3, 'c': 6},
+         {'a': 2, 'b': 4, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
+
+        """
+        items = self.items.copy()
+        for other in others:
+            if not isinstance(other, Sweep):
+                msg = "All arguments must be Sweep instances."
+                raise TypeError(msg)
+            items.update(other.items)
+
+        return Sweep(items)
+
+    def add_callables(
+        self,
+        callables: dict[str, Callable[[dict[str, Any]], Any]],
+    ) -> Sweep:
+        """Add callables to the sweep."""
+        return Sweep(
+            self.items,
+            dims=self.dims,
+            exclude=self.exclude,
+            constants=self.constants,
+            callables=callables,
+        )
+
 
 class MultiSweep(Sweep):
     """A class to concatenate multiple sweeps into one.
@@ -216,7 +277,7 @@ class MultiSweep(Sweep):
 
 
 def generate_sweep(
-    items: Mapping[str, Sequence[Any]],
+    items: dict[str, Sequence[Any]],
     dims: list[str | tuple[str, ...]] | None = None,
     exclude: Callable[[Mapping[str, Any]], bool] | None = None,
     constants: Mapping[str, Any] | None = None,

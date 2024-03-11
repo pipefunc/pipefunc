@@ -185,8 +185,8 @@ def test_multi_sweep_add():
 
 def test_constants() -> None:
     items = {"a": [1, 2], "b": [3, 4]}
-    sweep1 = Sweep(items, constants={"c": 5})
-    sweep2 = Sweep(items, constants={"c": 6})
+    sweep1 = Sweep(items, constants={"c": 5})  # type: ignore[arg-type]
+    sweep2 = Sweep(items, constants={"c": 6})  # type: ignore[arg-type]
     assert sweep1.list() == [
         {"a": 1, "b": 3, "c": 5},
         {"a": 1, "b": 4, "c": 5},
@@ -200,10 +200,42 @@ def test_constants() -> None:
         {"a": 2, "b": 4, "c": 6},
     ]
     assert MultiSweep(sweep1, sweep2).list() == sweep1.list() + sweep2.list()
-    sweep3 = Sweep(items, dims=[("a",), ("b",)], constants={"c": 5})
+    sweep3 = Sweep(items, dims=[("a",), ("b",)], constants={"c": 5})  # type: ignore[arg-type]
     assert sweep3.list() == [
         {"a": 1, "b": 3, "c": 5},
         {"a": 1, "b": 4, "c": 5},
         {"a": 2, "b": 3, "c": 5},
         {"a": 2, "b": 4, "c": 5},
     ]
+
+
+def test_callables() -> None:
+    items = {"a": [1, 2], "b": [3, 4]}
+
+    def double_a(combo):
+        return combo["a"] * 2
+
+    def square_b(combo):
+        return combo["b"] ** 2
+
+    callables = {
+        "a": double_a,
+        "b": square_b,
+        "c": lambda combo: combo["a"] + combo["b"],
+    }
+
+    sweep = Sweep(items, callables=callables)  # type: ignore[arg-type]
+    expected = [
+        {"a": 2, "b": 9, "c": 11},
+        {"a": 2, "b": 16, "c": 18},
+        {"a": 4, "b": 9, "c": 13},
+        {"a": 4, "b": 16, "c": 20},
+    ]
+    assert sweep.list() == expected
+
+    sweep1 = Sweep(items, dims=[("a",), ("b",)], callables=callables)  # type: ignore[arg-type]
+    assert sweep1.list() == expected
+
+    sweep2 = Sweep(items, dims=[("a",), ("b",)])  # type: ignore[arg-type]
+    sweep3 = sweep2.add_callables(callables)
+    assert sweep3.list() == expected
