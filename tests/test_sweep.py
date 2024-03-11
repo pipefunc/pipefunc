@@ -158,9 +158,10 @@ def test_multi_sweep():
     sweep1 = Sweep({"a": [1, 2], "b": [3, 4]})
     sweep2 = Sweep({"x": [5, 6], "y": [7, 8]})
     multi_sweep = MultiSweep(sweep1, sweep2)
+    multi_sweep2 = sweep1 + sweep2
     expected_result = sweep1.list() + sweep2.list()
-    assert multi_sweep.list() == expected_result
-    assert len(multi_sweep) == 8
+    assert multi_sweep.list() == multi_sweep2.list() == expected_result
+    assert len(multi_sweep) == len(multi_sweep2) == 8
 
 
 def test_sweep_add():
@@ -311,4 +312,83 @@ def test_filtered_sweep_without_callables() -> None:
         {"a": 1, "c": 6},
         {"a": 2, "c": 5},
         {"a": 2, "c": 6},
+    ]
+
+
+def test_sweep_product() -> None:
+    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]})
+    sweep2 = Sweep({"c": [5, 6]})
+    sweep3 = sweep1.product(sweep2)
+
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "c": 5},
+        {"a": 1, "b": 3, "c": 6},
+        {"a": 1, "b": 4, "c": 5},
+        {"a": 1, "b": 4, "c": 6},
+        {"a": 2, "b": 3, "c": 5},
+        {"a": 2, "b": 3, "c": 6},
+        {"a": 2, "b": 4, "c": 5},
+        {"a": 2, "b": 4, "c": 6},
+    ]
+
+
+def test_sweep_product_with_dims() -> None:
+    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]}, dims=[("a", "b")])
+    sweep2 = Sweep({"c": [5, 6]})
+    sweep3 = sweep1.product(sweep2)
+    assert sweep1.list() == [
+        {"a": 1, "b": 3},
+        {"a": 2, "b": 4},
+    ]
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "c": 5},
+        {"a": 1, "b": 3, "c": 6},
+        {"a": 2, "b": 4, "c": 5},
+        {"a": 2, "b": 4, "c": 6},
+    ]
+
+
+def test_sweep_product_with_exclude() -> None:
+    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]})
+    sweep2 = Sweep({"c": [5, 6]})
+
+    def exclude(combo):
+        return combo["a"] == 1 and combo["c"] == 6
+
+    sweep3 = sweep1.product(sweep2)
+    sweep3.exclude = exclude
+
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "c": 5},
+        {"a": 1, "b": 4, "c": 5},
+        {"a": 2, "b": 3, "c": 5},
+        {"a": 2, "b": 3, "c": 6},
+        {"a": 2, "b": 4, "c": 5},
+        {"a": 2, "b": 4, "c": 6},
+    ]
+
+
+def test_sweep_product_with_callables() -> None:
+    sweep1 = Sweep({"a": [1, 2]}, callables={"x": lambda combo: combo["a"] * 10})
+    sweep2 = Sweep({"b": [3, 4]}, callables={"y": lambda combo: combo["b"] * 20})
+    sweep3 = sweep1.product(sweep2)
+
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "x": 10, "y": 60},
+        {"a": 1, "b": 4, "x": 10, "y": 80},
+        {"a": 2, "b": 3, "x": 20, "y": 60},
+        {"a": 2, "b": 4, "x": 20, "y": 80},
+    ]
+
+
+def test_sweep_product_with_constants() -> None:
+    sweep1 = Sweep({"a": [1, 2]}, constants={"x": 10})
+    sweep2 = Sweep({"b": [3, 4]}, constants={"y": 20})
+    sweep3 = sweep1.product(sweep2)
+
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "x": 10, "y": 20},
+        {"a": 1, "b": 4, "x": 10, "y": 20},
+        {"a": 2, "b": 3, "x": 10, "y": 20},
+        {"a": 2, "b": 4, "x": 10, "y": 20},
     ]

@@ -16,6 +16,16 @@ def _at_least_tuple(x: Any) -> tuple[Any, ...]:
     return x if isinstance(x, tuple) else (x,)
 
 
+def _combined_exclude(*func: Callable[..., bool] | None) -> Callable[..., bool] | None:
+    """Combine multiple callables into one."""
+    funcs = [f for f in func if f is not None]
+    if len(funcs) == 0:
+        return None
+    if len(funcs) == 1:
+        return funcs[0]
+    return lambda x: all(func(x) for func in funcs)
+
+
 class Sweep:
     """Create a sweep of a pipeline.
 
@@ -217,18 +227,25 @@ class Sweep:
 
         """
         items = self.items.copy()
+        dims = self.dims.copy() if self.dims is not None else None
+
         for other in others:
             if not isinstance(other, Sweep):
                 msg = "All arguments must be Sweep instances."
                 raise TypeError(msg)
             items.update(other.items)
+            if dims is not None:
+                if other.dims is not None:
+                    dims.extend(other.dims)
+                else:
+                    dims.extend(list(other.items.keys()))
 
         return Sweep(
             items,
-            dims=self.dims,
-            exclude=self.exclude,
-            constants=self.constants,
-            callables=self.callables,
+            dims=dims,
+            exclude=_combined_exclude(self.exclude, other.exclude),
+            constants={**(self.constants or {}), **(other.constants or {})},
+            callables={**(self.callables or {}), **(other.callables or {})},
         )
 
     def add_callables(
