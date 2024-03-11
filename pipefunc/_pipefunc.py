@@ -13,6 +13,7 @@ the resource usage of the pipeline functions.
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
 import inspect
 import json
@@ -21,7 +22,6 @@ import sys
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -76,6 +76,12 @@ def _default_output_picker(
 ) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
+
+
+def _update_wrapper(wrapper, wrapped) -> None:  # noqa: ANN001
+    functools.update_wrapper(wrapper, wrapped)
+    # Need to manually update __wrapped__ to keep functions picklable
+    del wrapper.__dict__["__wrapped__"]
 
 
 class PipelineFunction(Generic[T]):
@@ -136,7 +142,7 @@ class PipelineFunction(Generic[T]):
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
-        update_wrapper(self, func)
+        _update_wrapper(self, func)
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
@@ -145,7 +151,7 @@ class PipelineFunction(Generic[T]):
         self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
-            self.output_picker = partial(
+            self.output_picker = functools.partial(
                 _default_output_picker,
                 output_name=self.output_name,
             )
