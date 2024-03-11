@@ -83,7 +83,8 @@ class Sweep:
             for res in product(*vals):
                 combination = dict(zip(names, res))
                 if self.constants is not None:
-                    combination.update(self.constants)
+                    for key, value in self.constants.items():
+                        combination.setdefault(key, value)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
         else:
@@ -96,7 +97,8 @@ class Sweep:
             for combo in product(*product_parts):
                 combination = {k: v for item in combo for k, v in item.items()}
                 if self.constants is not None:
-                    combination.update(self.constants)
+                    for key, value in self.constants.items():
+                        combination.setdefault(key, value)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
 
