@@ -140,6 +140,7 @@ class Sweep:
             dims=dims,
             exclude=self.exclude,
             constants=self.constants,
+            callables=self.callables,
         )
 
     def __len__(self) -> int:
@@ -203,7 +204,13 @@ class Sweep:
                 raise TypeError(msg)
             items.update(other.items)
 
-        return Sweep(items)
+        return Sweep(
+            items,
+            dims=self.dims,
+            exclude=self.exclude,
+            constants=self.constants,
+            callables=self.callables,
+        )
 
     def add_callables(
         self,
@@ -281,6 +288,7 @@ def generate_sweep(
     dims: list[str | tuple[str, ...]] | None = None,
     exclude: Callable[[Mapping[str, Any]], bool] | None = None,
     constants: Mapping[str, Any] | None = None,
+    callables: dict[str, Callable[[dict[str, Any]], Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Create a sweep of a pipeline.
 
@@ -302,6 +310,12 @@ def generate_sweep(
     constants
         A dictionary with constant values that should be added to each
         combination.
+    callables
+        A dictionary of functions to be applied to each
+        dict. The dictionary keys are attribute names and the
+        values are functions that take a dict as input and return
+        a new attribute value. The keys might be a subset of the
+        items keys, which means the values will be overwritten.
 
     Returns
     -------
@@ -327,7 +341,7 @@ def generate_sweep(
     [{'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 4, 'c': 6}]
 
     """
-    return Sweep(items, dims, exclude, constants).list()
+    return Sweep(items, dims, exclude, constants, callables).list()
 
 
 def count_sweep(
