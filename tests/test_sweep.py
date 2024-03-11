@@ -270,6 +270,25 @@ def test_filtered_sweep_with_callables() -> None:
 
     assert filtered_sweep.list() == [{"b": 3, "d": 3}, {"b": 4, "d": 8}]
 
+    # Test with unhashable items
+    sweep = Sweep(
+        items={"a": [[1], [2]], "b": [[3], [4]]},  # type: ignore[arg-type]
+        callables={"c": lambda combo: combo["a"][0] * 2},
+    )
+    assert sweep.list() == [  # check normal sweep
+        {"a": [1], "b": [3], "c": 2},
+        {"a": [1], "b": [4], "c": 2},
+        {"a": [2], "b": [3], "c": 4},
+        {"a": [2], "b": [4], "c": 4},
+    ]
+    with pytest.raises(TypeError, match="All items must be hashable"):
+        sweep.filtered_sweep(("a", "c"))
+
+    assert sweep.filtered_sweep(("c",)).list() == [
+        {"c": 2},
+        {"c": 4},
+    ]
+
 
 def test_filtered_sweep_without_callables() -> None:
     items = {"a": [1, 2], "b": [3, 4], "c": [5, 6]}

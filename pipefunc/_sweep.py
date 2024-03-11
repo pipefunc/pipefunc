@@ -125,10 +125,11 @@ class Sweep:
             for combo in self.generate():
                 filtered_combo = {k: combo[k] for k in keys}
                 key = tuple(filtered_combo.values())
-                if not isinstance(key, Hashable):
+                try:
+                    ordered_set[key] = None
+                except TypeError:
                     msg = "All items must be hashable when using `callables` and `filtered_sweep`."
-                    raise TypeError(msg)
-                ordered_set[key] = None
+                    raise TypeError(msg) from None
             new_items: dict[str, list[Hashable]] = {}
             for item in ordered_set:
                 for k, v in zip(keys, item):
