@@ -239,3 +239,60 @@ def test_callables() -> None:
     sweep2 = Sweep(items, dims=[("a",), ("b",)])  # type: ignore[arg-type]
     sweep3 = sweep2.add_callables(callables)
     assert sweep3.list() == expected
+
+
+def test_filtered_sweep_with_callables() -> None:
+    items = {"a": [1, 2], "b": [3, 4], "c": [5, 6]}
+
+    def multiply_ab(combo):
+        return combo["a"] * combo["b"]
+
+    callables = {
+        "d": multiply_ab,
+    }
+
+    sweep = Sweep(items, callables=callables)  # type: ignore[arg-type]
+    filtered_sweep = sweep.filtered_sweep(("a", "d"))
+
+    assert filtered_sweep.list() == [
+        {"a": 1, "d": 3},
+        {"a": 1, "d": 4},
+        {"a": 2, "d": 6},
+        {"a": 2, "d": 8},
+    ]
+
+    sweep = Sweep(
+        items,  # type: ignore[arg-type]
+        dims=[("a", "b"), ("c",)],
+        callables=callables,
+    )
+    filtered_sweep = sweep.filtered_sweep(("b", "d"))
+
+    assert filtered_sweep.list() == [{"b": 3, "d": 3}, {"b": 4, "d": 8}]
+
+
+def test_filtered_sweep_without_callables() -> None:
+    items = {"a": [1, 2], "b": [3, 4], "c": [5, 6]}
+
+    sweep = Sweep(items)  # type: ignore[arg-type]
+    filtered_sweep = sweep.filtered_sweep(("a", "b"))
+
+    assert filtered_sweep.list() == [
+        {"a": 1, "b": 3},
+        {"a": 1, "b": 4},
+        {"a": 2, "b": 3},
+        {"a": 2, "b": 4},
+    ]
+
+    sweep = Sweep(
+        items,  # type: ignore[arg-type]
+        dims=[("a", "b"), ("c",)],
+    )
+    filtered_sweep = sweep.filtered_sweep(("a", "c"))
+
+    assert filtered_sweep.list() == [
+        {"a": 1, "c": 5},
+        {"a": 1, "c": 6},
+        {"a": 2, "c": 5},
+        {"a": 2, "c": 6},
+    ]

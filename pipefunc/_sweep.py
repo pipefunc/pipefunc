@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Generator, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Sequence
 
 import networkx as nx
 
@@ -118,8 +118,26 @@ class Sweep:
         """Return the sweep as a list."""
         return list(self.generate())
 
-    def filtered_sweep(self, keys: Iterable[str]) -> Sweep:
+    def filtered_sweep(self, keys: Iterable[str]) -> Sweep:  # noqa: PLR0912
         """Return the sweep as a list, but only include the specified keys in each dictionary, and remove duplicates."""
+        if self.callables is not None:
+            ordered_set: dict[tuple[Hashable, ...], None] = {}
+            for combo in self.generate():
+                filtered_combo = {k: combo[k] for k in keys}
+                key = tuple(filtered_combo.values())
+                if not isinstance(key, Hashable):
+                    msg = "All items must be hashable when using `callables` and `filtered_sweep`."
+                    raise TypeError(msg)
+                ordered_set[key] = None
+            new_items: dict[str, list[Hashable]] = {}
+            for item in ordered_set:
+                for k, v in zip(keys, item):
+                    new_items.setdefault(k, []).append(v)
+            return Sweep(
+                items=new_items,  # type: ignore[arg-type]
+                dims=[tuple(keys)],
+            )
+
         dims: list[str | tuple[str, ...]]
         if self.dims is None or set(self.dims) == self.items.keys():
             dims = [k for k in self.items if k in keys]
@@ -140,7 +158,6 @@ class Sweep:
             dims=dims,
             exclude=self.exclude,
             constants=self.constants,
-            callables=self.callables,
         )
 
     def __len__(self) -> int:
