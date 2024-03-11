@@ -218,7 +218,7 @@ def test_constants() -> None:
     ]
 
 
-def test_callables() -> None:
+def test_derivers() -> None:
     items = {"a": [1, 2], "b": [3, 4]}
 
     def double_a(combo):
@@ -227,13 +227,13 @@ def test_callables() -> None:
     def square_b(combo):
         return combo["b"] ** 2
 
-    callables = {
+    derivers = {
         "a": double_a,
         "b": square_b,
         "c": lambda combo: combo["a"] + combo["b"],
     }
 
-    sweep = Sweep(items, callables=callables)  # type: ignore[arg-type]
+    sweep = Sweep(items, derivers=derivers)  # type: ignore[arg-type]
     expected = [
         {"a": 2, "b": 9, "c": 11},
         {"a": 2, "b": 16, "c": 18},
@@ -242,25 +242,25 @@ def test_callables() -> None:
     ]
     assert sweep.list() == expected
 
-    sweep1 = Sweep(items, dims=[("a",), ("b",)], callables=callables)  # type: ignore[arg-type]
+    sweep1 = Sweep(items, dims=[("a",), ("b",)], derivers=derivers)  # type: ignore[arg-type]
     assert sweep1.list() == expected
 
     sweep2 = Sweep(items, dims=[("a",), ("b",)])  # type: ignore[arg-type]
-    sweep3 = sweep2.add_callables(callables)
+    sweep3 = sweep2.add_derivers(derivers)
     assert sweep3.list() == expected
 
 
-def test_filtered_sweep_with_callables() -> None:
+def test_filtered_sweep_with_derivers() -> None:
     items = {"a": [1, 2], "b": [3, 4], "c": [5, 6]}
 
     def multiply_ab(combo):
         return combo["a"] * combo["b"]
 
-    callables = {
+    derivers = {
         "d": multiply_ab,
     }
 
-    sweep = Sweep(items, callables=callables)  # type: ignore[arg-type]
+    sweep = Sweep(items, derivers=derivers)  # type: ignore[arg-type]
     filtered_sweep = sweep.filtered_sweep(("a", "d"))
 
     assert filtered_sweep.list() == [
@@ -273,7 +273,7 @@ def test_filtered_sweep_with_callables() -> None:
     sweep = Sweep(
         items,  # type: ignore[arg-type]
         dims=[("a", "b"), ("c",)],
-        callables=callables,
+        derivers=derivers,
     )
     filtered_sweep = sweep.filtered_sweep(("b", "d"))
 
@@ -282,7 +282,7 @@ def test_filtered_sweep_with_callables() -> None:
     # Test with unhashable items
     sweep = Sweep(
         items={"a": [[1], [2]], "b": [[3], [4]]},  # type: ignore[arg-type]
-        callables={"c": lambda combo: combo["a"][0] * 2},
+        derivers={"c": lambda combo: combo["a"][0] * 2},
     )
     assert sweep.list() == [  # check normal sweep
         {"a": [1], "b": [3], "c": 2},
@@ -296,7 +296,7 @@ def test_filtered_sweep_with_callables() -> None:
     assert sweep.filtered_sweep(("c",)).list() == [{"c": 2}, {"c": 4}]
 
 
-def test_filtered_sweep_without_callables() -> None:
+def test_filtered_sweep_without_derivers() -> None:
     items = {"a": [1, 2], "b": [3, 4], "c": [5, 6]}
 
     sweep = Sweep(items)  # type: ignore[arg-type]
@@ -401,9 +401,9 @@ def test_sweep_product_with_exclude() -> None:
     ]
 
 
-def test_sweep_product_with_callables() -> None:
-    sweep1 = Sweep({"a": [1, 2]}, callables={"x": lambda combo: combo["a"] * 10})
-    sweep2 = Sweep({"b": [3, 4]}, callables={"y": lambda combo: combo["b"] * 20})
+def test_sweep_product_with_derivers() -> None:
+    sweep1 = Sweep({"a": [1, 2]}, derivers={"x": lambda combo: combo["a"] * 10})
+    sweep2 = Sweep({"b": [3, 4]}, derivers={"y": lambda combo: combo["b"] * 20})
     sweep3 = sweep1.product(sweep2)
 
     assert sweep3.list() == [
