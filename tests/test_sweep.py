@@ -347,6 +347,14 @@ def test_sweep_product_with_dims() -> None:
         {"a": 2, "b": 4, "c": 6},
     ]
 
+    # double product
+    assert sweep3.product(Sweep({"d": [7]})).list() == [
+        {"a": 1, "b": 3, "c": 5, "d": 7},
+        {"a": 1, "b": 3, "c": 6, "d": 7},
+        {"a": 2, "b": 4, "c": 5, "d": 7},
+        {"a": 2, "b": 4, "c": 6, "d": 7},
+    ]
+
 
 def test_sweep_product_with_exclude() -> None:
     sweep1 = Sweep({"a": [1, 2], "b": [3, 4]})
