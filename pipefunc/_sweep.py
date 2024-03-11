@@ -16,14 +16,30 @@ def _at_least_tuple(x: Any) -> tuple[Any, ...]:
     return x if isinstance(x, tuple) else (x,)
 
 
-def _combined_exclude(*func: Callable[..., bool] | None) -> Callable[..., bool] | None:
+def _combined_exclude(
+    *func: Callable[[Mapping[str, Any]], bool] | None,
+) -> Callable[[Mapping[str, Any]], bool] | None:
     """Combine multiple callables into one."""
     funcs = [f for f in func if f is not None]
     if len(funcs) == 0:
         return None
     if len(funcs) == 1:
         return funcs[0]
-    return lambda x: all(func(x) for func in funcs)
+    return lambda x: any(func(x) for func in funcs)
+
+
+def _combine_dicts(
+    *maybe_dict: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Combine multiple dictionaries into one."""
+    dicts = [d for d in maybe_dict if d is not None]
+    if len(dicts) == 0:
+        return None
+    if len(dicts) == 1:
+        return dicts[0]
+    # make sure no keys are repeated
+    assert len(set().union(*dicts)) == sum(len(d) for d in dicts)
+    return {k: v for d in dicts for k, v in d.items()}
 
 
 class Sweep:
@@ -244,8 +260,8 @@ class Sweep:
             items,
             dims=dims,
             exclude=_combined_exclude(self.exclude, other.exclude),
-            constants={**(self.constants or {}), **(other.constants or {})},
-            callables={**(self.callables or {}), **(other.callables or {})},
+            constants=_combine_dicts(self.constants, other.constants),  # type: ignore[arg-type]
+            callables=_combine_dicts(self.callables, other.callables),  # type: ignore[arg-type]
         )
 
     def add_callables(
