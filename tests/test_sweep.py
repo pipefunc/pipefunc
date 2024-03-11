@@ -284,10 +284,7 @@ def test_filtered_sweep_with_callables() -> None:
     with pytest.raises(TypeError, match="All items must be hashable"):
         sweep.filtered_sweep(("a", "c"))
 
-    assert sweep.filtered_sweep(("c",)).list() == [
-        {"c": 2},
-        {"c": 4},
-    ]
+    assert sweep.filtered_sweep(("c",)).list() == [{"c": 2}, {"c": 4}]
 
 
 def test_filtered_sweep_without_callables() -> None:
