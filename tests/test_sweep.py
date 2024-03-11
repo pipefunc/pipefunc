@@ -357,18 +357,20 @@ def test_sweep_product_with_dims() -> None:
 
 
 def test_sweep_product_with_exclude() -> None:
-    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]})
-    sweep2 = Sweep({"c": [5, 6]})
+    def exclude1(combo):
+        return combo["a"] == 1 and combo["b"] == 3
 
-    def exclude(combo):
-        return combo["a"] == 1 and combo["c"] == 6
+    def exclude2(combo):
+        return combo["c"] == 6
+
+    sweep1 = Sweep({"a": [1, 2], "b": [3, 4]}, exclude=exclude1)
+    sweep2 = Sweep({"c": [5, 6]}, exclude=exclude1)
 
     sweep3 = sweep1.product(sweep2)
-    sweep3.exclude = exclude
 
     assert sweep3.list() == [
-        {"a": 1, "b": 3, "c": 5},
         {"a": 1, "b": 4, "c": 5},
+        {"a": 1, "b": 4, "c": 6},
         {"a": 2, "b": 3, "c": 5},
         {"a": 2, "b": 3, "c": 6},
         {"a": 2, "b": 4, "c": 5},
