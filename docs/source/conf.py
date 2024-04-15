@@ -20,10 +20,10 @@ import pipefunc  # noqa: E402, isort:skip
 # -- Project information -----------------------------------------------------
 
 project = "pipefunc"
-copyright = "2023, Bas Nijholt"
 author = "Bas Nijholt"
+copyright = f"2023, {author}"
 
-version = pipefunc.__version__
+version = ".".join(pipefunc.__version__.split(".")[:3])
 release = pipefunc.__version__
 
 

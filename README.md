@@ -32,30 +32,23 @@
 
 ## :thinking: What is this?
 
-`pipefunc` is a Python library designed to create and manage complex networks of interdependent functions, often known as function pipelines.
+`pipefunc` is a Python library that simplifies the creation and management of complex function pipelines. It allows you to declare the dependencies between functions and automatically organizes the execution order to satisfy these dependencies.
 
-In a function pipeline, each function can have dependencies on the results of other functions. Managing these dependencies, ensuring each function has the inputs it needs, and determining the order of execution can become an annoying bookkeeping task in complex cases.
+`pipefunc` provides a range of features to streamline your workflow, including pipeline visualization, flexible function arguments, support for multiple outputs, pipeline simplification, resource usage profiling, parallel execution, caching, and parameter sweep utilities.
 
-`pipefunc` simplifies this process by allowing you to declare the dependencies of each function and automatically organizing the execution order to satisfy these dependencies. Additionally, the library provides features for visualizing the function pipeline, simplifying the pipeline graph, caching function results for efficiency, and profiling resource usage for optimization.
-
-For example, imagine you have a set of functions where `function B` needs the output from `function A`, and `function C` needs the outputs from both `function A` and `function B`. `pipefunc` allows you to specify these dependencies when you create the functions and then automatically manages their execution. It also provides tools for visualizing this function network, simplifying it if possible, and understanding the resource usage of each function.
-
-The library is designed to be an efficient and flexible tool for managing complex function dependencies in an intuitive and clear way. Whether you're dealing with data processing tasks, scientific computations, machine learning (AI) workflows, or other scenarios where functions depend on one another, `pipefunc` can help streamline your code and improve your productivity.
+Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
 
 ## :rocket: Key Features
 
-Some of the key features of `pipefunc` include:
-
-1. 🚀 **Function Composition and Pipelining:** The core functionality of `pipefunc` is to create a pipeline of functions, allowing you to feed the output of one function into another, and execute them in the right order.
-1. 📊 **Visualizing Pipelines:** `pipefunc` can generate a visual graph of the function pipeline, making it easier to understand the flow of data.
-1. 💡 **Flexible Function Arguments:** `pipefunc` lets you call a function with different combinations of arguments, automatically determining which other functions to call based on the arguments you provide.
-1. 👥 **Multiple Outputs:** `pipefunc` supports functions that return multiple results, allowing each result to be used as input to other functions.
-1. ➡️ **Reducing Pipelines:** `pipefunc` can simplify a complex pipeline by merging nodes, improving computational efficiency at the cost of losing visibility into some intermediate steps.
-1. 🎛️ **Resources Report:** `pipefunc` provides a report on the performance of your pipeline, including CPU usage, memory usage, and execution time, helping you identify bottlenecks and optimize your code.
-1. 🔄 **Parallel Execution and Caching:** `pipefunc` supports parallel execution of functions, and caching of results to avoid redundant computation.
-1. 🔍 **Parameter Sweeps:** `pipefunc` provides a utility for generating combinations of parameters to use in a parameter sweep, along with the ability to cache results to optimize the sweep.
-1. 🛠️ **Flexibility and Ease of Use:** `pipefunc` is a lightweight, flexible, and powerful tool for managing complex function dependencies in a clear and intuitive way, designed to improve your productivity in any scenario where functions depend on one another.
-
+1. 🚀 **Function Composition and Pipelining**: Create pipelines where the output of one function feeds into another, with `pipefunc` handling the execution order.
+2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
+3. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
+4. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
+5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
+6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
+7. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
+8. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+9. 🛠️ **Flexibility and Ease of Use**: Manage complex function dependencies in a clear, intuitive way with this lightweight yet powerful tool.
 
 ## :test_tube: How does it work?
 
