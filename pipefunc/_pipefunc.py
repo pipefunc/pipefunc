@@ -39,6 +39,7 @@ import cloudpickle
 import networkx as nx
 
 from pipefunc._cache import HybridCache, LRUCache
+from pipefunc._mapspec import MapSpec
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._plotting import visualize, visualize_holoviews
 
@@ -109,6 +110,10 @@ class PipelineFunction(Generic[T]):
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+    mapspec
+        This is a specification for mapping that dictates how input values should
+        be merged together. If None, the default behavior is that the input directly
+        maps to the output.
 
     Returns
     -------
@@ -140,6 +145,7 @@ class PipelineFunction(Generic[T]):
         cache: bool = False,
         save: bool | None = None,
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
+        mapspec: str | MapSpec | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         _update_wrapper(self, func)
@@ -148,6 +154,7 @@ class PipelineFunction(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.save_function = save_function
+        self.mapspec = mapspec
         self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
@@ -308,6 +315,7 @@ def pipefunc(
     cache: bool = False,
     save: bool | None = None,
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
+    mapspec: str | MapSpec | None = None,
 ) -> Callable[[Callable[..., Any]], PipelineFunction]:
     """A decorator for tagging pipeline functions with a return identifier.
 
@@ -331,6 +339,10 @@ def pipefunc(
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+    mapspec
+        This is a specification for mapping that dictates how input values should
+        be merged together. If None, the default behavior is that the input directly
+        maps to the output.
 
     Returns
     -------
@@ -364,6 +376,7 @@ def pipefunc(
             cache=cache,
             save=save,
             save_function=save_function,
+            mapspec=mapspec,
         )
 
     return decorator
@@ -524,7 +537,7 @@ class Pipeline:
 
     def __init__(
         self,
-        functions: list[PipelineFunction],
+        functions: list[PipelineFunction | tuple[PipelineFunction, str | MapSpec]],
         *,
         debug: bool | None = None,
         profile: bool | None = None,
@@ -540,7 +553,11 @@ class Pipeline:
         self._profile = profile
         self.output_to_func: dict[_OUTPUT_TYPE, PipelineFunction] = {}
         for f in functions:
-            self.add(f)
+            if isinstance(f, tuple):
+                f, mapspec = f  # noqa: PLW2901
+            else:
+                mapspec = None
+            self.add(f, mapspec=mapspec)
         self._graph = None
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self.cache: LRUCache | HybridCache
@@ -582,7 +599,11 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(self, f: PipelineFunction) -> None:
+    def add(
+        self,
+        f: PipelineFunction | Callable,
+        mapspec: str | MapSpec | None = None,
+    ) -> PipelineFunction:
         """Add a function to the pipeline.
 
         Parameters
@@ -591,10 +612,26 @@ class Pipeline:
             The function to add to the pipeline.
         profile
             Flag indicating whether profiling information should be collected.
+        mapspec
+            This is a specification for mapping that dictates how input values should
+            be merged together. If None, the default behavior is that the input directly
+            maps to the output.
 
         """
         if not isinstance(f, PipelineFunction):
             f = PipelineFunction(f, output_name=f.__name__)
+        elif mapspec is not None:
+            msg = (
+                "Initializing the `Pipeline` using `MapSpec`s and"
+                " `PipelineFunction`s modifies the `PipelineFunction`s inplace."
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+        if mapspec is not None:
+            if isinstance(mapspec, str):
+                mapspec = MapSpec.from_string(mapspec)
+            f.mapspec = mapspec
+
         self.functions.append(f)
 
         self.output_to_func[f.output_name] = f
@@ -608,6 +645,7 @@ class Pipeline:
             f.debug = self.debug
         self._graph = None
         self._arg_combinations = {}
+        return f
 
     def _check_consistent_defaults(self) -> None:
         """Check that the default values for shared arguments are consistent."""
