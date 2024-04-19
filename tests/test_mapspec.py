@@ -1,5 +1,6 @@
 import re
 
+import numpy as np
 import pytest
 
 from pipefunc._mapspec import (
@@ -8,6 +9,9 @@ from pipefunc._mapspec import (
     _parse_index_string,
     _parse_indexed_arrays,
     _shape_to_strides,
+    array_mask,
+    array_shape,
+    expected_mask,
 )
 
 
@@ -177,3 +181,66 @@ def test_parse_indexed_arrays():
         ArraySpec("b", ("i", "j")),
         ArraySpec("c", ("k",)),
     )
+
+
+def test_expected_mask():
+    mapspec = MapSpec.from_string("a[i], b[i, j] -> c[i, j]")
+
+    # Test with numpy arrays
+    inputs = {
+        "a": np.array([1, 2, 3]),
+        "b": np.array([[4, 5], [6, 7], [8, 9]]),
+    }
+    expected = np.array([[False, False], [False, False], [False, False]])
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
+
+    # Test with masked arrays
+    inputs = {
+        "a": np.ma.array([1, 2, 3], mask=[False, True, False]),
+        "b": np.ma.array(
+            [[4, 5], [6, 7], [8, 9]],
+            mask=[[False, False], [True, True], [False, False]],
+        ),
+    }
+    expected = np.array([[False, False], [True, True], [False, False]])
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
+
+    # Test with lists
+    mapspec = MapSpec.from_string("a[i] -> c[i]")  # Updated mapspec for 1D list
+    inputs = {
+        "a": [1, 2, 3],
+    }
+    expected = np.array([False, False, False])
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
+
+
+def test_array_mask():
+    # Test with masked array
+    arr = np.ma.array([1, 2, 3], mask=[False, True, False])
+    assert np.array_equal(array_mask(arr), [False, True, False])
+
+    # Test with unmasked array
+    arr = np.array([1, 2, 3])
+    assert np.array_equal(array_mask(arr), [False, False, False])
+
+    # Test with list
+    arr = [1, 2, 3]
+    assert np.array_equal(array_mask(arr), [False, False, False])
+
+    # Test with unsupported type
+    with pytest.raises(TypeError, match="No array mask defined for type"):
+        array_mask(42)
+
+
+def test_array_shape():
+    # Test with numpy array
+    arr = np.array([[1, 2], [3, 4]])
+    assert array_shape(arr) == (2, 2)
+
+    # Test with list
+    arr = [[1, 2], [3, 4]]
+    assert array_shape(arr) == (2,)
+
+    # Test with unsupported type
+    with pytest.raises(TypeError, match="No array shape defined for type"):
+        array_shape(42)
