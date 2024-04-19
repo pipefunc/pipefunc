@@ -206,11 +206,19 @@ def test_expected_mask():
     assert np.array_equal(expected_mask(mapspec, inputs), expected)
 
     # Test with lists
-    mapspec = MapSpec.from_string("a[i] -> c[i]")  # Updated mapspec for 1D list
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
     inputs = {
-        "a": [1, 2, 3],
+        "a": [0, 1, 2, 3],
+        "b": [4, 5, 6],
     }
-    expected = np.array([False, False, False])
+    expected = np.array(
+        [
+            [False, False, False],
+            [False, False, False],
+            [False, False, False],
+            [False, False, False],
+        ],
+    )
     assert np.array_equal(expected_mask(mapspec, inputs), expected)
 
 

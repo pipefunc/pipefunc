@@ -311,7 +311,7 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
     raise TypeError(msg)
 
 
-def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> np.ndarray:
+def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
     kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
     map_shape = mapspec.shape(kwarg_shapes)
@@ -323,3 +323,11 @@ def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> np.ndarray:
         )
 
     return np.array([is_masked(x) for x in range(map_size)]).reshape(map_shape)
+
+
+def num_mapjob_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
+    """Return the number of tasks that will be executed by a mapjob."""
+    if isinstance(mapspec, str):
+        mapspec = MapSpec.from_string(mapspec)
+    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
+    return np.sum(~expected_mask(mapspec, mapped_kwargs))  # type: ignore[return-value]
