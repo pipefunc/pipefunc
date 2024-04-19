@@ -325,9 +325,15 @@ def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bo
     return np.array([is_masked(x) for x in range(map_size)]).reshape(map_shape)
 
 
+def num_tasks_from_mask(mask: npt.NDArray[np.bool_]) -> int:
+    """Return the number of tasks that will be executed given a mask."""
+    return np.sum(~mask)  # type: ignore[return-value]
+
+
 def num_mapjob_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     """Return the number of tasks that will be executed by a mapjob."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
     mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
-    return np.sum(~expected_mask(mapspec, mapped_kwargs))  # type: ignore[return-value]
+    mask = expected_mask(mapspec, mapped_kwargs)
+    return num_tasks_from_mask(mask)
