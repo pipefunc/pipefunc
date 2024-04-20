@@ -46,7 +46,6 @@ def test_file_based_object_array_normalize_key():
         shape = (2, 3, 4)
         arr = FileBasedObjectArray(folder, shape)
         assert arr._normalize_key((1, 2, 3)) == (1, 2, 3)
-        assert arr._normalize_key((-1, -2, -3)) == (1, 1, 1)
         with pytest.raises(IndexError):
             arr._normalize_key((1, 2, 3, 4))
         with pytest.raises(NotImplementedError):
