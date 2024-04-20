@@ -16,6 +16,12 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
+def read(name: str | Path) -> bytes:
+    """Load file contents as a bytestring."""
+    with open(name, "rb") as f:  # noqa: PTH123
+        return f.read()
+
+
 def load(name: str | Path) -> Any:
     """Load a cloudpickled object from the named file."""
     with open(name, "rb") as f:  # noqa: PTH123
@@ -67,11 +73,9 @@ class FileBasedObjectArray:
         if len(key) != self.rank:
             msg = (
                 f"too many indices for array: array is {self.rank}-dimensional, "
-                "but {len(key)} were indexed"
+                f"but {len(key)} were indexed"
             )
-            raise IndexError(
-                msg,
-            )
+            raise IndexError(msg)
 
         if any(isinstance(k, slice) for k in key):
             msg = "Cannot yet slice subarrays"
@@ -82,10 +86,10 @@ class FileBasedObjectArray:
             axis_size = self.shape[axis]
             normalized_k = k if k >= 0 else (axis_size - k)
             if not (0 <= normalized_k < axis_size):
-                msg = "index {k} is out of bounds for axis {axis} with size {axis_size}"
-                raise IndexError(
-                    msg,
+                msg = (
+                    f"index {k} is out of bounds for axis {axis} with size {axis_size}"
                 )
+                raise IndexError(msg)
             normalized_key.append(k)
 
         return tuple(normalized_key)
@@ -146,7 +150,7 @@ class FileBasedObjectArray:
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
-        return cloudpickle.read(f) if f.is_file() else None
+        return read(f) if f.is_file() else None
 
     def maybe_load(x: str | None) -> Any | None:
         return cloudpickle.loads(x) if x is not None else None
