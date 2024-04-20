@@ -88,8 +88,8 @@ def test_file_based_object_array_getitem():
         folder = Path(tempdir)
         shape = (2, 3)
         arr = FileBasedObjectArray(folder, shape)
-        dump({"a": 1}, arr._key_to_file((0, 0)))
-        dump({"b": 2}, arr._key_to_file((1, 2)))
+        arr.dump((0, 0), {"a": 1})
+        arr.dump((1, 2), {"b": 2})
         assert arr[0, 0] == {"a": 1}
         assert arr[1, 2] == {"b": 2}
         assert arr[0, 1] is np.ma.masked
@@ -102,8 +102,8 @@ def test_file_based_object_array_to_array():
         folder = Path(tempdir)
         shape = (2, 3)
         arr = FileBasedObjectArray(folder, shape)
-        dump({"a": 1}, arr._key_to_file((0, 0)))
-        dump({"b": 2}, arr._key_to_file((1, 2)))
+        arr.dump((0, 0), {"a": 1})
+        arr.dump((1, 2), {"b": 2})
         result = arr.to_array()
         assert result.shape == (2, 3)
         assert result.dtype == object

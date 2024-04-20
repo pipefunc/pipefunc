@@ -34,7 +34,7 @@ def dump(obj: Any, name: str | Path) -> None:
         cloudpickle.dump(obj, f)
 
 
-filename_template = "__{:d}__.pickle"
+FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
 class FileBasedObjectArray:
@@ -48,7 +48,7 @@ class FileBasedObjectArray:
         folder: str | Path,
         shape: Sequence[int],
         strides: Sequence[int] | None = None,
-        filename_template: str = filename_template,
+        filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         self.folder = Path(folder).absolute()
         self.shape = tuple(shape)
@@ -72,7 +72,7 @@ class FileBasedObjectArray:
             key = (key,)
         if len(key) != self.rank:
             msg = (
-                f"too many indices for array: array is {self.rank}-dimensional, "
+                f"Too many indices for array: array is {self.rank}-dimensional, "
                 f"but {len(key)} were indexed"
             )
             raise IndexError(msg)
@@ -87,7 +87,7 @@ class FileBasedObjectArray:
             normalized_k = k if k >= 0 else (axis_size - k)
             if not (0 <= normalized_k < axis_size):
                 msg = (
-                    f"index {k} is out of bounds for axis {axis} with size {axis_size}"
+                    f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
                 )
                 raise IndexError(msg)
             normalized_key.append(k)
