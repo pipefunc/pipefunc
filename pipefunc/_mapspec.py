@@ -330,8 +330,8 @@ def num_tasks_from_mask(mask: npt.NDArray[np.bool_]) -> int:
     return np.sum(~mask)  # type: ignore[return-value]
 
 
-def num_mapjob_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
-    """Return the number of tasks that will be executed by a mapjob."""
+def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
+    """Return the number of tasks."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
     mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
