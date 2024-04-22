@@ -80,58 +80,48 @@ class MapSpec:
     """
 
     inputs: tuple[ArraySpec, ...]
-    outputs: tuple[ArraySpec, ...]
+    output: ArraySpec
 
     def __post_init__(self) -> None:
-        for output in self.outputs:
-            if any(x is None for x in output.axes):
-                msg = "Output arrays must have all axes indexed (no ':')."
-                raise ValueError(msg)
+        if any(x is None for x in self.output.axes):
+            msg = "Output array must have all axes indexed (no ':')."
+            raise ValueError(msg)
 
-        output_indices = {index for output in self.outputs for index in output.indices}
+        output_indices = set(self.output.indices)
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
         if extra_indices := output_indices - input_indices:
             msg = (
-                "Output arrays have indices that do not appear "
+                "Output array has indices that do not appear "
                 f"in the input: {extra_indices}"
             )
             raise ValueError(msg)
         if unused_indices := input_indices - output_indices:
             msg = (
-                "Input arrays have indices that do not appear "
+                "Input array have indices that do not appear "
                 f"in the output: {unused_indices}"
             )
             raise ValueError(msg)
-
-    @property
-    def indices(self) -> tuple[str, ...]:
-        """Return the index names for this MapSpec."""
-        return tuple(index for output in self.outputs for index in output.indices)
-
-    def output_shapes(
-        self,
-        shapes: dict[str, tuple[int, ...]],
-    ) -> dict[str, tuple[int, ...]]:
-        """Return the shapes of the outputs of this MapSpec."""
-        return {output.name: self.shape(shapes, output) for output in self.outputs}
 
     @property
     def parameters(self) -> tuple[str, ...]:
         """Return the parameter names of this mapspec."""
         return tuple(x.name for x in self.inputs)
 
-    def shape(
-        self,
-        shapes: dict[str, tuple[int, ...]],
-        output: ArraySpec | None = None,
-    ) -> tuple[int, ...]:
-        """Return the shape of a specific output of this MapSpec."""
-        if output is None:
-            if len(self.outputs) > 1:
-                msg = "Must specify output when there are multiple"
-                raise ValueError(msg)
-            output = self.outputs[0]
+    @property
+    def indices(self) -> tuple[str, ...]:
+        """Return the index names for this MapSpec."""
+        return self.output.indices
+
+    def shape(self, shapes: dict[str, tuple[int, ...]]) -> tuple[int, ...]:
+        """Return the shape of the output of this MapSpec.
+
+        Parameters
+        ----------
+        shapes
+            Shapes of the inputs, keyed by name.
+
+        """
         input_names = {x.name for x in self.inputs}
 
         if extra_names := set(shapes.keys()) - input_names:
@@ -145,14 +135,14 @@ class MapSpec:
         for x in self.inputs:
             x.validate(shapes[x.name])
 
-        # Shapes match between arrays sharing a named index
+        # Shapes match between array sharing a named index
 
         def get_dim(array: ArraySpec, index: str) -> int:
             axis = array.axes.index(index)
             return shapes[array.name][axis]
 
         shape = []
-        for index in output.indices:
+        for index in self.output.indices:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             dim, *rest = (get_dim(x, index) for x in relevant_arrays)
             if any(dim != x for x in rest):
@@ -219,23 +209,25 @@ class MapSpec:
         }
 
     def __str__(self) -> str:
-        return (
-            f"{', '.join(map(str, self.inputs))} -> {', '.join(map(str, self.outputs))}"
-        )
+        return f"{', '.join(map(str, self.inputs))} -> {self.output}"
 
     @classmethod
     def from_string(cls: type[MapSpec], expr: str) -> MapSpec:
-        """Construct a MapSpec from a string."""
+        """Construct an MapSpec from a string."""
         try:
             in_, out_ = expr.split("->")
         except ValueError:
-            msg = f"Expected expression of form 'a -> b', but got '{expr}'"
-            raise ValueError(msg)  # noqa: B904
+            msg = f"Expected expression of form 'a -> b', but got '{expr}''"
+            raise ValueError(msg)  # noqa: B904, TRY200
 
         inputs = _parse_indexed_arrays(in_)
         outputs = _parse_indexed_arrays(out_)
+        if len(outputs) != 1:
+            msg = f"Expected a single output, but got {len(outputs)}: {outputs}"
+            raise ValueError(msg)
+        (output,) = outputs
 
-        return cls(inputs, outputs)
+        return cls(inputs, output)
 
     def to_string(self) -> str:
         """Return a faithful representation of a MapSpec as a string."""
@@ -326,29 +318,18 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
     raise TypeError(msg)
 
 
-def expected_mask(
-    mapspec: MapSpec,
-    inputs: dict[str, Any],
-) -> dict[str, npt.NDArray[np.bool_]]:
+def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
     kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
-    output_shapes = mapspec.output_shapes(kwarg_shapes)
+    map_shape = mapspec.shape(kwarg_shapes)
+    map_size = np.prod(map_shape)
 
-    def is_masked(output_name: str, i: int) -> bool:
+    def is_masked(i: int) -> bool:
         return any(
-            kwarg_masks[k][v]
-            for k, v in mapspec.input_keys(output_shapes[output_name], i).items()
+            kwarg_masks[k][v] for k, v in mapspec.input_keys(map_shape, i).items()
         )
 
-    return {
-        output.name: np.array(
-            [
-                is_masked(output.name, x)
-                for x in range(np.prod(output_shapes[output.name]))
-            ],
-        ).reshape(output_shapes[output.name])
-        for output in mapspec.outputs
-    }
+    return np.array([is_masked(x) for x in range(map_size)]).reshape(map_shape)
 
 
 def num_tasks_from_mask(mask: npt.NDArray[np.bool_]) -> int:
@@ -356,10 +337,10 @@ def num_tasks_from_mask(mask: npt.NDArray[np.bool_]) -> int:
     return np.sum(~mask)  # type: ignore[return-value]
 
 
-def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> dict[str, int]:
+def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     """Return the number of tasks."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
     mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
-    masks = expected_mask(mapspec, mapped_kwargs)
-    return {k: num_tasks_from_mask(v) for k, v in masks.items()}
+    mask = expected_mask(mapspec, mapped_kwargs)
+    return num_tasks_from_mask(mask)

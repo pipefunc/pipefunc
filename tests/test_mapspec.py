@@ -62,51 +62,48 @@ def test_arrayspec_validate():
 
 def test_mapspec_init():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
-    outputs = (ArraySpec("q", ("i", "j")),)
-    spec = MapSpec(inputs, outputs)
+    output = ArraySpec("q", ("i", "j"))
+    spec = MapSpec(inputs, output)
     assert spec.inputs == inputs
-    assert spec.outputs == outputs
+    assert spec.output == output
 
-    outputs2 = (ArraySpec("q", ("i", None, "k")),)
     with pytest.raises(
         ValueError,
-        match=re.escape("Output arrays must have all axes indexed (no ':')."),
+        match=re.escape("Output array must have all axes indexed (no ':')."),
     ):
-        MapSpec(inputs, outputs2)
+        MapSpec(inputs, ArraySpec("q", ("i", None, "k")))
 
-    outputs3 = (ArraySpec("q", ("i", "j", "l")),)
     with pytest.raises(
         ValueError,
-        match="Output arrays have indices that do not appear in the input: {'l'}",
+        match="Output array has indices that do not appear in the input: {'l'}",
     ):
-        MapSpec(inputs, outputs3)
+        MapSpec(inputs, ArraySpec("q", ("i", "j", "l")))
 
-    inputs1 = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k")))
     with pytest.raises(
         ValueError,
-        match="Input arrays have indices that do not appear in the output: {'k'}",
+        match="Input array have indices that do not appear in the output: {'k'}",
     ):
-        MapSpec(inputs1, outputs)
+        MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), output)
 
 
 def test_mapspec_parameters():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
-    outputs = (ArraySpec("q", ("i", "j")),)
-    spec = MapSpec(inputs, outputs)
+    output = ArraySpec("q", ("i", "j"))
+    spec = MapSpec(inputs, output)
     assert spec.parameters == ("a", "b")
 
 
 def test_mapspec_indices():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
-    outputs = (ArraySpec("q", ("i", "j")),)
-    spec = MapSpec(inputs, outputs)
+    output = ArraySpec("q", ("i", "j"))
+    spec = MapSpec(inputs, output)
     assert spec.indices == ("i", "j")
 
 
 def test_mapspec_shape():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
-    outputs = (ArraySpec("q", ("i", "j")),)
-    spec = MapSpec(inputs, outputs)
+    output = ArraySpec("q", ("i", "j"))
+    spec = MapSpec(inputs, output)
     shapes = {"a": (3, 4), "b": (3, 4)}
     assert spec.shape(shapes) == (3, 4)
 
@@ -162,13 +159,13 @@ def test_mapspec_from_string():
     spec = MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k]")
     assert isinstance(spec, MapSpec)
     assert len(spec.inputs) == 3
-    assert spec.outputs == (ArraySpec("q", ("i", "j", "k")),)
+    assert spec.output == ArraySpec("q", ("i", "j", "k"))
 
     with pytest.raises(ValueError, match="Expected expression of form"):
         MapSpec.from_string("a[i, j], b[i, j], c[k]")
 
-    spec = MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k], r[i]")
-    assert len(spec.outputs) == 2
+    with pytest.raises(ValueError, match="Expected a single output, but got 2"):
+        MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k], r[i]")
 
 
 def test_mapspec_to_string():
@@ -200,8 +197,7 @@ def test_expected_mask():
         "b": np.array([[4, 5], [6, 7], [8, 9]]),
     }
     expected = np.array([[False, False], [False, False], [False, False]])
-    masks = expected_mask(mapspec, inputs)
-    assert np.array_equal(masks["c"], expected)
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
 
     # Test with masked arrays
     inputs = {
@@ -212,8 +208,7 @@ def test_expected_mask():
         ),
     }
     expected = np.array([[False, False], [True, True], [False, False]])
-    masks = expected_mask(mapspec, inputs)
-    assert np.array_equal(masks["c"], expected)
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
 
     # Test with lists
     mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
@@ -229,8 +224,7 @@ def test_expected_mask():
             [False, False, False],
         ],
     )
-    masks = expected_mask(mapspec, inputs)
-    assert np.array_equal(masks["c"], expected)
+    assert np.array_equal(expected_mask(mapspec, inputs), expected)
 
 
 def test_array_mask():
