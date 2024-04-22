@@ -223,7 +223,7 @@ class MapSpec:
         inputs = _parse_indexed_arrays(in_)
         outputs = _parse_indexed_arrays(out_)
         if len(outputs) != 1:
-            msg = f"Expected a single output, but got {len(outputs)}"
+            msg = f"Expected a single output, but got {len(outputs)}: {outputs}"
             raise ValueError(msg)
         (output,) = outputs
 
@@ -240,6 +240,13 @@ def _parse_index_string(index_string: str) -> tuple[str | None, ...]:
 
 
 def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
+    if "[" not in expr or "]" not in expr:
+        msg = (
+            f"Invalid expression '{expr.strip()}'. Expected an expression that includes "
+            "array indices in square brackets. For example, 'a[i]' or 'b[i, j]'. "
+            "Please check your syntax and try again."
+        )
+        raise ValueError(msg)
     array_pattern = r"(\w+?)\[(.+?)\]"
     return tuple(
         ArraySpec(name, _parse_index_string(indices))

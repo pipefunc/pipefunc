@@ -111,7 +111,7 @@ class FileBasedObjectArray:
 
     def __getitem__(self, key: tuple[int, ...]) -> np.ma.core.MaskedArray:
         key = self._normalize_key(key)
-        if any(isinstance(x, slice) for x in key):
+        if _key_has_slice(key):
             # XXX: need to figure out strides in order to implement this.  # noqa: FIX003, TD001
             msg = "Cannot yet slice subarrays"
             raise NotImplementedError(msg)
@@ -141,11 +141,15 @@ class FileBasedObjectArray:
 
         """
         key = self._normalize_key(key)
-        if not any(isinstance(x, slice) for x in key):
+        if not _key_has_slice(key):
             return dump(value, self._key_to_file(key))
 
         msg = "Cannot yet dump subarrays"
         raise NotImplementedError(msg)
+
+
+def _key_has_slice(key: tuple[int, ...]) -> bool:
+    return any(isinstance(x, slice) for x in key)
 
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:

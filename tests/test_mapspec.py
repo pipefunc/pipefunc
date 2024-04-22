@@ -150,6 +150,11 @@ def test_mapspec_str():
     assert str(spec) == "a[i, j], b[i, j], c[k] -> q[i, j, k]"
 
 
+def test_mapspec_missing_index():
+    with pytest.raises(ValueError, match="includes array indices in square brackets."):
+        MapSpec.from_string("a -> b")
+
+
 def test_mapspec_from_string():
     spec = MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k]")
     assert isinstance(spec, MapSpec)
