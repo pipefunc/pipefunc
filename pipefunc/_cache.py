@@ -282,6 +282,14 @@ class LRUCache:
         """Return the number of entries in the cache."""
         return len(self._cache_dict)
 
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._cache_lock:
+            keys = list(self._cache_dict.keys())
+            for key in keys:
+                del self._cache_dict[key]
+            del self._cache_queue[:]
+
 
 class DiskCache:
     """Disk cache implementation using pickle or cloudpickle for serialization.
@@ -298,6 +306,8 @@ class DiskCache:
         Use an in-memory LRU cache to prevent reading from disk too often.
     lru_cache_size
         The maximum size of the in-memory LRU cache. Only used if with_lru_cache is True.
+    lru_shared
+        Whether the in-memory LRU cache should be shared between multiple processes.
 
     """
 
@@ -309,6 +319,7 @@ class DiskCache:
         with_cloudpickle: bool = True,
         with_lru_cache: bool = False,
         lru_cache_size: int = 128,
+        lru_shared: bool = True,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
@@ -320,6 +331,7 @@ class DiskCache:
             self.lru_cache = LRUCache(
                 max_size=lru_cache_size,
                 with_cloudpickle=with_cloudpickle,
+                shared=lru_shared,
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
@@ -374,10 +386,7 @@ class DiskCache:
             with suppress(Exception):
                 file_path.unlink()
         if self.with_lru_cache:
-            self.lru_cache = LRUCache(
-                max_size=self.lru_cache.max_size,
-                with_cloudpickle=self.with_cloudpickle,
-            )
+            self.lru_cache.clear()
 
     @property
     def cache(self) -> dict:

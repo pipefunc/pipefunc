@@ -233,7 +233,7 @@ def test_file_cache_contains_with_lru_cache(cache_dir):
 
 
 def test_file_cache_clear_with_lru_cache(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=True)
     cache.put("key1", "value1")
     cache.put("key2", "value2")
     assert len(cache) == 2
