@@ -1,6 +1,8 @@
+from pathlib import Path
+
 import pytest
 
-from pipefunc._cache import HybridCache, LRUCache
+from pipefunc._cache import DiskCache, HybridCache, LRUCache
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -134,3 +136,71 @@ def test_cache_property(shared):
     cache.put("test", "value")
     cache_dict = cache.cache
     assert cache_dict == {"test": "value"}
+
+
+@pytest.fixture()
+def cache_dir(tmpdir):
+    return Path(tmpdir) / "cache"
+
+
+def test_file_cache_init(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    assert cache.cache_dir == cache_dir
+    assert cache.max_size is None
+    assert cache.with_cloudpickle is True
+    assert cache_dir.exists()
+
+
+def test_file_cache_put_and_get(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    assert cache.get("key1") == "value1"
+    assert "key1" in cache
+
+
+def test_file_cache_get_nonexistent_key(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    assert cache.get("nonexistent") is None
+
+
+def test_file_cache_evict_if_needed(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), max_size=2)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    cache.put("key3", "value3")
+    assert len(list(cache_dir.glob("*.pkl"))) == 2
+    assert "key1" not in cache
+
+
+def test_file_cache_clear(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+
+
+def test_file_cache_contains(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    assert "key1" in cache
+    assert "key2" not in cache
+
+
+def test_file_cache_len(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+
+
+def test_file_cache_without_cloudpickle(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_cloudpickle=False)
+    cache.put("key1", b"value1")
+    assert cache.get("key1") == b"value1"
+
+
+def test_file_cache_with_custom_max_size(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), max_size=10)
+    assert cache.max_size == 10

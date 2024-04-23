@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+import pickle
+from contextlib import nullcontext, suppress
 from multiprocessing import Manager
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Hashable
 
 import cloudpickle
 
@@ -270,3 +272,71 @@ class LRUCache:
     def cache(self) -> dict:
         """Returns a copy of the cache."""
         return dict(self._cache_dict.items())
+
+
+class DiskCache:
+    """Disk cache implementation using pickle or cloudpickle for serialization.
+
+    Parameters
+    ----------
+    cache_dir
+        The directory where the cache files are stored.
+    max_size
+        The maximum number of cache files to store. If None, no limit is set.
+    with_cloudpickle
+        Use cloudpickle for storing the data in memory.
+
+    """
+
+    def __init__(
+        self,
+        cache_dir: str,
+        max_size: int | None = None,
+        *,
+        with_cloudpickle: bool = True,
+    ) -> None:
+        self.cache_dir = Path(cache_dir)
+        self.max_size = max_size
+        self.with_cloudpickle = with_cloudpickle
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_file_path(self, key: Hashable) -> Path:
+        return self.cache_dir / f"{key}.pkl"
+
+    def get(self, key: Hashable) -> Any:
+        file_path = self._get_file_path(key)
+        if file_path.exists():
+            with file_path.open("rb") as f:
+                if self.with_cloudpickle:
+                    return cloudpickle.load(f)
+                return pickle.load(f)  # noqa: S301
+        return None
+
+    def put(self, key: Hashable, value: Any) -> None:
+        file_path = self._get_file_path(key)
+        with file_path.open("wb") as f:
+            if self.with_cloudpickle:
+                cloudpickle.dump(value, f)
+            else:
+                pickle.dump(value, f)
+        self._evict_if_needed()
+
+    def _evict_if_needed(self) -> None:
+        if self.max_size is not None:
+            files = list(self.cache_dir.glob("*.pkl"))
+            if len(files) > self.max_size:
+                oldest_file = min(files, key=lambda f: f.stat().st_ctime)
+                oldest_file.unlink()
+
+    def __contains__(self, key: Hashable) -> bool:
+        file_path = self._get_file_path(key)
+        return file_path.exists()
+
+    def __len__(self) -> int:
+        files = list(self.cache_dir.glob("*.pkl"))
+        return len(files)
+
+    def clear(self) -> None:
+        for file_path in self.cache_dir.glob("*.pkl"):
+            with suppress(Exception):
+                file_path.unlink()
