@@ -317,7 +317,7 @@ class DiskCache:
         max_size: int | None = None,
         *,
         with_cloudpickle: bool = True,
-        with_lru_cache: bool = False,
+        with_lru_cache: bool = True,
         lru_cache_size: int = 128,
         lru_shared: bool = True,
     ) -> None:
@@ -366,7 +366,7 @@ class DiskCache:
         if self.max_size is not None:
             files = list(self.cache_dir.glob("*.pkl"))
             if len(files) > self.max_size:
-                oldest_file = min(files, key=lambda f: f.stat().st_ctime)
+                oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
                 oldest_file.unlink()
 
     def __contains__(self, key: Hashable) -> bool:
