@@ -389,7 +389,7 @@ class DiskCache:
     @property
     def cache(self) -> dict:
         """Returns a copy of the cache, but only if with_lru_cache is True."""
-        if not self.with_lru_cache:
+        if not self.with_lru_cache:  # pragma: no cover
             msg = "LRU cache is not enabled."
             raise AttributeError(msg)
         return self.lru_cache.cache

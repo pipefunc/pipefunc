@@ -55,6 +55,7 @@ def test_access_count(shared):
     cache.get("key1")
     cache.get("key1")
     assert cache.access_counts["key1"] == 3
+    assert len(cache) == 1
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -95,6 +96,7 @@ def test_put_and_get(shared):
     assert len(cache._cache_queue) == 2
     assert len(cache._cache_dict) == 2
     assert "test" not in cache._cache_dict
+    assert len(cache) == 2
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -249,3 +251,4 @@ def test_file_cache_put_and_get_none(cache_dir):
     assert cache.get("key1") is None
     assert "key1" in cache
     assert "key1" in cache.lru_cache
+    assert cache.cache["key1"] == "__ReturnsNone__"
