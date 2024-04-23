@@ -38,7 +38,7 @@ from typing import (
 import cloudpickle
 import networkx as nx
 
-from pipefunc._cache import HybridCache, LRUCache
+from pipefunc._cache import DiskCache, HybridCache, LRUCache
 from pipefunc._mapspec import MapSpec
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._plotting import visualize, visualize_holoviews
@@ -520,6 +520,8 @@ class Pipeline:
         If None, the value of each PipelineFunction's profile attribute is used.
     cache
         The type of cache to use.
+    cache_kwargs
+        Keyword arguments passed to
 
     """
 
@@ -530,6 +532,7 @@ class Pipeline:
         debug: bool | None = None,
         profile: bool | None = None,
         cache: Literal["shared", "hybrid", "disk"] | None = "hybrid",
+        cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         # TODO: add support for disk cache
@@ -548,15 +551,15 @@ class Pipeline:
             self.add(f, mapspec=mapspec)
         self._graph = None
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
-        self.cache: LRUCache | HybridCache
-
+        self.cache: LRUCache | HybridCache | DiskCache
+        if cache_kwargs is None:
+            cache_kwargs = {}
         if cache == "shared":
-            self.cache = LRUCache()
+            self.cache = LRUCache(**cache_kwargs)
         elif cache == "hybrid":
-            self.cache = HybridCache()
+            self.cache = HybridCache(**cache_kwargs)
         elif cache == "disk":
-            msg = "Disk cache not yet implemented"
-            raise NotImplementedError(msg)
+            self.cache = DiskCache(**cache_kwargs)
         else:
             msg = f"Unknown cache type {cache}"
             raise ValueError(msg)

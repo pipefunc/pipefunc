@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+import hashlib
+import pickle
+from contextlib import nullcontext, suppress
 from multiprocessing import Manager
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Hashable
 
 import cloudpickle
 
@@ -192,6 +195,10 @@ class HybridCache:
         )
         return cache_str + access_counts_str + computation_durations_str
 
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache)
+
 
 class LRUCache:
     """A shared memory LRU cache implementation.
@@ -252,8 +259,8 @@ class LRUCache:
         elif self._with_cloudpickle:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
-            cache_size = len(self._cache_queue)
             self._cache_dict[key] = value
+            cache_size = len(self._cache_queue)
             if cache_size < self.max_size:
                 self._cache_queue.append(key)
             else:
@@ -270,3 +277,122 @@ class LRUCache:
     def cache(self) -> dict:
         """Returns a copy of the cache."""
         return dict(self._cache_dict.items())
+
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache_dict)
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._cache_lock:
+            keys = list(self._cache_dict.keys())
+            for key in keys:
+                del self._cache_dict[key]
+            del self._cache_queue[:]
+
+
+class DiskCache:
+    """Disk cache implementation using pickle or cloudpickle for serialization.
+
+    Parameters
+    ----------
+    cache_dir
+        The directory where the cache files are stored.
+    max_size
+        The maximum number of cache files to store. If None, no limit is set.
+    with_cloudpickle
+        Use cloudpickle for storing the data in memory.
+    with_lru_cache
+        Use an in-memory LRU cache to prevent reading from disk too often.
+    lru_cache_size
+        The maximum size of the in-memory LRU cache. Only used if with_lru_cache is True.
+    lru_shared
+        Whether the in-memory LRU cache should be shared between multiple processes.
+
+    """
+
+    def __init__(
+        self,
+        cache_dir: str,
+        max_size: int | None = None,
+        *,
+        with_cloudpickle: bool = True,
+        with_lru_cache: bool = True,
+        lru_cache_size: int = 128,
+        lru_shared: bool = True,
+    ) -> None:
+        self.cache_dir = Path(cache_dir)
+        self.max_size = max_size
+        self.with_cloudpickle = with_cloudpickle
+        self.with_lru_cache = with_lru_cache
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.with_lru_cache:
+            self.lru_cache = LRUCache(
+                max_size=lru_cache_size,
+                with_cloudpickle=with_cloudpickle,
+                shared=lru_shared,
+            )
+
+    def _get_file_path(self, key: Hashable) -> Path:
+        key_hash = hashlib.md5(str(key).encode()).hexdigest()  # noqa: S324
+        return self.cache_dir / f"{key_hash}.pkl"
+
+    def get(self, key: Hashable) -> Any:
+        if self.with_lru_cache and key in self.lru_cache:
+            return self.lru_cache.get(key)
+
+        file_path = self._get_file_path(key)
+        if file_path.exists():
+            with file_path.open("rb") as f:
+                value = cloudpickle.load(f) if self.with_cloudpickle else pickle.load(f)  # noqa: S301
+            if self.with_lru_cache:
+                self.lru_cache.put(key, value)
+            return value
+        return None
+
+    def put(self, key: Hashable, value: Any) -> None:
+        file_path = self._get_file_path(key)
+        with file_path.open("wb") as f:
+            if self.with_cloudpickle:
+                cloudpickle.dump(value, f)
+            else:
+                pickle.dump(value, f)
+        if self.with_lru_cache:
+            self.lru_cache.put(key, value)
+        self._evict_if_needed()
+
+    def _all_files(self) -> list[Path]:
+        return list(self.cache_dir.glob("*.pkl"))
+
+    def _evict_if_needed(self) -> None:
+        if self.max_size is not None:
+            files = self._all_files()
+            for _ in range(len(files) - self.max_size):
+                oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
+                oldest_file.unlink()
+
+    def __contains__(self, key: Hashable) -> bool:
+        if self.with_lru_cache and key in self.lru_cache:
+            return True
+        file_path = self._get_file_path(key)
+        return file_path.exists()
+
+    def __len__(self) -> int:
+        files = self._all_files()
+        return len(files)
+
+    def clear(self) -> None:
+        for file_path in self._all_files():
+            with suppress(Exception):
+                file_path.unlink()
+        if self.with_lru_cache:
+            self.lru_cache.clear()
+
+    @property
+    def cache(self) -> dict:
+        """Returns a copy of the cache, but only if with_lru_cache is True."""
+        if not self.with_lru_cache:  # pragma: no cover
+            msg = "LRU cache is not enabled."
+            raise AttributeError(msg)
+        return self.lru_cache.cache

@@ -1,6 +1,9 @@
+import time
+from pathlib import Path
+
 import pytest
 
-from pipefunc._cache import HybridCache, LRUCache
+from pipefunc._cache import DiskCache, HybridCache, LRUCache
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -53,6 +56,7 @@ def test_access_count(shared):
     cache.get("key1")
     cache.get("key1")
     assert cache.access_counts["key1"] == 3
+    assert len(cache) == 1
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -93,6 +97,7 @@ def test_put_and_get(shared):
     assert len(cache._cache_queue) == 2
     assert len(cache._cache_dict) == 2
     assert "test" not in cache._cache_dict
+    assert len(cache) == 2
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -134,3 +139,125 @@ def test_cache_property(shared):
     cache.put("test", "value")
     cache_dict = cache.cache
     assert cache_dict == {"test": "value"}
+
+
+@pytest.fixture()
+def cache_dir(tmpdir):
+    return Path(tmpdir) / "cache"
+
+
+def test_file_cache_init(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    assert cache.cache_dir == cache_dir
+    assert cache.max_size is None
+    assert cache.with_cloudpickle is True
+    assert cache_dir.exists()
+
+
+def test_file_cache_put_and_get(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    assert cache.get("key1") == "value1"
+    assert "key1" in cache
+
+
+def test_file_cache_get_nonexistent_key(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    assert cache.get("nonexistent") is None
+
+
+def test_file_cache_evict_if_needed(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), max_size=2, lru_cache_size=2)
+    cache.put("key1", "value1")
+    time.sleep(0.2)
+    cache.put("key2", "value2")
+    time.sleep(0.2)
+    cache.put("key3", "value3")
+    assert len(list(cache_dir.glob("*.pkl"))) == 2
+    assert len(cache.lru_cache) == 2
+    assert "key1" not in cache.lru_cache
+    assert "key1" not in cache
+
+
+def test_file_cache_clear(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+    assert len(cache.lru_cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+    assert len(cache.lru_cache) == 0
+
+
+def test_file_cache_contains(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    assert "key1" in cache
+    assert "key2" not in cache
+
+
+def test_file_cache_len(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir))
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+
+
+def test_file_cache_without_cloudpickle(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_cloudpickle=False)
+    cache.put("key1", b"value1")
+    assert cache.get("key1") == b"value1"
+
+
+def test_file_cache_with_custom_max_size(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), max_size=10)
+    assert cache.max_size == 10
+
+
+def test_file_cache_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_cache_size=2)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert cache.get("key1") == "value1"
+    assert "key1" in cache.lru_cache
+    assert "key2" in cache.lru_cache
+
+
+def test_file_cache_lru_cache_eviction(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_cache_size=2)
+    cache.put("key1", "value1")
+    time.sleep(0.01)
+    cache.put("key2", "value2")
+    time.sleep(0.01)
+    cache.put("key3", "value3")
+    assert "key1" not in cache.lru_cache
+    assert "key2" in cache.lru_cache
+    assert "key3" in cache.lru_cache
+
+
+def test_file_cache_contains_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache.put("key1", "value1")
+    assert "key1" in cache
+    assert "key1" in cache.lru_cache
+
+
+def test_file_cache_clear_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=True)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+    assert len(cache.lru_cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+    assert len(cache.lru_cache) == 0
+
+
+def test_file_cache_put_and_get_none(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache.put("key1", None)
+    assert cache.get("key1") is None
+    assert "key1" in cache
+    assert "key1" in cache.lru_cache
+    assert cache.cache["key1"] == "__ReturnsNone__"
