@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import pytest
@@ -220,7 +221,9 @@ def test_file_cache_with_lru_cache(cache_dir):
 def test_file_cache_lru_cache_eviction(cache_dir):
     cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_cache_size=2)
     cache.put("key1", "value1")
+    time.sleep(0.01)
     cache.put("key2", "value2")
+    time.sleep(0.01)
     cache.put("key3", "value3")
     assert "key1" not in cache.lru_cache
     assert "key2" in cache.lru_cache
