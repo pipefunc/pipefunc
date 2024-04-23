@@ -259,8 +259,8 @@ class LRUCache:
         elif self._with_cloudpickle:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
-            cache_size = len(self._cache_queue)
             self._cache_dict[key] = value
+            cache_size = len(self._cache_queue)
             if cache_size < self.max_size:
                 self._cache_queue.append(key)
             else:
