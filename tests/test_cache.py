@@ -174,6 +174,7 @@ def test_file_cache_evict_if_needed(cache_dir):
     assert len(list(cache_dir.glob("*.pkl"))) == 2
     assert len(cache.lru_cache) == 2
     assert "key1" not in cache.lru_cache
+    time.sleep(1)
     assert "key1" not in cache
 
 
@@ -182,8 +183,10 @@ def test_file_cache_clear(cache_dir):
     cache.put("key1", "value1")
     cache.put("key2", "value2")
     assert len(cache) == 2
+    assert len(cache.lru_cache) == 2
     cache.clear()
     assert len(cache) == 0
+    assert len(cache.lru_cache) == 0
 
 
 def test_file_cache_contains(cache_dir):
