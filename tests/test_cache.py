@@ -169,8 +169,11 @@ def test_file_cache_get_nonexistent_key(cache_dir):
 def test_file_cache_evict_if_needed(cache_dir):
     cache = DiskCache(cache_dir=str(cache_dir), max_size=2, lru_cache_size=2)
     cache.put("key1", "value1")
+    time.sleep(1)
     cache.put("key2", "value2")
+    time.sleep(1)
     cache.put("key3", "value3")
+    time.sleep(1)
     assert len(list(cache_dir.glob("*.pkl"))) == 2
     assert len(cache.lru_cache) == 2
     assert "key1" not in cache.lru_cache
