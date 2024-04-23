@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import pickle
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
@@ -301,7 +302,8 @@ class DiskCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_file_path(self, key: Hashable) -> Path:
-        return self.cache_dir / f"{key}.pkl"
+        key_hash = hashlib.md5(str(key).encode()).hexdigest()  # noqa: S324
+        return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
         file_path = self._get_file_path(key)
