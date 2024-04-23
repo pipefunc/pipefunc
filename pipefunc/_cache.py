@@ -339,10 +339,8 @@ class DiskCache:
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
-        if self.with_lru_cache:
-            value = self.lru_cache.get(key)
-            if value is not None:
-                return value
+        if self.with_lru_cache and key in self.lru_cache:
+            return self.lru_cache.get(key)
 
         file_path = self._get_file_path(key)
         if file_path.exists():

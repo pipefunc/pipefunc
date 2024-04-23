@@ -241,3 +241,11 @@ def test_file_cache_clear_with_lru_cache(cache_dir):
     cache.clear()
     assert len(cache) == 0
     assert len(cache.lru_cache) == 0
+
+
+def test_file_cache_put_and_get_none(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache.put("key1", None)
+    assert cache.get("key1") is None
+    assert "key1" in cache
+    assert "key1" in cache.lru_cache
