@@ -607,7 +607,13 @@ def test_full_output(cache, tmp_path: Path):
     def f3(a, f2i):
         return a + f2i
 
-    pipeline = Pipeline([f1, f2, f3])
+    if cache:
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir(exist_ok=True)
+        cache_kwargs = {"cache": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
+    else:
+        cache_kwargs = {}
+    pipeline = Pipeline([f1, f2, f3], **cache_kwargs)  # type: ignore[arg-type]
     for f in pipeline.functions:
         f.cache = cache
     pipeline("f3", a=1, b=2)
@@ -620,3 +626,5 @@ def test_full_output(cache, tmp_path: Path):
         "f2j": 1,
         "f3": 7,
     }
+    if cache:
+        assert len(list(cache_dir.glob("*.pkl"))) == 3

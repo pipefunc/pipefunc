@@ -195,6 +195,10 @@ class HybridCache:
         )
         return cache_str + access_counts_str + computation_durations_str
 
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache)
+
 
 class LRUCache:
     """A shared memory LRU cache implementation.
@@ -274,6 +278,10 @@ class LRUCache:
         """Returns a copy of the cache."""
         return dict(self._cache_dict.items())
 
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache_dict)
+
 
 class DiskCache:
     """Disk cache implementation using pickle or cloudpickle for serialization.
@@ -286,6 +294,10 @@ class DiskCache:
         The maximum number of cache files to store. If None, no limit is set.
     with_cloudpickle
         Use cloudpickle for storing the data in memory.
+    with_lru_cache
+        Use an in-memory LRU cache to prevent reading from disk too often.
+    lru_cache_size
+        The maximum size of the in-memory LRU cache. Only used if with_lru_cache is True.
 
     """
 
@@ -295,23 +307,38 @@ class DiskCache:
         max_size: int | None = None,
         *,
         with_cloudpickle: bool = True,
+        with_lru_cache: bool = False,
+        lru_cache_size: int = 128,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
         self.with_cloudpickle = with_cloudpickle
+        self.with_lru_cache = with_lru_cache
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.with_lru_cache:
+            self.lru_cache = LRUCache(
+                max_size=lru_cache_size,
+                with_cloudpickle=with_cloudpickle,
+            )
 
     def _get_file_path(self, key: Hashable) -> Path:
         key_hash = hashlib.md5(str(key).encode()).hexdigest()  # noqa: S324
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
+        if self.with_lru_cache:
+            value = self.lru_cache.get(key)
+            if value is not None:
+                return value
+
         file_path = self._get_file_path(key)
         if file_path.exists():
             with file_path.open("rb") as f:
-                if self.with_cloudpickle:
-                    return cloudpickle.load(f)
-                return pickle.load(f)  # noqa: S301
+                value = cloudpickle.load(f) if self.with_cloudpickle else pickle.load(f)  # noqa: S301
+            if self.with_lru_cache:
+                self.lru_cache.put(key, value)
+            return value
         return None
 
     def put(self, key: Hashable, value: Any) -> None:
@@ -321,6 +348,8 @@ class DiskCache:
                 cloudpickle.dump(value, f)
             else:
                 pickle.dump(value, f)
+        if self.with_lru_cache:
+            self.lru_cache.put(key, value)
         self._evict_if_needed()
 
     def _evict_if_needed(self) -> None:
@@ -331,6 +360,8 @@ class DiskCache:
                 oldest_file.unlink()
 
     def __contains__(self, key: Hashable) -> bool:
+        if self.with_lru_cache and key in self.lru_cache:
+            return True
         file_path = self._get_file_path(key)
         return file_path.exists()
 
@@ -342,3 +373,16 @@ class DiskCache:
         for file_path in self.cache_dir.glob("*.pkl"):
             with suppress(Exception):
                 file_path.unlink()
+        if self.with_lru_cache:
+            self.lru_cache = LRUCache(
+                max_size=self.lru_cache.max_size,
+                with_cloudpickle=self.with_cloudpickle,
+            )
+
+    @property
+    def cache(self) -> dict:
+        """Returns a copy of the cache, but only if with_lru_cache is True."""
+        if not self.with_lru_cache:
+            msg = "LRU cache is not enabled."
+            raise AttributeError(msg)
+        return self.lru_cache.cache

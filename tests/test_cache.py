@@ -204,3 +204,40 @@ def test_file_cache_without_cloudpickle(cache_dir):
 def test_file_cache_with_custom_max_size(cache_dir):
     cache = DiskCache(cache_dir=str(cache_dir), max_size=10)
     assert cache.max_size == 10
+
+
+def test_file_cache_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_cache_size=2)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert cache.get("key1") == "value1"
+    assert "key1" in cache.lru_cache
+    assert "key2" in cache.lru_cache
+
+
+def test_file_cache_lru_cache_eviction(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_cache_size=2)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    cache.put("key3", "value3")
+    assert "key1" not in cache.lru_cache
+    assert "key2" in cache.lru_cache
+    assert "key3" in cache.lru_cache
+
+
+def test_file_cache_contains_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache.put("key1", "value1")
+    assert "key1" in cache
+    assert "key1" in cache.lru_cache
+
+
+def test_file_cache_clear_with_lru_cache(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+    assert len(cache.lru_cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+    assert len(cache.lru_cache) == 0
