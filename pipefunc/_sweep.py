@@ -650,14 +650,14 @@ def get_min_sweep_sets(
         element is a nested dictionary that represents the sweep combinations.
 
     """
-    root_args = pipeline.arg_combinations(output_name, root_args_only=True)
+    root_args = pipeline.root_args(output_name)
     assert isinstance(root_args, tuple)
     root_args_set = set(root_args)
     left_over = root_args_set.copy()
 
     left_overs: list[tuple[str, ...]] = []
     for f in execution_order:
-        f_root_args = pipeline.arg_combinations(f.output_name, root_args_only=True)
+        f_root_args = pipeline.root_args(f.output_name)
         assert isinstance(f_root_args, tuple)
         left_over = left_over - set(f_root_args)
         if not left_over:
