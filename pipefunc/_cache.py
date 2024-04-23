@@ -362,10 +362,13 @@ class DiskCache:
             self.lru_cache.put(key, value)
         self._evict_if_needed()
 
+    def _all_files(self) -> list[Path]:
+        return list(self.cache_dir.glob("*.pkl"))
+
     def _evict_if_needed(self) -> None:
         if self.max_size is not None:
-            files = list(self.cache_dir.glob("*.pkl"))
-            if len(files) > self.max_size:
+            files = self._all_files()
+            for _ in range(len(files) - self.max_size):
                 oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
                 oldest_file.unlink()
 
@@ -376,11 +379,11 @@ class DiskCache:
         return file_path.exists()
 
     def __len__(self) -> int:
-        files = list(self.cache_dir.glob("*.pkl"))
+        files = self._all_files()
         return len(files)
 
     def clear(self) -> None:
-        for file_path in self.cache_dir.glob("*.pkl"):
+        for file_path in self._all_files():
             with suppress(Exception):
                 file_path.unlink()
         if self.with_lru_cache:
