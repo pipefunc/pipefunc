@@ -1,6 +1,10 @@
 """Tests for pipefunc.py."""
 
+from __future__ import annotations
+
 import inspect
+import pickle
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,6 +17,9 @@ from pipefunc import (
     pipefunc,
 )
 from pipefunc._pipefunc import _combine_nodes, _get_signature
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -288,7 +295,7 @@ def test_complex_pipeline():
     pipeline("f7", a=1, b=2, c=3, d=4, e=5)
 
 
-def test_tuple_outputs():
+def test_tuple_outputs(tmp_path: Path):
     cache = True
 
     @pipefunc(
@@ -301,7 +308,18 @@ def test_tuple_outputs():
     def f_c(a, b):
         return {"c": a + b, "_throw": 1}
 
-    @pipefunc(output_name=("d", "e"), cache=cache)
+    def save_function(fname, result):
+        p = tmp_path / fname
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("wb") as f:
+            pickle.dump(result, f)
+
+    @pipefunc(
+        output_name=("d", "e"),
+        cache=cache,
+        save=True,
+        save_function=save_function,
+    )
     def f_d(b, c, x=1):  # noqa: ARG001
         return b * c, 1
 
@@ -309,6 +327,8 @@ def test_tuple_outputs():
         output_name=("g", "h"),
         output_picker=getattr,
         cache=cache,
+        save=True,
+        save_function=save_function,
     )
     def f_e(c, e, x=1):  # noqa: ARG001
         from types import SimpleNamespace
@@ -566,17 +586,26 @@ def test_identify_combinable_nodes2():
 
 
 @pytest.mark.parametrize("cache", [True, False])
-def test_full_output(cache):
+def test_full_output(cache, tmp_path: Path):
     from pipefunc import Pipeline
 
+    def save_function(fname, result):
+        p = tmp_path / fname
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("wb") as f:
+            pickle.dump(result, f)
+
+    @pipefunc(output_name="f1", save=True, save_function=save_function)
     def f1(a, b):
         return a + b
 
+    @pipefunc(output_name=("f2i", "f2j"), save=True, save_function=save_function)
     def f2(f1):
-        return 2 * f1
+        return 2 * f1, 1
 
-    def f3(a, f2):
-        return a + f2
+    @pipefunc(output_name="f3", save=True, save_function=save_function)
+    def f3(a, f2i):
+        return a + f2i
 
     pipeline = Pipeline([f1, f2, f3])
     for f in pipeline.functions:
@@ -587,6 +616,7 @@ def test_full_output(cache):
         "a": 1,
         "b": 2,
         "f1": 3,
-        "f2": 6,
+        "f2i": 6,
+        "f2j": 1,
         "f3": 7,
     }

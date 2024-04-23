@@ -492,18 +492,6 @@ class _Function:
         return self._create_call_with_parameters_method(self.root_args)
 
 
-def _next_root_args(
-    pipeline: Pipeline,
-    arg_set: set[tuple[str, ...]],
-) -> tuple[str, ...]:
-    """Find the tuple of root arguments."""
-    return next(
-        args
-        for args in arg_set
-        if all(isinstance(pipeline.node_mapping[n], str) for n in args)
-    )
-
-
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
 
@@ -677,7 +665,7 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
-        root_args = self.arg_combinations(output_name, root_args_only=True)
+        root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
         return _Function(self, output_name, root_args=root_args)
 
@@ -731,7 +719,7 @@ class Pipeline:
             is skipped.
 
         """
-        root_args = self.arg_combinations(output_name, root_args_only=True)
+        root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
         cache_key_items = []
         for k in sorted(root_args):
@@ -787,7 +775,7 @@ class Pipeline:
             else:
                 all_results[func.output_name] = r
 
-        def _execute_pipeline(  # noqa: PLR0912
+        def _execute_pipeline(
             output_name: _OUTPUT_TYPE,
             **kwargs: Any,
         ) -> Any:
@@ -814,14 +802,13 @@ class Pipeline:
                     if not full_output:
                         return all_results[output_name]
 
-            func_args = {}
+            func_args = {
+                arg: kwargs.get(arg, func.defaults.get(arg)) for arg in func.parameters
+            }
             for arg in func.parameters:
                 if arg not in kwargs and arg not in func.defaults:
                     func_args[arg] = _execute_pipeline(arg, **kwargs)
-                elif arg in kwargs:
-                    func_args[arg] = kwargs[arg]
-                else:  # arg in func.defaults
-                    func_args[arg] = func.defaults[arg]
+
             if result_from_cache:
                 # Can only happen if full_output is True
                 return all_results[output_name]
@@ -837,11 +824,10 @@ class Pipeline:
 
             _update_all_results(func, r, output_name, all_results)
             if func.save and not result_from_cache:
-                root_args = self.arg_combinations(output_name, root_args_only=True)
-                to_save = {k: all_results[k] for k in root_args if k in all_results}
+                to_save = {k: all_results[k] for k in self.root_args(output_name)}
                 filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
                 filename = func.__name__ / filename
-                to_save[output_name] = all_results[output_name]
+                to_save[output_name] = all_results[output_name]  # type: ignore[index]
                 assert func.save_function is not None
                 func.save_function(filename, to_save)  # type: ignore[arg-type]
             return all_results[output_name]
@@ -872,6 +858,17 @@ class Pipeline:
                 mapping[node] = node
         return mapping
 
+    def _next_root_args(
+        self,
+        arg_set: set[tuple[str, ...]],
+    ) -> tuple[str, ...]:
+        """Find the tuple of root arguments."""
+        return next(
+            args
+            for args in arg_set
+            if all(isinstance(self.node_mapping[n], str) for n in args)
+        )
+
     def arg_combinations(
         self,
         output_name: _OUTPUT_TYPE,
@@ -897,7 +894,7 @@ class Pipeline:
         """
         if r := self._arg_combinations.get(output_name):
             if root_args_only:
-                return _next_root_args(self, r)
+                return self._next_root_args(r)
             return r
 
         def names(nodes: Iterable[PipelineFunction | str]) -> tuple[str, ...]:
@@ -949,8 +946,12 @@ class Pipeline:
         compute_arg_mapping(head, head, [], [])  # type: ignore[arg-type]
         self._arg_combinations[output_name] = arg_set
         if root_args_only:
-            return _next_root_args(self, arg_set)
+            return self._next_root_args(arg_set)
         return arg_set
+
+    def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
+        """Return the root arguments required to compute a specific output."""
+        return self.arg_combinations(output_name, root_args_only=True)  # type: ignore[return-value]
 
     def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output."""
@@ -1161,7 +1162,7 @@ class Pipeline:
         # `combinable_nodes` dictionary.
 
         def _recurse(head: PipelineFunction) -> None:
-            head_args = self.arg_combinations(head.output_name, root_args_only=True)
+            head_args = self.root_args(head.output_name)
             funcs = set()
             i = 0
             for node in self.graph.predecessors(head):
@@ -1169,7 +1170,7 @@ class Pipeline:
                     continue
                 i += 1
                 _recurse(node)
-                node_args = self.arg_combinations(node.output_name, root_args_only=True)
+                node_args = self.root_args(node.output_name)
                 if node_args == head_args:
                     funcs.add(node)
             if funcs and (not conservatively_combine or i == len(funcs)):
@@ -1390,7 +1391,7 @@ class Pipeline:
         pipeline = self.simplified_pipeline(output_name) if simplify else self
 
         func_only_graph = pipeline.graph.copy()
-        root_args = pipeline.arg_combinations(output_name, root_args_only=True)
+        root_args = pipeline.root_args(output_name)
         for arg in root_args:
             func_only_graph.remove_node(arg)
 
@@ -1559,6 +1560,7 @@ def _get_signature(
 
 def generate_filename_from_dict(obj: dict[str, Any], suffix: str = ".pickle") -> Path:
     """Generate a filename from a dictionary."""
+    assert all(isinstance(k, str) for k in obj)
     keys = "_".join(obj.keys())
     obj_string = json.dumps(
         obj,
