@@ -1505,13 +1505,11 @@ def _update_all_results(
         # Function produces multiple outputs, but only one is requested
         assert func.output_picker is not None
         for name in func.output_name:
-            if lazy:
-                all_results[name] = _LazyFunction(
-                    func.output_picker,
-                    args=(r, name),
-                )
-            else:
-                all_results[name] = func.output_picker(r, name)
+            all_results[name] = (
+                _LazyFunction(func.output_picker, args=(r, name))
+                if lazy
+                else func.output_picker(r, name)
+            )
     else:
         all_results[func.output_name] = r
 
