@@ -34,6 +34,10 @@ class HybridCache:
         The weight given to the access frequency in the score calculation.
     duration_weight
         The weight given to the computation duration in the score calculation.
+    with_cloudpickle
+        Use cloudpickle for storing the data in memory if using shared memory.
+    shared
+        Whether the cache should be shared between multiple processes.
 
     """
 
@@ -43,6 +47,7 @@ class HybridCache:
         access_weight: float = 0.5,
         duration_weight: float = 0.5,
         *,
+        with_cloudpickle: bool = True,
         shared: bool = True,
     ) -> None:
         """Initialize the HybridCache instance."""
@@ -61,6 +66,7 @@ class HybridCache:
         self.access_weight: float = access_weight
         self.duration_weight: float = duration_weight
         self.shared: bool = shared
+        self._with_cloudpickle: bool = with_cloudpickle
 
     @property
     def cache(self) -> dict[Hashable, Any]:
@@ -109,7 +115,10 @@ class HybridCache:
         with self.lock:
             if key in self._cache:
                 self._access_counts[key] += 1
-                return self._cache[key]
+                value = self._cache[key]
+                if self._with_cloudpickle and self.shared:
+                    value = cloudpickle.loads(value)
+                return value
         return None  # pragma: no cover
 
     def put(self, key: Hashable, value: Any, duration: float) -> None:
@@ -128,6 +137,8 @@ class HybridCache:
             The duration of the computation that generated the value.
 
         """
+        if self._with_cloudpickle and self.shared:
+            value = cloudpickle.dumps(value)
         with self.lock:
             if len(self._cache) >= self.max_size:
                 self._expire()
