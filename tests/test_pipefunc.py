@@ -389,17 +389,17 @@ def test_tuple_outputs(tmp_path: Path):
         lazy=True,
     )
     f = pipeline.func("i")
-    assert (
-        f.call_full_output(a=1, b=2, x=3)["i"].evaluate() == f(a=1, b=2, x=3).evaluate()
-    )
+    r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
+    assert r == f(a=1, b=2, x=3).evaluate()
     assert (
         pipeline.arg_combinations("g", root_args_only=True)
         == pipeline.arg_combinations("h", root_args_only=True)
         == pipeline.arg_combinations(("g", "h"), root_args_only=True)
         == ("a", "b", "x")
     )
-    assert pipeline.cache.cache[(("d", "e"), (("a", 1), ("b", 2), ("x", 3)))] == (6, 1)
-    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).g == 4
+    key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
+    assert pipeline.cache.cache[key].evaluate() == (6, 1)
+    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
 
     assert (
@@ -410,7 +410,7 @@ def test_tuple_outputs(tmp_path: Path):
     )
 
     f = pipeline.func(("g", "h"))
-    r = f(a=1, b=2, x=3)
+    r = f(a=1, b=2, x=3).evaluate()
     assert r.g == 4
     assert r.h == 2
 
