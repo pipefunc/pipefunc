@@ -510,15 +510,28 @@ class _Function:
 class _LazyFunction:
     """Lazy function wrapper for deferred evaluation of a function."""
 
+    __slots__ = [
+        "func",
+        "args",
+        "kwargs",
+        "delete_after_eval",
+        "_result",
+        "_evaluated",
+        "_delayed_callbacks",
+    ]
+
     def __init__(
         self,
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
+        *,
+        delete_after_eval: bool = False,
     ) -> None:
         self.func = func
         self.args = args
         self.kwargs = kwargs or {}
+        self.delete_after_eval = delete_after_eval
 
         self._result = None
         self._evaluated = False
@@ -539,6 +552,14 @@ class _LazyFunction:
         self._result = result
         for cb in self._delayed_callbacks:
             evaluate_lazy(cb)
+
+        if self.delete_after_eval:
+            # Clear the function and arguments to free up memory
+            self.func = None  # type: ignore[assignment]
+            self.args = None  # type: ignore[assignment]
+            self.kwargs = None  # type: ignore[assignment]
+            self._delayed_callbacks = None  # type: ignore[assignment]
+
         return result
 
 
