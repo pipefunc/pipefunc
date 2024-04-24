@@ -595,18 +595,15 @@ class Pipeline:
             self.add(f)
         self._graph = None
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
-        self.cache: LRUCache | HybridCache | DiskCache
+        self._cache: LRUCache | HybridCache | DiskCache | None = None
         if cache_kwargs is None:
             cache_kwargs = {}
         if cache_type == "lru":
-            self.cache = LRUCache(**cache_kwargs)
+            self._cache = LRUCache(**cache_kwargs)
         elif cache_type == "hybrid":
-            self.cache = HybridCache(**cache_kwargs)
+            self._cache = HybridCache(**cache_kwargs)
         elif cache_type == "disk":
-            self.cache = DiskCache(**cache_kwargs)
-        else:
-            msg = f"Unknown cache type {cache_type}"
-            raise ValueError(msg)
+            self._cache = DiskCache(**cache_kwargs)
 
     @property
     def profile(self) -> bool | None:
@@ -633,6 +630,19 @@ class Pipeline:
         if value is not None:
             for f in self.functions:
                 f.debug = value
+
+    @property
+    def cache(self) -> LRUCache | HybridCache | DiskCache:
+        """Return the cache object."""
+        if self._cache is None:
+            msg = "Cache not initialized."
+            raise ValueError(msg)
+        return self._cache
+
+    @cache.setter
+    def cache(self, value: LRUCache | HybridCache | DiskCache) -> None:
+        """Set the cache object."""
+        self._cache = value
 
     def add(self, f: PipelineFunction) -> None:
         """Add a function to the pipeline.
