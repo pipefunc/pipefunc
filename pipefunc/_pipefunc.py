@@ -796,6 +796,76 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
+    def _execute_pipeline(  # noqa: PLR0912
+        self,
+        output_name: _OUTPUT_TYPE,
+        kwargs: Any,
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,  # noqa: FBT001
+    ) -> Any:
+        if output_name in all_results:
+            return all_results[output_name]
+
+        func = self.output_to_func[output_name]
+
+        if func is None:
+            msg = f"Argument {output_name} is not in kwargs and has no default value."
+            raise ValueError(msg)
+
+        assert func.parameters is not None
+        result_from_cache = False
+        if func.cache:
+            cache_key = self._compute_cache_key(func.output_name, kwargs)
+            if cache_key is not None and cache_key in self.cache:
+                r = self.cache.get(cache_key)
+                _update_all_results(func, r, output_name, all_results, self.lazy)
+                result_from_cache = True
+                if not full_output:
+                    return all_results[output_name]
+
+        func_args = {}
+        for arg in func.parameters:
+            if arg in kwargs:
+                func_args[arg] = kwargs[arg]
+            elif arg in func.defaults:
+                func_args[arg] = func.defaults[arg]
+            else:
+                func_args[arg] = self._execute_pipeline(
+                    arg,
+                    kwargs,
+                    all_results,
+                    full_output,
+                )
+
+        if result_from_cache:
+            # Can only happen if full_output is True
+            return all_results[output_name]
+        start_time = time.perf_counter()
+
+        r = _LazyFunction(func, kwargs=func_args) if self.lazy else func(**func_args)
+
+        if func.cache and cache_key is not None:
+            if isinstance(self.cache, HybridCache):
+                duration = time.perf_counter() - start_time
+                self.cache.put(cache_key, r, duration)
+            else:
+                self.cache.put(cache_key, r)
+
+        _update_all_results(func, r, output_name, all_results, self.lazy)
+        if func.save and not result_from_cache:
+            to_save = {k: all_results[k] for k in self.root_args(output_name)}
+            filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
+            filename = func.__name__ / filename
+            to_save[output_name] = all_results[output_name]  # type: ignore[index]
+            assert func.save_function is not None
+            if self.lazy:
+                lazy_save = _LazyFunction(func.save_function, args=(filename, to_save))
+                r.add_delayed_callback(lazy_save)
+            else:
+                func.save_function(filename, to_save)  # type: ignore[arg-type]
+
+        return all_results[output_name]
+
     def _run_pipeline(
         self,
         output_name: _OUTPUT_TYPE,
@@ -822,81 +892,13 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
-
-        def _execute_pipeline(  # noqa: PLR0912
-            output_name: _OUTPUT_TYPE,
-            **kwargs: Any,
-        ) -> Any:
-            if output_name in all_results:
-                return all_results[output_name]
-
-            func = self.output_to_func[output_name]
-
-            if func is None:
-                msg = (
-                    f"Argument {output_name} is not in kwargs and has no default value."
-                )
-                raise ValueError(msg)
-
-            assert func.parameters is not None
-            result_from_cache = False
-            if func.cache:
-                cache_key = self._compute_cache_key(func.output_name, kwargs)
-                if cache_key is not None and cache_key in self.cache:
-                    r = self.cache.get(cache_key)
-                    assert r is not None
-                    _update_all_results(func, r, output_name, all_results, self.lazy)
-                    result_from_cache = True
-                    if not full_output:
-                        return all_results[output_name]
-
-            func_args = {}
-            for arg in func.parameters:
-                if arg in kwargs:
-                    func_args[arg] = kwargs[arg]
-                elif arg in func.defaults:
-                    func_args[arg] = func.defaults[arg]
-                else:
-                    func_args[arg] = _execute_pipeline(arg, **kwargs)
-
-            if result_from_cache:
-                # Can only happen if full_output is True
-                return all_results[output_name]
-            start_time = time.perf_counter()
-
-            if self.lazy:
-                # Create a _LazyFunction instance instead of executing the function
-                r = _LazyFunction(func, kwargs=func_args)
-            else:
-                r = func(**func_args)
-
-            if func.cache and cache_key is not None:
-                if isinstance(self.cache, HybridCache):
-                    duration = time.perf_counter() - start_time
-                    self.cache.put(cache_key, r, duration)
-                else:
-                    self.cache.put(cache_key, r)
-
-            _update_all_results(func, r, output_name, all_results, self.lazy)
-            if func.save and not result_from_cache:
-                to_save = {k: all_results[k] for k in self.root_args(output_name)}
-                filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-                filename = func.__name__ / filename
-                to_save[output_name] = all_results[output_name]  # type: ignore[index]
-                assert func.save_function is not None
-                if self.lazy:
-                    lazy_save = _LazyFunction(
-                        func.save_function,
-                        args=(filename, to_save),
-                    )
-                    r.add_delayed_callback(lazy_save)
-                else:
-                    func.save_function(filename, to_save)  # type: ignore[arg-type]
-
-            return all_results[output_name]
-
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
-        _execute_pipeline(output_name, **kwargs)
+        self._execute_pipeline(
+            output_name,
+            kwargs,
+            all_results,
+            full_output,
+        )
         return all_results if full_output else all_results[output_name]
 
     @property
