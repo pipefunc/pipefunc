@@ -601,6 +601,13 @@ class Pipeline:
         if cache_type == "lru":
             self._cache = LRUCache(**cache_kwargs)
         elif cache_type == "hybrid":
+            if lazy:
+                warnings.warn(
+                    "Hybrid cache uses function evaluation duration which"
+                    " is not measured correctly when using `lazy=True`.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             self._cache = HybridCache(**cache_kwargs)
         elif cache_type == "disk":
             self._cache = DiskCache(**cache_kwargs)
