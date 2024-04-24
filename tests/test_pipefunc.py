@@ -386,7 +386,7 @@ def test_tuple_outputs(tmp_path: Path):
         [f_c, f_d, f_e, f_i],
         debug=True,
         profile=True,
-        cache="lru",
+        cache_type="lru",
         cache_kwargs={"with_cloudpickle": True},
         lazy=True,
     )
@@ -661,7 +661,7 @@ def test_full_output(cache, tmp_path: Path):
     if cache:
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir(exist_ok=True)
-        cache_kwargs = {"cache": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
+        cache_kwargs = {"cache_type": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
     else:
         cache_kwargs = {}
     pipeline = Pipeline([f1, f2, f3], **cache_kwargs)  # type: ignore[arg-type]
