@@ -816,11 +816,6 @@ class Pipeline:
             return all_results[output_name]
 
         func = self.output_to_func[output_name]
-
-        if func is None:
-            msg = f"Argument {output_name} is not in kwargs and has no default value."
-            raise ValueError(msg)
-
         assert func.parameters is not None
         result_from_cache = False
         if func.cache:
