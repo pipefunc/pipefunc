@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -142,15 +147,15 @@ def test_cache_property(shared):
 
 
 @pytest.fixture()
-def cache_dir(tmpdir):
-    return Path(tmpdir) / "cache"
+def cache_dir(tmp_path):
+    return tmp_path / "cache"
 
 
 def test_file_cache_init(cache_dir):
     cache = DiskCache(cache_dir=str(cache_dir))
     assert cache.cache_dir == cache_dir
     assert cache.max_size is None
-    assert cache.with_cloudpickle is True
+    assert cache._with_cloudpickle is True
     assert cache_dir.exists()
 
 
@@ -261,3 +266,72 @@ def test_file_cache_put_and_get_none(cache_dir):
     assert "key1" in cache
     assert "key1" in cache.lru_cache
     assert cache.cache["key1"] == "__ReturnsNone__"
+
+
+@pytest.mark.parametrize("shared", [True, False])
+def test_hybrid_cache_clear(shared):
+    cache = HybridCache(max_size=3, shared=shared)
+    cache.put("key1", "value1", 2.0)
+    cache.put("key2", "value2", 3.0)
+    assert len(cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+    assert "key1" not in cache
+    assert "key2" not in cache
+
+    cache.put("key3", "value3", 4.0)
+    assert cache.get("key3") == "value3"
+    assert len(cache) == 1
+
+
+@pytest.mark.parametrize("shared", [True, False])
+def test_lru_cache_clear(shared):
+    cache = LRUCache(max_size=2, shared=shared)
+    cache.put("test", "value")
+    cache.put("test2", "value2")
+    assert len(cache._cache_queue) == 2
+    assert len(cache._cache_dict) == 2
+
+    cache.clear()
+    assert len(cache._cache_queue) == 0
+    assert len(cache._cache_dict) == 0
+    assert len(cache) == 0
+
+    cache.put("test3", "value3")
+    assert cache.get("test3") == "value3"
+    assert len(cache) == 1
+
+
+def test_disk_cache_clear(cache_dir):
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=False)
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+
+    cache.put("key3", "value3")
+    assert cache.get("key3") == "value3"
+    assert len(cache) == 1
+
+
+@pytest.mark.parametrize("shared", [True, False])
+def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa: FBT001
+    cache = DiskCache(
+        cache_dir=str(cache_dir),
+        with_lru_cache=True,
+        lru_shared=shared,
+    )
+    assert len(cache) == 0
+    cache.put("key1", "value1")
+    cache.put("key2", "value2")
+    assert len(cache) == 2, cache._all_files()
+    assert len(cache.lru_cache) == 2
+    cache.clear()
+    assert len(cache) == 0
+    assert len(cache.lru_cache) == 0
+
+    cache.put("key3", "value3")
+    assert cache.get("key3") == "value3"
+    assert len(cache) == 1
+    assert len(cache.lru_cache) == 1
