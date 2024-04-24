@@ -44,7 +44,7 @@ def test_hybrid_cache_expire(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_hybrid_cache_str(shared):
-    cache = HybridCache(max_size=3, shared=shared)
+    cache = HybridCache(max_size=3, shared=shared, with_cloudpickle=False)
     cache.put("key1", "value1", 2.0)
     assert "Cache: {'key1': 'value1'}" in str(cache)
 
