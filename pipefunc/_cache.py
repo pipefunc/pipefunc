@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import hashlib
 import pickle
 from contextlib import nullcontext, suppress
@@ -11,12 +12,41 @@ import cloudpickle
 
 if TYPE_CHECKING:
     from collections.abc import Hashable
-    from multiprocessing.managers import ListProxy
 
 _NONE_RETURN_STR = "__ReturnsNone__"
 
 
-class HybridCache:
+class _CacheBase(abc.ABC):
+    @abc.abstractmethod
+    def get(self, key: Hashable) -> Any:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def put(self, key: Hashable, value: Any) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __contains__(self, key: Hashable) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def clear(self) -> None:
+        raise NotImplementedError
+
+    def __getstate__(self) -> object:
+        msg = "The cache object should not be pickled!"
+        raise RuntimeError(msg)
+
+    def __setstate__(self, state: object) -> None:
+        msg = "The cache object should not be pickled!"
+        raise RuntimeError(msg)
+
+
+class HybridCache(_CacheBase):
     """A hybrid cache implementation.
 
     This uses a combination of Least Frequently Used (LFU) and
@@ -53,15 +83,15 @@ class HybridCache:
         """Initialize the HybridCache instance."""
         if shared:
             manager = Manager()
-            self._cache = manager.dict()
+            self._cache_dict = manager.dict()
             self._access_counts = manager.dict()
             self._computation_durations = manager.dict()
-            self.lock = manager.Lock()
+            self._cache_lock = manager.Lock()
         else:
-            self._cache = {}  # type: ignore[assignment]
+            self._cache_dict = {}  # type: ignore[assignment]
             self._access_counts = {}  # type: ignore[assignment]
             self._computation_durations = {}  # type: ignore[assignment]
-            self.lock = nullcontext()  # type: ignore[assignment]
+            self._cache_lock = nullcontext()  # type: ignore[assignment]
         self.max_size: int = max_size
         self.access_weight: float = access_weight
         self.duration_weight: float = duration_weight
@@ -72,10 +102,10 @@ class HybridCache:
     def cache(self) -> dict[Hashable, Any]:
         """Return the cache entries."""
         if not self.shared:
-            assert isinstance(self._cache, dict)
-            return self._cache
-        with self.lock:
-            return dict(self._cache.items())
+            assert isinstance(self._cache_dict, dict)
+            return self._cache_dict
+        with self._cache_lock:
+            return dict(self._cache_dict.items())
 
     @property
     def access_counts(self) -> dict[Hashable, int]:
@@ -83,7 +113,7 @@ class HybridCache:
         if not self.shared:
             assert isinstance(self._access_counts, dict)
             return self._access_counts
-        with self.lock:
+        with self._cache_lock:
             return dict(self._access_counts.items())
 
     @property
@@ -92,7 +122,7 @@ class HybridCache:
         if not self.shared:
             assert isinstance(self._computation_durations, dict)
             return self._computation_durations
-        with self.lock:
+        with self._cache_lock:
             return dict(self._computation_durations.items())
 
     def get(self, key: Hashable) -> Any | None:
@@ -112,16 +142,16 @@ class HybridCache:
             otherwise None.
 
         """
-        with self.lock:
-            if key in self._cache:
+        with self._cache_lock:
+            if key in self._cache_dict:
                 self._access_counts[key] += 1
-                value = self._cache[key]
+                value = self._cache_dict[key]
                 if self._with_cloudpickle and self.shared:
                     value = cloudpickle.loads(value)
                 return value
         return None  # pragma: no cover
 
-    def put(self, key: Hashable, value: Any, duration: float) -> None:
+    def put(self, key: Hashable, value: Any, duration: float) -> None:  # type: ignore[override]
         """Add a value to the cache with its associated key and computation duration.
 
         If the cache is full, the entry with the lowest score based on the access
@@ -139,10 +169,10 @@ class HybridCache:
         """
         if self._with_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
-        with self.lock:
-            if len(self._cache) >= self.max_size:
+        with self._cache_lock:
+            if len(self._cache_dict) >= self.max_size:
                 self._expire()
-            self._cache[key] = value
+            self._cache_dict[key] = value
             self._access_counts[key] = 1
             self._computation_durations[key] = duration
 
@@ -167,9 +197,16 @@ class HybridCache:
 
         # Find the key with the lowest score
         lowest_score_key = min(scores, key=lambda k: scores[k])
-        del self._cache[lowest_score_key]
+        del self._cache_dict[lowest_score_key]
         del self._access_counts[lowest_score_key]
         del self._computation_durations[lowest_score_key]
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._cache_lock:
+            self._cache_dict.clear()
+            self._access_counts.clear()
+            self._computation_durations.clear()
 
     def __contains__(self, key: Hashable) -> bool:
         """Check if a key is present in the cache.
@@ -185,7 +222,7 @@ class HybridCache:
             True if the key is present in the cache, otherwise False.
 
         """
-        return key in self._cache
+        return key in self._cache_dict
 
     def __str__(self) -> str:
         """Return a string representation of the HybridCache.
@@ -199,7 +236,7 @@ class HybridCache:
             A string representation of the HybridCache.
 
         """
-        cache_str = f"Cache: {self._cache}\n"
+        cache_str = f"Cache: {self._cache_dict}\n"
         access_counts_str = f"Access Counts: {self._access_counts}\n"
         computation_durations_str = (
             f"Computation Durations: {self._computation_durations}\n"
@@ -208,10 +245,10 @@ class HybridCache:
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""
-        return len(self._cache)
+        return len(self._cache_dict)
 
 
-class LRUCache:
+class LRUCache(_CacheBase):
     """A shared memory LRU cache implementation.
 
     Parameters
@@ -234,8 +271,8 @@ class LRUCache:
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
-        self._with_cloudpickle = with_cloudpickle
         self.shared = shared
+        self._with_cloudpickle = with_cloudpickle
         if max_size == 0:  # pragma: no cover
             msg = "max_size must be greater than 0"
             raise ValueError(msg)
@@ -263,7 +300,7 @@ class LRUCache:
                 value = cloudpickle.loads(value)
         return value
 
-    def put(self, key: Hashable, value: Any) -> ListProxy[Any]:
+    def put(self, key: Hashable, value: Any) -> None:
         """Insert a key value pair into the cache."""
         if value is None:
             value = _NONE_RETURN_STR
@@ -278,7 +315,6 @@ class LRUCache:
                 key_to_evict = self._cache_queue.pop(0)
                 self._cache_dict.pop(key_to_evict)
                 self._cache_queue.append(key)
-            return self._cache_queue
 
     def __contains__(self, key: Hashable) -> bool:
         """Check if a key is present in the cache."""
@@ -302,7 +338,7 @@ class LRUCache:
             del self._cache_queue[:]
 
 
-class DiskCache:
+class DiskCache(_CacheBase):
     """Disk cache implementation using pickle or cloudpickle for serialization.
 
     Parameters
@@ -334,7 +370,7 @@ class DiskCache:
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
-        self.with_cloudpickle = with_cloudpickle
+        self._with_cloudpickle = with_cloudpickle
         self.with_lru_cache = with_lru_cache
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -356,7 +392,9 @@ class DiskCache:
         file_path = self._get_file_path(key)
         if file_path.exists():
             with file_path.open("rb") as f:
-                value = cloudpickle.load(f) if self.with_cloudpickle else pickle.load(f)  # noqa: S301
+                value = (
+                    cloudpickle.load(f) if self._with_cloudpickle else pickle.load(f)  # noqa: S301
+                )
             if self.with_lru_cache:
                 self.lru_cache.put(key, value)
             return value
@@ -365,7 +403,7 @@ class DiskCache:
     def put(self, key: Hashable, value: Any) -> None:
         file_path = self._get_file_path(key)
         with file_path.open("wb") as f:
-            if self.with_cloudpickle:
+            if self._with_cloudpickle:
                 cloudpickle.dump(value, f)
             else:
                 pickle.dump(value, f)
