@@ -323,7 +323,11 @@ class LRUCache(_CacheBase):
     @property
     def cache(self) -> dict:
         """Returns a copy of the cache."""
-        return dict(self._cache_dict.items())
+        if not self.shared:
+            assert isinstance(self._cache_dict, dict)
+            return self._cache_dict
+        with self._cache_lock:
+            return dict(self._cache_dict.items())
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""

@@ -67,6 +67,46 @@ def test_pipeline_and_all_arg_combinations() -> None:
         assert fe(**_kw) == kw["e"]
 
 
+def test_pipeline_and_all_arg_combinations_lazy() -> None:
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True, lazy=True)
+
+    fc = pipeline.func("c")
+    fd = pipeline.func("d")
+    c = f1(a=2, b=3)
+    assert fc(a=2, b=3).evaluate() == c == fc(b=3, a=2).evaluate() == 5
+    assert fd(a=2, b=3).evaluate() == f2(b=3, c=c) == fd(b=3, c=c).evaluate() == 15
+
+    fe = pipeline.func("e")
+    assert (
+        fe(a=2, b=3, x=1).evaluate()
+        == fe(a=2, b=3, d=15, x=1).evaluate()
+        == f3(c=c, d=15, x=1)
+        == 75
+    )
+
+    all_args = pipeline.all_arg_combinations()
+
+    kw = {"a": 2, "b": 3, "x": 1}
+    kw["c"] = f1(a=kw["a"], b=kw["b"])
+    kw["d"] = f2(b=kw["b"], c=kw["c"])
+    kw["e"] = f3(c=kw["c"], d=kw["d"], x=kw["x"])
+    for params in all_args["e"]:
+        _kw = {k: kw[k] for k in params}
+        assert fe(**_kw).evaluate() == kw["e"]
+
+
 @pytest.mark.parametrize(
     "f2",
     [
@@ -290,9 +330,10 @@ def test_complex_pipeline():
     def f7(a, f2, f6):
         return a + f2 + f6
 
-    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
+    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7], lazy=True)
 
-    pipeline("f7", a=1, b=2, c=3, d=4, e=5)
+    r = pipeline("f7", a=1, b=2, c=3, d=4, e=5)
+    assert r.evaluate() == 52
 
 
 def test_tuple_outputs(tmp_path: Path):
@@ -345,17 +386,21 @@ def test_tuple_outputs(tmp_path: Path):
         debug=True,
         profile=True,
         cache_type="lru",
+        lazy=True,
+        cache_kwargs={"shared": False},
     )
     f = pipeline.func("i")
-    assert f.call_full_output(a=1, b=2, x=3)["i"] == f(a=1, b=2, x=3)
+    r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
+    assert r == f(a=1, b=2, x=3).evaluate()
     assert (
         pipeline.arg_combinations("g", root_args_only=True)
         == pipeline.arg_combinations("h", root_args_only=True)
         == pipeline.arg_combinations(("g", "h"), root_args_only=True)
         == ("a", "b", "x")
     )
-    assert pipeline.cache.cache[(("d", "e"), (("a", 1), ("b", 2), ("x", 3)))] == (6, 1)
-    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).g == 4
+    key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
+    assert pipeline.cache.cache[key].evaluate() == (6, 1)
+    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
 
     assert (
@@ -366,7 +411,7 @@ def test_tuple_outputs(tmp_path: Path):
     )
 
     f = pipeline.func(("g", "h"))
-    r = f(a=1, b=2, x=3)
+    r = f(a=1, b=2, x=3).evaluate()
     assert r.g == 4
     assert r.h == 2
 
@@ -633,3 +678,25 @@ def test_full_output(cache, tmp_path: Path):
     }
     if cache:
         assert len(list(cache_dir.glob("*.pkl"))) == 3
+
+
+def test_lazy_pipeline():
+    @pipefunc(output_name="c", cache=True)
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e", cache=True)
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3], lazy=True)
+
+    f = pipeline.func("e")
+    r = f(a=1, b=2, x=3).evaluate()
+    assert r == 162
+    r = f.call_full_output(a=1, b=2, x=3)["e"].evaluate()
+    assert r == 162
