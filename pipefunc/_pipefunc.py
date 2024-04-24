@@ -84,6 +84,21 @@ def _update_wrapper(wrapper, wrapped) -> None:  # noqa: ANN001
     del wrapper.__dict__["__wrapped__"]
 
 
+def evaluate_lazy(x: Any) -> Any:
+    """Evaluate a lazy object."""
+    if isinstance(x, _LazyFunction):
+        return x.evaluate()
+    if isinstance(x, dict):
+        return {k: evaluate_lazy(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [evaluate_lazy(v) for v in x]
+    if isinstance(x, tuple):
+        return tuple(evaluate_lazy(v) for v in x)
+    if isinstance(x, set):
+        return {evaluate_lazy(v) for v in x}
+    return x
+
+
 class PipelineFunction(Generic[T]):
     """Function wrapper class for pipeline functions with additional attributes.
 
@@ -180,7 +195,7 @@ class PipelineFunction(Generic[T]):
         """
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         with self._maybe_profiler():
-            result = self.func(*args, **kwargs)
+            result = self.func(*evaluate_lazy(args), **evaluate_lazy(kwargs))
 
         if self.debug and self.profiling_stats is not None:
             dt = self.profiling_stats.time.average
@@ -492,6 +507,28 @@ class _Function:
         return self._create_call_with_parameters_method(self.root_args)
 
 
+class _LazyFunction:
+    """Lazy function wrapper for deferred evaluation of a function."""
+
+    def __init__(
+        self,
+        func: Callable[..., Any],
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+    ) -> None:
+        if kwargs is None:
+            kwargs = {}
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def evaluate(self) -> Any:
+        """Evaluate the lazy function and return the result."""
+        args = evaluate_lazy(self.args)
+        kwargs = evaluate_lazy(self.kwargs)
+        return self.func(*args, **kwargs)
+
+
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
 
@@ -499,6 +536,8 @@ class Pipeline:
     ----------
     functions
         A list of functions that form the pipeline.
+    lazy
+        Flag indicating whether the pipeline should be lazy.
     debug
         Flag indicating whether debug information should be printed.
         If None, the value of each PipelineFunction's debug attribute is used.
@@ -516,17 +555,15 @@ class Pipeline:
         self,
         functions: list[PipelineFunction],
         *,
+        lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
         cache: Literal["shared", "hybrid", "disk"] | None = "hybrid",
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
-        # TODO: add support for disk cache
-        # TODO: check https://joblib.readthedocs.io/en/latest/memory.html
-        # TODO: add caching kwargs
-
         self.functions: list[PipelineFunction] = []
+        self.lazy = lazy
         self._debug = debug
         self._profile = profile
         self.output_to_func: dict[_OUTPUT_TYPE, PipelineFunction] = {}
@@ -735,7 +772,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _run_pipeline(
+    def _run_pipeline(  # noqa: PLR0915
         self,
         output_name: _OUTPUT_TYPE,
         *,
@@ -774,11 +811,17 @@ class Pipeline:
             ):
                 for name in func.output_name:
                     assert func.output_picker is not None
-                    all_results[name] = func.output_picker(r, name)
+                    if self.lazy:
+                        all_results[name] = _LazyFunction(
+                            func.output_picker,
+                            args=(r, name),
+                        )
+                    else:
+                        all_results[name] = func.output_picker(r, name)
             else:
                 all_results[func.output_name] = r
 
-        def _execute_pipeline(
+        def _execute_pipeline(  # noqa: PLR0912
             output_name: _OUTPUT_TYPE,
             **kwargs: Any,
         ) -> Any:
@@ -816,7 +859,12 @@ class Pipeline:
                 # Can only happen if full_output is True
                 return all_results[output_name]
             start_time = time.perf_counter()
-            r = func(**func_args)
+
+            if self.lazy:
+                # Create a _LazyFunction instance instead of executing the function
+                r = _LazyFunction(func, kwargs=func_args)
+            else:
+                r = func(**func_args)
 
             if func.cache and cache_key is not None:
                 if isinstance(self.cache, HybridCache):
