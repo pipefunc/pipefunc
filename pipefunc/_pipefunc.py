@@ -651,8 +651,6 @@ class Pipeline:
         ----------
         f
             The function to add to the pipeline.
-        profile
-            Flag indicating whether profiling information should be collected.
 
         """
         if not isinstance(f, PipelineFunction):
@@ -808,10 +806,11 @@ class Pipeline:
 
     def _execute_pipeline(  # noqa: PLR0912
         self,
+        *,
         output_name: _OUTPUT_TYPE,
         kwargs: Any,
         all_results: dict[_OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
+        full_output: bool,
     ) -> Any:
         if output_name in all_results:
             return all_results[output_name]
@@ -841,10 +840,10 @@ class Pipeline:
                 func_args[arg] = func.defaults[arg]
             else:
                 func_args[arg] = self._execute_pipeline(
-                    arg,
-                    kwargs,
-                    all_results,
-                    full_output,
+                    output_name=arg,
+                    kwargs=kwargs,
+                    all_results=all_results,
+                    full_output=full_output,
                 )
 
         if result_from_cache:
@@ -904,10 +903,10 @@ class Pipeline:
         """
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
         self._execute_pipeline(
-            output_name,
-            kwargs,
-            all_results,
-            full_output,
+            output_name=output_name,
+            kwargs=kwargs,
+            all_results=all_results,
+            full_output=full_output,
         )
         return all_results if full_output else all_results[output_name]
 
