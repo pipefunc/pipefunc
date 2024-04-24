@@ -49,7 +49,7 @@ def test_hybrid_cache_expire(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_hybrid_cache_str(shared):
-    cache = HybridCache(max_size=3, shared=shared, with_cloudpickle=False)
+    cache = HybridCache(max_size=3, shared=shared, allow_cloudpickle=False)
     cache.put("key1", "value1", 2.0)
     assert "Cache: {'key1': 'value1'}" in str(cache)
 
@@ -76,12 +76,12 @@ def test_computation_duration(shared):
 def test_cache_initialization(shared):
     cache = LRUCache(max_size=2, shared=shared)
     assert cache.max_size == 2
-    assert cache._with_cloudpickle is False
+    assert cache._allow_cloudpickle is False
     assert len(cache._cache_queue) == 0
     assert len(cache._cache_dict) == 0
 
-    cache_with_cp = LRUCache(max_size=2, with_cloudpickle=True, shared=shared)
-    assert cache_with_cp._with_cloudpickle is True
+    cache_with_cp = LRUCache(max_size=2, allow_cloudpickle=True, shared=shared)
+    assert cache_with_cp._allow_cloudpickle is True
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -122,7 +122,7 @@ def test_put_and_get_none(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_put_and_get_with_cloudpickle(shared):
-    cache = LRUCache(max_size=2, with_cloudpickle=True, shared=shared)
+    cache = LRUCache(max_size=2, allow_cloudpickle=True, shared=shared)
     cache.put("test", "value")
     assert len(cache._cache_queue) == 1
     assert len(cache._cache_dict) == 1
@@ -155,7 +155,7 @@ def test_file_cache_init(cache_dir):
     cache = DiskCache(cache_dir=str(cache_dir))
     assert cache.cache_dir == cache_dir
     assert cache.max_size is None
-    assert cache._with_cloudpickle is True
+    assert cache.use_cloudpickle is True
     assert cache_dir.exists()
 
 
@@ -210,7 +210,7 @@ def test_file_cache_len(cache_dir):
 
 
 def test_file_cache_without_cloudpickle(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir), with_cloudpickle=False)
+    cache = DiskCache(cache_dir=str(cache_dir), use_cloudpickle=False)
     cache.put("key1", b"value1")
     assert cache.get("key1") == b"value1"
 

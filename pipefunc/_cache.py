@@ -64,7 +64,7 @@ class HybridCache(_CacheBase):
         The weight given to the access frequency in the score calculation.
     duration_weight
         The weight given to the computation duration in the score calculation.
-    with_cloudpickle
+    allow_cloudpickle
         Use cloudpickle for storing the data in memory if using shared memory.
     shared
         Whether the cache should be shared between multiple processes.
@@ -77,7 +77,7 @@ class HybridCache(_CacheBase):
         access_weight: float = 0.5,
         duration_weight: float = 0.5,
         *,
-        with_cloudpickle: bool = True,
+        allow_cloudpickle: bool = True,
         shared: bool = True,
     ) -> None:
         """Initialize the HybridCache instance."""
@@ -96,7 +96,7 @@ class HybridCache(_CacheBase):
         self.access_weight: float = access_weight
         self.duration_weight: float = duration_weight
         self.shared: bool = shared
-        self._with_cloudpickle: bool = with_cloudpickle
+        self._allow_cloudpickle: bool = allow_cloudpickle
 
     @property
     def cache(self) -> dict[Hashable, Any]:
@@ -146,7 +146,7 @@ class HybridCache(_CacheBase):
             if key in self._cache_dict:
                 self._access_counts[key] += 1
                 value = self._cache_dict[key]
-                if self._with_cloudpickle and self.shared:
+                if self._allow_cloudpickle and self.shared:
                     value = cloudpickle.loads(value)
                 return value
         return None  # pragma: no cover
@@ -167,7 +167,7 @@ class HybridCache(_CacheBase):
             The duration of the computation that generated the value.
 
         """
-        if self._with_cloudpickle and self.shared:
+        if self._allow_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
             if len(self._cache_dict) >= self.max_size:
@@ -255,7 +255,7 @@ class LRUCache(_CacheBase):
     ----------
     max_size
         Cache size of the LRU cache, by default 128.
-    with_cloudpickle
+    allow_cloudpickle
         Use cloudpickle for storing the data in memory if using shared memory.
     shared
         Whether the cache should be shared between multiple processes.
@@ -266,13 +266,13 @@ class LRUCache(_CacheBase):
         self,
         *,
         max_size: int = 128,
-        with_cloudpickle: bool = False,
+        allow_cloudpickle: bool = False,
         shared: bool = True,
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
         self.shared = shared
-        self._with_cloudpickle = with_cloudpickle
+        self._allow_cloudpickle = allow_cloudpickle
         if max_size == 0:  # pragma: no cover
             msg = "max_size must be greater than 0"
             raise ValueError(msg)
@@ -296,7 +296,7 @@ class LRUCache(_CacheBase):
         if value is not None:
             if value == _NONE_RETURN_STR:
                 value = None
-            elif self._with_cloudpickle and self.shared:
+            elif self._allow_cloudpickle and self.shared:
                 value = cloudpickle.loads(value)
         return value
 
@@ -304,7 +304,7 @@ class LRUCache(_CacheBase):
         """Insert a key value pair into the cache."""
         if value is None:
             value = _NONE_RETURN_STR
-        elif self._with_cloudpickle and self.shared:
+        elif self._allow_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
             self._cache_dict[key] = value
@@ -351,7 +351,7 @@ class DiskCache(_CacheBase):
         The directory where the cache files are stored.
     max_size
         The maximum number of cache files to store. If None, no limit is set.
-    with_cloudpickle
+    use_cloudpickle
         Use cloudpickle for storing the data in memory.
     with_lru_cache
         Use an in-memory LRU cache to prevent reading from disk too often.
@@ -367,21 +367,21 @@ class DiskCache(_CacheBase):
         cache_dir: str,
         max_size: int | None = None,
         *,
-        with_cloudpickle: bool = True,
+        use_cloudpickle: bool = True,
         with_lru_cache: bool = True,
         lru_cache_size: int = 128,
         lru_shared: bool = True,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
-        self._with_cloudpickle = with_cloudpickle
+        self.use_cloudpickle = use_cloudpickle
         self.with_lru_cache = with_lru_cache
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         if self.with_lru_cache:
             self.lru_cache = LRUCache(
                 max_size=lru_cache_size,
-                with_cloudpickle=with_cloudpickle,
+                allow_cloudpickle=use_cloudpickle,
                 shared=lru_shared,
             )
 
@@ -397,7 +397,7 @@ class DiskCache(_CacheBase):
         if file_path.exists():
             with file_path.open("rb") as f:
                 value = (
-                    cloudpickle.load(f) if self._with_cloudpickle else pickle.load(f)  # noqa: S301
+                    cloudpickle.load(f) if self.use_cloudpickle else pickle.load(f)  # noqa: S301
                 )
             if self.with_lru_cache:
                 self.lru_cache.put(key, value)
@@ -407,7 +407,7 @@ class DiskCache(_CacheBase):
     def put(self, key: Hashable, value: Any) -> None:
         file_path = self._get_file_path(key)
         with file_path.open("wb") as f:
-            if self._with_cloudpickle:
+            if self.use_cloudpickle:
                 cloudpickle.dump(value, f)
             else:
                 pickle.dump(value, f)
