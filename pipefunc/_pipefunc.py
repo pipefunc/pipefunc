@@ -796,7 +796,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _run_pipeline(  # noqa: PLR0915, C901
+    def _run_pipeline(
         self,
         output_name: _OUTPUT_TYPE,
         *,
@@ -823,29 +823,6 @@ class Pipeline:
 
         """
 
-        def _update_all_results(
-            func: PipelineFunction,
-            r: Any,
-            output_name: _OUTPUT_TYPE,
-            all_results: dict[_OUTPUT_TYPE, Any],
-        ) -> None:
-            if isinstance(func.output_name, tuple) and not isinstance(
-                output_name,
-                tuple,
-            ):
-                # Function produces multiple outputs, but only one is requested
-                assert func.output_picker is not None
-                for name in func.output_name:
-                    if self.lazy:
-                        all_results[name] = _LazyFunction(
-                            func.output_picker,
-                            args=(r, name),
-                        )
-                    else:
-                        all_results[name] = func.output_picker(r, name)
-            else:
-                all_results[func.output_name] = r
-
         def _execute_pipeline(  # noqa: PLR0912
             output_name: _OUTPUT_TYPE,
             **kwargs: Any,
@@ -868,7 +845,7 @@ class Pipeline:
                 if cache_key is not None and cache_key in self.cache:
                     r = self.cache.get(cache_key)
                     assert r is not None
-                    _update_all_results(func, r, output_name, all_results)
+                    _update_all_results(func, r, output_name, all_results, self.lazy)
                     result_from_cache = True
                     if not full_output:
                         return all_results[output_name]
@@ -900,7 +877,7 @@ class Pipeline:
                 else:
                     self.cache.put(cache_key, r)
 
-            _update_all_results(func, r, output_name, all_results)
+            _update_all_results(func, r, output_name, all_results, self.lazy)
             if func.save and not result_from_cache:
                 to_save = {k: all_results[k] for k in self.root_args(output_name)}
                 filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
@@ -1509,6 +1486,28 @@ class Pipeline:
                 )
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
+
+
+def _update_all_results(
+    func: PipelineFunction,
+    r: Any,
+    output_name: _OUTPUT_TYPE,
+    all_results: dict[_OUTPUT_TYPE, Any],
+    lazy: bool,  # noqa: FBT001
+) -> None:
+    if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
+        # Function produces multiple outputs, but only one is requested
+        assert func.output_picker is not None
+        for name in func.output_name:
+            if lazy:
+                all_results[name] = _LazyFunction(
+                    func.output_picker,
+                    args=(r, name),
+                )
+            else:
+                all_results[name] = func.output_picker(r, name)
+    else:
+        all_results[func.output_name] = r
 
 
 def _wrap_dict_to_tuple(
