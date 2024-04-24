@@ -678,3 +678,25 @@ def test_full_output(cache, tmp_path: Path):
     }
     if cache:
         assert len(list(cache_dir.glob("*.pkl"))) == 3
+
+
+def test_lazy_pipeline():
+    @pipefunc(output_name="c", cache=True)
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e", cache=True)
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3], lazy=True)
+
+    f = pipeline.func("e")
+    r = f(a=1, b=2, x=3).evaluate()
+    assert r == 162
+    r = f.call_full_output(a=1, b=2, x=3)["e"].evaluate()
+    assert r == 162

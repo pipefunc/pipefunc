@@ -195,7 +195,9 @@ class PipelineFunction(Generic[T]):
         """
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         with self._maybe_profiler():
-            result = self.func(*evaluate_lazy(args), **evaluate_lazy(kwargs))
+            args = evaluate_lazy(args)
+            kwargs = evaluate_lazy(kwargs)
+            result = self.func(*args, **kwargs)
 
         if self.debug and self.profiling_stats is not None:
             dt = self.profiling_stats.time.average
@@ -514,7 +516,6 @@ class _LazyFunction:
         "func",
         "args",
         "kwargs",
-        "delete_after_eval",
         "_result",
         "_evaluated",
         "_delayed_callbacks",
@@ -525,13 +526,10 @@ class _LazyFunction:
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
-        *,
-        delete_after_eval: bool = False,
     ) -> None:
         self.func = func
         self.args = args
         self.kwargs = kwargs or {}
-        self.delete_after_eval = delete_after_eval
 
         self._result = None
         self._evaluated = False
@@ -548,18 +546,10 @@ class _LazyFunction:
         args = evaluate_lazy(self.args)
         kwargs = evaluate_lazy(self.kwargs)
         result = self.func(*args, **kwargs)
-        self._evaluated = True
         self._result = result
+        self._evaluated = True
         for cb in self._delayed_callbacks:
             evaluate_lazy(cb)
-
-        if self.delete_after_eval:
-            # Clear the function and arguments to free up memory
-            self.func = None  # type: ignore[assignment]
-            self.args = None  # type: ignore[assignment]
-            self.kwargs = None  # type: ignore[assignment]
-            self._delayed_callbacks = None  # type: ignore[assignment]
-
         return result
 
 
@@ -882,11 +872,13 @@ class Pipeline:
                     if not full_output:
                         return all_results[output_name]
 
-            func_args = {
-                arg: kwargs.get(arg, func.defaults.get(arg)) for arg in func.parameters
-            }
+            func_args = {}
             for arg in func.parameters:
-                if arg not in kwargs and arg not in func.defaults:
+                if arg in kwargs:
+                    func_args[arg] = kwargs[arg]
+                elif arg in func.defaults:
+                    func_args[arg] = func.defaults[arg]
+                else:
                     func_args[arg] = _execute_pipeline(arg, **kwargs)
 
             if result_from_cache:
