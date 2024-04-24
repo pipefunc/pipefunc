@@ -386,7 +386,7 @@ def test_tuple_outputs(tmp_path: Path):
         [f_c, f_d, f_e, f_i],
         debug=True,
         profile=True,
-        cache="shared",
+        cache="lru",
         cache_kwargs={"with_cloudpickle": True},
         lazy=True,
     )

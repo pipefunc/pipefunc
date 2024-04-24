@@ -571,7 +571,7 @@ class Pipeline:
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
-        cache: Literal["shared", "hybrid", "disk"] | None = "hybrid",
+        cache: Literal["lru", "hybrid", "disk"] | None = "hybrid",
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -587,7 +587,7 @@ class Pipeline:
         self.cache: LRUCache | HybridCache | DiskCache
         if cache_kwargs is None:
             cache_kwargs = {}
-        if cache == "shared":
+        if cache == "lru":
             self.cache = LRUCache(**cache_kwargs)
         elif cache == "hybrid":
             self.cache = HybridCache(**cache_kwargs)
