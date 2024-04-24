@@ -833,8 +833,9 @@ class Pipeline:
                 output_name,
                 tuple,
             ):
+                # Function produces multiple outputs, but only one is requested
+                assert func.output_picker is not None
                 for name in func.output_name:
-                    assert func.output_picker is not None
                     if self.lazy:
                         all_results[name] = _LazyFunction(
                             func.output_picker,
