@@ -528,6 +528,19 @@ class _LazyFunction:
         kwargs = evaluate_lazy(self.kwargs)
         return self.func(*args, **kwargs)
 
+    def __getstate__(
+        self,
+    ) -> tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]:
+        """Prepare the state of the current object for pickling."""
+        return self.func, self.args, self.kwargs
+
+    def __setstate__(
+        self,
+        state: tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]],
+    ) -> None:
+        """Restore the state of the current object from the provided state."""
+        self.func, self.args, self.kwargs = state
+
 
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
