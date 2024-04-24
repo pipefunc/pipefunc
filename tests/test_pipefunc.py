@@ -6,6 +6,7 @@ import inspect
 import pickle
 from typing import TYPE_CHECKING
 
+import cloudpickle
 import pytest
 
 from pipefunc import (
@@ -386,6 +387,7 @@ def test_tuple_outputs(tmp_path: Path):
         debug=True,
         profile=True,
         cache="shared",
+        cache_kwargs={"with_cloudpickle": True},
         lazy=True,
     )
     f = pipeline.func("i")
@@ -398,7 +400,7 @@ def test_tuple_outputs(tmp_path: Path):
         == ("a", "b", "x")
     )
     key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
-    assert pipeline.cache.cache[key].evaluate() == (6, 1)
+    assert cloudpickle.loads(pipeline.cache.cache[key]) == (6, 1)
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
 

@@ -516,30 +516,30 @@ class _LazyFunction:
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
     ) -> None:
-        if kwargs is None:
-            kwargs = {}
         self.func = func
         self.args = args
-        self.kwargs = kwargs
+        self.kwargs = kwargs or {}
+
+        self._result = None
+        self._evaluated = False
+        self._delayed_callbacks: list[_LazyFunction] = []
+
+    def add_delayed_callback(self, cb: _LazyFunction) -> None:
+        """Add a delayed callback to the lazy function."""
+        self._delayed_callbacks.append(cb)
 
     def evaluate(self) -> Any:
         """Evaluate the lazy function and return the result."""
+        if self._evaluated:
+            return self._result
         args = evaluate_lazy(self.args)
         kwargs = evaluate_lazy(self.kwargs)
-        return self.func(*args, **kwargs)
-
-    def __getstate__(
-        self,
-    ) -> tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]:
-        """Prepare the state of the current object for pickling."""
-        return self.func, self.args, self.kwargs
-
-    def __setstate__(
-        self,
-        state: tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]],
-    ) -> None:
-        """Restore the state of the current object from the provided state."""
-        self.func, self.args, self.kwargs = state
+        result = self.func(*args, **kwargs)
+        self._evaluated = True
+        self._result = result
+        for cb in self._delayed_callbacks:
+            evaluate_lazy(cb)
+        return result
 
 
 class Pipeline:
@@ -785,7 +785,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _run_pipeline(  # noqa: PLR0915
+    def _run_pipeline(  # noqa: PLR0915, C901
         self,
         output_name: _OUTPUT_TYPE,
         *,
@@ -893,7 +893,15 @@ class Pipeline:
                 filename = func.__name__ / filename
                 to_save[output_name] = all_results[output_name]  # type: ignore[index]
                 assert func.save_function is not None
-                func.save_function(filename, to_save)  # type: ignore[arg-type]
+                if self.lazy:
+                    lazy_save = _LazyFunction(
+                        func.save_function,
+                        args=(filename, to_save),
+                    )
+                    r.add_delayed_callback(lazy_save)
+                else:
+                    func.save_function(filename, to_save)  # type: ignore[arg-type]
+
             return all_results[output_name]
 
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
