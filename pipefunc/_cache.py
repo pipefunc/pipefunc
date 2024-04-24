@@ -219,7 +219,7 @@ class LRUCache:
     max_size
         Cache size of the LRU cache, by default 128.
     with_cloudpickle
-        Use cloudpickle for storing the data in memory.
+        Use cloudpickle for storing the data in memory if using shared memory.
     shared
         Whether the cache should be shared between multiple processes.
 
@@ -259,7 +259,7 @@ class LRUCache:
         if value is not None:
             if value == _NONE_RETURN_STR:
                 value = None
-            elif self._with_cloudpickle:
+            elif self._with_cloudpickle and self.shared:
                 value = cloudpickle.loads(value)
         return value
 
@@ -267,7 +267,7 @@ class LRUCache:
         """Insert a key value pair into the cache."""
         if value is None:
             value = _NONE_RETURN_STR
-        elif self._with_cloudpickle:
+        elif self._with_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
             self._cache_dict[key] = value

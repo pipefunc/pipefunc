@@ -505,7 +505,7 @@ class Pipeline:
     profile
         Flag indicating whether profiling information should be collected.
         If None, the value of each PipelineFunction's profile attribute is used.
-    cache
+    cache_type
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to
@@ -518,7 +518,7 @@ class Pipeline:
         *,
         debug: bool | None = None,
         profile: bool | None = None,
-        cache: Literal["shared", "hybrid", "disk"] | None = "hybrid",
+        cache_type: Literal["lru", "hybrid", "disk"] | None = "hybrid",
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -537,14 +537,14 @@ class Pipeline:
         self.cache: LRUCache | HybridCache | DiskCache
         if cache_kwargs is None:
             cache_kwargs = {}
-        if cache == "shared":
+        if cache_type == "lru":
             self.cache = LRUCache(**cache_kwargs)
-        elif cache == "hybrid":
+        elif cache_type == "hybrid":
             self.cache = HybridCache(**cache_kwargs)
-        elif cache == "disk":
+        elif cache_type == "disk":
             self.cache = DiskCache(**cache_kwargs)
         else:
-            msg = f"Unknown cache type {cache}"
+            msg = f"Unknown cache type {cache_type}"
             raise ValueError(msg)
 
     @property
