@@ -340,7 +340,12 @@ def test_tuple_outputs(tmp_path: Path):
     def f_i(h, g):
         return h + g
 
-    pipeline = Pipeline([f_c, f_d, f_e, f_i], debug=True, profile=True, cache="shared")
+    pipeline = Pipeline(
+        [f_c, f_d, f_e, f_i],
+        debug=True,
+        profile=True,
+        cache_type="lru",
+    )
     f = pipeline.func("i")
     assert f.call_full_output(a=1, b=2, x=3)["i"] == f(a=1, b=2, x=3)
     assert (
@@ -610,7 +615,7 @@ def test_full_output(cache, tmp_path: Path):
     if cache:
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir(exist_ok=True)
-        cache_kwargs = {"cache": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
+        cache_kwargs = {"cache_type": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
     else:
         cache_kwargs = {}
     pipeline = Pipeline([f1, f2, f3], **cache_kwargs)  # type: ignore[arg-type]
