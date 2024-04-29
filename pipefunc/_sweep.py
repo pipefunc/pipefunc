@@ -130,6 +130,7 @@ class Sweep:
             for dim_group in self.dims:
                 dims = _at_least_tuple(dim_group)
                 dim_seqs = [self.items[dim] for dim in dims]
+                _check_dim_lengths(dim_seqs, dims)
                 product_parts.append([dict(zip(dims, res)) for res in zip(*dim_seqs)])
             for combo in product(*product_parts):
                 combination = {k: v for item in combo for k, v in item.items()}
@@ -358,6 +359,15 @@ class MultiSweep(Sweep):
         else:
             self.sweeps.append(other)
         return self
+
+
+def _check_dim_lengths(seqs: Sequence[Sequence[Any]], dims: tuple[str, ...]) -> None:
+    """Check that all sequences in a list have the same length."""
+    seq_len = len(seqs[0])
+    for seq, dim in zip(seqs, dims):
+        if len(seq) != seq_len:
+            msg = f"Dimension '{dim}' has a different length than the other dimensions."
+            raise ValueError(msg)
 
 
 def generate_sweep(

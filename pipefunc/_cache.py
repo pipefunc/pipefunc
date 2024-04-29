@@ -266,7 +266,7 @@ class LRUCache(_CacheBase):
         self,
         *,
         max_size: int = 128,
-        allow_cloudpickle: bool = False,
+        allow_cloudpickle: bool = True,
         shared: bool = True,
     ) -> None:
         """Initialize the cache."""

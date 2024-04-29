@@ -399,6 +399,7 @@ def test_tuple_outputs(tmp_path: Path):
         == ("a", "b", "x")
     )
     key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
+    assert pipeline.cache is not None
     assert pipeline.cache.cache[key].evaluate() == (6, 1)
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
@@ -608,8 +609,8 @@ def test_identify_combinable_nodes2():
     # Test simplified_pipeline
     simplified_pipeline = pipeline.simplified_pipeline()
     assert (
-        pipeline._unique_leaf_node().output_name
-        == simplified_pipeline._unique_leaf_node().output_name
+        pipeline.unique_leaf_node.output_name
+        == simplified_pipeline.unique_leaf_node.output_name
         == "f7"
     )
     simplified_functions = simplified_pipeline.functions
