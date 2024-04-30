@@ -1,12 +1,11 @@
 """PipeFunc: A Python library for defining, managing, and executing function pipelines."""
 
+from pipefunc._lazy import construct_dag, evaluate_lazy
 from pipefunc._pipefunc import (
-    Pipeline,
     PipelineFunction,
-    construct_dag,
-    evaluate_lazy,
     pipefunc,
 )
+from pipefunc._pipeline import Pipeline
 from pipefunc._sweep import (
     MultiSweep,
     Sweep,
