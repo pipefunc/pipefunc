@@ -47,5 +47,7 @@ jobs:
           pytest
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
