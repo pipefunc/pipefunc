@@ -33,6 +33,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast,
 )
 
 import cloudpickle
@@ -90,10 +91,10 @@ def evaluate_lazy(x: Any) -> Any:
         return x.evaluate()
     if isinstance(x, dict):
         return {k: evaluate_lazy(v) for k, v in x.items()}
-    if isinstance(x, list):
-        return [evaluate_lazy(v) for v in x]
     if isinstance(x, tuple):
         return tuple(evaluate_lazy(v) for v in x)
+    if isinstance(x, list):
+        return [evaluate_lazy(v) for v in x]
     if isinstance(x, set):
         return {evaluate_lazy(v) for v in x}
     return x
@@ -400,6 +401,8 @@ class _Function:
 
     """
 
+    __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
+
     def __init__(
         self,
         pipeline: Pipeline,
@@ -410,7 +413,13 @@ class _Function:
         self.pipeline = pipeline
         self.output_name = output_name
         self.root_args = root_args
-        self.call_with_root_args = self._create_call_with_root_args_method()
+        self._call_with_root_args: Callable[..., Any] | None = None
+
+    @property
+    def call_with_root_args(self) -> Callable[..., Any]:
+        if self._call_with_root_args is None:
+            self._call_with_root_args = self._create_call_with_root_args_method()
+        return self._call_with_root_args
 
     def __call__(self, **kwargs: Any) -> Any:
         """Call the pipeline function with the given arguments.
@@ -467,13 +476,12 @@ class _Function:
     def __getstate__(self) -> dict:
         """Prepare the state of the current object for pickling."""
         state = self.__dict__.copy()
-        state.pop("call_with_root_args", None)  # don't pickle the execute method
+        state["_call_with_root_args"] = None  # don't pickle the execute method
         return state
 
     def __setstate__(self, state: dict) -> None:
         """Restore the state of the current object from the provided state."""
         self.__dict__.update(state)
-        self.call_with_root_args = self._create_call_with_root_args_method()
 
     def _create_call_with_parameters_method(
         self,
@@ -549,6 +557,7 @@ class _LazyFunction:
         self._result = result
         self._evaluated = True
         for cb in self._delayed_callbacks:
+            cb._result = result
             evaluate_lazy(cb)
         return result
 
@@ -582,7 +591,7 @@ class Pipeline:
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
-        cache_type: Literal["lru", "hybrid", "disk"] | None = "hybrid",
+        cache_type: Literal["lru", "hybrid", "disk"] | None = "lru",
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -593,13 +602,38 @@ class Pipeline:
         self.output_to_func: dict[_OUTPUT_TYPE, PipelineFunction] = {}
         for f in functions:
             self.add(f)
-        self._graph = None
+        self._init_internal_cache()
+        self._set_cache(cache_type, lazy, cache_kwargs)
+
+    def _init_internal_cache(self) -> None:
+        # Internal Pipeline cache
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
-        self._cache: LRUCache | HybridCache | DiskCache | None = None
+        self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
+        self._func: dict[_OUTPUT_TYPE, _Function] = {}
+        with contextlib.suppress(AttributeError):
+            del self.graph
+        with contextlib.suppress(AttributeError):
+            del self.root_nodes
+        with contextlib.suppress(AttributeError):
+            del self.leaf_nodes
+        with contextlib.suppress(AttributeError):
+            del self.unique_leaf_node
+
+    def _set_cache(
+        self,
+        cache_type: Literal["lru", "hybrid", "disk"] | None,
+        lazy: bool,  # noqa: FBT001
+        cache_kwargs: dict[str, Any] | None,
+    ) -> None:
+        # Function result cache
+        self.cache: LRUCache | HybridCache | DiskCache | None = None
+        if cache_type is None:
+            return
         if cache_kwargs is None:
             cache_kwargs = {}
         if cache_type == "lru":
-            self._cache = LRUCache(**cache_kwargs)
+            cache_kwargs.setdefault("shared", not lazy)
+            self.cache = LRUCache(**cache_kwargs)
         elif cache_type == "hybrid":
             if lazy:
                 warnings.warn(
@@ -608,9 +642,11 @@ class Pipeline:
                     UserWarning,
                     stacklevel=2,
                 )
-            self._cache = HybridCache(**cache_kwargs)
+            cache_kwargs.setdefault("shared", not lazy)
+            self.cache = HybridCache(**cache_kwargs)
         elif cache_type == "disk":
-            self._cache = DiskCache(**cache_kwargs)
+            cache_kwargs.setdefault("lru_shared", not lazy)
+            self.cache = DiskCache(**cache_kwargs)
 
     @property
     def profile(self) -> bool | None:
@@ -638,19 +674,6 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    @property
-    def cache(self) -> LRUCache | HybridCache | DiskCache:
-        """Return the cache object."""
-        if self._cache is None:
-            msg = "Cache not initialized."
-            raise ValueError(msg)
-        return self._cache
-
-    @cache.setter
-    def cache(self, value: LRUCache | HybridCache | DiskCache) -> None:
-        """Set the cache object."""
-        self._cache = value
-
     def add(self, f: PipelineFunction) -> None:
         """Add a function to the pipeline.
 
@@ -673,8 +696,8 @@ class Pipeline:
             f.set_profiling(enable=self.profile)
         if self.debug is not None:
             f.debug = self.debug
-        self._graph = None
-        self._arg_combinations = {}
+
+        self._init_internal_cache()  # reset cache
 
     def _check_consistent_defaults(self) -> None:
         """Check that the default values for shared arguments are consistent."""
@@ -690,14 +713,8 @@ class Pipeline:
                     )
                     raise ValueError(msg)
 
-    @property
+    @functools.cached_property
     def graph(self) -> nx.DiGraph:
-        """The directed graph representing the pipeline."""
-        if self._graph is None:
-            self._graph = self._make_graph()
-        return self._graph
-
-    def _make_graph(self) -> nx.DiGraph:
         """Create a directed graph representing the pipeline.
 
         Returns
@@ -744,11 +761,15 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
+        if f := self._func.get(output_name):
+            return f
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
-        return _Function(self, output_name, root_args=root_args)
+        f = _Function(self, output_name, root_args=root_args)
+        self._func[output_name] = f
+        return f
 
-    def __call__(self, output_name: _OUTPUT_TYPE, **kwargs: Any) -> Any:
+    def __call__(self, output_name: _OUTPUT_TYPE | None = None, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
@@ -764,6 +785,8 @@ class Pipeline:
             The return value of the pipeline.
 
         """
+        if output_name is None:
+            output_name = self.unique_leaf_node.output_name
         return self.func(output_name)(**kwargs)
 
     def _compute_cache_key(
@@ -825,7 +848,7 @@ class Pipeline:
         func = self.output_to_func[output_name]
         assert func.parameters is not None
         result_from_cache = False
-        if func.cache:
+        if func.cache and self.cache is not None:
             cache_key = self._compute_cache_key(func.output_name, kwargs)
             if cache_key is not None and cache_key in self.cache:
                 r = self.cache.get(cache_key)
@@ -855,7 +878,7 @@ class Pipeline:
 
         r = _LazyFunction(func, kwargs=func_args) if self.lazy else func(**func_args)
 
-        if func.cache and cache_key is not None:
+        if func.cache and cache_key is not None and self.cache is not None:
             if isinstance(self.cache, HybridCache):
                 duration = time.perf_counter() - start_time
                 self.cache.put(cache_key, r, duration)
@@ -1027,7 +1050,12 @@ class Pipeline:
 
     def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
         """Return the root arguments required to compute a specific output."""
-        return self.arg_combinations(output_name, root_args_only=True)  # type: ignore[return-value]
+        if r := self._root_args.get(output_name):
+            return r
+        root_args = self.arg_combinations(output_name, root_args_only=True)
+        root_args = cast(Tuple[str, ...], root_args)
+        self._root_args[output_name] = root_args
+        return root_args
 
     def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output."""
@@ -1082,7 +1110,8 @@ class Pipeline:
                 mapping[node.output_name] = arg_combinations
         return mapping
 
-    def _unique_leaf_node(self) -> PipelineFunction:
+    @functools.cached_property
+    def unique_leaf_node(self) -> PipelineFunction:
         """Return the unique leaf node of the pipeline graph."""
         leaf_nodes = self.leaf_nodes
         if len(leaf_nodes) != 1:  # pragma: no cover
@@ -1100,7 +1129,7 @@ class Pipeline:
         output_name: _OUTPUT_TYPE | None = None,
     ) -> list[str]:
         if output_name is None:
-            output_name = self._unique_leaf_node().output_name
+            output_name = self.unique_leaf_node.output_name
 
         func_node_colors = []
         combinable_nodes = self._identify_combinable_nodes(
@@ -1316,7 +1345,7 @@ class Pipeline:
 
         """
         if output_name is None:
-            output_name = self._unique_leaf_node().output_name
+            output_name = self.unique_leaf_node.output_name
         combinable_nodes = self._identify_combinable_nodes(
             output_name,
             conservatively_combine=conservatively_combine,
@@ -1423,12 +1452,12 @@ class Pipeline:
             func_only_graph.remove_node(arg)
         return nx.all_topological_sorts(func_only_graph)
 
-    @property
+    @functools.cached_property
     def leaf_nodes(self) -> list[PipelineFunction]:
         """Return the leaf nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
 
-    @property
+    @functools.cached_property
     def root_nodes(self) -> list[PipelineFunction]:
         """Return the root nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]

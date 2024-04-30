@@ -74,7 +74,7 @@ def test_computation_duration(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_cache_initialization(shared):
-    cache = LRUCache(max_size=2, shared=shared)
+    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=False)
     assert cache.max_size == 2
     assert cache._allow_cloudpickle is False
     assert len(cache._cache_queue) == 0
@@ -140,7 +140,7 @@ def test_contains(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_cache_property(shared):
-    cache = LRUCache(max_size=2, shared=shared)
+    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=False)
     cache.put("test", "value")
     cache_dict = cache.cache
     assert cache_dict == {"test": "value"}
