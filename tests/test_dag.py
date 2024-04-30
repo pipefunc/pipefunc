@@ -1,17 +1,17 @@
 import networkx as nx
 
-import pipefunc._pipefunc
-from pipefunc._pipefunc import TaskGraph, _LazyFunction, construct_dag
+import pipefunc._lazy
+from pipefunc._lazy import TaskGraph, _LazyFunction, construct_dag
 
 
 def test_construct_dag():
-    assert pipefunc._pipefunc._TASK_GRAPH is None
+    assert pipefunc._lazy._TASK_GRAPH is None
     with construct_dag() as dag:
         assert isinstance(dag, TaskGraph)
         assert isinstance(dag.graph, nx.DiGraph)
         assert dag.mapping == {}
-        assert pipefunc._pipefunc._TASK_GRAPH is dag
-    assert pipefunc._pipefunc._TASK_GRAPH is None
+        assert pipefunc._lazy._TASK_GRAPH is dag
+    assert pipefunc._lazy._TASK_GRAPH is None
 
 
 def test_lazy_function_without_dag():
