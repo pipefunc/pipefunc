@@ -58,10 +58,7 @@ if TYPE_CHECKING:
     from pipefunc._perf import ProfilingStats
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
-_CACHE_KEY_TYPE: TypeAlias = Tuple[
-    _OUTPUT_TYPE,
-    Tuple[Tuple[str, Any], ...],
-]
+_CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
 
 
 class _Function:
