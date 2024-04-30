@@ -401,13 +401,22 @@ class Pipeline:
         self._func[output_name] = f
         return f
 
-    def __call__(self, output_name: _OUTPUT_TYPE | None = None, **kwargs: Any) -> Any:
+    def __call__(
+        self,
+        __output_name__: _OUTPUT_TYPE | None = None,
+        /,
+        **kwargs: Any,
+    ) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
         ----------
-        output_name
+        __output_name__
             The identifier for the return value of the pipeline.
+            Is None by default, in which case the unique leaf node is used.
+            This parameter is positional-only and the strange name is used
+            to avoid conflicts with the `output_name` argument that might be
+            passed via `kwargs`.
         kwargs
             Keyword arguments to be passed to the pipeline functions.
 
@@ -417,9 +426,9 @@ class Pipeline:
             The return value of the pipeline.
 
         """
-        if output_name is None:
-            output_name = self.unique_leaf_node.output_name
-        return self.func(output_name)(**kwargs)
+        if __output_name__ is None:
+            __output_name__ = self.unique_leaf_node.output_name
+        return self.func(__output_name__)(**kwargs)
 
     def _compute_cache_key(
         self,
