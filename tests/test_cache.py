@@ -352,7 +352,9 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
     cache.put("key2", "value2", *duration2)
 
     if not shared:
-        with pytest.raises(RuntimeError, match="Cannot pickle non-shared cache instances"):
+        with pytest.raises(
+            RuntimeError, match="Cannot pickle non-shared cache instances"
+        ):
             pickle.dumps(cache)
         return
 
