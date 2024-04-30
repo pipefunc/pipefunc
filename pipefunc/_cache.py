@@ -40,7 +40,7 @@ class _CacheBase(abc.ABC):
     def __getstate__(self) -> object:
         if hasattr(self, "shared") and self.shared:
             return self.__dict__
-        msg = "The cache object should not be pickled, set `shared=True` to make it picklable!"
+        msg = "Cannot pickle non-shared cache instances, use `shared=True`."
         raise RuntimeError(msg)
 
     def __setstate__(self, state: dict) -> None:
