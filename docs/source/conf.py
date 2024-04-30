@@ -3,9 +3,9 @@
 #
 
 import os
+import shutil
 import sys
 from pathlib import Path
-import shutil
 
 package_path = Path("../..").resolve()
 sys.path.insert(0, str(package_path))
@@ -115,5 +115,5 @@ nb_docs_folder.mkdir(exist_ok=True)
 shutil.copy(nb, nb_docs_folder)
 
 
-def setup(app):
+def setup(app) -> None:
     pass

@@ -38,12 +38,13 @@ class _CacheBase(abc.ABC):
         raise NotImplementedError
 
     def __getstate__(self) -> object:
-        msg = "The cache object should not be pickled!"
+        if hasattr(self, "shared") and self.shared:
+            return self.__dict__
+        msg = "Cannot pickle non-shared cache instances, use `shared=True`."
         raise RuntimeError(msg)
 
-    def __setstate__(self, state: object) -> None:
-        msg = "The cache object should not be pickled!"
-        raise RuntimeError(msg)
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
 
 
 class HybridCache(_CacheBase):
@@ -266,7 +267,7 @@ class LRUCache(_CacheBase):
         self,
         *,
         max_size: int = 128,
-        allow_cloudpickle: bool = False,
+        allow_cloudpickle: bool = True,
         shared: bool = True,
     ) -> None:
         """Initialize the cache."""
@@ -449,3 +450,8 @@ class DiskCache(_CacheBase):
             msg = "LRU cache is not enabled."
             raise AttributeError(msg)
         return self.lru_cache.cache
+
+    @property
+    def shared(self) -> bool:
+        """Return whether the cache is shared."""
+        return self.lru_cache.shared
