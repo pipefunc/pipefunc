@@ -701,3 +701,37 @@ def test_lazy_pipeline():
     assert r == 162
     r = f.call_full_output(a=1, b=2, x=3)["e"].evaluate()
     assert r == 162
+
+
+@pipefunc(output_name="test_function")
+def test_function(arg1: str, arg2: str) -> str:
+    return f"{arg1} {arg2}"
+
+
+pipeline = Pipeline([test_function])
+
+
+def test_function_pickling():
+    # Get the _Function instance from the pipeline
+    func = pipeline.func("test_function")
+
+    # Pickle the _Function instance
+    pickled_func = pickle.dumps(func)
+
+    # Unpickle the _Function instance
+    unpickled_func = pickle.loads(pickled_func)  # noqa: S301
+
+    # Assert that the unpickled instance has the same attributes
+    assert unpickled_func.output_name == "test_function"
+    assert unpickled_func.root_args == ("arg1", "arg2")
+
+    # Assert that the unpickled instance behaves the same as the original
+    result = unpickled_func(arg1="hello", arg2="world")
+    assert result == "hello world"
+
+    # Assert that the call_with_root_args method is recreated after unpickling
+    assert unpickled_func.call_with_root_args is not None
+    assert unpickled_func.call_with_root_args.__signature__.parameters.keys() == {
+        "arg1",
+        "arg2",
+    }
