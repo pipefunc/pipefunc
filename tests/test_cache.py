@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pickle
 import time
 from typing import TYPE_CHECKING
 
@@ -335,3 +336,39 @@ def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa
     assert cache.get("key3") == "value3"
     assert len(cache) == 1
     assert len(cache.lru_cache) == 1
+
+
+@pytest.mark.parametrize("cache_cls", [HybridCache, LRUCache, DiskCache])
+@pytest.mark.parametrize("shared", [True, False])
+def test_cache_pickling(cache_cls, shared, tmp_path):
+    if cache_cls == DiskCache:
+        cache = cache_cls(cache_dir=str(tmp_path), lru_shared=shared)
+    else:
+        cache = cache_cls(shared=shared)
+
+    duration1 = (1.0,) if cache_cls == HybridCache else ()
+    duration2 = (2.0,) if cache_cls == HybridCache else ()
+    cache.put("key1", "value1", *duration1)
+    cache.put("key2", "value2", *duration2)
+
+    if not shared:
+        with pytest.raises(
+            RuntimeError,
+            match="Cannot pickle non-shared cache instances",
+        ):
+            pickle.dumps(cache)
+        return
+
+    pickled_cache = pickle.dumps(cache)
+    unpickled_cache = pickle.loads(pickled_cache)  # noqa: S301
+
+    assert unpickled_cache.get("key1") == "value1"
+    assert unpickled_cache.get("key2") == "value2"
+    assert len(unpickled_cache) == 2
+
+    assert shared
+    assert unpickled_cache.shared == shared
+    # Test that the unpickled cache is still shared
+    duration3 = (3.0,) if cache_cls == HybridCache else ()
+    unpickled_cache.put("key3", "value3", *duration3)
+    assert cache.get("key3") == "value3"

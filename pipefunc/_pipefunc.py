@@ -475,13 +475,16 @@ class _Function:
 
     def __getstate__(self) -> dict:
         """Prepare the state of the current object for pickling."""
-        state = self.__dict__.copy()
+        state = {slot: getattr(self, slot) for slot in self.__slots__}
         state["_call_with_root_args"] = None  # don't pickle the execute method
         return state
 
     def __setstate__(self, state: dict) -> None:
         """Restore the state of the current object from the provided state."""
-        self.__dict__.update(state)
+        for slot in self.__slots__:
+            setattr(self, slot, state[slot])
+        # Initialize _call_with_root_args if necessary
+        self._call_with_root_args = None
 
     def _create_call_with_parameters_method(
         self,
