@@ -26,7 +26,6 @@ from typing import (
     Iterable,
     Literal,
     Tuple,
-    TypeVar,
     Union,
     cast,
 )
@@ -40,11 +39,6 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict
 
-if sys.version_info < (3, 9):  # pragma: no cover
-    from typing import Callable
-else:
-    from collections.abc import Callable
-
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
 else:
@@ -52,13 +46,17 @@ else:
 
 
 if TYPE_CHECKING:
+    if sys.version_info < (3, 9):  # pragma: no cover
+        from typing import Callable
+    else:
+        from collections.abc import Callable
+
     from pathlib import Path
 
     import holoviews as hv
 
     from pipefunc._perf import ProfilingStats
 
-T = TypeVar("T", bound=Callable[..., Any])
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = Tuple[
     _OUTPUT_TYPE,
