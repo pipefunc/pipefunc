@@ -353,7 +353,8 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
 
     if not shared:
         with pytest.raises(
-            RuntimeError, match="Cannot pickle non-shared cache instances"
+            RuntimeError,
+            match="Cannot pickle non-shared cache instances",
         ):
             pickle.dumps(cache)
         return
@@ -365,12 +366,9 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
     assert unpickled_cache.get("key2") == "value2"
     assert len(unpickled_cache) == 2
 
-    if shared:
-        # Test that the unpickled cache is still shared
-        duration3 = (3.0,) if cache_cls == HybridCache else ()
-        unpickled_cache.put("key3", "value3", *duration3)
-        assert cache.get("key3") == "value3"
-    else:
-        # Test that pickling raises an error when shared=False
-        with pytest.raises(RuntimeError):
-            pickle.dumps(cache)
+    assert shared
+    assert unpickled_cache.shared == shared
+    # Test that the unpickled cache is still shared
+    duration3 = (3.0,) if cache_cls == HybridCache else ()
+    unpickled_cache.put("key3", "value3", *duration3)
+    assert cache.get("key3") == "value3"
