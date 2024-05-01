@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache
+from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -372,3 +372,12 @@ def test_cache_pickling(cache_cls, shared, tmp_path):
     duration3 = (3.0,) if cache_cls == HybridCache else ()
     unpickled_cache.put("key3", "value3", *duration3)
     assert cache.get("key3") == "value3"
+
+
+def test_simple_cache():
+    cache = SimpleCache()
+    cache.put("key1", "value1")
+    assert "key1" in cache
+    assert "key2" not in cache
+    assert cache.get("key1") == "value1"
+    assert cache.get("key2") is None

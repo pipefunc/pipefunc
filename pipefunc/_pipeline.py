@@ -32,8 +32,8 @@ from typing import (
 
 import networkx as nx
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache
-from pipefunc._lazy import _LazyFunction
+from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipelineFunction
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
@@ -258,7 +258,7 @@ class Pipeline:
         cache_kwargs: dict[str, Any] | None,
     ) -> None:
         # Function result cache
-        self.cache: LRUCache | HybridCache | DiskCache | None = None
+        self.cache: LRUCache | HybridCache | DiskCache | SimpleCache | None = None
         if cache_type is None:
             return
         if cache_kwargs is None:
@@ -279,6 +279,12 @@ class Pipeline:
         elif cache_type == "disk":
             cache_kwargs.setdefault("lru_shared", not lazy)
             self.cache = DiskCache(**cache_kwargs)
+
+    def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
+        """Return the cache used by the pipeline."""
+        if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
+            return tg.cache
+        return self.cache
 
     @property
     def profile(self) -> bool | None:
@@ -471,7 +477,7 @@ class Pipeline:
                 # i.e., the output of a function was directly provided as an input to
                 # another function. In this case, we don't want to cache the result.
                 return None
-            cache_key_items.append((k, kwargs[k]))
+            cache_key_items.append((k, _valid_key(kwargs[k])))
 
         return output_name, tuple(cache_key_items)
 
@@ -485,14 +491,18 @@ class Pipeline:
     ) -> Any:
         if output_name in all_results:
             return all_results[output_name]
-
         func = self.output_to_func[output_name]
         assert func.parameters is not None
+
+        # Get the result from the cache if it exists
         result_from_cache = False
-        if func.cache and self.cache is not None:
+        cache = self.get_cache()
+        use_cache = (func.cache and cache is not None) or task_graph() is not None
+        if use_cache:
+            assert cache is not None
             cache_key = self._compute_cache_key(func.output_name, kwargs)
-            if cache_key is not None and cache_key in self.cache:
-                r = self.cache.get(cache_key)
+            if cache_key is not None and cache_key in cache:
+                r = cache.get(cache_key)
                 _update_all_results(func, r, output_name, all_results, self.lazy)
                 result_from_cache = True
                 if not full_output:
@@ -519,12 +529,13 @@ class Pipeline:
 
         r = _LazyFunction(func, kwargs=func_args) if self.lazy else func(**func_args)
 
-        if func.cache and cache_key is not None and self.cache is not None:
-            if isinstance(self.cache, HybridCache):
+        if use_cache and cache_key is not None:
+            assert cache is not None
+            if isinstance(cache, HybridCache):
                 duration = time.perf_counter() - start_time
-                self.cache.put(cache_key, r, duration)
+                cache.put(cache_key, r, duration)
             else:
-                self.cache.put(cache_key, r)
+                cache.put(cache_key, r)
 
         _update_all_results(func, r, output_name, all_results, self.lazy)
         if func.save and not result_from_cache:
@@ -534,7 +545,11 @@ class Pipeline:
             to_save[output_name] = all_results[output_name]  # type: ignore[index]
             assert func.save_function is not None
             if self.lazy:
-                lazy_save = _LazyFunction(func.save_function, args=(filename, to_save))
+                lazy_save = _LazyFunction(
+                    func.save_function,
+                    args=(filename, to_save),
+                    add_to_graph=False,
+                )
                 r.add_delayed_callback(lazy_save)
             else:
                 func.save_function(filename, to_save)  # type: ignore[arg-type]
@@ -1189,3 +1204,13 @@ def _update_all_results(
             )
     else:
         all_results[func.output_name] = r
+
+
+def _valid_key(key: Any) -> Any:
+    if isinstance(key, dict):
+        return tuple(sorted(key.items()))
+    if isinstance(key, list):
+        return tuple(key)
+    if isinstance(key, set):
+        return tuple(sorted(key))
+    return key
