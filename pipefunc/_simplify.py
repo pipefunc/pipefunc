@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     import networkx as nx
 
-    from pipefunc._pipefunc import PipelineFunction
+    from pipefunc._pipefunc import PipeFunc
 
 
 def _wrap_dict_to_tuple(
@@ -49,14 +49,14 @@ def _wrap_dict_to_tuple(
 
 
 def _combine_nodes(
-    combinable_nodes: dict[PipelineFunction, set[PipelineFunction]],
-) -> dict[PipelineFunction, set[PipelineFunction]]:
+    combinable_nodes: dict[PipeFunc, set[PipeFunc]],
+) -> dict[PipeFunc, set[PipeFunc]]:
     """Reduce the dictionary of combinable nodes to a minimal set.
 
     The input dictionary `combinable_nodes` indicates which nodes
     (functions in the pipeline) can be combined together. The dictionary
-    keys are PipelineFunction objects, and the values are sets of
-    PipelineFunction objects that the key depends on and can be
+    keys are PipeFunc objects, and the values are sets of
+    PipeFunc objects that the key depends on and can be
     combined with. For example,
     if `combinable_nodes = {f6: {f5}, f5: {f1, f4}}`, it means that `f6`
     can be combined with `f5`, and `f5` can be combined with `f1` and `f4`.
@@ -77,13 +77,13 @@ def _combine_nodes(
     Parameters
     ----------
     combinable_nodes
-        A dictionary where the keys are PipelineFunction objects, and the
-        values are sets of PipelineFunction objects that can be combined
+        A dictionary where the keys are PipeFunc objects, and the
+        values are sets of PipeFunc objects that can be combined
         with the key.
 
     Returns
     -------
-    Dict[PipelineFunction, Set[PipelineFunction]]
+    Dict[PipeFunc, Set[PipeFunc]]
         A simplified dictionary where each node only depends on nodes
         that cannot be further combined.
 
@@ -102,9 +102,9 @@ def _combine_nodes(
 
 
 def _get_signature(
-    combinable_nodes: dict[PipelineFunction, set[PipelineFunction]],
+    combinable_nodes: dict[PipeFunc, set[PipeFunc]],
     graph: nx.DiGraph,
-) -> tuple[dict[PipelineFunction, set[str]], dict[PipelineFunction, set[str]]]:
+) -> tuple[dict[PipeFunc, set[str]], dict[PipeFunc, set[str]]]:
     """Retrieve the inputs and outputs for the signature of the combinable nodes.
 
     This function generates a mapping of the inputs and outputs required for
@@ -128,10 +128,10 @@ def _get_signature(
 
     Returns
     -------
-    all_inputs : dict[PipelineFunction, set[str]]
+    all_inputs : dict[PipeFunc, set[str]]
         Dictionary where keys are nodes and values are sets of parameter
         names that the node and its dependent nodes require.
-    all_outputs : dict[PipelineFunction, set[str]]
+    all_outputs : dict[PipeFunc, set[str]]
         Dictionary where keys are nodes and values are sets of output names
         that the node and its dependent nodes produce, plus additional output
         names based on the dependency relationships in the graph.

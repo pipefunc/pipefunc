@@ -53,7 +53,7 @@ def visualize(
     for node in graph.nodes:
         if isinstance(node, str):
             arg_nodes.append(node)
-        else:  # is PipelineFunction
+        else:  # is PipeFunc
             func_nodes.append(node)
 
     plt.figure(figsize=figsize)
@@ -100,7 +100,7 @@ def visualize(
                 inputs[edge] = f"{a}={default_value}"
             else:
                 inputs[edge] = a
-        else:  # is PipelineFunction
+        else:  # is PipeFunc
             arg = attrs["arg"]
             if isinstance(arg, tuple):
                 arg = ", ".join(arg)

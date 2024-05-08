@@ -2,7 +2,7 @@
 
 from pipefunc._lazy import construct_dag, evaluate_lazy
 from pipefunc._pipefunc import (
-    PipelineFunction,
+    PipeFunc,
     pipefunc,
 )
 from pipefunc._pipeline import Pipeline
@@ -26,7 +26,7 @@ __all__ = [
     "MultiSweep",
     "pipefunc",
     "Pipeline",
-    "PipelineFunction",
+    "PipeFunc",
     "set_cache_for_sweep",
     "Sweep",
 ]

@@ -34,7 +34,7 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._lazy import _LazyFunction, task_graph
-from pipefunc._pipefunc import PipelineFunction
+from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict
@@ -205,10 +205,10 @@ class Pipeline:
         Flag indicating whether the pipeline should be lazy.
     debug
         Flag indicating whether debug information should be printed.
-        If None, the value of each PipelineFunction's debug attribute is used.
+        If None, the value of each PipeFunc's debug attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
-        If None, the value of each PipelineFunction's profile attribute is used.
+        If None, the value of each PipeFunc's profile attribute is used.
     cache_type
         The type of cache to use.
     cache_kwargs
@@ -218,7 +218,7 @@ class Pipeline:
 
     def __init__(
         self,
-        functions: list[PipelineFunction],
+        functions: list[PipeFunc],
         *,
         lazy: bool = False,
         debug: bool | None = None,
@@ -227,11 +227,11 @@ class Pipeline:
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
-        self.functions: list[PipelineFunction] = []
+        self.functions: list[PipeFunc] = []
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
-        self.output_to_func: dict[_OUTPUT_TYPE, PipelineFunction] = {}
+        self.output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
         for f in functions:
             self.add(f)
         self._init_internal_cache()
@@ -312,7 +312,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(self, f: PipelineFunction) -> None:
+    def add(self, f: PipeFunc) -> None:
         """Add a function to the pipeline.
 
         Parameters
@@ -321,8 +321,8 @@ class Pipeline:
             The function to add to the pipeline.
 
         """
-        if not isinstance(f, PipelineFunction):
-            f = PipelineFunction(f, output_name=f.__name__)
+        if not isinstance(f, PipeFunc):
+            f = PipeFunc(f, output_name=f.__name__)
         self.functions.append(f)
 
         self.output_to_func[f.output_name] = f
@@ -592,18 +592,18 @@ class Pipeline:
         return all_results if full_output else all_results[output_name]
 
     @property
-    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipelineFunction | str]:
+    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
         """Return a mapping from node names to nodes.
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, PipelineFunction | str]
+        Dict[_OUTPUT_TYPE, PipeFunc | str]
             A mapping from node names to nodes.
 
         """
-        mapping: dict[_OUTPUT_TYPE, PipelineFunction | str] = {}
+        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
         for node in self.graph.nodes:
-            if isinstance(node, PipelineFunction):
+            if isinstance(node, PipeFunc):
                 if isinstance(node.output_name, tuple):
                     for name in node.output_name:
                         mapping[name] = node
@@ -652,38 +652,38 @@ class Pipeline:
                 return self._next_root_args(r)
             return r
 
-        def names(nodes: Iterable[PipelineFunction | str]) -> tuple[str, ...]:
+        def names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
             names: list[str] = []
             for n in nodes:
-                if isinstance(n, PipelineFunction):
+                if isinstance(n, PipeFunc):
                     names.extend(at_least_tuple(n.output_name))
                 else:
                     assert isinstance(n, str)
                     names.append(n)
             return tuple(names)
 
-        def sort_key(node: PipelineFunction | str) -> str:
-            if isinstance(node, PipelineFunction):
+        def sort_key(node: PipeFunc | str) -> str:
+            if isinstance(node, PipeFunc):
                 if isinstance(node.output_name, tuple):
                     return ",".join(node.output_name)
                 return node.output_name
             return node
 
         def unique(
-            nodes: Iterable[PipelineFunction | str],
-        ) -> tuple[PipelineFunction | str, ...]:
+            nodes: Iterable[PipeFunc | str],
+        ) -> tuple[PipeFunc | str, ...]:
             return tuple(sorted(set(nodes), key=sort_key))
 
         def filter_funcs(
-            funcs: Iterable[PipelineFunction | str],
-        ) -> list[PipelineFunction]:
-            return [f for f in funcs if isinstance(f, PipelineFunction)]
+            funcs: Iterable[PipeFunc | str],
+        ) -> list[PipeFunc]:
+            return [f for f in funcs if isinstance(f, PipeFunc)]
 
         def compute_arg_mapping(
-            node: PipelineFunction,
-            head: PipelineFunction,
-            args: list[PipelineFunction | str],
-            replaced: list[PipelineFunction | str],
+            node: PipeFunc,
+            head: PipeFunc,
+            args: list[PipeFunc | str],
+            replaced: list[PipeFunc | str],
         ) -> None:
             preds = [n for n in self.graph.predecessors(node) if n not in replaced]
             deps = unique(args + preds)
@@ -716,12 +716,12 @@ class Pipeline:
     def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output."""
 
-        def _predecessors(x: _OUTPUT_TYPE | PipelineFunction) -> list[_OUTPUT_TYPE]:
+        def _predecessors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
             preds = set()
             if isinstance(x, (str, tuple)):
                 x = self.node_mapping[x]
             for pred in self.graph.predecessors(x):
-                if isinstance(pred, PipelineFunction):
+                if isinstance(pred, PipeFunc):
                     preds.add(pred.output_name)
                     for p in _predecessors(pred):
                         preds.add(p)
@@ -756,7 +756,7 @@ class Pipeline:
         """
         mapping: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = defaultdict(set)
         for node in self.graph.nodes:
-            if isinstance(node, PipelineFunction):
+            if isinstance(node, PipeFunc):
                 arg_combinations = self.arg_combinations(
                     node.output_name,
                     root_args_only=root_args_only,
@@ -767,7 +767,7 @@ class Pipeline:
         return mapping
 
     @functools.cached_property
-    def unique_leaf_node(self) -> PipelineFunction:
+    def unique_leaf_node(self) -> PipeFunc:
         """Return the unique leaf node of the pipeline graph."""
         leaf_nodes = self.leaf_nodes
         if len(leaf_nodes) != 1:  # pragma: no cover
@@ -796,7 +796,7 @@ class Pipeline:
         node_sets = [{k, *v} for k, v in combinable_nodes.items()]
         color_index = len(node_sets)  # for non-combinable nodes
         for node in self.graph.nodes:
-            if isinstance(node, PipelineFunction):
+            if isinstance(node, PipeFunc):
                 i = next(
                     (i for i, nodes in enumerate(node_sets) if node in nodes),
                     None,
@@ -870,10 +870,10 @@ class Pipeline:
         output_name: _OUTPUT_TYPE,
         *,
         conservatively_combine: bool = False,
-    ) -> dict[PipelineFunction, set[PipelineFunction]]:
+    ) -> dict[PipeFunc, set[PipeFunc]]:
         """Identify which function nodes can be combined into a single function.
 
-        This method identifies the PipelineFunctions in the execution graph that
+        This method identifies the PipeFuncs in the execution graph that
         can be combined into a single function. The criterion for combinability
         is that the functions share the same root arguments.
 
@@ -892,15 +892,15 @@ class Pipeline:
 
         Returns
         -------
-        dict[PipelineFunction, set[PipelineFunction]]
-            A dictionary where each key is a PipelineFunction that can be
+        dict[PipeFunc, set[PipeFunc]]
+            A dictionary where each key is a PipeFunc that can be
             combined with others. The value associated with each key is a set of
-            PipelineFunctions that can be combined with the key function.
+            PipeFuncs that can be combined with the key function.
 
         Notes
         -----
         This function works by performing a depth-first search through the
-        pipeline's execution graph. Starting from the PipelineFunction
+        pipeline's execution graph. Starting from the PipeFunc
         corresponding to the `output_name`, it goes through each predecessor in
         the graph (functions that need to be executed before the current one).
         For each predecessor function, it recursively checks if it can be
@@ -922,7 +922,7 @@ class Pipeline:
         # Nested function _recurse performs the depth-first search and updates the
         # `combinable_nodes` dictionary.
 
-        def _recurse(head: PipelineFunction) -> None:
+        def _recurse(head: PipeFunc) -> None:
             head_args = self.root_args(head.output_name)
             funcs = set()
             i = 0
@@ -937,9 +937,9 @@ class Pipeline:
             if funcs and (not conservatively_combine or i == len(funcs)):
                 combinable_nodes[head] = funcs
 
-        combinable_nodes: dict[PipelineFunction, set[PipelineFunction]] = {}
+        combinable_nodes: dict[PipeFunc, set[PipeFunc]] = {}
         func = self.node_mapping[output_name]
-        assert isinstance(func, PipelineFunction)
+        assert isinstance(func, PipeFunc)
         _recurse(func)
         return combinable_nodes
 
@@ -1035,7 +1035,7 @@ class Pipeline:
                 func = mini_pipeline.func(f.output_name).call_full_output
                 f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
                 f_combined.__name__ = f"combined_{f.__name__}"
-                f_pipefunc = PipelineFunction(
+                f_pipefunc = PipeFunc(
                     f_combined,
                     outputs,
                     profile=f.profile,
@@ -1055,7 +1055,7 @@ class Pipeline:
     def all_execution_orders(
         self,
         output_name: str,
-    ) -> Generator[list[PipelineFunction], None, None]:
+    ) -> Generator[list[PipeFunc], None, None]:
         """Generate all possible execution orders for the functions in the pipeline.
 
         This method generates all possible topological sorts (execution orders)
@@ -1109,12 +1109,12 @@ class Pipeline:
         return nx.all_topological_sorts(func_only_graph)
 
     @functools.cached_property
-    def leaf_nodes(self) -> list[PipelineFunction]:
+    def leaf_nodes(self) -> list[PipeFunc]:
         """Return the leaf nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
 
     @functools.cached_property
-    def root_nodes(self) -> list[PipelineFunction]:
+    def root_nodes(self) -> list[PipeFunc]:
         """Return the root nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
 
@@ -1123,7 +1123,7 @@ class Pipeline:
         output_name: str,
         *,
         simplify: bool = False,
-    ) -> list[list[list[PipelineFunction]]]:
+    ) -> list[list[list[PipeFunc]]]:
         """Get all possible transitive paths for a specified output.
 
         This method retrieves all the possible ways the functions in the
@@ -1142,10 +1142,10 @@ class Pipeline:
 
         Returns
         -------
-        list[list[list[PipelineFunction]]]
-            A list of lists of lists of `PipelineFunction`s. Each list of lists
+        list[list[list[PipeFunc]]]
+            A list of lists of lists of `PipeFunc`s. Each list of lists
             represents an independent chain of computation in the pipeline that
-            can produce the output. Each list of `PipelineFunction` represents a
+            can produce the output. Each list of `PipeFunc` represents a
             possible ordering of functions in that chain.
 
         """
@@ -1176,7 +1176,7 @@ class Pipeline:
         """Return a string representation of the pipeline."""
         pipeline_str = "Pipeline:\n"
         for node in self.graph.nodes:
-            if isinstance(node, PipelineFunction):
+            if isinstance(node, PipeFunc):
                 fn = node
                 input_args = self.all_arg_combinations()[fn.output_name]
                 pipeline_str += (
@@ -1187,7 +1187,7 @@ class Pipeline:
 
 
 def _update_all_results(
-    func: PipelineFunction,
+    func: PipeFunc,
     r: Any,
     output_name: _OUTPUT_TYPE,
     all_results: dict[_OUTPUT_TYPE, Any],

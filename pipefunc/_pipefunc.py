@@ -61,7 +61,7 @@ def _update_wrapper(wrapper, wrapped) -> None:  # noqa: ANN001
     del wrapper.__dict__["__wrapped__"]
 
 
-class PipelineFunction(Generic[T]):
+class PipeFunc(Generic[T]):
     """Function wrapper class for pipeline functions with additional attributes.
 
     Parameters
@@ -95,7 +95,7 @@ class PipelineFunction(Generic[T]):
     --------
     >>> def add_one(a, b):
     ...     return a + 1, b + 1
-    >>> add_one_func = PipelineFunction(
+    >>> add_one_func = PipeFunc(
     ...     add_one,
     ...     output_name="a_plus_one",
     ...     renames={"a": "x", "b": "y"},
@@ -221,27 +221,27 @@ class PipelineFunction(Generic[T]):
         return getattr(self.func, name)
 
     def __str__(self) -> str:
-        """Return a string representation of the PipelineFunction instance.
+        """Return a string representation of the PipeFunc instance.
 
         Returns
         -------
         str
-            A string representation of the PipelineFunction instance.
+            A string representation of the PipeFunc instance.
 
         """
         outputs = ", ".join(at_least_tuple(self.output_name))
         return f"{self.func.__name__}(...) → {outputs}"
 
     def __repr__(self) -> str:
-        """Return a string representation of the PipelineFunction instance.
+        """Return a string representation of the PipeFunc instance.
 
         Returns
         -------
         str
-            A string representation of the PipelineFunction instance.
+            A string representation of the PipeFunc instance.
 
         """
-        return f"PipelineFunction({self.func.__name__})"
+        return f"PipeFunc({self.func.__name__})"
 
     def __getstate__(self) -> dict:
         """Prepare the state of the current object for pickling.
@@ -286,7 +286,7 @@ def pipefunc(
     cache: bool = False,
     save: bool | None = None,
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
-) -> Callable[[Callable[..., Any]], PipelineFunction]:
+) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator for tagging pipeline functions with a return identifier.
 
     Parameters
@@ -312,14 +312,14 @@ def pipefunc(
 
     Returns
     -------
-    Callable[[Callable[..., Any]], PipelineFunction]
+    Callable[[Callable[..., Any]], PipeFunc]
         A decorator function that takes the original function and output_name a
-        PipelineFunction instance with the specified return identifier.
+        PipeFunc instance with the specified return identifier.
 
     """
 
-    def decorator(f: Callable[..., Any]) -> PipelineFunction:
-        """Wraps the original function in a PipelineFunction instance.
+    def decorator(f: Callable[..., Any]) -> PipeFunc:
+        """Wraps the original function in a PipeFunc instance.
 
         Parameters
         ----------
@@ -328,11 +328,11 @@ def pipefunc(
 
         Returns
         -------
-        PipelineFunction
+        PipeFunc
             The wrapped function with the specified return identifier.
 
         """
-        return PipelineFunction(
+        return PipeFunc(
             f,
             output_name,
             output_picker=output_picker,
