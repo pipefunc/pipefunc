@@ -215,7 +215,7 @@ def test_profiling():
         p.resources_report()
 
 
-def test_pipeline_function_and_execution():
+def test_pipe_func_and_execution():
     def func1(a, b=2):
         return a + b
 
@@ -258,35 +258,35 @@ def test_pipeline_function_and_execution():
     assert pipeline("out3", y3=9, z3=3) == 6
 
 
-def test_pipeline_function_profile():
+def test_pipe_func_profile():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipeFunc(f1, output_name="c", profile=True)
-    assert pipeline_function.profile
-    assert pipeline_function.profiling_stats is not None
-    pipeline_function.profile = False
-    assert not pipeline_function.profile
-    assert pipeline_function.profiling_stats is None
+    pipe_func = PipeFunc(f1, output_name="c", profile=True)
+    assert pipe_func.profile
+    assert pipe_func.profiling_stats is not None
+    pipe_func.profile = False
+    assert not pipe_func.profile
+    assert pipe_func.profiling_stats is None
 
 
-def test_pipeline_function_str():
+def test_pipe_func_str():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipeFunc(f1, output_name="c")
-    assert str(pipeline_function) == "f1(...) → c"
+    pipe_func = PipeFunc(f1, output_name="c")
+    assert str(pipe_func) == "f1(...) → c"
 
 
-def test_pipeline_function_getstate_setstate():
+def test_pipe_func_getstate_setstate():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipeFunc(f1, output_name="c")
-    state = pipeline_function.__getstate__()
+    pipe_func = PipeFunc(f1, output_name="c")
+    state = pipe_func.__getstate__()
 
     # We'll validate getstate by asserting that 'func' in the state
     # is a bytes object (dumped by cloudpickle) and other attributes
@@ -296,12 +296,12 @@ def test_pipeline_function_getstate_setstate():
 
     # Now we'll test setstate by creating a new instance, applying setstate and
     # verifying that the object attributes match the original
-    new_pipeline_function = PipeFunc.__new__(PipeFunc)
-    new_pipeline_function.__setstate__(state)
+    new_pipe_func = PipeFunc.__new__(PipeFunc)
+    new_pipe_func.__setstate__(state)
 
-    assert new_pipeline_function.output_name == pipeline_function.output_name
-    assert new_pipeline_function.parameters == pipeline_function.parameters
-    assert new_pipeline_function.func(2, 3) == pipeline_function.func(
+    assert new_pipe_func.output_name == pipe_func.output_name
+    assert new_pipe_func.parameters == pipe_func.parameters
+    assert new_pipe_func.func(2, 3) == pipe_func.func(
         2,
         3,
     )  # the functions behave the same
