@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import (
+    PipeFunc,
     Pipeline,
-    PipelineFunction,
     Sweep,
     count_sweep,
     get_precalculation_order,
@@ -109,12 +109,12 @@ def test_pipeline_and_all_arg_combinations_lazy() -> None:
 @pytest.mark.parametrize(
     "f2",
     [
-        PipelineFunction(
+        PipeFunc(
             lambda b, c, x: b * c * x,
             output_name="d",
             renames={"x": "xx"},
         ),
-        PipelineFunction(lambda b, c, xx: b * c * xx, output_name="d"),
+        PipeFunc(lambda b, c, xx: b * c * xx, output_name="d"),
     ],
 )
 def test_pipeline_and_all_arg_combinations_rename(f2):
@@ -225,9 +225,9 @@ def test_pipeline_function_and_execution():
     def func3(y, z=3):
         return y - z
 
-    pipe_func1 = PipelineFunction(func1, "out1", renames={"a": "a1"})
-    pipe_func2 = PipelineFunction(func2, "out2", renames={"x": "x2"})
-    pipe_func3 = PipelineFunction(func3, "out3", renames={"y": "y3", "z": "z3"})
+    pipe_func1 = PipeFunc(func1, "out1", renames={"a": "a1"})
+    pipe_func2 = PipeFunc(func2, "out2", renames={"x": "x2"})
+    pipe_func3 = PipeFunc(func3, "out3", renames={"y": "y3", "z": "z3"})
 
     pipeline = Pipeline([pipe_func1, pipe_func2, pipe_func3], debug=True, profile=True)
 
@@ -263,7 +263,7 @@ def test_pipeline_function_profile():
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c", profile=True)
+    pipeline_function = PipeFunc(f1, output_name="c", profile=True)
     assert pipeline_function.profile
     assert pipeline_function.profiling_stats is not None
     pipeline_function.profile = False
@@ -276,7 +276,7 @@ def test_pipeline_function_str():
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c")
+    pipeline_function = PipeFunc(f1, output_name="c")
     assert str(pipeline_function) == "f1(...) → c"
 
 
@@ -285,7 +285,7 @@ def test_pipeline_function_getstate_setstate():
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c")
+    pipeline_function = PipeFunc(f1, output_name="c")
     state = pipeline_function.__getstate__()
 
     # We'll validate getstate by asserting that 'func' in the state
@@ -296,7 +296,7 @@ def test_pipeline_function_getstate_setstate():
 
     # Now we'll test setstate by creating a new instance, applying setstate and
     # verifying that the object attributes match the original
-    new_pipeline_function = PipelineFunction.__new__(PipelineFunction)
+    new_pipeline_function = PipeFunc.__new__(PipeFunc)
     new_pipeline_function.__setstate__(state)
 
     assert new_pipeline_function.output_name == pipeline_function.output_name

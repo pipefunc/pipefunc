@@ -10,7 +10,7 @@ import networkx as nx
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
-    from pipefunc._pipeline import _OUTPUT_TYPE, Pipeline, PipelineFunction
+    from pipefunc._pipeline import _OUTPUT_TYPE, PipeFunc, Pipeline
 
 
 def _combined_exclude(
@@ -510,7 +510,7 @@ def get_precalculation_order(
     pipeline: Pipeline,
     counts: dict[str | tuple[str, ...], dict[tuple[Any, ...], int]],
     min_executions: int = 2,
-) -> list[PipelineFunction]:
+) -> list[PipeFunc]:
     """Determine the order in which functions in a pipeline should be precalculated and cached.
 
     The order is determined by the topological dependencies of the functions
@@ -531,12 +531,12 @@ def get_precalculation_order(
 
     Returns
     -------
-    list[PipelineFunction]
+    list[PipeFunc]
         The ordered list of functions to be precalculated and cached.
 
     """
 
-    def key_func(node: PipelineFunction) -> int:
+    def key_func(node: PipeFunc) -> int:
         return -sum(counts[node.output_name].values())
 
     m = pipeline.node_mapping
@@ -624,7 +624,7 @@ def _assert_valid_sweep_dict(
 
 
 def get_min_sweep_sets(
-    execution_order: list[PipelineFunction],
+    execution_order: list[PipeFunc],
     pipeline: Pipeline,
     sweep: Sweep,
     output_name: str,

@@ -94,11 +94,11 @@ class _LazyFunction:
         return result
 
     def __repr__(self) -> str:
-        from pipefunc._pipefunc import PipelineFunction
+        from pipefunc._pipefunc import PipeFunc
 
         kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
         args = ", ".join(repr(arg) for arg in self.args)
-        if isinstance(self.func, PipelineFunction):
+        if isinstance(self.func, PipeFunc):
             func = str(self.func.__name__)
         else:
             func = str(self.func)
