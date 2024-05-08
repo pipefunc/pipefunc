@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=Callable[..., Any])
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+MAX_PARAMS_LEN = 15
 
 
 def _default_output_picker(
@@ -228,9 +229,8 @@ class PipelineFunction(Generic[T]):
             A string representation of the PipelineFunction instance.
 
         """
-        params = ", ".join(self.parameters)
         outputs = ", ".join(at_least_tuple(self.output_name))
-        return f"{self.func.__name__}({params}) → {outputs}"
+        return f"{self.func.__name__}(...) → {outputs}"
 
     def __repr__(self) -> str:
         """Return a string representation of the PipelineFunction instance.

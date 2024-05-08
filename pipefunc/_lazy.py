@@ -93,6 +93,23 @@ class _LazyFunction:
             evaluate_lazy(cb)
         return result
 
+    def __repr__(self) -> str:
+        from pipefunc._pipefunc import PipelineFunction
+
+        kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        args = ", ".join(repr(arg) for arg in self.args)
+        if isinstance(self.func, PipelineFunction):
+            func = str(self.func.__name__)
+        else:
+            func = str(self.func)
+        if args and kwargs:
+            return f"{func}({args}, {kwargs})"
+        if args:
+            return f"{func}({args})"
+        if kwargs:
+            return f"{func}({kwargs})"
+        return f"{func}()"
+
 
 class TaskGraph(NamedTuple):
     """A named tuple representing a task graph."""
