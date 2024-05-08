@@ -11,6 +11,8 @@ from typing import (
 
 import networkx as nx
 
+from pipefunc._cache import SimpleCache
+
 if TYPE_CHECKING:
     import sys
 
@@ -40,6 +42,8 @@ class _LazyFunction:
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
+        *,
+        add_to_graph: bool = True,
     ) -> None:
         self.func = func
         self.args = args
@@ -52,7 +56,7 @@ class _LazyFunction:
         self._id = _LazyFunction._counter
         _LazyFunction._counter += 1
 
-        if _TASK_GRAPH is not None:
+        if add_to_graph and _TASK_GRAPH is not None:
             _TASK_GRAPH.graph.add_node(self._id, lazy_func=self)
             _TASK_GRAPH.mapping[self._id] = self
 
@@ -89,12 +93,30 @@ class _LazyFunction:
             evaluate_lazy(cb)
         return result
 
+    def __repr__(self) -> str:
+        from pipefunc._pipefunc import PipelineFunction
+
+        kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        args = ", ".join(repr(arg) for arg in self.args)
+        if isinstance(self.func, PipelineFunction):
+            func = str(self.func.__name__)
+        else:
+            func = str(self.func)
+        if args and kwargs:
+            return f"{func}({args}, {kwargs})"
+        if args:
+            return f"{func}({args})"
+        if kwargs:
+            return f"{func}({kwargs})"
+        return f"{func}()"
+
 
 class TaskGraph(NamedTuple):
     """A named tuple representing a task graph."""
 
     graph: nx.DiGraph
     mapping: dict[int, _LazyFunction]
+    cache: SimpleCache = SimpleCache()
 
 
 @contextlib.contextmanager
@@ -106,7 +128,12 @@ def construct_dag() -> Generator[TaskGraph, None, None]:
     _TASK_GRAPH = None
 
 
-_TASK_GRAPH: nx.DiGraph | None = None
+_TASK_GRAPH: TaskGraph | None = None
+
+
+def task_graph() -> TaskGraph | None:
+    """Return the task graph."""
+    return _TASK_GRAPH
 
 
 def evaluate_lazy(x: Any) -> Any:

@@ -287,7 +287,7 @@ class LRUCache(_CacheBase):
             self._cache_queue = []  # type: ignore[assignment]
             self._cache_lock = nullcontext()  # type: ignore[assignment]
 
-    def get(self, key: Hashable) -> tuple[bool, Any]:
+    def get(self, key: Hashable) -> Any:
         """Get a value from the cache by key."""
         with self._cache_lock:
             value = self._cache_dict.get(key)
@@ -341,6 +341,41 @@ class LRUCache(_CacheBase):
             for key in keys:
                 del self._cache_dict[key]
             del self._cache_queue[:]
+
+
+class SimpleCache(_CacheBase):
+    """A simple cache without any eviction strategy."""
+
+    def __init__(self) -> None:
+        """Initialize the cache."""
+        self._cache_dict: dict[Hashable, Any] = {}
+
+    def get(self, key: Hashable) -> Any:
+        """Get a value from the cache by key."""
+        return self._cache_dict.get(key)
+
+    def put(self, key: Hashable, value: Any) -> None:
+        """Insert a key value pair into the cache."""
+        self._cache_dict[key] = value
+
+    def __contains__(self, key: Hashable) -> bool:
+        """Check if a key is present in the cache."""
+        return key in self._cache_dict
+
+    @property
+    def cache(self) -> dict:
+        """Returns a copy of the cache."""
+        return self._cache_dict
+
+    def __len__(self) -> int:
+        """Return the number of entries in the cache."""
+        return len(self._cache_dict)
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        keys = list(self._cache_dict.keys())
+        for key in keys:
+            del self._cache_dict[key]
 
 
 class DiskCache(_CacheBase):

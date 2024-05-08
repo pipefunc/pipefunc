@@ -277,7 +277,7 @@ def test_pipeline_function_str():
         return a + b
 
     pipeline_function = PipelineFunction(f1, output_name="c")
-    assert str(pipeline_function) == "f1(a, b) → c"
+    assert str(pipeline_function) == "f1(...) → c"
 
 
 def test_pipeline_function_getstate_setstate():
