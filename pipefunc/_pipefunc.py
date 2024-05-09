@@ -164,8 +164,8 @@ class PipeFunc(Generic[T]):
         if self.debug and self.profiling_stats is not None:
             dt = self.profiling_stats.time.average
             print(
-                f"Function {self.func.__name__} called with args={args},"
-                f" kwargs={kwargs}, took {dt:.2e} seconds to execute.",
+                f"Function `{self.func.__name__}` took {dt:.2e} seconds to execute"
+                f" called with args={args}, kwargs={kwargs}, .",
             )
         return result
 
