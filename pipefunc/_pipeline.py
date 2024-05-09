@@ -1277,7 +1277,7 @@ def _valid_key(key: Any) -> Any:
 def _handle_error(e: Exception, func: Callable, func_args: dict[str, Any]) -> None:
     kwargs_str = ", ".join(f"{k}={v}" for k, v in func_args.items())
     msg = f"Error occurred while executing function `{func.__name__}({kwargs_str})`."
-    if sys.version_info <= (3, 11):
+    if sys.version_info <= (3, 11):  # pragma: no cover
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
     raise
