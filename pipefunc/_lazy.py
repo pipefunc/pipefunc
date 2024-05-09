@@ -116,16 +116,18 @@ class TaskGraph(NamedTuple):
 
     graph: nx.DiGraph
     mapping: dict[int, _LazyFunction]
-    cache: SimpleCache = SimpleCache()
+    cache: SimpleCache
 
 
 @contextlib.contextmanager
 def construct_dag() -> Generator[TaskGraph, None, None]:
     """Create a directed acyclic graph (DAG) for a pipeline."""
     global _TASK_GRAPH
-    _TASK_GRAPH = TaskGraph(nx.DiGraph(), {})
-    yield _TASK_GRAPH
-    _TASK_GRAPH = None
+    _TASK_GRAPH = TaskGraph(nx.DiGraph(), {}, SimpleCache())
+    try:
+        yield _TASK_GRAPH
+    finally:
+        _TASK_GRAPH = None
 
 
 _TASK_GRAPH: TaskGraph | None = None
