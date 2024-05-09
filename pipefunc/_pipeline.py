@@ -516,6 +516,27 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
+    def _get_result_from_cache(
+        self,
+        func: PipeFunc,
+        cache: LRUCache | HybridCache | DiskCache | SimpleCache,
+        cache_key: _CACHE_KEY_TYPE | None,
+        output_name: _OUTPUT_TYPE,
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,  # noqa: FBT001
+        used_parameters: set[str | None],
+    ) -> tuple[bool, bool]:
+        # Used in _execute_pipeline
+        result_from_cache = False
+        if cache_key is not None and cache_key in cache:
+            r = cache.get(cache_key)
+            _update_all_results(func, r, output_name, all_results, self.lazy)
+            result_from_cache = True
+            if not full_output:
+                used_parameters.add(None)  # indicate that the result was from cache
+                return True, result_from_cache
+        return False, result_from_cache
+
     def _get_func_args(
         self,
         func: PipeFunc,
@@ -611,13 +632,17 @@ class Pipeline:
         if use_cache:
             assert cache is not None
             cache_key = self._compute_cache_key(func.output_name, kwargs)
-            if cache_key is not None and cache_key in cache:
-                r = cache.get(cache_key)
-                _update_all_results(func, r, output_name, all_results, self.lazy)
-                result_from_cache = True
-                if not full_output:
-                    used_parameters.add(None)  # indicate that the result was from cache
-                    return all_results[output_name]
+            return_now, result_from_cache = self._get_result_from_cache(
+                func,
+                cache,
+                cache_key,
+                output_name,
+                all_results,
+                full_output,
+                used_parameters,
+            )
+            if return_now:
+                return all_results[output_name]
 
         func_args = self._get_func_args(
             func,
