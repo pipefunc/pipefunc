@@ -506,13 +506,14 @@ class Pipeline:
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
         cache_key_items = []
-        for k in sorted(root_args):
+        for k in root_args:
             if k not in kwargs:
                 # This means the computation was run with non-root inputs
                 # i.e., the output of a function was directly provided as an input to
                 # another function. In this case, we don't want to cache the result.
                 return None
-            cache_key_items.append((k, _valid_key(kwargs[k])))
+            key = _valid_key(kwargs[k])
+            cache_key_items.append((k, key))
 
         return output_name, tuple(cache_key_items)
 
@@ -770,6 +771,7 @@ class Pipeline:
         -------
         Set[Tuple[str, ...]]
             A set of tuples containing possible argument combinations.
+            The tuples are sorted in lexicographical order.
 
         """
         if r := self._arg_combinations.get(output_name):
@@ -785,7 +787,7 @@ class Pipeline:
                 else:
                     assert isinstance(n, str)
                     names.append(n)
-            return tuple(names)
+            return tuple(sorted(names))
 
         def sort_key(node: PipeFunc | str) -> str:
             if isinstance(node, PipeFunc):
