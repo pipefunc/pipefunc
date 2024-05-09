@@ -622,3 +622,35 @@ def test_handle_error():
         # NOTE: with pytest.raises match="..." does not work
         # with add_note for some reason on my Mac, however,
         # on CI it works fine (Linux)...
+
+
+def test_full_output_cache():
+    ran_f1 = False
+    ran_f2 = False
+
+    @pipefunc(output_name="c", cache=True)
+    def f1(a, b):
+        nonlocal ran_f1
+        if ran_f2:
+            raise RuntimeError
+        ran_f1 = True
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def f2(b, c, x=1):
+        nonlocal ran_f2
+        if ran_f2:
+            raise RuntimeError
+        ran_f2 = True
+        return b * c * x
+
+    pipeline = Pipeline([f1, f2])
+    f = pipeline.func("d")
+    r = f.call_full_output(a=1, b=2, x=3)
+    expected = {"a": 1, "b": 2, "c": 3, "d": 18, "x": 3}
+    assert r == expected
+    assert len(pipeline.cache) == 2
+    r = f.call_full_output(a=1, b=2, x=3)
+    assert r == expected
+    r = f(a=1, b=2, x=3)
+    assert r == 18
