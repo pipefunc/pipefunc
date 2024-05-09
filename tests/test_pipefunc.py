@@ -16,6 +16,7 @@ from pipefunc import (
     get_precalculation_order,
     pipefunc,
 )
+from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -194,7 +195,9 @@ def test_output_name_in_kwargs():
     def f(a, b):
         return a + b
 
-    assert Pipeline([f])("a", a=1) == 1
+    p = Pipeline([f])
+    with pytest.raises(ValueError, match="cannot be provided in"):
+        assert p("a", a=1)
 
 
 def test_profiling():
@@ -509,15 +512,15 @@ def test_full_output(cache, tmp_path: Path):
 
 
 def test_lazy_pipeline():
-    @pipefunc(output_name="c", cache=True)
+    @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name="d", cache=True)
+    @pipefunc(output_name="d")
     def f2(b, c, x=1):
         return b * c * x
 
-    @pipefunc(output_name="e", cache=True)
+    @pipefunc(output_name="e")
     def f3(c, d, x=1):
         return c * d * x
 
@@ -565,15 +568,15 @@ def test_function_pickling():
 
 
 def test_drop_from_pipeline():
-    @pipefunc(output_name="c", cache=True)
+    @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name="d", cache=True)
+    @pipefunc(output_name="d")
     def f2(b, c, x=1):
         return b * c * x
 
-    @pipefunc(output_name="e", cache=True)
+    @pipefunc(output_name="e")
     def f3(c, d, x=1):
         return c * d * x
 
@@ -585,3 +588,14 @@ def test_drop_from_pipeline():
     pipeline = Pipeline([f1, f2, f3])
     assert "d" in pipeline.output_to_func
     pipeline.drop(f=f2)
+
+
+def test_used_variable():
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    pipeline = Pipeline([f1])
+    pipeline("c", a=1, b=2)
+    with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
+        pipeline("c", a=1, b=2, doesnotexist=3)
