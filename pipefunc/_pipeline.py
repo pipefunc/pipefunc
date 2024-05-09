@@ -623,9 +623,7 @@ class Pipeline:
             raise ValueError(msg)
 
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
-        used_parameters: set[str | None] = (
-            set()
-        )  # if has None, result was from cache, so we don't know
+        used_parameters: set[str | None] = set()
 
         self._execute_pipeline(
             output_name=output_name,
@@ -635,6 +633,7 @@ class Pipeline:
             used_parameters=used_parameters,
         )
 
+        # if has None, result was from cache, so we don't know which parameters were used
         if None not in used_parameters and (
             unused := set(kwargs) - set(used_parameters)
         ):
