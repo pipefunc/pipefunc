@@ -38,6 +38,7 @@ from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict
+from pipefunc.exceptions import UnusedParametersError
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -109,7 +110,7 @@ class _Function:
             The return value of the pipeline function.
 
         """
-        return self.pipeline._run_pipeline(output_name=self.output_name, **kwargs)
+        return self.pipeline._run_pipeline(output_name=self.output_name, kwargs=kwargs)
 
     def call_full_output(self, **kwargs: Any) -> dict[str, Any]:
         """Call the pipeline function with the given arguments and return all outputs.
@@ -128,7 +129,7 @@ class _Function:
         return self.pipeline._run_pipeline(
             output_name=self.output_name,
             full_output=True,
-            **kwargs,
+            kwargs=kwargs,
         )
 
     def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
@@ -180,8 +181,8 @@ class _Function:
                 return self(**bound.arguments)
             all_results = self.pipeline._run_pipeline(
                 output_name=self.output_name,
-                **bound.arguments,
                 full_output=True,
+                kwargs=bound.arguments,
             )
             if isinstance(output_name, str):
                 return all_results[output_name]
@@ -521,9 +522,8 @@ class Pipeline:
         kwargs: Any,
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,
+        used_parameters: set[str | None],
     ) -> Any:
-        if output_name in all_results:
-            return all_results[output_name]
         func = self.output_to_func[output_name]
         assert func.parameters is not None
 
@@ -539,6 +539,7 @@ class Pipeline:
                 _update_all_results(func, r, output_name, all_results, self.lazy)
                 result_from_cache = True
                 if not full_output:
+                    used_parameters.add(None)  # indicate that the result was from cache
                     return all_results[output_name]
 
         func_args = {}
@@ -553,7 +554,9 @@ class Pipeline:
                     kwargs=kwargs,
                     all_results=all_results,
                     full_output=full_output,
+                    used_parameters=used_parameters,
                 )
+        used_parameters.update(func_args)
 
         if result_from_cache:
             # Can only happen if full_output is True
@@ -594,7 +597,7 @@ class Pipeline:
         output_name: _OUTPUT_TYPE,
         *,
         full_output: bool = False,
-        **kwargs: Any,
+        kwargs: dict[str, Any],
     ) -> Any:
         """Execute the pipeline for a specific return value.
 
@@ -615,13 +618,29 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
+        if output_name in kwargs:
+            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
+            raise ValueError(msg)
+
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
+        used_parameters: set[str | None] = set()
+
         self._execute_pipeline(
             output_name=output_name,
             kwargs=kwargs,
             all_results=all_results,
             full_output=full_output,
+            used_parameters=used_parameters,
         )
+
+        # if has None, result was from cache, so we don't know which parameters were used
+        if None not in used_parameters and (
+            unused := set(kwargs) - set(used_parameters)
+        ):
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
+            raise UnusedParametersError(msg)
+
         return all_results if full_output else all_results[output_name]
 
     @property

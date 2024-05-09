@@ -16,6 +16,7 @@ from pipefunc import (
     get_precalculation_order,
     pipefunc,
 )
+from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -136,10 +137,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
 
     fe = pipeline.func("e")
     assert (
-        fe(a=2, b=3, x=1, xx=1)
-        == fe(a=2, b=3, d=15, x=1, xx=1)
-        == f3(c=c, d=15, x=1)
-        == 75
+        fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
     )
 
     all_args = pipeline.all_arg_combinations()
@@ -194,7 +192,9 @@ def test_output_name_in_kwargs():
     def f(a, b):
         return a + b
 
-    assert Pipeline([f])("a", a=1) == 1
+    p = Pipeline([f])
+    with pytest.raises(ValueError, match="cannot be provided in"):
+        assert p("a", a=1)
 
 
 def test_profiling():
@@ -509,15 +509,15 @@ def test_full_output(cache, tmp_path: Path):
 
 
 def test_lazy_pipeline():
-    @pipefunc(output_name="c", cache=True)
+    @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name="d", cache=True)
+    @pipefunc(output_name="d")
     def f2(b, c, x=1):
         return b * c * x
 
-    @pipefunc(output_name="e", cache=True)
+    @pipefunc(output_name="e")
     def f3(c, d, x=1):
         return c * d * x
 
@@ -565,15 +565,15 @@ def test_function_pickling():
 
 
 def test_drop_from_pipeline():
-    @pipefunc(output_name="c", cache=True)
+    @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name="d", cache=True)
+    @pipefunc(output_name="d")
     def f2(b, c, x=1):
         return b * c * x
 
-    @pipefunc(output_name="e", cache=True)
+    @pipefunc(output_name="e")
     def f3(c, d, x=1):
         return c * d * x
 
@@ -585,3 +585,23 @@ def test_drop_from_pipeline():
     pipeline = Pipeline([f1, f2, f3])
     assert "d" in pipeline.output_to_func
     pipeline.drop(f=f2)
+
+
+def test_used_variable():
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    pipeline = Pipeline([f1])
+    pipeline("c", a=1, b=2)
+    with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
+        pipeline("c", a=1, b=2, doesnotexist=3)
+
+    # Test regression with cache:
+    def f(a):
+        return a
+
+    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)])
+    f = pipeline.func("c")
+    assert f(a=1) == 1
+    assert f(a=1) == 1  # should not raise an error
