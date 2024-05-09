@@ -515,7 +515,7 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _execute_pipeline(  # noqa: PLR0912
+    def _execute_pipeline(  # noqa: PLR0912, PLR0915
         self,
         *,
         output_name: _OUTPUT_TYPE,
@@ -562,8 +562,14 @@ class Pipeline:
             # Can only happen if full_output is True
             return all_results[output_name]
         start_time = time.perf_counter()
-
-        r = _LazyFunction(func, kwargs=func_args) if self.lazy else func(**func_args)
+        if self.lazy:
+            r = _LazyFunction(func, kwargs=func_args)
+        else:
+            try:
+                r = func(**func_args)
+            except Exception as e:
+                _handle_error(e, func, func_args)
+                raise  # already raised in _handle_error, but mypy doesn't know that
 
         if use_cache and cache_key is not None:
             assert cache is not None
@@ -1266,3 +1272,12 @@ def _valid_key(key: Any) -> Any:
     if isinstance(key, set):
         return tuple(sorted(key))
     return key
+
+
+def _handle_error(e: Exception, func: Callable, func_args: dict[str, Any]) -> None:
+    kwargs_str = ", ".join(f"{k}={v}" for k, v in func_args.items())
+    msg = f"Error occurred while executing function `{func.__name__}({kwargs_str})`."
+    if sys.version_info <= (3, 11):
+        raise type(e)(e.args[0] + msg) from e
+    e.add_note(msg)
+    raise e
