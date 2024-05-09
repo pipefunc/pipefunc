@@ -1280,4 +1280,4 @@ def _handle_error(e: Exception, func: Callable, func_args: dict[str, Any]) -> No
     if sys.version_info <= (3, 11):
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
-    raise e
+    raise
