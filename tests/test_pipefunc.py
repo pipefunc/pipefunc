@@ -137,10 +137,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
 
     fe = pipeline.func("e")
     assert (
-        fe(a=2, b=3, x=1, xx=1)
-        == fe(a=2, b=3, d=15, x=1, xx=1)
-        == f3(c=c, d=15, x=1)
-        == 75
+        fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
     )
 
     all_args = pipeline.all_arg_combinations()
@@ -599,3 +596,12 @@ def test_used_variable():
     pipeline("c", a=1, b=2)
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
+
+    # Test regression with cache:
+    def f(a):
+        return a
+
+    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)])
+    f = pipeline.func("c")
+    assert f(a=1) == 1
+    assert f(a=1) == 1  # should not raise an error
