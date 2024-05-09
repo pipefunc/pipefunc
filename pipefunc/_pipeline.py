@@ -164,7 +164,6 @@ class _Function:
     def _create_call_with_parameters_method(
         self,
         parameters: tuple[str, ...],
-        output_name: _OUTPUT_TYPE | None = None,
     ) -> Callable[..., Any]:
         sig = inspect.signature(self.__call__)
         new_params = [
@@ -177,16 +176,7 @@ class _Function:
             """Call the pipeline function with the root arguments."""
             bound = new_sig.bind(*args, **kwargs)
             bound.apply_defaults()
-            if output_name is None:
-                return self(**bound.arguments)
-            all_results = self.pipeline._run_pipeline(
-                output_name=self.output_name,
-                full_output=True,
-                kwargs=bound.arguments,
-            )
-            if isinstance(output_name, str):
-                return all_results[output_name]
-            return tuple(all_results[o] for o in output_name)
+            return self(**bound.arguments)
 
         call.__signature__ = new_sig  # type: ignore[attr-defined]
         return call
