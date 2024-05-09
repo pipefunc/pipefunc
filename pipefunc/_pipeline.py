@@ -502,6 +502,7 @@ class Pipeline:
             is skipped.
 
         """
+        # Used in _execute_pipeline
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
         cache_key_items = []
@@ -515,33 +516,34 @@ class Pipeline:
 
         return output_name, tuple(cache_key_items)
 
-    def _execute_pipeline(  # noqa: PLR0912, PLR0915
+    def _get_result_from_cache(
         self,
-        *,
+        func: PipeFunc,
+        cache: LRUCache | HybridCache | DiskCache | SimpleCache,
+        cache_key: _CACHE_KEY_TYPE | None,
         output_name: _OUTPUT_TYPE,
-        kwargs: Any,
         all_results: dict[_OUTPUT_TYPE, Any],
-        full_output: bool,
+        full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
-    ) -> Any:
-        func = self.output_to_func[output_name]
-        assert func.parameters is not None
+    ) -> tuple[Any, bool]:
+        # Used in _execute_pipeline
+        if cache_key is not None and cache_key in cache:
+            r = cache.get(cache_key)
+            _update_all_results(func, r, output_name, all_results, self.lazy)
+            if not full_output:
+                used_parameters.add(None)  # indicate that the result was from cache
+                return all_results[output_name], True
+        return None, False
 
-        # Get the result from the cache if it exists
-        result_from_cache = False
-        cache = self.get_cache()
-        use_cache = (func.cache and cache is not None) or task_graph() is not None
-        if use_cache:
-            assert cache is not None
-            cache_key = self._compute_cache_key(func.output_name, kwargs)
-            if cache_key is not None and cache_key in cache:
-                r = cache.get(cache_key)
-                _update_all_results(func, r, output_name, all_results, self.lazy)
-                result_from_cache = True
-                if not full_output:
-                    used_parameters.add(None)  # indicate that the result was from cache
-                    return all_results[output_name]
-
+    def _get_func_args(
+        self,
+        func: PipeFunc,
+        kwargs: dict[str, Any],
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,  # noqa: FBT001
+        used_parameters: set[str | None],
+    ) -> dict[str, Any]:
+        # Used in _execute_pipeline
         func_args = {}
         for arg in func.parameters:
             if arg in kwargs:
@@ -557,11 +559,10 @@ class Pipeline:
                     used_parameters=used_parameters,
                 )
         used_parameters.update(func_args)
+        return func_args
 
-        if result_from_cache:
-            # Can only happen if full_output is True
-            return all_results[output_name]
-        start_time = time.perf_counter()
+    def _execute_func(self, func: PipeFunc, func_args: dict[str, Any]) -> Any:
+        # Used in _execute_pipeline
         if self.lazy:
             r = _LazyFunction(func, kwargs=func_args)
         else:
@@ -570,17 +571,31 @@ class Pipeline:
             except Exception as e:
                 _handle_error(e, func, func_args)
                 raise  # already raised in _handle_error, but mypy doesn't know that
+        return r
 
-        if use_cache and cache_key is not None:
-            assert cache is not None
-            if isinstance(cache, HybridCache):
-                duration = time.perf_counter() - start_time
-                cache.put(cache_key, r, duration)
-            else:
-                cache.put(cache_key, r)
+    def _update_cache(
+        self,
+        cache: LRUCache | HybridCache | DiskCache | SimpleCache,
+        cache_key: _CACHE_KEY_TYPE,
+        r: Any,
+        start_time: float,
+    ) -> None:
+        # Used in _execute_pipeline
+        if isinstance(cache, HybridCache):
+            duration = time.perf_counter() - start_time
+            cache.put(cache_key, r, duration)
+        else:
+            cache.put(cache_key, r)
 
-        _update_all_results(func, r, output_name, all_results, self.lazy)
-        if func.save and not result_from_cache:
+    def _save_results(
+        self,
+        func: PipeFunc,
+        r: Any,
+        output_name: _OUTPUT_TYPE,
+        all_results: dict[_OUTPUT_TYPE, Any],
+    ) -> None:
+        # Used in _execute_pipeline
+        if func.save:
             to_save = {k: all_results[k] for k in self.root_args(output_name)}
             filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
             filename = func.__name__ / filename
@@ -596,6 +611,50 @@ class Pipeline:
             else:
                 func.save_function(filename, to_save)  # type: ignore[arg-type]
 
+    def _execute_pipeline(
+        self,
+        *,
+        output_name: _OUTPUT_TYPE,
+        kwargs: Any,
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,
+        used_parameters: set[str | None],
+    ) -> Any:
+        func = self.output_to_func[output_name]
+        assert func.parameters is not None
+
+        cache = self.get_cache()
+        use_cache = (func.cache and cache is not None) or task_graph() is not None
+        if use_cache:
+            assert cache is not None
+            cache_key = self._compute_cache_key(func.output_name, kwargs)
+            result, result_from_cache = self._get_result_from_cache(
+                func,
+                cache,
+                cache_key,
+                output_name,
+                all_results,
+                full_output,
+                used_parameters,
+            )
+            if result_from_cache:
+                return result
+
+        func_args = self._get_func_args(
+            func,
+            kwargs,
+            all_results,
+            full_output,
+            used_parameters,
+        )
+
+        start_time = time.perf_counter()
+        r = self._execute_func(func, func_args)
+        if use_cache and cache_key is not None:
+            assert cache is not None
+            self._update_cache(cache, cache_key, r, start_time)
+        _update_all_results(func, r, output_name, all_results, self.lazy)
+        self._save_results(func, r, output_name, all_results)
         return all_results[output_name]
 
     def _run_pipeline(
