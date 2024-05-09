@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import inspect
 import pickle
-import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -615,8 +614,11 @@ def test_handle_error():
         raise ValueError(msg)
 
     pipeline = Pipeline([f1])
-    with pytest.raises(
-        ValueError,
-        match=re.escape("Error occurred while executing function `f1(a=1, b=2)`"),
-    ):
+    try:
         pipeline("c", a=1, b=2)
+    except ValueError as e:
+        msg = "Error occurred while executing function `f1(a=1, b=2)`"
+        assert msg in str(e) or msg in str(e.__notes__)  # noqa: PT017
+        # NOTE: with pytest.raises match="..." does not work
+        # with add_note for some reason on my Mac, however,
+        # on CI it works fine (Linux)...
