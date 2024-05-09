@@ -337,6 +337,39 @@ class Pipeline:
 
         self._init_internal_cache()  # reset cache
 
+    def drop(
+        self,
+        *,
+        f: PipeFunc | None = None,
+        output_name: _OUTPUT_TYPE | None = None,
+    ) -> None:
+        """Drop a function from the pipeline.
+
+        Parameters
+        ----------
+        f
+            The function to drop from the pipeline.
+        output_name
+            The name of the output to drop from the pipeline.
+
+        """
+        if (f is not None and output_name is not None) or (
+            f is None and output_name is None
+        ):
+            msg = "One of `f` or `output_name` should be provided."
+            raise ValueError(msg)
+        if f is not None:
+            self.functions.remove(f)
+            if isinstance(f.output_name, tuple):
+                for name in f.output_name:
+                    del self.output_to_func[name]
+            else:
+                del self.output_to_func[f.output_name]
+        elif output_name is not None:
+            f = self.output_to_func[output_name]
+            self.drop(f=f)
+        self._init_internal_cache()
+
     def _check_consistent_defaults(self) -> None:
         """Check that the default values for shared arguments are consistent."""
         arg_defaults = defaultdict(set)

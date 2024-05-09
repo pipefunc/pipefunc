@@ -562,3 +562,26 @@ def test_function_pickling():
         "arg1",
         "arg2",
     }
+
+
+def test_drop_from_pipeline():
+    @pipefunc(output_name="c", cache=True)
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e", cache=True)
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3])
+    assert "d" in pipeline.output_to_func
+    pipeline.drop(output_name="d")
+    assert "d" not in pipeline.output_to_func
+
+    pipeline = Pipeline([f1, f2, f3])
+    assert "d" in pipeline.output_to_func
+    pipeline.drop(f=f2)
