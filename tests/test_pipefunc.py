@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import pickle
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -605,3 +606,17 @@ def test_used_variable():
     f = pipeline.func("c")
     assert f(a=1) == 1
     assert f(a=1) == 1  # should not raise an error
+
+
+def test_handle_error():
+    @pipefunc(output_name="c")
+    def f1(a, b):  # noqa: ARG001
+        msg = "Test error"
+        raise ValueError(msg)
+
+    pipeline = Pipeline([f1])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Error occurred while executing function `f1(a=1, b=2)`"),
+    ):
+        pipeline("c", a=1, b=2)
