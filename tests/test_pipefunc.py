@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import (
+    PipeFunc,
     Pipeline,
-    PipelineFunction,
     Sweep,
     count_sweep,
     get_precalculation_order,
     pipefunc,
 )
-from pipefunc._pipefunc import _combine_nodes, _get_signature
+from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -67,15 +67,55 @@ def test_pipeline_and_all_arg_combinations() -> None:
         assert fe(**_kw) == kw["e"]
 
 
+def test_pipeline_and_all_arg_combinations_lazy() -> None:
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True, lazy=True)
+
+    fc = pipeline.func("c")
+    fd = pipeline.func("d")
+    c = f1(a=2, b=3)
+    assert fc(a=2, b=3).evaluate() == c == fc(b=3, a=2).evaluate() == 5
+    assert fd(a=2, b=3).evaluate() == f2(b=3, c=c) == fd(b=3, c=c).evaluate() == 15
+
+    fe = pipeline.func("e")
+    assert (
+        fe(a=2, b=3, x=1).evaluate()
+        == fe(a=2, b=3, d=15, x=1).evaluate()
+        == f3(c=c, d=15, x=1)
+        == 75
+    )
+
+    all_args = pipeline.all_arg_combinations()
+
+    kw = {"a": 2, "b": 3, "x": 1}
+    kw["c"] = f1(a=kw["a"], b=kw["b"])
+    kw["d"] = f2(b=kw["b"], c=kw["c"])
+    kw["e"] = f3(c=kw["c"], d=kw["d"], x=kw["x"])
+    for params in all_args["e"]:
+        _kw = {k: kw[k] for k in params}
+        assert fe(**_kw).evaluate() == kw["e"]
+
+
 @pytest.mark.parametrize(
     "f2",
     [
-        PipelineFunction(
+        PipeFunc(
             lambda b, c, x: b * c * x,
             output_name="d",
             renames={"x": "xx"},
         ),
-        PipelineFunction(lambda b, c, xx: b * c * xx, output_name="d"),
+        PipeFunc(lambda b, c, xx: b * c * xx, output_name="d"),
     ],
 )
 def test_pipeline_and_all_arg_combinations_rename(f2):
@@ -97,10 +137,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
 
     fe = pipeline.func("e")
     assert (
-        fe(a=2, b=3, x=1, xx=1)
-        == fe(a=2, b=3, d=15, x=1, xx=1)
-        == f3(c=c, d=15, x=1)
-        == 75
+        fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
     )
 
     all_args = pipeline.all_arg_combinations()
@@ -155,7 +192,9 @@ def test_output_name_in_kwargs():
     def f(a, b):
         return a + b
 
-    assert Pipeline([f])("a", a=1) == 1
+    p = Pipeline([f])
+    with pytest.raises(ValueError, match="cannot be provided in"):
+        assert p("a", a=1)
 
 
 def test_profiling():
@@ -176,7 +215,7 @@ def test_profiling():
         p.resources_report()
 
 
-def test_pipeline_function_and_execution():
+def test_pipe_func_and_execution():
     def func1(a, b=2):
         return a + b
 
@@ -186,9 +225,9 @@ def test_pipeline_function_and_execution():
     def func3(y, z=3):
         return y - z
 
-    pipe_func1 = PipelineFunction(func1, "out1", renames={"a": "a1"})
-    pipe_func2 = PipelineFunction(func2, "out2", renames={"x": "x2"})
-    pipe_func3 = PipelineFunction(func3, "out3", renames={"y": "y3", "z": "z3"})
+    pipe_func1 = PipeFunc(func1, "out1", renames={"a": "a1"})
+    pipe_func2 = PipeFunc(func2, "out2", renames={"x": "x2"})
+    pipe_func3 = PipeFunc(func3, "out3", renames={"y": "y3", "z": "z3"})
 
     pipeline = Pipeline([pipe_func1, pipe_func2, pipe_func3], debug=True, profile=True)
 
@@ -219,35 +258,35 @@ def test_pipeline_function_and_execution():
     assert pipeline("out3", y3=9, z3=3) == 6
 
 
-def test_pipeline_function_profile():
+def test_pipe_func_profile():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c", profile=True)
-    assert pipeline_function.profile
-    assert pipeline_function.profiling_stats is not None
-    pipeline_function.profile = False
-    assert not pipeline_function.profile
-    assert pipeline_function.profiling_stats is None
+    pipe_func = PipeFunc(f1, output_name="c", profile=True)
+    assert pipe_func.profile
+    assert pipe_func.profiling_stats is not None
+    pipe_func.profile = False
+    assert not pipe_func.profile
+    assert pipe_func.profiling_stats is None
 
 
-def test_pipeline_function_str():
+def test_pipe_func_str():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c")
-    assert str(pipeline_function) == "f1(a, b) → c"
+    pipe_func = PipeFunc(f1, output_name="c")
+    assert str(pipe_func) == "f1(...) → c"
 
 
-def test_pipeline_function_getstate_setstate():
+def test_pipe_func_getstate_setstate():
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline_function = PipelineFunction(f1, output_name="c")
-    state = pipeline_function.__getstate__()
+    pipe_func = PipeFunc(f1, output_name="c")
+    state = pipe_func.__getstate__()
 
     # We'll validate getstate by asserting that 'func' in the state
     # is a bytes object (dumped by cloudpickle) and other attributes
@@ -257,12 +296,12 @@ def test_pipeline_function_getstate_setstate():
 
     # Now we'll test setstate by creating a new instance, applying setstate and
     # verifying that the object attributes match the original
-    new_pipeline_function = PipelineFunction.__new__(PipelineFunction)
-    new_pipeline_function.__setstate__(state)
+    new_pipe_func = PipeFunc.__new__(PipeFunc)
+    new_pipe_func.__setstate__(state)
 
-    assert new_pipeline_function.output_name == pipeline_function.output_name
-    assert new_pipeline_function.parameters == pipeline_function.parameters
-    assert new_pipeline_function.func(2, 3) == pipeline_function.func(
+    assert new_pipe_func.output_name == pipe_func.output_name
+    assert new_pipe_func.parameters == pipe_func.parameters
+    assert new_pipe_func.func(2, 3) == pipe_func.func(
         2,
         3,
     )  # the functions behave the same
@@ -290,9 +329,10 @@ def test_complex_pipeline():
     def f7(a, f2, f6):
         return a + f2 + f6
 
-    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
+    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7], lazy=True)
 
-    pipeline("f7", a=1, b=2, c=3, d=4, e=5)
+    r = pipeline("f7", a=1, b=2, c=3, d=4, e=5)
+    assert r.evaluate() == 52
 
 
 def test_tuple_outputs(tmp_path: Path):
@@ -340,17 +380,27 @@ def test_tuple_outputs(tmp_path: Path):
     def f_i(h, g):
         return h + g
 
-    pipeline = Pipeline([f_c, f_d, f_e, f_i], debug=True, profile=True, cache="shared")
+    pipeline = Pipeline(
+        [f_c, f_d, f_e, f_i],
+        debug=True,
+        profile=True,
+        cache_type="lru",
+        lazy=True,
+        cache_kwargs={"shared": False},
+    )
     f = pipeline.func("i")
-    assert f.call_full_output(a=1, b=2, x=3)["i"] == f(a=1, b=2, x=3)
+    r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
+    assert r == f(a=1, b=2, x=3).evaluate()
     assert (
         pipeline.arg_combinations("g", root_args_only=True)
         == pipeline.arg_combinations("h", root_args_only=True)
         == pipeline.arg_combinations(("g", "h"), root_args_only=True)
         == ("a", "b", "x")
     )
-    assert pipeline.cache.cache[(("d", "e"), (("a", 1), ("b", 2), ("x", 3)))] == (6, 1)
-    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).g == 4
+    key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
+    assert pipeline.cache is not None
+    assert pipeline.cache.cache[key].evaluate() == (6, 1)
+    assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
 
     assert (
@@ -361,7 +411,7 @@ def test_tuple_outputs(tmp_path: Path):
     )
 
     f = pipeline.func(("g", "h"))
-    r = f(a=1, b=2, x=3)
+    r = f(a=1, b=2, x=3).evaluate()
     assert r.g == 4
     assert r.h == 2
 
@@ -413,178 +463,6 @@ def test_execution_order():
     assert get_precalculation_order(pipeline, cnt) == [f_e, f_gg]
 
 
-def test_identify_combinable_nodes():
-    @pipefunc(output_name=("d", "e"))
-    def f_d(b, g, x=1):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name=("g", "h"))
-    def f_e(a, x=1):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name="gg")
-    def f_gg(g):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name="i")
-    def f_i(gg, b, e):  # noqa: ARG001
-        pass
-
-    pipeline = Pipeline([f_d, f_e, f_i, f_gg])
-    combinable_nodes = pipeline._identify_combinable_nodes(
-        "i",
-        conservatively_combine=True,
-    )
-    assert combinable_nodes == {f_gg: {f_e}}
-    sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
-    assert sig_in == {f_gg: {"a", "x"}}
-    assert sig_out == {f_gg: {"gg", "h", "g"}}
-    combinable_nodes = pipeline._identify_combinable_nodes(
-        "i",
-        conservatively_combine=False,
-    )
-    assert combinable_nodes == {f_gg: {f_e}, f_i: {f_d}}
-    sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
-    assert sig_in == {f_gg: {"a", "x"}, f_i: {"g", "b", "gg", "x"}}
-    assert sig_out == {f_gg: {"gg", "h", "g"}, f_i: {"d", "i"}}
-
-
-def test_conservatively_combine():
-    @pipefunc(output_name="x")
-    def f1(a):
-        return a
-
-    @pipefunc(output_name="y")
-    def f2(b, x):
-        return x * b
-
-    @pipefunc(output_name="z")
-    def f3(b, x, y):
-        return x * y * b
-
-    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
-
-    root_args = pipeline.all_arg_combinations(root_args_only=True)
-    assert root_args == {"x": {("a",)}, "y": {("a", "b")}, "z": {("a", "b")}}
-
-    # Test with conservatively_combine=True
-    combinable_nodes_true = pipeline._identify_combinable_nodes(
-        "z",
-        conservatively_combine=True,
-    )
-    assert combinable_nodes_true == {}
-
-    # Test simplified_pipeline with conservatively_combine=True
-    simplified_pipeline_true = pipeline.simplified_pipeline(
-        "z",
-        conservatively_combine=True,
-    )
-    simplified_functions_true = simplified_pipeline_true.functions
-    assert len(simplified_functions_true) == 3
-    function_names_true = [f.__name__ for f in simplified_functions_true]
-    assert "f1" in function_names_true
-    assert "f2" in function_names_true
-    assert "f3" in function_names_true
-
-    # Test with conservatively_combine=False
-    combinable_nodes_false = pipeline._identify_combinable_nodes(
-        "z",
-        conservatively_combine=False,
-    )
-    assert combinable_nodes_false == {f3: {f2}}
-
-    # Test simplified_pipeline with conservatively_combine=False
-    simplified_pipeline_false = pipeline.simplified_pipeline(
-        "z",
-        conservatively_combine=False,
-    )
-    simplified_functions_false = simplified_pipeline_false.functions
-    assert len(simplified_functions_false) == 2
-    function_names_false = [f.__name__ for f in simplified_functions_false]
-    assert "f1" in function_names_false
-    assert "combined_f3" in function_names_false
-
-    # Check that the combined function has the expected input and output arguments
-    combined_f3 = next(
-        f for f in simplified_functions_false if f.__name__ == "combined_f3"
-    )
-    assert combined_f3.parameters == ["b", "x"]
-    assert combined_f3.output_name == "z"
-
-    # Check that the simplified pipeline produces the same output as the original pipeline
-    input_data = {"a": 2, "b": 3}
-    original_output = pipeline("z", **input_data)
-    simplified_output_true = simplified_pipeline_true("z", **input_data)
-    simplified_output_false = simplified_pipeline_false("z", **input_data)
-    assert original_output == simplified_output_true == simplified_output_false
-
-    assert pipeline._func_node_colors() == ["C1", "C0", "C0"]
-
-
-def test_identify_combinable_nodes2():
-    def f1(a, b, c, d):
-        return a + b + c + d
-
-    def f2(a, b, e):
-        return a + b + e
-
-    def f3(a, b, f1):
-        return a + b + f1
-
-    def f4(f1, f3):
-        return f1 + f3
-
-    def f5(f1, f4):
-        return f1 + f4
-
-    def f6(b, f5):
-        return b + f5
-
-    def f7(a, f2, f6):
-        return a + f2 + f6
-
-    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
-    m = pipeline.node_mapping
-
-    expected = {m["f6"]: {m["f1"], m["f3"], m["f4"], m["f5"]}}
-    combinable_nodes = pipeline._identify_combinable_nodes("f7")
-    simplified_combinable_nodes = _combine_nodes(combinable_nodes)
-    assert simplified_combinable_nodes == expected
-
-    sig_in, sig_out = _get_signature(simplified_combinable_nodes, pipeline.graph)
-    assert sig_in == {m["f6"]: {"a", "b", "c", "d"}}
-    assert sig_out == {m["f6"]: {"f6"}}
-
-    # Test simplified_pipeline
-    simplified_pipeline = pipeline.simplified_pipeline()
-    assert (
-        pipeline._unique_leaf_node().output_name
-        == simplified_pipeline._unique_leaf_node().output_name
-        == "f7"
-    )
-    simplified_functions = simplified_pipeline.functions
-
-    # Check that the simplified pipeline has the expected number of functions
-    assert len(simplified_functions) == 3
-
-    # Check that the simplified pipeline has the expected function names
-    function_names = [f.__name__ for f in simplified_functions]
-    assert "f2" in function_names
-    assert "combined_f6" in function_names
-    assert "f7" in function_names
-
-    # Check that the combined function has the expected input and output arguments
-    combined_f6 = next(f for f in simplified_functions if f.__name__ == "combined_f6")
-    assert combined_f6.parameters == ["a", "b", "c", "d"]
-    assert combined_f6.output_name == "f6"
-
-    # Check that the simplified pipeline produces the same output as the original pipeline
-    input_data = {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}
-    original_output = pipeline("f7", **input_data)
-    simplified_output = simplified_pipeline("f7", **input_data)
-    assert original_output == simplified_output
-
-
 @pytest.mark.parametrize("cache", [True, False])
 def test_full_output(cache, tmp_path: Path):
     from pipefunc import Pipeline
@@ -610,7 +488,7 @@ def test_full_output(cache, tmp_path: Path):
     if cache:
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir(exist_ok=True)
-        cache_kwargs = {"cache": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
+        cache_kwargs = {"cache_type": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
     else:
         cache_kwargs = {}
     pipeline = Pipeline([f1, f2, f3], **cache_kwargs)  # type: ignore[arg-type]
@@ -628,3 +506,151 @@ def test_full_output(cache, tmp_path: Path):
     }
     if cache:
         assert len(list(cache_dir.glob("*.pkl"))) == 3
+
+
+def test_lazy_pipeline():
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3], lazy=True)
+
+    f = pipeline.func("e")
+    r = f(a=1, b=2, x=3).evaluate()
+    assert r == 162
+    r = f.call_full_output(a=1, b=2, x=3)["e"].evaluate()
+    assert r == 162
+
+
+@pipefunc(output_name="test_function")
+def test_function(arg1: str, arg2: str) -> str:
+    return f"{arg1} {arg2}"
+
+
+pipeline = Pipeline([test_function])
+
+
+def test_function_pickling():
+    # Get the _Function instance from the pipeline
+    func = pipeline.func("test_function")
+
+    # Pickle the _Function instance
+    pickled_func = pickle.dumps(func)
+
+    # Unpickle the _Function instance
+    unpickled_func = pickle.loads(pickled_func)  # noqa: S301
+
+    # Assert that the unpickled instance has the same attributes
+    assert unpickled_func.output_name == "test_function"
+    assert unpickled_func.root_args == ("arg1", "arg2")
+
+    # Assert that the unpickled instance behaves the same as the original
+    result = unpickled_func(arg1="hello", arg2="world")
+    assert result == "hello world"
+
+    # Assert that the call_with_root_args method is recreated after unpickling
+    assert unpickled_func.call_with_root_args is not None
+    assert unpickled_func.call_with_root_args.__signature__.parameters.keys() == {
+        "arg1",
+        "arg2",
+    }
+
+
+def test_drop_from_pipeline():
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3])
+    assert "d" in pipeline.output_to_func
+    pipeline.drop(output_name="d")
+    assert "d" not in pipeline.output_to_func
+
+    pipeline = Pipeline([f1, f2, f3])
+    assert "d" in pipeline.output_to_func
+    pipeline.drop(f=f2)
+
+
+def test_used_variable():
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    pipeline = Pipeline([f1])
+    pipeline("c", a=1, b=2)
+    with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
+        pipeline("c", a=1, b=2, doesnotexist=3)
+
+    # Test regression with cache:
+    def f(a):
+        return a
+
+    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)])
+    f = pipeline.func("c")
+    assert f(a=1) == 1
+    assert f(a=1) == 1  # should not raise an error
+
+
+def test_handle_error():
+    @pipefunc(output_name="c")
+    def f1(a, b):  # noqa: ARG001
+        msg = "Test error"
+        raise ValueError(msg)
+
+    pipeline = Pipeline([f1])
+    try:
+        pipeline("c", a=1, b=2)
+    except ValueError as e:
+        msg = "Error occurred while executing function `f1(a=1, b=2)`"
+        assert msg in str(e) or msg in str(e.__notes__)  # noqa: PT017
+        # NOTE: with pytest.raises match="..." does not work
+        # with add_note for some reason on my Mac, however,
+        # on CI it works fine (Linux)...
+
+
+def test_full_output_cache():
+    ran_f1 = False
+    ran_f2 = False
+
+    @pipefunc(output_name="c", cache=True)
+    def f1(a, b):
+        nonlocal ran_f1
+        if ran_f2:
+            raise RuntimeError
+        ran_f1 = True
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def f2(b, c, x=1):
+        nonlocal ran_f2
+        if ran_f2:
+            raise RuntimeError
+        ran_f2 = True
+        return b * c * x
+
+    pipeline = Pipeline([f1, f2])
+    f = pipeline.func("d")
+    r = f.call_full_output(a=1, b=2, x=3)
+    expected = {"a": 1, "b": 2, "c": 3, "d": 18, "x": 3}
+    assert r == expected
+    assert len(pipeline.cache) == 2
+    r = f.call_full_output(a=1, b=2, x=3)
+    assert r == expected
+    r = f(a=1, b=2, x=3)
+    assert r == 18

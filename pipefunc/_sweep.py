@@ -7,13 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Sequence
 
 import networkx as nx
 
+from pipefunc._utils import at_least_tuple
+
 if TYPE_CHECKING:
-    from pipefunc._pipefunc import _OUTPUT_TYPE, Pipeline, PipelineFunction
-
-
-def _at_least_tuple(x: Any) -> tuple[Any, ...]:
-    """Convert x to a tuple if it is not already a tuple."""
-    return x if isinstance(x, tuple) else (x,)
+    from pipefunc._pipeline import _OUTPUT_TYPE, PipeFunc, Pipeline
 
 
 def _combined_exclude(
@@ -127,8 +124,9 @@ class Sweep:
             # Otherwise, create a product considering the provided dimensions.
             product_parts = []
             for dim_group in self.dims:
-                dims = _at_least_tuple(dim_group)
+                dims = at_least_tuple(dim_group)
                 dim_seqs = [self.items[dim] for dim in dims]
+                _check_dim_lengths(dim_seqs, dims)
                 product_parts.append([dict(zip(dims, res)) for res in zip(*dim_seqs)])
             for combo in product(*product_parts):
                 combination = {k: v for item in combo for k, v in item.items()}
@@ -202,7 +200,7 @@ class Sweep:
         # Otherwise, calculate lengths considering the provided dimensions.
         total_length = 1
         for dim_group in self.dims:
-            dims = _at_least_tuple(dim_group)
+            dims = at_least_tuple(dim_group)
             group_length = len(self.items[dims[0]])
             total_length *= group_length
         return total_length
@@ -359,6 +357,15 @@ class MultiSweep(Sweep):
         return self
 
 
+def _check_dim_lengths(seqs: Sequence[Sequence[Any]], dims: tuple[str, ...]) -> None:
+    """Check that all sequences in a list have the same length."""
+    seq_len = len(seqs[0])
+    for seq, dim in zip(seqs, dims):
+        if len(seq) != seq_len:
+            msg = f"Dimension '{dim}' has a different length than the other dimensions."
+            raise ValueError(msg)
+
+
 def generate_sweep(
     items: dict[str, Sequence[Any]],
     dims: list[str | tuple[str, ...]] | None = None,
@@ -502,7 +509,7 @@ def get_precalculation_order(
     pipeline: Pipeline,
     counts: dict[str | tuple[str, ...], dict[tuple[Any, ...], int]],
     min_executions: int = 2,
-) -> list[PipelineFunction]:
+) -> list[PipeFunc]:
     """Determine the order in which functions in a pipeline should be precalculated and cached.
 
     The order is determined by the topological dependencies of the functions
@@ -523,12 +530,12 @@ def get_precalculation_order(
 
     Returns
     -------
-    list[PipelineFunction]
+    list[PipeFunc]
         The ordered list of functions to be precalculated and cached.
 
     """
 
-    def key_func(node: PipelineFunction) -> int:
+    def key_func(node: PipeFunc) -> int:
         return -sum(counts[node.output_name].values())
 
     m = pipeline.node_mapping
@@ -616,7 +623,7 @@ def _assert_valid_sweep_dict(
 
 
 def get_min_sweep_sets(
-    execution_order: list[PipelineFunction],
+    execution_order: list[PipeFunc],
     pipeline: Pipeline,
     sweep: Sweep,
     output_name: str,

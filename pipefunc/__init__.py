@@ -1,7 +1,12 @@
 """PipeFunc: A Python library for defining, managing, and executing function pipelines."""
 
 from pipefunc._filearray import FileBasedObjectArray
-from pipefunc._pipefunc import Pipeline, PipelineFunction, pipefunc
+from pipefunc._lazy import construct_dag, evaluate_lazy
+from pipefunc._pipefunc import (
+    PipeFunc,
+    pipefunc,
+)
+from pipefunc._pipeline import Pipeline
 from pipefunc._sweep import (
     MultiSweep,
     Sweep,
@@ -13,15 +18,17 @@ from pipefunc._sweep import (
 from pipefunc._version import __version__
 
 __all__ = [
+    "construct_dag",
     "__version__",
     "count_sweep",
     "FileBasedObjectArray",
+    "evaluate_lazy",
     "generate_sweep",
     "get_precalculation_order",
     "MultiSweep",
     "pipefunc",
     "Pipeline",
-    "PipelineFunction",
+    "PipeFunc",
     "set_cache_for_sweep",
     "Sweep",
 ]
