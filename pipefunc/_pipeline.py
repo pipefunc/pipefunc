@@ -1176,7 +1176,7 @@ class Pipeline:
                 if len(outputs) == 1:
                     outputs = outputs[0]  # type: ignore[assignment]
                 funcs = [f, *combinable_nodes[f]]
-                mini_pipeline = Pipeline(funcs, debug=False, profile=False)
+                mini_pipeline = Pipeline(funcs)  # type: ignore[arg-type]
                 func = mini_pipeline.func(f.output_name).call_full_output
                 f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
                 f_combined.__name__ = f"combined_{f.__name__}"
@@ -1195,7 +1195,7 @@ class Pipeline:
                 new_functions.append(f_pipefunc)
             elif f not in skip:
                 new_functions.append(f)
-        return Pipeline(new_functions)
+        return Pipeline(new_functions)  # type: ignore[arg-type]
 
     def all_execution_orders(
         self,
