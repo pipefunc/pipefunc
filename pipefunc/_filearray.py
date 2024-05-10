@@ -51,6 +51,7 @@ class FileArray:
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         self.folder = Path(folder).absolute()
+        self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
         self.strides = (
             _shape_to_strides(self.shape) if strides is None else tuple(strides)
@@ -130,6 +131,16 @@ class FileArray:
         items = _load_all(map(self._index_to_file, range(self.size)))
         mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
         return np.ma.array(items, mask=mask, dtype=object).reshape(self.shape)
+
+    @property
+    def mask(self) -> np.ma.core.MaskedArray:
+        """Return a masked numpy array containing the mask.
+
+        The returned numpy array has dtype "bool" and a mask for
+        masking out missing data.
+        """
+        mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
+        return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int, ...], value: Any) -> None:
         """Dump 'value' into the file associated with 'key'.

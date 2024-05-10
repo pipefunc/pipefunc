@@ -13,6 +13,7 @@ the resource usage of the pipeline functions.
 from __future__ import annotations
 
 import contextlib
+import copy
 import functools
 import inspect
 import sys
@@ -1332,7 +1333,7 @@ class Pipeline:
 
     def copy(self) -> Pipeline:
         """Return a copy of the pipeline."""
-        return Pipeline(self.functions)
+        return copy.deepcopy(self)
 
 
 def _update_all_results(

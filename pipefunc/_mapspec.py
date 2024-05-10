@@ -155,6 +155,11 @@ class MapSpec:
 
         return tuple(shape)
 
+    def shape_from_kwargs(self, kwargs: dict[str, npt.NDArray]) -> tuple[int, ...]:
+        inputs = {k: v for k, v in kwargs.items() if k in self.parameters}
+        kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
+        return self.shape(kwarg_shapes)
+
     def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
 
