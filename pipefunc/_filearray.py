@@ -37,7 +37,7 @@ def dump(obj: Any, name: str | Path) -> None:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-class FileBasedObjectArray:
+class FileArray:
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
@@ -136,7 +136,7 @@ class FileBasedObjectArray:
 
         Examples
         --------
-        >>> arr = FileBasedObjectArray(...)
+        >>> arr = FileArray(...)
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """

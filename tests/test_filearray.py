@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from pipefunc._filearray import (
-    FileBasedObjectArray,
+    FileArray,
     _load_all,
     dump,
     load,
@@ -24,7 +24,7 @@ def test_file_based_object_array_init():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3, 4)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         assert arr.folder == folder
         assert arr.shape == shape
         assert arr.strides == (12, 4, 1)
@@ -35,7 +35,7 @@ def test_file_based_object_array_properties():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3, 4)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         assert arr.size == 24
         assert arr.rank == 3
 
@@ -44,7 +44,7 @@ def test_file_based_object_array_normalize_key():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3, 4)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         assert arr._normalize_key((1, 2, 3)) == (1, 2, 3)
         with pytest.raises(IndexError):
             arr._normalize_key((1, 2, 3, 4))
@@ -58,7 +58,7 @@ def test_file_based_object_array_index_to_file():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3, 4)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         assert arr._index_to_file(0) == folder / "__0__.pickle"
         assert arr._index_to_file(23) == folder / "__23__.pickle"
 
@@ -67,7 +67,7 @@ def test_file_based_object_array_key_to_file():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3, 4)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         assert arr._key_to_file((0, 0, 0)) == folder / "__0__.pickle"
         assert arr._key_to_file((1, 2, 3)) == folder / "__23__.pickle"
 
@@ -76,7 +76,7 @@ def test_file_based_object_array_files():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         files = list(arr._files())
         assert len(files) == 6
         assert files[0] == folder / "__0__.pickle"
@@ -87,7 +87,7 @@ def test_file_based_object_array_getitem():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         arr.dump((0, 0), {"a": 1})
         arr.dump((1, 2), {"b": 2})
         assert arr[0, 0] == {"a": 1}
@@ -101,7 +101,7 @@ def test_file_based_object_array_to_array():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         arr.dump((0, 0), {"a": 1})
         arr.dump((1, 2), {"b": 2})
         result = arr.to_array()
@@ -117,7 +117,7 @@ def test_file_based_object_array_dump():
     with tempfile.TemporaryDirectory() as tempdir:
         folder = Path(tempdir)
         shape = (2, 3)
-        arr = FileBasedObjectArray(folder, shape)
+        arr = FileArray(folder, shape)
         arr.dump((0, 0), {"a": 1})
         arr.dump((1, 2), {"b": 2})
         assert load(arr._key_to_file((0, 0))) == {"a": 1}

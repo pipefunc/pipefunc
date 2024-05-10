@@ -1330,6 +1330,10 @@ class Pipeline:
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
+    def copy(self) -> Pipeline:
+        """Return a copy of the pipeline."""
+        return Pipeline(self.functions)
+
 
 def _update_all_results(
     func: PipeFunc,
