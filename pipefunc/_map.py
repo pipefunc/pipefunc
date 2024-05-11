@@ -197,7 +197,8 @@ def _execute_map_spec(
     _dump_file_array_shape(file_array_path, shape)
     outputs = []
     output_paths = {}
-    for index in range(np.prod(shape)):
+    n = np.prod(shape)
+    for index in range(n):
         input_keys = {
             k: v[0] if len(v) == 1 else v
             for k, v in func.mapspec.input_keys(shape, index).items()
@@ -210,7 +211,9 @@ def _execute_map_spec(
         file_array.dump(output_key, output)
         outputs.append(output)
         output_paths[index] = file_array._key_to_file(output_key)
-    return np.asarray(outputs, dtype=object).reshape(shape), output_paths
+    output = np.empty(n, dtype=object)
+    output[:] = outputs
+    return output.reshape(shape), output_paths
 
 
 class Result(NamedTuple):

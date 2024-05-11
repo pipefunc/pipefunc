@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_simple_fan_out_fan_in(tmp_path: Path) -> None:
+def test_simple(tmp_path: Path) -> None:
     @pipefunc(output_name="result")
     def simulate(seed: int) -> int:
         assert isinstance(seed, int)
@@ -36,7 +36,7 @@ def test_simple_fan_out_fan_in(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
 
 
-def test_simple_fan_out_fan_in_2_dim_array(tmp_path: Path) -> None:
+def test_simple_2_dim_array(tmp_path: Path) -> None:
     @pipefunc(output_name="result")
     def simulate(seed: int) -> int:
         assert isinstance(seed, np.int_)
@@ -60,7 +60,7 @@ def test_simple_fan_out_fan_in_2_dim_array(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [24, 30, 36, 42]
 
 
-def test_simple_fan_out_fan_in_2_dim_array_to_1_dim(tmp_path: Path) -> None:
+def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="result")
     def simulate(seed: int) -> int:
         assert isinstance(seed, np.int_)
@@ -84,7 +84,7 @@ def test_simple_fan_out_fan_in_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [12, 44, 76]
 
 
-def test_simple_fan_out_fan_in_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
+def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     @pipefunc(output_name="result")
     def simulate(seed: int) -> int:
         assert isinstance(seed, np.int_)
@@ -115,7 +115,7 @@ def test_simple_fan_out_fan_in_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> 
     assert results[-1].output == 1961990553600
 
 
-def test_simple_fan_out_fan_in_from_step(tmp_path: Path) -> None:
+def test_simple_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="seed")
     def generate_seeds(n: int) -> list[int]:
         return list(range(n))
@@ -142,7 +142,30 @@ def test_simple_fan_out_fan_in_from_step(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
 
 
-def test_simple_fan_out_fan_in_from_step_nd(tmp_path: Path) -> None:
+def test_simple_multi_output(tmp_path: Path) -> None:
+    @pipefunc(output_name=("single", "double"))
+    def simulate(x: int) -> tuple[int, int]:
+        assert isinstance(x, int)
+        return x, 2 * x
+
+    @pipefunc(output_name="sum")
+    def post_process(single: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+        return sum(single)
+
+    pipeline = Pipeline(
+        [
+            (simulate, "x[i] -> result[i]"),
+            post_process,
+        ],
+    )
+
+    inputs = {"x": [0, 1, 2, 3]}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output == 12
+    assert results[-1].output_name == "sum"
+
+
+def test_simple_from_step_nd(tmp_path: Path) -> None:
     @pipefunc(output_name="array")
     def generate_array(shape: tuple[int, ...]) -> np.ndarray[Any, np.dtype[np.int_]]:
         return np.arange(1, np.prod(shape) + 1).reshape(shape)
