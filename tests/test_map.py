@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -139,6 +139,34 @@ def test_simple_fan_out_fan_in_from_step(tmp_path: Path) -> None:
     inputs = {"n": 4}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 12
+    assert results[-1].output_name == "sum"
+
+
+def test_simple_fan_out_fan_in_from_step_nd(tmp_path: Path) -> None:
+    @pipefunc(output_name="array")
+    def generate_array(shape: tuple[int, ...]) -> np.ndarray[Any, np.dtype[np.int_]]:
+        return np.arange(1, np.prod(shape) + 1).reshape(shape)
+
+    @pipefunc(output_name="vector")
+    def simulate(array: np.ndarray, shape: tuple[int, ...]) -> np.ndarray:
+        assert isinstance(array, np.ndarray)
+        assert array.shape == shape[1:]
+        return array.sum(axis=0).sum(axis=0)
+
+    @pipefunc(output_name="sum")
+    def norm(vector: np.ndarray) -> np.float64:
+        return np.linalg.norm(vector)
+
+    pipeline = Pipeline(
+        [
+            generate_array,
+            (simulate, "array[i, :, :] -> result[i]"),
+            norm,
+        ],
+    )
+    inputs = {"shape": (1, 2, 3)}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
 
 
