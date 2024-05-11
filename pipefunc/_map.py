@@ -8,10 +8,11 @@ from typing import Any, Literal, NamedTuple, Tuple, Union
 
 import cloudpickle
 import networkx as nx
+import numpy as np
 
 from pipefunc import PipeFunc, Pipeline
 from pipefunc._filearray import FileArray
-from pipefunc._mapspec import MapSpec, num_tasks
+from pipefunc._mapspec import MapSpec
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 
@@ -180,10 +181,7 @@ def _func_kwargs(
             file_array_path = _file_array_path(parameter, run_folder)
             shape = _load_file_array_shape(file_array_path)
             file_array = FileArray(file_array_path, shape)
-            if not func.mapspec:
-                kwargs[parameter] = file_array.to_array()
-            else:
-                kwargs[parameter] = file_array
+            kwargs[parameter] = file_array.to_array()
     return kwargs
 
 
@@ -191,15 +189,15 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_folder: Path,
-) -> tuple[dict[int, Any], dict[int, Path]]:
+) -> tuple[np.ndarray, dict[int, Path]]:
     assert isinstance(func.mapspec, MapSpec)
     shape = func.mapspec.shape_from_kwargs(kwargs)
     file_array_path = _file_array_path(func.output_name, run_folder)
     file_array = FileArray(file_array_path, shape)
     _dump_file_array_shape(file_array_path, shape)
-    outputs = {}
+    outputs = []
     output_paths = {}
-    for index in range(num_tasks(kwargs, func.mapspec)):
+    for index in range(np.prod(shape)):
         input_keys = {
             k: v[0] if len(v) == 1 else v
             for k, v in func.mapspec.input_keys(shape, index).items()
@@ -210,9 +208,9 @@ def _execute_map_spec(
         output = func(**kwargs_)
         output_key = func.mapspec.output_key(shape, index)
         file_array.dump(output_key, output)
-        outputs[index] = output
+        outputs.append(output)
         output_paths[index] = file_array._key_to_file(output_key)
-    return outputs, output_paths
+    return np.asarray(outputs, dtype=object).reshape(shape), output_paths
 
 
 class Result(NamedTuple):
