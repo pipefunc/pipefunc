@@ -159,6 +159,7 @@ def _output_types(
 
 def _func_kwargs(
     func: PipeFunc,
+    pipeline: Pipeline,
     output_types: dict[
         _OUTPUT_TYPE,
         Literal["single", "single_indexable", "file_array"],
@@ -168,20 +169,24 @@ def _func_kwargs(
 ) -> dict[str, Any]:
     kwargs = {}
     for parameter in func.parameters:
-        output_type = output_types[parameter]
+        if parameter in output_types:
+            output_name = parameter
+        else:
+            output_name = pipeline.output_to_func[parameter].output_name
+        output_type = output_types[output_name]
         if parameter in input_paths:
             assert output_type in ("single", "single_indexable")
             value = _load_input(parameter, input_paths)
             kwargs[parameter] = value
         elif output_type in ("single_indexable", "single"):
-            value = _load_output(parameter, run_folder)
-            kwargs[parameter] = value
+            value = _load_output(output_name, run_folder)
+            kwargs[output_name] = value
         else:
             assert output_type == "file_array"
-            file_array_path = _file_array_path(parameter, run_folder)
+            file_array_path = _file_array_path(output_name, run_folder)
             shape = _load_file_array_shape(file_array_path)
             file_array = FileArray(file_array_path, shape)
-            kwargs[parameter] = file_array.to_array()
+            kwargs[output_name] = file_array.to_array()
     return kwargs
 
 
@@ -195,9 +200,9 @@ def _execute_map_spec(
     file_array_path = _file_array_path(func.output_name, run_folder)
     file_array = FileArray(file_array_path, shape)
     _dump_file_array_shape(file_array_path, shape)
-    outputs = []
     output_paths = {}
     n = np.prod(shape)
+    output_array = np.empty(n, dtype=object)
     for index in range(n):
         input_keys = {
             k: v[0] if len(v) == 1 else v
@@ -209,11 +214,9 @@ def _execute_map_spec(
         output = func(**kwargs_)
         output_key = func.mapspec.output_key(shape, index)
         file_array.dump(output_key, output)
-        outputs.append(output)
+        output_array[index] = output
         output_paths[index] = file_array._key_to_file(output_key)
-    output = np.empty(n, dtype=object)
-    output[:] = outputs
-    return output.reshape(shape), output_paths
+    return output_array.reshape(shape), output_paths
 
 
 class Result(NamedTuple):
@@ -241,7 +244,7 @@ def run_pipeline(
     for gen in generations[1:]:
         # These evaluations can happen in parallel
         for func in gen:
-            kwargs = _func_kwargs(func, output_types, input_paths, run_folder)
+            kwargs = _func_kwargs(func, pipeline, output_types, input_paths, run_folder)
             if func.mapspec:
                 output, _ = _execute_map_spec(func, kwargs, run_folder)
             else:
