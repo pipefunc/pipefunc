@@ -180,7 +180,10 @@ def _func_kwargs(
             file_array_path = _file_array_path(parameter, run_folder)
             shape = _load_file_array_shape(file_array_path)
             file_array = FileArray(file_array_path, shape)
-            kwargs[parameter] = file_array
+            if not func.mapspec:
+                kwargs[parameter] = file_array.to_array()
+            else:
+                kwargs[parameter] = file_array
     return kwargs
 
 
@@ -222,8 +225,9 @@ class Result(NamedTuple):
 def run_pipeline(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    run_folder: Path,
+    run_folder: str | Path,
 ) -> list[Result]:
+    run_folder = Path(run_folder)
     _clean_run_folder(run_folder)
     function_paths = _dump_functions(pipeline, run_folder)
     input_paths = _dump_inputs(inputs, run_folder)
