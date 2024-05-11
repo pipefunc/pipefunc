@@ -84,6 +84,37 @@ def test_simple_fan_out_fan_in_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [12, 44, 76]
 
 
+def test_simple_fan_out_fan_in_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
+    @pipefunc(output_name="result")
+    def simulate(seed: int) -> int:
+        assert isinstance(seed, np.int_)
+        return seed * 2
+
+    @pipefunc(output_name="sum")
+    def take_sum(result: np.ndarray) -> int:
+        assert isinstance(result, np.ndarray)
+        return np.sum(result)
+
+    @pipefunc(output_name="prod")
+    def take_prod(result: np.ndarray) -> int:
+        assert isinstance(result, np.ndarray)
+        return np.prod(result)
+
+    pipeline = Pipeline(
+        [
+            (simulate, "seed[i, j] -> result[i, j]"),
+            (take_sum, "result[i, :] -> sum[i]"),
+            take_prod,
+        ],
+    )
+
+    inputs = {"seed": np.arange(1, 13).reshape(3, 4)}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output_name == "prod"
+    assert isinstance(results[-1].output, np.int_)
+    assert results[-1].output == 1961990553600
+
+
 def test_simple_fan_out_fan_in_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="seed")
     def generate_seeds(n: int) -> list[int]:
