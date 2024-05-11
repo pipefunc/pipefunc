@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pytest
 
-from pipefunc import FileArray, Pipeline, pipefunc
+from pipefunc import Pipeline, pipefunc
 from pipefunc._map import run_pipeline
 
 if TYPE_CHECKING:
@@ -236,10 +236,10 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         return sum(electrostatics.voltages)
 
     @pipefunc(output_name="average_charge")
-    def average_charge(charge: FileArray) -> float:
+    def average_charge(charge: np.ndarray) -> float:
         # .to_array() is a bit dumb; it loads in _all_ the data at once, but
         # this is the simplest way, and in this example the data is not so large.
-        return np.mean(charge.to_array())
+        return np.mean(charge)
 
     pipeline = Pipeline(
         [
