@@ -60,6 +60,30 @@ def test_simple_fan_out_fan_in_2_dim_array(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [24, 30, 36, 42]
 
 
+def test_simple_fan_out_fan_in_2_dim_array_to_1_dim(tmp_path: Path) -> None:
+    @pipefunc(output_name="result")
+    def simulate(seed: int) -> int:
+        assert isinstance(seed, np.int_)
+        return seed * 2
+
+    @pipefunc(output_name="sum")
+    def post_process(result: FileArray) -> int:
+        assert isinstance(result, FileArray)
+        return np.sum(result)
+
+    pipeline = Pipeline(
+        [
+            (simulate, "seed[i, j] -> result[i, j]"),
+            (post_process, "result[i, :] -> sum[i]"),
+        ],
+    )
+
+    inputs = {"seed": np.arange(12).reshape(3, 4)}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output_name == "sum"
+    assert results[-1].output.to_array().tolist() == [24, 30, 36, 42]
+
+
 def test_simple_fan_out_fan_in_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="seed")
     def generate_seeds(n: int) -> list[int]:
