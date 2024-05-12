@@ -180,7 +180,12 @@ def _func_kwargs(
             kwargs[parameter] = value
         elif output_type in ("single_indexable", "single"):
             value = _load_output(output_name, run_folder)
-            kwargs[output_name] = value
+            if isinstance(output_name, str):
+                kwargs[output_name] = value
+            else:
+                assert isinstance(output_name, tuple)
+                for name in zip(output_name, value):
+                    kwargs[name] = value[value]
         else:
             assert output_type == "file_array"
             file_array_path = _file_array_path(output_name, run_folder)
@@ -211,7 +216,12 @@ def _execute_map_spec(
         kwargs_ = {
             k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()
         }
-        output = func(**kwargs_)
+        try:
+            output = func(**kwargs_)
+        except Exception as e:
+            raise ValueError(
+                f"Error in {func.__name__} at index {index} {kwargs=}"
+            ) from e
         output_key = func.mapspec.output_key(shape, index)
         file_array.dump(output_key, output)
         output_array[index] = output
@@ -248,7 +258,10 @@ def run_pipeline(
             if func.mapspec:
                 output, _ = _execute_map_spec(func, kwargs, run_folder)
             else:
-                output = func(**kwargs)
+                try:
+                    output = func(**kwargs)
+                except Exception as e:
+                    raise ValueError(f"Error in {func.__name__} {kwargs=}") from e
                 _dump_output(output, func.output_name, run_folder)
             outputs.append(
                 Result(

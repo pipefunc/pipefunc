@@ -130,7 +130,9 @@ class FileArray:
         """
         items = _load_all(map(self._index_to_file, range(self.size)))
         mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
-        return np.ma.array(items, mask=mask, dtype=object).reshape(self.shape)
+        arr = np.empty(self.size, dtype=object)
+        arr[:] = items
+        return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
