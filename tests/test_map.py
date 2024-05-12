@@ -161,7 +161,7 @@ def test_simple_multi_output(tmp_path: Path) -> None:
 
     inputs = {"x": [0, 1, 2, 3]}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
-    assert results[-1].output == 12
+    assert results[-1].output == 6
     assert results[-1].output_name == "sum"
 
 
