@@ -169,10 +169,11 @@ def _func_kwargs(
 ) -> dict[str, Any]:
     kwargs = {}
     for parameter in func.parameters:
-        if parameter in output_types:
-            output_name = parameter
-        else:
-            output_name = pipeline.output_to_func[parameter].output_name
+        output_name = (
+            parameter
+            if parameter in output_types
+            else pipeline.output_to_func[parameter].output_name
+        )
         output_type = output_types[output_name]
         if parameter in input_paths:
             assert output_type in ("single", "single_indexable")
@@ -180,12 +181,7 @@ def _func_kwargs(
             kwargs[parameter] = value
         elif output_type in ("single_indexable", "single"):
             value = _load_output(output_name, run_folder)
-            if isinstance(output_name, str):
-                kwargs[output_name] = value
-            else:
-                assert isinstance(output_name, tuple)
-                for name in zip(output_name, value):
-                    kwargs[name] = value[value]
+            kwargs[output_name] = value
         else:
             assert output_type == "file_array"
             file_array_path = _file_array_path(output_name, run_folder)
@@ -195,8 +191,33 @@ def _func_kwargs(
     return kwargs
 
 
+def _select_output(
+    func: PipeFunc,
+    pipeline: Pipeline,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...] | None = None,
+    index: int | None = None,
+) -> None:
+    if func.mapspec is None:
+        input_keys = {}
+    else:
+        input_keys = {
+            k: v[0] if len(v) == 1 else v
+            for k, v in func.mapspec.input_keys(shape, index).items()
+        }
+    selected = {}
+    for k, v in kwargs.items():
+        if k in input_keys:
+            v = v[input_keys[k]]  # noqa: PLW2901
+        if (f := pipeline.output_to_func.get(k)) and f.output_picker is not None:
+            v = f.output_picker(v, k)  # noqa: PLW2901
+        selected[k] = v
+    return selected
+
+
 def _execute_map_spec(
     func: PipeFunc,
+    pipeline: Pipeline,
     kwargs: dict[str, Any],
     run_folder: Path,
 ) -> tuple[np.ndarray, dict[int, Path]]:
@@ -209,19 +230,12 @@ def _execute_map_spec(
     n = np.prod(shape)
     output_array = np.empty(n, dtype=object)
     for index in range(n):
-        input_keys = {
-            k: v[0] if len(v) == 1 else v
-            for k, v in func.mapspec.input_keys(shape, index).items()
-        }
-        kwargs_ = {
-            k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()
-        }
+        selected = _select_output(func, pipeline, kwargs, shape, index)
         try:
-            output = func(**kwargs_)
+            output = func(**selected)
         except Exception as e:
-            raise ValueError(
-                f"Error in {func.__name__} at index {index} {kwargs=}"
-            ) from e
+            msg = f"Error in {func.__name__} at {index=}, {kwargs=}, {selected=}"
+            raise ValueError(msg) from e
         output_key = func.mapspec.output_key(shape, index)
         file_array.dump(output_key, output)
         output_array[index] = output
@@ -256,12 +270,14 @@ def run_pipeline(
         for func in gen:
             kwargs = _func_kwargs(func, pipeline, output_types, input_paths, run_folder)
             if func.mapspec:
-                output, _ = _execute_map_spec(func, kwargs, run_folder)
+                output, _ = _execute_map_spec(func, pipeline, kwargs, run_folder)
             else:
+                selected = _select_output(func, pipeline, kwargs)
                 try:
-                    output = func(**kwargs)
+                    output = func(**selected)
                 except Exception as e:
-                    raise ValueError(f"Error in {func.__name__} {kwargs=}") from e
+                    msg = f"Error in {func.__name__} with {kwargs=} {selected=}"
+                    raise ValueError(msg) from e
                 _dump_output(output, func.output_name, run_folder)
             outputs.append(
                 Result(
