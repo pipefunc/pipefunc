@@ -174,7 +174,7 @@ def _func_kwargs(
     func: PipeFunc,
     pipeline: Pipeline,
     output_types: dict[
-        _OUTPUT_TYPE,
+        str,
         Literal["single", "single_indexable", "file_array"],
     ],
     input_paths: dict[str, Path],
@@ -210,7 +210,8 @@ def _select_kwargs(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     index: int,
-) -> None:
+) -> dict[str, Any]:
+    assert func.mapspec is not None
     input_keys = {
         k: v[0] if len(v) == 1 else v
         for k, v in func.mapspec.input_keys(shape, index).items()
@@ -222,13 +223,13 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_folder: Path,
-) -> tuple[list[np.ndarray], list[dict[int, Path]]]:
+) -> tuple[list[np.ndarray], list[list[Path]]]:
     assert isinstance(func.mapspec, MapSpec)
     shape = func.mapspec.shape_from_kwargs(kwargs)
     n = np.prod(shape)
     file_arrays = []
-    output_arrays = []
-    output_paths = []
+    output_arrays: list[np.ndarray] = []
+    output_paths: list[list[Path]] = []
     output_names = at_least_tuple(func.output_name)
     for output_name in output_names:
         file_array_path = _file_array_path(output_name, run_folder)
@@ -236,7 +237,7 @@ def _execute_map_spec(
         _dump_file_array_shape(file_array_path, shape)
         file_arrays.append(file_array)
         output_arrays.append(np.empty(n, dtype=object))
-        output_paths.append({})
+        output_paths.append([])
 
     for index in range(n):
         selected = _select_kwargs(func, kwargs, shape, index)
@@ -260,7 +261,7 @@ def _execute_map_spec(
             )
             file_array.dump(output_key, _output)
             output_array[index] = _output
-            _output_paths[index] = file_array._key_to_file(output_key)
+            _output_paths.append(file_array._key_to_file(output_key))
     output_arrays = [x.reshape(shape) for x in output_arrays]
     return output_arrays, output_paths
 
@@ -305,6 +306,7 @@ def run_pipeline(
                     at_least_tuple(func.output_name),
                     output,
                 ):
+                    # TODO: use output_picker here
                     _dump_output(_output, output_name, run_folder)
             if isinstance(func.output_name, str):
                 outputs.append(
