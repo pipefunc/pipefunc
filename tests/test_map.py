@@ -147,7 +147,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     @pipefunc(output_name=("single", "double"), output_picker=output_picker)
     def simulate(x: int) -> tuple[int, int]:
         assert isinstance(x, int)
-        return x, 2 * x if output_picker is None else {"single": x, "double": 2 * x}
+        return (x, 2 * x) if output_picker is None else {"single": x, "double": 2 * x}
 
     @pipefunc(output_name="sum")
     def post_process(single: np.ndarray[Any, np.dtype[np.int_]]) -> int:

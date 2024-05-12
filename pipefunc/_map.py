@@ -229,7 +229,6 @@ def _execute_map_spec(
     n = np.prod(shape)
     file_arrays = []
     output_arrays: list[np.ndarray] = []
-    output_paths: list[list[Path]] = []
     output_names = at_least_tuple(func.output_name)
     for output_name in output_names:
         file_array_path = _file_array_path(output_name, run_folder)
@@ -237,7 +236,6 @@ def _execute_map_spec(
         _dump_file_array_shape(file_array_path, shape)
         file_arrays.append(file_array)
         output_arrays.append(np.empty(n, dtype=object))
-        output_paths.append([])
 
     for index in range(n):
         selected = _select_kwargs(func, kwargs, shape, index)
@@ -248,11 +246,10 @@ def _execute_map_spec(
             raise ValueError(msg) from e
 
         output_key = func.mapspec.output_key(shape, index)
-        for output_name, file_array, output_array, _output_paths in zip(
+        for output_name, file_array, output_array in zip(
             output_names,
             file_arrays,
             output_arrays,
-            output_paths,
         ):
             _output = (
                 func.output_picker(output, output_name)
@@ -261,9 +258,8 @@ def _execute_map_spec(
             )
             file_array.dump(output_key, _output)
             output_array[index] = _output
-            _output_paths.append(file_array._key_to_file(output_key))
     output_arrays = [x.reshape(shape) for x in output_arrays]
-    return output_arrays, output_paths
+    return output_arrays if isinstance(func.output_name, tuple) else output_arrays[0]
 
 
 class Result(NamedTuple):
@@ -293,28 +289,31 @@ def run_pipeline(
         for func in gen:
             kwargs = _func_kwargs(func, pipeline, output_types, input_paths, run_folder)
             if func.mapspec:
-                output, _ = _execute_map_spec(func, kwargs, run_folder)
+                output = _execute_map_spec(func, kwargs, run_folder)
             else:
                 try:
                     output = func(**kwargs)
                 except Exception as e:
                     msg = f"Error in {func.__name__} with {kwargs=}"
                     raise ValueError(msg) from e
-                if isinstance(func.output_name, str):
-                    output = [output]
-                for output_name, _output in zip(
-                    at_least_tuple(func.output_name),
-                    output,
-                ):
-                    # TODO: use output_picker here
-                    _dump_output(_output, output_name, run_folder)
+
+                if isinstance(func.output_name, tuple):
+                    new_output = []
+                    for output_name in func.output_name:
+                        _output = func.output_picker(output, output_name)
+                        new_output.append(_output)
+                        _dump_output(_output, output_name, run_folder)
+                    output = new_output
+                else:
+                    _dump_output(output, func.output_name, run_folder)
+
             if isinstance(func.output_name, str):
                 outputs.append(
                     Result(
                         function=func.__name__,
                         kwargs=kwargs,
                         output_name=func.output_name,
-                        output=output[0],
+                        output=output,
                     ),
                 )
             else:
