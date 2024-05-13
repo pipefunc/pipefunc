@@ -219,12 +219,12 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         ],
     )
     inputs = {"shape": (1, 2, 3)}
-    manual_shapes = {"array": (1, 2, 3)}
+    manual_shapes: dict[str, tuple[int, ...]] = {"array": (1, 2, 3)}
     results = run_pipeline(
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes=manual_shapes,
+        manual_shapes=manual_shapes,  # type: ignore[arg-type]
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
@@ -334,8 +334,8 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
 
 
 def test_validate_mapspec():
-    def f(x: int) -> int:  # noqa: ARG001
-        pass
+    def f(x: int) -> int:
+        return x
 
     with pytest.raises(
         ValueError,

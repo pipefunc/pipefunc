@@ -115,7 +115,7 @@ def _json_serializable(obj: Any) -> Any:
 def _dump_run_info(
     function_paths: list[Path],
     input_paths: dict[str, Path],
-    shapes: dict[str, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
 ) -> None:
     path = run_folder / "run_info.json"
@@ -170,7 +170,7 @@ def _func_kwargs(
         Literal["single", "single_indexable", "file_array"],
     ],
     input_paths: dict[str, Path],
-    shapes: dict[str, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     kwargs = {}
@@ -259,7 +259,7 @@ def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     manual_shapes: dict[str, tuple[int, ...]] | None = None,
-) -> dict[str, tuple[int, ...]]:
+) -> dict[_OUTPUT_TYPE, tuple[int, ...]]:
     map_parameters: set[str] = set()
     for func in pipeline.functions:
         if func.mapspec:
