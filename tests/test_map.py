@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pytest
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._map import map_shapes, run_pipeline
 
 if TYPE_CHECKING:
@@ -179,7 +179,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
 
     pipeline = Pipeline(
         [
-            (simulate, "x[i] -> result[i]"),
+            (simulate, "x[i] -> single[i], double[i]"),
             post_process,
         ],
     )
@@ -331,3 +331,28 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
+
+
+def test_validate_mapspec():
+    def f(x: int) -> int:  # noqa: ARG001
+        pass
+
+    with pytest.raises(
+        ValueError,
+        match="The input of the function `f` should match the input of the MapSpec",
+    ):
+        PipeFunc(
+            f,
+            output_name="y",
+            mapspec="x[i], yolo[i] -> y[i]",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="The output of the function `f` should match the output of the MapSpec",
+    ):
+        PipeFunc(
+            f,
+            output_name="y",
+            mapspec="x[i] -> yolo[i]",
+        )

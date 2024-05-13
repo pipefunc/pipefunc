@@ -4,7 +4,7 @@ import functools
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal, NamedTuple, Tuple, Union
 
 import cloudpickle
 import networkx as nx
@@ -14,6 +14,8 @@ from pipefunc import PipeFunc, Pipeline
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
 from pipefunc._utils import at_least_tuple
+
+_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 
 
 def _func_path(func: PipeFunc, folder: Path) -> Path:
@@ -68,12 +70,13 @@ def _dump_output(
     func: PipeFunc,
     output: Any,
     run_folder: Path,
-) -> None:
+) -> Any:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
     if isinstance(func.output_name, tuple):
         new_output = []
         for output_name in func.output_name:
+            assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
             path = _output_path(output_name, folder)
@@ -119,7 +122,7 @@ def _dump_run_info(
     info = {
         "functions": _json_serializable(function_paths),
         "inputs": _json_serializable(input_paths),
-        # "shapes": _json_serializable(shapes),
+        "shapes": _json_serializable(list(shapes.items())),
     }
     with path.open("w") as f:
         json.dump(info, f, indent=4)
@@ -212,7 +215,7 @@ def _select_kwargs(
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shapes: dict[str, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
@@ -261,7 +264,8 @@ def map_shapes(
     for func in pipeline.functions:
         if func.mapspec:
             map_parameters.update(func.mapspec.parameters)
-            map_parameters.add(func.mapspec.output.name)
+            for output in func.mapspec.outputs:
+                map_parameters.add(output.name)
 
     generations = list(nx.topological_generations(pipeline.graph))
     input_parameters = set(generations[0])
@@ -291,8 +295,8 @@ def map_shapes(
                 if isinstance(func.output_name, tuple):
                     for output_name in func.output_name:
                         shapes[output_name] = output_shape
-    # TODO: see _validate_mapspec
-    # assert all(k in shapes for k in map_parameters)
+
+    assert all(k in shapes for k in map_parameters)
     return shapes
 
 

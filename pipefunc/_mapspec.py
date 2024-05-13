@@ -80,14 +80,18 @@ class MapSpec:
     """
 
     inputs: tuple[ArraySpec, ...]
-    output: ArraySpec
+    outputs: tuple[ArraySpec, ...]
 
     def __post_init__(self) -> None:
-        if any(x is None for x in self.output.axes):
+        if any(x is None for x in self.outputs[0].axes):
             msg = "Output array must have all axes indexed (no ':')."
             raise ValueError(msg)
 
-        output_indices = set(self.output.indices)
+        if not all(x.indices == self.outputs[0].indices for x in self.outputs[1:]):
+            msg = "All output arrays must have identical indices."
+            raise ValueError(msg)
+
+        output_indices = set(self.outputs[0].indices)
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
         if extra_indices := output_indices - input_indices:
@@ -111,7 +115,7 @@ class MapSpec:
     @property
     def indices(self) -> tuple[str, ...]:
         """Return the index names for this MapSpec."""
-        return self.output.indices
+        return self.outputs[0].indices  # All outputs have the same indices
 
     def shape(self, shapes: dict[str, tuple[int, ...]]) -> tuple[int, ...]:
         """Return the shape of the output of this MapSpec.
@@ -142,7 +146,7 @@ class MapSpec:
             return shapes[array.name][axis]
 
         shape = []
-        for index in self.output.indices:
+        for index in self.outputs[0].indices:  # All outputs have the same indices
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             dim, *rest = (get_dim(x, index) for x in relevant_arrays)
             if any(dim != x for x in rest):
@@ -214,7 +218,9 @@ class MapSpec:
         }
 
     def __str__(self) -> str:
-        return f"{', '.join(map(str, self.inputs))} -> {self.output}"
+        inputs = ", ".join(map(str, self.inputs))
+        outputs = ", ".join(map(str, self.outputs))
+        return f"{inputs} -> {outputs}"
 
     @classmethod
     def from_string(cls: type[MapSpec], expr: str) -> MapSpec:
@@ -227,12 +233,8 @@ class MapSpec:
 
         inputs = _parse_indexed_arrays(in_)
         outputs = _parse_indexed_arrays(out_)
-        if len(outputs) != 1:
-            msg = f"Expected a single output, but got {len(outputs)}: {outputs}"
-            raise ValueError(msg)
-        (output,) = outputs
 
-        return cls(inputs, output)
+        return cls(inputs, outputs)
 
     def to_string(self) -> str:
         """Return a faithful representation of a MapSpec as a string."""

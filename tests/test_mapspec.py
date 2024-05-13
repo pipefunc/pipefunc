@@ -63,47 +63,47 @@ def test_arrayspec_validate():
 def test_mapspec_init():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
-    spec = MapSpec(inputs, output)
+    spec = MapSpec(inputs, (output,))
     assert spec.inputs == inputs
-    assert spec.output == output
+    assert spec.outputs == (output,)
 
     with pytest.raises(
         ValueError,
         match=re.escape("Output array must have all axes indexed (no ':')."),
     ):
-        MapSpec(inputs, ArraySpec("q", ("i", None, "k")))
+        MapSpec(inputs, (ArraySpec("q", ("i", None, "k")),))
 
     with pytest.raises(
         ValueError,
         match="Output array has indices that do not appear in the input: {'l'}",
     ):
-        MapSpec(inputs, ArraySpec("q", ("i", "j", "l")))
+        MapSpec(inputs, (ArraySpec("q", ("i", "j", "l")),))
 
     with pytest.raises(
         ValueError,
         match="Input array have indices that do not appear in the output: {'k'}",
     ):
-        MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), output)
+        MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), (output,))
 
 
 def test_mapspec_parameters():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
-    spec = MapSpec(inputs, output)
+    spec = MapSpec(inputs, (output,))
     assert spec.parameters == ("a", "b")
 
 
 def test_mapspec_indices():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
-    spec = MapSpec(inputs, output)
+    spec = MapSpec(inputs, (output,))
     assert spec.indices == ("i", "j")
 
 
 def test_mapspec_shape():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
-    spec = MapSpec(inputs, output)
+    spec = MapSpec(inputs, (output,))
     shapes = {"a": (3, 4), "b": (3, 4)}
     assert spec.shape(shapes) == (3, 4)
 
@@ -159,13 +159,19 @@ def test_mapspec_from_string():
     spec = MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k]")
     assert isinstance(spec, MapSpec)
     assert len(spec.inputs) == 3
-    assert spec.output == ArraySpec("q", ("i", "j", "k"))
+    assert spec.outputs[0] == ArraySpec("q", ("i", "j", "k"))
 
     with pytest.raises(ValueError, match="Expected expression of form"):
         MapSpec.from_string("a[i, j], b[i, j], c[k]")
 
-    with pytest.raises(ValueError, match="Expected a single output, but got 2"):
+    with pytest.raises(
+        ValueError,
+        match="All output arrays must have identical indices.",
+    ):
         MapSpec.from_string("a[i, j], b[i, j], c[k] -> q[i, j, k], r[i]")
+
+    multi_output = MapSpec.from_string("a[i, j], b[i, j] -> q[i, j], r[i, j]")
+    assert len(multi_output.outputs) == 2
 
 
 def test_mapspec_to_string():
