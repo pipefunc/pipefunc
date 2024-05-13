@@ -17,14 +17,7 @@ import functools
 import inspect
 import os
 import sys
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 
 import cloudpickle
 
