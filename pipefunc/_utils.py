@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 from pathlib import Path
@@ -28,8 +29,15 @@ def generate_filename_from_dict(obj: dict[str, Any], suffix: str = ".pickle") ->
     return Path(f"{keys}__{str_hash}{suffix}")
 
 
-def load(path: Path) -> Any:
-    """Load a cloudpickled object from a path."""
+def load(path: Path, *, cache: bool = False) -> Any:
+    """Load a cloudpickled object from a path.
+
+    If `cache` is True, the object will be cached in memory.
+    """
+    if cache:
+        cache_key = _get_cache_key(path)
+        return _cached_load(cache_key)
+
     with path.open("rb") as f:
         return cloudpickle.load(f)
 
@@ -38,3 +46,17 @@ def dump(obj: Any, path: Path) -> None:
     """Dump an object to a path using cloudpickle."""
     with path.open("wb") as f:
         cloudpickle.dump(obj, f)
+
+
+def _get_cache_key(path: Path) -> tuple:
+    """Generate a cache key based on the path, file modification time, and file size."""
+    resolved_path = path.resolve()
+    stats = resolved_path.stat()
+    return (str(resolved_path), stats.st_mtime, stats.st_size)
+
+
+@functools.lru_cache(maxsize=128)
+def _cached_load(cache_key: tuple) -> Any:
+    """Load a cloudpickled object using a cache key."""
+    path = Path(cache_key[0])
+    return load(path, cache=False)

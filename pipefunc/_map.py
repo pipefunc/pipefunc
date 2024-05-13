@@ -52,7 +52,7 @@ def _dump_inputs(
 
 def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
     path = input_paths[name]
-    return load(path)
+    return load(path, cache=True)
 
 
 def _output_path(output_name: str, folder: Path) -> Path:
