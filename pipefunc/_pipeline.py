@@ -226,6 +226,8 @@ class Pipeline:
         for f in functions:
             self.add(f)
         self._init_internal_cache()
+        self._cache_type = cache_type
+        self._cache_kwargs = cache_kwargs
         self._set_cache(cache_type, lazy, cache_kwargs)
 
     def _init_internal_cache(self) -> None:
@@ -241,6 +243,8 @@ class Pipeline:
             del self.leaf_nodes
         with contextlib.suppress(AttributeError):
             del self.unique_leaf_node
+        with contextlib.suppress(AttributeError):
+            del self.defaults
 
     def _set_cache(
         self,
@@ -303,17 +307,23 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(self, f: PipeFunc) -> None:
+    def add(
+        self,
+        f: PipeFunc | Callable,
+    ) -> PipeFunc:
         """Add a function to the pipeline.
 
         Parameters
         ----------
         f
             The function to add to the pipeline.
+        profile
+            Flag indicating whether profiling information should be collected.
 
         """
         if not isinstance(f, PipeFunc):
             f = PipeFunc(f, output_name=f.__name__)
+
         self.functions.append(f)
 
         self.output_to_func[f.output_name] = f
@@ -323,10 +333,12 @@ class Pipeline:
 
         if self.profile is not None:
             f.set_profiling(enable=self.profile)
+
         if self.debug is not None:
             f.debug = self.debug
 
         self._init_internal_cache()  # reset cache
+        return f
 
     def drop(
         self,
@@ -884,6 +896,13 @@ class Pipeline:
         return mapping
 
     @functools.cached_property
+    def defaults(self) -> dict[str, Any]:
+        defaults = {}
+        for func in self.functions:
+            defaults.update(func.defaults)
+        return defaults
+
+    @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:
         """Return the unique leaf node of the pipeline graph."""
         leaf_nodes = self.leaf_nodes
@@ -1148,7 +1167,7 @@ class Pipeline:
                 if len(outputs) == 1:
                     outputs = outputs[0]  # type: ignore[assignment]
                 funcs = [f, *combinable_nodes[f]]
-                mini_pipeline = Pipeline(funcs, debug=False, profile=False)
+                mini_pipeline = Pipeline(funcs)  # type: ignore[arg-type]
                 func = mini_pipeline.func(f.output_name).call_full_output
                 f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
                 f_combined.__name__ = f"combined_{f.__name__}"
@@ -1167,7 +1186,7 @@ class Pipeline:
                 new_functions.append(f_pipefunc)
             elif f not in skip:
                 new_functions.append(f)
-        return Pipeline(new_functions)
+        return Pipeline(new_functions)  # type: ignore[arg-type]
 
     def all_execution_orders(
         self,
@@ -1301,6 +1320,17 @@ class Pipeline:
                 )
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
+
+    def copy(self) -> Pipeline:
+        """Return a copy of the pipeline."""
+        return Pipeline(
+            self.functions,  # type: ignore[arg-type]
+            lazy=self.lazy,
+            debug=self._debug,
+            profile=self._profile,
+            cache_type=self._cache_type,
+            cache_kwargs=self._cache_kwargs,
+        )
 
 
 def _update_all_results(
