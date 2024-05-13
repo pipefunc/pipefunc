@@ -48,9 +48,15 @@ def _dump_functions(pipeline: Pipeline, run_folder: Path) -> list[Path]:
     return paths
 
 
-def _dump_inputs(inputs: dict[str, Any], run_folder: Path) -> dict[str, Path]:
+def _dump_inputs(
+    inputs: dict[str, Any],
+    defaults: dict[str, Any],
+    run_folder: Path,
+) -> dict[str, Path]:
     folder = run_folder / "inputs"
     folder.mkdir(parents=True, exist_ok=True)
+    for k, v in defaults.items():
+        inputs.setdefault(k, v)
     paths = {}
     for k, v in inputs.items():
         path = folder / f"{k}.cloudpickle"
@@ -287,8 +293,7 @@ def run_pipeline(
     if manual_shapes is None:
         manual_shapes = {}
     function_paths = _dump_functions(pipeline, run_folder)
-    inputs.update(pipeline.defaults)
-    input_paths = _dump_inputs(inputs, run_folder)
+    input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
     shapes = map_shapes(pipeline, inputs, manual_shapes)
     _dump_run_info(function_paths, input_paths, shapes, manual_shapes, run_folder)
 
