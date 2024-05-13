@@ -74,7 +74,7 @@ def _dump_output(
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
     if isinstance(func.output_name, tuple):
-        new_output = []
+        new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
