@@ -4,16 +4,18 @@ import functools
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import cloudpickle
 import networkx as nx
 import numpy as np
 
-from pipefunc import PipeFunc, Pipeline
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
 from pipefunc._utils import at_least_tuple
+
+if TYPE_CHECKING:
+    from pipefunc import PipeFunc, Pipeline
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 
@@ -133,68 +135,27 @@ def _file_array_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / output_name
 
 
-def _output_types(
-    pipeline: Pipeline,
-) -> dict[str, Literal["single", "single_indexable", "file_array"]]:
-    generations = list(nx.topological_generations(pipeline.graph))
-    assert all(isinstance(x, str) for x in generations[0])
-    otypes: dict[str, Literal["single", "single_indexable", "file_array"]] = {}
-    for gen in generations:
-        for f in gen:
-            if isinstance(f, str):
-                otypes[f] = "single"
-                continue
-            assert isinstance(f, PipeFunc)
-            if f.mapspec is None:
-                for output_name in at_least_tuple(f.output_name):
-                    otypes[output_name] = "single"
-            else:
-                for output_name in at_least_tuple(f.output_name):
-                    otypes[output_name] = "file_array"
-            for p in f.parameters:
-                if (
-                    otypes.get(p) == "single"
-                    and f.mapspec is not None
-                    and p in f.mapspec.parameters  # type: ignore[union-attr]
-                ):
-                    otypes[p] = "single_indexable"
-    assert all(isinstance(x, str) for x in otypes)
-    return otypes
-
-
 def _func_kwargs(
     func: PipeFunc,
-    pipeline: Pipeline,
-    output_types: dict[
-        str,
-        Literal["single", "single_indexable", "file_array"],
-    ],
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    manual_shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     kwargs = {}
     for parameter in func.parameters:
-        output_name = (
-            parameter
-            if parameter in output_types
-            else pipeline.output_to_func[parameter].output_name
-        )
-        assert isinstance(output_name, str)
-        output_type = output_types[output_name]
         if parameter in input_paths:
-            assert output_type in ("single", "single_indexable")
             value = _load_input(parameter, input_paths)
             kwargs[parameter] = value
-        elif output_type in ("single_indexable", "single"):
-            value = _load_output(output_name, run_folder)
-            kwargs[output_name] = value
+        elif parameter in manual_shapes or parameter not in shapes:
+            value = _load_output(parameter, run_folder)
+            kwargs[parameter] = value
         else:
-            assert output_type == "file_array"
-            file_array_path = _file_array_path(output_name, run_folder)
-            shape = shapes[output_name]
+            file_array_path = _file_array_path(parameter, run_folder)
+            print(f"{parameter=}, {manual_shapes=}, {shapes=}")
+            shape = shapes[parameter]
             file_array = FileArray(file_array_path, shape)
-            kwargs[output_name] = file_array.to_array()
+            kwargs[parameter] = file_array.to_array()
     return kwargs
 
 
@@ -260,12 +221,9 @@ def map_shapes(
     inputs: dict[str, Any],
     manual_shapes: dict[str, tuple[int, ...]] | None = None,
 ) -> dict[_OUTPUT_TYPE, tuple[int, ...]]:
-    map_parameters: set[str] = set()
-    for func in pipeline.functions:
-        if func.mapspec:
-            map_parameters.update(func.mapspec.parameters)
-            for output in func.mapspec.outputs:
-                map_parameters.add(output.name)
+    if manual_shapes is None:
+        manual_shapes = {}
+    map_parameters: set[str] = pipeline.map_parameters
 
     generations = list(nx.topological_generations(pipeline.graph))
     input_parameters = set(generations[0])
@@ -273,8 +231,6 @@ def map_shapes(
     shapes = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
-    if manual_shapes is not None:
-        shapes.update(manual_shapes)
 
     for gen in generations[1:]:
         for func in gen:
@@ -283,6 +239,8 @@ def map_shapes(
                 for p in func.mapspec.parameters:
                     if shape := shapes.get(p):
                         input_shapes[p] = shape
+                    elif p in manual_shapes:
+                        input_shapes[p] = manual_shapes[p]
                     else:
                         msg = (
                             f"Parameter `{p}` is used in map but its shape"
@@ -296,7 +254,7 @@ def map_shapes(
                     for output_name in func.output_name:
                         shapes[output_name] = output_shape
 
-    assert all(k in shapes for k in map_parameters)
+    assert all(k in shapes for k in map_parameters if k not in manual_shapes)
     return shapes
 
 
@@ -315,17 +273,12 @@ def run_pipeline(
 ) -> list[Result]:
     run_folder = Path(run_folder)
     _clean_run_folder(run_folder)
+    if manual_shapes is None:
+        manual_shapes = {}
     function_paths = _dump_functions(pipeline, run_folder)
     input_paths = _dump_inputs(inputs, run_folder)
     shapes = map_shapes(pipeline, inputs, manual_shapes)
     _dump_run_info(function_paths, input_paths, shapes, run_folder)
-    output_types = _output_types(pipeline)
-    if manual_shapes is not None:
-        assert all(
-            k in manual_shapes
-            for k, v in output_types.items()
-            if v == "single_indexable"
-        )
 
     generations = list(nx.topological_generations(pipeline.graph))
     assert all(isinstance(x, str) for x in generations[0])
@@ -335,10 +288,9 @@ def run_pipeline(
         for func in gen:
             kwargs = _func_kwargs(
                 func,
-                pipeline,
-                output_types,
                 input_paths,
                 shapes,
+                manual_shapes,
                 run_folder,
             )
             if func.mapspec:

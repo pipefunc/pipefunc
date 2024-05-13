@@ -160,10 +160,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="is used in map but"):
         map_shapes(pipeline, inputs)
 
-    assert map_shapes(pipeline, inputs, {"seed": (4,)}) == {
-        "seed": (4,),
-        "result": (4,),
-    }
+    assert map_shapes(pipeline, inputs, {"seed": (4,)}) == {"result": (4,)}
 
 
 @pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])
@@ -228,10 +225,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
-    assert map_shapes(pipeline, inputs, manual_shapes) == {
-        "array": (1, 2, 3),
-        "vector": (1,),
-    }
+    assert map_shapes(pipeline, inputs, manual_shapes) == {"vector": (1,)}
 
 
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
@@ -322,15 +316,15 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "y": 0.2,
         "coarse_mesh_size": 0.05,
     }
-    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
-    assert results[-1].output == 1.0
-    assert results[-1].output_name == "average_charge"
     assert map_shapes(pipeline, inputs) == {
         "V_right": (2,),
         "V_left": (3,),
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output == 1.0
+    assert results[-1].output_name == "average_charge"
 
 
 def test_validate_mapspec():
