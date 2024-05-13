@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._map import run_pipeline
+from pipefunc._map import map_shapes, run_pipeline
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,6 +34,7 @@ def test_simple(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
+    assert map_shapes(pipeline, inputs) == {"seed": (4,), "result": (4,)}
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
@@ -58,6 +59,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [24, 30, 36, 42]
+    assert map_shapes(pipeline, inputs) == {"seed": (3, 4), "result": (3, 4)}
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
@@ -82,6 +84,11 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [12, 44, 76]
+    assert map_shapes(pipeline, inputs) == {
+        "seed": (3, 4),
+        "result": (3, 4),
+        "sum": (3,),
+    }
 
 
 def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
@@ -113,6 +120,11 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     assert results[-1].output_name == "prod"
     assert isinstance(results[-1].output, np.int_)
     assert results[-1].output == 1961990553600
+    assert map_shapes(pipeline, inputs) == {
+        "seed": (3, 4),
+        "result": (3, 4),
+        "sum": (3,),
+    }
 
 
 def test_simple_from_step(tmp_path: Path) -> None:
@@ -140,6 +152,13 @@ def test_simple_from_step(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
+    with pytest.raises(ValueError, match="is used in map but"):
+        map_shapes(pipeline, inputs)
+
+    assert map_shapes(pipeline, inputs, {"seed": (4,)}) == {
+        "seed": (4,),
+        "result": (4,),
+    }
 
 
 @pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])
@@ -164,6 +183,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
+    assert map_shapes(pipeline, inputs) == {"x": (4,), ("single", "double"): (4,)}
 
 
 def test_simple_from_step_nd(tmp_path: Path) -> None:
@@ -192,6 +212,10 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
+    assert map_shapes(pipeline, inputs, {"array": (1, 2, 3)}) == {
+        "array": (1, 2, 3),
+        "vector": (1,),
+    }
 
 
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
@@ -285,3 +309,9 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 1.0
     assert results[-1].output_name == "average_charge"
+    assert map_shapes(pipeline, inputs) == {
+        "V_right": (2,),
+        "V_left": (3,),
+        "electrostatics": (3, 2),
+        "charge": (3, 2),
+    }

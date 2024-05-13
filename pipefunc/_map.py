@@ -12,7 +12,7 @@ import numpy as np
 
 from pipefunc import PipeFunc, Pipeline
 from pipefunc._filearray import FileArray
-from pipefunc._mapspec import MapSpec
+from pipefunc._mapspec import MapSpec, array_shape
 from pipefunc._utils import at_least_tuple
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
@@ -260,6 +260,46 @@ def _execute_map_spec(
             output_array[index] = _output
     output_arrays = [x.reshape(shape) for x in output_arrays]
     return output_arrays if isinstance(func.output_name, tuple) else output_arrays[0]
+
+
+def map_shapes(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    manual_shapes: dict[str, tuple[int, ...]] | None = None,
+) -> dict[str, tuple[int, ...]]:
+    map_parameters: set[str] = set()
+    for func in pipeline.functions:
+        if func.mapspec:
+            map_parameters.update(func.mapspec.parameters)
+            map_parameters.add(func.mapspec.output.name)
+
+    generations = list(nx.topological_generations(pipeline.graph))
+    input_parameters = set(generations[0])
+
+    shapes = {
+        p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
+    }
+    if manual_shapes is not None:
+        shapes.update(manual_shapes)
+
+    for gen in generations[1:]:
+        for func in gen:
+            if func.mapspec:
+                input_shapes = {}
+                for p in func.mapspec.parameters:
+                    shape = shapes.get(p)
+                    if shape is not None:
+                        input_shapes[p] = shape
+                    else:
+                        msg = (
+                            f"Parameter `{p}` is used in map but its shape"
+                            " cannot be inferred from the inputs."
+                            " Provide the shape manually in `manual_shapes`."
+                        )
+                        raise ValueError(msg)
+                shapes[func.output_name] = func.mapspec.shape(input_shapes)
+
+    return shapes
 
 
 class Result(NamedTuple):
