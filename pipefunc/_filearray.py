@@ -68,9 +68,10 @@ class FileArray:
         """Return the rank of the array."""
         return len(self.shape)
 
-    def _normalize_key(self, key: tuple[int, ...]) -> tuple[int, ...]:
+    def _normalize_key(self, key: tuple[int | slice, ...]) -> tuple[int | slice, ...]:
         if not isinstance(key, tuple):
             key = (key,)
+
         if len(key) != self.rank:
             msg = (
                 f"Too many indices for array: array is {self.rank}-dimensional, "
@@ -78,20 +79,16 @@ class FileArray:
             )
             raise IndexError(msg)
 
-        if any(isinstance(k, slice) for k in key):
-            msg = "Cannot yet slice subarrays"
-            raise NotImplementedError(msg)
-
-        normalized_key = []
-        for axis, k in enumerate(key):
-            axis_size = self.shape[axis]
-            normalized_k = k if k >= 0 else (axis_size - k)
-            if not (0 <= normalized_k < axis_size):
-                msg = (
-                    f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
-                )
-                raise IndexError(msg)
-            normalized_key.append(k)
+        normalized_key: list[int | slice] = []
+        for axis, (axis_size, k) in enumerate(zip(self.shape, key)):
+            if isinstance(k, slice):
+                normalized_key.append(k)
+            else:
+                normalized_k = k if k >= 0 else (k + axis_size)
+                if not (0 <= normalized_k < axis_size):
+                    msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
+                    raise IndexError(msg)
+                normalized_key.append(normalized_k)
 
         return tuple(normalized_key)
 
@@ -110,17 +107,43 @@ class FileArray:
             self._key_to_file(x) for x in itertools.product(*map(range, self.shape))
         )
 
-    def __getitem__(self, key: tuple[int, ...]) -> np.ma.core.MaskedArray:
-        key = self._normalize_key(key)
-        if _key_has_slice(key):
-            # XXX: need to figure out strides in order to implement this.  # noqa: FIX003, TD001
-            msg = "Cannot yet slice subarrays"
-            raise NotImplementedError(msg)
+    def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
+        return [
+            range(*k.indices(self.shape[i]))
+            if isinstance(k, slice)
+            else range(k, k + 1)
+            for i, k in enumerate(key)
+        ]
 
-        f = self._key_to_file(key)
-        if not f.is_file():
-            return np.ma.core.masked
-        return load(f)
+    def __getitem__(self, key: tuple[int | slice, ...]) -> np.ma.core.MaskedArray:
+        key = self._normalize_key(key)
+
+        if any(isinstance(k, slice) for k in key):
+            slice_indices = self._slice_indices(key)
+            sliced_data = []
+
+            for index in itertools.product(*slice_indices):
+                file = self._key_to_file(index)
+                if file.is_file():
+                    sliced_data.append(load(file))
+                else:
+                    sliced_data.append(np.ma.masked)
+
+            sliced_array = np.ma.array(sliced_data, dtype=object)
+
+            # Determine the new shape based on the sliced dimensions
+            new_shape = tuple(
+                len(range_) if isinstance(k, slice) else None
+                for k, range_ in zip(key, slice_indices)
+            )
+            new_shape = tuple(filter(None, new_shape))
+
+            return sliced_array.reshape(new_shape)
+
+        file = self._key_to_file(key)  # type: ignore[arg-type]
+        if not file.is_file():
+            return np.ma.masked
+        return load(file)
 
     def to_array(self) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
@@ -144,7 +167,7 @@ class FileArray:
         mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
         return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
-    def dump(self, key: tuple[int, ...], value: Any) -> None:
+    def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the file associated with 'key'.
 
         Examples
@@ -154,15 +177,13 @@ class FileArray:
 
         """
         key = self._normalize_key(key)
-        if not _key_has_slice(key):
-            return dump(value, self._key_to_file(key))
+        if not any(isinstance(k, slice) for k in key):
+            dump(value, self._key_to_file(key))  # type: ignore[arg-type]
+            return
 
-        msg = "Cannot yet dump subarrays"
-        raise NotImplementedError(msg)
-
-
-def _key_has_slice(key: tuple[int, ...]) -> bool:
-    return any(isinstance(x, slice) for x in key)
+        for index in itertools.product(*self._slice_indices(key)):
+            file = self._key_to_file(index)
+            dump(value, file)
 
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
