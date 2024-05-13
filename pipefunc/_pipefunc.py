@@ -37,6 +37,8 @@ if sys.version_info < (3, 9):  # pragma: no cover
 else:
     from collections.abc import Callable
 
+from pipefunc._mapspec import MapSpec
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -86,6 +88,10 @@ class PipeFunc(Generic[T]):
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+    mapspec
+        This is a specification for mapping that dictates how input values should
+        be merged together. If None, the default behavior is that the input directly
+        maps to the output.
 
     Returns
     -------
@@ -117,6 +123,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         save: bool | None = None,
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
+        mapspec: str | MapSpec | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         _update_wrapper(self, func)
@@ -125,6 +132,9 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.save_function = save_function
+        self.mapspec = (
+            MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+        )
         self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
@@ -145,6 +155,7 @@ class PipeFunc(Generic[T]):
         }
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
+        self._validate_mapspec()
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -256,8 +267,8 @@ class PipeFunc(Generic[T]):
             A dictionary containing the picklable state of the object.
 
         """
-        state = self.__dict__.copy()
-        state["func"] = cloudpickle.dumps(state.pop("func"))
+        state = {k: v for k, v in self.__dict__.items() if k != "func"}
+        state["func"] = cloudpickle.dumps(self.func)
         return state
 
     def __setstate__(self, state: dict) -> None:
@@ -275,6 +286,37 @@ class PipeFunc(Generic[T]):
         self.__dict__.update(state)
         self.func = cloudpickle.loads(self.func)
 
+    def _validate_mapspec(self) -> None:
+        if self.mapspec is None:
+            return
+
+        if not isinstance(self.mapspec, MapSpec):
+            msg = (
+                "The 'mapspec' argument should be an instance of MapSpec,"
+                f" not {type(self.mapspec)}."
+            )
+            raise TypeError(msg)
+
+        mapspec_input_names = {x.name for x in self.mapspec.inputs}
+        input_names = set(self.parameters)
+        if extra := mapspec_input_names - input_names:
+            msg = (
+                f"The input of the function `{self.__name__}` should match"
+                f" the input of the MapSpec `{self.mapspec}`:"
+                f" `{extra} not in {input_names}`."
+            )
+            raise ValueError(msg)
+
+        mapspec_output_names = {x.name for x in self.mapspec.outputs}
+        output_names = set(at_least_tuple(self.output_name))
+        if mapspec_output_names != output_names:
+            msg = (
+                f"The output of the function `{self.__name__}` should match"
+                f" the output of the MapSpec `{self.mapspec}`:"
+                f" `{mapspec_output_names} != {output_names}`."
+            )
+            raise ValueError(msg)
+
 
 def pipefunc(
     output_name: _OUTPUT_TYPE,
@@ -286,6 +328,7 @@ def pipefunc(
     cache: bool = False,
     save: bool | None = None,
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
+    mapspec: str | MapSpec | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator for tagging pipeline functions with a return identifier.
 
@@ -309,6 +352,10 @@ def pipefunc(
         Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+    mapspec
+        This is a specification for mapping that dictates how input values should
+        be merged together. If None, the default behavior is that the input directly
+        maps to the output.
 
     Returns
     -------
@@ -342,6 +389,7 @@ def pipefunc(
             cache=cache,
             save=save,
             save_function=save_function,
+            mapspec=mapspec,
         )
 
     return decorator

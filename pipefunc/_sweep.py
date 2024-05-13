@@ -99,7 +99,6 @@ class Sweep:
         constants: Mapping[str, Any] | None = None,
         derivers: dict[str, Callable[[dict[str, Any]], Any]] | None = None,
     ) -> None:
-        """Initialize the sweep."""
         self.items = items
         self.dims = dims
         self.exclude = exclude
