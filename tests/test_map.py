@@ -149,7 +149,12 @@ def test_simple_from_step(tmp_path: Path) -> None:
         ],
     )
     inputs = {"n": 4}
-    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    results = run_pipeline(
+        pipeline,
+        inputs,
+        run_folder=tmp_path,
+        manual_shapes={"seed": (4,)},
+    )
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     with pytest.raises(ValueError, match="is used in map but"):
@@ -183,7 +188,12 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
-    assert map_shapes(pipeline, inputs) == {"x": (4,), ("single", "double"): (4,)}
+    assert map_shapes(pipeline, inputs) == {
+        "x": (4,),
+        ("single", "double"): (4,),
+        "single": (4,),
+        "double": (4,),
+    }
 
 
 def test_simple_from_step_nd(tmp_path: Path) -> None:
@@ -209,10 +219,16 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         ],
     )
     inputs = {"shape": (1, 2, 3)}
-    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    manual_shapes = {"array": (1, 2, 3)}
+    results = run_pipeline(
+        pipeline,
+        inputs,
+        run_folder=tmp_path,
+        manual_shapes=manual_shapes,
+    )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
-    assert map_shapes(pipeline, inputs, {"array": (1, 2, 3)}) == {
+    assert map_shapes(pipeline, inputs, manual_shapes) == {
         "array": (1, 2, 3),
         "vector": (1,),
     }

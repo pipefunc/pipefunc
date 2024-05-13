@@ -102,7 +102,7 @@ def _json_serializable(obj: Any) -> Any:
         return str(obj.resolve())
     if isinstance(obj, dict):
         return {k: _json_serializable(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple)):
         return [_json_serializable(v) for v in obj]
     msg = f"Object {obj} is not JSON serializable"
     raise ValueError(msg)
@@ -111,12 +111,14 @@ def _json_serializable(obj: Any) -> Any:
 def _dump_run_info(
     function_paths: list[Path],
     input_paths: dict[str, Path],
+    shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> None:
     path = run_folder / "run_info.json"
     info = {
         "functions": _json_serializable(function_paths),
         "inputs": _json_serializable(input_paths),
+        # "shapes": _json_serializable(shapes),
     }
     with path.open("w") as f:
         json.dump(info, f, indent=4)
@@ -125,20 +127,6 @@ def _dump_run_info(
 def _file_array_path(output_name: str, run_folder: Path) -> Path:
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
-
-
-def _dump_file_array_shape(file_array_path: Path, shape: tuple[int, ...]) -> None:
-    path = file_array_path / "shape"
-    if not path.exists():
-        with path.open("w") as f:
-            json.dump(shape, f)
-
-
-@functools.lru_cache(maxsize=None)
-def _load_file_array_shape(file_array_path: Path) -> tuple[int, ...]:
-    path = file_array_path / "shape"
-    with path.open("r") as f:
-        return tuple(json.load(f))
 
 
 def _output_types(
@@ -178,6 +166,7 @@ def _func_kwargs(
         Literal["single", "single_indexable", "file_array"],
     ],
     input_paths: dict[str, Path],
+    shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     kwargs = {}
@@ -199,7 +188,7 @@ def _func_kwargs(
         else:
             assert output_type == "file_array"
             file_array_path = _file_array_path(output_name, run_folder)
-            shape = _load_file_array_shape(file_array_path)
+            shape = shapes[output_name]
             file_array = FileArray(file_array_path, shape)
             kwargs[output_name] = file_array.to_array()
     return kwargs
@@ -222,10 +211,11 @@ def _select_kwargs(
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
+    shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
-    shape = func.mapspec.shape_from_kwargs(kwargs)
+    shape = shapes[func.output_name]
     n = np.prod(shape)
     file_arrays = []
     output_arrays: list[np.ndarray] = []
@@ -233,7 +223,6 @@ def _execute_map_spec(
     for output_name in output_names:
         file_array_path = _file_array_path(output_name, run_folder)
         file_array = FileArray(file_array_path, shape)
-        _dump_file_array_shape(file_array_path, shape)
         file_arrays.append(file_array)
         output_arrays.append(np.empty(n, dtype=object))
 
@@ -297,7 +286,11 @@ def map_shapes(
                             " Provide the shape manually in `manual_shapes`."
                         )
                         raise ValueError(msg)
-                shapes[func.output_name] = func.mapspec.shape(input_shapes)
+                output_shape = func.mapspec.shape(input_shapes)
+                shapes[func.output_name] = output_shape
+                if isinstance(func.output_name, tuple):
+                    for output_name in func.output_name:
+                        shapes[output_name] = output_shape
 
     return shapes
 
@@ -313,12 +306,14 @@ def run_pipeline(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
+    manual_shapes: dict[str, tuple[int, ...]] | None = None,
 ) -> list[Result]:
     run_folder = Path(run_folder)
     _clean_run_folder(run_folder)
     function_paths = _dump_functions(pipeline, run_folder)
     input_paths = _dump_inputs(inputs, run_folder)
-    _dump_run_info(function_paths, input_paths, run_folder)
+    shapes = map_shapes(pipeline, inputs, manual_shapes)
+    _dump_run_info(function_paths, input_paths, shapes, run_folder)
     output_types = _output_types(pipeline)
 
     generations = list(nx.topological_generations(pipeline.graph))
@@ -327,9 +322,16 @@ def run_pipeline(
     for gen in generations[1:]:
         # These evaluations can happen in parallel
         for func in gen:
-            kwargs = _func_kwargs(func, pipeline, output_types, input_paths, run_folder)
+            kwargs = _func_kwargs(
+                func,
+                pipeline,
+                output_types,
+                input_paths,
+                shapes,
+                run_folder,
+            )
             if func.mapspec:
-                output = _execute_map_spec(func, kwargs, run_folder)
+                output = _execute_map_spec(func, kwargs, shapes, run_folder)
             else:
                 try:
                     output = func(**kwargs)
