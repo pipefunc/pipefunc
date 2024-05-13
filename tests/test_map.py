@@ -262,7 +262,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         return Geometry(x, y)
 
     if with_multiple_outputs:
-        # TODO: make work with multiple outputs
+
         @pipefunc(output_name=("mesh", "coarse_mesh"))
         def make_mesh(
             geo: Geometry,
