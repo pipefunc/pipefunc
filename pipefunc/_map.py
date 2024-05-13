@@ -156,8 +156,7 @@ def _func_kwargs(
             file_array_path = _file_array_path(parameter, run_folder)
             shape = shapes[parameter]
             file_array = FileArray(file_array_path, shape)
-            # TODO: do not load the whole array when it is not needed
-            kwargs[parameter] = file_array.to_array()
+            kwargs[parameter] = file_array
     return kwargs
 
 
@@ -172,7 +171,13 @@ def _select_kwargs(
         k: v[0] if len(v) == 1 else v
         for k, v in func.mapspec.input_keys(shape, index).items()
     }
-    return {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
+    _load_file_array(kwargs)
+    selected = {
+        k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()
+    }
+    # TODO: Load FileArray object AFTER selecting the correct index. Requires slicing
+    # to be implemented in FileArray.
+    return selected  # noqa: RET504
 
 
 def _execute_map_spec(
@@ -260,6 +265,12 @@ def map_shapes(
     return shapes
 
 
+def _load_file_array(kwargs: dict[str, Any]) -> None:
+    for k, v in kwargs.items():
+        if isinstance(v, FileArray):
+            kwargs[k] = v.to_array()
+
+
 class Result(NamedTuple):
     function: str
     kwargs: dict[str, Any]
@@ -299,6 +310,7 @@ def run_pipeline(
                 output = _execute_map_spec(func, kwargs, shapes, run_folder)
             else:
                 try:
+                    _load_file_array(kwargs)
                     output = func(**kwargs)
                 except Exception as e:
                     msg = f"Error in {func.__name__} with {kwargs=}"
