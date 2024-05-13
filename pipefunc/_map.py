@@ -156,6 +156,7 @@ def _func_kwargs(
             file_array_path = _file_array_path(parameter, run_folder)
             shape = shapes[parameter]
             file_array = FileArray(file_array_path, shape)
+            # TODO: do not load the whole array when it is not needed
             kwargs[parameter] = file_array.to_array()
     return kwargs
 
