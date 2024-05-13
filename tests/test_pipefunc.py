@@ -654,3 +654,12 @@ def test_full_output_cache():
     assert r == expected
     r = f(a=1, b=2, x=3)
     assert r == 18
+
+
+def test_output_picker_single_output():
+    @pipefunc(output_name=("y",), output_picker=dict.__getitem__)
+    def f(a, b):
+        return {"y": a + b, "_throw": 1}
+
+    pipeline = Pipeline([f])
+    assert pipeline("y", a=1, b=2) == 3

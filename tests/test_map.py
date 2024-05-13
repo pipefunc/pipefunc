@@ -145,7 +145,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
 @pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])
 def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     @pipefunc(output_name=("single", "double"), output_picker=output_picker)
-    def simulate(x: int) -> tuple[int, int]:
+    def simulate(x: int) -> tuple[int, int] | dict[str, int]:
         assert isinstance(x, int)
         return (x, 2 * x) if output_picker is None else {"single": x, "double": 2 * x}
 
@@ -261,8 +261,6 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
 
     @pipefunc(output_name="average_charge")
     def average_charge(charge: np.ndarray) -> float:
-        # .to_array() is a bit dumb; it loads in _all_ the data at once, but
-        # this is the simplest way, and in this example the data is not so large.
         return np.mean(charge)
 
     pipeline = Pipeline(

@@ -223,7 +223,7 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_folder: Path,
-) -> tuple[list[np.ndarray], list[list[Path]]]:
+) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = func.mapspec.shape_from_kwargs(kwargs)
     n = np.prod(shape)
