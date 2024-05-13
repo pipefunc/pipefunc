@@ -154,7 +154,6 @@ def _func_kwargs(
             kwargs[parameter] = value
         else:
             file_array_path = _file_array_path(parameter, run_folder)
-            print(f"{parameter=}, {manual_shapes=}, {shapes=}")
             shape = shapes[parameter]
             file_array = FileArray(file_array_path, shape)
             kwargs[parameter] = file_array.to_array()
