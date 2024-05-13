@@ -59,13 +59,10 @@ def _output_path(output_name: str, folder: Path) -> Path:
     return folder / f"{output_name}.cloudpickle"
 
 
-def _dump_output(
-    func: PipeFunc,
-    output: Any,
-    run_folder: Path,
-) -> Any:
+def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
+
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
@@ -78,6 +75,7 @@ def _dump_output(
     else:
         path = _output_path(func.output_name, folder)
         dump(output, path)
+
     return output
 
 
@@ -277,6 +275,7 @@ def run_pipeline(
     _clean_run_folder(run_folder)
     if manual_shapes is None:
         manual_shapes = {}
+    # TODO: consider removing the function & info dump because it is not used ATM
     function_paths = _dump_functions(pipeline, run_folder)
     input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
     shapes = map_shapes(pipeline, inputs, manual_shapes)
