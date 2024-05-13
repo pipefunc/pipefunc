@@ -67,21 +67,24 @@ def _output_path(output_name: str, folder: Path) -> Path:
 
 
 def _dump_output(
+    func: PipeFunc,
     output: Any,
-    output_name: _OUTPUT_TYPE,
     run_folder: Path,
-) -> list[Path]:
-    paths = []
-    output_names = at_least_tuple(output_name)
-    for _output_name in output_names:
-        assert isinstance(_output_name, str)
-        folder = run_folder / "outputs"
-        folder.mkdir(parents=True, exist_ok=True)
-        path = _output_path(_output_name, folder)
+) -> None:
+    folder = run_folder / "outputs"
+    folder.mkdir(parents=True, exist_ok=True)
+    if isinstance(func.output_name, tuple):
+        new_output = []
+        for output_name in func.output_name:
+            _output = func.output_picker(output, output_name)
+            new_output.append(_output)
+            path = _output_path(output_name, folder)
+            _dump(output, path)
+        output = new_output
+    else:
+        path = _output_path(func.output_name, folder)
         _dump(output, path)
-        paths.append(path)
-
-    return paths
+    return output
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
@@ -338,16 +341,7 @@ def run_pipeline(
                 except Exception as e:
                     msg = f"Error in {func.__name__} with {kwargs=}"
                     raise ValueError(msg) from e
-
-                if isinstance(func.output_name, tuple):
-                    new_output = []
-                    for output_name in func.output_name:
-                        _output = func.output_picker(output, output_name)
-                        new_output.append(_output)
-                        _dump_output(_output, output_name, run_folder)
-                    output = new_output
-                else:
-                    _dump_output(output, func.output_name, run_folder)
+                output = _dump_output(func, output, run_folder)
 
             if isinstance(func.output_name, str):
                 outputs.append(
