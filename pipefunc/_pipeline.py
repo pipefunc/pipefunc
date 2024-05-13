@@ -341,6 +341,7 @@ class Pipeline:
             if isinstance(mapspec, str):
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
+            f._validate_mapspec()
 
         self.functions.append(f)
 

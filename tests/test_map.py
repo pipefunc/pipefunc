@@ -214,7 +214,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     pipeline = Pipeline(
         [
             generate_array,
-            (simulate, "array[i, :, :] -> result[i]"),
+            (simulate, "array[i, :, :] -> vector[i]"),
             norm,
         ],
     )

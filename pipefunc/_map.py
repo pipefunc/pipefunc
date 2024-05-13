@@ -4,7 +4,7 @@ import functools
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, Tuple, Union
+from typing import Any, Literal, NamedTuple
 
 import cloudpickle
 import networkx as nx
@@ -14,8 +14,6 @@ from pipefunc import PipeFunc, Pipeline
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
 from pipefunc._utils import at_least_tuple
-
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 
 
 def _func_path(func: PipeFunc, folder: Path) -> Path:
@@ -279,8 +277,7 @@ def map_shapes(
             if func.mapspec:
                 input_shapes = {}
                 for p in func.mapspec.parameters:
-                    shape = shapes.get(p)
-                    if shape is not None:
+                    if shape := shapes.get(p):
                         input_shapes[p] = shape
                     else:
                         msg = (
@@ -294,7 +291,8 @@ def map_shapes(
                 if isinstance(func.output_name, tuple):
                     for output_name in func.output_name:
                         shapes[output_name] = output_shape
-
+    # TODO: see _validate_mapspec
+    # assert all(k in shapes for k in map_parameters)
     return shapes
 
 
@@ -318,6 +316,12 @@ def run_pipeline(
     shapes = map_shapes(pipeline, inputs, manual_shapes)
     _dump_run_info(function_paths, input_paths, shapes, run_folder)
     output_types = _output_types(pipeline)
+    if manual_shapes is not None:
+        assert all(
+            k in manual_shapes
+            for k, v in output_types.items()
+            if v == "single_indexable"
+        )
 
     generations = list(nx.topological_generations(pipeline.graph))
     assert all(isinstance(x, str) for x in generations[0])

@@ -135,6 +135,7 @@ class PipeFunc(Generic[T]):
         self.mapspec = (
             MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
         )
+        self._validate_mapspec()
         self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
@@ -284,6 +285,27 @@ class PipeFunc(Generic[T]):
         """
         self.__dict__.update(state)
         self.func = cloudpickle.loads(self.func)
+
+    def _validate_mapspec(self) -> None:
+        if self.mapspec is None:
+            return
+        if not isinstance(self.mapspec, MapSpec):
+            msg = (
+                "The 'mapspec' argument should be an instance of MapSpec,"
+                f" not {type(self.mapspec)}."
+            )
+            raise TypeError(msg)
+        if isinstance(self.output_name, tuple):
+            # TODO: need to handle multiple outputs in MapSpec
+            # currently things seem to work, but there is no check.
+            return
+        if self.mapspec.output.name != self.output_name:
+            msg = (
+                f"The output of the function `{self.__name__}` should match"
+                f" the output of the MapSpec `{self.mapspec}`:"
+                f" `{self.mapspec.output.name} != {self.output_name}`."
+            )
+            raise ValueError(msg)
 
 
 def pipefunc(
