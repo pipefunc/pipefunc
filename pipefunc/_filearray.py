@@ -152,10 +152,13 @@ class FileArray:
         masking out missing data.
         """
         items = _load_all(map(self._index_to_file, range(self.size)))
-        mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
+        mask = self._mask_list()
         arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
         arr[:] = items
         return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
+
+    def _mask_list(self) -> list[bool]:
+        return [not self._index_to_file(i).is_file() for i in range(self.size)]
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
@@ -164,7 +167,7 @@ class FileArray:
         The returned numpy array has dtype "bool" and a mask for
         masking out missing data.
         """
-        mask = [not self._index_to_file(i).is_file() for i in range(self.size)]
+        mask = self._mask_list()
         return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
