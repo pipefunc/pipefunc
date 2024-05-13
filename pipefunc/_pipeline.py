@@ -352,6 +352,7 @@ class Pipeline:
 
         if self.profile is not None:
             f.set_profiling(enable=self.profile)
+
         if self.debug is not None:
             f.debug = self.debug
 
