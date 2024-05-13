@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import functools
 import json
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
-import cloudpickle
 import networkx as nx
 import numpy as np
 
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, dump, load
 
 if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
@@ -24,26 +22,13 @@ def _func_path(func: PipeFunc, folder: Path) -> Path:
     return folder / f"{func.__module__}.{func.__name__}.cloudpickle"
 
 
-def _load(path: Path) -> Any:
-    with path.open("rb") as f:
-        return cloudpickle.load(f)
-
-
-def _dump(obj: Any, path: Path) -> None:
-    with path.open("wb") as f:
-        cloudpickle.dump(obj, f)
-
-
-_load_cached = functools.lru_cache(maxsize=None)(_load)
-
-
 def _dump_functions(pipeline: Pipeline, run_folder: Path) -> list[Path]:
     folder = run_folder / "functions"
     folder.mkdir(parents=True, exist_ok=True)
     paths = []
     for func in pipeline.functions:
         path = _func_path(func, folder)
-        _dump(func, path)
+        dump(func, path)
         paths.append(path)
     return paths
 
@@ -60,14 +45,14 @@ def _dump_inputs(
     paths = {}
     for k, v in inputs.items():
         path = folder / f"{k}.cloudpickle"
-        _dump(v, path)
+        dump(v, path)
         paths[k] = path
     return paths
 
 
 def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
     path = input_paths[name]
-    return _load_cached(path)
+    return load(path)
 
 
 def _output_path(output_name: str, folder: Path) -> Path:
@@ -88,18 +73,18 @@ def _dump_output(
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
             path = _output_path(output_name, folder)
-            _dump(output, path)
+            dump(output, path)
         output = new_output
     else:
         path = _output_path(func.output_name, folder)
-        _dump(output, path)
+        dump(output, path)
     return output
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
     folder = run_folder / "outputs"
     path = _output_path(output_name, folder)
-    return _load_cached(path)
+    return load(path)
 
 
 def _clean_run_folder(run_folder: Path) -> None:

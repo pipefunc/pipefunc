@@ -11,6 +11,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._mapspec import _shape_to_strides
+from pipefunc._utils import dump, load
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -20,18 +21,6 @@ def read(name: str | Path) -> bytes:
     """Load file contents as a bytestring."""
     with open(name, "rb") as f:  # noqa: PTH123
         return f.read()
-
-
-def load(name: str | Path) -> Any:
-    """Load a cloudpickled object from the named file."""
-    with open(name, "rb") as f:  # noqa: PTH123
-        return cloudpickle.load(f)
-
-
-def dump(obj: Any, name: str | Path) -> None:
-    """Dump an object to the named file using cloudpickle."""
-    with open(name, "wb") as f:  # noqa: PTH123
-        cloudpickle.dump(obj, f)
 
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"

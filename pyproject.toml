@@ -31,6 +31,7 @@ dependencies = [
     "versioningit",
     "typing_extensions; python_version <= '3.9'",
     "cloudpickle",
+    "numpy",
 ]
 [project.optional-dependencies]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
