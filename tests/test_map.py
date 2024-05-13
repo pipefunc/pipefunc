@@ -350,3 +350,26 @@ def test_validate_mapspec():
             output_name="y",
             mapspec="x[i] -> yolo[i]",
         )
+
+
+def test_pipeline_with_defaults(tmp_path: Path) -> None:
+    @pipefunc(output_name="z")
+    def f(x: int, y: int = 1) -> int:
+        return x + y
+
+    @pipefunc(output_name="sum")
+    def g(z: np.ndarray) -> int:
+        return sum(z)
+
+    pipeline = Pipeline(
+        [
+            (f, "x[i] -> z[i]"),
+            g,
+        ],
+    )
+
+    inputs = {"x": [0, 1, 2, 3]}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[-1].output == 10
+    assert results[-1].output_name == "sum"
+    assert map_shapes(pipeline, inputs) == {"x": (4,), "z": (4,)}

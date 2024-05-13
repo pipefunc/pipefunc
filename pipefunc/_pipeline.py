@@ -250,6 +250,8 @@ class Pipeline:
             del self.unique_leaf_node
         with contextlib.suppress(AttributeError):
             del self.map_parameters
+        with contextlib.suppress(AttributeError):
+            del self.defaults
 
     def _set_cache(
         self,
@@ -926,6 +928,13 @@ class Pipeline:
                 for output in func.mapspec.outputs:
                     map_parameters.add(output.name)
         return map_parameters
+
+    @functools.cached_property
+    def defaults(self) -> dict[str, Any]:
+        defaults = {}
+        for func in self.functions:
+            defaults.update(func.defaults)
+        return defaults
 
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:

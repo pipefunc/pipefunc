@@ -287,6 +287,7 @@ def run_pipeline(
     if manual_shapes is None:
         manual_shapes = {}
     function_paths = _dump_functions(pipeline, run_folder)
+    inputs.update(pipeline.defaults)
     input_paths = _dump_inputs(inputs, run_folder)
     shapes = map_shapes(pipeline, inputs, manual_shapes)
     _dump_run_info(function_paths, input_paths, shapes, manual_shapes, run_folder)
