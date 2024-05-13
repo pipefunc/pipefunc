@@ -118,6 +118,7 @@ def _dump_run_info(
     function_paths: list[Path],
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    manual_shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> None:
     path = run_folder / "run_info.json"
@@ -125,6 +126,7 @@ def _dump_run_info(
         "functions": _json_serializable(function_paths),
         "inputs": _json_serializable(input_paths),
         "shapes": _json_serializable(list(shapes.items())),
+        "manual_shapes": _json_serializable(manual_shapes),
     }
     with path.open("w") as f:
         json.dump(info, f, indent=4)
@@ -278,7 +280,7 @@ def run_pipeline(
     function_paths = _dump_functions(pipeline, run_folder)
     input_paths = _dump_inputs(inputs, run_folder)
     shapes = map_shapes(pipeline, inputs, manual_shapes)
-    _dump_run_info(function_paths, input_paths, shapes, run_folder)
+    _dump_run_info(function_paths, input_paths, shapes, manual_shapes, run_folder)
 
     generations = list(nx.topological_generations(pipeline.graph))
     assert all(isinstance(x, str) for x in generations[0])
