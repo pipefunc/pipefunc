@@ -13,7 +13,6 @@ the resource usage of the pipeline functions.
 from __future__ import annotations
 
 import contextlib
-import copy
 import functools
 import inspect
 import sys
@@ -232,6 +231,8 @@ class Pipeline:
                 mapspec = None
             self.add(f, mapspec=mapspec)
         self._init_internal_cache()
+        self._cache_type = cache_type
+        self._cache_kwargs = cache_kwargs
         self._set_cache(cache_type, lazy, cache_kwargs)
 
     def _init_internal_cache(self) -> None:
@@ -1347,7 +1348,14 @@ class Pipeline:
 
     def copy(self) -> Pipeline:
         """Return a copy of the pipeline."""
-        return copy.deepcopy(self)
+        return Pipeline(
+            self.functions,  # type: ignore[arg-type]
+            lazy=self.lazy,
+            debug=self._debug,
+            profile=self._profile,
+            cache_type=self._cache_type,
+            cache_kwargs=self._cache_kwargs,
+        )
 
 
 def _update_all_results(

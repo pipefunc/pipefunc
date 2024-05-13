@@ -267,8 +267,8 @@ class PipeFunc(Generic[T]):
             A dictionary containing the picklable state of the object.
 
         """
-        state = self.__dict__.copy()
-        state["func"] = cloudpickle.dumps(state.pop("func"))
+        state = {k: v for k, v in self.__dict__.items() if k != "func"}
+        state["func"] = cloudpickle.dumps(self.func)
         return state
 
     def __setstate__(self, state: dict) -> None:
