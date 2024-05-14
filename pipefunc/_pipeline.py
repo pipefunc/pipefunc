@@ -603,54 +603,9 @@ class Pipeline:
         """
         if r := self._arg_combinations.get(output_name):
             return r
-
-        def names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
-            names: list[str] = []
-            for n in nodes:
-                if isinstance(n, PipeFunc):
-                    names.extend(at_least_tuple(n.output_name))
-                else:
-                    assert isinstance(n, str)
-                    names.append(n)
-            return tuple(sorted(names))
-
-        def sort_key(node: PipeFunc | str) -> str:
-            if isinstance(node, PipeFunc):
-                if isinstance(node.output_name, tuple):
-                    return ",".join(node.output_name)
-                return node.output_name
-            return node
-
-        def unique(
-            nodes: Iterable[PipeFunc | str],
-        ) -> tuple[PipeFunc | str, ...]:
-            return tuple(sorted(set(nodes), key=sort_key))
-
-        def filter_funcs(
-            funcs: Iterable[PipeFunc | str],
-        ) -> list[PipeFunc]:
-            return [f for f in funcs if isinstance(f, PipeFunc)]
-
-        def compute_arg_mapping(
-            node: PipeFunc,
-            head: PipeFunc,
-            args: list[PipeFunc | str],
-            replaced: list[PipeFunc | str],
-        ) -> None:
-            preds = [n for n in self.graph.predecessors(node) if n not in replaced]
-            deps = unique(args + preds)
-            deps_names = names(deps)
-            if deps_names in arg_set:
-                return
-            arg_set.add(deps_names)
-
-            for func in filter_funcs(deps):
-                new_args = [dep for dep in deps if dep != func]
-                compute_arg_mapping(func, head, new_args, [*replaced, node])
-
         head = self.node_mapping[output_name]
         arg_set: set[tuple[str, ...]] = set()
-        compute_arg_mapping(head, head, [], [])  # type: ignore[arg-type]
+        _compute_arg_mapping(self.graph, head, head, [], [], arg_set)  # type: ignore[arg-type]
         self._arg_combinations[output_name] = arg_set
         return arg_set
 
@@ -1250,3 +1205,54 @@ def _save_results(
             r.add_delayed_callback(lazy_save)
         else:
             func.save_function(filename, to_save)  # type: ignore[arg-type]
+
+
+def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
+    names: list[str] = []
+    for n in nodes:
+        if isinstance(n, PipeFunc):
+            names.extend(at_least_tuple(n.output_name))
+        else:
+            assert isinstance(n, str)
+            names.append(n)
+    return tuple(sorted(names))
+
+
+def _sort_key(node: PipeFunc | str) -> str:
+    if isinstance(node, PipeFunc):
+        if isinstance(node.output_name, tuple):
+            return ",".join(node.output_name)
+        return node.output_name
+    return node
+
+
+def _unique(
+    nodes: Iterable[PipeFunc | str],
+) -> tuple[PipeFunc | str, ...]:
+    return tuple(sorted(set(nodes), key=_sort_key))
+
+
+def _filter_funcs(
+    funcs: Iterable[PipeFunc | str],
+) -> list[PipeFunc]:
+    return [f for f in funcs if isinstance(f, PipeFunc)]
+
+
+def _compute_arg_mapping(
+    graph: nx.DiGraph,
+    node: PipeFunc,
+    head: PipeFunc,
+    args: list[PipeFunc | str],
+    replaced: list[PipeFunc | str],
+    arg_set: set[tuple[str, ...]],
+) -> None:
+    preds = [n for n in graph.predecessors(node) if n not in replaced]
+    deps = _unique(args + preds)
+    deps_names = _names(deps)
+    if deps_names in arg_set:
+        return
+    arg_set.add(deps_names)
+
+    for func in _filter_funcs(deps):
+        new_args = [dep for dep in deps if dep != func]
+        _compute_arg_mapping(graph, func, head, new_args, [*replaced, node], arg_set)
