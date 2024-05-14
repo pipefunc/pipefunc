@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
-import functools
 import itertools
-import operator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -11,7 +9,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._mapspec import _shape_to_strides
-from pipefunc._utils import dump, load
+from pipefunc._utils import dump, load, prod
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -50,7 +48,7 @@ class FileArray:
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
-        return functools.reduce(operator.mul, self.shape, 1)
+        return prod(self.shape)
 
     @property
     def rank(self) -> int:

@@ -3,9 +3,10 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import operator
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 import cloudpickle
 
@@ -76,3 +77,8 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
     raise
+
+
+def prod(iterable: Iterable[int]) -> int:
+    """Return the product of an iterable."""
+    return functools.reduce(operator.mul, iterable, 1)

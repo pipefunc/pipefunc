@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from pipefunc._filearray import FileArray, _load_all, dump, load
+from pipefunc._utils import prod
 
 
 def test_load_and_dump(tmp_path):
@@ -300,7 +301,7 @@ def test_sliced_arange():
         folder = Path(tempdir)
         shape = (3, 4, 5)
         arr = FileArray(folder, shape)
-        np_arr = np.arange(np.prod(shape)).reshape(shape)
+        np_arr = np.arange(prod(shape)).reshape(shape)
         for key in np.ndindex(shape):
             arr.dump(key, np_arr[key])
 

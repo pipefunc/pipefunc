@@ -8,6 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._map import map_shapes, run_pipeline
+from pipefunc._utils import prod
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -196,7 +197,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
 def test_simple_from_step_nd(tmp_path: Path) -> None:
     @pipefunc(output_name="array")
     def generate_array(shape: tuple[int, ...]) -> np.ndarray[Any, np.dtype[np.int_]]:
-        return np.arange(1, np.prod(shape) + 1).reshape(shape)
+        return np.arange(1, prod(shape) + 1).reshape(shape)
 
     @pipefunc(output_name="vector")
     def simulate(array: np.ndarray, shape: tuple[int, ...]) -> np.ndarray:

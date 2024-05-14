@@ -10,7 +10,7 @@ import numpy as np
 
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
-from pipefunc._utils import at_least_tuple, dump, handle_error, load
+from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 
 if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
@@ -175,7 +175,7 @@ def _execute_map_spec(
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
-    n = np.prod(shape)
+    n = prod(shape)
     file_arrays = []
     output_arrays: list[np.ndarray] = []
     output_names = at_least_tuple(func.output_name)
