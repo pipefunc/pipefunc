@@ -193,6 +193,80 @@ def _init_result_arrays(
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
+def _pick_output(func: PipeFunc, output: Any) -> list[Any]:
+    return [
+        (
+            func.output_picker(output, output_name)
+            if func.output_picker is not None
+            else output
+        )
+        for output_name in at_least_tuple(func.output_name)
+    ]
+
+
+def _run_iteration(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...],
+    index: int,
+) -> Any:
+    selected = _select_kwargs(func, kwargs, shape, index)
+    try:
+        return func(**selected)
+    except Exception as e:
+        handle_error(e, func, selected)
+        raise  # handle_error raises but mypy doesn't know that
+
+
+def _run_iteration_and_pick_output(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...],
+    index: int,
+) -> list[Any]:
+    output = _run_iteration(func, kwargs, shape, index)
+    return _pick_output(func, output)
+
+
+def _update_file_array(
+    func: PipeFunc,
+    file_arrays: list[FileArray],
+    shape: tuple[int, ...],
+    index: int,
+    output: list[Any],
+) -> None:
+    assert isinstance(func.mapspec, MapSpec)
+    output_key = func.mapspec.output_key(shape, index)
+    for file_array, _output in zip(file_arrays, output):
+        file_array.dump(output_key, _output)
+
+
+def _update_result_array(
+    result_arrays: list[np.ndarray],
+    index: int,
+    output: list[Any],
+) -> None:
+    for result_array, _output in zip(result_arrays, output):
+        result_array[index] = _output
+
+
+def _execute_iteration_in_map_spec(
+    func: PipeFunc,
+    index: int,
+    shape: tuple[int, ...],
+    kwargs: dict[str, Any],
+    run_folder: Path,
+) -> None:
+    """Execute a single iteration of a map spec.
+
+    Is parallelizable.
+    """
+    assert isinstance(func.mapspec, MapSpec)
+    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
+    _update_file_array(func, file_arrays, shape, index, outputs)
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -205,26 +279,9 @@ def _execute_map_spec(
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     for index in range(n):
-        selected = _select_kwargs(func, kwargs, shape, index)
-        try:
-            output = func(**selected)
-        except Exception as e:
-            handle_error(e, func, selected)
-            raise  # handle_error raises but mypy doesn't know that
-
-        output_key = func.mapspec.output_key(shape, index)
-        for output_name, file_array, result_array in zip(
-            at_least_tuple(func.output_name),
-            file_arrays,
-            result_arrays,
-        ):
-            _output = (
-                func.output_picker(output, output_name)
-                if func.output_picker is not None
-                else output
-            )
-            file_array.dump(output_key, _output)
-            result_array[index] = _output
+        outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
+        _update_file_array(func, file_arrays, shape, index, outputs)
+        _update_result_array(result_arrays, index, outputs)
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
