@@ -8,7 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._map import map_shapes, run_pipeline
+from pipefunc.map._run import map_shapes, run_pipeline
 
 if TYPE_CHECKING:
     from pathlib import Path
