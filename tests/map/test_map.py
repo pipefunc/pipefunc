@@ -39,114 +39,114 @@ def test_simple(tmp_path: Path) -> None:
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
-    @pipefunc(output_name="result")
-    def simulate(seed: int) -> int:
-        assert isinstance(seed, np.int_)
-        return seed * 2
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        assert isinstance(x, np.int_)
+        return 2 * x
 
     @pipefunc(output_name="sum")
-    def post_process(result: np.ndarray) -> int:
-        assert isinstance(result, np.ndarray)
-        return np.sum(result, axis=0)
+    def take_sum(y: np.ndarray) -> int:
+        assert isinstance(y, np.ndarray)
+        return np.sum(y, axis=0)
 
     pipeline = Pipeline(
         [
-            (simulate, "seed[i, j] -> result[i, j]"),
-            post_process,
+            (double_it, "x[i, j] -> y[i, j]"),
+            take_sum,
         ],
     )
 
-    inputs = {"seed": np.arange(12).reshape(3, 4)}
+    inputs = {"x": np.arange(12).reshape(3, 4)}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [24, 30, 36, 42]
-    assert map_shapes(pipeline, inputs) == {"seed": (3, 4), "result": (3, 4)}
+    assert map_shapes(pipeline, inputs) == {"x": (3, 4), "y": (3, 4)}
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
-    @pipefunc(output_name="result")
-    def simulate(seed: int) -> int:
-        assert isinstance(seed, np.int_)
-        return seed * 2
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        assert isinstance(x, np.int_)
+        return 2 * x
 
     @pipefunc(output_name="sum")
-    def post_process(result: np.ndarray) -> int:
-        assert isinstance(result, np.ndarray)
-        return np.sum(result)
+    def take_sum(y: np.ndarray) -> int:
+        assert isinstance(y, np.ndarray)
+        return sum(y)
 
     pipeline = Pipeline(
         [
-            (simulate, "seed[i, j] -> result[i, j]"),
-            (post_process, "result[i, :] -> sum[i]"),
+            (double_it, "x[i, j] -> y[i, j]"),
+            (take_sum, "y[i, :] -> sum[i]"),
         ],
     )
 
-    inputs = {"seed": np.arange(12).reshape(3, 4)}
+    inputs = {"x": np.arange(12).reshape(3, 4)}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [12, 44, 76]
     assert map_shapes(pipeline, inputs) == {
-        "seed": (3, 4),
-        "result": (3, 4),
+        "x": (3, 4),
+        "y": (3, 4),
         "sum": (3,),
     }
 
 
 def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
-    @pipefunc(output_name="result")
-    def simulate(seed: int) -> int:
-        assert isinstance(seed, np.int_)
-        return seed * 2
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        assert isinstance(x, np.int_)
+        return 2 * x
 
     @pipefunc(output_name="sum")
-    def take_sum(result: np.ndarray) -> int:
-        assert isinstance(result, np.ndarray)
-        return np.sum(result)
+    def take_sum(y: np.ndarray) -> int:
+        assert isinstance(y, np.ndarray)
+        return sum(y)
 
     @pipefunc(output_name="prod")
-    def take_prod(result: np.ndarray) -> int:
-        assert isinstance(result, np.ndarray)
-        return np.prod(result)
+    def take_prod(y: np.ndarray) -> int:
+        assert isinstance(y, np.ndarray)
+        return np.prod(y)
 
     pipeline = Pipeline(
         [
-            (simulate, "seed[i, j] -> result[i, j]"),
-            (take_sum, "result[i, :] -> sum[i]"),
+            (double_it, "x[i, j] -> y[i, j]"),
+            (take_sum, "y[i, :] -> sum[i]"),
             take_prod,
         ],
     )
 
-    inputs = {"seed": np.arange(1, 13).reshape(3, 4)}
+    inputs = {"x": np.arange(1, 13).reshape(3, 4)}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "prod"
     assert isinstance(results[-1].output, np.int_)
     assert results[-1].output == 1961990553600
     assert map_shapes(pipeline, inputs) == {
-        "seed": (3, 4),
-        "result": (3, 4),
+        "x": (3, 4),
+        "y": (3, 4),
         "sum": (3,),
     }
 
 
 def test_simple_from_step(tmp_path: Path) -> None:
-    @pipefunc(output_name="seed")
+    @pipefunc(output_name="x")
     def generate_seeds(n: int) -> list[int]:
         return list(range(n))
 
-    @pipefunc(output_name="result")
-    def simulate(seed: int) -> int:
-        assert isinstance(seed, int)
-        return seed * 2
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        assert isinstance(x, int)
+        return x * 2
 
     @pipefunc(output_name="sum")
-    def post_process(result: list[int]) -> int:
-        return sum(result)
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
 
     pipeline = Pipeline(
         [
             generate_seeds,
-            (simulate, "seed[i] -> result[i]"),
-            post_process,
+            (double_it, "x[i] -> y[i]"),
+            take_sum,
         ],
     )
     inputs = {"n": 4}
@@ -154,31 +154,31 @@ def test_simple_from_step(tmp_path: Path) -> None:
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes={"seed": (4,)},
+        manual_shapes={"x": (4,)},
     )
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     with pytest.raises(ValueError, match="is used in map but"):
         map_shapes(pipeline, inputs)
 
-    assert map_shapes(pipeline, inputs, {"seed": (4,)}) == {"result": (4,)}
+    assert map_shapes(pipeline, inputs, {"x": (4,)}) == {"y": (4,)}
 
 
 @pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])
 def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     @pipefunc(output_name=("single", "double"), output_picker=output_picker)
-    def simulate(x: int) -> tuple[int, int] | dict[str, int]:
+    def double_it(x: int) -> tuple[int, int] | dict[str, int]:
         assert isinstance(x, int)
         return (x, 2 * x) if output_picker is None else {"single": x, "double": 2 * x}
 
     @pipefunc(output_name="sum")
-    def post_process(single: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+    def take_sum(single: np.ndarray[Any, np.dtype[np.int_]]) -> int:
         return sum(single)
 
     pipeline = Pipeline(
         [
-            (simulate, "x[i] -> single[i], double[i]"),
-            post_process,
+            (double_it, "x[i] -> single[i], double[i]"),
+            take_sum,
         ],
     )
 
@@ -200,7 +200,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         return np.arange(1, prod(shape) + 1).reshape(shape)
 
     @pipefunc(output_name="vector")
-    def simulate(array: np.ndarray, shape: tuple[int, ...]) -> np.ndarray:
+    def double_it(array: np.ndarray, shape: tuple[int, ...]) -> np.ndarray:
         assert isinstance(array, np.ndarray)
         assert array.shape == shape[1:]
         return array.sum(axis=0).sum(axis=0)
@@ -212,7 +212,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     pipeline = Pipeline(
         [
             generate_array,
-            (simulate, "array[i, :, :] -> vector[i]"),
+            (double_it, "array[i, :, :] -> vector[i]"),
             norm,
         ],
     )
