@@ -214,7 +214,7 @@ class Pipeline:
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
-        cache_type: Literal["lru", "hybrid", "disk"] | None = "lru",
+        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = "lru",
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -228,7 +228,7 @@ class Pipeline:
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
-        self._set_cache(cache_type, lazy, cache_kwargs)
+        self.cache = _create_cache(cache_type, lazy, cache_kwargs)
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache
@@ -245,35 +245,8 @@ class Pipeline:
             del self.unique_leaf_node
         with contextlib.suppress(AttributeError):
             del self.defaults
-
-    def _set_cache(
-        self,
-        cache_type: Literal["lru", "hybrid", "disk"] | None,
-        lazy: bool,  # noqa: FBT001
-        cache_kwargs: dict[str, Any] | None,
-    ) -> None:
-        # Function result cache
-        self.cache: LRUCache | HybridCache | DiskCache | SimpleCache | None = None
-        if cache_type is None:
-            return
-        if cache_kwargs is None:
-            cache_kwargs = {}
-        if cache_type == "lru":
-            cache_kwargs.setdefault("shared", not lazy)
-            self.cache = LRUCache(**cache_kwargs)
-        elif cache_type == "hybrid":
-            if lazy:
-                warnings.warn(
-                    "Hybrid cache uses function evaluation duration which"
-                    " is not measured correctly when using `lazy=True`.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            cache_kwargs.setdefault("shared", not lazy)
-            self.cache = HybridCache(**cache_kwargs)
-        elif cache_type == "disk":
-            cache_kwargs.setdefault("lru_shared", not lazy)
-            self.cache = DiskCache(**cache_kwargs)
+        with contextlib.suppress(AttributeError):
+            del self.node_mapping
 
     def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -373,20 +346,6 @@ class Pipeline:
             self.drop(f=f)
         self._init_internal_cache()
 
-    def _check_consistent_defaults(self) -> None:
-        """Check that the default values for shared arguments are consistent."""
-        arg_defaults = defaultdict(set)
-        for f in self.functions:
-            for arg, default_value in f.defaults.items():
-                arg_defaults[arg].add(default_value)
-                if len(arg_defaults[arg]) > 1:
-                    msg = (
-                        f"Inconsistent default values for argument '{arg}' in"
-                        " functions. Please make sure the shared input arguments have"
-                        " the same default value or are set only for one function.",
-                    )
-                    raise ValueError(msg)
-
     @functools.cached_property
     def graph(self) -> nx.DiGraph:
         """Create a directed graph representing the pipeline.
@@ -398,7 +357,7 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        self._check_consistent_defaults()
+        _check_consistent_defaults(self.functions)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
@@ -472,74 +431,6 @@ class Pipeline:
             __output_name__ = self.unique_leaf_node.output_name
         return self.func(__output_name__)(**kwargs)
 
-    def _compute_cache_key(
-        self,
-        output_name: _OUTPUT_TYPE,
-        kwargs: dict[str, Any],
-    ) -> _CACHE_KEY_TYPE | None:
-        """Compute the cache key for a specific output name.
-
-        The cache key is a tuple consisting of the output name and a tuple of
-        root input keys and their corresponding values. Root inputs are the
-        inputs that are not derived from any other function in the pipeline.
-
-        If any of the root inputs required for the output_name are not available
-        in kwargs, the cache key computation is skipped, and the method returns
-        None. This can happen when a non-root input is directly provided as an
-        input to another function, in which case the result should not be
-        cached.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the pipeline.
-        kwargs
-            Keyword arguments to be passed to the pipeline functions.
-
-        Returns
-        -------
-        _CACHE_KEY_TYPE | None
-            A tuple containing the output name and a tuple of root input keys
-            and their corresponding values, or None if the cache key computation
-            is skipped.
-
-        """
-        # Used in _execute_pipeline
-        root_args = self.root_args(output_name)
-        assert isinstance(root_args, tuple)
-        cache_key_items = []
-        for k in root_args:
-            if k not in kwargs:
-                # This means the computation was run with non-root inputs
-                # i.e., the output of a function was directly provided as an input to
-                # another function. In this case, we don't want to cache the result.
-                return None
-            key = _valid_key(kwargs[k])
-            cache_key_items.append((k, key))
-
-        return output_name, tuple(cache_key_items)
-
-    def _get_result_from_cache(
-        self,
-        func: PipeFunc,
-        cache: LRUCache | HybridCache | DiskCache | SimpleCache,
-        cache_key: _CACHE_KEY_TYPE | None,
-        output_name: _OUTPUT_TYPE,
-        all_results: dict[_OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
-        used_parameters: set[str | None],
-    ) -> tuple[bool, bool]:
-        # Used in _execute_pipeline
-        result_from_cache = False
-        if cache_key is not None and cache_key in cache:
-            r = cache.get(cache_key)
-            _update_all_results(func, r, output_name, all_results, self.lazy)
-            result_from_cache = True
-            if not full_output:
-                used_parameters.add(None)  # indicate that the result was from cache
-                return True, result_from_cache
-        return False, result_from_cache
-
     def _get_func_args(
         self,
         func: PipeFunc,
@@ -566,56 +457,6 @@ class Pipeline:
         used_parameters.update(func_args)
         return func_args
 
-    def _execute_func(self, func: PipeFunc, func_args: dict[str, Any]) -> Any:
-        # Used in _execute_pipeline
-        if self.lazy:
-            r = _LazyFunction(func, kwargs=func_args)
-        else:
-            try:
-                r = func(**func_args)
-            except Exception as e:
-                _handle_error(e, func, func_args)
-                raise  # already raised in _handle_error, but mypy doesn't know that
-        return r
-
-    def _update_cache(
-        self,
-        cache: LRUCache | HybridCache | DiskCache | SimpleCache,
-        cache_key: _CACHE_KEY_TYPE,
-        r: Any,
-        start_time: float,
-    ) -> None:
-        # Used in _execute_pipeline
-        if isinstance(cache, HybridCache):
-            duration = time.perf_counter() - start_time
-            cache.put(cache_key, r, duration)
-        else:
-            cache.put(cache_key, r)
-
-    def _save_results(
-        self,
-        func: PipeFunc,
-        r: Any,
-        output_name: _OUTPUT_TYPE,
-        all_results: dict[_OUTPUT_TYPE, Any],
-    ) -> None:
-        # Used in _execute_pipeline
-        if func.save:
-            to_save = {k: all_results[k] for k in self.root_args(output_name)}
-            filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-            filename = func.__name__ / filename
-            to_save[output_name] = all_results[output_name]  # type: ignore[index]
-            assert func.save_function is not None
-            if self.lazy:
-                lazy_save = _LazyFunction(
-                    func.save_function,
-                    args=(filename, to_save),
-                    add_to_graph=False,
-                )
-                r.add_delayed_callback(lazy_save)
-            else:
-                func.save_function(filename, to_save)  # type: ignore[arg-type]
-
     def _execute_pipeline(
         self,
         *,
@@ -631,11 +472,12 @@ class Pipeline:
         cache = self.get_cache()
         use_cache = (func.cache and cache is not None) or task_graph() is not None
 
+        root_args = self.root_args(output_name)
         result_from_cache = False
         if use_cache:
             assert cache is not None
-            cache_key = self._compute_cache_key(func.output_name, kwargs)
-            return_now, result_from_cache = self._get_result_from_cache(
+            cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
+            return_now, result_from_cache = _get_result_from_cache(
                 func,
                 cache,
                 cache_key,
@@ -643,6 +485,7 @@ class Pipeline:
                 all_results,
                 full_output,
                 used_parameters,
+                self.lazy,
             )
             if return_now:
                 return all_results[output_name]
@@ -660,12 +503,12 @@ class Pipeline:
             return all_results[output_name]
 
         start_time = time.perf_counter()
-        r = self._execute_func(func, func_args)
+        r = _execute_func(func, func_args, self.lazy)
         if use_cache and cache_key is not None:
             assert cache is not None
-            self._update_cache(cache, cache_key, r, start_time)
+            _update_cache(cache, cache_key, r, start_time)
         _update_all_results(func, r, output_name, all_results, self.lazy)
-        self._save_results(func, r, output_name, all_results)
+        _save_results(func, r, output_name, all_results, root_args, self.lazy)
         return all_results[output_name]
 
     def _run_pipeline(
@@ -719,7 +562,7 @@ class Pipeline:
 
         return all_results if full_output else all_results[output_name]
 
-    @property
+    @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
         """Return a mapping from node names to nodes.
 
@@ -1370,3 +1213,169 @@ def _handle_error(e: Exception, func: Callable, func_args: dict[str, Any]) -> No
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
     raise
+
+
+def _update_cache(
+    cache: LRUCache | HybridCache | DiskCache | SimpleCache,
+    cache_key: _CACHE_KEY_TYPE,
+    r: Any,
+    start_time: float,
+) -> None:
+    # Used in _execute_pipeline
+    if isinstance(cache, HybridCache):
+        duration = time.perf_counter() - start_time
+        cache.put(cache_key, r, duration)
+    else:
+        cache.put(cache_key, r)
+
+
+def _get_result_from_cache(
+    func: PipeFunc,
+    cache: LRUCache | HybridCache | DiskCache | SimpleCache,
+    cache_key: _CACHE_KEY_TYPE | None,
+    output_name: _OUTPUT_TYPE,
+    all_results: dict[_OUTPUT_TYPE, Any],
+    full_output: bool,  # noqa: FBT001
+    used_parameters: set[str | None],
+    lazy: bool = False,  # noqa: FBT002, FBT001
+) -> tuple[bool, bool]:
+    # Used in _execute_pipeline
+    result_from_cache = False
+    if cache_key is not None and cache_key in cache:
+        r = cache.get(cache_key)
+        _update_all_results(func, r, output_name, all_results, lazy)
+        result_from_cache = True
+        if not full_output:
+            used_parameters.add(None)  # indicate that the result was from cache
+            return True, result_from_cache
+    return False, result_from_cache
+
+
+def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
+    """Check that the default values for shared arguments are consistent."""
+    arg_defaults = defaultdict(set)
+    for f in functions:
+        for arg, default_value in f.defaults.items():
+            arg_defaults[arg].add(default_value)
+            if len(arg_defaults[arg]) > 1:
+                msg = (
+                    f"Inconsistent default values for argument '{arg}' in"
+                    " functions. Please make sure the shared input arguments have"
+                    " the same default value or are set only for one function.",
+                )
+                raise ValueError(msg)
+
+
+def _create_cache(
+    cache_type: Literal["lru", "hybrid", "disk", "simple"] | None,
+    lazy: bool,  # noqa: FBT001
+    cache_kwargs: dict[str, Any] | None,
+) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
+    if cache_type is None:
+        return None
+    if cache_kwargs is None:
+        cache_kwargs = {}
+    if cache_type == "lru":
+        cache_kwargs.setdefault("shared", not lazy)
+        return LRUCache(**cache_kwargs)
+    if cache_type == "hybrid":
+        if lazy:
+            warnings.warn(
+                "Hybrid cache uses function evaluation duration which"
+                " is not measured correctly when using `lazy=True`.",
+                UserWarning,
+                stacklevel=2,
+            )
+        cache_kwargs.setdefault("shared", not lazy)
+        return HybridCache(**cache_kwargs)
+    if cache_type == "disk":
+        cache_kwargs.setdefault("lru_shared", not lazy)
+        return DiskCache(**cache_kwargs)
+    if cache_type == "simple":
+        return SimpleCache()
+
+    msg = f"Invalid cache type: {cache_type}."
+    raise ValueError(msg)
+
+
+def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
+    if lazy:
+        return _LazyFunction(func, kwargs=func_args)
+    try:
+        return func(**func_args)
+    except Exception as e:
+        _handle_error(e, func, func_args)
+        raise  # already raised in _handle_error, but mypy doesn't know that
+
+
+def _compute_cache_key(
+    output_name: _OUTPUT_TYPE,
+    kwargs: dict[str, Any],
+    root_args: tuple[str, ...],
+) -> _CACHE_KEY_TYPE | None:
+    """Compute the cache key for a specific output name.
+
+    The cache key is a tuple consisting of the output name and a tuple of
+    root input keys and their corresponding values. Root inputs are the
+    inputs that are not derived from any other function in the pipeline.
+
+    If any of the root inputs required for the output_name are not available
+    in kwargs, the cache key computation is skipped, and the method returns
+    None. This can happen when a non-root input is directly provided as an
+    input to another function, in which case the result should not be
+    cached.
+
+    Parameters
+    ----------
+    output_name
+        The identifier for the return value of the pipeline.
+    kwargs
+        Keyword arguments to be passed to the pipeline functions.
+    root_args
+        The names of the pipeline function's root inputs.
+
+    Returns
+    -------
+    _CACHE_KEY_TYPE | None
+        A tuple containing the output name and a tuple of root input keys
+        and their corresponding values, or None if the cache key computation
+        is skipped.
+
+    """
+    cache_key_items = []
+    for k in root_args:
+        if k not in kwargs:
+            # This means the computation was run with non-root inputs
+            # i.e., the output of a function was directly provided as an input to
+            # another function. In this case, we don't want to cache the result.
+            return None
+        key = _valid_key(kwargs[k])
+        cache_key_items.append((k, key))
+
+    return output_name, tuple(cache_key_items)
+
+
+def _save_results(
+    func: PipeFunc,
+    r: Any,
+    output_name: _OUTPUT_TYPE,
+    all_results: dict[_OUTPUT_TYPE, Any],
+    root_args: tuple[str, ...],
+    lazy: bool,  # noqa: FBT001
+) -> None:
+    # Used in _execute_pipeline
+    if func.save:
+        to_save = {k: all_results[k] for k in root_args}
+        filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
+        filename = func.__name__ / filename
+        to_save[output_name] = all_results[output_name]  # type: ignore[index]
+        assert func.save_function is not None
+        if lazy:
+            lazy_save = _LazyFunction(
+                func.save_function,
+                args=(filename, to_save),
+                add_to_graph=False,
+            )
+            r.add_delayed_callback(lazy_save)
+        else:
+            func.save_function(filename, to_save)  # type: ignore[arg-type]
