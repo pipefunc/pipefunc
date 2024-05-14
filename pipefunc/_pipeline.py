@@ -32,12 +32,12 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._lazy import _LazyFunction, task_graph
-from pipefunc._mapspec import MapSpec
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias

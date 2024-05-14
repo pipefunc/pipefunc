@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Sequence
 import cloudpickle
 import numpy as np
 
-from pipefunc._mapspec import _shape_to_strides
 from pipefunc._utils import dump, load, prod
+from pipefunc.map._mapspec import shape_to_strides
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -41,7 +41,7 @@ class FileArray:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
         self.strides = (
-            _shape_to_strides(self.shape) if strides is None else tuple(strides)
+            shape_to_strides(self.shape) if strides is None else tuple(strides)
         )
         self.filename_template = str(filename_template)
 

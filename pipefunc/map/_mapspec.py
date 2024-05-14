@@ -8,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-def _shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
+def shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
     """Compute strides for a multidimensional array given its shape.
 
     Parameters
@@ -181,7 +181,7 @@ class MapSpec:
             raise ValueError(msg)
         return tuple(
             (linear_index // stride) % dim
-            for stride, dim in zip(_shape_to_strides(shape), shape)
+            for stride, dim in zip(shape_to_strides(shape), shape)
         )
 
     def input_keys(

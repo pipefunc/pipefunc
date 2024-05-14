@@ -30,7 +30,7 @@ if sys.version_info < (3, 9):  # pragma: no cover
 else:
     from collections.abc import Callable
 
-from pipefunc._mapspec import MapSpec
+from pipefunc.map._mapspec import MapSpec
 
 if TYPE_CHECKING:
     from pathlib import Path

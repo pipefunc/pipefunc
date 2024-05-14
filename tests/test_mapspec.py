@@ -3,23 +3,23 @@ import re
 import numpy as np
 import pytest
 
-from pipefunc._mapspec import (
+from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
     _parse_index_string,
     _parse_indexed_arrays,
-    _shape_to_strides,
     array_mask,
     array_shape,
     expected_mask,
+    shape_to_strides,
 )
 
 
-def test_shape_to_strides():
-    assert _shape_to_strides((3, 4, 5)) == (20, 5, 1)
-    assert _shape_to_strides(()) == ()
-    assert _shape_to_strides((1,)) == (1,)
-    assert _shape_to_strides((1, 2)) == (2, 1)
+def testshape_to_strides():
+    assert shape_to_strides((3, 4, 5)) == (20, 5, 1)
+    assert shape_to_strides(()) == ()
+    assert shape_to_strides((1,)) == (1,)
+    assert shape_to_strides((1, 2)) == (2, 1)
 
 
 def test_arrayspec_init():

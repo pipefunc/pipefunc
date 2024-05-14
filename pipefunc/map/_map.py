@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 import networkx as nx
 import numpy as np
 
-from pipefunc._filearray import FileArray
-from pipefunc._mapspec import MapSpec, array_shape
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
+from pipefunc.map._filearray import FileArray
+from pipefunc.map._mapspec import MapSpec, array_shape
 
 if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline

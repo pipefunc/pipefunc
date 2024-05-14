@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pipefunc._filearray import FileArray, _load_all, dump, load
 from pipefunc._utils import prod
+from pipefunc.map._filearray import FileArray, _load_all, dump, load
 
 
 def test_load_and_dump(tmp_path):
