@@ -287,7 +287,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         ],
     )
     inputs = {"shape": (1, 2, 3)}
-    manual_shapes: dict[str, tuple[int, ...]] = {"array": (1, 2, 3)}
+    manual_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
     results = run_pipeline(
         pipeline,
         inputs,

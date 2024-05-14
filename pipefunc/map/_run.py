@@ -87,7 +87,7 @@ class RunInfo(NamedTuple):
     function_paths: list[Path]
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    manual_shapes: dict[str, tuple[int, ...]]
+    manual_shapes: dict[str, int | tuple[int, ...]]
 
     @classmethod
     def create(
@@ -95,7 +95,7 @@ class RunInfo(NamedTuple):
         run_folder: str | Path,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        manual_shapes: dict[str, tuple[int, ...]] | None = None,
+        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
     ) -> RunInfo:
@@ -138,7 +138,7 @@ def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, tuple[int, ...]],
+    manual_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     kwargs = {}
@@ -282,7 +282,7 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> dict[_OUTPUT_TYPE, tuple[int, ...]]:
     if manual_shapes is None:
         manual_shapes = {}
@@ -303,7 +303,7 @@ def map_shapes(
             if shape := shapes.get(p):
                 input_shapes[p] = shape
             elif p in manual_shapes:
-                input_shapes[p] = manual_shapes[p]
+                input_shapes[p] = at_least_tuple(manual_shapes[p])
             else:
                 msg = (
                     f"Parameter `{p}` is used in map but its shape"
@@ -373,7 +373,7 @@ def run_pipeline(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
-    manual_shapes: dict[str, tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> list[Result]:
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)

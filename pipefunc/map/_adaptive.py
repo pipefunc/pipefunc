@@ -27,10 +27,10 @@ def make_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
-    manual_shapes: dict[str, tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     return_output: bool = False,
-) -> list[list[adaptive.SequenceLearner]]:
+) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     import adaptive
 
     run_folder = Path(run_folder)
@@ -38,7 +38,7 @@ def make_learners(
     run_info.dump(run_folder)
     learners = []
     for gen in pipeline.topological_generations[1]:
-        _learners = []
+        _learners = {}
         for func in gen:
             if func.mapspec:
                 f = functools.partial(
@@ -59,7 +59,7 @@ def make_learners(
                 )
                 sequence = [None]  # type: ignore[list-item]
             learner = adaptive.SequenceLearner(f, sequence)
-            _learners.append(learner)
+            _learners[func.output_name] = learner
         learners.append(_learners)
     return learners
 
