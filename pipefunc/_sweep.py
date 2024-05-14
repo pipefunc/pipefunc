@@ -467,7 +467,7 @@ def count_sweep(
     counts: dict[_OUTPUT_TYPE, dict[tuple[Any, ...], int]] = {}
     deps = pipeline.func_dependencies(output_name)
     for _output_name in deps:
-        arg_combination = pipeline.arg_combinations(_output_name, root_args_only=True)
+        arg_combination = pipeline.root_args(_output_name)
         assert isinstance(arg_combination, tuple)
         if use_pandas:
             import pandas as pd

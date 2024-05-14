@@ -46,16 +46,16 @@ def test_pipeline_and_all_arg_combinations() -> None:
     fe = pipeline.func("e")
     assert fe(a=2, b=3, x=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
 
-    all_args = pipeline.all_arg_combinations()
+    all_args = pipeline.all_arg_combinations
     assert all_args == {
         "c": {("a", "b")},
         "d": {("a", "b", "x"), ("b", "c", "x")},
         "e": {("a", "b", "d", "x"), ("a", "b", "x"), ("b", "c", "x"), ("c", "d", "x")},
     }
-    assert pipeline.all_arg_combinations(root_args_only=True) == {
-        "c": {("a", "b")},
-        "d": {("a", "b", "x")},
-        "e": {("a", "b", "x")},
+    assert pipeline.all_root_args == {
+        "c": ("a", "b"),
+        "d": ("a", "b", "x"),
+        "e": ("a", "b", "x"),
     }
 
     kw = {"a": 2, "b": 3, "x": 1}
@@ -96,7 +96,7 @@ def test_pipeline_and_all_arg_combinations_lazy() -> None:
         == 75
     )
 
-    all_args = pipeline.all_arg_combinations()
+    all_args = pipeline.all_arg_combinations
 
     kw = {"a": 2, "b": 3, "x": 1}
     kw["c"] = f1(a=kw["a"], b=kw["b"])
@@ -140,7 +140,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
         fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
     )
 
-    all_args = pipeline.all_arg_combinations()
+    all_args = pipeline.all_arg_combinations
     assert all_args == {
         "c": {("a", "b")},
         "d": {("a", "b", "xx"), ("b", "c", "xx")},
@@ -152,10 +152,10 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
         },
     }
 
-    assert pipeline.all_arg_combinations(root_args_only=True) == {
-        "c": {("a", "b")},
-        "d": {("a", "b", "xx")},
-        "e": {("a", "b", "x", "xx")},
+    assert pipeline.all_root_args == {
+        "c": ("a", "b"),
+        "d": ("a", "b", "xx"),
+        "e": ("a", "b", "x", "xx"),
     }
 
 
@@ -392,9 +392,9 @@ def test_tuple_outputs(tmp_path: Path):
     r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
     assert r == f(a=1, b=2, x=3).evaluate()
     assert (
-        pipeline.arg_combinations("g", root_args_only=True)
-        == pipeline.arg_combinations("h", root_args_only=True)
-        == pipeline.arg_combinations(("g", "h"), root_args_only=True)
+        pipeline.root_args("g")
+        == pipeline.root_args("h")
+        == pipeline.root_args(("g", "h"))
         == ("a", "b", "x")
     )
     key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
