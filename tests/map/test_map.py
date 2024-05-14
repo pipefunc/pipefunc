@@ -153,6 +153,30 @@ def test_outer_product(tmp_path: Path) -> None:
     assert results[0].output.tolist() == [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
     assert results[1].output_name == "sum"
     assert results[1].output == 36
+    assert len(results) == 2
+    assert map_shapes(pipeline, inputs) == {"y": (3,), "x": (3,), "z": (3, 3)}
+
+
+def test_outer_product_decorator(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
+    def add(x: int, y: int) -> int:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x + y
+
+    @pipefunc(output_name="sum")
+    def total_sum(z: np.ndarray) -> int:
+        assert isinstance(z, np.ndarray)
+        return np.sum(z)
+
+    pipeline = Pipeline([add, total_sum])
+    inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
+    results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
+    assert results[0].output_name == "z"
+    assert results[0].output.tolist() == [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
+    assert results[1].output_name == "sum"
+    assert results[1].output == 36
+    assert len(results) == 2
     assert map_shapes(pipeline, inputs) == {"y": (3,), "x": (3,), "z": (3, 3)}
 
 
