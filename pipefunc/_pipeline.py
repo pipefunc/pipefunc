@@ -22,7 +22,6 @@ from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generator,
     Iterable,
     Literal,
     Tuple,
@@ -1031,62 +1030,6 @@ class Pipeline:
                 new_functions.append(f)
         return Pipeline(new_functions)  # type: ignore[arg-type]
 
-    def all_execution_orders(
-        self,
-        output_name: str,
-    ) -> Generator[list[PipeFunc], None, None]:
-        """Generate all possible execution orders for the functions in the pipeline.
-
-        This method generates all possible topological sorts (execution orders)
-        of the functions in the pipeline's execution graph. It first simplifies the
-        pipeline to a version where combinable function nodes have been merged
-        into single function nodes, and then generates all topological sorts of
-        the functions in the simplified graph.
-
-        The method only considers the functions in the graph and ignores the
-        root arguments.
-
-        Parameters
-        ----------
-        output_name
-            The name of the output from the pipeline function we are starting
-            from. It is used to get the starting function in the pipeline and to
-            determine the simplified pipeline.
-
-        Returns
-        -------
-        Generator[list[str], None, None]
-            A generator that yields lists of function names, each list
-            representing a possible execution order of the functions in the
-            pipeline.
-
-        Notes
-        -----
-        A topological sort of a directed graph is a linear ordering of its
-        vertices such that for every directed edge U -> V from vertex U to
-        vertex V, U comes before V in the ordering. For a pipeline, this means
-        that each function only gets executed after all its dependencies have
-        been executed.
-
-        The method uses the NetworkX function `all_topological_sorts` to
-        generate all possible topological sorts. If there are cycles in the
-        graph (i.e., there's a circular dependency between functions), the
-        method will raise a NetworkXUnfeasible exception.
-
-        The function 'head' in the nested function `_recurse` represents the
-        current function being checked in the execution graph.
-
-        """
-        simplified_pipeline = self.simplified_pipeline(output_name)
-        func_only_graph = simplified_pipeline.graph.copy()
-        root_args = simplified_pipeline.arg_combinations(
-            output_name,
-            root_args_only=True,
-        )
-        for arg in root_args:
-            func_only_graph.remove_node(arg)
-        return nx.all_topological_sorts(func_only_graph)
-
     @functools.cached_property
     def leaf_nodes(self) -> list[PipeFunc]:
         """Return the leaf nodes in the pipeline's execution graph."""
@@ -1096,53 +1039,6 @@ class Pipeline:
     def root_nodes(self) -> list[PipeFunc]:
         """Return the root nodes in the pipeline's execution graph."""
         return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
-
-    def all_transitive_paths(
-        self,
-        output_name: str,
-        *,
-        simplify: bool = False,
-    ) -> list[list[list[PipeFunc]]]:
-        """Get all possible transitive paths for a specified output.
-
-        This method retrieves all the possible ways the functions in the
-        pipeline can be ordered (transitive paths) to produce a specified
-        output.
-
-        Parameters
-        ----------
-        output_name
-            The name of the output variable to find paths for.
-        simplify
-            A flag indicating whether to simplify the pipeline before computing
-            the paths. If True, the pipeline is first simplified to a sub-pipeline
-            that is necessary for producing the output_name. If False, the paths
-            are computed on the full pipeline. Default is False.
-
-        Returns
-        -------
-        list[list[list[PipeFunc]]]
-            A list of lists of lists of `PipeFunc`s. Each list of lists
-            represents an independent chain of computation in the pipeline that
-            can produce the output. Each list of `PipeFunc` represents a
-            possible ordering of functions in that chain.
-
-        """
-        pipeline = self.simplified_pipeline(output_name) if simplify else self
-
-        func_only_graph = pipeline.graph.copy()
-        root_args = pipeline.root_args(output_name)
-        for arg in root_args:
-            func_only_graph.remove_node(arg)
-
-        leaf = next(
-            n
-            for n in func_only_graph.nodes
-            if output_name in at_least_tuple(n.output_name)
-        )
-        roots = [n for n, d in func_only_graph.in_degree() if d == 0]
-        graph = nx.transitive_reduction(func_only_graph)
-        return [list(nx.all_simple_paths(graph, root, leaf)) for root in roots]
 
     @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
