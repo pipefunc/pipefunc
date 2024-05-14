@@ -21,7 +21,8 @@ def test_simple(tmp_path: Path) -> None:
         return 2 * x
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+        assert isinstance(y, np.ndarray)
         return sum(y)
 
     pipeline = Pipeline(
