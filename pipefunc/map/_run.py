@@ -83,11 +83,6 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
     return load(path)
 
 
-def _clean_run_folder(run_folder: Path) -> None:
-    for folder in ["functions", "inputs", "outputs"]:
-        shutil.rmtree(run_folder / folder, ignore_errors=True)
-
-
 class RunInfo(NamedTuple):
     function_paths: list[Path]
     input_paths: dict[str, Path]
@@ -107,7 +102,7 @@ class RunInfo(NamedTuple):
         run_folder = Path(run_folder)
         manual_shapes = manual_shapes or {}
         if cleanup:
-            _clean_run_folder(run_folder)
+            shutil.rmtree(run_folder, ignore_errors=True)
         function_paths = _dump_functions(pipeline, run_folder)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
@@ -287,10 +282,7 @@ class Result(NamedTuple):
     output: Any
 
 
-def _run_function(
-    func: PipeFunc,
-    run_folder: Path,
-) -> list[Result]:
+def _run_function(func: PipeFunc, run_folder: Path) -> list[Result]:
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
         func,

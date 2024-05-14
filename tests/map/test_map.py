@@ -15,27 +15,27 @@ if TYPE_CHECKING:
 
 
 def test_simple(tmp_path: Path) -> None:
-    @pipefunc(output_name="result")
-    def simulate(seed: int) -> int:
-        assert isinstance(seed, int)
-        return seed * 2
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        assert isinstance(x, int)
+        return 2 * x
 
     @pipefunc(output_name="sum")
-    def post_process(result: list[int]) -> int:
-        return sum(result)
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
 
     pipeline = Pipeline(
         [
-            (simulate, "seed[i] -> result[i]"),
-            post_process,
+            (double_it, "x[i] -> y[i]"),
+            take_sum,
         ],
     )
 
-    inputs = {"seed": [0, 1, 2, 3]}
+    inputs = {"x": [0, 1, 2, 3]}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
-    assert map_shapes(pipeline, inputs) == {"seed": (4,), "result": (4,)}
+    assert map_shapes(pipeline, inputs) == {"x": (4,), "y": (4,)}
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
