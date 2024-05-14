@@ -723,6 +723,7 @@ class Pipeline:
     def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str) for x in generations[0])
+        assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         return generations[0], generations[1:]
 
     def _func_node_colors(
