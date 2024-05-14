@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import cloudpickle
 
@@ -60,3 +61,18 @@ def _cached_load(cache_key: tuple) -> Any:
     """Load a cloudpickled object using a cache key."""
     path = Path(cache_key[0])
     return load(path, cache=False)
+
+
+def format_kwargs(kwargs: dict[str, Any]) -> str:
+    """Format kwargs as a string."""
+    return ", ".join(f"{k}={v!r}" for k, v in kwargs.items())
+
+
+def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
+    """Handle an error that occurred while executing a function."""
+    kwargs_str = format_kwargs(kwargs)
+    msg = f"Error occurred while executing function `{func.__name__}({kwargs_str})`."
+    if sys.version_info <= (3, 11):  # pragma: no cover
+        raise type(e)(e.args[0] + msg) from e
+    e.add_note(msg)
+    raise

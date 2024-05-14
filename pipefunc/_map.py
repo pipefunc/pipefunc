@@ -10,7 +10,7 @@ import numpy as np
 
 from pipefunc._filearray import FileArray
 from pipefunc._mapspec import MapSpec, array_shape
-from pipefunc._utils import at_least_tuple, dump, load
+from pipefunc._utils import at_least_tuple, dump, handle_error, load
 
 if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
@@ -190,8 +190,8 @@ def _execute_map_spec(
         try:
             output = func(**selected)
         except Exception as e:
-            msg = f"Error in {func.__name__} at {index=}, {kwargs=}, {selected=}"
-            raise ValueError(msg) from e
+            handle_error(e, func, selected)
+            raise  # already raised in handle_error, but mypy doesn't know that
 
         output_key = func.mapspec.output_key(shape, index)
         for output_name, file_array, output_array in zip(
@@ -265,6 +265,45 @@ class Result(NamedTuple):
     output: Any
 
 
+def _run_function(
+    func: PipeFunc,
+    input_paths: dict[str, Path],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    manual_shapes: dict[str, tuple[int, ...]],
+    run_folder: Path,
+) -> list[Result]:
+    kwargs = _func_kwargs(func, input_paths, shapes, manual_shapes, run_folder)
+    if func.mapspec:
+        output = _execute_map_spec(func, kwargs, shapes, run_folder)
+    else:
+        _load_file_array(kwargs)
+        try:
+            output = func(**kwargs)
+        except Exception as e:
+            handle_error(e, func, kwargs)
+            raise  # already raised in handle_error, but mypy doesn't know that
+        output = _dump_output(func, output, run_folder)
+
+    if isinstance(func.output_name, str):
+        result = Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=func.output_name,
+            output=output,
+        )
+        return [result]
+
+    return [
+        Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=output_name,
+            output=_output,
+        )
+        for output_name, _output in zip(func.output_name, output)
+    ]
+
+
 def run_pipeline(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -287,41 +326,12 @@ def run_pipeline(
     for gen in generations[1:]:
         # These evaluations can happen in parallel
         for func in gen:
-            kwargs = _func_kwargs(
+            outputs = _run_function(
                 func,
                 input_paths,
                 shapes,
                 manual_shapes,
                 run_folder,
             )
-            if func.mapspec:
-                output = _execute_map_spec(func, kwargs, shapes, run_folder)
-            else:
-                try:
-                    _load_file_array(kwargs)
-                    output = func(**kwargs)
-                except Exception as e:
-                    msg = f"Error in {func.__name__} with {kwargs=}"
-                    raise ValueError(msg) from e
-                output = _dump_output(func, output, run_folder)
-
-            if isinstance(func.output_name, str):
-                outputs.append(
-                    Result(
-                        function=func.__name__,
-                        kwargs=kwargs,
-                        output_name=func.output_name,
-                        output=output,
-                    ),
-                )
-            else:
-                for output_name, _output in zip(func.output_name, output):
-                    outputs.append(
-                        Result(
-                            function=func.__name__,
-                            kwargs=kwargs,
-                            output_name=output_name,
-                            output=_output,
-                        ),
-                    )
+            outputs.extend(outputs)
     return outputs
