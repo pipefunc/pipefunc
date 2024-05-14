@@ -210,6 +210,16 @@ def _execute_map_spec(
     return output_arrays if isinstance(func.output_name, tuple) else output_arrays[0]
 
 
+def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+    _load_file_array(kwargs)
+    try:
+        output = func(**kwargs)
+    except Exception as e:
+        handle_error(e, func, kwargs)
+        raise  # handle_error raises but mypy doesn't know that
+    return _dump_output(func, output, run_folder)
+
+
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -276,13 +286,7 @@ def _run_function(
     if func.mapspec:
         output = _execute_map_spec(func, kwargs, shapes, run_folder)
     else:
-        _load_file_array(kwargs)
-        try:
-            output = func(**kwargs)
-        except Exception as e:
-            handle_error(e, func, kwargs)
-            raise  # handle_error raises but mypy doesn't know that
-        output = _dump_output(func, output, run_folder)
+        output = _execute_single(func, kwargs, run_folder)
 
     if isinstance(func.output_name, str):
         result = Result(
