@@ -191,7 +191,7 @@ def _execute_map_spec(
             output = func(**selected)
         except Exception as e:
             handle_error(e, func, selected)
-            raise  # already raised in handle_error, but mypy doesn't know that
+            raise  # handle_error raises but mypy doesn't know that
 
         output_key = func.mapspec.output_key(shape, index)
         for output_name, file_array, output_array in zip(
@@ -281,7 +281,7 @@ def _run_function(
             output = func(**kwargs)
         except Exception as e:
             handle_error(e, func, kwargs)
-            raise  # already raised in handle_error, but mypy doesn't know that
+            raise  # handle_error raises but mypy doesn't know that
         output = _dump_output(func, output, run_folder)
 
     if isinstance(func.output_name, str):

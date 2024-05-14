@@ -599,7 +599,7 @@ class Pipeline:
                 r = func(**func_args)
             except Exception as e:
                 handle_error(e, func, func_args)
-                raise  # already raised in handle_error, but mypy doesn't know that
+                raise  # handle_error raises but mypy doesn't know that
         return r
 
     def _update_cache(
