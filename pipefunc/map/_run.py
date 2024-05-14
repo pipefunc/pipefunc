@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
@@ -12,8 +11,6 @@ from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape
 
 if TYPE_CHECKING:
-    import adaptive
-
     from pipefunc import PipeFunc, Pipeline
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
@@ -253,37 +250,6 @@ def _update_result_array(
         result_array[index] = _output
 
 
-def _execute_iteration_in_map_spec(
-    index: int,
-    func: PipeFunc,
-    run_info: RunInfo,
-    run_folder: Path,
-    *,
-    return_output: bool = False,
-) -> Any | None:
-    """Execute a single iteration of a map spec.
-
-    Performs a single iteration of the code in `_execute_map_spec`, however,
-    it does not keep and return the output. This is meant to be used in the
-    parallel execution of the map spec.
-
-    Meets the requirements of `adaptive.SequenceLearner`.
-    """
-    assert isinstance(func.mapspec, MapSpec)
-    kwargs = _func_kwargs(
-        func,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.manual_shapes,
-        run_folder,
-    )
-    shape = run_info.shapes[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
-    outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
-    _update_file_array(func, file_arrays, shape, index, outputs)
-    return outputs if return_output else None
-
-
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -311,29 +277,6 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
     return _dump_output(func, output, run_folder)
-
-
-def _execute_iteration_in_single(
-    _: Any,
-    func: PipeFunc,
-    run_info: RunInfo,
-    run_folder: Path,
-    *,
-    return_output: bool = False,
-) -> Any | None:
-    """Execute a single iteration of a single function.
-
-    Meets the requirements of `adaptive.SequenceLearner`.
-    """
-    kwargs = _func_kwargs(
-        func,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.manual_shapes,
-        run_folder,
-    )
-    result = _execute_single(func, kwargs, run_folder)
-    return result if return_output else None
 
 
 def map_shapes(
@@ -442,44 +385,3 @@ def run_pipeline(
             _outputs = _run_function(func, run_folder)
             outputs.extend(_outputs)
     return outputs
-
-
-def make_learners(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    run_folder: str | Path,
-    manual_shapes: dict[str, tuple[int, ...]] | None = None,
-    *,
-    return_output: bool = False,
-) -> list[list[adaptive.SequenceLearner]]:
-    import adaptive
-
-    run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
-    run_info.dump(run_folder)
-    learners = []
-    for gen in pipeline.topological_generations[1]:
-        _learners = []
-        for func in gen:
-            if func.mapspec:
-                f = functools.partial(
-                    _execute_iteration_in_map_spec,
-                    func=func,
-                    run_info=run_info,
-                    run_folder=run_folder,
-                    return_output=return_output,
-                )
-                sequence = list(range(prod(run_info.shapes[func.output_name])))
-            else:
-                f = functools.partial(
-                    _execute_iteration_in_single,
-                    func=func,
-                    run_info=run_info,
-                    run_folder=run_folder,
-                    return_output=return_output,
-                )
-                sequence = [None]  # type: ignore[list-item]
-            learner = adaptive.SequenceLearner(f, sequence)
-            _learners.append(learner)
-        learners.append(_learners)
-    return learners
