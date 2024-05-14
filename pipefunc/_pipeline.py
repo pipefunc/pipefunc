@@ -711,9 +711,6 @@ class Pipeline:
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
 
-        Considering only the root input nodes if `root_args_only` is
-        set to True.
-
         Returns
         -------
         Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
