@@ -245,6 +245,10 @@ class Pipeline:
             del self.defaults
         with contextlib.suppress(AttributeError):
             del self.node_mapping
+        with contextlib.suppress(AttributeError):
+            del self.all_arg_combinations
+        with contextlib.suppress(AttributeError):
+            del self.all_root_args
 
     def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -679,23 +683,12 @@ class Pipeline:
 
         return sorted(_predecessors(output_name), key=at_least_tuple)
 
-    def all_arg_combinations(
-        self,
-        *,
-        root_args_only: bool = False,
-    ) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
+    @functools.cached_property
+    def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
 
         Considering only the root input nodes if `root_args_only` is
         set to True.
-
-        Parameters
-        ----------
-        root_args_only
-            If True, the function will only consider the root input nodes
-            (i.e., nodes with no predecessor functions) while calculating the
-            possible argument combinations. If False, all predecessor nodes,
-            including intermediate functions, will be considered.
 
         Returns
         -------
@@ -704,17 +697,20 @@ class Pipeline:
             possible argument combinations.
 
         """
-        mapping: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = defaultdict(set)
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                if root_args_only:
-                    arg_combinations = {self.root_args(node.output_name)}
-                else:
-                    arg_combinations = self.arg_combinations(
-                        node.output_name,
-                    )
-                mapping[node.output_name] = arg_combinations
-        return mapping
+        return {
+            node.output_name: self.arg_combinations(node.output_name)
+            for node in self.graph.nodes
+            if isinstance(node, PipeFunc)
+        }
+
+    @functools.cached_property
+    def all_root_args(self) -> dict[_OUTPUT_TYPE, tuple[str, ...]]:
+        """Return the root arguments required to compute all outputs."""
+        return {
+            node.output_name: self.root_args(node.output_name)
+            for node in self.graph.nodes
+            if isinstance(node, PipeFunc)
+        }
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
@@ -1032,7 +1028,7 @@ class Pipeline:
         for node in self.graph.nodes:
             if isinstance(node, PipeFunc):
                 fn = node
-                input_args = self.all_arg_combinations()[fn.output_name]
+                input_args = self.all_arg_combinations[fn.output_name]
                 pipeline_str += (
                     f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
                 )

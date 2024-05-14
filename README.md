@@ -91,7 +91,7 @@ assert h_e(c=5, d=15, x=1) == 75
 pipeline.visualize()
 
 # Get all possible argument mappings for each function
-all_args = pipeline.all_arg_combinations()
+all_args = pipeline.all_arg_combinations
 print(all_args)
 
 # Show resource reporting (only works if profile=True)

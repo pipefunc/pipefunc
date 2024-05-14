@@ -60,8 +60,8 @@ def test_conservatively_combine():
 
     pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
 
-    root_args = pipeline.all_arg_combinations(root_args_only=True)
-    assert root_args == {"x": {("a",)}, "y": {("a", "b")}, "z": {("a", "b")}}
+    root_args = pipeline.all_root_args
+    assert root_args == {"x": ("a",), "y": ("a", "b"), "z": ("a", "b")}
 
     # Test with conservatively_combine=True
     combinable_nodes_true = pipeline._identify_combinable_nodes(
