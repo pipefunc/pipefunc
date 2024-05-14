@@ -392,9 +392,9 @@ def test_tuple_outputs(tmp_path: Path):
     r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
     assert r == f(a=1, b=2, x=3).evaluate()
     assert (
-        pipeline.arg_combinations("g", root_args_only=True)
-        == pipeline.arg_combinations("h", root_args_only=True)
-        == pipeline.arg_combinations(("g", "h"), root_args_only=True)
+        pipeline.root_args("g")
+        == pipeline.root_args("h")
+        == pipeline.root_args(("g", "h"))
         == ("a", "b", "x")
     )
     key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))

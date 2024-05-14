@@ -26,7 +26,6 @@ from typing import (
     Literal,
     Tuple,
     Union,
-    cast,
 )
 
 import networkx as nx
@@ -583,33 +582,13 @@ class Pipeline:
                 mapping[node] = node
         return mapping
 
-    def _next_root_args(
-        self,
-        arg_set: set[tuple[str, ...]],
-    ) -> tuple[str, ...]:
-        """Find the tuple of root arguments."""
-        return next(
-            args
-            for args in arg_set
-            if all(isinstance(self.node_mapping[n], str) for n in args)
-        )
-
-    def arg_combinations(
-        self,
-        output_name: _OUTPUT_TYPE,
-        *,
-        root_args_only: bool = False,
-    ) -> set[tuple[str, ...]] | tuple[str, ...]:
+    def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.
 
         Parameters
         ----------
         output_name
             The identifier for the return value of the pipeline.
-        root_args_only
-            If True, only return the root arguments required to compute the
-            output. If False, return all arguments required to compute the
-            output.
 
         Returns
         -------
@@ -619,8 +598,6 @@ class Pipeline:
 
         """
         if r := self._arg_combinations.get(output_name):
-            if root_args_only:
-                return self._next_root_args(r)
             return r
 
         def names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
@@ -671,16 +648,18 @@ class Pipeline:
         arg_set: set[tuple[str, ...]] = set()
         compute_arg_mapping(head, head, [], [])  # type: ignore[arg-type]
         self._arg_combinations[output_name] = arg_set
-        if root_args_only:
-            return self._next_root_args(arg_set)
         return arg_set
 
     def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
         """Return the root arguments required to compute a specific output."""
         if r := self._root_args.get(output_name):
             return r
-        root_args = self.arg_combinations(output_name, root_args_only=True)
-        root_args = cast(Tuple[str, ...], root_args)
+        arg_combos = self.arg_combinations(output_name)
+        root_args = next(
+            args
+            for args in arg_combos
+            if all(isinstance(self.node_mapping[n], str) for n in args)
+        )
         self._root_args[output_name] = root_args
         return root_args
 
@@ -728,12 +707,12 @@ class Pipeline:
         mapping: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = defaultdict(set)
         for node in self.graph.nodes:
             if isinstance(node, PipeFunc):
-                arg_combinations = self.arg_combinations(
-                    node.output_name,
-                    root_args_only=root_args_only,
-                )
-                if not isinstance(arg_combinations, set):  # root_args_only=True
-                    arg_combinations = {arg_combinations}
+                if root_args_only:
+                    arg_combinations = {self.root_args(node.output_name)}
+                else:
+                    arg_combinations = self.arg_combinations(
+                        node.output_name,
+                    )
                 mapping[node.output_name] = arg_combinations
         return mapping
 
