@@ -297,13 +297,14 @@ def _run_function(func: PipeFunc, run_folder: Path) -> list[Result]:
         output = _execute_single(func, kwargs, run_folder)
 
     if isinstance(func.output_name, str):
-        result = Result(
-            function=func.__name__,
-            kwargs=kwargs,
-            output_name=func.output_name,
-            output=output,
-        )
-        return [result]
+        return [
+            Result(
+                function=func.__name__,
+                kwargs=kwargs,
+                output_name=func.output_name,
+                output=output,
+            ),
+        ]
 
     return [
         Result(
@@ -329,6 +330,6 @@ def run_pipeline(
     for gen in pipeline.topological_generations[1]:
         # These evaluations can happen in parallel
         for func in gen:
-            outputs = _run_function(func, run_folder)
-            outputs.extend(outputs)
+            _outputs = _run_function(func, run_folder)
+            outputs.extend(_outputs)
     return outputs
