@@ -310,28 +310,29 @@ def map_shapes(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
-
-    for gen in pipeline.topological_generations[1]:
-        for func in gen:
-            if func.mapspec:
-                input_shapes = {}
-                for p in func.mapspec.parameters:
-                    if shape := shapes.get(p):
-                        input_shapes[p] = shape
-                    elif p in manual_shapes:
-                        input_shapes[p] = manual_shapes[p]
-                    else:
-                        msg = (
-                            f"Parameter `{p}` is used in map but its shape"
-                            " cannot be inferred from the inputs."
-                            " Provide the shape manually in `manual_shapes`."
-                        )
-                        raise ValueError(msg)
-                output_shape = func.mapspec.shape(input_shapes)
-                shapes[func.output_name] = output_shape
-                if isinstance(func.output_name, tuple):
-                    for output_name in func.output_name:
-                        shapes[output_name] = output_shape
+    mapspec_funcs = [
+        f for gen in pipeline.topological_generations[1] for f in gen if f.mapspec
+    ]
+    for func in mapspec_funcs:
+        assert func.mapspec is not None
+        input_shapes = {}
+        for p in func.mapspec.parameters:
+            if shape := shapes.get(p):
+                input_shapes[p] = shape
+            elif p in manual_shapes:
+                input_shapes[p] = manual_shapes[p]
+            else:
+                msg = (
+                    f"Parameter `{p}` is used in map but its shape"
+                    " cannot be inferred from the inputs."
+                    " Provide the shape manually in `manual_shapes`."
+                )
+                raise ValueError(msg)
+        output_shape = func.mapspec.shape(input_shapes)
+        shapes[func.output_name] = output_shape
+        if isinstance(func.output_name, tuple):
+            for output_name in func.output_name:
+                shapes[output_name] = output_shape
 
     assert all(k in shapes for k in map_parameters if k not in manual_shapes)
     return shapes
