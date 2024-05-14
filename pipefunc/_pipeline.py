@@ -256,6 +256,8 @@ class Pipeline:
             del self.all_arg_combinations
         with contextlib.suppress(AttributeError):
             del self.all_root_args
+        with contextlib.suppress(AttributeError):
+            del self.topological_generations
 
     def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -716,6 +718,12 @@ class Pipeline:
             )
             raise ValueError(msg)
         return leaf_nodes[0]
+
+    @functools.cached_property
+    def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
+        generations = list(nx.topological_generations(self.graph))
+        assert all(isinstance(x, str) for x in generations[0])
+        return generations[0], generations[1:]
 
     def _func_node_colors(
         self,

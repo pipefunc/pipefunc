@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
-import networkx as nx
 import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
@@ -90,35 +88,50 @@ def _clean_run_folder(run_folder: Path) -> None:
         shutil.rmtree(run_folder / folder, ignore_errors=True)
 
 
-def _json_serializable(obj: Any) -> Any:
-    if isinstance(obj, (int, float, str, bool)):
-        return obj
-    if isinstance(obj, Path):
-        return str(obj.resolve())
-    if isinstance(obj, dict):
-        return {k: _json_serializable(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_json_serializable(v) for v in obj]
-    msg = f"Object {obj} is not JSON serializable"
-    raise ValueError(msg)
+class RunInfo(NamedTuple):
+    function_paths: list[Path]
+    input_paths: dict[str, Path]
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
+    manual_shapes: dict[str, tuple[int, ...]]
 
+    @classmethod
+    def create(
+        cls: type[RunInfo],
+        run_folder: str | Path,
+        pipeline: Pipeline,
+        inputs: dict[str, Any],
+        manual_shapes: dict[str, tuple[int, ...]] | None = None,
+        *,
+        cleanup: bool = True,
+    ) -> RunInfo:
+        run_folder = Path(run_folder)
+        manual_shapes = manual_shapes or {}
+        if cleanup:
+            _clean_run_folder(run_folder)
+        function_paths = _dump_functions(pipeline, run_folder)
+        input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
+        shapes = map_shapes(pipeline, inputs, manual_shapes)
+        return cls(
+            function_paths=function_paths,
+            input_paths=input_paths,
+            shapes=shapes,
+            manual_shapes=manual_shapes,
+        )
 
-def _dump_run_info(
-    function_paths: list[Path],
-    input_paths: dict[str, Path],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, tuple[int, ...]],
-    run_folder: Path,
-) -> None:
-    path = run_folder / "run_info.json"
-    info = {
-        "functions": _json_serializable(function_paths),
-        "inputs": _json_serializable(input_paths),
-        "shapes": _json_serializable(list(shapes.items())),
-        "manual_shapes": _json_serializable(manual_shapes),
-    }
-    with path.open("w") as f:
-        json.dump(info, f, indent=4)
+    def dump(self, run_folder: str | Path) -> None:
+        path = Path(run_folder) / "run_info.cloudpickle"
+        dump(self._asdict(), path)
+
+    @classmethod
+    def load(
+        cls: type[RunInfo],
+        run_folder: str | Path,
+        *,
+        cache: bool = True,
+    ) -> RunInfo:
+        path = Path(run_folder) / "run_info.cloudpickle"
+        dct = load(path, cache=cache)
+        return cls(**dct)
 
 
 def _file_array_path(output_name: str, run_folder: Path) -> Path:
@@ -229,14 +242,13 @@ def map_shapes(
         manual_shapes = {}
     map_parameters: set[str] = pipeline.map_parameters
 
-    generations = list(nx.topological_generations(pipeline.graph))
-    input_parameters = set(generations[0])
+    input_parameters = set(pipeline.topological_generations[0])
 
-    shapes = {
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
 
-    for gen in generations[1:]:
+    for gen in pipeline.topological_generations[1]:
         for func in gen:
             if func.mapspec:
                 input_shapes = {}
@@ -277,14 +289,18 @@ class Result(NamedTuple):
 
 def _run_function(
     func: PipeFunc,
-    input_paths: dict[str, Path],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, tuple[int, ...]],
     run_folder: Path,
 ) -> list[Result]:
-    kwargs = _func_kwargs(func, input_paths, shapes, manual_shapes, run_folder)
+    run_info = RunInfo.load(run_folder)
+    kwargs = _func_kwargs(
+        func,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.manual_shapes,
+        run_folder,
+    )
     if func.mapspec:
-        output = _execute_map_spec(func, kwargs, shapes, run_folder)
+        output = _execute_map_spec(func, kwargs, run_info.shapes, run_folder)
     else:
         output = _execute_single(func, kwargs, run_folder)
 
@@ -315,27 +331,12 @@ def run_pipeline(
     manual_shapes: dict[str, tuple[int, ...]] | None = None,
 ) -> list[Result]:
     run_folder = Path(run_folder)
-    _clean_run_folder(run_folder)
-    if manual_shapes is None:
-        manual_shapes = {}
-    # TODO: consider removing the function & info dump because it is not used ATM
-    function_paths = _dump_functions(pipeline, run_folder)
-    input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
-    shapes = map_shapes(pipeline, inputs, manual_shapes)
-    _dump_run_info(function_paths, input_paths, shapes, manual_shapes, run_folder)
-
-    generations = list(nx.topological_generations(pipeline.graph))
-    assert all(isinstance(x, str) for x in generations[0])
+    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
+    run_info.dump(run_folder)
     outputs = []
-    for gen in generations[1:]:
+    for gen in pipeline.topological_generations[1]:
         # These evaluations can happen in parallel
         for func in gen:
-            outputs = _run_function(
-                func,
-                input_paths,
-                shapes,
-                manual_shapes,
-                run_folder,
-            )
+            outputs = _run_function(func, run_folder)
             outputs.extend(outputs)
     return outputs
