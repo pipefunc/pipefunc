@@ -44,7 +44,7 @@ docs = [
     "emoji",
     "jupytext",
     "jupyterlite-sphinx",
-    "jupyterlite-xeus-python",
+    "jupyterlite-xeus",
     "pandas",                  # used in example.ipynb
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]

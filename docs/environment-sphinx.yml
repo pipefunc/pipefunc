@@ -32,6 +32,5 @@ dependencies:
   - emoji
   - jupytext
   - jupyterlite-sphinx
+  - jupyterlite-xeus
   - pandas
-  - pip:
-    - jupyterlite-xeus-python
