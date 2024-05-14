@@ -175,6 +175,24 @@ def _select_kwargs(
     return selected
 
 
+def _init_file_arrays(
+    output_name: _OUTPUT_TYPE,
+    shape: tuple[int, ...],
+    run_folder: Path,
+) -> list[FileArray]:
+    return [
+        FileArray(_file_array_path(output_name, run_folder), shape)
+        for output_name in at_least_tuple(output_name)
+    ]
+
+
+def _init_result_arrays(
+    output_name: _OUTPUT_TYPE,
+    shape: tuple[int, ...],
+) -> list[np.ndarray]:
+    return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -184,15 +202,8 @@ def _execute_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     n = prod(shape)
-    file_arrays = []
-    output_arrays: list[np.ndarray] = []
-    output_names = at_least_tuple(func.output_name)
-    for output_name in output_names:
-        file_array_path = _file_array_path(output_name, run_folder)
-        file_array = FileArray(file_array_path, shape)
-        file_arrays.append(file_array)
-        output_arrays.append(np.empty(n, dtype=object))
-
+    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    result_arrays = _init_result_arrays(func.output_name, shape)
     for index in range(n):
         selected = _select_kwargs(func, kwargs, shape, index)
         try:
@@ -202,10 +213,10 @@ def _execute_map_spec(
             raise  # handle_error raises but mypy doesn't know that
 
         output_key = func.mapspec.output_key(shape, index)
-        for output_name, file_array, output_array in zip(
-            output_names,
+        for output_name, file_array, result_array in zip(
+            at_least_tuple(func.output_name),
             file_arrays,
-            output_arrays,
+            result_arrays,
         ):
             _output = (
                 func.output_picker(output, output_name)
@@ -213,9 +224,9 @@ def _execute_map_spec(
                 else output
             )
             file_array.dump(output_key, _output)
-            output_array[index] = _output
-    output_arrays = [x.reshape(shape) for x in output_arrays]
-    return output_arrays if isinstance(func.output_name, tuple) else output_arrays[0]
+            result_array[index] = _output
+    result_arrays = [x.reshape(shape) for x in result_arrays]
+    return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
 
 def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
