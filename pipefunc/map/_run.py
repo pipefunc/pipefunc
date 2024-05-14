@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
@@ -11,6 +12,8 @@ from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape
 
 if TYPE_CHECKING:
+    import adaptive
+
     from pipefunc import PipeFunc, Pipeline
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
@@ -251,17 +254,26 @@ def _update_result_array(
 
 
 def _execute_iteration_in_map_spec(
-    func: PipeFunc,
     index: int,
-    shape: tuple[int, ...],
-    kwargs: dict[str, Any],
+    func: PipeFunc,
+    run_info: RunInfo,
     run_folder: Path,
 ) -> None:
     """Execute a single iteration of a map spec.
 
-    Is parallelizable.
+    Performs a single iteration of the code in `_execute_map_spec`, however,
+    it does not keep and return the output. This is meant to be used in the
+    parallel execution of the map spec.
     """
     assert isinstance(func.mapspec, MapSpec)
+    kwargs = _func_kwargs(
+        func,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.manual_shapes,
+        run_folder,
+    )
+    shape = run_info.shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
     _update_file_array(func, file_arrays, shape, index, outputs)
@@ -402,3 +414,35 @@ def run_pipeline(
             _outputs = _run_function(func, run_folder)
             outputs.extend(_outputs)
     return outputs
+
+
+def make_learners(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path,
+    manual_shapes: dict[str, tuple[int, ...]] | None = None,
+) -> list[list[adaptive.SequenceLearner]]:
+    import adaptive
+
+    run_folder = Path(run_folder)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
+    run_info.dump(run_folder)
+    learners = []
+    for gen in pipeline.topological_generations[1]:
+        _learners = []
+        # These evaluations can happen in parallel
+        for func in gen:
+            if func.mapspec:
+                f = functools.partial(
+                    _execute_iteration_in_map_spec,
+                    func=func,
+                    run_info=run_info,
+                    run_folder=run_folder,
+                )
+                sequence = list(range(prod(run_info.shapes[func.output_name])))
+                learner = adaptive.SequenceLearner(f, sequence)
+                _learners.append(learner)
+            else:
+                raise NotImplementedError
+        learners.append(_learners)
+    return learners
