@@ -6,7 +6,7 @@ from typing import Iterable
 
 import tomllib
 
-PIP_ONLY_DEPS = {"jupyterlite-xeus"}
+PIP_ONLY_DEPS: set[str] = set()
 
 
 def clean_deps(deps: Iterable[str]) -> list[str]:
