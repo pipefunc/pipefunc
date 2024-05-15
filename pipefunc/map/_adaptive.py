@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Tuple, Union
+
+import adaptive
 
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import MapSpec
@@ -18,9 +20,7 @@ from pipefunc.map._run import (
 if TYPE_CHECKING:
     import sys
 
-    import adaptive
-
-    from pipefunc import PipeFunc, Pipeline
+    from pipefunc import PipeFunc, Pipeline, Sweep
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
-def make_learners(
+def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
@@ -39,8 +39,6 @@ def make_learners(
     *,
     return_output: bool = False,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
-    import adaptive
-
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
     run_info.dump(run_folder)
@@ -124,3 +122,35 @@ def _execute_iteration_in_map_spec(
     outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
     _update_file_array(func, file_arrays, shape, index, outputs)
     return outputs if return_output else None
+
+
+def _map_wrapper(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: Path,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+) -> Callable[[Any], None]:
+    """Wraps the `pipeline.map` method and makes it a callable with a single unused argument."""
+
+    def wrapped(_: Any) -> None:
+        pipeline.map(inputs, run_folder=run_folder, manual_shapes=manual_shapes)
+
+    return wrapped
+
+
+def create_learners_from_sweep(
+    pipeline: Pipeline,
+    sweep: Sweep,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
+    run_folder = Path("my_run")
+    learners = []
+    folders = []
+    max_digits = len(str(len(sweep) - 1))
+    for i, inputs in enumerate(sweep):
+        sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
+        f = _map_wrapper(pipeline, inputs, sweep_run, manual_shapes)
+        learner = adaptive.SequenceLearner(f, sequence=[None])
+        learners.append(learner)
+        folders.append(sweep_run)
+    return learners, folders

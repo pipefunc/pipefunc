@@ -6,7 +6,7 @@ import adaptive
 import numpy as np
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map._adaptive import make_learners
+from pipefunc.map._adaptive import create_learners
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,7 +32,7 @@ def test_basic(tmp_path: Path) -> None:
     )
 
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    learners_dicts = make_learners(
+    learners_dicts = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
@@ -78,7 +78,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         ],
     )
     inputs = {"n": 4}
-    learners_dicts = make_learners(
+    learners_dicts = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,

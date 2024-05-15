@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Iterator, Sequence
 
 import networkx as nx
 
@@ -138,6 +138,10 @@ class Sweep:
                         combination[key] = func(combination)
                 if self.exclude is None or not self.exclude(combination):
                     yield combination
+
+    def __iter__(self) -> Iterator[dict[str, Any]]:
+        """Return a generator of the sweep."""
+        return self.generate()
 
     def list(self) -> list[dict[str, Any]]:
         """Return the sweep as a list."""
