@@ -37,6 +37,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -207,7 +208,7 @@ class Pipeline:
 
     def __init__(
         self,
-        functions: list[PipeFunc],
+        functions: list[PipeFunc | tuple[PipeFunc, str | MapSpec]],
         *,
         lazy: bool = False,
         debug: bool | None = None,
@@ -222,7 +223,11 @@ class Pipeline:
         self._profile = profile
         self.output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
         for f in functions:
-            self.add(f)
+            if isinstance(f, tuple):
+                f, mapspec = f  # noqa: PLW2901
+            else:
+                mapspec = None
+            self.add(f, mapspec=mapspec)
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
@@ -241,6 +246,8 @@ class Pipeline:
             del self.leaf_nodes
         with contextlib.suppress(AttributeError):
             del self.unique_leaf_node
+        with contextlib.suppress(AttributeError):
+            del self.map_parameters
         with contextlib.suppress(AttributeError):
             del self.defaults
         with contextlib.suppress(AttributeError):
@@ -287,6 +294,7 @@ class Pipeline:
     def add(
         self,
         f: PipeFunc | Callable,
+        mapspec: str | MapSpec | None = None,
     ) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -296,10 +304,26 @@ class Pipeline:
             The function to add to the pipeline.
         profile
             Flag indicating whether profiling information should be collected.
+        mapspec
+            This is a specification for mapping that dictates how input values should
+            be merged together. If None, the default behavior is that the input directly
+            maps to the output.
 
         """
         if not isinstance(f, PipeFunc):
             f = PipeFunc(f, output_name=f.__name__)
+        elif mapspec is not None:
+            msg = (
+                "Initializing the `Pipeline` using `MapSpec`s and"
+                " `PipeFunc`s modifies the `PipeFunc`s inplace."
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+        if mapspec is not None:
+            if isinstance(mapspec, str):
+                mapspec = MapSpec.from_string(mapspec)
+            f.mapspec = mapspec
+            f._validate_mapspec()
 
         self.functions.append(f)
 
@@ -665,6 +689,16 @@ class Pipeline:
             for node in self.graph.nodes
             if isinstance(node, PipeFunc)
         }
+
+    @functools.cached_property
+    def map_parameters(self) -> set[str]:
+        map_parameters: set[str] = set()
+        for func in self.functions:
+            if func.mapspec:
+                map_parameters.update(func.mapspec.parameters)
+                for output in func.mapspec.outputs:
+                    map_parameters.add(output.name)
+        return map_parameters
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:

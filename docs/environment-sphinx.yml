@@ -13,6 +13,7 @@ dependencies:
   - versioningit
   - typing_extensions
   - cloudpickle
+  - numpy
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -23,6 +24,7 @@ dependencies:
   - coverage
   - pytest-cov
   - pandas
+  - adaptive
   # optional-dependencies: docs
   - myst-nb
   - sphinx
