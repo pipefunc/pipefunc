@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable, NamedTuple
 import networkx as nx
 
 from pipefunc._cache import SimpleCache
+from pipefunc._utils import format_kwargs
 
 if TYPE_CHECKING:
     import sys
@@ -90,7 +91,7 @@ class _LazyFunction:
     def __repr__(self) -> str:
         from pipefunc._pipefunc import PipeFunc
 
-        kwargs = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        kwargs = format_kwargs(self.kwargs)
         args = ", ".join(repr(arg) for arg in self.args)
         if isinstance(self.func, PipeFunc):
             func = str(self.func.__name__)

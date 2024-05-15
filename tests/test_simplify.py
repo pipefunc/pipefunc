@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from pipefunc import (
-    Pipeline,
-    pipefunc,
-)
+from pipefunc import Pipeline, pipefunc
 from pipefunc._simplify import _combine_nodes, _get_signature
 
 
