@@ -1,3 +1,5 @@
+"""Provides functions to create adaptive learners for a pipeline."""
+
 from __future__ import annotations
 
 import functools
@@ -39,6 +41,33 @@ def create_learners(
     *,
     return_output: bool = False,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
+    """Create adaptive learners for a single `Pipeline.map` call.
+
+    Creates a learner for each function node in the graph. Which means that
+    the returned lists of learners have to be executed in order.
+    If a single list contains multiple learners, they can be executed in
+    parallel.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to create learners for.
+    inputs
+        The inputs to the pipeline, the same as passed to `pipeline.map`.
+    run_folder
+        The folder to store the run information.
+    manual_shapes
+        The manual shapes to use for the run.
+    return_output
+        Whether to return the output of the function in the learner.
+
+    Returns
+    -------
+    A list of dictionaries where the keys are the output names of the
+    functions and the values are the corresponding adaptive learners. As noted
+    above, the learners have to be executed in order.
+
+    """
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
     run_info.dump(run_folder)
@@ -144,6 +173,33 @@ def create_learners_from_sweep(
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
+    """Create adaptive learners for a sweep.
+
+    Creates an `adaptive.SequenceLearner` for each sweep run. These learners
+    have a single iteration that executes the sweep run in parallel. This means
+    that here we rely on the internal parallelization of the pipeline. Each
+    learner is fully independent of the others, and they can be executed in
+    parallel.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to create learners for.
+    sweep
+        The sweep to create learners for, must generate `input` dictionaries as
+        expected by `pipeline.map`.
+    run_folder
+        The folder to store the run information. Each sweep run will be stored in
+        a subfolder of this folder.
+    manual_shapes
+        The manual shapes to use for the run, as expected by `pipeline.map`.
+
+    Returns
+    -------
+    A tuple of lists where the first list contains the learners and the second
+    list contains the run folders for each sweep run.
+
+    """
     run_folder = Path(run_folder)
     learners = []
     folders = []
