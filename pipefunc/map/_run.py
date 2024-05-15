@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 
 
-def _func_path(func: PipeFunc, folder: Path) -> Path:
-    return folder / f"{func.__module__}.{func.__name__}.cloudpickle"
-
-
 def _dump_inputs(
     inputs: dict[str, Any],
     defaults: dict[str, Any],
