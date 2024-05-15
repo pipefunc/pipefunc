@@ -24,7 +24,6 @@ dependencies:
   - coverage
   - pytest-cov
   - pandas
-  - adaptive
   # optional-dependencies: docs
   - myst-nb
   - sphinx
