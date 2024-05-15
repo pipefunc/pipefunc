@@ -24,7 +24,7 @@ author = "Bas Nijholt"
 copyright = f"2023, {author}"
 
 version = ".".join(pipefunc.__version__.split(".")[:3])
-release = pipefunc.__version__
+release = version
 
 
 # -- General configuration ---------------------------------------------------
