@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable, NamedTuple
 import networkx as nx
 
 from pipefunc._cache import SimpleCache
-from pipefunc._utils import format_kwargs
+from pipefunc._utils import format_function_call
 
 if TYPE_CHECKING:
     import sys
@@ -91,16 +91,8 @@ class _LazyFunction:
     def __repr__(self) -> str:
         from pipefunc._pipefunc import PipeFunc
 
-        kwargs = format_kwargs(self.kwargs)
-        args = ", ".join(repr(arg) for arg in self.args)
         func = str(self.func.__name__) if isinstance(self.func, PipeFunc) else str(self.func)
-        if args and kwargs:
-            return f"{func}({args}, {kwargs})"
-        if args:
-            return f"{func}({args})"
-        if kwargs:
-            return f"{func}({kwargs})"
-        return f"{func}()"
+        return format_function_call(func, self.args, self.kwargs)
 
 
 class TaskGraph(NamedTuple):

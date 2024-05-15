@@ -69,6 +69,22 @@ def format_kwargs(kwargs: dict[str, Any]) -> str:
     return ", ".join(f"{k}={v!r}" for k, v in kwargs.items())
 
 
+def format_args(args: tuple) -> str:
+    """Format args as a string."""
+    return ", ".join(repr(arg) for arg in args)
+
+
+def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) -> str:
+    """Format a function call as a string."""
+    if args and kwargs:
+        return f"{func_name}({format_args(args)}, {format_kwargs(kwargs)})"
+    if args:
+        return f"{func_name}({format_args(args)})"
+    if kwargs:
+        return f"{func_name}({format_kwargs(kwargs)})"
+    return f"{func_name}()"
+
+
 def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     """Handle an error that occurred while executing a function."""
     kwargs_str = format_kwargs(kwargs)

@@ -23,7 +23,7 @@ import cloudpickle
 
 from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, format_function_call
 
 if sys.version_info < (3, 9):  # pragma: no cover
     from typing import Callable
@@ -160,13 +160,16 @@ class PipeFunc(Generic[T]):
             kwargs = evaluate_lazy(kwargs)
             result = self.func(*args, **kwargs)
 
-        if self.debug and self.profiling_stats is not None:
-            dt = self.profiling_stats.time.average
-            print(
-                f"Function `{self.func.__name__}` -> with `output_name={self.output_name}`"
-                f" took {dt:.2e} seconds to execute and was"
-                f" called with `{args=}`, `{kwargs=}`, `{result=}`.",
+        if self.debug:
+            func_str = format_function_call(self.func.__name__, (), kwargs)
+            msg = (
+                f"Function returning '{self.output_name}' was invoked"
+                f" as `{func_str}`. The results was `{result}`."
             )
+            if self.profiling_stats is not None:
+                dt = self.profiling_stats.time.average
+                msg += f" The execution time was {dt:.2e} seconds on average."
+            print(msg)
         return result
 
     @property

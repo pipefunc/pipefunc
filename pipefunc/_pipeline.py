@@ -1209,20 +1209,17 @@ def _save_results(
     lazy: bool,  # noqa: FBT001
 ) -> None:
     # Used in _execute_pipeline
-    if func.save_function is not None:
-        to_save = {k: all_results[k] for k in root_args}
-        filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-        filename = func.__name__ / filename
-        to_save[output_name] = all_results[output_name]  # type: ignore[index]
-        if lazy:
-            lazy_save = _LazyFunction(
-                func.save_function,
-                args=(filename, to_save),
-                add_to_graph=False,
-            )
-            r.add_delayed_callback(lazy_save)
-        else:
-            func.save_function(filename, to_save)  # type: ignore[arg-type]
+    if func.save_function is None:
+        return
+    to_save = {k: all_results[k] for k in root_args}
+    filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
+    filename = func.__name__ / filename
+    to_save[output_name] = all_results[output_name]  # type: ignore[index]
+    if lazy:
+        lazy_save = _LazyFunction(func.save_function, args=(filename, to_save), add_to_graph=False)
+        r.add_delayed_callback(lazy_save)
+    else:
+        func.save_function(filename, to_save)  # type: ignore[arg-type]
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
