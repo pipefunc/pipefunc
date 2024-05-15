@@ -14,6 +14,7 @@ dependencies:
   - typing_extensions
   - cloudpickle
   - numpy
+  - tabulate
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz

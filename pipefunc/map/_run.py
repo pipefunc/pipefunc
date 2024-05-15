@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
@@ -22,7 +23,32 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
+    if sys.version_info < (3, 11):  # pragma: no cover
+        pass
+    else:
+        pass
+
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+
+
+@dataclass
+class _MockPipeline:
+    """An object that contains all information required to run a pipeline.
+
+    Ensures that we're not pickling the entire pipeline object when not needed.
+    """
+
+    defaults: dict[str, Any]
+    map_parameters: set[str]
+    topological_generations: tuple[list[str], list[list[PipeFunc]]]
+
+    @classmethod
+    def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
+        return cls(
+            defaults=pipeline.defaults,
+            map_parameters=pipeline.map_parameters,
+            topological_generations=pipeline.topological_generations,
+        )
 
 
 def _dump_inputs(
@@ -254,7 +280,7 @@ def _execute_map_spec(
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
-    if parallel:
+    if parallel and n > 1:
         with ProcessPoolExecutor() as ex:
             outputs_list = list(ex.map(process_index, range(n)))
     else:
