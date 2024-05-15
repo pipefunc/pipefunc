@@ -403,7 +403,7 @@ def run_pipeline(
 def load_outputs(
     *output_names: str,
     run_folder: str | Path,
-) -> Any | list[Any]:
+) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)

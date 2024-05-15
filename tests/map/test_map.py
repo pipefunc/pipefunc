@@ -36,6 +36,7 @@ def test_simple(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == 12
     assert map_shapes(pipeline, inputs) == {"x": (4,), "y": (4,)}
 
 
@@ -61,6 +62,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [24, 30, 36, 42]
+    assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
     assert map_shapes(pipeline, inputs) == {"x": (3, 4), "y": (3, 4)}
 
 
@@ -86,6 +88,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [12, 44, 76]
+    assert load_outputs("sum", run_folder=tmp_path).tolist() == [12, 44, 76]
     assert map_shapes(pipeline, inputs) == {
         "x": (3, 4),
         "y": (3, 4),
@@ -122,6 +125,7 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     assert results[-1].output_name == "prod"
     assert isinstance(results[-1].output, np.int_)
     assert results[-1].output == 1961990553600
+    assert load_outputs("prod", run_folder=tmp_path) == 1961990553600
     assert map_shapes(pipeline, inputs) == {
         "x": (3, 4),
         "y": (3, 4),
@@ -135,9 +139,12 @@ def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[0].output_name == "z"
-    assert results[0].output.tolist() == [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
+    expected = [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
+    assert results[0].output.tolist() == expected
+    assert load_outputs("z", run_folder=tmp_path).tolist() == expected
     assert results[1].output_name == "sum"
     assert results[1].output == 36
+    assert load_outputs("sum", run_folder=tmp_path) == 36
     assert len(results) == 2
     assert map_shapes(pipeline, inputs) == {"y": (3,), "x": (3,), "z": (3, 3)}
 
@@ -228,6 +235,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     )
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == 12
     with pytest.raises(ValueError, match="is used in map but"):
         map_shapes(pipeline, inputs)
 
@@ -256,6 +264,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == 6
     assert map_shapes(pipeline, inputs) == {
         "x": (4,),
         ("single", "double"): (4,),
@@ -296,6 +305,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == 21.0
     assert map_shapes(pipeline, inputs, manual_shapes) == {"vector": (1,)}
 
 
@@ -396,6 +406,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
     assert results[-1].output == 1.0
     assert results[-1].output_name == "average_charge"
+    assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
 
 
 def test_validate_mapspec():
