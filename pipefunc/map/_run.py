@@ -368,7 +368,7 @@ def _run_function(func: PipeFunc, run_folder: Path) -> list[Result]:
     ]
 
 
-def run_pipeline(
+def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
