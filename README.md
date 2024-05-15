@@ -44,11 +44,12 @@ Whether you're working with data processing, scientific computations, machine le
 2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
 3. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 4. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
-5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
-6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-7. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
-8. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
-9. 🛠️ **Flexibility and Ease of Use**: Manage complex function dependencies in a clear, intuitive way with this lightweight yet powerful tool.
+5. 🔁 **Map-Reduce Support**: Utilize "fan-out" to distribute tasks and "fan-in" to aggregate results, streamlining data processing in distributed environments.
+6. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
+7. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
+8. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
+9. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+10. 🛠️ **Flexibility and Ease of Use**: Manage complex function dependencies in a clear, intuitive way with this lightweight yet powerful tool.
 
 ## :test_tube: How does it work?
 
