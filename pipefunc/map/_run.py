@@ -11,9 +11,16 @@ from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape
 
 if TYPE_CHECKING:
+    import sys
+
     from pipefunc import PipeFunc, Pipeline
 
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
+
+_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
 def _dump_inputs(

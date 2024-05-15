@@ -16,11 +16,19 @@ from pipefunc.map._run import (
 )
 
 if TYPE_CHECKING:
+    import sys
+
     import adaptive
 
     from pipefunc import PipeFunc, Pipeline
 
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
+
+
+_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
 def make_learners(

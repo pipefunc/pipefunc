@@ -26,22 +26,25 @@ from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, format_function_call
 from pipefunc.map._mapspec import MapSpec
 
+with contextlib.suppress(ImportError):  # pragma: no cover
+    from rich import print
+
 if sys.version_info < (3, 9):  # pragma: no cover
     from typing import Callable
 else:
     from collections.abc import Callable
 
-
-with contextlib.suppress(ImportError):  # pragma: no cover
-    from rich import print
-
-
 if TYPE_CHECKING:
     from pathlib import Path
 
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
+
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 MAX_PARAMS_LEN = 15
 
 
