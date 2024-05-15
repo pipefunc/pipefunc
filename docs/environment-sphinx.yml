@@ -32,6 +32,4 @@ dependencies:
   - myst-parser
   - emoji
   - jupytext
-  - jupyterlite-sphinx
-  - jupyterlite-xeus
   - pandas

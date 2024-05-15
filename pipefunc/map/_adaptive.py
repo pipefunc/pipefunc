@@ -16,11 +16,19 @@ from pipefunc.map._run import (
 )
 
 if TYPE_CHECKING:
+    import sys
+
     import adaptive
 
     from pipefunc import PipeFunc, Pipeline
 
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
+
+
+_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
 def make_learners(
@@ -113,6 +121,6 @@ def _execute_iteration_in_map_spec(
     )
     shape = run_info.shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
-    outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
+    outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
     _update_file_array(func, file_arrays, shape, index, outputs)
     return outputs if return_output else None

@@ -44,8 +44,6 @@ docs = [
     "myst-parser",
     "emoji",
     "jupytext",
-    "jupyterlite-sphinx",
-    "jupyterlite-xeus",
     "pandas",                  # used in example.ipynb
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
@@ -64,6 +62,10 @@ default-version = "0.0.0"
 [tool.versioningit.onbuild]
 build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
+
+[tool.setuptools.cmdclass]
+sdist = "versioningit.cmdclass.sdist"
+build_py = "versioningit.cmdclass.build_py"
 
 [tool.setuptools.packages.find]
 include = ["pipefunc.*", "pipefunc"]

@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from pipefunc._perf import ProfilingStats
     from pipefunc.map._run import Result
 
-_OUTPUT_TYPE = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
 
 
@@ -316,7 +316,7 @@ class Pipeline:
                 "Initializing the `Pipeline` using `MapSpec`s and"
                 " `PipeFunc`s modifies the `PipeFunc`s inplace."
             )
-            warnings.warn(msg, UserWarning, stacklevel=2)
+            warnings.warn(msg, UserWarning, stacklevel=3)
 
         if mapspec is not None:
             if isinstance(mapspec, str):
@@ -599,10 +599,11 @@ class Pipeline:
         manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
+        parallel: bool = True,
     ) -> list[Result]:
         from pipefunc.map import run
 
-        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup)
+        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
