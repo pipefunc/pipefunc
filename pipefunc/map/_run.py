@@ -361,12 +361,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         ]
 
     return [
-        Result(
-            function=func.__name__,
-            kwargs=kwargs,
-            output_name=output_name,
-            output=_output,
-        )
+        Result(function=func.__name__, kwargs=kwargs, output_name=output_name, output=_output)
         for output_name, _output in zip(func.output_name, output)
     ]
 
