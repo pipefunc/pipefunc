@@ -443,12 +443,7 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     def g(z: np.ndarray) -> int:
         return sum(z)
 
-    pipeline = Pipeline(
-        [
-            (f, "x[i] -> z[i]"),
-            g,
-        ],
-    )
+    pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
 
     inputs = {"x": [0, 1, 2, 3]}
     results = run_pipeline(pipeline, inputs, run_folder=tmp_path)
