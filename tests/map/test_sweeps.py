@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from pipefunc import Pipeline, Sweep, pipefunc
+from pipefunc.map._run import load_outputs, map_shapes
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def test_simple_sweep(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def add(x: int, y: int) -> int:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x + y
+
+    @pipefunc(output_name="sum")
+    def take_sum(z: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+        assert isinstance(z, np.ndarray)
+        return sum(z)
+
+    pipeline = Pipeline([add, take_sum])
+
+    inputs = {"x": [1, 2, 3], "y": 2}
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    assert results[-1].output == 12
+    assert results[-1].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == 12
+    assert map_shapes(pipeline, inputs) == {"x": (3,), "z": (3,)}
+
+    sweep = Sweep({"y": [42, 69]}, constants={"x": [1, 2, 3]})
+    for combo in sweep.generate():
+        results = pipeline.map(combo, run_folder=tmp_path, parallel=False)
