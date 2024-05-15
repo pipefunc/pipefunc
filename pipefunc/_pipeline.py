@@ -46,7 +46,9 @@ else:
     from typing import TypeAlias
 
 with contextlib.suppress(ImportError):  # pragma: no cover
-    from rich import print
+    from rich.console import Console
+
+    print = functools.partial(Console(width=500).print)  # noqa: A001
 
 
 if TYPE_CHECKING:
@@ -824,19 +826,26 @@ class Pipeline:
             "Avg CPU Usage (%)",
             "Max Memory Usage (MB)",
             "Avg Time (s)",
+            "Total Time (%)",
             "Number of Calls",
         ]
         table_data = []
-
+        total_time = 0.0
         for func_name, stats in self.profiling_stats.items():
+            t = stats.time.average
+            total_time += t
             row = [
                 func_name,
                 f"{stats.cpu.average:.2f}",
                 f"{stats.memory.max / (1024 * 1024):.2f}",
-                f"{stats.time.average:.2e}",
+                f"{t:.2e}",
+                t,  # need to divide by total time later
                 stats.time.num_executions,
             ]
             table_data.append(row)
+
+        for row in table_data:
+            row[4] = f"{row[4] / total_time:.2f}"  # type: ignore[operator]
 
         print("Resource Usage Report:")
         print(tabulate(table_data, headers, tablefmt="grid"))
