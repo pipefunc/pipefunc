@@ -121,6 +121,6 @@ def _execute_iteration_in_map_spec(
     )
     shape = run_info.shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
-    outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
+    outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
     _update_file_array(func, file_arrays, shape, index, outputs)
     return outputs if return_output else None

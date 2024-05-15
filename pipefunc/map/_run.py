@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import shutil
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
@@ -208,10 +210,10 @@ def _run_iteration(
 
 
 def _run_iteration_and_pick_output(
+    index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
-    index: int,
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, index)
     return _pick_output(func, output)
@@ -244,16 +246,25 @@ def _execute_map_spec(
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
+    *,
+    parallel: bool = True,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     n = prod(shape)
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
-    for index in range(n):
-        outputs = _run_iteration_and_pick_output(func, kwargs, shape, index)
+    process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
+    if parallel:
+        with ProcessPoolExecutor() as ex:
+            outputs_list = list(ex.map(process_index, range(n)))
+    else:
+        outputs_list = [process_index(index) for index in range(n)]
+
+    for index, outputs in enumerate(outputs_list):
         _update_file_array(func, file_arrays, shape, index, outputs)
         _update_result_array(result_arrays, index, outputs)
+
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
