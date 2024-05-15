@@ -246,8 +246,7 @@ def _execute_map_spec(
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
-    *,
-    parallel: bool = True,
+    parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -337,7 +336,7 @@ class Result(NamedTuple):
     output: Any
 
 
-def _run_function(func: PipeFunc, run_folder: Path) -> list[Result]:
+def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Result]:  # noqa: FBT001
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
         func,
@@ -347,7 +346,7 @@ def _run_function(func: PipeFunc, run_folder: Path) -> list[Result]:
         run_folder,
     )
     if func.mapspec:
-        output = _execute_map_spec(func, kwargs, run_info.shapes, run_folder)
+        output = _execute_map_spec(func, kwargs, run_info.shapes, run_folder, parallel)
     else:
         output = _execute_single(func, kwargs, run_folder)
 
@@ -379,6 +378,7 @@ def run(
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     cleanup: bool = True,
+    parallel: bool = True,
 ) -> list[Result]:
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
@@ -387,7 +387,7 @@ def run(
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder)
+            _outputs = _run_function(func, run_folder, parallel)
             outputs.extend(_outputs)
     return outputs
 

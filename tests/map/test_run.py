@@ -33,12 +33,12 @@ def test_simple(tmp_path: Path) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     assert map_shapes(pipeline, inputs) == {"x": (4,), "y": (4,)}
-    results2 = pipeline.map(inputs, run_folder=tmp_path)
+    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results2[-1].output == 12
 
 
@@ -61,12 +61,12 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [24, 30, 36, 42]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
     assert map_shapes(pipeline, inputs) == {"x": (3, 4), "y": (3, 4)}
-    results2 = pipeline.map(inputs, run_folder=tmp_path)
+    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results2[-1].output.tolist() == [24, 30, 36, 42]
 
 
@@ -89,7 +89,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [12, 44, 76]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [12, 44, 76]
@@ -125,7 +125,7 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(1, 13).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output_name == "prod"
     assert isinstance(results[-1].output, np.int_)
     assert results[-1].output == 1961990553600
@@ -141,7 +141,7 @@ def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     """Run the outer product test for the given pipeline."""
     # Used in the next three tests where we use alternative ways of defining the same pipeline
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[0].output_name == "z"
     expected = [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
     assert results[0].output.tolist() == expected
@@ -236,6 +236,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         inputs,
         run_folder=tmp_path,
         manual_shapes={"x": (4,)},
+        parallel=False,
     )
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
@@ -253,7 +254,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert pipeline("x", n=4) == list(range(4))
 
 
-@pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])
+@pytest.mark.parametrize("output_picker", [None, dict.__getitem__])
 def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     @pipefunc(output_name=("single", "double"), output_picker=output_picker)
     def double_it(x: int) -> tuple[int, int] | dict[str, int]:
@@ -272,7 +273,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=True)
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 6
@@ -313,6 +314,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         inputs,
         run_folder=tmp_path,
         manual_shapes=manual_shapes,  # type: ignore[arg-type]
+        parallel=False,
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
@@ -320,29 +322,33 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     assert map_shapes(pipeline, inputs, manual_shapes) == {"vector": (1,)}
 
 
+@dataclass(frozen=True)
+class Geometry:
+    x: float
+    y: float
+
+
+@dataclass(frozen=True)
+class Mesh:
+    geometry: Geometry
+    mesh_size: float
+
+
+@dataclass(frozen=True)
+class Materials:
+    geometry: Geometry
+    materials: list[str]
+
+
+@dataclass(frozen=True)
+class Electrostatics:
+    mesh: Mesh
+    materials: Materials
+    voltages: list[float]
+
+
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
 def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  # noqa: FBT001
-    @dataclass(frozen=True)
-    class Geometry:
-        x: float
-        y: float
-
-    @dataclass(frozen=True)
-    class Mesh:
-        geometry: Geometry
-        mesh_size: float
-
-    @dataclass(frozen=True)
-    class Materials:
-        geometry: Geometry
-        materials: list[str]
-
-    @dataclass(frozen=True)
-    class Electrostatics:
-        mesh: Mesh
-        materials: Materials
-        voltages: list[float]
-
     @pipefunc(output_name="geo")
     def make_geometry(x: float, y: float) -> Geometry:
         return Geometry(x, y)
@@ -414,7 +420,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=True)
     assert results[-1].output == 1.0
     assert results[-1].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
@@ -457,7 +463,7 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 10
     assert results[-1].output_name == "sum"
     assert map_shapes(pipeline, inputs) == {"x": (4,), "z": (4,)}
@@ -467,5 +473,5 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
 
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
-    results = pipeline.map(inputs, run_folder=tmp_path)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 14

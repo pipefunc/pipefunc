@@ -599,10 +599,11 @@ class Pipeline:
         manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
+        parallel: bool = True,
     ) -> list[Result]:
         from pipefunc.map import run
 
-        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup)
+        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
