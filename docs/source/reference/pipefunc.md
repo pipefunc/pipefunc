@@ -7,3 +7,10 @@
     :undoc-members:
     :show-inheritance:
 ```
+
+```{eval-rst}
+.. automodule:: pipefunc.map
+    :members:
+    :undoc-members:
+    :show-inheritance:
+```
