@@ -34,8 +34,9 @@ dependencies = [
     "numpy",
 ]
 [project.optional-dependencies]
+adaptive = ["adaptive", "adaptive-scheduler"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov", "pandas"]
+test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive"]
 docs = [
     "myst-nb",
     "sphinx",
