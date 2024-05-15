@@ -38,6 +38,8 @@ def test_simple(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     assert map_shapes(pipeline, inputs) == {"x": (4,), "y": (4,)}
+    results2 = pipeline.map(inputs, run_folder=tmp_path)
+    assert results2[-1].output == 12
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
@@ -64,6 +66,8 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [24, 30, 36, 42]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
     assert map_shapes(pipeline, inputs) == {"x": (3, 4), "y": (3, 4)}
+    results2 = pipeline.map(inputs, run_folder=tmp_path)
+    assert results2[-1].output.tolist() == [24, 30, 36, 42]
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
@@ -207,13 +211,13 @@ def test_outer_product_functions(tmp_path: Path) -> None:
 
 def test_simple_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
-    def generate_seeds(n: int) -> list[int]:
+    def generate_ints(n: int) -> list[int]:
         return list(range(n))
 
     @pipefunc(output_name="y")
     def double_it(x: int) -> int:
         assert isinstance(x, int)
-        return x * 2
+        return 2 * x
 
     @pipefunc(output_name="sum")
     def take_sum(y: list[int]) -> int:
@@ -221,7 +225,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            generate_seeds,
+            generate_ints,
             (double_it, "x[i] -> y[i]"),
             take_sum,
         ],
@@ -240,6 +244,13 @@ def test_simple_from_step(tmp_path: Path) -> None:
         map_shapes(pipeline, inputs)
 
     assert map_shapes(pipeline, inputs, {"x": (4,)}) == {"y": (4,)}
+
+    with pytest.raises(
+        RuntimeError,
+        match="Use `Pipeline.map` instead",
+    ):
+        pipeline("sum", n=4)
+    assert pipeline("x", n=4) == list(range(4))
 
 
 @pytest.mark.parametrize("output_picker", [None, lambda x, key: x[key]])

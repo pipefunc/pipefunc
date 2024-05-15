@@ -44,6 +44,9 @@ if sys.version_info < (3, 10):  # pragma: no cover
 else:
     from typing import TypeAlias
 
+with contextlib.suppress(ImportError):  # pragma: no cover
+    from rich import print
+
 
 if TYPE_CHECKING:
     if sys.version_info < (3, 9):  # pragma: no cover
@@ -56,6 +59,7 @@ if TYPE_CHECKING:
     import holoviews as hv
 
     from pipefunc._perf import ProfilingStats
+    from pipefunc.map._run import Result
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
@@ -125,11 +129,7 @@ class _Function:
             The return value of the pipeline function.
 
         """
-        return self.pipeline._run_pipeline(
-            output_name=self.output_name,
-            full_output=True,
-            kwargs=kwargs,
-        )
+        return self.pipeline._run_pipeline(self.output_name, full_output=True, kwargs=kwargs)
 
     def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
         """Call the pipeline function with the given arguments.
@@ -562,6 +562,13 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
+        if p := self.map_parameters & set(self.func_dependencies(output_name)):
+            msg = (
+                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
+                f" have `MapSpec`(s). Use `Pipeline.map` instead."
+            )
+            raise RuntimeError(msg)
+
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
@@ -584,6 +591,18 @@ class Pipeline:
             raise UnusedParametersError(msg)
 
         return all_results if full_output else all_results[output_name]
+
+    def map(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path,
+        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        cleanup: bool = True,
+    ) -> list[Result]:
+        from pipefunc.map import run
+
+        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
@@ -980,13 +999,12 @@ class Pipeline:
                     f_combined,
                     outputs,
                     profile=f.profile,
-                    save=f.save,
                     cache=f.cache,
                     save_function=f.save_function,
                 )
                 # Disable saving for all functions that are being combined
                 for f_ in funcs:
-                    f_.save = False
+                    f_.save_function = None
                 f_pipefunc.parameters = list(inputs)
                 new_functions.append(f_pipefunc)
             elif f not in skip:
@@ -1210,21 +1228,17 @@ def _save_results(
     lazy: bool,  # noqa: FBT001
 ) -> None:
     # Used in _execute_pipeline
-    if func.save:
-        to_save = {k: all_results[k] for k in root_args}
-        filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-        filename = func.__name__ / filename
-        to_save[output_name] = all_results[output_name]  # type: ignore[index]
-        assert func.save_function is not None
-        if lazy:
-            lazy_save = _LazyFunction(
-                func.save_function,
-                args=(filename, to_save),
-                add_to_graph=False,
-            )
-            r.add_delayed_callback(lazy_save)
-        else:
-            func.save_function(filename, to_save)  # type: ignore[arg-type]
+    if func.save_function is None:
+        return
+    to_save = {k: all_results[k] for k in root_args}
+    filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
+    filename = func.__name__ / filename
+    to_save[output_name] = all_results[output_name]  # type: ignore[index]
+    if lazy:
+        lazy_save = _LazyFunction(func.save_function, args=(filename, to_save), add_to_graph=False)
+        r.add_delayed_callback(lazy_save)
+    else:
+        func.save_function(filename, to_save)  # type: ignore[arg-type]
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:

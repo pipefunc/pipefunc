@@ -355,7 +355,6 @@ def test_tuple_outputs(tmp_path: Path):
     @pipefunc(
         output_name=("d", "e"),
         cache=cache,
-        save=True,
         save_function=save_function,
     )
     def f_d(b, c, x=1):  # noqa: ARG001
@@ -365,7 +364,6 @@ def test_tuple_outputs(tmp_path: Path):
         output_name=("g", "h"),
         output_picker=getattr,
         cache=cache,
-        save=True,
         save_function=save_function,
     )
     def f_e(c, e, x=1):  # noqa: ARG001
@@ -471,15 +469,15 @@ def test_full_output(cache, tmp_path: Path):
         with p.open("wb") as f:
             pickle.dump(result, f)
 
-    @pipefunc(output_name="f1", save=True, save_function=save_function)
+    @pipefunc(output_name="f1", save_function=save_function)
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name=("f2i", "f2j"), save=True, save_function=save_function)
+    @pipefunc(output_name=("f2i", "f2j"), save_function=save_function)
     def f2(f1):
         return 2 * f1, 1
 
-    @pipefunc(output_name="f3", save=True, save_function=save_function)
+    @pipefunc(output_name="f3", save_function=save_function)
     def f3(a, f2i):
         return a + f2i
 

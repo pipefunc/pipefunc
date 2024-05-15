@@ -1,7 +1,7 @@
 import cloudpickle
 import pytest
 
-from pipefunc._utils import _cached_load, load
+from pipefunc._utils import _cached_load, format_args, format_function_call, format_kwargs, load
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -81,3 +81,21 @@ def test_cache_invalidation_on_file_size_change(tmp_path, modify_size):
     assert result1 != result2
     # Check cache was invalidated (i.e., miss occurred)
     assert _cached_load.cache_info().misses == 2
+
+
+def test_format_args_empty():
+    assert format_args(()) == ""
+    assert format_args((42,)) == "42"
+    assert format_args((42, "hello", [1, 2, 3])) == "42, 'hello', [1, 2, 3]"
+    assert format_kwargs({}) == ""
+    assert format_kwargs({"a": 1}) == "a=1"
+    assert format_kwargs({"a": 1, "b": "test", "c": [1, 2, 3]}) == "a=1, b='test', c=[1, 2, 3]"
+    assert format_function_call("func", (), {}) == "func()"
+    assert format_function_call("func", (1, 2), {}) == "func(1, 2)"
+    assert format_function_call("func", (), {"x": 1, "y": "test"}) == "func(x=1, y='test')"
+    assert (
+        format_function_call("func", (1, 2), {"x": 1, "y": "test"}) == "func(1, 2, x=1, y='test')"
+    )
+    args = ("foo",)
+    kwargs = {"func2": "func2(arg)"}
+    assert format_function_call("func1", args, kwargs) == "func1('foo', func2='func2(arg)')"
