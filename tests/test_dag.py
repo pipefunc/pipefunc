@@ -99,6 +99,7 @@ def test_lazy_pipeline():
     assert r2["e"].evaluate() == 18
     assert pipefunc.evaluate_lazy(r2) == {"a": 1, "b": 2, "c": 3, "d": 6, "e": 18}
     assert r3.evaluate() == 18
+    assert str(r1) == "f3(c=f1(a=1, b=2), d=f2(b=2, c=f1(a=1, b=2), x=1), x=1)"
 
 
 def test_running_dag_pipeline():
