@@ -98,9 +98,7 @@ def test_conservatively_combine():
     assert "combined_f3" in function_names_false
 
     # Check that the combined function has the expected input and output arguments
-    combined_f3 = next(
-        f for f in simplified_functions_false if f.__name__ == "combined_f3"
-    )
+    combined_f3 = next(f for f in simplified_functions_false if f.__name__ == "combined_f3")
     assert combined_f3.parameters == ["b", "x"]
     assert combined_f3.output_name == "z"
 

@@ -239,9 +239,7 @@ class HybridCache(_CacheBase):
         """
         cache_str = f"Cache: {self._cache_dict}\n"
         access_counts_str = f"Access Counts: {self._access_counts}\n"
-        computation_durations_str = (
-            f"Computation Durations: {self._computation_durations}\n"
-        )
+        computation_durations_str = f"Computation Durations: {self._computation_durations}\n"
         return cache_str + access_counts_str + computation_durations_str
 
     def __len__(self) -> int:

@@ -44,9 +44,7 @@ class FileArray:
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
-        self.strides = (
-            shape_to_strides(self.shape) if strides is None else tuple(strides)
-        )
+        self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
         self.filename_template = str(filename_template)
 
     @property
@@ -94,15 +92,11 @@ class FileArray:
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (
-            self._key_to_file(x) for x in itertools.product(*map(range, self.shape))
-        )
+        return (self._key_to_file(x) for x in itertools.product(*map(range, self.shape)))
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         return [
-            range(*k.indices(self.shape[i]))
-            if isinstance(k, slice)
-            else range(k, k + 1)
+            range(*k.indices(self.shape[i])) if isinstance(k, slice) else range(k, k + 1)
             for i, k in enumerate(key)
         ]
 

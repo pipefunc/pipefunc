@@ -90,7 +90,7 @@ exclude_lines = [
 omit = ["pipefunc/_plotting.py"]
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 target-version = "py38"
 
 [tool.ruff.lint]

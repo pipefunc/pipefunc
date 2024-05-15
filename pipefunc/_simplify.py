@@ -26,8 +26,7 @@ def _wrap_dict_to_tuple(
 ) -> Callable[..., Any]:
     sig = inspect.signature(func)
     new_params = [
-        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-        for name in inputs
+        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in inputs
     ]
     new_sig = sig.replace(parameters=new_params)
 

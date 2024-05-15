@@ -155,12 +155,9 @@ def _select_kwargs(
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     input_keys = {
-        k: v[0] if len(v) == 1 else v
-        for k, v in func.mapspec.input_keys(shape, index).items()
+        k: v[0] if len(v) == 1 else v for k, v in func.mapspec.input_keys(shape, index).items()
     }
-    selected = {
-        k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()
-    }
+    selected = {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
     _load_file_array(selected)
     return selected
 
@@ -185,11 +182,7 @@ def _init_result_arrays(
 
 def _pick_output(func: PipeFunc, output: Any) -> list[Any]:
     return [
-        (
-            func.output_picker(output, output_name)
-            if func.output_picker is not None
-            else output
-        )
+        (func.output_picker(output, output_name) if func.output_picker is not None else output)
         for output_name in at_least_tuple(func.output_name)
     ]
 
@@ -283,9 +276,7 @@ def map_shapes(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
-    mapspec_funcs = [
-        f for gen in pipeline.topological_generations[1] for f in gen if f.mapspec
-    ]
+    mapspec_funcs = [f for gen in pipeline.topological_generations[1] for f in gen if f.mapspec]
     for func in mapspec_funcs:
         assert func.mapspec is not None
         input_shapes = {}
@@ -369,13 +360,15 @@ def run(
     inputs: dict[str, Any],
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    cleanup: bool = True,
 ) -> list[Result]:
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     outputs = []
     for gen in pipeline.topological_generations[1]:
-        # These evaluations can happen in parallel
+        # These evaluations *can* happen in parallel
         for func in gen:
             _outputs = _run_function(func, run_folder)
             outputs.extend(_outputs)

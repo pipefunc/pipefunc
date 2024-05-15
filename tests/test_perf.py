@@ -29,9 +29,7 @@ def test_resource_stats_std():
     for time in execution_times:
         stats.update(time)
 
-    variance = sum((xi - stats.average) ** 2 for xi in execution_times) / (
-        len(execution_times) - 1
-    )
+    variance = sum((xi - stats.average) ** 2 for xi in execution_times) / (len(execution_times) - 1)
     std_dev = variance**0.5
 
     assert stats.std == std_dev

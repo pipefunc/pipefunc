@@ -166,8 +166,7 @@ class _Function:
     ) -> Callable[..., Any]:
         sig = inspect.signature(self.__call__)
         new_params = [
-            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-            for name in parameters
+            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in parameters
         ]
         new_sig = sig.replace(parameters=new_params)
 
@@ -357,9 +356,7 @@ class Pipeline:
             The name of the output to drop from the pipeline.
 
         """
-        if (f is not None and output_name is not None) or (
-            f is None and output_name is None
-        ):
+        if (f is not None and output_name is not None) or (f is None and output_name is None):
             msg = "One of `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
@@ -581,9 +578,7 @@ class Pipeline:
         )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (
-            unused := set(kwargs) - set(used_parameters)
-        ):
+        if None not in used_parameters and (unused := set(kwargs) - set(used_parameters)):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
@@ -641,9 +636,7 @@ class Pipeline:
             return r
         arg_combos = self.arg_combinations(output_name)
         root_args = next(
-            args
-            for args in arg_combos
-            if all(isinstance(self.node_mapping[n], str) for n in args)
+            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
         )
         self._root_args[output_name] = root_args
         return root_args
@@ -1013,9 +1006,7 @@ class Pipeline:
     @property
     def profiling_stats(self) -> dict[str, ProfilingStats]:
         """Return the profiling data for each function in the pipeline."""
-        return {
-            f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats
-        }
+        return {f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats}
 
     def __str__(self) -> str:
         """Return a string representation of the pipeline."""
@@ -1024,9 +1015,7 @@ class Pipeline:
             if isinstance(node, PipeFunc):
                 fn = node
                 input_args = self.all_arg_combinations[fn.output_name]
-                pipeline_str += (
-                    f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
-                )
+                pipeline_str += f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
