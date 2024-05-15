@@ -832,20 +832,19 @@ class Pipeline:
         table_data = []
         total_time = 0.0
         for func_name, stats in self.profiling_stats.items():
-            t = stats.time.average
-            total_time += t
             row = [
                 func_name,
                 f"{stats.cpu.average:.2f}",
                 f"{stats.memory.max / (1024 * 1024):.2f}",
-                f"{t:.2e}",
-                t,  # need to divide by total time later
+                f"{stats.time.average:.2e}",
+                stats.time.average * stats.time.num_executions,
                 stats.time.num_executions,
             ]
             table_data.append(row)
 
+        total_time = sum(row[4] for row in table_data)  # type: ignore[misc]
         for row in table_data:
-            row[4] = f"{row[4] / total_time:.2f}"  # type: ignore[operator]
+            row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
 
         print("Resource Usage Report:")
         print(tabulate(table_data, headers, tablefmt="grid"))
