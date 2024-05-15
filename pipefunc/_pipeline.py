@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     import holoviews as hv
 
     from pipefunc._perf import ProfilingStats
+    from pipefunc.map._run import Result
 
 _OUTPUT_TYPE = Union[str, Tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
@@ -561,9 +562,13 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
-        if self.map_parameters:
-            msg = "Cannot execute pipeline with `MapSpec`(s)."
+        if p := self.map_parameters & set(self.func_dependencies(output_name)):
+            msg = (
+                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
+                f" have `MapSpec`(s). Use `Pipeline.map` instead."
+            )
             raise RuntimeError(msg)
+
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
@@ -586,6 +591,18 @@ class Pipeline:
             raise UnusedParametersError(msg)
 
         return all_results if full_output else all_results[output_name]
+
+    def map(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path,
+        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        cleanup: bool = True,
+    ) -> list[Result]:
+        from pipefunc.map import run
+
+        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
