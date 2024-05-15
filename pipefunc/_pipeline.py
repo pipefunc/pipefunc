@@ -35,7 +35,7 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict
+from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
 
 if sys.version_info < (3, 10):  # pragma: no cover
@@ -249,6 +249,8 @@ class Pipeline:
             del self.all_arg_combinations
         with contextlib.suppress(AttributeError):
             del self.all_root_args
+        with contextlib.suppress(AttributeError):
+            del self.topological_generations
 
     def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -642,9 +644,6 @@ class Pipeline:
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
 
-        Considering only the root input nodes if `root_args_only` is
-        set to True.
-
         Returns
         -------
         Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
@@ -685,6 +684,13 @@ class Pipeline:
             )
             raise ValueError(msg)
         return leaf_nodes[0]
+
+    @functools.cached_property
+    def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
+        generations = list(nx.topological_generations(self.graph))
+        assert all(isinstance(x, str) for x in generations[0])
+        assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
+        return generations[0], generations[1:]
 
     def _func_node_colors(
         self,
@@ -1032,15 +1038,6 @@ def _valid_key(key: Any) -> Any:
     return key
 
 
-def _handle_error(e: Exception, func: Callable, func_args: dict[str, Any]) -> None:
-    kwargs_str = ", ".join(f"{k}={v}" for k, v in func_args.items())
-    msg = f"Error occurred while executing function `{func.__name__}({kwargs_str})`."
-    if sys.version_info <= (3, 11):  # pragma: no cover
-        raise type(e)(e.args[0] + msg) from e
-    e.add_note(msg)
-    raise
-
-
 def _update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
@@ -1130,8 +1127,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     try:
         return func(**func_args)
     except Exception as e:
-        _handle_error(e, func, func_args)
-        raise  # already raised in _handle_error, but mypy doesn't know that
+        handle_error(e, func, func_args)
+        raise  # handle_error raises but mypy doesn't know that
 
 
 def _compute_cache_key(
