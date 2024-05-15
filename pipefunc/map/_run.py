@@ -254,7 +254,7 @@ def _execute_map_spec(
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
-    if parallel:
+    if parallel and n > 1:
         with ProcessPoolExecutor() as ex:
             outputs_list = list(ex.map(process_index, range(n)))
     else:
