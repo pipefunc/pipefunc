@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections import OrderedDict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 

@@ -31,10 +31,12 @@ dependencies = [
     "versioningit",
     "typing_extensions; python_version <= '3.9'",
     "cloudpickle",
+    "numpy",
 ]
 [project.optional-dependencies]
+adaptive = ["adaptive", "adaptive-scheduler"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov", "pandas"]
+test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive"]
 docs = [
     "myst-nb",
     "sphinx",
