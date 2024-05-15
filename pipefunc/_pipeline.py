@@ -29,6 +29,7 @@ from typing import (
 )
 
 import networkx as nx
+from tabulate import tabulate
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._lazy import _LazyFunction, task_graph
@@ -817,14 +818,28 @@ class Pipeline:
         if not self.profiling_stats:
             msg = "Profiling is not enabled."
             raise ValueError(msg)
-        print("Resource Usage Report:")
+
+        headers = [
+            "Function",
+            "Avg CPU Usage (%)",
+            "Max Memory Usage (MB)",
+            "Avg Time (s)",
+            "Number of Calls",
+        ]
+        table_data = []
+
         for func_name, stats in self.profiling_stats.items():
-            print(
-                f"{func_name}: average CPU usage: {stats.cpu.average * 100:.2f}%,"
-                f" max memory usage: {stats.memory.max / (1024 * 1024):.2f} MB,"
-                f" average time: {stats.time.average:.2e} s,"
-                f" number of calls: {stats.time.num_executions}",
-            )
+            row = [
+                func_name,
+                f"{stats.cpu.average:.2f}",
+                f"{stats.memory.max / (1024 * 1024):.2f}",
+                f"{stats.time.average:.2e}",
+                stats.time.num_executions,
+            ]
+            table_data.append(row)
+
+        print("Resource Usage Report:")
+        print(tabulate(table_data, headers, tablefmt="grid"))
 
     def _identify_combinable_nodes(
         self,

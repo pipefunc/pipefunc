@@ -33,5 +33,6 @@ def test_simple_sweep(tmp_path: Path) -> None:
     assert map_shapes(pipeline, inputs) == {"x": (3,), "z": (3,)}
 
     sweep = Sweep({"y": [42, 69]}, constants={"x": [1, 2, 3]})
-    for combo in sweep.generate():
-        results = pipeline.map(combo, run_folder=tmp_path, parallel=False)
+    for i, combo in enumerate(sweep.generate()):
+        run_folder = tmp_path / f"sweep_{i}"
+        results = pipeline.map(combo, run_folder=run_folder, parallel=False)
