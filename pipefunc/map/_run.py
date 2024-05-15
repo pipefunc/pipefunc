@@ -88,6 +88,7 @@ class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     manual_shapes: dict[str, int | tuple[int, ...]]
+    run_folder: Path
 
     @classmethod
     def create(
@@ -111,6 +112,7 @@ class RunInfo(NamedTuple):
             input_paths=input_paths,
             shapes=shapes,
             manual_shapes=manual_shapes,
+            run_folder=run_folder,
         )
 
     def dump(self, run_folder: str | Path) -> None:
@@ -134,6 +136,22 @@ def _file_array_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / output_name
 
 
+def _load_parameter(
+    parameter: str,
+    input_paths: dict[str, Path],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    manual_shapes: dict[str, int | tuple[int, ...]],
+    run_folder: Path,
+) -> Any:
+    if parameter in input_paths:
+        return _load_input(parameter, input_paths)
+    if parameter in manual_shapes or parameter not in shapes:
+        return _load_output(parameter, run_folder)
+    file_array_path = _file_array_path(parameter, run_folder)
+    shape = shapes[parameter]
+    return FileArray(file_array_path, shape)
+
+
 def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
@@ -141,20 +159,10 @@ def _func_kwargs(
     manual_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
-    kwargs = {}
-    for parameter in func.parameters:
-        if parameter in input_paths:
-            value = _load_input(parameter, input_paths)
-            kwargs[parameter] = value
-        elif parameter in manual_shapes or parameter not in shapes:
-            value = _load_output(parameter, run_folder)
-            kwargs[parameter] = value
-        else:
-            file_array_path = _file_array_path(parameter, run_folder)
-            shape = shapes[parameter]
-            file_array = FileArray(file_array_path, shape)
-            kwargs[parameter] = file_array
-    return kwargs
+    return {
+        p: _load_parameter(p, input_paths, shapes, manual_shapes, run_folder)
+        for p in func.parameters
+    }
 
 
 def _select_kwargs(
@@ -321,10 +329,15 @@ def map_shapes(
     return shapes
 
 
+def _maybe_load_file_array(x: Any) -> Any:
+    if isinstance(x, FileArray):
+        return x.to_array()
+    return x
+
+
 def _load_file_array(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        if isinstance(v, FileArray):
-            kwargs[k] = v.to_array()
+        kwargs[k] = _maybe_load_file_array(v)
 
 
 class Result(NamedTuple):
@@ -385,3 +398,24 @@ def run_pipeline(
             _outputs = _run_function(func, run_folder)
             outputs.extend(_outputs)
     return outputs
+
+
+def load_outputs(
+    *output_names: str,
+    run_folder: str | Path,
+) -> Any | list[Any]:
+    """Load the outputs of a run."""
+    run_folder = Path(run_folder)
+    run_info = RunInfo.load(run_folder)
+    outputs = [
+        _load_parameter(
+            on,
+            run_info.input_paths,
+            run_info.shapes,
+            run_info.manual_shapes,
+            run_folder,
+        )
+        for on in output_names
+    ]
+    outputs = [_maybe_load_file_array(o) for o in outputs]
+    return outputs[0] if len(output_names) == 1 else outputs

@@ -8,7 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._run import map_shapes, run_pipeline
+from pipefunc.map._run import load_outputs, map_shapes, run_pipeline
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -444,3 +444,7 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     assert results[-1].output == 10
     assert results[-1].output_name == "sum"
     assert map_shapes(pipeline, inputs) == {"x": (4,), "z": (4,)}
+    sum_result = load_outputs("sum", run_folder=tmp_path)
+    assert sum_result == 10
+    sum_result = load_outputs("z", run_folder=tmp_path)
+    assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
