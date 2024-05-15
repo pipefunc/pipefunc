@@ -6,7 +6,8 @@ import adaptive
 import numpy as np
 
 from pipefunc import Pipeline, Sweep, pipefunc
-from pipefunc.map import create_learners, create_learners_from_sweep, load_outputs
+from pipefunc.map import load_outputs
+from pipefunc.map.adaptive import create_learners, create_learners_from_sweep
 
 if TYPE_CHECKING:
     from pathlib import Path

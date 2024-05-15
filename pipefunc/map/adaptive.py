@@ -15,8 +15,10 @@ from pipefunc.map._run import (
     _execute_single,
     _func_kwargs,
     _init_file_arrays,
+    _MockPipeline,
     _run_iteration_and_pick_output,
     _update_file_array,
+    run,
 )
 
 if TYPE_CHECKING:
@@ -154,7 +156,7 @@ def _execute_iteration_in_map_spec(
 
 
 def _map_wrapper(
-    pipeline: Pipeline,
+    pipeline: _MockPipeline,
     inputs: dict[str, Any],
     run_folder: Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
@@ -162,7 +164,7 @@ def _map_wrapper(
     """Wraps the `pipeline.map` method and makes it a callable with a single unused argument."""
 
     def wrapped(_: Any) -> None:
-        pipeline.map(inputs, run_folder=run_folder, manual_shapes=manual_shapes)
+        run(pipeline, inputs, run_folder=run_folder, manual_shapes=manual_shapes)  # type: ignore[arg-type]
 
     return wrapped
 
@@ -210,7 +212,8 @@ def create_learners_from_sweep(
     max_digits = len(str(len(sweep) - 1))
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
-        f = _map_wrapper(pipeline, inputs, sweep_run, manual_shapes)
+        mock_pipeline = _MockPipeline.from_pipeline(pipeline)
+        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes)
         learner = adaptive.SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

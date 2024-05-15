@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
@@ -22,7 +23,32 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
+    if sys.version_info < (3, 11):  # pragma: no cover
+        pass
+    else:
+        pass
+
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+
+
+@dataclass
+class _MockPipeline:
+    """An object that contains all information required to run a pipeline.
+
+    Ensures that we're not pickling the entire pipeline object when not needed.
+    """
+
+    defaults: dict[str, Any]
+    map_parameters: set[str]
+    topological_generations: tuple[list[str], list[list[PipeFunc]]]
+
+    @classmethod
+    def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
+        return cls(
+            defaults=pipeline.defaults,
+            map_parameters=pipeline.map_parameters,
+            topological_generations=pipeline.topological_generations,
+        )
 
 
 def _dump_inputs(
