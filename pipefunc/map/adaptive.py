@@ -161,7 +161,11 @@ def _map_wrapper(
     run_folder: Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> Callable[[Any], None]:
-    """Wraps the `pipeline.map` method and makes it a callable with a single unused argument."""
+    """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
+
+    Uses a `_MockPipeline` that contains all the required information to run the pipeline but is
+    cheaper to serialize and pass around.
+    """
 
     def wrapped(_: Any) -> None:
         run(pipeline, inputs, run_folder=run_folder, manual_shapes=manual_shapes)  # type: ignore[arg-type]
