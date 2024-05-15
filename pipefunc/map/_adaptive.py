@@ -141,9 +141,10 @@ def _map_wrapper(
 def create_learners_from_sweep(
     pipeline: Pipeline,
     sweep: Sweep,
+    run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
-    run_folder = Path("my_run")
+    run_folder = Path(run_folder)
     learners = []
     folders = []
     max_digits = len(str(len(sweep) - 1))
