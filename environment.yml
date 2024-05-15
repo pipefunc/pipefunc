@@ -13,6 +13,7 @@ dependencies:
   - versioningit
   - typing_extensions
   - cloudpickle
+  - numpy
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
