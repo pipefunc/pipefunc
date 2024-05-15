@@ -49,7 +49,7 @@ pygments_style = "sphinx"
 
 # -- Options for HTML output -------------------------------------------------
 
-html_logo = "https://github.com/basnijholt/nijho.lt/raw/d21b88e104fcc4cef964b9a21efd8789dc4ea733/content/project/pipefunc/featured.png"
+html_logo = "https://github.com/basnijholt/nijho.lt/raw/6b2c80b1b42507b46e71e66b06fd986dc7abef5c/content/project/pipefunc/featured.png"
 html_theme = "furo"
 html_static_path = ["_static"]
 
