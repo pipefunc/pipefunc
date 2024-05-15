@@ -980,13 +980,12 @@ class Pipeline:
                     f_combined,
                     outputs,
                     profile=f.profile,
-                    save=f.save,
                     cache=f.cache,
                     save_function=f.save_function,
                 )
                 # Disable saving for all functions that are being combined
                 for f_ in funcs:
-                    f_.save = False
+                    f_.save_function = None
                 f_pipefunc.parameters = list(inputs)
                 new_functions.append(f_pipefunc)
             elif f not in skip:
@@ -1210,7 +1209,7 @@ def _save_results(
     lazy: bool,  # noqa: FBT001
 ) -> None:
     # Used in _execute_pipeline
-    if func.save:
+    if func.save_function is not None:
         to_save = {k: all_results[k] for k in root_args}
         filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
         filename = func.__name__ / filename

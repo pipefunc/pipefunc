@@ -77,10 +77,9 @@ class PipeFunc(Generic[T]):
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
-    save
-        Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+        If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
         be merged together. If None, the default behavior is that the input directly
@@ -114,7 +113,6 @@ class PipeFunc(Generic[T]):
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
-        save: bool | None = None,
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
         mapspec: str | MapSpec | None = None,
     ) -> None:
@@ -126,7 +124,6 @@ class PipeFunc(Generic[T]):
         self.cache = cache
         self.save_function = save_function
         self.mapspec = MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
-        self.save = save if save is not None else save_function is not None
         self.output_picker: Callable[[Any, str], Any] | None = output_picker
         if output_picker is None and isinstance(output_name, tuple):
             self.output_picker = functools.partial(
@@ -318,7 +315,6 @@ def pipefunc(
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
-    save: bool | None = None,
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
@@ -340,10 +336,9 @@ def pipefunc(
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the decorated function should be cached.
-    save
-        Flag indicating whether the output of the wrapped function should be saved.
     save_function
         A function that takes the filename and a dict containing the inputs and output.
+        If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
         be merged together. If None, the default behavior is that the input directly
@@ -379,7 +374,6 @@ def pipefunc(
             profile=profile,
             debug=debug,
             cache=cache,
-            save=save,
             save_function=save_function,
             mapspec=mapspec,
         )
