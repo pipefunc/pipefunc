@@ -127,11 +127,12 @@ def visualize(
     plt.axis("off")
     # plt.tight_layout()
     axis = plt.gca()
-    fix_graph_scale(axis,pos)
+    fix_graph_scale(axis, pos)
     if filename is not None:
         plt.savefig(filename)
 
     plt.show()
+
 
 def get_ax_size(ax):
     bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
@@ -141,9 +142,8 @@ def get_ax_size(ax):
     return width, height
 
 
-def fix_graph_scale(ax,pos,node_size = 4000):
-
-    node_radius = (node_size / 3.14159265359)**0.5
+def fix_graph_scale(ax, pos, node_size=4000):
+    node_radius = (node_size / 3.14159265359) ** 0.5
 
     min_x = min(i_pos[0] for i_pos in pos.values())
     max_x = max(i_pos[0] for i_pos in pos.values())
@@ -151,8 +151,8 @@ def fix_graph_scale(ax,pos,node_size = 4000):
     max_y = max(i_pos[1] for i_pos in pos.values())
 
     ax_size_x, ax_size_y = get_ax_size(ax)
-    points_to_x_axis = (max_x - min_x)/(ax_size_x-node_radius*2)
-    points_to_y_axis = (max_y - min_y)/(ax_size_y-node_radius*2)
+    points_to_x_axis = (max_x - min_x) / (ax_size_x - node_radius * 2)
+    points_to_y_axis = (max_y - min_y) / (ax_size_y - node_radius * 2)
     node_radius_in_x_axis = node_radius * points_to_x_axis
     node_radius_in_y_axis = node_radius * points_to_y_axis
 
