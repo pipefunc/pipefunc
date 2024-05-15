@@ -176,10 +176,14 @@ def create_learners_from_sweep(
     """Create adaptive learners for a sweep.
 
     Creates an `adaptive.SequenceLearner` for each sweep run. These learners
-    have a single iteration that executes the sweep run in parallel. This means
+    have a single iteration that executes the map in parallel. This means
     that here we rely on the internal parallelization of the pipeline. Each
     learner is fully independent of the others, and they can be executed in
     parallel.
+
+    Note that this only parallelizes the nodes with a `MapSpec`, the rest of
+    the nodes are executed in order. Only use this if the sequential execution
+    of the nodes is not a bottleneck.
 
     Parameters
     ----------
