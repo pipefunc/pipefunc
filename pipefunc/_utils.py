@@ -88,7 +88,7 @@ def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) ->
 def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     """Handle an error that occurred while executing a function."""
     call_str = format_function_call(func.__name__, (), kwargs)
-    msg = f"Error occurred while executing function `{call_str})`."
+    msg = f"Error occurred while executing function `{call_str}`."
     if sys.version_info <= (3, 11):  # pragma: no cover
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)

@@ -24,13 +24,17 @@ import cloudpickle
 from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 9):  # pragma: no cover
     from typing import Callable
 else:
     from collections.abc import Callable
 
-from pipefunc.map._mapspec import MapSpec
+
+with contextlib.suppress(ImportError):  # pragma: no cover
+    from rich import print
+
 
 if TYPE_CHECKING:
     from pathlib import Path

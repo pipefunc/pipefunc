@@ -44,6 +44,9 @@ if sys.version_info < (3, 10):  # pragma: no cover
 else:
     from typing import TypeAlias
 
+with contextlib.suppress(ImportError):  # pragma: no cover
+    from rich import print
+
 
 if TYPE_CHECKING:
     if sys.version_info < (3, 9):  # pragma: no cover
