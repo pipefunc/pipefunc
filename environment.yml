@@ -24,4 +24,3 @@ dependencies:
   - coverage
   - pytest-cov
   - pandas
-  - adaptive
