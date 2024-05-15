@@ -830,7 +830,7 @@ class Pipeline:
             "Number of Calls",
         ]
         table_data = []
-        total_time = 0.0
+
         for func_name, stats in self.profiling_stats.items():
             row = [
                 func_name,
@@ -843,8 +843,9 @@ class Pipeline:
             table_data.append(row)
 
         total_time = sum(row[4] for row in table_data)  # type: ignore[misc]
-        for row in table_data:
-            row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
+        if total_time > 0:
+            for row in table_data:
+                row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
 
         print("Resource Usage Report:")
         print(tabulate(table_data, headers, tablefmt="grid"))
