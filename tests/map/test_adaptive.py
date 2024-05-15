@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import adaptive
 import numpy as np
 
-from pipefunc import Pipeline, pipefunc
-from pipefunc.map._adaptive import create_learners
+from pipefunc import Pipeline, Sweep, pipefunc
+from pipefunc.map import create_learners, create_learners_from_sweep, load_outputs
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,12 +24,7 @@ def test_basic(tmp_path: Path) -> None:
         assert isinstance(z, np.ndarray)
         return np.prod(z)
 
-    pipeline = Pipeline(
-        [
-            (add, "x[i], y[j] -> z[i, j]"),
-            take_sum,
-        ],
-    )
+    pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
 
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
     learners_dicts = create_learners(
@@ -93,3 +88,28 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert flat_learners["y"].data == {0: [0], 1: [2], 2: [4], 3: [6]}
     adaptive.runner.simple(flat_learners["sum"])
     assert flat_learners["sum"].data == {0: 12}
+
+
+def test_create_learners_from_sweep(tmp_path: Path) -> None:
+    @pipefunc(output_name="z")
+    def add(x: int, y: int) -> int:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x + y
+
+    @pipefunc(output_name="prod")
+    def take_sum(z: np.ndarray) -> int:
+        assert isinstance(z, np.ndarray)
+        return np.prod(z)
+
+    pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
+    sweep = Sweep({"y": [[1, 2], [3, 4, 5]]}, constants={"x": [1, 2]})
+    learners, folders = create_learners_from_sweep(
+        pipeline,
+        sweep,
+        run_folder=tmp_path,
+    )
+    for learner in learners:
+        adaptive.runner.simple(learner)
+    for folder in folders:
+        assert load_outputs("prod", run_folder=folder) > 0
