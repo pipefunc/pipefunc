@@ -23,10 +23,9 @@ def _dump_inputs(
 ) -> dict[str, Path]:
     folder = run_folder / "inputs"
     folder.mkdir(parents=True, exist_ok=True)
-    for k, v in defaults.items():
-        inputs.setdefault(k, v)
     paths = {}
-    for k, v in inputs.items():
+    to_dump = dict(defaults, **inputs)
+    for k, v in to_dump.items():
         path = folder / f"{k}.cloudpickle"
         dump(v, path)
         paths[k] = path

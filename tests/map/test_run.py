@@ -465,3 +465,7 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     assert sum_result == 10
     sum_result = load_outputs("z", run_folder=tmp_path)
     assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
+
+    inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
+    results = pipeline.map(inputs, run_folder=tmp_path)
+    assert results[-1].output == 14
