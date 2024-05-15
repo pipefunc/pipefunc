@@ -93,10 +93,7 @@ class _LazyFunction:
 
         kwargs = format_kwargs(self.kwargs)
         args = ", ".join(repr(arg) for arg in self.args)
-        if isinstance(self.func, PipeFunc):
-            func = str(self.func.__name__)
-        else:
-            func = str(self.func)
+        func = str(self.func.__name__) if isinstance(self.func, PipeFunc) else str(self.func)
         if args and kwargs:
             return f"{func}({args}, {kwargs})"
         if args:

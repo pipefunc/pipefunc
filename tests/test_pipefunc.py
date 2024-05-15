@@ -136,9 +136,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
     assert fd(a=2, b=3, xx=1) == f2(b=3, c=c, xx=1) == fd(b=3, c=c, xx=1) == 15
 
     fe = pipeline.func("e")
-    assert (
-        fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
-    )
+    assert fe(a=2, b=3, x=1, xx=1) == fe(a=2, b=3, d=15, x=1) == f3(c=c, d=15, x=1) == 75
 
     all_args = pipeline.all_arg_combinations
     assert all_args == {

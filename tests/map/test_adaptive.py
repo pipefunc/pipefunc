@@ -38,9 +38,7 @@ def test_basic(tmp_path: Path) -> None:
         run_folder=tmp_path,
         return_output=True,
     )
-    flat_learners = {
-        k: v for learner_dict in learners_dicts for k, v in learner_dict.items()
-    }
+    flat_learners = {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
     assert len(flat_learners) == 2
     adaptive.runner.simple(flat_learners["z"])
     assert flat_learners["z"].data == {
@@ -87,9 +85,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         manual_shapes={"x": 4},  # 4 should become (4,)
         return_output=True,
     )
-    flat_learners = {
-        k: v for learner_dict in learners_dicts for k, v in learner_dict.items()
-    }
+    flat_learners = {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
     assert len(flat_learners) == 3
     adaptive.runner.simple(flat_learners["x"])
     assert flat_learners["x"].data == {0: [0, 1, 2, 3]}

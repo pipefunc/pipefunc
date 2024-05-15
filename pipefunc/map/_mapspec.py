@@ -99,16 +99,10 @@ class MapSpec:
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
         if extra_indices := output_indices - input_indices:
-            msg = (
-                "Output array has indices that do not appear "
-                f"in the input: {extra_indices}"
-            )
+            msg = f"Output array has indices that do not appear in the input: {extra_indices}"
             raise ValueError(msg)
         if unused_indices := input_indices - output_indices:
-            msg = (
-                "Input array have indices that do not appear "
-                f"in the output: {unused_indices}"
-            )
+            msg = f"Input array have indices that do not appear in the output: {unused_indices}"
             raise ValueError(msg)
 
     @property
@@ -154,10 +148,7 @@ class MapSpec:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             dim, *rest = (get_dim(x, index) for x in relevant_arrays)
             if any(dim != x for x in rest):
-                msg = (
-                    f"Dimension mismatch for arrays {relevant_arrays} "
-                    f"along {index} axis."
-                )
+                msg = f"Dimension mismatch for arrays {relevant_arrays} along {index} axis."
                 raise ValueError(msg)
             shape.append(dim)
 
@@ -184,8 +175,7 @@ class MapSpec:
             msg = f"Expected a shape of length {len(self.indices)}, got {shape}"
             raise ValueError(msg)
         return tuple(
-            (linear_index // stride) % dim
-            for stride, dim in zip(shape_to_strides(shape), shape)
+            (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
         )
 
     def input_keys(
@@ -331,9 +321,7 @@ def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bo
     map_size = np.prod(map_shape)
 
     def is_masked(i: int) -> bool:
-        return any(
-            kwarg_masks[k][v] for k, v in mapspec.input_keys(map_shape, i).items()
-        )
+        return any(kwarg_masks[k][v] for k, v in mapspec.input_keys(map_shape, i).items())
 
     return np.array([is_masked(x) for x in range(map_size)]).reshape(map_shape)
 
