@@ -64,6 +64,7 @@ def visualize(
         node_size=4000,
         node_color="lightgreen",
         node_shape="s",
+        edgecolors="black",
     )
     nx.draw_networkx_nodes(
         graph,
@@ -72,20 +73,21 @@ def visualize(
         node_size=4000,
         node_color=func_node_colors or "skyblue",
         node_shape="o",
+        edgecolors="black",
     )
 
-    nx.draw_networkx_labels(
-        graph,
-        pos,
-        {node: node for node in arg_nodes},
-        font_size=12,
-    )
-    nx.draw_networkx_labels(
-        graph,
-        pos,
-        {node: f"{node!s}" for node in func_nodes},
-        font_size=12,
-    )
+    # nx.draw_networkx_labels(
+    #     graph,
+    #     pos,
+    #     {node: node for node in arg_nodes},
+    #     font_size=12,
+    # )
+    # nx.draw_networkx_labels(
+    #     graph,
+    #     pos,
+    #     {node: f"{node!s}" for node in func_nodes},
+    #     font_size=12,
+    # )
 
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
@@ -106,27 +108,61 @@ def visualize(
                 arg = ", ".join(arg)
             outputs[edge] = arg
 
-    nx.draw_networkx_edge_labels(
-        graph,
-        pos,
-        edge_labels=outputs,
-        font_size=12,
-        font_color="skyblue",
-    )
+    # nx.draw_networkx_edge_labels(
+    #     graph,
+    #     pos,
+    #     edge_labels=outputs,
+    #     font_size=12,
+    #     font_color="skyblue",
+    # )
 
-    nx.draw_networkx_edge_labels(
-        graph,
-        pos,
-        edge_labels=inputs,
-        font_size=12,
-        font_color="lightgreen",
-    )
+    # nx.draw_networkx_edge_labels(
+    #     graph,
+    #     pos,
+    #     edge_labels=inputs,
+    #     font_size=12,
+    #     font_color="lightgreen",
+    # )
 
     plt.axis("off")
-    plt.tight_layout()
+    # plt.tight_layout()
+    axis = plt.gca()
+    fix_graph_scale(axis, pos)
     if filename is not None:
         plt.savefig(filename)
+
     plt.show()
+
+
+def get_ax_size(ax):
+    bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
+    width, height = bbox.width, bbox.height
+    width *= 72
+    height *= 72
+    return width, height
+
+
+def fix_graph_scale(ax, pos, node_size=4000):
+    node_radius = (node_size / 3.14159265359) ** 0.5
+
+    min_x = min(i_pos[0] for i_pos in pos.values())
+    max_x = max(i_pos[0] for i_pos in pos.values())
+    min_y = min(i_pos[1] for i_pos in pos.values())
+    max_y = max(i_pos[1] for i_pos in pos.values())
+
+    ax_size_x, ax_size_y = get_ax_size(ax)
+    points_to_x_axis = (max_x - min_x) / (ax_size_x - node_radius * 2)
+    points_to_y_axis = (max_y - min_y) / (ax_size_y - node_radius * 2)
+    node_radius_in_x_axis = node_radius * points_to_x_axis
+    node_radius_in_y_axis = node_radius * points_to_y_axis
+
+    ax_min_x = min_x - node_radius_in_x_axis
+    ax_max_x = max_x + node_radius_in_x_axis
+    ax_min_y = min_y - node_radius_in_y_axis
+    ax_max_y = max_y + node_radius_in_y_axis
+
+    ax.set_xlim([ax_min_x, ax_max_x])
+    ax.set_ylim([ax_min_y, ax_max_y])
 
 
 def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
