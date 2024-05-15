@@ -24,7 +24,7 @@ author = "Bas Nijholt"
 copyright = f"2023, {author}"
 
 version = ".".join(pipefunc.__version__.split(".")[:3])
-release = pipefunc.__version__
+release = version
 
 
 # -- General configuration ---------------------------------------------------
@@ -49,6 +49,7 @@ pygments_style = "sphinx"
 
 # -- Options for HTML output -------------------------------------------------
 
+html_logo = "https://github.com/basnijholt/nijho.lt/raw/6b2c80b1b42507b46e71e66b06fd986dc7abef5c/content/project/pipefunc/featured.png"
 html_theme = "furo"
 html_static_path = ["_static"]
 
