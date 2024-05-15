@@ -1214,7 +1214,6 @@ def _save_results(
         filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
         filename = func.__name__ / filename
         to_save[output_name] = all_results[output_name]  # type: ignore[index]
-        assert func.save_function is not None
         if lazy:
             lazy_save = _LazyFunction(
                 func.save_function,
