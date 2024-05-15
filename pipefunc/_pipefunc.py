@@ -164,7 +164,7 @@ class PipeFunc(Generic[T]):
             func_str = format_function_call(self.func.__name__, (), kwargs)
             msg = (
                 f"Function returning '{self.output_name}' was invoked"
-                f" as `{func_str}`. The results was `{result}`."
+                f" as `{func_str}` and returned `{result}`."
             )
             if self.profiling_stats is not None:
                 dt = self.profiling_stats.time.average
