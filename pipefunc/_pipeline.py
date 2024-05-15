@@ -128,11 +128,7 @@ class _Function:
             The return value of the pipeline function.
 
         """
-        return self.pipeline._run_pipeline(
-            output_name=self.output_name,
-            full_output=True,
-            kwargs=kwargs,
-        )
+        return self.pipeline._run_pipeline(self.output_name, full_output=True, kwargs=kwargs)
 
     def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
         """Call the pipeline function with the given arguments.
@@ -565,6 +561,9 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
+        if self.map_parameters:
+            msg = "Cannot execute pipeline with `MapSpec`(s)."
+            raise RuntimeError(msg)
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
