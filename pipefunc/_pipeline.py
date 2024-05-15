@@ -316,7 +316,7 @@ class Pipeline:
                 "Initializing the `Pipeline` using `MapSpec`s and"
                 " `PipeFunc`s modifies the `PipeFunc`s inplace."
             )
-            warnings.warn(msg, UserWarning, stacklevel=2)
+            warnings.warn(msg, UserWarning, stacklevel=3)
 
         if mapspec is not None:
             if isinstance(mapspec, str):
