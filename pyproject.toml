@@ -65,6 +65,10 @@ default-version = "0.0.0"
 build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
 
+[tool.setuptools.cmdclass]
+sdist = "versioningit.cmdclass.sdist"
+build_py = "versioningit.cmdclass.build_py"
+
 [tool.setuptools.packages.find]
 include = ["pipefunc.*", "pipefunc"]
 
