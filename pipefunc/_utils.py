@@ -114,9 +114,9 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
         return a == b
     if isinstance(a, (float, np.floating)):
         return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
-    if hasattr(a, "__eq__"):
+    if isinstance(a, str):
         return a == b
-    if isinstance(b, Iterable) and hasattr(a, "__len__"):
+    if isinstance(a, (list, tuple)):
         if len(a) != len(b):  # type: ignore[arg-type]
             return False
         return all(_is_equal(x, y) for x, y in zip(a, b))

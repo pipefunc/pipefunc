@@ -130,6 +130,7 @@ def test_is_equal_dict():
 
     assert not equal_dicts({"a": 1}, {"a": 1, "b": 3})
     assert not equal_dicts({"a": 1}, {"b": 1})
+    assert not equal_dicts({"a": [1]}, {"b": (1,)})
 
 
 def test_is_equal_numpy_array():
@@ -159,6 +160,7 @@ def test_is_equal_list_and_tuple():
     assert _is_equal([1, 2, 3], [1, 2, 3])
     assert not _is_equal([1, 2, 3], [1, 2, 4])
     assert _is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
+    assert not _is_equal([1], [1, 2])
 
 
 def test_is_equal_float():
