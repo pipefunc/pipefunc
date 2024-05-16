@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import pickle
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -659,3 +660,24 @@ def test_output_picker_single_output():
 
     pipeline = Pipeline([f])
     assert pipeline("y", a=1, b=2) == 3
+
+
+def f(a, b):
+    return a + b
+
+
+@dataclass
+class DataClass:
+    a: int
+
+
+def test_pickle_pipefunc():
+    func = PipeFunc(f, output_name="c")
+    p = pickle.dumps(func)
+    func2 = pickle.loads(p)  # noqa: S301
+    assert func(1, 2) == func2(1, 2)
+
+    func = PipeFunc(DataClass, output_name="c")
+    p = pickle.dumps(func)
+    func2 = pickle.loads(p)  # noqa: S301
+    assert func(a=1) == func2(a=1)
