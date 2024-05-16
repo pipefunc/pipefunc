@@ -13,6 +13,8 @@ from pipefunc.map.adaptive import create_learners, create_learners_from_sweep, f
 if TYPE_CHECKING:
     from pathlib import Path
 
+# Tests with create_learners
+
 
 def test_basic(tmp_path: Path) -> None:
     @pipefunc(output_name="z")
@@ -141,16 +143,23 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
     assert counters["take_sum"] == 1
 
 
+# Tests with create_learners_from_sweep
+
+
 def test_create_learners_from_sweep(tmp_path: Path) -> None:
+    counters = {"add": 0, "take_sum": 0}
+
     @pipefunc(output_name="z")
     def add(x: int, y: int) -> int:
         assert isinstance(x, int)
         assert isinstance(y, int)
+        counters["add"] += 1
         return x + y
 
     @pipefunc(output_name="prod")
     def take_sum(z: np.ndarray) -> int:
         assert isinstance(z, np.ndarray)
+        counters["take_sum"] += 1
         return np.prod(z)
 
     pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
@@ -159,8 +168,38 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
         pipeline,
         sweep,
         run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,  # otherwise the counters won't be set
     )
     for learner in learners:
         adaptive.runner.simple(learner)
     for folder in folders:
         assert load_outputs("prod", run_folder=folder) > 0
+    assert counters["add"] == 10
+    assert counters["take_sum"] == 2
+
+    # Run again, should load the data
+    learners, folders = create_learners_from_sweep(
+        pipeline,
+        sweep,
+        run_folder=tmp_path,
+        cleanup=False,
+        parallel=False,  # otherwise the counters won't be set
+    )
+    for learner in learners:
+        adaptive.runner.simple(learner)
+    assert counters["add"] == 10
+    assert counters["take_sum"] == 2
+
+    # Run again, now cleaning up the data
+    learners, folders = create_learners_from_sweep(
+        pipeline,
+        sweep,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,  # otherwise the counters won't be set
+    )
+    for learner in learners:
+        adaptive.runner.simple(learner)
+    assert counters["add"] == 20
+    assert counters["take_sum"] == 4

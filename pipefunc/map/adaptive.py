@@ -176,10 +176,12 @@ def _execute_iteration_in_map_spec(
 
 
 def _map_wrapper(
-    pipeline: _MockPipeline,
+    mock_pipeline: _MockPipeline,
     inputs: dict[str, Any],
     run_folder: Path,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None,
+    parallel: bool,  # noqa: FBT001
+    cleanup: bool,  # noqa: FBT001
 ) -> Callable[[Any], None]:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 
@@ -188,7 +190,14 @@ def _map_wrapper(
     """
 
     def wrapped(_: Any) -> None:
-        run(pipeline, inputs, run_folder=run_folder, manual_shapes=manual_shapes)  # type: ignore[arg-type]
+        run(
+            mock_pipeline,  # type: ignore[arg-type]
+            inputs,
+            run_folder,
+            manual_shapes,
+            parallel=parallel,
+            cleanup=cleanup,
+        )
 
     return wrapped
 
@@ -198,6 +207,9 @@ def create_learners_from_sweep(
     sweep: Sweep,
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    parallel: bool = True,
+    cleanup: bool = True,
 ) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
@@ -223,6 +235,10 @@ def create_learners_from_sweep(
         a subfolder of this folder.
     manual_shapes
         The manual shapes to use for the run, as expected by `pipeline.map`.
+    parallel
+        Whether to run the map in parallel.
+    cleanup
+        Whether to clean up the `run_folder`.
 
     Returns
     -------
@@ -237,7 +253,7 @@ def create_learners_from_sweep(
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
         mock_pipeline = _MockPipeline.from_pipeline(pipeline)
-        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes)
+        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes, parallel, cleanup)
         learner = adaptive.SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

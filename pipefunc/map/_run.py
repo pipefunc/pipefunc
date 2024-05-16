@@ -443,8 +443,8 @@ def run(
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    cleanup: bool = True,
     parallel: bool = True,
+    cleanup: bool = True,
 ) -> list[Result]:
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
