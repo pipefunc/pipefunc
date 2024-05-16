@@ -72,8 +72,8 @@ def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
     return load(path, cache=True)
 
 
-def _output_path(output_name: str, folder: Path) -> Path:
-    return folder / f"{output_name}.cloudpickle"
+def _output_path(output_name: str, run_folder: Path) -> Path:
+    return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
 def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
@@ -86,19 +86,18 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, folder)
+            path = _output_path(output_name, run_folder)
             dump(output, path)
         output = new_output
     else:
-        path = _output_path(func.output_name, folder)
+        path = _output_path(func.output_name, run_folder)
         dump(output, path)
 
     return output
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
-    folder = run_folder / "outputs"
-    path = _output_path(output_name, folder)
+    path = _output_path(output_name, run_folder)
     return load(path)
 
 
@@ -307,12 +306,20 @@ def _execute_map_spec(
         outputs = [file_array.get_from_linear_index(index) for file_array in file_arrays]
         _update_result_array(result_arrays, index, outputs)
 
-    print(f"{existing=} {missing=} {n=} ")
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
 
 def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+    # Load the output if it exists
+    output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
+    if all(p.is_file() for p in output_paths):
+        outputs = [load(p) for p in output_paths]
+        if isinstance(func.output_name, tuple):
+            return outputs
+        return outputs[0]
+
+    # Otherwise, run the function
     _load_file_array(kwargs)
     try:
         output = func(**kwargs)

@@ -475,3 +475,32 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 14
+
+
+def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
+    counters = {"f": 0, "g": 0}
+
+    @pipefunc(output_name="z")
+    def f(x: int, y: int = 1) -> int:
+        counters["f"] += 1
+        return x + y
+
+    @pipefunc(output_name="sum")
+    def g(z: np.ndarray) -> int:
+        counters["g"] += 1
+        return sum(z)
+
+    pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    assert results[-1].output == 9
+    assert results[-1].output_name == "sum"
+    assert counters["f"] == 3
+    assert counters["g"] == 1
+
+    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    assert results2[-1].output == 9
+    assert results2[-1].output_name == "sum"
+    assert counters["f"] == 3
+    assert counters["g"] == 1
