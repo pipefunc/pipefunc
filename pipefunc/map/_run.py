@@ -267,6 +267,18 @@ def _update_result_array(
         result_array[index] = _output
 
 
+def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[int], list[int]]:
+    masks = (arr._mask_list() for arr in file_arrays)
+    existing_indices = []
+    missing_indices = []
+    for i, mask_values in enumerate(zip(*masks)):
+        if all(mask_values):
+            missing_indices.append(i)
+        else:
+            existing_indices.append(i)
+    return existing_indices, missing_indices
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -276,20 +288,26 @@ def _execute_map_spec(
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
-    n = prod(shape)
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
+    existing, missing = _existing_and_missing_indices(file_arrays)
+    n = len(missing)
     if parallel and n > 1:
         with ProcessPoolExecutor() as ex:
-            outputs_list = list(ex.map(process_index, range(n)))
+            outputs_list = list(ex.map(process_index, missing))
     else:
-        outputs_list = [process_index(index) for index in range(n)]
+        outputs_list = [process_index(index) for index in missing]
 
-    for index, outputs in enumerate(outputs_list):
+    for index, outputs in zip(missing, outputs_list):
         _update_file_array(func, file_arrays, shape, index, outputs)
         _update_result_array(result_arrays, index, outputs)
 
+    for index in existing:
+        outputs = [file_array.get_from_linear_index(index) for file_array in file_arrays]
+        _update_result_array(result_arrays, index, outputs)
+
+    print(f"{existing=} {missing=} {n=} ")
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
