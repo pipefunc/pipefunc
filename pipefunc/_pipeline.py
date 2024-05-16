@@ -533,7 +533,7 @@ class Pipeline:
         _save_results(func, r, output_name, all_results, root_args, self.lazy)
         return all_results[output_name]
 
-    def _run_pipeline(
+    def run(
         self,
         output_name: _OUTPUT_TYPE,
         *,
