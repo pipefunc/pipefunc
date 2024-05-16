@@ -1,7 +1,16 @@
 import cloudpickle
+import numpy as np
 import pytest
 
-from pipefunc._utils import _cached_load, format_args, format_function_call, format_kwargs, load
+from pipefunc._utils import (
+    _cached_load,
+    _is_equal,
+    equal_dicts,
+    format_args,
+    format_function_call,
+    format_kwargs,
+    load,
+)
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -99,3 +108,102 @@ def test_format_args_empty():
     args = ("foo",)
     kwargs = {"func2": "func2(arg)"}
     assert format_function_call("func1", args, kwargs) == "func1('foo', func2='func2(arg)')"
+
+
+class CustomObject:
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        if isinstance(other, CustomObject):
+            return self.value == other.value
+        return False
+
+
+def test_is_equal_dict():
+    d1 = {"a": 1, "b": 2}
+    d2 = {"a": 1, "b": 2}
+    assert _is_equal(d1, d2)
+
+    d3 = {"a": 1, "b": 3}
+    assert not _is_equal(d1, d3)
+
+
+def test_is_equal_numpy_array():
+    a1 = np.array([1, 2, 3])
+    a2 = np.array([1, 2, 3])
+    assert _is_equal(a1, a2)
+
+    a3 = np.array([1, 2, 4])
+    assert not _is_equal(a1, a3)
+
+    a4 = np.array([1, 2, np.nan])
+    a5 = np.array([1, 2, np.nan])
+    assert _is_equal(a4, a5)
+
+
+def test_is_equal_set():
+    s1 = {1, 2, 3}
+    s2 = {1, 2, 3}
+    assert _is_equal(s1, s2)
+
+    s3 = {1, 2, 4}
+    assert not _is_equal(s1, s3)
+
+
+def test_is_equal_float():
+    assert _is_equal(1.0, 1.0)
+    assert _is_equal(1.0, 1.0000000001)
+    assert not _is_equal(1.0, 1.1)
+
+
+def test_is_equal_custom_object():
+    obj1 = CustomObject(1)
+    obj2 = CustomObject(1)
+    assert _is_equal(obj1, obj2)
+
+    obj3 = CustomObject(2)
+    assert not _is_equal(obj1, obj3)
+
+
+def test_is_equal_iterable():
+    assert _is_equal([1, 2, 3], [1, 2, 3])
+    assert not _is_equal([1, 2, 3], [1, 2, 4])
+    assert _is_equal((1, 2, 3), (1, 2, 3))
+    assert not _is_equal((1, 2, 3), (1, 2, 4))
+
+
+def test_is_equal_other_types():
+    assert _is_equal(1, 1)
+    assert not _is_equal(1, 2)
+    assert _is_equal("abc", "abc")
+    assert not _is_equal("abc", "def")
+
+
+def test_equal_dicts():
+    d1 = {"a": 1, "b": 2}
+    d2 = {"a": 1, "b": 2}
+    assert equal_dicts(d1, d2)
+
+    d3 = {"a": 1, "b": 3}
+    assert not equal_dicts(d1, d3)
+
+    d4 = {"a": 1, "b": {"c": 2}}
+    d5 = {"a": 1, "b": {"c": 2}}
+    assert equal_dicts(d4, d5)
+
+    d6 = {"a": 1, "b": {"c": 3}}
+    assert not equal_dicts(d4, d6)
+
+    # test with numpy arrays
+    d7 = {"a": np.array([1, 2, 3])}
+    d8 = {"a": np.array([1, 2, 3])}
+    assert equal_dicts(d7, d8)
+
+    d9 = {"a": {"a": np.array([1, 2, 3])}}
+    d10 = {"a": {"a": np.array([1, 2, 3])}}
+    assert equal_dicts(d9, d10)
+
+    d11 = {"a": {"a": np.array([1, 2, 3])}}
+    d12 = {"a": {"a": np.array([1, 2, 4])}}
+    assert not equal_dicts(d11, d12)

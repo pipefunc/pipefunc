@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
+from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape
 
@@ -107,6 +107,34 @@ def cleanup_run_folder(run_folder: str | Path) -> None:
     shutil.rmtree(run_folder, ignore_errors=True)
 
 
+def _compare_to_previous_run_info(
+    pipeline: Pipeline,
+    run_folder: Path,
+    inputs: dict[str, Any],
+    manual_shapes: dict[str, int | tuple[int, ...]],
+) -> None:
+    if not RunInfo.path(run_folder).is_file():
+        return
+    old = RunInfo.load(run_folder, cache=False)
+    if manual_shapes != old.manual_shapes:
+        msg = "Manual shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    if map_shapes(pipeline, inputs, manual_shapes) != old.shapes:
+        msg = "Shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
+    equal_inputs = equal_dicts(inputs, old_inputs)
+    if equal_inputs is None:
+        print(
+            "Could not compare new `inputs` to `inputs` from previous run."
+            " Proceeding without `cleanup`, hoping for the best.",
+        )
+        return
+    if not equal_inputs:
+        msg = "Inputs do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+
+
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
@@ -127,6 +155,8 @@ class RunInfo(NamedTuple):
         manual_shapes = manual_shapes or {}
         if cleanup:
             cleanup_run_folder(run_folder)
+        else:
+            _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
@@ -137,7 +167,7 @@ class RunInfo(NamedTuple):
         )
 
     def dump(self, run_folder: str | Path) -> None:
-        path = Path(run_folder) / "run_info.cloudpickle"
+        path = self.path(run_folder)
         dump(self._asdict(), path)
 
     @classmethod
@@ -147,9 +177,13 @@ class RunInfo(NamedTuple):
         *,
         cache: bool = True,
     ) -> RunInfo:
-        path = Path(run_folder) / "run_info.cloudpickle"
+        path = cls.path(run_folder)
         dct = load(path, cache=cache)
         return cls(**dct)
+
+    @staticmethod
+    def path(run_folder: str | Path) -> Path:
+        return Path(run_folder) / "run_info.cloudpickle"
 
 
 def _file_array_path(output_name: str, run_folder: Path) -> Path:

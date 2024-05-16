@@ -3,12 +3,15 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import math
 import operator
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 import cloudpickle
+import numpy as np
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -98,3 +101,50 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
 def prod(iterable: Iterable[int]) -> int:
     """Return the product of an iterable."""
     return functools.reduce(operator.mul, iterable, 1)
+
+
+def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
+    if type(a) != type(b):
+        return False
+    if isinstance(a, dict):
+        return equal_dicts(a, b)
+    if isinstance(a, np.ndarray):
+        return np.array_equal(a, b, equal_nan=True)
+    if isinstance(a, set):
+        return a == b
+    if isinstance(a, (float, np.floating)):
+        return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
+    if hasattr(a, "__eq__"):
+        return a == b
+    if isinstance(b, Iterable) and hasattr(a, "__len__"):
+        if len(a) != len(b):  # type: ignore[arg-type]
+            return False
+        return all(_is_equal(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def equal_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> bool | None:
+    """Check if two dictionaries are equal.
+
+    Returns True if the dictionaries are equal, False if they are not equal,
+    and None if there are errors comparing keys and values.
+    """
+    if len(d1) != len(d2):
+        return False
+
+    if set(d1.keys()) != set(d2.keys()):
+        return False
+
+    errors = []
+    for k, v1 in d1.items():
+        v2 = d2[k]
+        try:
+            equal = _is_equal(v1, v2)
+            if not equal:
+                return False
+        except Exception:  # noqa: BLE001
+            errors.append((k, v1, v2))
+    if errors:
+        warnings.warn(f"Errors comparing keys and values: {errors}", stacklevel=3)
+        return None
+    return True
