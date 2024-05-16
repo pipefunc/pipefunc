@@ -510,3 +510,20 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     assert results3[-1].output_name == "sum"
     assert counters["f"] == 6
     assert counters["g"] == 2
+
+
+def test_run_info_compare(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def f(x: int, y: int = 1) -> int:
+        return x + y
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [1, 2, 3]}
+
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert results[-1].output.tolist() == [2, 3, 4]
+    assert results[-1].output_name == "z"
+
+    inputs = {"x": [1, 2, 3, 4]}
+    with pytest.raises(ValueError, match="Shapes do not match previous run"):
+        pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
