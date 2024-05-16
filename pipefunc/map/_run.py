@@ -123,7 +123,7 @@ def _compare_to_previous_run_info(
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
-    equal_inputs = equal_dicts(inputs, old_inputs)
+    equal_inputs = equal_dicts(inputs, old_inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."

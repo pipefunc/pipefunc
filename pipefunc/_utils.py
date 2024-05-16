@@ -123,7 +123,7 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
     return a == b
 
 
-def equal_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> bool | None:
+def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False) -> bool | None:
     """Check if two dictionaries are equal.
 
     Returns True if the dictionaries are equal, False if they are not equal,
@@ -141,6 +141,8 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any]) -> bool | None:
         try:
             equal = _is_equal(v1, v2)
             if not equal:
+                if verbose:
+                    print(f"Not equal `{k}`: `{v1} != {v2}`")
                 return False
         except Exception:  # noqa: BLE001
             errors.append((k, v1, v2))
