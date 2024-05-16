@@ -493,7 +493,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
     inputs = {"x": [1, 2, 3]}
 
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
     assert results[-1].output == 9
     assert results[-1].output_name == "sum"
     assert counters["f"] == 3
@@ -504,3 +504,9 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     assert results2[-1].output_name == "sum"
     assert counters["f"] == 3
     assert counters["g"] == 1
+
+    results3 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert results3[-1].output == 9
+    assert results3[-1].output_name == "sum"
+    assert counters["f"] == 6
+    assert counters["g"] == 2
