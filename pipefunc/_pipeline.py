@@ -110,7 +110,7 @@ class _Function:
             The return value of the pipeline function.
 
         """
-        return self.pipeline._run_pipeline(output_name=self.output_name, kwargs=kwargs)
+        return self.pipeline.run(output_name=self.output_name, kwargs=kwargs)
 
     def call_full_output(self, **kwargs: Any) -> dict[str, Any]:
         """Call the pipeline function with the given arguments and return all outputs.
@@ -126,7 +126,7 @@ class _Function:
             The return value of the pipeline function.
 
         """
-        return self.pipeline._run_pipeline(self.output_name, full_output=True, kwargs=kwargs)
+        return self.pipeline.run(self.output_name, full_output=True, kwargs=kwargs)
 
     def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
         """Call the pipeline function with the given arguments.
@@ -533,7 +533,7 @@ class Pipeline:
         _save_results(func, r, output_name, all_results, root_args, self.lazy)
         return all_results[output_name]
 
-    def _run_pipeline(
+    def run(
         self,
         output_name: _OUTPUT_TYPE,
         *,
