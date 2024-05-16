@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union, Literal
 
 import numpy as np
 
@@ -103,10 +103,12 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
 
 
 class RunInfo(NamedTuple):
-    input_paths: dict[str, Path]
+    input_paths: dict[str, Path] | None
+    inputs: dict[str, Any] | None
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     manual_shapes: dict[str, int | tuple[int, ...]]
-    run_folder: Path
+    run_folder: Path | None
+    storage: Literal["file", "memory"]
 
     @classmethod
     def create(
@@ -117,18 +119,25 @@ class RunInfo(NamedTuple):
         manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
+        storage: Literal["file", "memory"] = "file",
     ) -> RunInfo:
         run_folder = Path(run_folder)
         manual_shapes = manual_shapes or {}
-        if cleanup:
-            shutil.rmtree(run_folder, ignore_errors=True)
-        input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
+        if storage == "file":
+            if cleanup:
+                shutil.rmtree(run_folder, ignore_errors=True)
+            input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
+            inputs = None
+        else:
+            input_paths = None
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
             input_paths=input_paths,
+            inputs=inputs,
             shapes=shapes,
             manual_shapes=manual_shapes,
             run_folder=run_folder,
+            storage=storage,
         )
 
     def dump(self, run_folder: str | Path) -> None:
@@ -400,6 +409,7 @@ def run(
     *,
     cleanup: bool = True,
     parallel: bool = True,
+    storage: Literal["file", "memory"] = "file",
 ) -> list[Result]:
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
