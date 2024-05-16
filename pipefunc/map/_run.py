@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union, Literal
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Tuple, Union
 
 import numpy as np
 
