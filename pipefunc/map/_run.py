@@ -277,7 +277,7 @@ def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[in
     existing_indices = []
     missing_indices = []
     for i, mask_values in enumerate(zip(*masks)):
-        if all(mask_values):
+        if any(mask_values):  # rerun if any of the outputs are missing
             missing_indices.append(i)
         else:
             existing_indices.append(i)
