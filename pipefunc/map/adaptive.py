@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import functools
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Tuple, Union
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import adaptive
 
@@ -175,31 +176,31 @@ def _execute_iteration_in_map_spec(
     return outputs if return_output else None
 
 
-def _map_wrapper(
-    mock_pipeline: _MockPipeline,
-    inputs: dict[str, Any],
-    run_folder: Path,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None,
-    parallel: bool,  # noqa: FBT001
-    cleanup: bool,  # noqa: FBT001
-) -> Callable[[Any], None]:
+@dataclass
+class _MapWrapper:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 
     Uses a `_MockPipeline` that contains all the required information to run the pipeline but is
     cheaper to serialize and pass around.
     """
 
-    def wrapped(_: Any) -> None:
-        run(
-            mock_pipeline,  # type: ignore[arg-type]
-            inputs,
-            run_folder,
-            manual_shapes,
-            parallel=parallel,
-            cleanup=cleanup,
-        )
+    mock_pipeline: _MockPipeline
+    inputs: dict[str, Any]
+    run_folder: Path
+    manual_shapes: dict[str, int | tuple[int, ...]] | None
+    parallel: bool
+    cleanup: bool
 
-    return wrapped
+    def __call__(self, _: Any) -> None:
+        """Run the pipeline."""
+        run(
+            self.mock_pipeline,  # type: ignore[arg-type]
+            self.inputs,
+            self.run_folder,
+            self.manual_shapes,
+            parallel=self.parallel,
+            cleanup=self.cleanup,
+        )
 
 
 def create_learners_from_sweep(
@@ -253,7 +254,7 @@ def create_learners_from_sweep(
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
         mock_pipeline = _MockPipeline.from_pipeline(pipeline)
-        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes, parallel, cleanup)
+        f = _MapWrapper(mock_pipeline, inputs, sweep_run, manual_shapes, parallel, cleanup)
         learner = adaptive.SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)
