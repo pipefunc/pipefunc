@@ -54,12 +54,6 @@ def _default_output_picker(
     return output[output_name.index(name)]
 
 
-def _update_wrapper(wrapper, wrapped) -> None:  # noqa: ANN001
-    functools.update_wrapper(wrapper, wrapped)
-    # Need to manually update __wrapped__ to keep functions picklable
-    del wrapper.__dict__["__wrapped__"]
-
-
 class PipeFunc(Generic[T]):
     """Function wrapper class for pipeline functions with additional attributes.
 
@@ -121,7 +115,6 @@ class PipeFunc(Generic[T]):
         mapspec: str | MapSpec | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
-        _update_wrapper(self, func)
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
