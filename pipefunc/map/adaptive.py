@@ -15,6 +15,7 @@ from pipefunc.map._run import (
     _execute_single,
     _func_kwargs,
     _init_file_arrays,
+    _maybe_load_single_output,
     _MockPipeline,
     _run_iteration_and_pick_output,
     _update_file_array,
@@ -42,6 +43,7 @@ def create_learners(
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     return_output: bool = False,
+    cleanup: bool = True,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -62,6 +64,8 @@ def create_learners(
         The manual shapes to use for the run.
     return_output
         Whether to return the output of the function in the learner.
+    cleanup
+        Whether to clean up the `run_folder`.
 
     Returns
     -------
@@ -71,7 +75,7 @@ def create_learners(
 
     """
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     learners = []
     for gen in pipeline.topological_generations[1]:
@@ -101,6 +105,13 @@ def create_learners(
     return learners
 
 
+def flatten_learners(
+    learners_dicts: list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]],
+) -> dict[_OUTPUT_TYPE, adaptive.SequenceLearner]:
+    """Flatten the list of dictionaries of learners into a single dictionary."""
+    return {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
+
+
 def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
@@ -113,6 +124,9 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    output, exists = _maybe_load_single_output(func, run_folder, return_output=return_output)
+    if exists:
+        return output
     kwargs = _func_kwargs(
         func,
         run_info.input_paths,
@@ -131,7 +145,7 @@ def _execute_iteration_in_map_spec(
     run_folder: Path,
     *,
     return_output: bool = False,
-) -> Any | None:
+) -> list[Any] | None:
     """Execute a single iteration of a map spec.
 
     Performs a single iteration of the code in `_execute_map_spec`, however,
@@ -140,6 +154,14 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    shape = run_info.shapes[func.output_name]
+    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    # Load the data if it exists
+    if all(arr.has_index(index) for arr in file_arrays):
+        if not return_output:
+            return None
+        return [arr.get_from_index(index) for arr in file_arrays]
+    # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(
         func,
@@ -148,18 +170,18 @@ def _execute_iteration_in_map_spec(
         run_info.manual_shapes,
         run_folder,
     )
-    shape = run_info.shapes[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
     _update_file_array(func, file_arrays, shape, index, outputs)
     return outputs if return_output else None
 
 
 def _map_wrapper(
-    pipeline: _MockPipeline,
+    mock_pipeline: _MockPipeline,
     inputs: dict[str, Any],
     run_folder: Path,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int, ...]] | None,
+    parallel: bool,  # noqa: FBT001
+    cleanup: bool,  # noqa: FBT001
 ) -> Callable[[Any], None]:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 
@@ -168,7 +190,14 @@ def _map_wrapper(
     """
 
     def wrapped(_: Any) -> None:
-        run(pipeline, inputs, run_folder=run_folder, manual_shapes=manual_shapes)  # type: ignore[arg-type]
+        run(
+            mock_pipeline,  # type: ignore[arg-type]
+            inputs,
+            run_folder,
+            manual_shapes,
+            parallel=parallel,
+            cleanup=cleanup,
+        )
 
     return wrapped
 
@@ -178,6 +207,9 @@ def create_learners_from_sweep(
     sweep: Sweep,
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    parallel: bool = True,
+    cleanup: bool = True,
 ) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
@@ -203,6 +235,10 @@ def create_learners_from_sweep(
         a subfolder of this folder.
     manual_shapes
         The manual shapes to use for the run, as expected by `pipeline.map`.
+    parallel
+        Whether to run the map in parallel.
+    cleanup
+        Whether to clean up the `run_folder`.
 
     Returns
     -------
@@ -217,7 +253,7 @@ def create_learners_from_sweep(
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
         mock_pipeline = _MockPipeline.from_pipeline(pipeline)
-        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes)
+        f = _map_wrapper(mock_pipeline, inputs, sweep_run, manual_shapes, parallel, cleanup)
         learner = adaptive.SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

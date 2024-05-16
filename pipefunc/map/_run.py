@@ -72,8 +72,8 @@ def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
     return load(path, cache=True)
 
 
-def _output_path(output_name: str, folder: Path) -> Path:
-    return folder / f"{output_name}.cloudpickle"
+def _output_path(output_name: str, run_folder: Path) -> Path:
+    return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
 def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
@@ -86,20 +86,25 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, folder)
+            path = _output_path(output_name, run_folder)
             dump(output, path)
         output = new_output
     else:
-        path = _output_path(func.output_name, folder)
+        path = _output_path(func.output_name, run_folder)
         dump(output, path)
 
     return output
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
-    folder = run_folder / "outputs"
-    path = _output_path(output_name, folder)
+    path = _output_path(output_name, run_folder)
     return load(path)
+
+
+def cleanup_run_folder(run_folder: str | Path) -> None:
+    """Remove the run folder and its contents."""
+    run_folder = Path(run_folder)
+    shutil.rmtree(run_folder, ignore_errors=True)
 
 
 class RunInfo(NamedTuple):
@@ -121,7 +126,7 @@ class RunInfo(NamedTuple):
         run_folder = Path(run_folder)
         manual_shapes = manual_shapes or {}
         if cleanup:
-            shutil.rmtree(run_folder, ignore_errors=True)
+            cleanup_run_folder(run_folder)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
@@ -267,6 +272,18 @@ def _update_result_array(
         result_array[index] = _output
 
 
+def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[int], list[int]]:
+    masks = (arr._mask_list() for arr in file_arrays)
+    existing_indices = []
+    missing_indices = []
+    for i, mask_values in enumerate(zip(*masks)):
+        if any(mask_values):  # rerun if any of the outputs are missing
+            missing_indices.append(i)
+        else:
+            existing_indices.append(i)
+    return existing_indices, missing_indices
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -276,25 +293,57 @@ def _execute_map_spec(
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
-    n = prod(shape)
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
+    existing, missing = _existing_and_missing_indices(file_arrays)
+    n = len(missing)
     if parallel and n > 1:
         with ProcessPoolExecutor() as ex:
-            outputs_list = list(ex.map(process_index, range(n)))
+            outputs_list = list(ex.map(process_index, missing))
     else:
-        outputs_list = [process_index(index) for index in range(n)]
+        outputs_list = [process_index(index) for index in missing]
 
-    for index, outputs in enumerate(outputs_list):
+    for index, outputs in zip(missing, outputs_list):
         _update_file_array(func, file_arrays, shape, index, outputs)
+        _update_result_array(result_arrays, index, outputs)
+
+    for index in existing:
+        outputs = [file_array.get_from_index(index) for file_array in file_arrays]
         _update_result_array(result_arrays, index, outputs)
 
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
 
+def _maybe_load_single_output(
+    func: PipeFunc,
+    run_folder: Path,
+    *,
+    return_output: bool = True,
+) -> tuple[Any, bool]:
+    """Load the output if it exists.
+
+    Returns the output and a boolean indicating whether the output exists.
+    """
+    output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
+    if all(p.is_file() for p in output_paths):
+        if not return_output:
+            return None, True
+        outputs = [load(p) for p in output_paths]
+        if isinstance(func.output_name, tuple):
+            return outputs, True
+        return outputs[0], True
+    return None, False
+
+
 def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+    # Load the output if it exists
+    output, exists = _maybe_load_single_output(func, run_folder)
+    if exists:
+        return output
+
+    # Otherwise, run the function
     _load_file_array(kwargs)
     try:
         output = func(**kwargs)
@@ -398,8 +447,8 @@ def run(
     run_folder: str | Path,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    cleanup: bool = True,
     parallel: bool = True,
+    cleanup: bool = True,
 ) -> list[Result]:
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
