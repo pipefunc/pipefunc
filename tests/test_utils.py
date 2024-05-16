@@ -151,6 +151,13 @@ def test_is_equal_set():
     assert not _is_equal(s1, s3)
 
 
+def test_is_equal_list_and_tuple():
+    assert not _is_equal([1, 2, 3], (1, 2, 3))
+    assert _is_equal([1, 2, 3], [1, 2, 3])
+    assert not _is_equal([1, 2, 3], [1, 2, 4])
+    assert _is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
+
+
 def test_is_equal_float():
     assert _is_equal(1.0, 1.0)
     assert _is_equal(1.0, 1.0000000001)
