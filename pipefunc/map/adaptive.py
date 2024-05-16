@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Tuple, Union
 
@@ -175,6 +176,7 @@ def _execute_iteration_in_map_spec(
     return outputs if return_output else None
 
 
+@dataclass
 class _MapWrapper:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 
@@ -182,23 +184,15 @@ class _MapWrapper:
     cheaper to serialize and pass around.
     """
 
-    def __init__(
-        self,
-        mock_pipeline: _MockPipeline,
-        inputs: dict[str, Any],
-        run_folder: Path,
-        manual_shapes: dict[str, int | tuple[int, ...]] | None,
-        parallel: bool,  # noqa: FBT001
-        cleanup: bool,  # noqa: FBT001
-    ) -> None:
-        self.mock_pipeline = mock_pipeline
-        self.inputs = inputs
-        self.run_folder = run_folder
-        self.manual_shapes = manual_shapes
-        self.parallel = parallel
-        self.cleanup = cleanup
+    mock_pipeline: _MockPipeline
+    inputs: dict[str, Any]
+    run_folder: Path
+    manual_shapes: dict[str, int | tuple[int, ...]] | None
+    parallel: bool
+    cleanup: bool
 
     def __call__(self, _: Any) -> None:
+        """Run the pipeline."""
         run(
             self.mock_pipeline,  # type: ignore[arg-type]
             self.inputs,
