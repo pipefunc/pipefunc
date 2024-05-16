@@ -322,6 +322,10 @@ def _maybe_load_single_output(
     *,
     return_output: bool = True,
 ) -> tuple[Any, bool]:
+    """Load the output if it exists.
+
+    Returns the output and a boolean indicating whether the output exists.
+    """
     output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
     if all(p.is_file() for p in output_paths):
         if not return_output:
