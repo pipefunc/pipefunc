@@ -18,6 +18,7 @@ from pipefunc.map._run import (
     _MockPipeline,
     _run_iteration_and_pick_output,
     _update_file_array,
+    cleanup_run_folder,
     run,
 )
 
@@ -42,6 +43,7 @@ def create_learners(
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     return_output: bool = False,
+    cleanup: bool = True,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -62,6 +64,8 @@ def create_learners(
         The manual shapes to use for the run.
     return_output
         Whether to return the output of the function in the learner.
+    cleanup
+        Whether to clean up the `run_folder`.
 
     Returns
     -------
@@ -70,6 +74,8 @@ def create_learners(
     above, the learners have to be executed in order.
 
     """
+    if cleanup:
+        cleanup_run_folder(run_folder)
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
     run_info.dump(run_folder)
@@ -99,6 +105,13 @@ def create_learners(
             _learners[func.output_name] = learner
         learners.append(_learners)
     return learners
+
+
+def flatten_learners(
+    learners_dicts: list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]],
+) -> dict[_OUTPUT_TYPE, adaptive.SequenceLearner]:
+    """Flatten the list of dictionaries of learners into a single dictionary."""
+    return {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
 
 
 def _execute_iteration_in_single(
@@ -131,7 +144,7 @@ def _execute_iteration_in_map_spec(
     run_folder: Path,
     *,
     return_output: bool = False,
-) -> Any | None:
+) -> list[Any] | None:
     """Execute a single iteration of a map spec.
 
     Performs a single iteration of the code in `_execute_map_spec`, however,
@@ -140,6 +153,14 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    shape = run_info.shapes[func.output_name]
+    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    # Load the data if it exists
+    if all(arr.has_index(index) for arr in file_arrays):
+        if not return_output:
+            return None
+        return [arr.get_from_index(index) for arr in file_arrays]
+    # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(
         func,
@@ -148,8 +169,6 @@ def _execute_iteration_in_map_spec(
         run_info.manual_shapes,
         run_folder,
     )
-    shape = run_info.shapes[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
     _update_file_array(func, file_arrays, shape, index, outputs)
     return outputs if return_output else None

@@ -101,6 +101,12 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
     return load(path)
 
 
+def cleanup_run_folder(run_folder: str | Path) -> None:
+    """Remove the run folder and its contents."""
+    run_folder = Path(run_folder)
+    shutil.rmtree(run_folder, ignore_errors=True)
+
+
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
@@ -120,7 +126,7 @@ class RunInfo(NamedTuple):
         run_folder = Path(run_folder)
         manual_shapes = manual_shapes or {}
         if cleanup:
-            shutil.rmtree(run_folder, ignore_errors=True)
+            cleanup_run_folder(run_folder)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
@@ -303,7 +309,7 @@ def _execute_map_spec(
         _update_result_array(result_arrays, index, outputs)
 
     for index in existing:
-        outputs = [file_array.get_from_linear_index(index) for file_array in file_arrays]
+        outputs = [file_array.get_from_index(index) for file_array in file_arrays]
         _update_result_array(result_arrays, index, outputs)
 
     result_arrays = [x.reshape(shape) for x in result_arrays]

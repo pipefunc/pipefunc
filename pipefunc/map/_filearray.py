@@ -90,9 +90,13 @@ class FileArray:
         index = sum(k * s for k, s in zip(key, self.strides))
         return self._index_to_file(index)
 
-    def get_from_linear_index(self, index: int) -> Any:
+    def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
         return load(self._index_to_file(index))
+
+    def has_index(self, index: int) -> bool:
+        """Return whether the given linear index exists."""
+        return self._index_to_file(index).is_file()
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
