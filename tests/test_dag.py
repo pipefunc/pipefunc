@@ -117,9 +117,9 @@ def test_running_dag_pipeline():
 
     pipeline = pipefunc.Pipeline([f1, f2, f3], lazy=True)
     f = pipeline.func("e")
-    assert not isinstance(pipeline.get_cache(), pipefunc._cache.SimpleCache)
+    assert not isinstance(pipeline._current_cache(), pipefunc._cache.SimpleCache)
     with construct_dag() as dag:
-        cache = pipeline.get_cache()
+        cache = pipeline._current_cache()
         assert isinstance(cache, pipefunc._cache.SimpleCache)
         assert not cache.cache
         f(a=1, b=2)

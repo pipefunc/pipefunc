@@ -255,7 +255,7 @@ class Pipeline:
         with contextlib.suppress(AttributeError):
             del self.topological_generations
 
-    def get_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
+    def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
         if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
             return tg.cache
@@ -491,7 +491,7 @@ class Pipeline:
         func = self.output_to_func[output_name]
         assert func.parameters is not None
 
-        cache = self.get_cache()
+        cache = self._current_cache()
         use_cache = (func.cache and cache is not None) or task_graph() is not None
 
         root_args = self.root_args(output_name)
