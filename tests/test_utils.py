@@ -128,6 +128,9 @@ def test_is_equal_dict():
     d3 = {"a": 1, "b": 3}
     assert not _is_equal(d1, d3)
 
+    assert not equal_dicts({"a": 1}, {"a": 1, "b": 3})
+    assert not equal_dicts({"a": 1}, {"b": 1})
+
 
 def test_is_equal_numpy_array():
     a1 = np.array([1, 2, 3])
