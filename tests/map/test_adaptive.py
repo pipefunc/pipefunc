@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import adaptive
 import numpy as np
+import pytest
 
 from pipefunc import Pipeline, Sweep, pipefunc
 from pipefunc.map import load_outputs
@@ -91,7 +92,8 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert flat_learners["sum"].data == {0: 12}
 
 
-def test_create_learners_loading_data(tmp_path: Path) -> None:
+@pytest.mark.parametrize("return_output", [True, False])
+def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> None:  # noqa: FBT001
     counters = {"add": 0, "take_sum": 0}
 
     @pipefunc(output_name="z")
@@ -110,11 +112,12 @@ def test_create_learners_loading_data(tmp_path: Path) -> None:
     pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
     inputs = {"x": [1, 2], "y": [3, 4]}
 
+    # First run, should create the files
     learners_dicts = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
-        return_output=True,
+        return_output=return_output,
         cleanup=True,
     )
     flat_learners = flatten_learners(learners_dicts)
@@ -123,11 +126,12 @@ def test_create_learners_loading_data(tmp_path: Path) -> None:
     assert counters["add"] == 4
     assert counters["take_sum"] == 1
 
+    # Second run, should load the files (not run the functions again)
     learners_dicts = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
-        return_output=True,
+        return_output=return_output,
         cleanup=False,
     )
     flat_learners = flatten_learners(learners_dicts)

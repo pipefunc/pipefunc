@@ -15,10 +15,10 @@ from pipefunc.map._run import (
     _execute_single,
     _func_kwargs,
     _init_file_arrays,
+    _maybe_load_single_output,
     _MockPipeline,
     _run_iteration_and_pick_output,
     _update_file_array,
-    cleanup_run_folder,
     run,
 )
 
@@ -74,10 +74,8 @@ def create_learners(
     above, the learners have to be executed in order.
 
     """
-    if cleanup:
-        cleanup_run_folder(run_folder)
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     learners = []
     for gen in pipeline.topological_generations[1]:
@@ -126,6 +124,9 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
+    output, exists = _maybe_load_single_output(func, run_folder, return_output=return_output)
+    if exists:
+        return output
     kwargs = _func_kwargs(
         func,
         run_info.input_paths,

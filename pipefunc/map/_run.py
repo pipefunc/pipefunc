@@ -316,14 +316,28 @@ def _execute_map_spec(
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
 
 
-def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
-    # Load the output if it exists
+def _maybe_load_single_output(
+    func: PipeFunc,
+    run_folder: Path,
+    *,
+    return_output: bool = True,
+) -> tuple[Any, bool]:
     output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
     if all(p.is_file() for p in output_paths):
+        if not return_output:
+            return None, True
         outputs = [load(p) for p in output_paths]
         if isinstance(func.output_name, tuple):
-            return outputs
-        return outputs[0]
+            return outputs, True
+        return outputs[0], True
+    return None, False
+
+
+def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+    # Load the output if it exists
+    output, exists = _maybe_load_single_output(func, run_folder)
+    if exists:
+        return output
 
     # Otherwise, run the function
     _load_file_array(kwargs)
