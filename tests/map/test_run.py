@@ -647,3 +647,34 @@ def test_add_mapspec_axes_complex_pipeline() -> None:
     assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
     assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
     assert str(func3.mapspec) == "out2[:, :, l], out3[:, :, :, l] -> out4[l]"
+
+
+def test_mapspec_manual_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="x")
+    def generate_ints(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y")
+    def double_it(x: int, z: int) -> int:
+        assert isinstance(x, int)
+        return 2 * x + z
+
+    @pipefunc(output_name="sum")
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
+
+    pipeline = Pipeline(
+        [generate_ints, (double_it, "x[i] -> y[i]"), take_sum],
+    )
+
+    pipeline.add_mapspec_axes("z", "k")
+    assert generate_ints.mapspec is None
+    assert str(double_it.mapspec) == "x[i], z[k] -> y[i, k]"
+    assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
+
+    inputs = {"n": 4, "z": [1, 2]}
+    manual_shapes = {"x": 4}
+    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
+    assert results[-1].output.tolist() == [16, 20]
+    shapes = {"z": (2,), "y": (4, 2), "sum": (2,)}
+    assert map_shapes(pipeline, inputs, manual_shapes) == shapes  # type: ignore[arg-type]
