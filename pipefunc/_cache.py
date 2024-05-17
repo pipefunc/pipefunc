@@ -141,14 +141,14 @@ class HybridCache(_CacheBase):
             otherwise None.
 
         """
+        if key not in self._cache_dict:
+            return None
         with self._cache_lock:
-            if key in self._cache_dict:
-                self._access_counts[key] += 1
-                value = self._cache_dict[key]
-                if self._allow_cloudpickle and self.shared:
-                    value = cloudpickle.loads(value)
-                return value
-        return None  # pragma: no cover
+            self._access_counts[key] += 1
+        value = self._cache_dict[key]
+        if self._allow_cloudpickle and self.shared:
+            value = cloudpickle.loads(value)
+        return value
 
     def put(self, key: Hashable, value: Any, duration: float) -> None:  # type: ignore[override]
         """Add a value to the cache with its associated key and computation duration.
@@ -289,16 +289,16 @@ class LRUCache(_CacheBase):
 
     def get(self, key: Hashable) -> Any:
         """Get a value from the cache by key."""
-        if key in self._cache_dict:
-            with self._cache_lock:
-                value = self._cache_dict[key]
-                # Move key to back of queue
-                self._cache_queue.remove(key)
-                self._cache_queue.append(key)
-            if self._allow_cloudpickle and self.shared:
-                return cloudpickle.loads(value)
-            return value
-        return None
+        if key not in self._cache_dict:
+            return None
+        with self._cache_lock:
+            value = self._cache_dict[key]
+            # Move key to back of queue
+            self._cache_queue.remove(key)
+            self._cache_queue.append(key)
+        if self._allow_cloudpickle and self.shared:
+            return cloudpickle.loads(value)
+        return value
 
     def put(self, key: Hashable, value: Any) -> None:
         """Insert a key value pair into the cache."""
