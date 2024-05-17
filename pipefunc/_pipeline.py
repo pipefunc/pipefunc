@@ -738,20 +738,44 @@ class Pipeline:
 
     def add_mapspec_axes(self, parameter: str, axis: str) -> None:
         """Add a MapSpec to the pipeline."""
-        for f in self.functions:
-            if f.mapspec is None:
-                input_specs = [ArraySpec(parameter, (axis,))]
-                output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
-            else:
-                existing_inputs = {s.name for s in f.mapspec.inputs}
-                if parameter in existing_inputs:
-                    input_specs = [
-                        s.add_axes(axis) if s.name == parameter else s for s in f.mapspec.inputs
+
+        def axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None, ...]:
+            n = dims.get(p, 1) - 1
+            return n * (None,) + (axis,)
+
+        def update_mapspec(pending: set[str], dims: dict[str, int]) -> None:
+            p = pending.pop()
+            for f in self.functions:
+                if p not in f.parameters:
+                    continue
+                if f.mapspec is None:
+                    axes = axes_from_dims(p, dims, axis)
+                    input_specs = [ArraySpec(p, axes)]
+                    output_specs = [
+                        ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)
                     ]
                 else:
-                    input_specs = [*f.mapspec.inputs, ArraySpec(parameter, (axis,))]
-                output_specs = [s.add_axes(axis) for s in f.mapspec.outputs]
-            f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
+                    existing_inputs = {s.name for s in f.mapspec.inputs}
+                    if p in existing_inputs:
+                        input_specs = [
+                            s.add_axes(axis) if s.name == p and axis not in s.axes else s
+                            for s in f.mapspec.inputs
+                        ]
+                    else:
+                        input_specs = [*f.mapspec.inputs, ArraySpec(p, (axis,))]
+                    output_specs = [
+                        s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
+                    ]
+                f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
+                for o in output_specs:
+                    pending.add(o.name)
+                    dims[o.name] = len(o.axes)
+
+        pending = {parameter}
+        dims: dict[str, int] = {}
+        while pending:
+            update_mapspec(pending=pending, dims=dims)
+        self._init_internal_cache()
 
     def _func_node_colors(
         self,

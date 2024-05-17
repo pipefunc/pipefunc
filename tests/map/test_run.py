@@ -555,18 +555,18 @@ def test_nd_input_list(tmp_path: Path) -> None:
 def test_add_mapspec_axes(tmp_path: Path) -> None:
     @pipefunc(output_name="one")
     def one(a, b):
-        assert isinstance(a, int)
-        assert isinstance(b, int)
-        return a + b
+        assert isinstance(a, (int, np.float64))
+        assert isinstance(b, (int, np.float64))
+        return a * b
 
     @pipefunc(output_name="two")
     def two(one, d):
         assert isinstance(one, np.ndarray)
-        return np.sum(one) + d
+        return np.sum(one) / d
 
     @pipefunc(output_name="three")
     def three(two, d):
-        return two + d
+        return two / d
 
     pipeline = Pipeline(
         [
@@ -575,14 +575,75 @@ def test_add_mapspec_axes(tmp_path: Path) -> None:
             three,
         ],
     )
-    inputs = {"a": [1, 1], "b": [1, 1], "d": 1}
+    inputs = {"a": np.ones((2,)), "b": [1, 1], "d": 1}
+    shapes = {"b": (2,), "a": (2,), "one": (2, 2)}
+    assert map_shapes(pipeline, inputs) == shapes
     results = pipeline.map(inputs, tmp_path, parallel=False)
-    assert results[-1].output == 10
+    assert results[-1].output == 4.0
 
+    # Adding another axis to "one"
     pipeline.add_mapspec_axes("a", "k")
     assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
     assert str(two.mapspec) == "one[:, :, k] -> two[k]"
     assert str(three.mapspec) == "two[k] -> three[k]"
-    inputs = {"a": np.array([[1, 1], [1, 1]]), "b": [1, 1], "d": 1}
+
+    # Run the pipeline
+    inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": 1}
+    shapes = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3,), "three": (3,)}
+    assert map_shapes(pipeline, inputs) == shapes
     results = pipeline.map(inputs, tmp_path, parallel=False)
-    assert results[-1].output.tolist() == [10, 10]
+    assert results[-1].output.tolist() == [4.0, 4.0, 4.0]
+
+    # Adding another axis to "d"
+    pipeline.add_mapspec_axes("d", "l")
+    assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
+    assert str(two.mapspec) == "one[:, :, k], d[l] -> two[k, l]"
+    assert str(three.mapspec) == "two[k, l], d[l] -> three[k, l]"
+
+    # Run the pipeline
+    inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": [1, 1]}
+    assert pipeline.map_parameters == {"one", "a", "three", "two", "b", "d"}
+    shapes = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3, 2), "three": (3, 2), "d": (2,)}
+    assert map_shapes(pipeline, inputs) == shapes
+    results = pipeline.map(inputs, tmp_path, parallel=False)
+    assert results[-1].output.tolist() == [[4.0, 4.0], [4.0, 4.0], [4.0, 4.0]]
+
+
+def test_add_mapspec_axes_unused_parameter() -> None:
+    @pipefunc(output_name="result")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([(func, "a[i] -> result[i]")])
+
+    pipeline.add_mapspec_axes("unused_param", "j")
+
+    assert str(func.mapspec) == "a[i] -> result[i]"
+
+
+def test_add_mapspec_axes_complex_pipeline() -> None:
+    @pipefunc(output_name=("out1", "out2"))
+    def func1(a, b):
+        return a + b, a - b
+
+    @pipefunc(output_name="out3")
+    def func2(out1, c):
+        return out1 * c
+
+    @pipefunc(output_name="out4")
+    def func3(out2, out3):
+        return out2 + out3
+
+    pipeline = Pipeline(
+        [
+            (func1, "a[i], b[j] -> out1[i, j], out2[i, j]"),
+            (func2, "out1[i, j], c[k] -> out3[i, j, k]"),
+            func3,
+        ],
+    )
+
+    pipeline.add_mapspec_axes("a", "l")
+
+    assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
+    assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
+    assert str(func3.mapspec) == "out2[:, :, l], out3[:, :, :, l] -> out4[l]"
