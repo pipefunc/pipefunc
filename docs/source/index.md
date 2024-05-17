@@ -25,5 +25,5 @@ start-after: <!-- toc-end -->
 :hidden:
 :maxdepth: 2
 
-🛠️ API reference <reference/pipefunc>
+🛠️ API reference <reference/index>
 ```
