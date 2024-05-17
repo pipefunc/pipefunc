@@ -154,9 +154,12 @@ def test_multi_sweep():
     sweep2 = Sweep({"x": [5, 6], "y": [7, 8]})
     multi_sweep = MultiSweep(sweep1, sweep2)
     multi_sweep2 = sweep1 + sweep2
+    multi_sweep3 = sweep1.combine(sweep2)
     expected_result = sweep1.list() + sweep2.list()
     assert multi_sweep.list() == multi_sweep2.list() == expected_result
+    assert multi_sweep.list() == multi_sweep3.list() == expected_result
     assert len(multi_sweep) == len(multi_sweep2) == 8
+    assert len(multi_sweep) == len(multi_sweep3) == 8
 
 
 def test_sweep_add():
@@ -273,6 +276,10 @@ def test_filtered_sweep_with_derivers() -> None:
     filtered_sweep = sweep.filtered_sweep(("b", "d"))
 
     assert filtered_sweep.list() == [{"b": 3, "d": 3}, {"b": 4, "d": 8}]
+
+    multi = sweep.filtered_sweep(("b",)) + sweep.filtered_sweep(("d",))
+    assert multi.list() == [{"b": 3}, {"b": 4}, {"d": 3}, {"d": 8}]
+    assert multi.filtered_sweep(("b",)).list() == [{"b": 3}, {"b": 4}]
 
     # Test with unhashable items
     sweep = Sweep(
@@ -420,3 +427,11 @@ def test_sweep_product_with_constants() -> None:
         {"a": 2, "b": 3, "x": 10, "y": 20},
         {"a": 2, "b": 4, "x": 10, "y": 20},
     ]
+
+
+def test_empty_filtered_sweep() -> None:
+    assert Sweep({}).list() == []
+
+    sweep = Sweep({"a": [1, 2], "b": [3, 4]})
+    filtered_sweep = sweep.filtered_sweep(("x",))
+    assert filtered_sweep.list() == []

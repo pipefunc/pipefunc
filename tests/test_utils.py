@@ -128,9 +128,9 @@ def test_is_equal_dict():
     d3 = {"a": 1, "b": 3}
     assert not _is_equal(d1, d3)
 
-    assert not equal_dicts({"a": 1}, {"a": 1, "b": 3})
-    assert not equal_dicts({"a": 1}, {"b": 1})
-    assert not equal_dicts({"a": [1]}, {"b": (1,)})
+    assert not equal_dicts({"a": 1}, {"a": 1, "b": 3}, verbose=True)
+    assert not equal_dicts({"a": 1}, {"b": 1}, verbose=True)
+    assert not equal_dicts({"a": [1]}, {"b": (1,)}, verbose=True)
 
 
 def test_is_equal_numpy_array():
@@ -195,27 +195,35 @@ def test_is_equal_other_types():
 def test_equal_dicts():
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
-    assert equal_dicts(d1, d2)
+    assert equal_dicts(d1, d2, verbose=True)
 
     d3 = {"a": 1, "b": 3}
-    assert not equal_dicts(d1, d3)
+    assert not equal_dicts(d1, d3, verbose=True)
 
     d4 = {"a": 1, "b": {"c": 2}}
     d5 = {"a": 1, "b": {"c": 2}}
-    assert equal_dicts(d4, d5)
+    assert equal_dicts(d4, d5, verbose=True)
 
     d6 = {"a": 1, "b": {"c": 3}}
-    assert not equal_dicts(d4, d6)
+    assert not equal_dicts(d4, d6, verbose=True)
 
     # test with numpy arrays
     d7 = {"a": np.array([1, 2, 3])}
     d8 = {"a": np.array([1, 2, 3])}
-    assert equal_dicts(d7, d8)
+    assert equal_dicts(d7, d8, verbose=True)
 
     d9 = {"a": {"a": np.array([1, 2, 3])}}
     d10 = {"a": {"a": np.array([1, 2, 3])}}
-    assert equal_dicts(d9, d10)
+    assert equal_dicts(d9, d10, verbose=True)
 
     d11 = {"a": {"a": np.array([1, 2, 3])}}
     d12 = {"a": {"a": np.array([1, 2, 4])}}
-    assert not equal_dicts(d11, d12)
+    assert not equal_dicts(d11, d12, verbose=True)
+
+    class A:
+        def __eq__(self, other):
+            msg = "Error"
+            raise RuntimeError(msg)
+
+    with pytest.warns(Warning, match="Errors comparing keys"):
+        assert equal_dicts({"a": A()}, {"a": A()}, verbose=True) is None
