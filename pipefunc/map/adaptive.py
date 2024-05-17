@@ -18,8 +18,7 @@ from pipefunc.map._run import (
     _init_file_arrays,
     _maybe_load_single_output,
     _MockPipeline,
-    _run_iteration_and_pick_output,
-    _update_file_array,
+    _run_iteration_and_process,
     run,
 )
 
@@ -171,8 +170,7 @@ def _execute_iteration_in_map_spec(
         run_info.manual_shapes,
         run_folder,
     )
-    outputs = _run_iteration_and_pick_output(index, func, kwargs, shape)
-    _update_file_array(func, file_arrays, shape, index, outputs)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, file_arrays)
     return outputs if return_output else None
 
 

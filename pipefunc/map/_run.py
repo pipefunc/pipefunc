@@ -274,14 +274,17 @@ def _run_iteration(
         raise  # handle_error raises but mypy doesn't know that
 
 
-def _run_iteration_and_pick_output(
+def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
+    file_arrays: list[FileArray],
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, index)
-    return _pick_output(func, output)
+    outputs = _pick_output(func, output)
+    _update_file_array(func, file_arrays, shape, index, outputs)
+    return outputs
 
 
 def _update_file_array(
@@ -289,11 +292,11 @@ def _update_file_array(
     file_arrays: list[FileArray],
     shape: tuple[int, ...],
     index: int,
-    output: list[Any],
+    outputs: list[Any],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
     output_key = func.mapspec.output_key(shape, index)
-    for file_array, _output in zip(file_arrays, output):
+    for file_array, _output in zip(file_arrays, outputs):
         file_array.dump(output_key, _output)
 
 
@@ -329,7 +332,13 @@ def _execute_map_spec(
     shape = shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
-    process_index = partial(_run_iteration_and_pick_output, func=func, kwargs=kwargs, shape=shape)
+    process_index = partial(
+        _run_iteration_and_process,
+        func=func,
+        kwargs=kwargs,
+        shape=shape,
+        file_arrays=file_arrays,
+    )
     existing, missing = _existing_and_missing_indices(file_arrays)
     n = len(missing)
     if parallel and n > 1:
@@ -339,7 +348,6 @@ def _execute_map_spec(
         outputs_list = [process_index(index) for index in missing]
 
     for index, outputs in zip(missing, outputs_list):
-        _update_file_array(func, file_arrays, shape, index, outputs)
         _update_result_array(result_arrays, index, outputs)
 
     for index in existing:
