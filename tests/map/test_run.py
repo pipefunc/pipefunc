@@ -527,3 +527,26 @@ def test_run_info_compare(tmp_path: Path) -> None:
     inputs = {"x": [1, 2, 3, 4]}
     with pytest.raises(ValueError, match="Shapes do not match previous run"):
         pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+
+
+def test_nd_input_list(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([(double_it, "x[i, j] -> y[i, j]")])
+
+    inputs_list = {"x": [[1, 2], [3, 4]]}
+    with pytest.raises(ValueError, match="Expected 2D"):
+        pipeline.map(inputs_list, tmp_path, parallel=False)
+
+    inputs_arr = {k: np.array(v) for k, v in inputs_list.items()}
+    assert map_shapes(pipeline, inputs_arr) == {"x": (2, 2), "y": (2, 2)}
+    results = pipeline.map(inputs_arr, tmp_path, parallel=False)
+    assert results[-1].output.tolist() == [[2, 4], [6, 8]]
+
+    pipeline.add_mapspec_axes("k")
+    inputs = {"x": np.arange(2**3).reshape(2, 2, 2)}
+    assert map_shapes(pipeline, inputs) == {"x": (2, 2, 2), "y": (2, 2, 2)}
+    results = pipeline.map(inputs, tmp_path, parallel=False)
+    assert results[-1].output.tolist() == [[[0, 2], [4, 6]], [[8, 10], [12, 14]]]

@@ -50,6 +50,10 @@ class _MockPipeline:
             topological_generations=pipeline.topological_generations,
         )
 
+    @property
+    def functions(self) -> list[PipeFunc]:
+        return [f for gen in self.topological_generations[1] for f in gen]
+
 
 def _dump_inputs(
     inputs: dict[str, Any],
@@ -135,6 +139,14 @@ def _compare_to_previous_run_info(
         raise ValueError(msg)
 
 
+def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
+    input_dimensions = _input_dimensions(pipeline)
+    for name, value in inputs.items():
+        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
+            msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
+            raise ValueError(msg)
+
+
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
@@ -157,6 +169,7 @@ class RunInfo(NamedTuple):
             cleanup_run_folder(run_folder)
         else:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
+        _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
@@ -393,6 +406,24 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
     return _dump_output(func, output, run_folder)
+
+
+def _input_dimensions(pipeline: Pipeline) -> dict[str, int]:
+    input_dims: dict[str, int] = {}
+    for f in pipeline.functions:
+        if f.mapspec is None:
+            continue
+        for arrayspec in f.mapspec.inputs:
+            if arrayspec.name in input_dims:
+                if input_dims[arrayspec.name] != len(arrayspec.axes):
+                    msg = (
+                        f"Dimension mismatch for arrays with name `{arrayspec.name}`."
+                        " All arrays with the same name must have the same number of axes."
+                    )
+                    raise ValueError(msg)
+                continue
+            input_dims[arrayspec.name] = len(arrayspec.axes)
+    return input_dims
 
 
 def map_shapes(

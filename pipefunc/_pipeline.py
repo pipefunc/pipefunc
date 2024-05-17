@@ -38,7 +38,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import MapSpec
+from pipefunc.map._mapspec import ArraySpec, MapSpec
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -735,6 +735,27 @@ class Pipeline:
         assert all(isinstance(x, str) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         return generations[0], generations[1:]
+
+    def add_mapspec_axes(self, *axis: str) -> None:
+        """Add a MapSpec to the pipeline."""
+        for f in self.functions:
+            inputs = tuple(f.parameters)
+            outputs = at_least_tuple(f.output_name)
+            if f.mapspec is None:
+                input_specs = [ArraySpec(name, axis) for name in inputs]
+                output_specs = [ArraySpec(name, axis) for name in outputs]
+            else:
+                existing_inputs = {s.name for s in f.mapspec.inputs}
+                existing_outputs = {s.name for s in f.mapspec.outputs}
+                input_specs = [s.add_axes(*axis) for s in f.mapspec.inputs]
+                output_specs = [s.add_axes(*axis) for s in f.mapspec.outputs]
+                for name in inputs:
+                    if name not in existing_inputs:
+                        input_specs.append(ArraySpec(name, axis))
+                for name in outputs:
+                    if name not in existing_outputs:
+                        output_specs.append(ArraySpec(name, axis))
+            f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
 
     def _func_node_colors(
         self,

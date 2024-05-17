@@ -71,6 +71,14 @@ class ArraySpec:
             msg = f"Expecting array of rank {self.rank}, but got array of shape {shape}"
             raise ValueError(msg)
 
+    def add_axes(self, *axis: str | None) -> ArraySpec:
+        """Return a new ArraySpec with additional axes."""
+        # check for no duplicate axes
+        if any(ax in self.axes for ax in axis if ax is not None):
+            msg = f"Duplicate axes are not allowed: {axis}"
+            raise ValueError(msg)
+        return ArraySpec(self.name, self.axes + axis)
+
 
 @dataclass(frozen=True)
 class MapSpec:
@@ -228,6 +236,13 @@ class MapSpec:
     def to_string(self) -> str:
         """Return a faithful representation of a MapSpec as a string."""
         return str(self)
+
+    def add_axes(self, *axis: str | None) -> MapSpec:
+        """Return a new MapSpec with additional axes."""
+        return MapSpec(
+            tuple(x.add_axes(*axis) for x in self.inputs),
+            tuple(x.add_axes(*axis) for x in self.outputs),
+        )
 
 
 def _parse_index_string(index_string: str) -> tuple[str | None, ...]:
