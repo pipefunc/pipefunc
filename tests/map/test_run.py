@@ -550,3 +550,39 @@ def test_nd_input_list(tmp_path: Path) -> None:
     assert map_shapes(pipeline, inputs) == {"x": (2, 2, 2), "y": (2, 2, 2)}
     results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results[-1].output.tolist() == [[[0, 2], [4, 6]], [[8, 10], [12, 14]]]
+
+
+def test_add_mapspec_axes(tmp_path: Path) -> None:
+    @pipefunc(output_name="one")
+    def one(a, b):
+        assert isinstance(a, int)
+        assert isinstance(b, int)
+        return a + b
+
+    @pipefunc(output_name="two")
+    def two(one, d):
+        assert isinstance(one, np.ndarray)
+        return np.sum(one) + d
+
+    @pipefunc(output_name="three")
+    def three(two, d):
+        return two + d
+
+    pipeline = Pipeline(
+        [
+            (one, "a[i], b[j] -> one[i, j]"),
+            two,
+            three,
+        ],
+    )
+    inputs = {"a": [1, 1], "b": [1, 1], "d": 1}
+    results = pipeline.map(inputs, tmp_path, parallel=False)
+    assert results[-1].output == 10
+
+    pipeline.add_mapspec_axes("a", "k")
+    assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
+    assert str(two.mapspec) == "one[:, :, k] -> two[k]"
+    assert str(three.mapspec) == "two[k] -> three[k]"
+    inputs = {"a": np.array([[1, 1], [1, 1]]), "b": [1, 1], "d": 1}
+    results = pipeline.map(inputs, tmp_path, parallel=False)
+    assert results[-1].output.tolist() == [10, 10]
