@@ -62,7 +62,7 @@ def visualize(
         pos,
         nodelist=arg_nodes,
         node_size=4000,
-        node_color="lightgreen",
+        node_color="C2",
         node_shape="s",
     )
     nx.draw_networkx_nodes(
@@ -70,7 +70,7 @@ def visualize(
         pos,
         nodelist=func_nodes,
         node_size=4000,
-        node_color=func_node_colors or "skyblue",
+        node_color=func_node_colors or "C1",
         node_shape="o",
     )
 
@@ -92,10 +92,13 @@ def visualize(
     # Add edge labels with function outputs
     outputs = {}
     inputs = {}
+    mapspecs = {}
     for edge, attrs in graph.edges.items():
         a, b = edge
         if isinstance(a, str):
             default_value = graph.nodes[a]["default_value"]
+            if not isinstance(b, str) and b.mapspec:
+                mapspecs[edge] = f"${b.mapspec.latex()}$"
             if default_value is not inspect.Parameter.empty:
                 inputs[edge] = f"{a}={default_value}"
             else:
@@ -105,13 +108,15 @@ def visualize(
             if isinstance(arg, tuple):
                 arg = ", ".join(arg)
             outputs[edge] = arg
+            if b.mapspec:
+                mapspecs[edge] = f"${b.mapspec.latex()}$"
 
     nx.draw_networkx_edge_labels(
         graph,
         pos,
         edge_labels=outputs,
         font_size=12,
-        font_color="skyblue",
+        font_color="C1",
     )
 
     nx.draw_networkx_edge_labels(
@@ -119,7 +124,16 @@ def visualize(
         pos,
         edge_labels=inputs,
         font_size=12,
-        font_color="lightgreen",
+        font_color="C2",
+    )
+
+    nx.draw_networkx_edge_labels(
+        graph,
+        pos,
+        edge_labels=mapspecs,
+        font_size=12,
+        font_color="C2",
+        font_weight="bold",
     )
 
     plt.axis("off")
@@ -165,7 +179,7 @@ def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
         "xaxis": None,
         "yaxis": None,
         "node_color": hv.dim("type").categorize(
-            {"str": "lightgreen", "func": "skyblue"},
+            {"str": "C2", "func": "C1"},
             "gray",
         ),
         "edge_color": "black",
