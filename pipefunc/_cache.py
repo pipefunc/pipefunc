@@ -106,7 +106,9 @@ class HybridCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return {k: cloudpickle.loads(v) for k, v in self._cache_dict.items()}
+            if self._allow_cloudpickle:
+                return {k: _maybe_load(v) for k, v in self._cache_dict.items()}
+            return dict(self._cache_dict.items())
 
     @property
     def access_counts(self) -> dict[Hashable, int]:
@@ -247,6 +249,12 @@ class HybridCache(_CacheBase):
         return len(self._cache_dict)
 
 
+def _maybe_load(value: bytes | str) -> Any:
+    if value == _NONE_RETURN_STR:
+        return None
+    return cloudpickle.loads(value)
+
+
 class LRUCache(_CacheBase):
     """A shared memory LRU cache implementation.
 
@@ -326,7 +334,9 @@ class LRUCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return {k: cloudpickle.loads(v) for k, v in self._cache_dict.items()}
+            if self._allow_cloudpickle:
+                return {k: _maybe_load(v) for k, v in self._cache_dict.items()}
+            return dict(self._cache_dict.items())
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""

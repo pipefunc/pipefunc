@@ -141,7 +141,7 @@ def test_contains(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_cache_property(shared):
-    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=False)
+    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=True)
     cache.put("test", "value")
     cache_dict = cache.cache
     assert cache_dict == {"test": "value"}
@@ -266,7 +266,7 @@ def test_file_cache_put_and_get_none(cache_dir):
     assert cache.get("key1") is None
     assert "key1" in cache
     assert "key1" in cache.lru_cache
-    assert cache.cache["key1"] == "__ReturnsNone__"
+    assert cache.cache["key1"] is None
 
 
 @pytest.mark.parametrize("shared", [True, False])
