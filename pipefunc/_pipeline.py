@@ -762,7 +762,8 @@ class Pipeline:
                             for s in f.mapspec.inputs
                         ]
                     else:
-                        input_specs = [*f.mapspec.inputs, ArraySpec(p, (axis,))]
+                        axes = axes_from_dims(p, dims, axis)
+                        input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
                     output_specs = [
                         s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
                     ]
