@@ -279,7 +279,7 @@ class PipeFunc(Generic[T]):
         if self.mapspec is None:
             return
 
-        if not isinstance(self.mapspec, MapSpec):
+        if not isinstance(self.mapspec, MapSpec):  # pragma: no cover
             msg = (
                 "The 'mapspec' argument should be an instance of MapSpec,"
                 f" not {type(self.mapspec)}."

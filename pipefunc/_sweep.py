@@ -106,6 +106,9 @@ class Sweep:
         self.derivers = derivers
 
     def generate(self) -> Generator[dict[str, Any], None, None]:  # noqa: PLR0912
+        if not self.items:
+            return  # If there are no items, return an empty generator
+
         if self.dims is None or set(self.dims) == self.items.keys():
             # Create the full Cartesian product if no dimensions are provided.
             names = self.items.keys()
@@ -168,6 +171,10 @@ class Sweep:
                 dims=[tuple(keys)],
             )
 
+        if not any(k in self.items for k in keys):
+            # Return an empty sweep with no dimensions if no items match the filter keys
+            return Sweep({})
+
         dims: list[str | tuple[str, ...]]
         if self.dims is None or set(self.dims) == self.items.keys():
             dims = [k for k in self.items if k in keys]
@@ -211,14 +218,14 @@ class Sweep:
 
     def __add__(self, other: Sweep) -> MultiSweep:
         """Combine this Sweep with another one, creating a MultiSweep."""
-        if not isinstance(other, Sweep):
-            msg = "Other object must be a Sweep or a MultiSweep instance."
+        if not isinstance(other, Sweep):  # pragma: no cover
+            msg = "Other object must be a `Sweep` or a `MultiSweep` instance."
             raise TypeError(msg)
         return MultiSweep(self, other)
 
     def combine(self, other: Sweep) -> MultiSweep:
         """Add another sweep to this MultiSweep."""
-        return other + self
+        return self + other
 
     def product(self, *others: Sweep) -> Sweep:
         """Create a Cartesian product of this Sweep with other Sweeps.
@@ -249,7 +256,7 @@ class Sweep:
         dims = self.dims.copy() if self.dims is not None else None
 
         for other in others:
-            if not isinstance(other, Sweep):
+            if not isinstance(other, Sweep):  # pragma: no cover
                 msg = "All arguments must be Sweep instances."
                 raise TypeError(msg)
             items.update(other.items)
@@ -347,13 +354,13 @@ class MultiSweep(Sweep):
 
     def __add__(self, other: Sweep) -> MultiSweep:
         """Add another sweep to this MultiSweep."""
-        if not isinstance(other, Sweep):
-            msg = "Other object must be a Sweep or a MultiSweep instance."
+        if not isinstance(other, Sweep):  # pragma: no cover
+            msg = "Other object must be a `Sweep` or a `MultiSweep` instance."
             raise TypeError(msg)
         return self.combine(other)
 
     def combine(self, other: Sweep) -> MultiSweep:
-        """Add another sweep to this MultiSweep."""
+        """Add another sweep to this `MultiSweep`."""
         if isinstance(other, MultiSweep):
             self.sweeps.extend(other.sweeps)
         else:

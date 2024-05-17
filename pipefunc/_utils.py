@@ -140,12 +140,13 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
         v2 = d2[k]
         try:
             equal = _is_equal(v1, v2)
+        except Exception:  # noqa: BLE001
+            errors.append((k, v1, v2))
+        else:
             if not equal:
                 if verbose:
                     print(f"Not equal `{k}`: `{v1} != {v2}`")
                 return False
-        except Exception:  # noqa: BLE001
-            errors.append((k, v1, v2))
     if errors:
         warnings.warn(f"Errors comparing keys and values: {errors}", stacklevel=3)
         return None
