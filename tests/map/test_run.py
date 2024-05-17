@@ -545,7 +545,7 @@ def test_nd_input_list(tmp_path: Path) -> None:
     results = pipeline.map(inputs_arr, tmp_path, parallel=False)
     assert results[-1].output.tolist() == [[2, 4], [6, 8]]
 
-    pipeline.add_mapspec_axes("k")
+    pipeline.add_mapspec_axes("x", "k")
     inputs = {"x": np.arange(2**3).reshape(2, 2, 2)}
     assert map_shapes(pipeline, inputs) == {"x": (2, 2, 2), "y": (2, 2, 2)}
     results = pipeline.map(inputs, tmp_path, parallel=False)
