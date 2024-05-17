@@ -106,7 +106,7 @@ class HybridCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return dict(self._cache_dict.items())
+            return {k: cloudpickle.loads(v) for k, v in self._cache_dict.items()}
 
     @property
     def access_counts(self) -> dict[Hashable, int]:
@@ -326,7 +326,7 @@ class LRUCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return dict(self._cache_dict.items())
+            return {k: cloudpickle.loads(v) for k, v in self._cache_dict.items()}
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""
