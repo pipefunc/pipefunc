@@ -44,8 +44,10 @@ def test_hybrid_cache_expire(shared):
     cache.put("key2", "value2", 2.0)
     cache.put("key3", "value3", 3.0)
     cache.put("key4", "value4", 4.0)
-    assert "key1" not in cache, cache.cache
-    assert "key4" in cache, cache.cache
+    assert "key1" not in cache
+    assert "key4" in cache
+    assert len(cache) == 3
+    assert len(cache.cache) == 3
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -260,8 +262,9 @@ def test_file_cache_clear_with_lru_cache(cache_dir):
     assert len(cache.lru_cache) == 0
 
 
-def test_file_cache_put_and_get_none(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+@pytest.mark.parametrize("shared", [True, False])
+def test_file_cache_put_and_get_none(cache_dir, shared: bool):  # noqa: FBT001
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=shared)
     cache.put("key1", None)
     assert cache.get("key1") is None
     assert "key1" in cache
