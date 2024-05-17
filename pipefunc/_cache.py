@@ -13,8 +13,6 @@ import cloudpickle
 if TYPE_CHECKING:
     from collections.abc import Hashable
 
-_NONE_RETURN_STR = "__ReturnsNone__"
-
 
 class _CacheBase(abc.ABC):
     @abc.abstractmethod
@@ -106,7 +104,7 @@ class HybridCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return dict(self._cache_dict.items())
+            return {k: _maybe_load(v, self._allow_cloudpickle) for k, v in self._cache_dict.items()}
 
     @property
     def access_counts(self) -> dict[Hashable, int]:
@@ -143,14 +141,14 @@ class HybridCache(_CacheBase):
             otherwise None.
 
         """
+        if key not in self._cache_dict:
+            return None
         with self._cache_lock:
-            if key in self._cache_dict:
-                self._access_counts[key] += 1
-                value = self._cache_dict[key]
-                if self._allow_cloudpickle and self.shared:
-                    value = cloudpickle.loads(value)
-                return value
-        return None  # pragma: no cover
+            self._access_counts[key] += 1
+        value = self._cache_dict[key]
+        if self._allow_cloudpickle and self.shared:
+            value = cloudpickle.loads(value)
+        return value
 
     def put(self, key: Hashable, value: Any, duration: float) -> None:  # type: ignore[override]
         """Add a value to the cache with its associated key and computation duration.
@@ -247,6 +245,10 @@ class HybridCache(_CacheBase):
         return len(self._cache_dict)
 
 
+def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:  # noqa: FBT001
+    return cloudpickle.loads(value) if allow_cloudpickle else value
+
+
 class LRUCache(_CacheBase):
     """A shared memory LRU cache implementation.
 
@@ -287,23 +289,20 @@ class LRUCache(_CacheBase):
 
     def get(self, key: Hashable) -> Any:
         """Get a value from the cache by key."""
+        if key not in self._cache_dict:
+            return None
         with self._cache_lock:
-            value = self._cache_dict.get(key)
-            if value is not None:  # Move key to back of queue
-                self._cache_queue.remove(key)
-                self._cache_queue.append(key)
-        if value is not None:
-            if value == _NONE_RETURN_STR:
-                value = None
-            elif self._allow_cloudpickle and self.shared:
-                value = cloudpickle.loads(value)
+            value = self._cache_dict[key]
+            # Move key to back of queue
+            self._cache_queue.remove(key)
+            self._cache_queue.append(key)
+        if self._allow_cloudpickle and self.shared:
+            return cloudpickle.loads(value)
         return value
 
     def put(self, key: Hashable, value: Any) -> None:
         """Insert a key value pair into the cache."""
-        if value is None:
-            value = _NONE_RETURN_STR
-        elif self._allow_cloudpickle and self.shared:
+        if self._allow_cloudpickle and self.shared:
             value = cloudpickle.dumps(value)
         with self._cache_lock:
             self._cache_dict[key] = value
@@ -326,7 +325,7 @@ class LRUCache(_CacheBase):
             assert isinstance(self._cache_dict, dict)
             return self._cache_dict
         with self._cache_lock:
-            return dict(self._cache_dict.items())
+            return {k: _maybe_load(v, self._allow_cloudpickle) for k, v in self._cache_dict.items()}
 
     def __len__(self) -> int:
         """Return the number of entries in the cache."""

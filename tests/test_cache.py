@@ -44,8 +44,10 @@ def test_hybrid_cache_expire(shared):
     cache.put("key2", "value2", 2.0)
     cache.put("key3", "value3", 3.0)
     cache.put("key4", "value4", 4.0)
-    assert "key1" not in cache, cache.cache
-    assert "key4" in cache, cache.cache
+    assert "key1" not in cache
+    assert "key4" in cache
+    assert len(cache) == 3
+    assert len(cache.cache) == 3
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -141,7 +143,7 @@ def test_contains(shared):
 
 @pytest.mark.parametrize("shared", [True, False])
 def test_cache_property(shared):
-    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=False)
+    cache = LRUCache(max_size=2, shared=shared, allow_cloudpickle=True)
     cache.put("test", "value")
     cache_dict = cache.cache
     assert cache_dict == {"test": "value"}
@@ -260,13 +262,14 @@ def test_file_cache_clear_with_lru_cache(cache_dir):
     assert len(cache.lru_cache) == 0
 
 
-def test_file_cache_put_and_get_none(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
+@pytest.mark.parametrize("shared", [True, False])
+def test_file_cache_put_and_get_none(cache_dir, shared: bool):  # noqa: FBT001
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True, lru_shared=shared)
     cache.put("key1", None)
     assert cache.get("key1") is None
     assert "key1" in cache
     assert "key1" in cache.lru_cache
-    assert cache.cache["key1"] == "__ReturnsNone__"
+    assert cache.cache["key1"] is None
 
 
 @pytest.mark.parametrize("shared", [True, False])
