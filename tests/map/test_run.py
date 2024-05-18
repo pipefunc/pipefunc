@@ -545,14 +545,14 @@ def test_nd_input_list(tmp_path: Path) -> None:
     results = pipeline.map(inputs_arr, tmp_path, parallel=False)
     assert results[-1].output.tolist() == [[2, 4], [6, 8]]
 
-    pipeline.add_mapspec_axes("x", "k")
+    pipeline.add_mapspec_axis("x", "k")
     inputs = {"x": np.arange(2**3).reshape(2, 2, 2)}
     assert map_shapes(pipeline, inputs) == {"x": (2, 2, 2), "y": (2, 2, 2)}
     results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results[-1].output.tolist() == [[[0, 2], [4, 6]], [[8, 10], [12, 14]]]
 
 
-def test_add_mapspec_axes(tmp_path: Path) -> None:
+def test_add_mapspec_axis(tmp_path: Path) -> None:
     @pipefunc(output_name="one")
     def one(a, b):
         assert isinstance(a, (int, np.float64))
@@ -582,7 +582,7 @@ def test_add_mapspec_axes(tmp_path: Path) -> None:
     assert results[-1].output == 4.0
 
     # Adding another axis to "one"
-    pipeline.add_mapspec_axes("a", "k")
+    pipeline.add_mapspec_axis("a", "k")
     assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
     assert str(two.mapspec) == "one[:, :, k] -> two[k]"
     assert str(three.mapspec) == "two[k] -> three[k]"
@@ -595,7 +595,7 @@ def test_add_mapspec_axes(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [4.0, 4.0, 4.0]
 
     # Adding another axis to "d"
-    pipeline.add_mapspec_axes("d", "l")
+    pipeline.add_mapspec_axis("d", "l")
     assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
     assert str(two.mapspec) == "one[:, :, k], d[l] -> two[k, l]"
     assert str(three.mapspec) == "two[k, l], d[l] -> three[k, l]"
@@ -609,19 +609,19 @@ def test_add_mapspec_axes(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [[4.0, 4.0], [4.0, 4.0], [4.0, 4.0]]
 
 
-def test_add_mapspec_axes_unused_parameter() -> None:
+def test_add_mapspec_axis_unused_parameter() -> None:
     @pipefunc(output_name="result")
     def func(a):
         return a
 
     pipeline = Pipeline([(func, "a[i] -> result[i]")])
 
-    pipeline.add_mapspec_axes("unused_param", "j")
+    pipeline.add_mapspec_axis("unused_param", "j")
 
     assert str(func.mapspec) == "a[i] -> result[i]"
 
 
-def test_add_mapspec_axes_complex_pipeline() -> None:
+def test_add_mapspec_axis_complex_pipeline() -> None:
     @pipefunc(output_name=("out1", "out2"))
     def func1(a, b):
         return a + b, a - b
@@ -642,11 +642,11 @@ def test_add_mapspec_axes_complex_pipeline() -> None:
         ],
     )
 
-    pipeline.add_mapspec_axes("a", "l")
+    pipeline.add_mapspec_axis("a", "l")
 
     assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
     assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
-    assert str(func3.mapspec) == "out2[:, :, l], out3[:, :, :, l] -> out4[l]"
+    assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
 
 
 def test_mapspec_manual_shapes(tmp_path: Path) -> None:
@@ -667,7 +667,7 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
         [generate_ints, (double_it, "x[i] -> y[i]"), take_sum],
     )
 
-    pipeline.add_mapspec_axes("z", "k")
+    pipeline.add_mapspec_axis("z", "k")
     assert generate_ints.mapspec is None
     assert str(double_it.mapspec) == "x[i], z[k] -> y[i, k]"
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
@@ -680,27 +680,27 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     assert map_shapes(pipeline, inputs, manual_shapes) == shapes  # type: ignore[arg-type]
 
 
-def test_add_mapspec_axes_multiple_axes() -> None:
+def test_add_mapspec_axis_multiple_axes() -> None:
     @pipefunc(output_name="result")
     def func(a, b):
         return a + b
 
     pipeline = Pipeline([(func, "a[i], b[j] -> result[i, j]")])
 
-    pipeline.add_mapspec_axes("a", "k")
-    pipeline.add_mapspec_axes("b", "l")
+    pipeline.add_mapspec_axis("a", "k")
+    pipeline.add_mapspec_axis("b", "l")
 
     assert str(func.mapspec) == "a[i, k], b[j, l] -> result[i, j, k, l]"
 
 
-def test_add_mapspec_axes_parameter_in_output() -> None:
+def test_add_mapspec_axis_parameter_in_output() -> None:
     @pipefunc(output_name="result")
     def func(a):
         return a
 
     pipeline = Pipeline([(func, "a[i, j] -> result[i, j]")])
 
-    pipeline.add_mapspec_axes("a", "k")
+    pipeline.add_mapspec_axis("a", "k")
 
     assert str(func.mapspec) == "a[i, j, k] -> result[i, j, k]"
 

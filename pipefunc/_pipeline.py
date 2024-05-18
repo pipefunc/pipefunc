@@ -741,46 +741,11 @@ class Pipeline:
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         return generations[0], generations[1:]
 
-    def add_mapspec_axes(self, parameter: str, axis: str) -> None:
-        """Add a MapSpec to the pipeline."""
-
-        def axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None, ...]:
-            n = dims.get(p, 1) - 1
-            return n * (None,) + (axis,)
-
-        def update_mapspec(pending: set[str], dims: dict[str, int]) -> None:
-            p = pending.pop()
-            functions = [f for gen in self.topological_generations[1] for f in gen]
-            for f in functions:
-                if p not in f.parameters:
-                    continue
-                if f.mapspec is None:
-                    axes = axes_from_dims(p, dims, axis)
-                    input_specs = [ArraySpec(p, axes)]
-                    output_specs = [
-                        ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)
-                    ]
-                else:
-                    existing_inputs = {s.name for s in f.mapspec.inputs}
-                    if p in existing_inputs:
-                        input_specs = [
-                            s.add_axes(axis) if s.name == p else s for s in f.mapspec.inputs
-                        ]
-                    else:
-                        axes = axes_from_dims(p, dims, axis)
-                        input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
-                    output_specs = [
-                        s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
-                    ]
-                f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
-                for o in output_specs:
-                    pending.add(o.name)
-                    dims[o.name] = len(o.axes)
-
-        pending = {parameter}
+    def add_mapspec_axis(self, parameter: str, axis: str) -> None:
+        """Add a new axis to `parameter`'s MapSpec."""
         dims: dict[str, int] = {}
-        while pending:
-            update_mapspec(pending=pending, dims=dims)
+        functions = [f for gen in self.topological_generations[1] for f in gen]
+        _add_mapspec_axis(parameter, dims, axis, functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
@@ -1356,3 +1321,32 @@ def _compute_arg_mapping(
     for func in _filter_funcs(deps):
         new_args = [dep for dep in deps if dep != func]
         _compute_arg_mapping(graph, func, head, new_args, [*replaced, node], arg_set)
+
+
+def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None, ...]:
+    n = dims.get(p, 1) - 1
+    return n * (None,) + (axis,)
+
+
+def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
+    for f in functions:
+        if p not in f.parameters:
+            continue
+        if f.mapspec is None:
+            axes = _axes_from_dims(p, dims, axis)
+            input_specs = [ArraySpec(p, axes)]
+            output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
+        else:
+            existing_inputs = {s.name for s in f.mapspec.inputs}
+            if p in existing_inputs:
+                input_specs = [s.add_axes(axis) if s.name == p else s for s in f.mapspec.inputs]
+            else:
+                axes = _axes_from_dims(p, dims, axis)
+                input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
+            output_specs = [
+                s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
+            ]
+        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
+        for o in output_specs:
+            dims[o.name] = len(o.axes)
+            _add_mapspec_axis(o.name, dims, axis, functions)
