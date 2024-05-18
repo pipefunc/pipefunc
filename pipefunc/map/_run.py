@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
@@ -518,17 +519,47 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
     ]
 
 
+def _ensure_run_folder(run_folder: str | Path | None) -> Path:
+    if run_folder is None:
+        tmp_dir = tempfile.mkdtemp()
+        run_folder = Path(tmp_dir)
+    return Path(run_folder)
+
+
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    run_folder: str | Path,
+    run_folder: str | Path | None,
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
 ) -> list[Result]:
+    """Run a pipeline with `MapSpec` functions for given `inputs`.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to run.
+    inputs
+        The inputs to the pipeline. The keys should be the names of the input
+        parameters of the pipeline functions and the values should be the
+        corresponding input data, these are either single values for functions without `mapspec`
+        or lists of values or `numpy.ndarray`s for functions with `mapspec`.
+    run_folder
+        The folder to store the run information. If `None`, a temporary folder
+        is created.
+    manual_shapes
+        The shapes for intermediary outputs that cannot be inferred from the inputs.
+        You will receive an exception if the shapes cannot be inferred and need to be provided.
+    parallel
+        Whether to run the functions in parallel.
+    cleanup
+        Whether to clean up the `run_folder` before running the pipeline.
+
+    """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    run_folder = Path(run_folder)
+    run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     outputs = []

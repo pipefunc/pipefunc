@@ -38,7 +38,8 @@ def test_simple(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     assert map_shapes(pipeline, inputs) == {"x": (4,), "y": (4,)}
-    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    # Test `map` and a tmp run_folder
+    results2 = pipeline.map(inputs, run_folder=None, parallel=False)
     assert results2[-1].output == 12
 
 
