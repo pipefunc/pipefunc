@@ -743,9 +743,8 @@ class Pipeline:
 
     def add_mapspec_axis(self, parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec."""
-        dims: dict[str, int] = {}
         functions = [f for gen in self.topological_generations[1] for f in gen]
-        _add_mapspec_axis(parameter, dims, axis, functions)
+        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
