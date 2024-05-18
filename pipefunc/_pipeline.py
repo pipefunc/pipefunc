@@ -38,8 +38,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import ArraySpec, MapSpec
-from pipefunc.map._run import _validate_mapspec
+from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -258,7 +257,7 @@ class Pipeline:
             del self.topological_generations
 
     def _validate_mapspec(self) -> None:
-        _validate_mapspec(self.functions)
+        validate_consistent_axes(self.mapspecs(ordered=False))
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -723,14 +722,14 @@ class Pipeline:
             defaults.update(func.defaults)
         return defaults
 
-    def mapspecs(self) -> list[MapSpec]:
+    def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
         """Return the MapSpecs for all functions in the pipeline."""
-        functions = self.topologically_sorted
+        functions = self.sorted_functions if ordered else self.functions
         return [f.mapspec for f in functions if f.mapspec]
 
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
-        return [str(mapspec) for mapspec in self.mapspecs()]
+        return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
 
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:
@@ -752,12 +751,13 @@ class Pipeline:
         return generations[0], generations[1:]
 
     @property
-    def topologically_sorted(self) -> list[PipeFunc]:
+    def sorted_functions(self) -> list[PipeFunc]:
+        """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations[1] for f in gen]
 
     def add_mapspec_axis(self, parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec."""
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.topologically_sorted)
+        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
