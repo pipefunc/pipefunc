@@ -11,7 +11,7 @@ import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc.map._filearray import FileArray
-from pipefunc.map._mapspec import MapSpec, array_shape
+from pipefunc.map._mapspec import MapSpec, array_shape, validate_consistent_axes
 
 if TYPE_CHECKING:
     import sys
@@ -49,6 +49,10 @@ class _MockPipeline:
             map_parameters=pipeline.map_parameters,
             topological_generations=pipeline.topological_generations,
         )
+
+    @property
+    def functions(self) -> list[PipeFunc]:
+        return [f for gen in self.topological_generations[1] for f in gen]
 
 
 def _dump_inputs(
@@ -135,6 +139,14 @@ def _compare_to_previous_run_info(
         raise ValueError(msg)
 
 
+def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
+    input_dimensions = _input_dimensions(pipeline)
+    for name, value in inputs.items():
+        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
+            msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
+            raise ValueError(msg)
+
+
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
@@ -157,6 +169,7 @@ class RunInfo(NamedTuple):
             cleanup_run_folder(run_folder)
         else:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
+        _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
         shapes = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
@@ -395,6 +408,15 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     return _dump_output(func, output, run_folder)
 
 
+def _input_dimensions(pipeline: Pipeline) -> dict[str, int]:
+    return {
+        arrayspec.name: len(arrayspec.axes)
+        for f in pipeline.functions
+        if f.mapspec is not None
+        for arrayspec in f.mapspec.inputs
+    }
+
+
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -492,6 +514,7 @@ def run(
     parallel: bool = True,
     cleanup: bool = True,
 ) -> list[Result]:
+    _validate_mapspec(pipeline.functions)
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
@@ -523,3 +546,8 @@ def load_outputs(
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def _validate_mapspec(functions: list[PipeFunc]) -> None:
+    mapspecs = [f.mapspec for f in functions if f.mapspec]
+    validate_consistent_axes(mapspecs)

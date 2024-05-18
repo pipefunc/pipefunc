@@ -12,6 +12,7 @@ from pipefunc.map._mapspec import (
     array_shape,
     expected_mask,
     shape_to_strides,
+    validate_consistent_axes,
 )
 
 
@@ -37,6 +38,11 @@ def test_arrayspec_init():
 def test_arrayspec_str():
     spec = ArraySpec("a", ("i", None, "j"))
     assert str(spec) == "a[i, :, j]"
+    new_spec = spec.add_axes("k")
+    assert str(new_spec) == "a[i, :, j, k]"
+    assert str(spec.add_axes(None)) == "a[i, :, j, :]"
+    with pytest.raises(ValueError, match="Duplicate axes"):
+        new_spec = spec.add_axes("i")
 
 
 def test_arrayspec_indices():
@@ -263,3 +269,43 @@ def test_array_shape():
     # Test with unsupported type
     with pytest.raises(TypeError, match="No array shape defined for type"):
         array_shape(42)
+
+
+def test_mapspec_add_axes():
+    spec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    new_spec = spec.add_axes("k")
+    assert str(new_spec) == "a[i, k], b[j, k] -> c[i, j, k]"
+    with pytest.raises(ValueError, match="Duplicate axes"):
+        spec.add_axes("i")
+
+
+def test_validate_consistent_axes():
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same name at the same index",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i], b[i] -> f[i]"),
+                MapSpec.from_string("f[k], g[k] -> h[k]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same length",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i] -> f[i]"),
+                MapSpec.from_string("a[i, j] -> g[i, j]"),
+            ],
+        )
+
+    validate_consistent_axes(
+        [
+            MapSpec.from_string("a[i], b[j] -> f[i, j]"),
+            MapSpec.from_string("f[i, j], c[k] -> g[i, j, k]"),
+            MapSpec.from_string("g[i, j, k], d[l] -> h[i, j, k, l]"),
+        ],
+    )
