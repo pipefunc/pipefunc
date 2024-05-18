@@ -564,10 +564,11 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
-        if p := self.map_parameters & set(self.root_args(output_name)):
+        if p := self.map_parameters & set(self.func_dependencies(output_name)):
+            inputs = self.map_parameters & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
-                f" have `MapSpec`(s). Use `Pipeline.map` instead."
+                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
             )
             raise RuntimeError(msg)
 
@@ -1338,10 +1339,7 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         else:
             existing_inputs = {s.name for s in f.mapspec.inputs}
             if p in existing_inputs:
-                input_specs = [
-                    s.add_axes(axis) if s.name == p and axis not in s.axes else s
-                    for s in f.mapspec.inputs
-                ]
+                input_specs = [s.add_axes(axis) if s.name == p else s for s in f.mapspec.inputs]
             else:
                 axes = _axes_from_dims(p, dims, axis)
                 input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
