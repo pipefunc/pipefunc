@@ -38,7 +38,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import ArraySpec, MapSpec
+from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -228,6 +228,7 @@ class Pipeline:
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        self._validate_mapspec()
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache
@@ -254,6 +255,10 @@ class Pipeline:
             del self.all_root_args
         with contextlib.suppress(AttributeError):
             del self.topological_generations
+
+    def _validate_mapspec(self) -> None:
+        mapspecs = [f.mapspec for f in self.functions if f.mapspec]
+        validate_consistent_axes(mapspecs)
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""

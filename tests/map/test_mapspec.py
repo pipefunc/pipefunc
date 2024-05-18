@@ -12,6 +12,7 @@ from pipefunc.map._mapspec import (
     array_shape,
     expected_mask,
     shape_to_strides,
+    validate_consistent_axes,
 )
 
 
@@ -276,3 +277,35 @@ def test_mapspec_add_axes():
     assert str(new_spec) == "a[i, k], b[j, k] -> c[i, j, k]"
     with pytest.raises(ValueError, match="Duplicate axes"):
         spec.add_axes("i")
+
+
+def test_validate_consistent_axes():
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same values at the same index",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i], b[i] -> f[i]"),
+                MapSpec.from_string("f[k], g[k] -> h[k]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same length",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i] -> f[i]"),
+                MapSpec.from_string("a[i, j] -> g[i, j]"),
+            ],
+        )
+
+    validate_consistent_axes(
+        [
+            MapSpec.from_string("a[i], b[j] -> f[i, j]"),
+            MapSpec.from_string("f[i, j], c[k] -> g[i, j, k]"),
+            MapSpec.from_string("g[i, j, k], d[l] -> h[i, j, k, l]"),
+        ],
+    )

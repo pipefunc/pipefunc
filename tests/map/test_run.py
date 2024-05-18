@@ -401,7 +401,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
             make_mesh,
             make_materials,
             (run_electrostatics, "V_left[a], V_right[b] -> electrostatics[a, b]"),
-            (get_charge, "electrostatics[i, j] -> charge[i, j]"),
+            (get_charge, "electrostatics[a, b] -> charge[a, b]"),
             average_charge,
         ],
     )
@@ -678,3 +678,63 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [16, 20]
     shapes = {"z": (2,), "y": (4, 2), "sum": (2,)}
     assert map_shapes(pipeline, inputs, manual_shapes) == shapes  # type: ignore[arg-type]
+
+
+def test_add_mapspec_axes_multiple_axes() -> None:
+    @pipefunc(output_name="result")
+    def func(a, b):
+        return a + b
+
+    pipeline = Pipeline([(func, "a[i], b[j] -> result[i, j]")])
+
+    pipeline.add_mapspec_axes("a", "k")
+    pipeline.add_mapspec_axes("b", "l")
+
+    assert str(func.mapspec) == "a[i, k], b[j, l] -> result[i, j, k, l]"
+
+
+def test_add_mapspec_axes_parameter_in_output() -> None:
+    @pipefunc(output_name="result")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([(func, "a[i, j] -> result[i, j]")])
+
+    pipeline.add_mapspec_axes("a", "k")
+
+    assert str(func.mapspec) == "a[i, j, k] -> result[i, j, k]"
+
+
+def test_consistent_indices() -> None:
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same values at the same index",
+    ):
+        Pipeline(
+            [
+                PipeFunc(lambda a, b: a + b, "f", mapspec="a[i], b[i] -> f[i]"),
+                PipeFunc(lambda f, g: f + g, "h", mapspec="f[k], g[k] -> h[k]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same length",
+    ):
+        Pipeline(
+            [
+                PipeFunc(lambda a: a, "f", mapspec="a[i] -> f[i]"),
+                PipeFunc(lambda a: a, "g", mapspec="a[i, j] -> g[i, j]"),
+            ],
+        )
+
+
+def test_consistent_indices_multiple_functions() -> None:
+    pipeline = Pipeline(
+        [
+            PipeFunc(lambda a, b: a + b, "f", mapspec="a[i], b[j] -> f[i, j]"),
+            PipeFunc(lambda f, c: f * c, "g", mapspec="f[i, j], c[k] -> g[i, j, k]"),
+            PipeFunc(lambda g, d: g + d, "h", mapspec="g[i, j, k], d[l] -> h[i, j, k, l]"),
+        ],
+    )
+    pipeline._validate_mapspec()  # Should not raise any error

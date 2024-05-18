@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -353,3 +354,34 @@ def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
     mask = expected_mask(mapspec, mapped_kwargs)
     return num_tasks_from_mask(mask)
+
+
+def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
+    """Raise an exception if the axes of the mapspecs are inconsistent."""
+    indices = defaultdict(set)
+    for mapspec in mapspecs:
+        for spec in mapspec.inputs:
+            indices[spec.name].add(spec)
+        for spec in mapspec.outputs:
+            indices[spec.name].add(spec)
+
+    for name, specs in indices.items():
+        specs_str = ", ".join(str(spec) for spec in specs)
+        lengths = {len(spec.axes) for spec in specs}
+        if len(lengths) > 1:
+            msg = (
+                f"MapSpec axes for `{name}` are inconsistent: {specs_str}."
+                " All axes should have the same length."
+            )
+            raise ValueError(msg)
+        axes: dict[int, str] = {}
+        for spec in specs:
+            for i, axis in enumerate(spec.axes):
+                if axis is not None:
+                    if i in axes and axes[i] != axis:
+                        msg = (
+                            f"MapSpec axes for `{name}` are inconsistent: {specs_str}."
+                            " All axes should have the same values at the same index."
+                        )
+                        raise ValueError(msg)
+                    axes[i] = axis
