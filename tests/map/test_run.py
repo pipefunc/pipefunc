@@ -761,3 +761,9 @@ def test_adding_axes_to_mapspec_less_pipeline():
     assert str(f_c.mapspec) == "a[i], b[j] -> c[i, j]"
     assert str(f_d.mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
     assert str(f_e.mapspec) == "d[i, j, k], c[i, j], x[k] -> e[i, j, k]"
+
+    assert pipeline.mapspecs_as_strings() == [
+        "a[i], b[j] -> c[i, j]",
+        "c[i, j], b[j], x[k] -> d[i, j, k]",
+        "d[i, j, k], c[i, j], x[k] -> e[i, j, k]",
+    ]
