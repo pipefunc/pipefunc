@@ -282,7 +282,7 @@ def test_mapspec_add_axes():
 def test_validate_consistent_axes():
     with pytest.raises(
         ValueError,
-        match="All axes should have the same values at the same index",
+        match="All axes should have the same name at the same index",
     ):
         validate_consistent_axes(
             [

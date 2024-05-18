@@ -381,7 +381,7 @@ def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
                     if i in axes and axes[i] != axis:
                         msg = (
                             f"MapSpec axes for `{name}` are inconsistent: {specs_str}."
-                            " All axes should have the same values at the same index."
+                            " All axes should have the same name at the same index."
                         )
                         raise ValueError(msg)
                     axes[i] = axis

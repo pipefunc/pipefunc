@@ -708,7 +708,7 @@ def test_add_mapspec_axes_parameter_in_output() -> None:
 def test_consistent_indices() -> None:
     with pytest.raises(
         ValueError,
-        match="All axes should have the same values at the same index",
+        match="All axes should have the same name at the same index",
     ):
         Pipeline(
             [
