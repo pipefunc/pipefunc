@@ -32,23 +32,21 @@
 
 ## :thinking: What is this?
 
-`pipefunc` is a Python library that simplifies the creation and management of complex function pipelines. It allows you to declare the dependencies between functions and automatically organizes the execution order to satisfy these dependencies.
-
-`pipefunc` provides a range of features to streamline your workflow, including pipeline visualization, flexible function arguments, support for multiple outputs, pipeline simplification, resource usage profiling, parallel execution, caching, and parameter sweep utilities.
+`pipefunc` is a Python library for creating and running function pipelines. By annotating functions and specifying their outputs, it forms a pipeline that automatically organizes the execution order to satisfy dependencies. Just specify the names of the outputs you want to compute, and `pipefunc` will handle the rest by leveraging the parameter names of the annotated functions.
 
 Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
 
 ## :rocket: Key Features
 
-1. 🚀 **Function Composition and Pipelining**: Create pipelines where the output of one function feeds into another, with `pipefunc` handling the execution order.
+1. 🚀 **Function Composition and Pipelining**: Create pipelines by using the `@pipefunc` decorator; execution order is automatically handled.
 2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
-3. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
-4. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
-5. 🔁 **Map-Reduce Support**: Utilize "fan-out" to distribute tasks and "fan-in" to aggregate results, streamlining data processing in distributed environments.
-6. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
-7. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-8. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
-9. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+3. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
+4. 🔁 **Map-Reduce Support**: Performs "fan-out" to distribute tasks and "fan-in" to aggregate results, allowing n-dimensional mappings.
+5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
+6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
+7. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
+8. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+9. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 10. 🛠️ **Flexibility and Ease of Use**: Manage complex function dependencies in a clear, intuitive way with this lightweight yet powerful tool.
 
 ## :test_tube: How does it work?

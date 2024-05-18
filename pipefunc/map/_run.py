@@ -52,7 +52,18 @@ class _MockPipeline:
 
     @property
     def functions(self) -> list[PipeFunc]:
+        # Return all functions in topological order
         return [f for gen in self.topological_generations[1] for f in gen]
+
+    def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:  # noqa: ARG002
+        """Return the MapSpecs for all functions in the pipeline."""
+        functions = self.functions  # topologically ordered
+        return [f.mapspec for f in functions if f.mapspec]
+
+    @property
+    def sorted_functions(self) -> list[PipeFunc]:
+        """Return the functions in the pipeline in topological order."""
+        return self.functions
 
 
 def _dump_inputs(
@@ -431,7 +442,7 @@ def map_shapes(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
-    mapspec_funcs = [f for gen in pipeline.topological_generations[1] for f in gen if f.mapspec]
+    mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
         assert func.mapspec is not None
         input_shapes = {}
@@ -516,7 +527,7 @@ def run(
     parallel: bool = True,
     cleanup: bool = True,
 ) -> list[Result]:
-    _validate_mapspec(pipeline.functions)
+    validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
@@ -548,8 +559,3 @@ def load_outputs(
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
-
-
-def _validate_mapspec(functions: list[PipeFunc]) -> None:
-    mapspecs = [f.mapspec for f in functions if f.mapspec]
-    validate_consistent_axes(mapspecs)
