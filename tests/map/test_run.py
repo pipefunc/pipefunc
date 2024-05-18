@@ -768,3 +768,32 @@ def test_adding_axes_to_mapspec_less_pipeline():
         "c[i, j], b[j], x[k] -> d[i, j, k]",
         "d[i, j, k], c[i, j], x[k] -> e[i, j, k]",
     ]
+
+
+def test_adding_zipped_axes_to_mapspec_less_pipeline():
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f_e(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", "i")
+    pipeline.add_mapspec_axis("b", "i")
+    pipeline.add_mapspec_axis("x", "j")
+
+    assert str(f_c.mapspec) == "a[i], b[i] -> c[i]"
+    assert str(f_d.mapspec) == "c[i], b[i], x[j] -> d[i, j]"
+    assert str(f_e.mapspec) == "d[i, j], c[i], x[j] -> e[i, j]"
+
+    assert pipeline.mapspecs_as_strings() == [
+        "a[i], b[i] -> c[i]",
+        "c[i], b[i], x[j] -> d[i, j]",
+        "d[i, j], c[i], x[j] -> e[i, j]",
+    ]
