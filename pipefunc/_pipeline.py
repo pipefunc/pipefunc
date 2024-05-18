@@ -777,7 +777,19 @@ class Pipeline:
         return [f for gen in self.topological_generations[1] for f in gen]
 
     def add_mapspec_axis(self, parameter: str, axis: str) -> None:
-        """Add a new axis to `parameter`'s MapSpec."""
+        """Add a new axis to `parameter`'s MapSpec.
+
+        Parameters
+        ----------
+        parameter
+            The parameter to add an axis to.
+        axis
+            The axis to add to the parameter's MapSpec.
+            Provide a new axis name to add a new axis or
+            an existing axis name to zip the parameter with
+            the existing axis.
+
+        """
         _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
