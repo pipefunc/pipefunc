@@ -1339,7 +1339,10 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         else:
             existing_inputs = {s.name for s in f.mapspec.inputs}
             if p in existing_inputs:
-                input_specs = [s.add_axes(axis) if s.name == p else s for s in f.mapspec.inputs]
+                input_specs = [
+                    s.add_axes(axis) if s.name == p and axis not in s.axes else s
+                    for s in f.mapspec.inputs
+                ]
             else:
                 axes = _axes_from_dims(p, dims, axis)
                 input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
