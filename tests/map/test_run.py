@@ -738,3 +738,26 @@ def test_consistent_indices_multiple_functions() -> None:
         ],
     )
     pipeline._validate_mapspec()  # Should not raise any error
+
+
+def test_adding_axes_to_mapspec_less_pipeline():
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f_e(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", "i")
+    pipeline.add_mapspec_axis("b", "j")
+    pipeline.add_mapspec_axis("x", "k")
+
+    assert str(f_c.mapspec) == "a[i], b[j] -> c[i, j]"
+    assert str(f_d.mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
+    assert str(f_e.mapspec) == "d[i, j, k], c[i, j], x[k] -> e[i, j, k]"
