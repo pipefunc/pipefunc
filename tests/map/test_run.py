@@ -815,3 +815,20 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
     dimensions = _dimensions(pipeline)
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
+
+
+def test_reusing_axis_names() -> None:
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int):
+        return a + b
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def g(x, y):
+        return x + y
+
+    # TODO: this doesn't fail ATM but should it?
+    with pytest.raises(
+        ValueError,
+        match="Axis name `i` is used in multiple functions",
+    ):
+        Pipeline([f, g])
