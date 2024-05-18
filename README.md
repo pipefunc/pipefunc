@@ -41,7 +41,7 @@ Whether you're working with data processing, scientific computations, machine le
 1. 🚀 **Function Composition and Pipelining**: Create pipelines by using the `@pipefunc` decorator; execution order is automatically handled.
 2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
 3. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
-4. 🔁 **Map-Reduce Support**: Performs "fan-out" to distribute tasks and "fan-in" to aggregate results, allowing n-dimensional mappings.
+4. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
 5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
 6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
 7. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
