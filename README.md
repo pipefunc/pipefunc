@@ -123,10 +123,10 @@ pipeline = Pipeline([f, g])
 inputs = {"a": [1, 2, 3], "b": [4, 5, 6]}
 pipeline.map(inputs, run_folder="my_run_folder", parallel=True)
 result = load_outputs("mean", run_folder="my_run_folder")
-print(result)
+print(result)  # prints 7.0
 ```
 
-Here the `mapspec` argument is used to specify the mapping between the inputs and outputs of the `f` function, it creates the product of the `a` and `b` input lists and computes the sum of each pair. The `g` function then computes the mean of the resulting 2D array. The `map` method is used to apply the `f` function to all possible pairs of `a` and `b` values, and the `load_outputs` function is used to load the results of the `g` function from the specified run folder.
+Here the `mapspec` argument is used to specify the mapping between the inputs and outputs of the `f` function, it creates the product of the `a` and `b` input lists and computes the sum of each pair. The `g` function then computes the mean of the resulting 2D array. The `map` method executes the pipeline for the `inputs`, and the `load_outputs` function is used to load the results of the `g` function from the specified run folder.
 
 ## :notebook: Jupyter Notebook Example
 
