@@ -781,7 +781,7 @@ class Pipeline:
         dims: dict[str, int] = {}
         while pending:
             update_mapspec(pending=pending, dims=dims)
-        self._init_internal_cache()
+        self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
         self,
