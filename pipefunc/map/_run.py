@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import itertools
 import shutil
 import tempfile
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
@@ -152,7 +154,7 @@ def _compare_to_previous_run_info(
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = _input_dimensions(pipeline)
+    input_dimensions = _dimensions(pipeline)
     for name, value in inputs.items():
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
@@ -420,13 +422,22 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     return _dump_output(func, output, run_folder)
 
 
-def _input_dimensions(pipeline: Pipeline) -> dict[str, int]:
+def _dimensions(pipeline: Pipeline) -> dict[str, int]:
     return {
         arrayspec.name: len(arrayspec.axes)
-        for f in pipeline.functions
-        if f.mapspec is not None
-        for arrayspec in f.mapspec.inputs
+        for mapspec in pipeline.mapspecs()
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs)
     }
+
+
+def _axes(pipeline: Pipeline) -> dict[str, tuple[str, ...]]:
+    axes: dict[str, dict[int, str]] = defaultdict(dict)
+    for mapspec in pipeline.mapspecs():
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs):
+            for i, axis in enumerate(arrayspec.axes):
+                if axis is not None:
+                    axes[arrayspec.name][i] = axis
+    return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}
 
 
 def map_shapes(
