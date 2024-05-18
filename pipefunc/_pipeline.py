@@ -565,9 +565,10 @@ class Pipeline:
 
         """
         if p := self.map_parameters & set(self.func_dependencies(output_name)):
+            inputs = self.map_parameters & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
-                f" have `MapSpec`(s). Use `Pipeline.map` instead."
+                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
             )
             raise RuntimeError(msg)
 
