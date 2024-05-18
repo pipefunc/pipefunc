@@ -784,10 +784,9 @@ class Pipeline:
         parameter
             The parameter to add an axis to.
         axis
-            The axis to add to the parameter's MapSpec.
-            Provide a new axis name to add a new axis or
-            an existing axis name to zip the parameter with
-            the existing axis.
+            The axis to add to the `MapSpec` of all functions that depends on
+            `parameter`. Provide a new axis name to add a new axis or an
+            existing axis name to zip the parameter with the existing axis.
 
         """
         _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
