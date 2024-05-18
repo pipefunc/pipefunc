@@ -597,12 +597,33 @@ class Pipeline:
     def map(
         self,
         inputs: dict[str, Any],
-        run_folder: str | Path,
+        run_folder: str | Path | None,
         manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        cleanup: bool = True,
         parallel: bool = True,
+        cleanup: bool = True,
     ) -> list[Result]:
+        """Run a pipeline with `MapSpec` functions for given `inputs`.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without `mapspec`
+            or lists of values or `numpy.ndarray`s for functions with `mapspec`.
+        run_folder
+            The folder to store the run information. If `None`, a temporary folder
+            is created.
+        manual_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+        parallel
+            Whether to run the functions in parallel.
+        cleanup
+            Whether to clean up the `run_folder` before running the pipeline.
+
+        """
         from pipefunc.map import run
 
         return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
