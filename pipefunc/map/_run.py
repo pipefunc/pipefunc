@@ -409,21 +409,12 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
 
 
 def _input_dimensions(pipeline: Pipeline) -> dict[str, int]:
-    input_dims: dict[str, int] = {}
-    for f in pipeline.functions:
-        if f.mapspec is None:
-            continue
-        for arrayspec in f.mapspec.inputs:
-            if arrayspec.name in input_dims:
-                if input_dims[arrayspec.name] != len(arrayspec.axes):
-                    msg = (
-                        f"Dimension mismatch for arrays with name `{arrayspec.name}`."
-                        " All arrays with the same name must have the same number of axes."
-                    )
-                    raise ValueError(msg)
-                continue
-            input_dims[arrayspec.name] = len(arrayspec.axes)
-    return input_dims
+    return {
+        arrayspec.name: len(arrayspec.axes)
+        for f in pipeline.functions
+        if f.mapspec is not None
+        for arrayspec in f.mapspec.inputs
+    }
 
 
 def map_shapes(
