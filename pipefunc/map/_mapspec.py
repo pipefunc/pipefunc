@@ -157,7 +157,8 @@ class MapSpec:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             dim, *rest = (get_dim(x, index) for x in relevant_arrays)
             if any(dim != x for x in rest):
-                msg = f"Dimension mismatch for arrays {relevant_arrays} along {index} axis."
+                arrs = ", ".join(x.name for x in relevant_arrays)
+                msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
                 raise ValueError(msg)
             shape.append(dim)
 
