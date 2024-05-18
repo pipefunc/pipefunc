@@ -723,6 +723,15 @@ class Pipeline:
             defaults.update(func.defaults)
         return defaults
 
+    def mapspecs(self) -> list[MapSpec]:
+        """Return the MapSpecs for all functions in the pipeline."""
+        functions = self.topologically_sorted
+        return [f.mapspec for f in functions if f.mapspec]
+
+    def mapspecs_as_strings(self) -> list[str]:
+        """Return the MapSpecs for all functions in the pipeline as strings."""
+        return [str(mapspec) for mapspec in self.mapspecs()]
+
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:
         """Return the unique leaf node of the pipeline graph."""
@@ -742,10 +751,13 @@ class Pipeline:
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         return generations[0], generations[1:]
 
+    @property
+    def topologically_sorted(self) -> list[PipeFunc]:
+        return [f for gen in self.topological_generations[1] for f in gen]
+
     def add_mapspec_axis(self, parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec."""
-        functions = [f for gen in self.topological_generations[1] for f in gen]
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=functions)
+        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.topologically_sorted)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
