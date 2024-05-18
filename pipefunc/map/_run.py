@@ -11,7 +11,7 @@ import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc.map._filearray import FileArray
-from pipefunc.map._mapspec import MapSpec, array_shape
+from pipefunc.map._mapspec import MapSpec, array_shape, validate_consistent_axes
 
 if TYPE_CHECKING:
     import sys
@@ -523,6 +523,7 @@ def run(
     parallel: bool = True,
     cleanup: bool = True,
 ) -> list[Result]:
+    _validate_mapspec(pipeline.functions)
     run_folder = Path(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
@@ -554,3 +555,8 @@ def load_outputs(
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def _validate_mapspec(functions: list[PipeFunc]) -> None:
+    mapspecs = [f.mapspec for f in functions if f.mapspec]
+    validate_consistent_axes(mapspecs)
