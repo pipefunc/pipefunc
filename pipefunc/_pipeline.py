@@ -750,7 +750,8 @@ class Pipeline:
 
         def update_mapspec(pending: set[str], dims: dict[str, int]) -> None:
             p = pending.pop()
-            for f in self.functions:
+            functions = [f for gen in self.topological_generations[1] for f in gen]
+            for f in functions:
                 if p not in f.parameters:
                     continue
                 if f.mapspec is None:
