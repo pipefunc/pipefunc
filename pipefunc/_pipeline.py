@@ -36,7 +36,12 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
+from pipefunc._utils import (
+    at_least_tuple,
+    generate_filename_from_dict,
+    handle_error,
+    join_overlapping_sets,
+)
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
 
@@ -1397,3 +1402,9 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         for o in output_specs:
             dims[o.name] = len(o.axes)
             _add_mapspec_axis(o.name, dims, axis, functions)
+
+
+def _independent_parameters(pipeline: Pipeline) -> list[set[str]]:
+    """Return the sets of input and output parameters that are independent."""
+    sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in pipeline.functions]
+    return join_overlapping_sets(sets)
