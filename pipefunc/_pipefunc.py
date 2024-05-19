@@ -286,7 +286,7 @@ class PipeFunc(Generic[T]):
             )
             raise TypeError(msg)
 
-        mapspec_input_names = set(self.mapspec.parameters)
+        mapspec_input_names = set(self.mapspec.input_names)
         input_names = set(self.parameters)
         if extra := mapspec_input_names - input_names:
             msg = (

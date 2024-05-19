@@ -458,7 +458,7 @@ def map_shapes(
     for func in mapspec_funcs:
         assert func.mapspec is not None
         input_shapes = {}
-        for p in func.mapspec.parameters:
+        for p in func.mapspec.input_names:
             if shape := shapes.get(p):
                 input_shapes[p] = shape
             elif p in manual_shapes:

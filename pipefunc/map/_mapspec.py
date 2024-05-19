@@ -115,7 +115,7 @@ class MapSpec:
             raise ValueError(msg)
 
     @property
-    def parameters(self) -> tuple[str, ...]:
+    def input_names(self) -> tuple[str, ...]:
         """Return the parameter names of this mapspec."""
         return tuple(x.name for x in self.inputs)
 
@@ -357,7 +357,7 @@ def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     """Return the number of tasks."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
-    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
+    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.input_names}
     mask = expected_mask(mapspec, mapped_kwargs)
     return num_tasks_from_mask(mask)
 
