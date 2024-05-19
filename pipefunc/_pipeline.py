@@ -734,10 +734,9 @@ class Pipeline:
     @functools.cached_property
     def map_parameters(self) -> set[str]:
         map_parameters: set[str] = set()
-        for func in self.functions:
-            if func.mapspec:
-                map_parameters.update(func.mapspec.input_names)
-                map_parameters.update(func.mapspec.output_names)
+        for func in self.mapspecs():
+            map_parameters.update(func.mapspec.input_names)
+            map_parameters.update(func.mapspec.output_names)
         return map_parameters
 
     @functools.cached_property

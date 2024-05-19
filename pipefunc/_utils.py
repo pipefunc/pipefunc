@@ -159,14 +159,12 @@ def join_overlapping_sets(sets: list[set]) -> list[set]:
     """Join overlapping sets in a list of sets."""
     if len(sets) <= 1:
         return sets
-
     G = nx.Graph()  # noqa: N806
     for idx, s in enumerate(sets):
         G.add_node(idx, elements=s)
     for i, j in itertools.combinations(range(len(sets)), 2):
         if not sets[i].isdisjoint(sets[j]):
             G.add_edge(i, j)
-
     return [
         {item for idx in component for item in sets[idx]}
         for component in nx.connected_components(G)

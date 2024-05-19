@@ -601,3 +601,28 @@ def load_outputs(
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def independent_axes_in_mapspecs(pipeline: Pipeline):
+    from pipefunc._pipeline import _independent_parameters
+
+    passed_directly = set()
+    for f in pipeline.functions:
+        params = set(f.parameters) | set(at_least_tuple(f.output_name))
+        mapspec_params = (
+            {*f.mapspec.input_names, *f.mapspec.output_names} if f.mapspec is not None else set()
+        )
+        passed_directly.update(params - mapspec_params)
+
+    axes = {k: list(v) for k, v in _axes(pipeline).items()}
+    for f in pipeline.mapspecs():
+        for spec in f.mapspec.inputs:
+            if axs := axes.get(spec.name):
+                for i, name in enumerate(spec.axes):
+                    if name is None:
+                        axs[i] = None
+
+    sets = _independent_parameters(pipeline)
+    dicts = [{k: axes[k] for k in s} for s in sets]
+    # TODO
+    return passed_directly, axes
