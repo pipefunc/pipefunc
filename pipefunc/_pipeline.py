@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
+import itertools
 import sys
 import time
 import warnings
@@ -38,6 +39,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import (
     at_least_tuple,
+    common_in_sets,
     generate_filename_from_dict,
     handle_error,
     join_overlapping_sets,
@@ -734,9 +736,9 @@ class Pipeline:
     @functools.cached_property
     def map_parameters(self) -> set[str]:
         map_parameters: set[str] = set()
-        for func in self.mapspecs():
-            map_parameters.update(func.mapspec.input_names)
-            map_parameters.update(func.mapspec.output_names)
+        for mapspec in self.mapspecs():
+            map_parameters.update(mapspec.input_names)
+            map_parameters.update(mapspec.output_names)
         return map_parameters
 
     @functools.cached_property
@@ -1126,6 +1128,40 @@ class Pipeline:
             cache_kwargs=self._cache_kwargs,
         )
 
+    def _independent_parameters(self: Pipeline) -> list[set[str]]:
+        """Return the sets of input and output parameters that are independent."""
+        sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in self.functions]
+        return join_overlapping_sets(sets)
+
+    def _group_functions_by_chains(self: Pipeline) -> list[list[PipeFunc]]:
+        """Group functions by independent chains."""
+        chains = self._independent_parameters()
+        functions = self.functions
+        function_chains: list[list[PipeFunc]] = [[] for _ in chains]
+        for f in functions:
+            for i, chain in enumerate(chains):
+                if at_least_tuple(f.output_name)[0] in chain:
+                    # We can just check whether a single input or output is in the chain
+                    function_chains[i].append(f)
+        return function_chains
+
+    def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[list[PipeFunc], set[str]]]:
+        function_chains = self._group_functions_by_chains()
+        mapspec_chains = [
+            [f.mapspec for f in functions if f.mapspec] for functions in function_chains
+        ]
+        common_axes: list[tuple[list[PipeFunc], set[str]]] = []
+        for function_chain, mapspec_chain in zip(function_chains, mapspec_chains):
+            if len(function_chain) != len(mapspec_chain):
+                # if not all functions have mapspecs, there are no independent axes
+                common_axes.append((function_chain, set()))
+                continue
+            outputs = itertools.chain.from_iterable([spec.outputs for spec in mapspec_chain])
+            axes: list[set[str]] = [set(spec.axes) for spec in outputs]  # type: ignore[arg-type]
+            sets = common_in_sets(axes)
+            common_axes.append((function_chain, sets))  # type: ignore[arg-type]
+        return common_axes
+
 
 def _update_all_results(
     func: PipeFunc,
@@ -1400,9 +1436,3 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         for o in output_specs:
             dims[o.name] = len(o.axes)
             _add_mapspec_axis(o.name, dims, axis, functions)
-
-
-def _independent_parameters(pipeline: Pipeline) -> list[set[str]]:
-    """Return the sets of input and output parameters that are independent."""
-    sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in pipeline.functions]
-    return join_overlapping_sets(sets)

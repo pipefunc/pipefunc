@@ -169,3 +169,13 @@ def join_overlapping_sets(sets: list[set]) -> list[set]:
         {item for idx in component for item in sets[idx]}
         for component in nx.connected_components(G)
     ]
+
+
+def common_in_sets(sets: list[set[Any]]) -> set[Any]:
+    """Identify the items in sets that are common to all sets."""
+    if not sets:
+        return set()
+    common = sets[0]
+    for s in sets[1:]:
+        common.intersection_update(s)
+    return common
