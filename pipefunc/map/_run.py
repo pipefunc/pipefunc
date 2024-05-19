@@ -429,6 +429,7 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     return _dump_output(func, output, run_folder)
 
 
+# TODO: make method?
 def _dimensions(pipeline: Pipeline) -> dict[str, int]:
     return {
         arrayspec.name: len(arrayspec.axes)
@@ -437,6 +438,7 @@ def _dimensions(pipeline: Pipeline) -> dict[str, int]:
     }
 
 
+# TODO: make method?
 def _axes(pipeline: Pipeline) -> dict[str, tuple[str, ...]]:
     axes: dict[str, dict[int, str]] = defaultdict(dict)
     for mapspec in pipeline.mapspecs():
