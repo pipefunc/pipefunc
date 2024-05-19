@@ -737,8 +737,7 @@ class Pipeline:
         for func in self.functions:
             if func.mapspec:
                 map_parameters.update(func.mapspec.parameters)
-                for output in func.mapspec.outputs:
-                    map_parameters.add(output.name)
+                map_parameters.update(func.mapspec.output_names)
         return map_parameters
 
     @functools.cached_property
@@ -1386,7 +1385,7 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
             input_specs = [ArraySpec(p, axes)]
             output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
         else:
-            existing_inputs = {s.name for s in f.mapspec.inputs}
+            existing_inputs = set(f.mapspec.parameters)
             if p in existing_inputs:
                 input_specs = [
                     s.add_axes(axis) if s.name == p and axis not in s.axes else s

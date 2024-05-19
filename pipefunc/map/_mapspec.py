@@ -120,6 +120,11 @@ class MapSpec:
         return tuple(x.name for x in self.inputs)
 
     @property
+    def output_names(self) -> tuple[str, ...]:
+        """Return the names of the output arrays."""
+        return tuple(x.name for x in self.outputs)
+
+    @property
     def indices(self) -> tuple[str, ...]:
         """Return the index names for this MapSpec."""
         return self.outputs[0].indices  # All outputs have the same indices
@@ -359,7 +364,7 @@ def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
 
 def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
     """Raise an exception if the axes of the mapspecs are inconsistent."""
-    indices = defaultdict(set)
+    indices: dict[str, set[ArraySpec]] = defaultdict(set)
     for mapspec in mapspecs:
         for spec in mapspec.inputs:
             indices[spec.name].add(spec)
