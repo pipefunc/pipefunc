@@ -738,7 +738,7 @@ class Pipeline:
         return {
             name
             for mapspec in self.mapspecs()
-            for name in set(mapspec.input_names) | set(mapspec.output_names)
+            for name in mapspec.input_names + mapspec.output_names
         }
 
     @functools.cached_property
