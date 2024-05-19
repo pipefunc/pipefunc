@@ -735,11 +735,11 @@ class Pipeline:
 
     @functools.cached_property
     def map_parameters(self) -> set[str]:
-        map_parameters: set[str] = set()
-        for mapspec in self.mapspecs():
-            map_parameters.update(mapspec.input_names)
-            map_parameters.update(mapspec.output_names)
-        return map_parameters
+        return {
+            name
+            for mapspec in self.mapspecs()
+            for name in set(mapspec.input_names) | set(mapspec.output_names)
+        }
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
