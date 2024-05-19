@@ -834,3 +834,6 @@ def test_reusing_axis_names() -> None:
         match="Axis name `i` is used in multiple functions",
     ):
         Pipeline([f, g])
+
+    # TODO: write a pipeline where we do map-reduce and then another map-reduce
+    # reusing the same axis names and consider what *should* happen
