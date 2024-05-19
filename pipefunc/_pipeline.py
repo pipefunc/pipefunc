@@ -1131,6 +1131,7 @@ class Pipeline:
     def _independent_parameters(self: Pipeline) -> list[set[str]]:
         """Return the sets of input and output parameters that are independent."""
         sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in self.functions]
+        # Note: we could also use `nx.connected_components(self.graph.to_undirected())`
         return join_overlapping_sets(sets)
 
     def _group_functions_by_chains(self: Pipeline) -> list[list[PipeFunc]]:
