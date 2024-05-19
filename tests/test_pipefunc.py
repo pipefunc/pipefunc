@@ -683,7 +683,7 @@ def test_pickle_pipefunc():
     assert func(a=1) == func2(a=1)
 
 
-def test_independent_axes_in_mapspecs():
+def test_independent_axes_in_mapspecs_with_disconnected_chains():
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
     def f(a: int, b: int):
         return a + b

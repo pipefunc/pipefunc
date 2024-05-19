@@ -655,6 +655,8 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
     assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
 
+    assert pipeline._independent_axes_in_mapspecs() == [([func1, func2, func3], {"l"})]
+
 
 def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     @pipefunc(output_name="x")

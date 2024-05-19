@@ -1135,7 +1135,7 @@ class Pipeline:
         return join_overlapping_sets(sets)
 
     def _group_functions_by_chains(self: Pipeline) -> list[list[PipeFunc]]:
-        """Group functions by independent chains."""
+        """Group functions by independent chains / disconnected subgraphs."""
         chains = self._independent_parameters()
         functions = self.functions
         function_chains: list[list[PipeFunc]] = [[] for _ in chains]
