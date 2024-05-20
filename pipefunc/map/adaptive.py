@@ -131,6 +131,7 @@ def _execute_iteration_in_single(
         func,
         run_info.input_paths,
         run_info.shapes,
+        run_info.shape_masks,
         run_info.manual_shapes,
         run_folder,
     )
@@ -167,6 +168,7 @@ def _execute_iteration_in_map_spec(
         func,
         run_info.input_paths,
         run_info.shapes,
+        run_info.shape_masks,
         run_info.manual_shapes,
         run_folder,
     )

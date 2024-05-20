@@ -146,7 +146,7 @@ def _compare_to_previous_run_info(
     if manual_shapes != old.manual_shapes:
         msg = "Manual shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+    shapes, _ = map_shapes(pipeline, inputs, manual_shapes)
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
@@ -175,7 +175,7 @@ class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     manual_shapes: dict[str, int | tuple[int, ...]]
-    shapes_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
 
     @classmethod
@@ -201,7 +201,7 @@ class RunInfo(NamedTuple):
             input_paths=input_paths,
             shapes=shapes,
             manual_shapes=manual_shapes,
-            shapes_masks=masks,
+            shape_masks=masks,
             run_folder=run_folder,
         )
 
@@ -230,33 +230,42 @@ def _file_array_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / output_name
 
 
+def _filearray_shape(
+    parameter: str,
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+):
+    shape = shapes[parameter]
+    mask = shape_masks[parameter]
+    return tuple(s for s, m in zip(shape, mask) if m)
+
+
 def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, int | tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
-    try:
+    if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
-    except:  # TODO: fix
-        file_array_path = _file_array_path(parameter, run_folder)
-        shape = shapes[parameter]
-        return FileArray(file_array_path, shape)
+    file_array_path = _file_array_path(parameter, run_folder)
+    save_shape = _filearray_shape(parameter, shapes, shape_masks)
+    return FileArray(file_array_path, save_shape)
 
 
 def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     manual_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, manual_shapes, run_folder)
-        for p in func.parameters
+        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
     }
 
 
@@ -365,18 +374,20 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
     parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
-    result_arrays = _init_result_arrays(func.output_name, shape)
+    save_shape = _filearray_shape(func.output_name, shapes, shape_masks)
+    result_arrays = _init_result_arrays(func.output_name, save_shape)
     process_index = partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
-        shape=shape,
+        shape=save_shape,
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)
@@ -505,11 +516,19 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         func,
         run_info.input_paths,
         run_info.shapes,
+        run_info.shape_masks,
         run_info.manual_shapes,
         run_folder,
     )
     if func.mapspec:
-        output = _execute_map_spec(func, kwargs, run_info.shapes, run_folder, parallel)
+        output = _execute_map_spec(
+            func,
+            kwargs,
+            run_info.shapes,
+            run_info.shape_masks,
+            run_folder,
+            parallel,
+        )
     else:
         output = _execute_single(func, kwargs, run_folder)
 
@@ -595,7 +614,7 @@ def load_outputs(
             on,
             run_info.input_paths,
             run_info.shapes,
-            run_info.manual_shapes,
+            run_info.shape_masks,
             run_folder,
         )
         for on in output_names
