@@ -149,7 +149,7 @@ class MapSpec:
         input_names = set(self.input_names)
         _validate_shapes(input_names, input_shapes, self.inputs, output_shapes, self.output_names)
 
-        output_shape_dict = output_shapes or {}
+        output_shapes = output_shapes or {}
         shape = []
         for index in self.outputs[0].indices:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
@@ -157,7 +157,7 @@ class MapSpec:
                 dim = _get_common_dim(relevant_arrays, index, input_shapes)
                 shape.append(dim)
             else:
-                dim = _get_output_dim(self.outputs, output_shape_dict, index)
+                dim = _get_output_dim(self.outputs, output_shapes, index)
                 shape.append(dim)
         return tuple(shape)
 
@@ -449,10 +449,10 @@ def _get_common_dim(
 
 def _get_output_dim(
     outputs: tuple[ArraySpec, ...],
-    output_shape_dict: dict[str, tuple[int, ...]],
+    output_shapes: dict[str, tuple[int, ...]],
     index: str,
 ) -> int:
-    if not output_shape_dict:
+    if not output_shapes:
         msg = (
             f"Output array has an axis `{index}` not shared with any input, "
             "but `output_shapes` is not provided."
@@ -463,7 +463,7 @@ def _get_output_dim(
     output_dim = next(
         (
             output_shape[output_axis]
-            for output_shape in output_shape_dict.values()
+            for output_shape in output_shapes.values()
             if len(output_shape) > output_axis and output_shape[output_axis] is not Ellipsis
         ),
         None,

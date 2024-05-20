@@ -356,3 +356,30 @@ def test_larger_output_then_input():
     input_shapes = {"a": (3,), "b": (4,)}
     shape = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
     assert shape == (3, 4, 5, 6)
+
+
+def test_shape_exceptions():
+    # Extra input arrays
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    with pytest.raises(ValueError, match="Got extra array"):
+        mapspec.shape({"a": (3,), "extra": (3,)}, output_shapes={"b": (..., 4)})
+
+    # Missing input arrays
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    with pytest.raises(ValueError, match="Inputs expected by this map were not provided"):
+        mapspec.shape({"a": (3,)}, output_shapes={"c": (..., ...)})
+
+    # Dimension mismatch
+    mapspec = MapSpec.from_string("a[i, j], b[j, k] -> c[i, j, k]")
+    with pytest.raises(ValueError, match="Dimension mismatch for arrays"):
+        mapspec.shape({"a": (2, 3), "b": (4, 4)}, output_shapes={"c": (..., ..., ...)})
+
+    # Missing output shapes for unshared axes
+    mapspec = MapSpec.from_string("a[i, j] -> b[i, j, k]")
+    with pytest.raises(ValueError, match="Output array has an axis `k` not shared with any input"):
+        mapspec.shape({"a": (2, 3)}, output_shapes={"b": (..., ..., ...)})
+
+    # Output array not accepted by this map
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    with pytest.raises(ValueError, match="Output array `extra` is not accepted by this map"):
+        mapspec.shape({"a": (3,)}, output_shapes={"extra": (3, 4)})
