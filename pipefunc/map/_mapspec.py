@@ -139,11 +139,11 @@ class MapSpec:
         input_shapes
             Shapes of the inputs, keyed by name.
         output_shapes
-            Shapes of the outputs, keyed by name. One only needs to provide this if the output
-            has an axis that is not shared with any input. If there are multiple output axes,
-            only provide the shape for the missing axis, use `...` for the rest. For example,
-            if the mapspec is `x[i, j], y[j, k] -> z[i, j, k, l]` and the only missing axis is `l`,
-            then `output_shapes={'z': (..., ..., ..., 5)}` should be provided.
+            Shapes of the outputs, keyed by name. Provide this only if the output
+            has an axis not shared with any input. If there are multiple output axes,
+            specify only the shape for the missing axis and use `...` for the rest.
+            For example, for the mapspec `x[i, j], y[j, k] -> z[i, j, k, l]` where only `l` is missing,
+            use `output_shapes={'z': (..., ..., ..., 5)}`, if `l` has a size of 5.
 
         """
         input_names = set(self.input_names)
