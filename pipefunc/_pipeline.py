@@ -45,7 +45,13 @@ from pipefunc._utils import (
     join_overlapping_sets,
 )
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
+from pipefunc.map._mapspec import (
+    ArraySpec,
+    MapSpec,
+    mapspec_axes,
+    mapspec_dimensions,
+    validate_consistent_axes,
+)
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -756,6 +762,14 @@ class Pipeline:
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
+
+    def mapspec_dimensions(self: Pipeline) -> dict[str, int]:
+        """Return the number of dimensions for each array parameter in the pipeline."""
+        return mapspec_dimensions(self.mapspecs())
+
+    def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
+        """Return the axes for each array parameter in the pipeline."""
+        return mapspec_axes(self.mapspecs())
 
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:

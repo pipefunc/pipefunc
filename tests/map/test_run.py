@@ -8,7 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._run import _axes, _dimensions, load_outputs, map_shapes, run
+from pipefunc.map._run import load_outputs, map_shapes, run
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,9 +42,9 @@ def test_simple(tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=None, parallel=False)
     assert results2[-1].output == 12
 
-    axes = _axes(pipeline)
+    axes = pipeline.mapspec_axes()
     assert axes == {"x": ("i",), "y": ("i",)}
-    dimensions = _dimensions(pipeline)
+    dimensions = pipeline.mapspec_dimensions()
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
 
@@ -805,7 +805,7 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         "c[i], b[i], x[j] -> d[i, j]",
         "d[i, j], c[i], x[j] -> e[i, j]",
     ]
-    axes = _axes(pipeline)
+    axes = pipeline.mapspec_axes()
     assert axes == {
         "a": ("i",),
         "b": ("i",),
@@ -814,7 +814,7 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         "d": ("i", "j"),
         "e": ("i", "j"),
     }
-    dimensions = _dimensions(pipeline)
+    dimensions = pipeline.mapspec_dimensions()
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
 

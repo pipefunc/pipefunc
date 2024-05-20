@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -391,3 +392,23 @@ def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
                         )
                         raise ValueError(msg)
                     axes[i] = axis
+
+
+def mapspec_dimensions(mapspecs: list[MapSpec]) -> dict[str, int]:
+    """Return the number of dimensions for each array parameter in the pipeline."""
+    return {
+        arrayspec.name: len(arrayspec.axes)
+        for mapspec in mapspecs
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs)
+    }
+
+
+def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
+    """Return the axes for each array parameter in the pipeline."""
+    axes: dict[str, dict[int, str]] = defaultdict(dict)
+    for mapspec in mapspecs:
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs):
+            for i, axis in enumerate(arrayspec.axes):
+                if axis is not None:
+                    axes[arrayspec.name][i] = axis
+    return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}

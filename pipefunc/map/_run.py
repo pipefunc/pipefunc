@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import itertools
 import shutil
 import tempfile
-from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
@@ -21,7 +19,7 @@ from pipefunc._utils import (
     prod,
 )
 from pipefunc.map._filearray import FileArray
-from pipefunc.map._mapspec import MapSpec, array_shape, validate_consistent_axes
+from pipefunc.map._mapspec import MapSpec, array_shape, mapspec_dimensions, validate_consistent_axes
 
 if TYPE_CHECKING:
     import sys
@@ -74,6 +72,10 @@ class _MockPipeline:
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
         return self.functions
+
+    def mapspec_dimensions(self) -> dict[str, int]:
+        """Return the number of dimensions for each array parameter in the pipeline."""
+        return mapspec_dimensions(self.mapspecs())
 
 
 def _dump_inputs(
@@ -161,7 +163,7 @@ def _compare_to_previous_run_info(
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = _dimensions(pipeline)
+    input_dimensions = pipeline.mapspec_dimensions()
     for name, value in inputs.items():
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
@@ -427,26 +429,6 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
     return _dump_output(func, output, run_folder)
-
-
-# TODO: make method?
-def _dimensions(pipeline: Pipeline) -> dict[str, int]:
-    return {
-        arrayspec.name: len(arrayspec.axes)
-        for mapspec in pipeline.mapspecs()
-        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs)
-    }
-
-
-# TODO: make method?
-def _axes(pipeline: Pipeline) -> dict[str, tuple[str, ...]]:
-    axes: dict[str, dict[int, str]] = defaultdict(dict)
-    for mapspec in pipeline.mapspecs():
-        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs):
-            for i, axis in enumerate(arrayspec.axes):
-                if axis is not None:
-                    axes[arrayspec.name][i] = axis
-    return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}
 
 
 def map_shapes(
