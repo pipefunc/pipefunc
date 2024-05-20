@@ -1153,12 +1153,12 @@ class Pipeline:
         for function_chain, mapspec_chain in zip(function_chains, mapspec_chains):
             if len(function_chain) != len(mapspec_chain):
                 # if not all functions have mapspecs, there are no independent axes
-                common_axes.append((function_chain, set()))
                 continue
             outputs = itertools.chain.from_iterable([spec.outputs for spec in mapspec_chain])
             axes: list[set[str]] = [set(spec.axes) for spec in outputs]  # type: ignore[arg-type]
             sets = common_in_sets(axes)
-            common_axes.append((function_chain, sets))  # type: ignore[arg-type]
+            if sets:
+                common_axes.append((function_chain, sets))  # type: ignore[arg-type]
         return common_axes
 
 
