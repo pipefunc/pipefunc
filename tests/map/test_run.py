@@ -42,6 +42,12 @@ def test_simple(tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=None, parallel=False)
     assert results2[-1].output == 12
 
+    axes = pipeline.mapspec_axes()
+    assert axes == {"x": ("i",), "y": ("i",)}
+    dimensions = pipeline.mapspec_dimensions()
+    assert dimensions.keys() == axes.keys()
+    assert all(dimensions[k] == len(v) for k, v in axes.items())
+
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
@@ -797,3 +803,15 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         "c[i], b[i], x[j] -> d[i, j]",
         "d[i, j], c[i], x[j] -> e[i, j]",
     ]
+    axes = pipeline.mapspec_axes()
+    assert axes == {
+        "a": ("i",),
+        "b": ("i",),
+        "c": ("i",),
+        "x": ("j",),
+        "d": ("i", "j"),
+        "e": ("i", "j"),
+    }
+    dimensions = pipeline.mapspec_dimensions()
+    assert dimensions.keys() == axes.keys()
+    assert all(dimensions[k] == len(v) for k, v in axes.items())

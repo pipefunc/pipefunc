@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -115,9 +116,14 @@ class MapSpec:
             raise ValueError(msg)
 
     @property
-    def parameters(self) -> tuple[str, ...]:
+    def input_names(self) -> tuple[str, ...]:
         """Return the parameter names of this mapspec."""
         return tuple(x.name for x in self.inputs)
+
+    @property
+    def output_names(self) -> tuple[str, ...]:
+        """Return the names of the output arrays."""
+        return tuple(x.name for x in self.outputs)
 
     @property
     def indices(self) -> tuple[str, ...]:
@@ -157,7 +163,8 @@ class MapSpec:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             dim, *rest = (get_dim(x, index) for x in relevant_arrays)
             if any(dim != x for x in rest):
-                msg = f"Dimension mismatch for arrays {relevant_arrays} along {index} axis."
+                arrs = ", ".join(x.name for x in relevant_arrays)
+                msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
                 raise ValueError(msg)
             shape.append(dim)
 
@@ -351,14 +358,14 @@ def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     """Return the number of tasks."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
-    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
+    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.input_names}
     mask = expected_mask(mapspec, mapped_kwargs)
     return num_tasks_from_mask(mask)
 
 
 def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
     """Raise an exception if the axes of the mapspecs are inconsistent."""
-    indices = defaultdict(set)
+    indices: dict[str, set[ArraySpec]] = defaultdict(set)
     for mapspec in mapspecs:
         for spec in mapspec.inputs:
             indices[spec.name].add(spec)
@@ -385,3 +392,23 @@ def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
                         )
                         raise ValueError(msg)
                     axes[i] = axis
+
+
+def mapspec_dimensions(mapspecs: list[MapSpec]) -> dict[str, int]:
+    """Return the number of dimensions for each array parameter in the pipeline."""
+    return {
+        arrayspec.name: len(arrayspec.axes)
+        for mapspec in mapspecs
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs)
+    }
+
+
+def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
+    """Return the axes for each array parameter in the pipeline."""
+    axes: dict[str, dict[int, str]] = defaultdict(dict)
+    for mapspec in mapspecs:
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs):
+            for i, axis in enumerate(arrayspec.axes):
+                if axis is not None:
+                    axes[arrayspec.name][i] = axis
+    return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}

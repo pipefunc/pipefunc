@@ -36,9 +36,19 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
+from pipefunc._utils import (
+    at_least_tuple,
+    generate_filename_from_dict,
+    handle_error,
+)
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
+from pipefunc.map._mapspec import (
+    ArraySpec,
+    MapSpec,
+    mapspec_axes,
+    mapspec_dimensions,
+    validate_consistent_axes,
+)
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -728,13 +738,11 @@ class Pipeline:
 
     @functools.cached_property
     def map_parameters(self) -> set[str]:
-        map_parameters: set[str] = set()
-        for func in self.functions:
-            if func.mapspec:
-                map_parameters.update(func.mapspec.parameters)
-                for output in func.mapspec.outputs:
-                    map_parameters.add(output.name)
-        return map_parameters
+        return {
+            name
+            for mapspec in self.mapspecs()
+            for name in mapspec.input_names + mapspec.output_names
+        }
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
@@ -751,6 +759,14 @@ class Pipeline:
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
+
+    def mapspec_dimensions(self: Pipeline) -> dict[str, int]:
+        """Return the number of dimensions for each array parameter in the pipeline."""
+        return mapspec_dimensions(self.mapspecs())
+
+    def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
+        """Return the axes for each array parameter in the pipeline."""
+        return mapspec_axes(self.mapspecs())
 
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:
@@ -1381,7 +1397,7 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
             input_specs = [ArraySpec(p, axes)]
             output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
         else:
-            existing_inputs = {s.name for s in f.mapspec.inputs}
+            existing_inputs = set(f.mapspec.input_names)
             if p in existing_inputs:
                 input_specs = [
                     s.add_axes(axis) if s.name == p and axis not in s.axes else s
