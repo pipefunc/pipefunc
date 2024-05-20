@@ -146,7 +146,8 @@ def _compare_to_previous_run_info(
     if manual_shapes != old.manual_shapes:
         msg = "Manual shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    if map_shapes(pipeline, inputs, manual_shapes) != old.shapes:
+    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+    if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
@@ -174,6 +175,7 @@ class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     manual_shapes: dict[str, int | tuple[int, ...]]
+    shapes_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
 
     @classmethod
@@ -194,11 +196,12 @@ class RunInfo(NamedTuple):
             _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
-        shapes = map_shapes(pipeline, inputs, manual_shapes)
+        shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
         return cls(
             input_paths=input_paths,
             shapes=shapes,
             manual_shapes=manual_shapes,
+            shapes_masks=masks,
             run_folder=run_folder,
         )
 
@@ -236,11 +239,12 @@ def _load_parameter(
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
-    if parameter in manual_shapes or parameter not in shapes:
+    try:
         return _load_output(parameter, run_folder)
-    file_array_path = _file_array_path(parameter, run_folder)
-    shape = shapes[parameter]
-    return FileArray(file_array_path, shape)
+    except:  # TODO: fix
+        file_array_path = _file_array_path(parameter, run_folder)
+        shape = shapes[parameter]
+        return FileArray(file_array_path, shape)
 
 
 def _func_kwargs(
@@ -435,7 +439,7 @@ def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> dict[_OUTPUT_TYPE, tuple[int, ...]]:
+) -> tuple[dict[_OUTPUT_TYPE, tuple[int, ...]], dict[_OUTPUT_TYPE, tuple[bool, ...]]]:
     if manual_shapes is None:
         manual_shapes = {}
     map_parameters: set[str] = pipeline.map_parameters
@@ -445,6 +449,7 @@ def map_shapes(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
     }
+    masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
         assert func.mapspec is not None
@@ -461,14 +466,19 @@ def map_shapes(
                     " Provide the shape manually in `manual_shapes`."
                 )
                 raise ValueError(msg)
-        output_shape = func.mapspec.shape(input_shapes)
+        output_shapes = {
+            k: manual_shapes[k] for k in func.mapspec.output_names if k in manual_shapes
+        }
+        output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)
         shapes[func.output_name] = output_shape
+        masks[func.output_name] = mask
         if isinstance(func.output_name, tuple):
             for output_name in func.output_name:
                 shapes[output_name] = output_shape
+                masks[output_name] = mask
 
     assert all(k in shapes for k in map_parameters if k not in manual_shapes)
-    return shapes
+    return shapes, masks
 
 
 def _maybe_load_file_array(x: Any) -> Any:

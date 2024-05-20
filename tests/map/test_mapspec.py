@@ -110,7 +110,8 @@ def test_mapspec_shape():
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
     shapes = {"a": (3, 4), "b": (3, 4)}
-    assert spec.shape(shapes) == (3, 4)
+    shape, mask = spec.shape(shapes)
+    assert shape == (3, 4)
 
     with pytest.raises(
         ValueError,
@@ -314,47 +315,65 @@ def test_larger_output_then_input():
     mapspec = MapSpec.from_string("... -> b[j]")
     assert mapspec.input_names == ()
     assert mapspec.output_names == ("b",)
-    assert mapspec.shape(input_shapes={}, output_shapes={"b": (3,)})
+    shape, mask = mapspec.shape(input_shapes={}, output_shapes={"b": (3,)})
+    assert shape == (3,)
+    assert mask == (False,)
 
     mapspec = MapSpec.from_string("x[i, j], y[j, k] -> z[i, j, k, l]")
     assert mapspec.input_names == ("x", "y")
     assert mapspec.output_names == ("z",)
     input_shapes = {"x": (2, 3), "y": (3, 4)}
-    shape = mapspec.shape(input_shapes, output_shapes={"z": (..., ..., ..., 5)})
+    shape, mask = mapspec.shape(input_shapes, output_shapes={"z": (..., ..., ..., 5)})
+    assert mask == (True, True, True, False)
     assert shape == (2, 3, 4, 5)
 
     mapspec = MapSpec.from_string("a[i] -> b[i, j]")
-    assert mapspec.shape({"a": (3,)}, output_shapes={"b": (..., 4)}) == (3, 4)
+    shape, mask = mapspec.shape({"a": (3,)}, output_shapes={"b": (..., 4)})
+    assert mask == (True, False)
+    assert shape == (3, 4)
 
     mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k]")
-    shape = mapspec.shape(input_shapes={"a": (3,), "b": (4,)}, output_shapes={"c": (..., ..., 5)})
+    shape, mask = mapspec.shape(
+        input_shapes={"a": (3,), "b": (4,)},
+        output_shapes={"c": (..., ..., 5)},
+    )
+    assert mask == (True, True, False)
     assert shape == (3, 4, 5)
 
     mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
     input_shapes = {"a": (3,), "b": (4,)}
-    shape = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    shape, mask = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    assert mask == (True, True, False, False)
     assert shape == (3, 4, 5, 6)
 
     mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
-    shape = mapspec.shape(input_shapes={"a": (3,), "b": (4,)}, output_shapes={"c": (..., ...)})
+    shape, mask = mapspec.shape(
+        input_shapes={"a": (3,), "b": (4,)},
+        output_shapes={"c": (..., ...)},
+    )
+    assert mask == (True, True)
     assert shape == (3, 4)
 
     mapspec = MapSpec.from_string("a[i, j] -> b[i, j, k, l]")
-    shape = mapspec.shape(input_shapes={"a": (2, 3)}, output_shapes={"b": (..., ..., 4, 5)})
+    shape, mask = mapspec.shape(input_shapes={"a": (2, 3)}, output_shapes={"b": (..., ..., 4, 5)})
+    assert mask == (True, True, False, False)
     assert shape == (2, 3, 4, 5)
 
     mapspec = MapSpec.from_string("a[i, j, k] -> b[i, j, k, l, m]")
     input_shapes = {"a": (2, 3, 4)}
-    shape = mapspec.shape(input_shapes, output_shapes={"b": (..., ..., ..., 5, 6)})
+    shape, mask = mapspec.shape(input_shapes, output_shapes={"b": (..., ..., ..., 5, 6)})
+    assert mask == (True, True, True, False, False)
     assert shape == (2, 3, 4, 5, 6)
 
     mapspec = MapSpec.from_string("a[j] -> b[i, j, k, l]")
-    shape = mapspec.shape(input_shapes={"a": (2,)}, output_shapes={"b": (3, ..., 4, 5)})
+    shape, mask = mapspec.shape(input_shapes={"a": (2,)}, output_shapes={"b": (3, ..., 4, 5)})
+    assert mask == (False, True, False, False)
     assert shape == (3, 2, 4, 5)
 
     mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
     input_shapes = {"a": (3,), "b": (4,)}
-    shape = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    shape, mask = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    assert mask == (True, True, False, False)
     assert shape == (3, 4, 5, 6)
 
 

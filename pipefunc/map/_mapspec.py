@@ -131,7 +131,7 @@ class MapSpec:
         self,
         input_shapes: dict[str, tuple[int, ...]],
         output_shapes: dict[str, tuple[int, ...]] | None = None,
-    ) -> tuple[int, ...]:
+    ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
         Parameters
@@ -151,15 +151,18 @@ class MapSpec:
 
         output_shapes = output_shapes or {}
         shape = []
+        from_input = []
         for index in self.outputs[0].indices:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             if relevant_arrays:
                 dim = _get_common_dim(relevant_arrays, index, input_shapes)
                 shape.append(dim)
+                from_input.append(True)
             else:
                 dim = _get_output_dim(self.outputs, output_shapes, index)
                 shape.append(dim)
-        return tuple(shape)
+                from_input.append(False)
+        return tuple(shape), tuple(from_input)
 
     def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
@@ -333,7 +336,7 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
 def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
     kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
-    map_shape = mapspec.shape(kwarg_shapes)
+    map_shape, _ = mapspec.shape(kwarg_shapes)
     map_size = np.prod(map_shape)
 
     def is_masked(i: int) -> bool:
@@ -464,7 +467,7 @@ def _get_output_dim(
         (
             output_shape[output_axis]
             for output_shape in output_shapes.values()
-            if len(output_shape) > output_axis and output_shape[output_axis] is not Ellipsis
+            if len(output_shape) > output_axis and output_shape[output_axis] is not ...
         ),
         None,
     )
