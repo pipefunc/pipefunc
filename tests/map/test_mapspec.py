@@ -73,17 +73,15 @@ def test_mapspec_init():
     assert spec.inputs == inputs
     assert spec.outputs == (output,)
 
+    # Add an extra axis to the output
+    spec = MapSpec(inputs, (ArraySpec("q", ("i", "j", "l")),))
+    assert str(spec) == "a[i, j], b[i, j] -> q[i, j, l]"
+
     with pytest.raises(
         ValueError,
         match=re.escape("Output array must have all axes indexed (no ':')."),
     ):
         MapSpec(inputs, (ArraySpec("q", ("i", None, "k")),))
-
-    with pytest.raises(
-        ValueError,
-        match="Output array has indices that do not appear in the input: {'l'}",
-    ):
-        MapSpec(inputs, (ArraySpec("q", ("i", "j", "l")),))
 
     with pytest.raises(
         ValueError,
@@ -310,3 +308,21 @@ def test_validate_consistent_axes():
             MapSpec.from_string("g[i, j, k], d[l] -> h[i, j, k, l]"),
         ],
     )
+
+
+def test_larger_output_then_input():
+    mapspec = MapSpec.from_string("... -> b[j]")
+    assert mapspec.input_names == ()
+    assert mapspec.output_names == ("b",)
+    assert mapspec.shape(input_shapes={}, output_shapes={"b": (3,)})
+
+    mapspec = MapSpec.from_string("x[i, j], y[j, k] -> z[i, j, k, l]")
+    assert mapspec.input_names == ("x", "y")
+    assert mapspec.output_names == ("z",)
+    assert mapspec.shape(
+        input_shapes={"x": (2, 3), "y": (3, 4)},
+        output_shapes={"z": (..., ..., ..., 5)},
+    ) == (2, 3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    assert mapspec.shape({"a": (3,)}, output_shapes={"b": (..., 4)}) == (3, 4)

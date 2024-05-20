@@ -792,7 +792,7 @@ class Pipeline:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations[1] for f in gen]
 
-    def add_mapspec_axis(self, parameter: str, axis: str) -> None:
+    def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec.
 
         Parameters
@@ -805,7 +805,8 @@ class Pipeline:
             existing axis name to zip the parameter with the existing axis.
 
         """
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
+        for p in parameter:
+            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(

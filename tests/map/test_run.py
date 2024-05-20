@@ -552,7 +552,7 @@ def test_nd_input_list(tmp_path: Path) -> None:
     results = pipeline.map(inputs_arr, tmp_path, parallel=False)
     assert results[-1].output.tolist() == [[2, 4], [6, 8]]
 
-    pipeline.add_mapspec_axis("x", "k")
+    pipeline.add_mapspec_axis("x", axis="k")
     inputs = {"x": np.arange(2**3).reshape(2, 2, 2)}
     assert map_shapes(pipeline, inputs) == {"x": (2, 2, 2), "y": (2, 2, 2)}
     results = pipeline.map(inputs, tmp_path, parallel=False)
@@ -589,7 +589,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     assert results[-1].output == 4.0
 
     # Adding another axis to "one"
-    pipeline.add_mapspec_axis("a", "k")
+    pipeline.add_mapspec_axis("a", axis="k")
     assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
     assert str(two.mapspec) == "one[:, :, k] -> two[k]"
     assert str(three.mapspec) == "two[k] -> three[k]"
@@ -602,7 +602,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [4.0, 4.0, 4.0]
 
     # Adding another axis to "d"
-    pipeline.add_mapspec_axis("d", "l")
+    pipeline.add_mapspec_axis("d", axis="l")
     assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
     assert str(two.mapspec) == "one[:, :, k], d[l] -> two[k, l]"
     assert str(three.mapspec) == "two[k, l], d[l] -> three[k, l]"
@@ -623,7 +623,7 @@ def test_add_mapspec_axis_unused_parameter() -> None:
 
     pipeline = Pipeline([(func, "a[i] -> result[i]")])
 
-    pipeline.add_mapspec_axis("unused_param", "j")
+    pipeline.add_mapspec_axis("unused_param", axis="j")
 
     assert str(func.mapspec) == "a[i] -> result[i]"
 
@@ -649,7 +649,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
         ],
     )
 
-    pipeline.add_mapspec_axis("a", "l")
+    pipeline.add_mapspec_axis("a", axis="l")
 
     assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
     assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
@@ -674,7 +674,7 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
         [generate_ints, (double_it, "x[i] -> y[i]"), take_sum],
     )
 
-    pipeline.add_mapspec_axis("z", "k")
+    pipeline.add_mapspec_axis("z", axis="k")
     assert generate_ints.mapspec is None
     assert str(double_it.mapspec) == "x[i], z[k] -> y[i, k]"
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
@@ -694,8 +694,8 @@ def test_add_mapspec_axis_multiple_axes() -> None:
 
     pipeline = Pipeline([(func, "a[i], b[j] -> result[i, j]")])
 
-    pipeline.add_mapspec_axis("a", "k")
-    pipeline.add_mapspec_axis("b", "l")
+    pipeline.add_mapspec_axis("a", axis="k")
+    pipeline.add_mapspec_axis("b", axis="l")
 
     assert str(func.mapspec) == "a[i, k], b[j, l] -> result[i, j, k, l]"
 
@@ -707,7 +707,7 @@ def test_add_mapspec_axis_parameter_in_output() -> None:
 
     pipeline = Pipeline([(func, "a[i, j] -> result[i, j]")])
 
-    pipeline.add_mapspec_axis("a", "k")
+    pipeline.add_mapspec_axis("a", axis="k")
 
     assert str(func.mapspec) == "a[i, j, k] -> result[i, j, k]"
 
@@ -761,9 +761,9 @@ def test_adding_axes_to_mapspec_less_pipeline():
         return c * d * x
 
     pipeline = Pipeline([f_c, f_d, f_e])
-    pipeline.add_mapspec_axis("a", "i")
-    pipeline.add_mapspec_axis("b", "j")
-    pipeline.add_mapspec_axis("x", "k")
+    pipeline.add_mapspec_axis("a", axis="i")
+    pipeline.add_mapspec_axis("b", axis="j")
+    pipeline.add_mapspec_axis("x", axis="k")
 
     assert str(f_c.mapspec) == "a[i], b[j] -> c[i, j]"
     assert str(f_d.mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
@@ -790,9 +790,9 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         return c * d * x
 
     pipeline = Pipeline([f_c, f_d, f_e])
-    pipeline.add_mapspec_axis("a", "i")
-    pipeline.add_mapspec_axis("b", "i")
-    pipeline.add_mapspec_axis("x", "j")
+    pipeline.add_mapspec_axis("a", axis="i")
+    pipeline.add_mapspec_axis("b", axis="i")
+    pipeline.add_mapspec_axis("x", axis="j")
 
     assert str(f_c.mapspec) == "a[i], b[i] -> c[i]"
     assert str(f_d.mapspec) == "c[i], b[i], x[j] -> d[i, j]"
@@ -845,6 +845,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
 
     inputs = {"n": 4, "z": 1}
     manual_shapes = {"x": (4,)}
+    assert pipeline.mapspec_axes() == {"x": ("i",), "y": ("i",)}
     results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output == 13
 
@@ -869,7 +870,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
 
     # Do the same but with `add_mapspec_axis` on the first pipeline
     assert pipeline.mapspecs_as_strings() == ["x[i] -> y[i]"]
-    pipeline.add_mapspec_axis("n", "j")
+    pipeline.add_mapspec_axis("n", axis="j")
     assert pipeline.mapspecs_as_strings() == [
         "n[j] -> x[i, j]",
         "x[i, j] -> y[i, j]",

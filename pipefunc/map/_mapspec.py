@@ -108,9 +108,6 @@ class MapSpec:
         output_indices = set(self.outputs[0].indices)
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
-        if extra_indices := output_indices - input_indices:
-            msg = f"Output array has indices that do not appear in the input: {extra_indices}"
-            raise ValueError(msg)
         if unused_indices := input_indices - output_indices:
             msg = f"Input array have indices that do not appear in the output: {unused_indices}"
             raise ValueError(msg)
@@ -130,43 +127,76 @@ class MapSpec:
         """Return the index names for this MapSpec."""
         return self.outputs[0].indices  # All outputs have the same indices
 
-    def shape(self, shapes: dict[str, tuple[int, ...]]) -> tuple[int, ...]:
+    def shape(
+        self,
+        input_shapes: dict[str, tuple[int, ...]],
+        output_shapes: dict[str, tuple[int, ...]] | None = None,
+    ) -> tuple[int, ...]:
         """Return the shape of the output of this MapSpec.
 
         Parameters
         ----------
-        shapes
+        input_shapes
             Shapes of the inputs, keyed by name.
+        output_shapes
+            Shapes of the outputs, keyed by name. One only needs to provide this if the output
+            has an axis that is not shared with any input. If there are multiple output axes,
+            only provide the shape for the missing axis, use `...` for the rest. For example,
+            if the mapspec is `x[i, j], y[j, k] -> z[i, j, k, l]` and the only missing axis is `l`,
+            then `output_shapes={'z': (..., ..., ..., 5)}` should be provided.
 
         """
-        input_names = {x.name for x in self.inputs}
+        input_names = set(self.input_names)
 
-        if extra_names := set(shapes.keys()) - input_names:
+        if extra_names := set(input_shapes.keys()) - input_names:
             msg = f"Got extra array {extra_names} that are not accepted by this map."
             raise ValueError(msg)
-        if missing_names := input_names - set(shapes.keys()):
+        if missing_names := input_names - set(input_shapes.keys()):
             msg = f"Inputs expected by this map were not provided: {missing_names}"
             raise ValueError(msg)
 
         # Each individual array is of the appropriate rank
         for x in self.inputs:
-            x.validate(shapes[x.name])
+            x.validate(input_shapes[x.name])
 
         # Shapes match between array sharing a named index
-
         def get_dim(array: ArraySpec, index: str) -> int:
             axis = array.axes.index(index)
-            return shapes[array.name][axis]
+            return input_shapes[array.name][axis]
 
         shape = []
         for index in self.outputs[0].indices:  # All outputs have the same indices
             relevant_arrays = [x for x in self.inputs if index in x.indices]
-            dim, *rest = (get_dim(x, index) for x in relevant_arrays)
-            if any(dim != x for x in rest):
-                arrs = ", ".join(x.name for x in relevant_arrays)
-                msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
-                raise ValueError(msg)
-            shape.append(dim)
+            if relevant_arrays:
+                dim, *rest = (get_dim(x, index) for x in relevant_arrays)
+                if any(dim != x for x in rest):
+                    arrs = ", ".join(x.name for x in relevant_arrays)
+                    msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
+                    raise ValueError(msg)
+                shape.append(dim)
+            else:
+                # Handle the case where the output has an axis not shared with any input
+                if output_shapes is None:
+                    msg = (
+                        f"Output array has an axis `{index}` not shared with any input, "
+                        "but `output_shapes` is not provided."
+                    )
+                    raise ValueError(msg)
+                for output_name, output_shape in output_shapes.items():
+                    if output_name in self.output_names:
+                        output_axis = self.outputs[0].axes.index(index)
+                        if (
+                            len(output_shape) > output_axis
+                            and output_shape[output_axis] is not Ellipsis
+                        ):
+                            shape.append(output_shape[output_axis])
+                            break
+                else:
+                    msg = (
+                        f"Output array has an axis `{index}` not shared with any input, "
+                        f"but `output_shapes` does not provide a shape for it."
+                    )
+                    raise ValueError(msg)
 
         return tuple(shape)
 
@@ -259,6 +289,8 @@ def _parse_index_string(index_string: str) -> tuple[str | None, ...]:
 
 
 def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
+    if expr.strip() == "...":
+        return ()
     if "[" not in expr or "]" not in expr:
         msg = (
             f"Invalid expression '{expr.strip()}'. Expected an expression that includes "
