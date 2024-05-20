@@ -42,6 +42,12 @@ def test_simple(tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=None, parallel=False)
     assert results2[-1].output == 12
 
+    axes = pipeline.mapspec_axes()
+    assert axes == {"x": ("i",), "y": ("i",)}
+    dimensions = pipeline.mapspec_dimensions()
+    assert dimensions.keys() == axes.keys()
+    assert all(dimensions[k] == len(v) for k, v in axes.items())
+
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
@@ -797,6 +803,18 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         "c[i], b[i], x[j] -> d[i, j]",
         "d[i, j], c[i], x[j] -> e[i, j]",
     ]
+    axes = pipeline.mapspec_axes()
+    assert axes == {
+        "a": ("i",),
+        "b": ("i",),
+        "c": ("i",),
+        "x": ("j",),
+        "d": ("i", "j"),
+        "e": ("i", "j"),
+    }
+    dimensions = pipeline.mapspec_dimensions()
+    assert dimensions.keys() == axes.keys()
+    assert all(dimensions[k] == len(v) for k, v in axes.items())
 
 
 def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
@@ -827,7 +845,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
 
     inputs = {"n": 4, "z": 1}
     manual_shapes = {"x": (4,)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output == 13
 
     # Add an axis `j` to `x`
@@ -839,9 +857,14 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
             (take_sum, "y[:, j] -> sum[j]"),
         ],
     )
-    inputs = {"n": [4], "z": 1}
-    manual_shapes = {"x": (4, 1)}
-    results = pipeline_map.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    inputs_map = {"n": [4], "z": 1}
+    manual_shapes_map = {"x": (4, 1)}
+    results = pipeline_map.map(
+        inputs_map,
+        tmp_path,
+        manual_shapes=manual_shapes_map,  # type: ignore[arg-type]
+        parallel=False,
+    )
     assert results[-1].output.tolist() == [13]
 
     # Do the same but with `add_mapspec_axis` on the first pipeline
@@ -852,7 +875,10 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         "x[i, j] -> y[i, j]",
         "y[:, j] -> sum[j]",
     ]
-    inputs = {"n": [4], "z": 1}
-    manual_shapes = {"x": (4, 1)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    results = pipeline.map(
+        inputs_map,
+        tmp_path,
+        manual_shapes=manual_shapes_map,  # type: ignore[arg-type]
+        parallel=False,
+    )
     assert results[-1].output.tolist() == [13]
