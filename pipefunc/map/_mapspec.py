@@ -147,66 +147,18 @@ class MapSpec:
 
         """
         input_names = set(self.input_names)
+        _validate_shapes(input_names, input_shapes, self.inputs, output_shapes, self.output_names)
 
-        if extra_names := set(input_shapes.keys()) - input_names:
-            msg = f"Got extra array {extra_names} that are not accepted by this map."
-            raise ValueError(msg)
-        if missing_names := input_names - set(input_shapes.keys()):
-            msg = f"Inputs expected by this map were not provided: {missing_names}"
-            raise ValueError(msg)
-
-        # Each individual array is of the appropriate rank
-        for x in self.inputs:
-            x.validate(input_shapes[x.name])
-
-        # Shapes match between array sharing a named index
-        def get_dim(array: ArraySpec, index: str) -> int:
-            axis = array.axes.index(index)
-            return input_shapes[array.name][axis]
-
+        output_shape_dict = output_shapes or {}
         shape = []
-        output_shape_dict = {
-            output_name: output_shape
-            for output_name, output_shape in (output_shapes or {}).items()
-            if output_name in self.output_names
-        }
-
-        for index in self.outputs[0].indices:  # All outputs have the same indices
+        for index in self.outputs[0].indices:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             if relevant_arrays:
-                dim, *rest = (get_dim(x, index) for x in relevant_arrays)
-                if any(dim != x for x in rest):
-                    arrs = ", ".join(x.name for x in relevant_arrays)
-                    msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
-                    raise ValueError(msg)
+                dim = _get_common_dim(relevant_arrays, index, input_shapes)
                 shape.append(dim)
             else:
-                # Handle the case where the output has an axis not shared with any input
-                if not output_shape_dict:
-                    msg = (
-                        f"Output array has an axis `{index}` not shared with any input, "
-                        "but `output_shapes` is not provided."
-                    )
-                    raise ValueError(msg)
-
-                output_axis = self.outputs[0].axes.index(index)
-                output_dim = None
-                for output_shape in output_shape_dict.values():
-                    if (
-                        len(output_shape) > output_axis
-                        and output_shape[output_axis] is not Ellipsis
-                    ):
-                        output_dim = output_shape[output_axis]
-                        break
-                if output_dim is not None:
-                    shape.append(output_dim)
-                else:
-                    msg = (
-                        f"Output array has an axis `{index}` not shared with any input, "
-                        f"but `output_shapes` does not provide a shape for it."
-                    )
-                    raise ValueError(msg)
-
+                dim = _get_output_dim(self.outputs, output_shape_dict, index)
+                shape.append(dim)
         return tuple(shape)
 
     def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
@@ -453,3 +405,73 @@ def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
                 if axis is not None:
                     axes[arrayspec.name][i] = axis
     return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}
+
+
+def _validate_shapes(
+    input_names: set[str],
+    input_shapes: dict[str, tuple[int, ...]],
+    inputs: tuple[ArraySpec, ...],
+    output_shapes: dict[str, tuple[int, ...]] | None,
+    output_names: tuple[str, ...],
+) -> None:
+    if extra_names := set(input_shapes.keys()) - input_names:
+        msg = f"Got extra array {extra_names} that are not accepted by this map."
+        raise ValueError(msg)
+    if missing_names := input_names - set(input_shapes.keys()):
+        msg = f"Inputs expected by this map were not provided: {missing_names}"
+        raise ValueError(msg)
+    for x in inputs:
+        x.validate(input_shapes[x.name])
+
+    if output_shapes:
+        for output_name in output_shapes:
+            if output_name not in output_names:
+                msg = f"Output array `{output_name}` is not accepted by this map."
+                raise ValueError(msg)
+
+
+def _get_common_dim(
+    arrays: list[ArraySpec],
+    index: str,
+    input_shapes: dict[str, tuple[int, ...]],
+) -> int:
+    def _get_dim(array: ArraySpec, index: str, input_shapes: dict[str, tuple[int, ...]]) -> int:
+        axis = array.axes.index(index)
+        return input_shapes[array.name][axis]
+
+    dims = [_get_dim(x, index, input_shapes) for x in arrays]
+    if any(dim != dims[0] for dim in dims):
+        arrs = ", ".join(x.name for x in arrays)
+        msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
+        raise ValueError(msg)
+    return dims[0]
+
+
+def _get_output_dim(
+    outputs: tuple[ArraySpec, ...],
+    output_shape_dict: dict[str, tuple[int, ...]],
+    index: str,
+) -> int:
+    if not output_shape_dict:
+        msg = (
+            f"Output array has an axis `{index}` not shared with any input, "
+            "but `output_shapes` is not provided."
+        )
+        raise ValueError(msg)
+
+    output_axis = outputs[0].axes.index(index)
+    output_dim = next(
+        (
+            output_shape[output_axis]
+            for output_shape in output_shape_dict.values()
+            if len(output_shape) > output_axis and output_shape[output_axis] is not Ellipsis
+        ),
+        None,
+    )
+    if output_dim is None:
+        msg = (
+            f"Output array has an axis `{index}` not shared with any input, "
+            f"but `output_shapes` does not provide a shape for it."
+        )
+        raise ValueError(msg)
+    return output_dim
