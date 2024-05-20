@@ -10,9 +10,16 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 
-from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    equal_dicts,
+    handle_error,
+    load,
+    prod,
+)
 from pipefunc.map._filearray import FileArray
-from pipefunc.map._mapspec import MapSpec, array_shape, validate_consistent_axes
+from pipefunc.map._mapspec import MapSpec, array_shape, mapspec_dimensions, validate_consistent_axes
 
 if TYPE_CHECKING:
     import sys
@@ -65,6 +72,10 @@ class _MockPipeline:
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
         return self.functions
+
+    def mapspec_dimensions(self) -> dict[str, int]:
+        """Return the number of dimensions for each array parameter in the pipeline."""
+        return mapspec_dimensions(self.mapspecs())
 
 
 def _dump_inputs(
@@ -152,7 +163,7 @@ def _compare_to_previous_run_info(
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = _input_dimensions(pipeline)
+    input_dimensions = pipeline.mapspec_dimensions()
     for name, value in inputs.items():
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
@@ -420,15 +431,6 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     return _dump_output(func, output, run_folder)
 
 
-def _input_dimensions(pipeline: Pipeline) -> dict[str, int]:
-    return {
-        arrayspec.name: len(arrayspec.axes)
-        for f in pipeline.functions
-        if f.mapspec is not None
-        for arrayspec in f.mapspec.inputs
-    }
-
-
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -447,7 +449,7 @@ def map_shapes(
     for func in mapspec_funcs:
         assert func.mapspec is not None
         input_shapes = {}
-        for p in func.mapspec.parameters:
+        for p in func.mapspec.input_names:
             if shape := shapes.get(p):
                 input_shapes[p] = shape
             elif p in manual_shapes:

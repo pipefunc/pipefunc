@@ -681,3 +681,29 @@ def test_pickle_pipefunc():
     p = pickle.dumps(func)
     func2 = pickle.loads(p)  # noqa: S301
     assert func(a=1) == func2(a=1)
+
+
+def test_independent_axes_in_mapspecs_with_disconnected_chains():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a: int, b: int):
+        return a + b
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def g(x, y):
+        return x + y
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.mapspecs_as_strings() == [
+        "a[i] -> c[i]",
+        "x[i], y[i] -> z[i]",
+    ]
+
+    pipeline.add_mapspec_axis("b", "j")
+    assert pipeline.mapspecs_as_strings() == ["a[i], b[j] -> c[i, j]", "x[i], y[i] -> z[i]"]
+
+    pipeline.add_mapspec_axis("x", "j")
+    pipeline.add_mapspec_axis("y", "j")
+    assert pipeline.mapspecs_as_strings() == [
+        "a[i], b[j] -> c[i, j]",
+        "x[i, j], y[i, j] -> z[i, j]",
+    ]

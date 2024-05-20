@@ -92,11 +92,12 @@ def test_mapspec_init():
         MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), (output,))
 
 
-def test_mapspec_parameters():
+def test_mapspec_input_names():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
-    assert spec.parameters == ("a", "b")
+    assert spec.input_names == ("a", "b")
+    assert spec.output_names == ("q",)
 
 
 def test_mapspec_indices():
