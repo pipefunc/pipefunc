@@ -1131,27 +1131,36 @@ class Pipeline:
     def _independent_parameters(self: Pipeline) -> list[set[str]]:
         """Return the sets of input and output parameters that are independent."""
         sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in self.functions]
-        # Note: we could also use `nx.connected_components(self.graph.to_undirected())`
         return join_overlapping_sets(sets)
 
-    def _group_functions_by_chains(self: Pipeline) -> list[list[PipeFunc]]:
+    def _connected_components(self) -> list[set[PipeFunc | str]]:
+        """Return the connected components of the pipeline graph."""
+        return list(nx.connected_components(self.graph.to_undirected()))
+
+    def _group_functions_by_chains(self: Pipeline) -> list[set[PipeFunc]]:
         """Group functions by independent chains / disconnected subgraphs."""
+        # Note: we could also use `_connected_components`
         chains = self._independent_parameters()
         functions = self.functions
-        function_chains: list[list[PipeFunc]] = [[] for _ in chains]
+        function_chains: list[set[PipeFunc]] = [set() for _ in chains]
         for f in functions:
             for i, chain in enumerate(chains):
                 if at_least_tuple(f.output_name)[0] in chain:
                     # We can just check whether a single input or output is in the chain
-                    function_chains[i].append(f)
+                    function_chains[i].add(f)
+        connected_components = self._connected_components()
+        connected_functions = [
+            {x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components
+        ]
+        assert function_chains == connected_functions, (function_chains, connected_functions)
         return function_chains
 
-    def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[list[PipeFunc], set[str]]]:
+    def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
         function_chains = self._group_functions_by_chains()
         mapspec_chains = [
             [f.mapspec for f in functions if f.mapspec] for functions in function_chains
         ]
-        common_axes: list[tuple[list[PipeFunc], set[str]]] = []
+        common_axes: list[tuple[set[PipeFunc], set[str]]] = []
         for function_chain, mapspec_chain in zip(function_chains, mapspec_chains):
             if len(function_chain) != len(mapspec_chain):
                 # if not all functions have mapspecs, there are no independent axes
