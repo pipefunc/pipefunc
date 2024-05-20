@@ -797,3 +797,62 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline():
         "c[i], b[i], x[j] -> d[i, j]",
         "d[i, j], c[i], x[j] -> e[i, j]",
     ]
+
+
+def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
+    @pipefunc(output_name="x")
+    def generate_ints(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="side")
+    def side_chain(z: int) -> int:
+        return z
+
+    @pipefunc(output_name="sum")
+    def take_sum(y: list[int], z: int) -> int:
+        return sum(y) + z
+
+    pipeline = Pipeline(
+        [
+            generate_ints,
+            (double_it, "x[i] -> y[i]"),
+            side_chain,
+            take_sum,
+        ],
+    )
+
+    inputs = {"n": 4, "z": 1}
+    manual_shapes = {"x": (4,)}
+    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    assert results[-1].output == 13
+
+    # Add an axis `j` to `x`
+    pipeline_map = Pipeline(
+        [
+            (generate_ints, "n[j] -> x[i, j]"),
+            (double_it, "x[i, j] -> y[i, j]"),
+            side_chain,
+            (take_sum, "y[:, j] -> sum[j]"),
+        ],
+    )
+    inputs = {"n": [4], "z": 1}
+    manual_shapes = {"x": (4, 1)}
+    results = pipeline_map.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    assert results[-1].output.tolist() == [13]
+
+    # Do the same but with `add_mapspec_axis` on the first pipeline
+    assert pipeline.mapspecs_as_strings() == ["x[i] -> y[i]"]
+    pipeline.add_mapspec_axis("n", "j")
+    assert pipeline.mapspecs_as_strings() == [
+        "n[j] -> x[i, j]",
+        "x[i, j] -> y[i, j]",
+        "y[:, j] -> sum[j]",
+    ]
+    inputs = {"n": [4], "z": 1}
+    manual_shapes = {"x": (4, 1)}
+    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)
+    assert results[-1].output.tolist() == [13]
