@@ -165,6 +165,12 @@ class MapSpec:
             return input_shapes[array.name][axis]
 
         shape = []
+        output_shape_dict = {
+            output_name: output_shape
+            for output_name, output_shape in (output_shapes or {}).items()
+            if output_name in self.output_names
+        }
+
         for index in self.outputs[0].indices:  # All outputs have the same indices
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             if relevant_arrays:
@@ -176,21 +182,24 @@ class MapSpec:
                 shape.append(dim)
             else:
                 # Handle the case where the output has an axis not shared with any input
-                if output_shapes is None:
+                if not output_shape_dict:
                     msg = (
                         f"Output array has an axis `{index}` not shared with any input, "
                         "but `output_shapes` is not provided."
                     )
                     raise ValueError(msg)
-                for output_name, output_shape in output_shapes.items():
-                    if output_name in self.output_names:
-                        output_axis = self.outputs[0].axes.index(index)
-                        if (
-                            len(output_shape) > output_axis
-                            and output_shape[output_axis] is not Ellipsis
-                        ):
-                            shape.append(output_shape[output_axis])
-                            break
+
+                output_axis = self.outputs[0].axes.index(index)
+                output_dim = None
+                for output_shape in output_shape_dict.values():
+                    if (
+                        len(output_shape) > output_axis
+                        and output_shape[output_axis] is not Ellipsis
+                    ):
+                        output_dim = output_shape[output_axis]
+                        break
+                if output_dim is not None:
+                    shape.append(output_dim)
                 else:
                     msg = (
                         f"Output array has an axis `{index}` not shared with any input, "

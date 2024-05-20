@@ -319,10 +319,40 @@ def test_larger_output_then_input():
     mapspec = MapSpec.from_string("x[i, j], y[j, k] -> z[i, j, k, l]")
     assert mapspec.input_names == ("x", "y")
     assert mapspec.output_names == ("z",)
-    assert mapspec.shape(
-        input_shapes={"x": (2, 3), "y": (3, 4)},
-        output_shapes={"z": (..., ..., ..., 5)},
-    ) == (2, 3, 4, 5)
+    input_shapes = {"x": (2, 3), "y": (3, 4)}
+    shape = mapspec.shape(input_shapes, output_shapes={"z": (..., ..., ..., 5)})
+    assert shape == (2, 3, 4, 5)
 
     mapspec = MapSpec.from_string("a[i] -> b[i, j]")
     assert mapspec.shape({"a": (3,)}, output_shapes={"b": (..., 4)}) == (3, 4)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k]")
+    shape = mapspec.shape(input_shapes={"a": (3,), "b": (4,)}, output_shapes={"c": (..., ..., 5)})
+    assert shape == (3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
+    input_shapes = {"a": (3,), "b": (4,)}
+    shape = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    assert shape == (3, 4, 5, 6)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    shape = mapspec.shape(input_shapes={"a": (3,), "b": (4,)}, output_shapes={"c": (..., ...)})
+    assert shape == (3, 4)
+
+    mapspec = MapSpec.from_string("a[i, j] -> b[i, j, k, l]")
+    shape = mapspec.shape(input_shapes={"a": (2, 3)}, output_shapes={"b": (..., ..., 4, 5)})
+    assert shape == (2, 3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i, j, k] -> b[i, j, k, l, m]")
+    input_shapes = {"a": (2, 3, 4)}
+    shape = mapspec.shape(input_shapes, output_shapes={"b": (..., ..., ..., 5, 6)})
+    assert shape == (2, 3, 4, 5, 6)
+
+    mapspec = MapSpec.from_string("a[j] -> b[i, j, k, l]")
+    shape = mapspec.shape(input_shapes={"a": (2,)}, output_shapes={"b": (3, ..., 4, 5)})
+    assert shape == (3, 2, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
+    input_shapes = {"a": (3,), "b": (4,)}
+    shape = mapspec.shape(input_shapes, output_shapes={"c": (..., ..., 5, 6)})
+    assert shape == (3, 4, 5, 6)
