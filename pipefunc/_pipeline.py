@@ -1130,6 +1130,8 @@ class Pipeline:
 
     def _independent_parameters(self: Pipeline) -> list[set[str]]:
         """Return the sets of input and output parameters that are independent."""
+        # Note: could use `_connected_components` instead of `join_overlapping_sets`
+        # Not used ATM...
         sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in self.functions]
         return join_overlapping_sets(sets)
 
@@ -1139,21 +1141,8 @@ class Pipeline:
 
     def _group_functions_by_chains(self: Pipeline) -> list[set[PipeFunc]]:
         """Group functions by independent chains / disconnected subgraphs."""
-        # Note: we could also use `_connected_components`
-        chains = self._independent_parameters()
-        functions = self.functions
-        function_chains: list[set[PipeFunc]] = [set() for _ in chains]
-        for f in functions:
-            for i, chain in enumerate(chains):
-                if at_least_tuple(f.output_name)[0] in chain:
-                    # We can just check whether a single input or output is in the chain
-                    function_chains[i].add(f)
         connected_components = self._connected_components()
-        connected_functions = [
-            {x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components
-        ]
-        assert function_chains == connected_functions, (function_chains, connected_functions)
-        return function_chains
+        return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
     def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
         function_chains = self._group_functions_by_chains()
