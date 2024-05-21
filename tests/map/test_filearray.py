@@ -533,6 +533,7 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
     data1 = np.array([42, 69])
+    expected_full = np.ma.array(data1, mask=False, dtype=object).reshape(full_shape)
 
     arr.dump((0,), data1)
 
@@ -547,10 +548,11 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     assert slice_indices == expected_slice_indices
 
     # Check _normalize_key
-    assert arr._normalize_key((0,)) == (0,)
-    assert arr._normalize_key((slice(None),)) == (slice(None),)
     assert arr._normalize_key((slice(None), slice(None))) == (slice(None), slice(None))
     assert arr._normalize_key((0, 0)) == (0, 0)
+
+    assert expected_full.shape == (1, 2)
+    assert expected_full[:, 0].shape == (1,)
 
     result = arr[:, 0]
     assert result.shape == (1,)

@@ -215,19 +215,24 @@ class FileArray:
             sliced_array = np.ma.masked_array(sliced_array, mask=mask)
 
             new_shape = tuple(
-                len(range_) if isinstance(k, slice) else 1
+                len(range_)
                 for k, range_ in zip(normalized_key, slice_indices)
+                if isinstance(k, slice)
             )
             print(f"New shape: {new_shape}")
-            return sliced_array.reshape(new_shape).squeeze()
+            return sliced_array.reshape(new_shape)  # .squeeze()
 
         file = self._key_to_file(external_indices)
         if not file.is_file():
             return np.ma.masked
 
         sub_array = load(file)
+        print(f"Loaded sub-array: {sub_array}")
         if internal_indices:
-            return sub_array[internal_indices]
+            result = sub_array[internal_indices]
+            print(f"Result after internal indexing: {result}")
+            return result
+        print("Returning sub-array directly")
         return sub_array
 
     def to_array(self, *, splat_internal: bool = False) -> np.ma.core.MaskedArray:
