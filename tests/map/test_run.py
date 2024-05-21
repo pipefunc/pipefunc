@@ -37,7 +37,7 @@ def test_simple(tmp_path: Path) -> None:
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "y": (4,)}
     # Test `map` and a tmp run_folder
@@ -74,7 +74,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [24, 30, 36, 42]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (3, 4), "y": (3, 4)}
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
@@ -104,7 +104,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert results[-1].output.tolist() == [12, 44, 76]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [12, 44, 76]
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {
         "x": (3, 4),
@@ -143,7 +143,7 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     assert isinstance(results[-1].output, np.int_)
     assert results[-1].output == 1961990553600
     assert load_outputs("prod", run_folder=tmp_path) == 1961990553600
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {
         "x": (3, 4),
@@ -165,7 +165,7 @@ def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     assert results[1].output == 36
     assert load_outputs("sum", run_folder=tmp_path) == 36
     assert len(results) == 2
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"y": (3,), "x": (3,), "z": (3, 3)}
 
@@ -252,18 +252,19 @@ def test_simple_from_step(tmp_path: Path) -> None:
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes={"x": (4,)},
+        internal_shapes={"x": (4,)},
         parallel=False,
     )
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
-    with pytest.raises(ValueError, match="is used in map but"):
-        map_shapes(pipeline, inputs)
 
-    shapes, masks = map_shapes(pipeline, inputs, {"x": (4,)})
-    assert all(all(mask) for mask in masks.values())
-    assert shapes == {"y": (4,)}
+    shapes, masks, _ = map_shapes(pipeline, inputs, {"x": (4,)})
+    assert masks == {"x": (False,), "y": (True,)}
+    assert shapes == {"x": (4,), "y": (4,)}
+
+    with pytest.raises(ValueError, match="Internal shape for 'x' is missing."):
+        map_shapes(pipeline, inputs)
 
     with pytest.raises(
         RuntimeError,
@@ -296,7 +297,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 6
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {
         "x": (4,),
@@ -329,18 +330,18 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         ],
     )
     inputs = {"shape": (1, 2, 3)}
-    manual_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
+    internal_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
     results = run(
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes=manual_shapes,  # type: ignore[arg-type]
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+    shapes, masks, _ = map_shapes(pipeline, inputs, internal_shapes)
     assert shapes == {"array": (1, 2, 3), "vector": (1,)}
     assert masks == {"array": (False, False, False), "vector": (True,)}
 
@@ -437,7 +438,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "y": 0.2,
         "coarse_mesh_size": 0.05,
     }
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {
         "V_right": (2,),
@@ -491,7 +492,7 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 10
     assert results[-1].output_name == "sum"
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "z": (4,)}
     sum_result = load_outputs("sum", run_folder=tmp_path)
@@ -568,7 +569,7 @@ def test_nd_input_list(tmp_path: Path) -> None:
         pipeline.map(inputs_list, tmp_path, parallel=False)
 
     inputs_arr = {k: np.array(v) for k, v in inputs_list.items()}
-    shapes, masks = map_shapes(pipeline, inputs_arr)
+    shapes, masks, _ = map_shapes(pipeline, inputs_arr)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (2, 2), "y": (2, 2)}
     results = pipeline.map(inputs_arr, tmp_path, parallel=False)
@@ -576,7 +577,7 @@ def test_nd_input_list(tmp_path: Path) -> None:
 
     pipeline.add_mapspec_axis("x", axis="k")
     inputs = {"x": np.arange(2**3).reshape(2, 2, 2)}
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (2, 2, 2), "y": (2, 2, 2)}
     results = pipeline.map(inputs, tmp_path, parallel=False)
@@ -608,7 +609,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     )
     inputs = {"a": np.ones((2,)), "b": [1, 1], "d": 1}
     expected = {"b": (2,), "a": (2,), "one": (2, 2)}
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
     results = pipeline.map(inputs, tmp_path, parallel=False)
@@ -623,7 +624,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     # Run the pipeline
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": 1}
     expected = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3,), "three": (3,)}
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
     results = pipeline.map(inputs, tmp_path, parallel=False)
@@ -639,7 +640,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": [1, 1]}
     assert pipeline.map_parameters == {"one", "a", "three", "two", "b", "d"}
     expected = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3, 2), "three": (3, 2), "d": (2,)}
-    shapes, masks = map_shapes(pipeline, inputs)
+    shapes, masks, _ = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected
     results = pipeline.map(inputs, tmp_path, parallel=False)
@@ -686,7 +687,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
 
 
-def test_mapspec_manual_shapes(tmp_path: Path) -> None:
+def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -710,11 +711,11 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
 
     inputs = {"n": 4, "z": [1, 2]}
-    manual_shapes = {"x": 4}
-    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
+    internal_shapes = {"x": 4}
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output.tolist() == [16, 20]
     expected = {"z": (2,), "y": (4, 2), "sum": (2,)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
+    shapes, masks, _ = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert all(all(mask) for mask in masks.values())
     assert shapes == expected  # type: ignore[arg-type]
 
@@ -856,13 +857,13 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
 
     pipeline = Pipeline([(generate_ints, "... -> x[i]")])
     inputs = {"n": 4}
-    manual_shapes = {"x": (4,)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
+    internal_shapes = {"x": (4,)}
+    shapes, masks, _ = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"x": (4,)}
     assert masks == {"x": (False,)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
-    assert load_outputs("x", run_folder=tmp_path).tolist() == list(range(4))
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output == list(range(4))
+    assert load_outputs("x", run_folder=tmp_path) == list(range(4))
 
 
 def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
@@ -872,11 +873,11 @@ def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
 
     pipeline = Pipeline([(f, "b[i] -> c[i, j]")])
     inputs = {"a": 1, "b": [1, 2]}
-    manual_shapes = {"c": (..., 2)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
+    internal_shapes = {"c": (2,)}
+    shapes, masks, _ = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"b": (2,), "c": (2, 2)}
     assert masks == {"b": (True,), "c": (True, False)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert load_outputs("c", run_folder=tmp_path) == list(range(4))
     assert results[-1].output == list(range(4))
 
@@ -908,12 +909,12 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     )
 
     inputs = {"n": 4, "z": 1}
-    manual_shapes = {"x": (4,)}
+    internal_shapes = {"x": (4,)}
     assert pipeline.mapspec_axes() == {"x": ("i",), "y": ("i",)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
-    assert all(all(mask) for mask in masks.values())
-    assert shapes == {"y": (4,)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)  # type: ignore[arg-type]
+    shapes, masks, _ = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
+    assert masks == {"x": (False,), "y": (True,)}
+    assert shapes == {"x": (4,), "y": (4,)}
+    results = pipeline.map(inputs, tmp_path, internal_shapes=internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output == 13
 
     # Add an axis `j` to `x`
@@ -926,14 +927,14 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         ],
     )
     inputs_map = {"n": [4], "z": 1}
-    manual_shapes_map = {"x": (4, ...)}
-    shapes, masks = map_shapes(pipeline_map, inputs_map, manual_shapes_map)
+    internal_shapes_map = {"x": (4,)}
+    shapes, masks, _ = map_shapes(pipeline_map, inputs_map, internal_shapes_map)  # type: ignore[arg-type]
     assert masks == {"n": (True,), "x": (False, True), "y": (True, True), "sum": (True,)}
     assert shapes == {"n": (1,), "x": (4, 1), "y": (4, 1), "sum": (1,)}
     results = pipeline_map.map(
         inputs_map,
         tmp_path,
-        manual_shapes=manual_shapes_map,  # type: ignore[arg-type]
+        internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
     )
     assert results[-1].output.tolist() == [13]
@@ -949,7 +950,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     results = pipeline.map(
         inputs_map,
         tmp_path,
-        manual_shapes=manual_shapes_map,  # type: ignore[arg-type]
+        internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
     )
     assert results[-1].output.tolist() == [13]

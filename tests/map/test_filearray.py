@@ -593,7 +593,7 @@ def test_sliced_arange_splat(tmp_path: Path):
 def test_exceptions(tmp_path: Path) -> None:
     with pytest.raises(
         ValueError,
-        match="internal_shape must be provided if shape_mask is provided",
+        match="shape_mask must be provided if internal_shape is provided",
     ):
         FileArray(tmp_path, shape=(1, 2), internal_shape=(2, 3))
     with pytest.raises(

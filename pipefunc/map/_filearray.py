@@ -7,7 +7,7 @@ from __future__ import annotations
 import concurrent.futures
 import itertools
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import numpy as np
@@ -55,16 +55,16 @@ class FileArray:
     def __init__(
         self,
         folder: str | Path,
-        shape: Sequence[int],
-        strides: Sequence[int] | None = None,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+        strides: tuple[int, ...] | None = None,
         filename_template: str = FILENAME_TEMPLATE,
-        shape_mask: Sequence[bool] | None = None,
-        internal_shape: Sequence[int] | None = None,
     ) -> None:
-        if (shape_mask is None) ^ (internal_shape is None):
-            msg = "internal_shape must be provided if shape_mask is provided"
+        if internal_shape and shape_mask is None:
+            msg = "shape_mask must be provided if internal_shape is provided"
             raise ValueError(msg)
-        if shape_mask is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
+        if internal_shape is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
         self.folder = Path(folder).absolute()

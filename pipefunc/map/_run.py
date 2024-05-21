@@ -31,11 +31,6 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
-    if sys.version_info < (3, 10):  # pragma: no cover
-        EllipsisType: TypeAlias = type(...)
-    else:
-        from typing import EllipsisType
-
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
@@ -106,7 +101,6 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
 def _dump_output(
     func: PipeFunc,
     output: Any,
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
 ) -> Any:
     folder = run_folder / "outputs"
@@ -118,46 +112,14 @@ def _dump_output(
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            _dump_to_single_or_file_array(
-                _output,
-                output_name,
-                func.mapspec,
-                shapes,
-                run_folder,
-            )
+            path = _output_path(output_name, run_folder)
+            dump(output, path)
         output = new_output
     else:
-        _dump_to_single_or_file_array(
-            output,
-            func.output_name,
-            func.mapspec,
-            shapes,
-            run_folder,
-        )
+        path = _output_path(func.output_name, run_folder)
+        dump(output, path)
 
     return output
-
-
-def _dump_to_single_or_file_array(
-    output: Any,
-    output_name: str,
-    mapspec: MapSpec | None,
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    run_folder: Path,
-):
-    if mapspec is None:
-        path = _output_path(output_name, run_folder)
-        dump(output, path)
-    else:
-        shape = shapes[output_name]
-        path = _file_array_path(output_name, run_folder)
-        file_array = FileArray(path, shape)
-        if len(shape) > 1:
-            assert isinstance(output, np.ndarray)
-            output = output.flat
-        for i, item in enumerate(output):
-            key = mapspec.output_key(shape, i)
-            file_array.dump(key, item)
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
@@ -175,16 +137,16 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | tuple[int, ...]],
 ) -> None:
     if not RunInfo.path(run_folder).is_file():
         return
     old = RunInfo.load(run_folder, cache=False)
-    if manual_shapes != old.manual_shapes:
-        msg = "Manual shapes do not match previous run, cannot use `cleanup=False`."
+    if internal_shapes != old.internal_shapes:
+        msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    shapes, _ = map_shapes(pipeline, inputs, manual_shapes)
-    if shapes != old.shapes:
+    shapes = map_shapes(pipeline, inputs, internal_shapes)
+    if shapes.shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
@@ -211,7 +173,7 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    manual_shapes: dict[str, int | tuple[int, ...]]
+    internal_shapes: dict[str, tuple[int, ...]]
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
 
@@ -221,24 +183,24 @@ class RunInfo(NamedTuple):
         run_folder: str | Path,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = Path(run_folder)
-        manual_shapes = manual_shapes or {}
+        internal_shapes = internal_shapes or {}
         if cleanup:
             cleanup_run_folder(run_folder)
         else:
-            _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
+            _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
-        shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+        shapes = map_shapes(pipeline, inputs, internal_shapes)
         return cls(
             input_paths=input_paths,
-            shapes=shapes,
-            manual_shapes=manual_shapes,
-            shape_masks=masks,
+            shapes=shapes.shapes,
+            internal_shapes=shapes.internal_shapes,
+            shape_masks=shapes.masks,
             run_folder=run_folder,
         )
 
@@ -271,6 +233,7 @@ def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> Any:
@@ -279,18 +242,25 @@ def _load_parameter(
     if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
-    return FileArray(file_array_path, shapes[parameter])
+    return FileArray(
+        file_array_path,
+        shapes[parameter],
+        internal_shapes.get(parameter),
+        shape_masks[parameter],
+    )
 
 
 def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
+        p: _load_parameter(p, input_paths, shapes, internal_shapes, shape_masks, run_folder)
+        for p in func.parameters
     }
 
 
@@ -312,10 +282,19 @@ def _select_kwargs(
 def _init_file_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
+    internal_shape: tuple[int, ...] | None,
+    mask: tuple[bool, ...],
     run_folder: Path,
 ) -> list[FileArray]:
+    shape_mask = None if all(mask) else mask
+    external_shape = tuple(s for s, m in zip(shape, mask) if m)
     return [
-        FileArray(_file_array_path(output_name, run_folder), shape)
+        FileArray(
+            _file_array_path(output_name, run_folder),
+            external_shape,
+            internal_shape,
+            shape_mask,
+        )
         for output_name in at_least_tuple(output_name)
     ]
 
@@ -399,13 +378,16 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
     parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    mask = shape_masks[func.output_name]
+    internal_shape = internal_shapes.get(at_least_tuple(func.output_name)[0])
+    file_arrays = _init_file_arrays(func.output_name, shape, internal_shape, mask, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(
         _run_iteration_and_process,
@@ -457,7 +439,6 @@ def _maybe_load_single_output(
 def _execute_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     run_folder: Path,
 ) -> Any:
     # Load the output if it exists
@@ -472,21 +453,24 @@ def _execute_single(
     except Exception as e:
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
-    return _dump_output(func, output, shapes, run_folder)
+    return _dump_output(func, output, run_folder)
 
 
 class Shapes(NamedTuple):
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    internal_shapes: dict[str, tuple[int, ...]]
 
 
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, int | tuple[int | EllipsisType, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> Shapes:
-    if manual_shapes is None:
-        manual_shapes = {}
+    if internal_shapes is None:
+        internal_shapes = {}
+    internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
+
     map_parameters: set[str] = pipeline.map_parameters
 
     input_parameters = set(pipeline.topological_generations[0])
@@ -502,25 +486,21 @@ def map_shapes(
         for p in func.mapspec.input_names:
             if shape := shapes.get(p):
                 input_shapes[p] = shape
-            elif p in manual_shapes:
-                input_shapes[p] = at_least_tuple(manual_shapes[p])
+            elif p in internal:
+                input_shapes[p] = internal[p]
             else:
                 msg = (
                     f"Parameter `{p}` is used in map but its shape"
                     " cannot be inferred from the inputs."
-                    " Provide the shape manually in `manual_shapes`."
+                    " Provide the shape manually in `internal_shapes`."
                 )
                 raise ValueError(msg)
 
         output_shapes = {}
         for p in func.mapspec.output_names:
-            if p in manual_shapes:
-                shape = at_least_tuple(manual_shapes[p])
+            if p in internal:
+                shape = internal[p]
                 output_shapes[p] = shape
-                n_axis = len(func.mapspec.outputs[0].axes)
-                if len(output_shapes[p]) != n_axis:
-                    msg = f"Manual shape `{p}={shape}` should be of length `{n_axis}`."
-                    raise ValueError(msg)
 
         output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
         shapes[func.output_name] = output_shape
@@ -530,8 +510,8 @@ def map_shapes(
                 shapes[output_name] = output_shape
                 masks[output_name] = mask
 
-    assert all(k in shapes for k in map_parameters if k not in manual_shapes)
-    return Shapes(shapes, masks)
+    assert all(k in shapes for k in map_parameters if k not in internal)
+    return Shapes(shapes, masks, internal)
 
 
 def _maybe_load_file_array(x: Any) -> Any:
@@ -558,6 +538,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         func,
         run_info.input_paths,
         run_info.shapes,
+        run_info.internal_shapes,
         run_info.shape_masks,
         run_folder,
     )
@@ -566,12 +547,13 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
             func,
             kwargs,
             run_info.shapes,
+            run_info.internal_shapes,
             run_info.shape_masks,
             run_folder,
             parallel,
         )
     else:
-        output = _execute_single(func, kwargs, run_info.shapes, run_folder)
+        output = _execute_single(func, kwargs, run_folder)
 
     # Note that the kwargs still contain the FileArray objects if _execute_map_spec
     # was used. TODO: Fix this?
@@ -602,7 +584,7 @@ def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -621,7 +603,7 @@ def run(
     run_folder
         The folder to store the run information. If `None`, a temporary folder
         is created.
-    manual_shapes
+    internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
@@ -632,7 +614,7 @@ def run(
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     outputs = []
     for gen in pipeline.topological_generations[1]:
@@ -651,7 +633,14 @@ def load_outputs(
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     outputs = [
-        _load_parameter(on, run_info.input_paths, run_info.shapes, run_info.shape_masks, run_folder)
+        _load_parameter(
+            on,
+            run_info.input_paths,
+            run_info.shapes,
+            run_info.internal_shapes,
+            run_info.shape_masks,
+            run_folder,
+        )
         for on in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
