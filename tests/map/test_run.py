@@ -861,8 +861,8 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     assert shapes == {"x": (4,)}
     assert masks == {"x": (False,)}
     results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)
-    assert load_outputs("x", run_folder=tmp_path).tolist() == list(range(4))
-    # assert results[-1].output.tolist() == list(range(4))
+    assert load_outputs("x", run_folder=tmp_path) == list(range(4))
+    assert results[-1].output == list(range(4))
 
 
 def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:

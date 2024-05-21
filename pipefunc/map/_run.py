@@ -261,7 +261,6 @@ def _func_kwargs(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    manual_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
@@ -517,10 +516,9 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
-        run_info.manual_shapes,
         run_folder,
     )
-    if func.mapspec:
+    if func.mapspec and func.mapspec.inputs:
         output = _execute_map_spec(
             func,
             kwargs,
