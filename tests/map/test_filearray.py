@@ -588,3 +588,23 @@ def test_sliced_arange_splat(tmp_path: Path):
     assert (arr[0, 2, ::-1, -1] == np_arr[2, ::-1, -1]).all()
     assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
     assert (arr[0, :1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
+
+
+def test_exceptions(tmp_path: Path) -> None:
+    with pytest.raises(
+        ValueError,
+        match="internal_shape must be provided if shape_mask is provided",
+    ):
+        FileArray(tmp_path, shape=(1, 2), internal_shape=(2, 3))
+    with pytest.raises(
+        ValueError,
+        match="shape_mask must have the same length",
+    ):
+        FileArray(tmp_path, shape=(1, 2), internal_shape=(2, 3), shape_mask=(True, True, False))
+    arr = FileArray(tmp_path, shape=(2,))
+    arr.dump((0,), np.array([1, 2]))
+    with pytest.raises(
+        ValueError,
+        match="internal_shape must be provided if splat_internal is True",
+    ):
+        arr.to_array(splat_internal=True)
