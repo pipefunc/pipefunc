@@ -127,7 +127,13 @@ def _execute_iteration_in_single(
     output, exists = _maybe_load_single_output(func, run_folder, return_output=return_output)
     if exists:
         return output
-    kwargs = _func_kwargs(func, run_info.input_paths, run_info.shapes, run_folder)
+    kwargs = _func_kwargs(
+        func,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.shape_masks,
+        run_folder,
+    )
     result = _execute_single(func, kwargs, run_info.shapes, run_folder)
     return result if return_output else None
 
@@ -157,7 +163,13 @@ def _execute_iteration_in_map_spec(
         return [arr.get_from_index(index) for arr in file_arrays]
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
-    kwargs = _func_kwargs(func, run_info.input_paths, run_info.shapes, run_folder)
+    kwargs = _func_kwargs(
+        func,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.shape_masks,
+        run_folder,
+    )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, file_arrays)
     return outputs if return_output else None
 

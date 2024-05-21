@@ -271,11 +271,12 @@ def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
-    if parameter not in shapes:
+    if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
     return FileArray(file_array_path, shapes[parameter])
@@ -285,9 +286,12 @@ def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
-    return {p: _load_parameter(p, input_paths, shapes, run_folder) for p in func.parameters}
+    return {
+        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
+    }
 
 
 def _select_kwargs(
@@ -550,7 +554,13 @@ class Result(NamedTuple):
 
 def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Result]:  # noqa: FBT001
     run_info = RunInfo.load(run_folder)
-    kwargs = _func_kwargs(func, run_info.input_paths, run_info.shapes, run_folder)
+    kwargs = _func_kwargs(
+        func,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.shape_masks,
+        run_folder,
+    )
     if func.mapspec and func.mapspec.inputs:
         output = _execute_map_spec(
             func,
@@ -641,7 +651,7 @@ def load_outputs(
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     outputs = [
-        _load_parameter(on, run_info.input_paths, run_info.shapes, run_folder)
+        _load_parameter(on, run_info.input_paths, run_info.shapes, run_info.shape_masks, run_folder)
         for on in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
