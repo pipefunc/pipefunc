@@ -130,7 +130,7 @@ class MapSpec:
     def shape(
         self,
         input_shapes: dict[str, tuple[int, ...]],
-        output_shapes: dict[str, tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, tuple[int, ...]] | None = None,
     ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
@@ -138,31 +138,32 @@ class MapSpec:
         ----------
         input_shapes
             Shapes of the inputs, keyed by name.
-        output_shapes
+        internal_shapes
             Shapes of the outputs, keyed by name. Provide this only if the output
-            has an axis not shared with any input. If there are multiple output axes,
-            specify only the shape for the missing axis and use `...` for the rest.
-            For example, for the mapspec `x[i, j], y[j, k] -> z[i, j, k, l]` where only `l` is missing,
-            use `output_shapes={'z': (..., ..., ..., 5)}`, if `l` has a size of 5.
+            has an axis not shared with any input.
 
         """
         input_names = set(self.input_names)
-        _validate_shapes(input_names, input_shapes, self.inputs, output_shapes, self.output_names)
+        _validate_shapes(input_names, input_shapes, self.inputs, internal_shapes, self.output_names)
 
-        output_shapes = output_shapes or {}
+        internal_shapes = internal_shapes or {}
         shape = []
-        from_input = []
-        for index in self.outputs[0].axes:
+        mask = []
+        internal_shape_index = 0
+        output = self.outputs[0]
+        for index in output.axes:
+            assert isinstance(index, str)
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             if relevant_arrays:
                 dim = _get_common_dim(relevant_arrays, index, input_shapes)
                 shape.append(dim)
-                from_input.append(True)
+                mask.append(True)
             else:
-                dim = _get_output_dim(self.outputs, output_shapes, index)
+                dim = _get_output_dim(output, internal_shapes, internal_shape_index)
                 shape.append(dim)
-                from_input.append(False)
-        return tuple(shape), tuple(from_input)
+                mask.append(False)
+                internal_shape_index += 1
+        return tuple(shape), tuple(mask)
 
     def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
@@ -415,7 +416,7 @@ def _validate_shapes(
     input_names: set[str],
     input_shapes: dict[str, tuple[int, ...]],
     inputs: tuple[ArraySpec, ...],
-    output_shapes: dict[str, tuple[int, ...]] | None,
+    internal_shapes: dict[str, tuple[int, ...]] | None,
     output_names: tuple[str, ...],
 ) -> None:
     if extra_names := set(input_shapes.keys()) - input_names:
@@ -427,10 +428,10 @@ def _validate_shapes(
     for x in inputs:
         x.validate(input_shapes[x.name])
 
-    if output_shapes:
-        for output_name in output_shapes:
+    if internal_shapes:
+        for output_name in internal_shapes:
             if output_name not in output_names:
-                msg = f"Output array `{output_name}` is not accepted by this map."
+                msg = f"Internal shape of `{output_name}` is not accepted by this map."
                 raise ValueError(msg)
 
 
@@ -452,30 +453,18 @@ def _get_common_dim(
 
 
 def _get_output_dim(
-    outputs: tuple[ArraySpec, ...],
-    output_shapes: dict[str, tuple[int, ...]],
-    index: str,
+    output: ArraySpec,
+    internal_shapes: dict[str, tuple[int, ...]],
+    internal_shape_index: int,
 ) -> int:
-    if not output_shapes:
-        msg = (
-            f"Output array has an axis `{index}` not shared with any input, "
-            "but `output_shapes` is not provided."
-        )
+    if output.name not in internal_shapes:
+        msg = f"Internal shape for '{output.name}' is missing."
         raise ValueError(msg)
-
-    output_axis = outputs[0].axes.index(index)
-    output_dim = next(
-        (
-            output_shape[output_axis]
-            for output_shape in output_shapes.values()
-            if len(output_shape) > output_axis and output_shape[output_axis] is not ...
-        ),
-        None,
-    )
-    if output_dim is None:
-        msg = (
-            f"Output array has an axis `{index}` not shared with any input, "
-            f"but `output_shapes` does not provide a shape for it."
-        )
+    if internal_shape_index >= len(internal_shapes[output.name]):
+        msg = f"Internal shape for '{output.name}' is too short."
         raise ValueError(msg)
-    return output_dim
+    dim = internal_shapes[output.name][internal_shape_index]
+    if not isinstance(dim, int):
+        msg = f"Internal shape for '{output.name}' must be a tuple of integers."
+        raise TypeError(msg)
+    return dim
