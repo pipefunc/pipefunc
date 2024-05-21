@@ -152,7 +152,7 @@ class MapSpec:
         output_shapes = output_shapes or {}
         shape = []
         from_input = []
-        for index in self.outputs[0].indices:
+        for index in self.outputs[0].axes:
             relevant_arrays = [x for x in self.inputs if index in x.indices]
             if relevant_arrays:
                 dim = _get_common_dim(relevant_arrays, index, input_shapes)

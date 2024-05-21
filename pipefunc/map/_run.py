@@ -103,7 +103,12 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
-def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
+def _dump_output(
+    func: PipeFunc,
+    output: Any,
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    run_folder: Path,
+) -> Any:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -113,14 +118,46 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, run_folder)
-            dump(output, path)
+            _dump_to_single_or_file_array(
+                _output,
+                output_name,
+                func.mapspec,
+                shapes,
+                run_folder,
+            )
         output = new_output
     else:
-        path = _output_path(func.output_name, run_folder)
-        dump(output, path)
+        _dump_to_single_or_file_array(
+            output,
+            func.output_name,
+            func.mapspec,
+            shapes,
+            run_folder,
+        )
 
     return output
+
+
+def _dump_to_single_or_file_array(
+    output: Any,
+    output_name: str,
+    mapspec: MapSpec | None,
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    run_folder: Path,
+):
+    if mapspec is None:
+        path = _output_path(output_name, run_folder)
+        dump(output, path)
+    else:
+        shape = shapes[output_name]
+        path = _file_array_path(output_name, run_folder)
+        file_array = FileArray(path, shape)
+        if len(shape) > 1:
+            assert isinstance(output, np.ndarray)
+            output = output.flat
+        for i, item in enumerate(output):
+            key = mapspec.output_key(shape, i)
+            file_array.dump(key, item)
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
@@ -230,42 +267,27 @@ def _file_array_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / output_name
 
 
-def _filearray_shape(
-    parameter: _OUTPUT_TYPE,
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-) -> tuple[int, ...]:
-    shape = shapes[parameter]
-    mask = shape_masks[parameter]
-    return tuple(s for s, m in zip(shape, mask) if m)
-
-
 def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
-    if parameter not in shapes or not any(shape_masks[parameter]):
+    if parameter not in shapes:
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
-    save_shape = _filearray_shape(parameter, shapes, shape_masks)
-    return FileArray(file_array_path, save_shape)
+    return FileArray(file_array_path, shapes[parameter])
 
 
 def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
-    return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
-    }
+    return {p: _load_parameter(p, input_paths, shapes, run_folder) for p in func.parameters}
 
 
 def _select_kwargs(
@@ -380,13 +402,12 @@ def _execute_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
-    save_shape = _filearray_shape(func.output_name, shapes, shape_masks)
-    result_arrays = _init_result_arrays(func.output_name, save_shape)
+    result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
-        shape=save_shape,
+        shape=shape,
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)
@@ -429,7 +450,12 @@ def _maybe_load_single_output(
     return None, False
 
 
-def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+def _execute_single(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    run_folder: Path,
+) -> Any:
     # Load the output if it exists
     output, exists = _maybe_load_single_output(func, run_folder)
     if exists:
@@ -442,14 +468,19 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     except Exception as e:
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
-    return _dump_output(func, output, run_folder)
+    return _dump_output(func, output, shapes, run_folder)
+
+
+class Shapes(NamedTuple):
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
+    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
 
 
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     manual_shapes: dict[str, int | tuple[int | EllipsisType, ...]] | None = None,
-) -> tuple[dict[_OUTPUT_TYPE, tuple[int, ...]], dict[_OUTPUT_TYPE, tuple[bool, ...]]]:
+) -> Shapes:
     if manual_shapes is None:
         manual_shapes = {}
     map_parameters: set[str] = pipeline.map_parameters
@@ -476,9 +507,17 @@ def map_shapes(
                     " Provide the shape manually in `manual_shapes`."
                 )
                 raise ValueError(msg)
-        output_shapes = {
-            k: manual_shapes[k] for k in func.mapspec.output_names if k in manual_shapes
-        }
+
+        output_shapes = {}
+        for p in func.mapspec.output_names:
+            if p in manual_shapes:
+                shape = at_least_tuple(manual_shapes[p])
+                output_shapes[p] = shape
+                n_axis = len(func.mapspec.outputs[0].axes)
+                if len(output_shapes[p]) != n_axis:
+                    msg = f"Manual shape `{p}={shape}` should be of length `{n_axis}`."
+                    raise ValueError(msg)
+
         output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
         shapes[func.output_name] = output_shape
         masks[func.output_name] = mask
@@ -488,7 +527,7 @@ def map_shapes(
                 masks[output_name] = mask
 
     assert all(k in shapes for k in map_parameters if k not in manual_shapes)
-    return shapes, masks
+    return Shapes(shapes, masks)
 
 
 def _maybe_load_file_array(x: Any) -> Any:
@@ -511,13 +550,7 @@ class Result(NamedTuple):
 
 def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Result]:  # noqa: FBT001
     run_info = RunInfo.load(run_folder)
-    kwargs = _func_kwargs(
-        func,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        run_folder,
-    )
+    kwargs = _func_kwargs(func, run_info.input_paths, run_info.shapes, run_folder)
     if func.mapspec and func.mapspec.inputs:
         output = _execute_map_spec(
             func,
@@ -528,7 +561,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
             parallel,
         )
     else:
-        output = _execute_single(func, kwargs, run_folder)
+        output = _execute_single(func, kwargs, run_info.shapes, run_folder)
 
     # Note that the kwargs still contain the FileArray objects if _execute_map_spec
     # was used. TODO: Fix this?
@@ -608,13 +641,7 @@ def load_outputs(
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     outputs = [
-        _load_parameter(
-            on,
-            run_info.input_paths,
-            run_info.shapes,
-            run_info.shape_masks,
-            run_folder,
-        )
+        _load_parameter(on, run_info.input_paths, run_info.shapes, run_folder)
         for on in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]

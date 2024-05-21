@@ -71,7 +71,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            generate_seeds,
+            (generate_seeds, "... -> x[i]"),
             (double_it, "x[i] -> y[i]"),
             take_sum,
         ],

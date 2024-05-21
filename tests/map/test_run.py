@@ -242,7 +242,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            generate_ints,
+            (generate_ints, "... -> x[i]"),
             (double_it, "x[i] -> y[i]"),
             take_sum,
         ],
@@ -323,7 +323,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            generate_array,
+            (generate_array, "... -> array[i, j, k]"),
             (double_it, "array[i, :, :] -> vector[i]"),
             norm,
         ],
@@ -341,8 +341,8 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
     shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
-    assert all(all(mask) for mask in masks.values())
-    assert shapes == {"vector": (1,)}
+    assert shapes == {"array": (1, 2, 3), "vector": (1,)}
+    assert masks == {"array": (False, False, False), "vector": (True,)}
 
 
 @dataclass(frozen=True)
@@ -861,7 +861,23 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     assert shapes == {"x": (4,)}
     assert masks == {"x": (False,)}
     results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
-    assert load_outputs("x", run_folder=tmp_path) == list(range(4))
+    assert load_outputs("x", run_folder=tmp_path).tolist() == list(range(4))
+    assert results[-1].output == list(range(4))
+
+
+def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> list[int]:
+        return [a + b, a - b]
+
+    pipeline = Pipeline([(f, "b[i] -> c[i, j]")])
+    inputs = {"a": 1, "b": [1, 2]}
+    manual_shapes = {"c": (..., 2)}
+    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
+    assert shapes == {"b": (2,), "c": (2, 2)}
+    assert masks == {"b": (True,), "c": (True, False)}
+    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
+    assert load_outputs("c", run_folder=tmp_path) == list(range(4))
     assert results[-1].output == list(range(4))
 
 
@@ -884,7 +900,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            generate_ints,
+            (generate_ints, "... -> x[i]"),
             (double_it, "x[i] -> y[i]"),
             side_chain,
             take_sum,
