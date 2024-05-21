@@ -153,22 +153,19 @@ class FileArray:
         internal_shape_index = 0
         normalized_key = self._normalize_key(key)
         for k, m in zip(normalized_key, self.shape_mask):
+            shape = self.shape if m else self.internal_shape
+            index = shape_index if m else internal_shape_index
+
+            if isinstance(k, slice):
+                slice_indices.append(range(*k.indices(shape[index])))
+            else:
+                slice_indices.append(range(k, k + 1))
+
             if m:
-                if isinstance(k, slice):
-                    slice_indices.append(
-                        range(*k.indices(self.shape[shape_index])),
-                    )
-                else:
-                    slice_indices.append(range(k, k + 1))
                 shape_index += 1
             else:
-                if isinstance(k, slice):
-                    slice_indices.append(
-                        range(*k.indices(self.internal_shape[internal_shape_index])),
-                    )
-                else:
-                    slice_indices.append(range(k, k + 1))
                 internal_shape_index += 1
+
         return slice_indices
 
     def _iterate_shape_indices(self, shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
@@ -208,6 +205,7 @@ class FileArray:
                     sub_array = load(file)
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
+                        sub_array = np.asarray(sub_array)  # could be a list
                         sliced_sub_array = sub_array[internal_index]
                         sliced_data.append(sliced_sub_array)
                     else:
@@ -237,7 +235,7 @@ class FileArray:
             return sub_array[internal_indices]
         return sub_array
 
-    def to_array(self, *, splat_internal: bool = False) -> np.ma.core.MaskedArray:
+    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
 
         The returned numpy array has dtype "object" and a mask for
@@ -247,6 +245,7 @@ class FileArray:
         ----------
         splat_internal : bool
             If True, the internal array dimensions will be splatted out.
+            If None, it will happen if and only if `internal_shape` is provided.
 
         Returns
         -------
@@ -254,6 +253,9 @@ class FileArray:
             The array containing all the data.
 
         """
+        if splat_internal is None:
+            splat_internal = bool(self.internal_shape)
+
         items = _load_all(map(self._index_to_file, range(self.size)))
 
         if not splat_internal:
@@ -275,6 +277,7 @@ class FileArray:
 
             if file.is_file():
                 sub_array = load(file)
+                sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in self._iterate_shape_indices(self.internal_shape):
                     full_index = self._construct_full_index(external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]

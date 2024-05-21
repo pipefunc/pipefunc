@@ -420,7 +420,7 @@ def test_file_array_with_internal_arrays_full_array(tmp_path: Path):
     arr.dump((1, 1), data2)
 
     # Test retrieving the entire array
-    result = arr.to_array()
+    result = arr.to_array(splat_internal=False)
     assert result.shape == (2, 2)
     assert np.array_equal(result[0, 0], data1)
     assert result[0, 1] is np.ma.masked
@@ -506,7 +506,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Pa
     arr.dump((0, 0), data1)
     arr.dump((1, 1), data2)
 
-    assert arr.to_array().shape == (2, 2)
+    assert arr.to_array(splat_internal=False).shape == (2, 2)
     assert arr.to_array(splat_internal=True).shape == _full_shape(shape, internal_shape, shape_mask)
 
     # Test slicing
@@ -568,7 +568,10 @@ def test_sliced_arange_splat(tmp_path: Path):
     shape = (1,)
     internal_shape = (3, 4, 5)
     arr = FileArray(
-        folder, shape, internal_shape=internal_shape, shape_mask=(True, False, False, False)
+        folder,
+        shape,
+        internal_shape=internal_shape,
+        shape_mask=(True, False, False, False),
     )
     np_arr = np.arange(prod(internal_shape)).reshape(internal_shape)
     arr.dump((0,), np_arr)
@@ -585,3 +588,38 @@ def test_sliced_arange_splat(tmp_path: Path):
     assert (arr[0, 2, ::-1, -1] == np_arr[2, ::-1, -1]).all()
     assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
     assert (arr[0, :1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
+
+
+def test_exceptions(tmp_path: Path) -> None:
+    with pytest.raises(
+        ValueError,
+        match="internal_shape must be provided if shape_mask is provided",
+    ):
+        FileArray(tmp_path, shape=(1, 2), internal_shape=(2, 3))
+    with pytest.raises(
+        ValueError,
+        match="shape_mask must have the same length",
+    ):
+        FileArray(tmp_path, shape=(1, 2), internal_shape=(2, 3), shape_mask=(True, True, False))
+    arr = FileArray(tmp_path, shape=(2,))
+    arr.dump((0,), np.array([1, 2]))
+    with pytest.raises(
+        ValueError,
+        match="internal_shape must be provided if splat_internal is True",
+    ):
+        arr.to_array(splat_internal=True)
+
+
+@pytest.mark.parametrize("typ", [list, np.array])
+def test_internal_shape_list(typ: type, tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, shape=(2,), internal_shape=(2,), shape_mask=(True, False))
+    arr.dump((0,), typ([1, 2]))
+    arr.dump((1,), typ([3, 4]))
+    if typ == list:
+        assert arr[0, :].tolist() == [1, 2]
+        assert arr[1, :].tolist() == [3, 4]
+    else:
+        assert arr[0, :].tolist() == [1, 2]
+        assert arr[1, :].tolist() == [3, 4]
+    assert arr.to_array().tolist() == [[1, 2], [3, 4]]
+    assert arr[:, :].shape == (2, 2)
