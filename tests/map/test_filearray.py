@@ -608,3 +608,18 @@ def test_exceptions(tmp_path: Path) -> None:
         match="internal_shape must be provided if splat_internal is True",
     ):
         arr.to_array(splat_internal=True)
+
+
+@pytest.mark.parametrize("typ", [list, np.array])
+def test_internal_shape_list(typ: type, tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, shape=(2,), internal_shape=(2,), shape_mask=(True, False))
+    arr.dump((0,), typ([1, 2]))
+    arr.dump((1,), typ([3, 4]))
+    if typ == list:
+        assert arr[0, :].tolist() == [1, 2]
+        assert arr[1, :].tolist() == [3, 4]
+    else:
+        assert arr[0, :].tolist() == [1, 2]
+        assert arr[1, :].tolist() == [3, 4]
+    assert arr.to_array().tolist() == [[1, 2], [3, 4]]
+    assert arr[:, :].shape == (2, 2)

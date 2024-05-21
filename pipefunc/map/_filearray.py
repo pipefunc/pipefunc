@@ -205,6 +205,7 @@ class FileArray:
                     sub_array = load(file)
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
+                        sub_array = np.asarray(sub_array)  # could be a list
                         sliced_sub_array = sub_array[internal_index]
                         sliced_data.append(sliced_sub_array)
                     else:
@@ -276,6 +277,7 @@ class FileArray:
 
             if file.is_file():
                 sub_array = load(file)
+                sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in self._iterate_shape_indices(self.internal_shape):
                     full_index = self._construct_full_index(external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
