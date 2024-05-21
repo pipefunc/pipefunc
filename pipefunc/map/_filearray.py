@@ -82,7 +82,7 @@ class FileArray:
             raise IndexError(msg)
 
         normalized_key: list[int | slice] = []
-        shape_index = 0  # To keep track of the index in the shape
+        shape_index = 0
         for axis, k in enumerate(key):
             if self.shape_mask[axis]:
                 axis_size = self.shape[shape_index]
@@ -123,70 +123,85 @@ class FileArray:
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
-        shape_index = 0  # To keep track of the index in the shape
+        shape_index = 0
+        internal_shape_index = 0
         for k, mask in zip(key, self.shape_mask):
             if mask:
                 if isinstance(k, slice):
                     slice_indices.append(range(*k.indices(self.shape[shape_index])))
                 else:
                     slice_indices.append(range(k, k + 1))
-                shape_index += 1  # Only increment when shape_mask is True
-            elif isinstance(k, slice):
-                slice_indices.append(
-                    range(*k.indices(self.internal_shape[shape_index - len(self.shape)])),
-                )
+                shape_index += 1
             else:
-                slice_indices.append(range(k, k + 1))
+                if isinstance(k, slice):
+                    slice_indices.append(
+                        range(*k.indices(self.internal_shape[internal_shape_index])),
+                    )
+                else:
+                    slice_indices.append(range(k, k + 1))
+                internal_shape_index += 1
         return slice_indices
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
-        print(f"Getting item with key: {key}")  # Debugging statement
-        key = self._normalize_key(key)
-        print(f"Normalized key: {key}")  # Debugging statement
+        normalized_key = self._normalize_key(key)
+        external_indices = tuple(idx for idx, mask in zip(normalized_key, self.shape_mask) if mask)
+        internal_indices = tuple(
+            idx for idx, mask in zip(normalized_key, self.shape_mask) if not mask
+        )
 
-        if any(isinstance(k, slice) for k in key):
-            slice_indices = self._slice_indices(key)
+        if any(isinstance(k, slice) for k in external_indices):
+            slice_indices = self._slice_indices(normalized_key)
             sliced_data = []
             sliced_mask = []
 
             for index in itertools.product(*slice_indices):
-                file = self._key_to_file(index)
+                file = self._key_to_file(index[: len(self.shape)])
                 if file.is_file():
                     sub_array = load(file)
-                    internal_index = tuple(k for k, mask in zip(key, self.shape_mask) if not mask)
+                    internal_index = tuple(
+                        idx for idx, mask in zip(index, self.shape_mask) if not mask
+                    )
                     if internal_index:
-                        sliced_data.append(sub_array[internal_index])
-                        sliced_mask.append(False)
+                        sliced_sub_array = sub_array
+                        for idx in internal_index:
+                            sliced_sub_array = sliced_sub_array[idx]
+                        sliced_data.append(sliced_sub_array)
                     else:
                         sliced_data.append(sub_array)
-                        sliced_mask.append(False)
+                    sliced_mask.append(False)
                 else:
                     sliced_data.append(np.ma.masked)
                     sliced_mask.append(True)
 
-            print(f"Sliced data: {sliced_data}")  # Debugging statement
+            if all(isinstance(item, np.ndarray) for item in sliced_data):
+                data = np.stack(sliced_data)
+                mask = np.array(sliced_mask).reshape(data.shape)
+                sliced_array = np.ma.masked_array(data, mask=mask, dtype=object)
+            else:
+                sliced_array = np.array(sliced_data, dtype=object)
+                mask = np.array(sliced_mask, dtype=bool)
+                sliced_array = np.ma.masked_array(sliced_array, mask=mask)
 
-            sliced_array = np.ma.masked_array(sliced_data, mask=sliced_mask, dtype=object)
-
-            # Determine the new shape based on the sliced dimensions
             new_shape = tuple(
-                len(range_) if isinstance(k, slice) else None
-                for k, range_ in zip(key, slice_indices)
+                len(range_) if isinstance(k, slice) else 1
+                for k, range_ in zip(normalized_key, slice_indices)
             )
-            new_shape = tuple(filter(None, new_shape))
-            print(f"New shape: {new_shape}")  # Debugging statement
+            new_shape = tuple(filter(lambda x: x != 1, new_shape))
 
-            return sliced_array.reshape(new_shape)
+            if sliced_array.size != np.prod(new_shape):
+                raise ValueError(
+                    f"Cannot reshape array of size {sliced_array.size} into shape {new_shape}",
+                )
 
-        file = self._key_to_file(key)  # type: ignore[arg-type]
+            return sliced_array.reshape(new_shape) if sliced_array.size else sliced_array
+
+        file = self._key_to_file(external_indices)
         if not file.is_file():
             return np.ma.masked
 
         sub_array = load(file)
-        internal_index = tuple(k for k, mask in zip(key, self.shape_mask) if not mask)
-        print(f"Sub-array: {sub_array}, Internal index: {internal_index}")  # Debugging statement
-        if internal_index:
-            return sub_array[internal_index]
+        if internal_indices:
+            return sub_array[internal_indices]
         return sub_array
 
     def to_array(self, splat_internal: bool = False) -> np.ma.core.MaskedArray:

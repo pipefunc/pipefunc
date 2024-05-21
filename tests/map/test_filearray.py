@@ -404,26 +404,6 @@ def test_file_array_with_internal_arrays_full_array(tmp_path: Path):
     assert np.array_equal(result[1, 1], data2)
 
 
-def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 2)
-    internal_shape = (3, 3, 4)
-    shape_mask = (False, True, True, False, False)
-
-    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
-
-    data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
-    data2 = np.ones(internal_shape)
-
-    arr.dump((0, 0), data1)
-    arr.dump((1, 1), data2)
-
-    # Test slicing
-    result = arr[0, 0, :, :, :]
-    expected = np.ma.array(data1, mask=False, dtype=object)
-    assert np.array_equal(result, expected)
-
-
 def test_file_array_with_internal_arrays_splat(tmp_path: Path):
     folder = Path(tmp_path)
     shape = (2, 2)
@@ -446,3 +426,69 @@ def test_file_array_with_internal_arrays_splat(tmp_path: Path):
     assert np.ma.is_masked(result[0, 1])
     assert np.ma.is_masked(result[1, 0])
     assert np.array_equal(result[1, 1], data2)
+
+
+# def test_file_array_with_internal_arrays_splat(tmp_path: Path):
+#     folder = Path(tmp_path)
+#     shape = (2, 2)
+#     internal_shape = (3, 3, 4)
+#     shape_mask = (False, True, True, False, False)
+
+#     arr = FileArray(folder, shape, shape_mask=shape_mask)
+
+#     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
+#     data2 = np.ones(internal_shape)
+
+#     arr.dump((0, 0), data1)
+#     arr.dump((1, 1), data2)
+
+#     # Test retrieving the entire array with splat_internal=True
+#     result = arr.to_array(splat_internal=True)
+#     expected_shape = (3, 2, 2, 3, 4)
+#     assert result.shape == expected_shape
+
+
+def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (2, 2)
+    internal_shape = (3, 3, 4)
+    shape_mask = (False, True, True, False, False)
+
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
+
+    data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
+    data2 = np.ones(internal_shape)
+
+    arr.dump((0, 0), data1)
+    arr.dump((1, 1), data2)
+
+    # Test slicing
+    result = arr[0, 0, :, :, :]
+    expected = np.ma.array(data1, mask=False, dtype=object)
+    print("Expected data:")
+    print(expected)
+    print("Result data:")
+    print(result)
+    assert np.array_equal(
+        result,
+        expected,
+    ), f"Arrays are not equal!\nResult:\n{result}\nExpected:\n{expected}"
+
+
+def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (1,)
+    internal_shape = (2,)
+    shape_mask = (True, False)  # means shape is (1, 2)
+
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
+
+    data1 = np.array([42, 69])
+
+    arr.dump((0,), data1)
+
+    result = arr[:, :]
+    assert result.shape == (1, 2)
+    expected = data1.reshape(1, 2)
+    expected = np.ma.array(expected, mask=False, dtype=object)
+    assert np.array_equal(result, expected)
