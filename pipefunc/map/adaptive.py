@@ -157,7 +157,7 @@ def _execute_iteration_in_map_spec(
     """
     shape = run_info.shapes[func.output_name]
     name = at_least_tuple(func.output_name)[0]
-    internal_shape = run_info.internal_shapes[name]
+    internal_shape = run_info.internal_shapes.get(name)
     mask = run_info.shape_masks[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, internal_shape, mask, run_folder)
     # Load the data if it exists
