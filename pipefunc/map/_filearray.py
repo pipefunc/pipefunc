@@ -91,7 +91,6 @@ class FileArray:
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        print(f"_normalize_key called with key: {key}, for_dump: {for_dump}")
         if not isinstance(key, tuple):
             key = (key,)
 
@@ -125,7 +124,6 @@ class FileArray:
                     raise IndexError(msg)
                 normalized_key.append(normalized_k)
 
-        print(f"Normalized key result: {normalized_key}")
         return tuple(normalized_key)
 
     def _index_to_file(self, index: int) -> Path:
@@ -150,7 +148,6 @@ class FileArray:
         return (self._key_to_file(x) for x in itertools.product(*map(range, self.shape)))
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
-        print(f"_slice_indices called with key: {key}")
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0
@@ -172,32 +169,23 @@ class FileArray:
                 else:
                     slice_indices.append(range(k, k + 1))
                 internal_shape_index += 1
-        print(f"Slice indices result: {slice_indices}")
         return slice_indices
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
-        print(f"__getitem__ called with key: {key}")
         normalized_key = self._normalize_key(key)
-        print(f"Normalized key: {normalized_key}")
         external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
         internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
-        print(f"External indices: {external_indices}")
-        print(f"Internal indices: {internal_indices}")
 
         if any(isinstance(k, slice) for k in normalized_key):
             slice_indices = self._slice_indices(key)
-            print(f"Slice indices: {slice_indices}")
             sliced_data = []
             sliced_mask = []
 
             for index in itertools.product(*slice_indices):
                 file_key = tuple(i for i, m in zip(index, self.shape_mask) if m)
                 file = self._key_to_file(file_key)
-                print(f"File key: {file_key}")
-                print(f"File path: {file}")
                 if file.is_file():
                     sub_array = load(file)
-                    print(f"Loaded sub-array: {sub_array}")
                     internal_index = tuple(i for i, m in zip(index, self.shape_mask) if not m)
                     if internal_index:
                         sliced_sub_array = sub_array[internal_index]
@@ -206,7 +194,6 @@ class FileArray:
                         sliced_data.append(sub_array)
                     sliced_mask.append(False)
                 else:
-                    print(f"File not found: {file}")
                     sliced_data.append(np.ma.masked)
                     sliced_mask.append(True)
 
@@ -219,7 +206,6 @@ class FileArray:
                 for k, range_ in zip(normalized_key, slice_indices)
                 if isinstance(k, slice)
             )
-            print(f"New shape: {new_shape}")
             return sliced_array.reshape(new_shape)  # .squeeze()
 
         file = self._key_to_file(external_indices)
@@ -227,12 +213,8 @@ class FileArray:
             return np.ma.masked
 
         sub_array = load(file)
-        print(f"Loaded sub-array: {sub_array}")
         if internal_indices:
-            result = sub_array[internal_indices]
-            print(f"Result after internal indexing: {result}")
-            return result
-        print("Returning sub-array directly")
+            return sub_array[internal_indices]
         return sub_array
 
     def to_array(self, *, splat_internal: bool = False) -> np.ma.core.MaskedArray:
@@ -272,7 +254,6 @@ class FileArray:
             file = self._key_to_file(external_index)
 
             if file.is_file():
-                print(f"Loading file: {file}")
                 sub_array = load(file)
                 for internal_index in itertools.product(*map(range, self.internal_shape)):
                     full_index = []
@@ -280,29 +261,24 @@ class FileArray:
                     internal_idx = 0
                     for m in self.shape_mask:
                         if m:
-                            print(f"external_index[external_idx]: {external_index[external_idx]}")
                             full_index.append(external_index[external_idx])
                             external_idx += 1
                         else:
-                            print(f"internal_index[internal_idx]: {internal_index[internal_idx]}")
                             full_index.append(internal_index[internal_idx])
                             internal_idx += 1
                     full_index = tuple(full_index)  # type: ignore[assignment]
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                print(f"File not found: {file}")
                 for internal_index in itertools.product(*map(range, self.internal_shape)):
                     full_index = []
                     external_idx = 0
                     internal_idx = 0
                     for m in self.shape_mask:
                         if m:
-                            print(f"external_index[external_idx]: {external_index[external_idx]}")
                             full_index.append(external_index[external_idx])
                             external_idx += 1
                         else:
-                            print(f"internal_index[internal_idx]: {internal_index[internal_idx]}")
                             full_index.append(internal_index[internal_idx])
                             internal_idx += 1
                     full_index = tuple(full_index)  # type: ignore[assignment]

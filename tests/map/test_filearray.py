@@ -512,14 +512,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Pa
     # Test slicing
     result = arr[:, 0, 0, :, :]
     expected = np.ma.array(data1, mask=False, dtype=object)
-    print("Expected data:")
-    print(expected)
-    print("Result data:")
-    print(result)
-    assert np.array_equal(
-        result,
-        expected,
-    ), f"Arrays are not equal!\nResult:\n{result}\nExpected:\n{expected}"
+    assert np.array_equal(result, expected)
 
 
 def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_path: Path):
