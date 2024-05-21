@@ -151,8 +151,8 @@ class FileArray:
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0
-        normalized_key = self._normalize_key(key)  # Use the normalized key
-        for k, m in zip(normalized_key, self.shape_mask):  # Use the normalized key
+        normalized_key = self._normalize_key(key)
+        for k, m in zip(normalized_key, self.shape_mask):
             if m:
                 if isinstance(k, slice):
                     slice_indices.append(
@@ -305,7 +305,7 @@ class FileArray:
         Examples
         --------
         >>> arr = FileArray(...)
-        >>> arr.dump((2, 1, 5), np.array([1, 2, 3]))
+        >>> arr.dump((2, 1, 5), dict(a=1, b=2)))
 
         """
         key = self._normalize_key(key, for_dump=True)

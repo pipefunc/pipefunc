@@ -561,3 +561,27 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     expected = data1
     expected = np.ma.array(expected, mask=False, dtype=object)
     assert np.array_equal(result, expected)
+
+
+def test_sliced_arange_splat(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (1,)
+    internal_shape = (3, 4, 5)
+    arr = FileArray(
+        folder, shape, internal_shape=internal_shape, shape_mask=(True, False, False, False)
+    )
+    np_arr = np.arange(prod(internal_shape)).reshape(internal_shape)
+    arr.dump((0,), np_arr)
+
+    assert (arr[0, :, :, :] == np_arr[:, :, :]).all()
+    assert (arr[0, :, ::2, :] == np_arr[:, ::2, :]).all()
+    assert (arr[0, :, ::3, :] == np_arr[:, ::3, :]).all()
+    assert (arr[0, :, ::-1, :] == np_arr[:, ::-1, :]).all()
+    assert (arr[0, :, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
+    assert (arr[0, 1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
+    assert (arr[0, 1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
+    assert (arr[0, 1:, ::-1, ::-1] == np_arr[1:, ::-1, ::-1]).all()
+    assert (arr[0, 1:, ::-1, -1] == np_arr[1:, ::-1, -1]).all()
+    assert (arr[0, 2, ::-1, -1] == np_arr[2, ::-1, -1]).all()
+    assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
+    assert (arr[0, :1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
