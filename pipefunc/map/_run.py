@@ -31,10 +31,10 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
-    if sys.version_info < (3, 11):  # pragma: no cover
-        pass
+    if sys.version_info < (3, 10):  # pragma: no cover
+        EllipsisType: TypeAlias = type(...)
     else:
-        pass
+        from typing import EllipsisType
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
@@ -231,10 +231,10 @@ def _file_array_path(output_name: str, run_folder: Path) -> Path:
 
 
 def _filearray_shape(
-    parameter: str,
+    parameter: _OUTPUT_TYPE,
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-):
+) -> tuple[int, ...]:
     shape = shapes[parameter]
     mask = shape_masks[parameter]
     return tuple(s for s, m in zip(shape, mask) if m)
@@ -448,7 +448,7 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    manual_shapes: dict[str, int | tuple[int | EllipsisType, ...]] | None = None,
 ) -> tuple[dict[_OUTPUT_TYPE, tuple[int, ...]], dict[_OUTPUT_TYPE, tuple[bool, ...]]]:
     if manual_shapes is None:
         manual_shapes = {}
@@ -479,7 +479,7 @@ def map_shapes(
         output_shapes = {
             k: manual_shapes[k] for k in func.mapspec.output_names if k in manual_shapes
         }
-        output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)
+        output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
         shapes[func.output_name] = output_shape
         masks[func.output_name] = mask
         if isinstance(func.output_name, tuple):

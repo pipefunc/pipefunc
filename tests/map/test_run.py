@@ -857,10 +857,10 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     pipeline = Pipeline([(generate_ints, "... -> x[i]")])
     inputs = {"n": 4}
     manual_shapes = {"x": (4,)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
     assert shapes == {"x": (4,)}
     assert masks == {"x": (False,)}
-    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)
+    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
     assert load_outputs("x", run_folder=tmp_path) == list(range(4))
     assert results[-1].output == list(range(4))
 
@@ -894,7 +894,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     inputs = {"n": 4, "z": 1}
     manual_shapes = {"x": (4,)}
     assert pipeline.mapspec_axes() == {"x": ("i",), "y": ("i",)}
-    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)
+    shapes, masks = map_shapes(pipeline, inputs, manual_shapes)  # type: ignore[arg-type]
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"y": (4,)}
     results = pipeline.map(inputs, tmp_path, manual_shapes=manual_shapes, parallel=False)  # type: ignore[arg-type]
