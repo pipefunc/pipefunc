@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import FileArray, _load_all, dump, load
+from pipefunc.map._filearray import FileArray, _load_all, dump, load, _full_shape
 
 
 def test_load_and_dump(tmp_path):
@@ -500,6 +500,8 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     shape = (1,)
     internal_shape = (2,)
     shape_mask = (True, False)  # means shape is (1, 2)
+    full_shape = _full_shape(shape, internal_shape, shape_mask)
+    assert full_shape == (1, 2)
 
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
@@ -507,11 +509,11 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
 
     arr.dump((0,), data1)
 
-    r = arr.to_array()
-    assert r.shape == (1, 2)
+    r = arr.to_array(splat_internal=True)
+    assert r.shape == full_shape
 
     result = arr[:, :]
-    assert result.shape == (1, 2)
+    assert result.shape == full_shape
     expected = data1.reshape(1, 2)
     expected = np.ma.array(expected, mask=False, dtype=object)
     assert np.array_equal(result, expected)

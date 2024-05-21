@@ -233,7 +233,8 @@ class FileArray:
 
         if splat_internal:
             if not self.internal_shape:
-                raise ValueError("internal_shape must be provided if splat_internal is True")
+                msg = "internal_shape must be provided if splat_internal is True"
+                raise ValueError(msg)
 
             full_shape = _full_shape(self.shape, self.internal_shape, self.shape_mask)
             arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
