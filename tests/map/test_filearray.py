@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import FileArray, _load_all, dump, load, _full_shape
+from pipefunc.map._filearray import FileArray, _full_shape, _load_all, dump, load
 
 
 def test_load_and_dump(tmp_path):
@@ -180,8 +180,8 @@ def test_file_array_slice_indices(tmp_path: Path):
     indices = arr._slice_indices(key)
     assert indices == [range(1), range(3), range(1, 3)]
 
-    key = (slice(None), 1, slice(None, None, 2))
-    indices = arr._slice_indices(key)
+    key2 = (slice(None), 1, slice(None, None, 2))
+    indices = arr._slice_indices(key2)
     assert indices == [range(2), range(1, 2), range(0, 4, 2)]
 
 
@@ -194,9 +194,9 @@ def test_file_array_normalize_key_with_slicing(tmp_path: Path):
     normalized_key = arr._normalize_key(key)
     assert normalized_key == (0, slice(None, None, None), 1)
 
-    key = (slice(None), -1, slice(1, None, 2))
-    normalized_key = arr._normalize_key(key)
-    assert normalized_key == (slice(None, None, None), 2, slice(1, None, 2))
+    key2 = (slice(None), -1, slice(1, None, 2))
+    normalized_key2 = arr._normalize_key(key2)
+    assert normalized_key2 == (slice(None, None, None), 2, slice(1, None, 2))
 
     with pytest.raises(IndexError):
         arr._normalize_key((0, slice(None), 10))
@@ -206,7 +206,7 @@ def test_high_dim_with_slicing(tmp_path: Path):
     folder = Path(tmp_path)
     shape = (2, 3, 4, 5)
     arr = FileArray(folder, shape)
-    np_arr = np.zeros(shape, dtype=object)
+    np_arr: np.ndarray = np.zeros(shape, dtype=object)
     np_arr[:] = np.ma.masked
     keys = [
         (0, 0, slice(None), 0),
@@ -250,19 +250,19 @@ def test_slice_indices_with_step_size(tmp_path: Path):
     arr = FileArray(folder, shape)
 
     # Test case 1: Slice indices with step size along one axis
-    key = (slice(0, 5, 2), 1, 2)
-    indices = arr._slice_indices(key)
-    assert indices == [range(0, 5, 2), range(1, 2), range(2, 3)]
+    key1 = (slice(0, 5, 2), 1, 2)
+    indices1 = arr._slice_indices(key1)
+    assert indices1 == [range(0, 5, 2), range(1, 2), range(2, 3)]
 
     # Test case 2: Slice indices with step size along multiple axes
-    key = (slice(1, 4, 2), slice(2, 5, 2), slice(3, 7, 3))
-    indices = arr._slice_indices(key)
-    assert indices == [range(1, 4, 2), range(2, 5, 2), range(3, 7, 3)]
+    key2 = (slice(1, 4, 2), slice(2, 5, 2), slice(3, 7, 3))
+    indices2 = arr._slice_indices(key2)
+    assert indices2 == [range(1, 4, 2), range(2, 5, 2), range(3, 7, 3)]
 
     # Test case 3: Slice indices with step size and negative indices
-    key = (slice(4, 1, -2), slice(5, 2, -2), slice(6, 1, -3))
-    indices = arr._slice_indices(key)
-    assert indices == [range(4, 1, -2), range(5, 2, -2), range(6, 1, -3)]
+    key3 = (slice(4, 1, -2), slice(5, 2, -2), slice(6, 1, -3))
+    indices3 = arr._slice_indices(key3)
+    assert indices3 == [range(4, 1, -2), range(5, 2, -2), range(6, 1, -3)]
 
 
 def test_key_to_file(tmp_path: Path):
@@ -301,14 +301,44 @@ def test_sliced_arange(tmp_path: Path):
     assert (arr[:1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
 
 
+def test_sliced_arange_minimal(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (1, 2)
+    arr = FileArray(folder, shape)
+    np_arr = np.arange(prod(shape)).reshape(shape)
+    for key in np.ndindex(shape):
+        arr.dump(key, np_arr[key])
+
+    assert (arr[:, 1] == np_arr[:, 1]).all()
+    assert (arr[0, -1] == np_arr[0, -1]).all()
+    assert (arr[:, -1] == np_arr[:, -1]).all()
+
+
+def test_sliced_arange_minimal2(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (2, 2, 4)
+    arr = FileArray(folder, shape)
+    np_arr = np.arange(prod(shape)).reshape(shape)
+    for key in np.ndindex(shape):
+        arr.dump(key, np_arr[key])
+
+    assert (arr[0, :, 1] == np_arr[0, :, 1]).all()
+    assert (arr[0, 0, -1] == np_arr[0, 0, -1]).all()
+    assert (arr[0, :, -1] == np_arr[0, :, -1]).all()
+    assert (arr[0, ::-1, 0] == np_arr[0, ::-1, 0]).all()
+    assert (arr[0, ::-1, -1] == np_arr[0, ::-1, -1]).all()
+    assert (arr[:, ::-1, -1] == np_arr[:, ::-1, -1]).all()
+    assert (arr[1:, ::-1, -1] == np_arr[1:, ::-1, -1]).all()
+
+
 def test_file_array_with_internal_arrays(tmp_path: Path):
     folder = Path(tmp_path)
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
-
-    arr = FileArray(folder, shape, shape_mask=shape_mask)
-
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
+    full_shape = (2, 2, 3, 3, 4)
+    assert _full_shape(shape, internal_shape, shape_mask) == full_shape
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
 
@@ -321,7 +351,7 @@ def test_file_array_with_internal_arrays(tmp_path: Path):
 
     # Test slicing that includes internal array dimensions
     result = arr[0, :, 1, 1, 1]
-    expected = np.ma.masked_array(
+    expected: np.ma.masked_array = np.ma.masked_array(
         [data1[1, 1, 1], np.ma.masked],
         mask=[False, True],
         dtype=object,
@@ -343,7 +373,7 @@ def test_file_array_with_internal_arrays_slicing(tmp_path: Path):
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
 
-    arr = FileArray(folder, shape, shape_mask=shape_mask)
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
@@ -353,15 +383,9 @@ def test_file_array_with_internal_arrays_slicing(tmp_path: Path):
 
     # Test full slicing including internal array dimensions
     result = arr[:, :, 1, 1, 1]
-    expected = np.ma.masked_array(
-        [
-            [data1[1, 1, 1], np.ma.masked],
-            [np.ma.masked, data2[1, 1, 1]],
-        ],
-        mask=[
-            [False, True],
-            [True, False],
-        ],
+    expected: np.ma.masked_array = np.ma.masked_array(
+        [[data1[1, 1, 1], np.ma.masked], [np.ma.masked, data2[1, 1, 1]]],
+        mask=[[False, True], [True, False]],
         dtype=object,
     )
     assert np.ma.allequal(result, expected)
@@ -387,7 +411,7 @@ def test_file_array_with_internal_arrays_full_array(tmp_path: Path):
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
 
-    arr = FileArray(folder, shape, shape_mask=shape_mask)
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
@@ -420,7 +444,7 @@ def test_file_array_with_internal_arrays_splat(tmp_path: Path):
 
     # Test retrieving the entire array with splat_internal=True
     result = arr.to_array(splat_internal=True)
-    expected_shape = (2, 2) + internal_shape
+    expected_shape = (2, 2, *internal_shape)
     assert result.shape == expected_shape
     assert np.array_equal(result[0, 0], data1)
     assert np.ma.is_masked(result[0, 1])
@@ -448,24 +472,24 @@ def test_file_array_with_internal_arrays_splat_different_order(tmp_path: Path):
     assert result.shape == expected_shape
 
 
-# def test_file_array_with_internal_arrays_splat(tmp_path: Path):
-#     folder = Path(tmp_path)
-#     shape = (2, 2)
-#     internal_shape = (3, 3, 4)
-#     shape_mask = (False, True, True, False, False)
+def test_file_array_with_internal_arrays_splat_1(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (2, 2)
+    internal_shape = (3, 3, 4)
+    shape_mask = (False, True, True, False, False)
 
-#     arr = FileArray(folder, shape, shape_mask=shape_mask)
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
-#     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
-#     data2 = np.ones(internal_shape)
+    data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
+    data2 = np.ones(internal_shape)
 
-#     arr.dump((0, 0), data1)
-#     arr.dump((1, 1), data2)
+    arr.dump((0, 0), data1)
+    arr.dump((1, 1), data2)
 
-#     # Test retrieving the entire array with splat_internal=True
-#     result = arr.to_array(splat_internal=True)
-#     expected_shape = (3, 2, 2, 3, 4)
-#     assert result.shape == expected_shape
+    # Test retrieving the entire array with splat_internal=True
+    result = arr.to_array(splat_internal=True)
+    expected_shape = (3, 2, 2, 3, 4)
+    assert result.shape == expected_shape
 
 
 def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Path):
@@ -482,8 +506,11 @@ def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Pa
     arr.dump((0, 0), data1)
     arr.dump((1, 1), data2)
 
+    assert arr.to_array().shape == (2, 2)
+    assert arr.to_array(splat_internal=True).shape == _full_shape(shape, internal_shape, shape_mask)
+
     # Test slicing
-    result = arr[0, 0, :, :, :]
+    result = arr[:, 0, 0, :, :]
     expected = np.ma.array(data1, mask=False, dtype=object)
     print("Expected data:")
     print(expected)
@@ -509,11 +536,33 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
 
     arr.dump((0,), data1)
 
+    r = arr.to_array(splat_internal=False)
+    assert r.shape == (1,)
     r = arr.to_array(splat_internal=True)
     assert r.shape == full_shape
+
+    # Check _slice_indices
+    expected_slice_indices = [range(1), range(2)]
+    slice_indices = arr._slice_indices((slice(None), slice(None)))
+    assert slice_indices == expected_slice_indices
+
+    # Check _normalize_key
+    assert arr._normalize_key((0,)) == (0,)
+    assert arr._normalize_key((slice(None),)) == (slice(None),)
+    assert arr._normalize_key((slice(None), slice(None))) == (slice(None), slice(None))
+    assert arr._normalize_key((0, 0)) == (0, 0)
+
+    result = arr[:, 0]
+    assert result.shape == (1,)
 
     result = arr[:, :]
     assert result.shape == full_shape
     expected = data1.reshape(1, 2)
+    expected = np.ma.array(expected, mask=False, dtype=object)
+    assert np.array_equal(result, expected)
+
+    result = arr[0, :]
+    assert result.shape == (2,), result.shape
+    expected = data1
     expected = np.ma.array(expected, mask=False, dtype=object)
     assert np.array_equal(result, expected)
