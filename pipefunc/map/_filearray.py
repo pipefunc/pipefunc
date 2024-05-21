@@ -7,7 +7,7 @@ from __future__ import annotations
 import concurrent.futures
 import itertools
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence, Union
+from typing import TYPE_CHECKING, Any, Sequence
 
 import cloudpickle
 import numpy as np
@@ -41,6 +41,7 @@ class FileArray:
         strides: Sequence[int] | None = None,
         filename_template: str = FILENAME_TEMPLATE,
         shape_mask: Sequence[bool] | None = None,
+        internal_shape: Sequence[int] | None = None,
     ) -> None:
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
@@ -48,7 +49,7 @@ class FileArray:
         self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
-        self.internal_shape = None
+        self.internal_shape = tuple(internal_shape) if internal_shape is not None else tuple()
 
     @property
     def size(self) -> int:
@@ -121,12 +122,24 @@ class FileArray:
         return (self._key_to_file(x) for x in itertools.product(*map(range, self.shape)))
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
-        return [
-            range(*k.indices(self.shape[i])) if isinstance(k, slice) else range(k, k + 1)
-            for i, k in enumerate(key)
-        ]
+        slice_indices = []
+        shape_index = 0  # To keep track of the index in the shape
+        for k, mask in zip(key, self.shape_mask):
+            if mask:
+                if isinstance(k, slice):
+                    slice_indices.append(range(*k.indices(self.shape[shape_index])))
+                else:
+                    slice_indices.append(range(k, k + 1))
+                shape_index += 1  # Only increment when shape_mask is True
+            elif isinstance(k, slice):
+                slice_indices.append(
+                    range(*k.indices(self.internal_shape[shape_index - len(self.shape)])),
+                )
+            else:
+                slice_indices.append(range(k, k + 1))
+        return slice_indices
 
-    def __getitem__(self, key: tuple[Union[int, slice], ...]) -> Any:
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         print(f"Getting item with key: {key}")  # Debugging statement
         key = self._normalize_key(key)
         print(f"Normalized key: {key}")  # Debugging statement
@@ -176,14 +189,94 @@ class FileArray:
             return sub_array[internal_index]
         return sub_array
 
-    def to_array(self) -> np.ma.core.MaskedArray:
+    def to_array(self, splat_internal: bool = False) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
 
         The returned numpy array has dtype "object" and a mask for
         masking out missing data.
+
+        Parameters
+        ----------
+        splat_internal : bool
+            If True, the internal array dimensions will be splatted out.
+
+        Returns
+        -------
+        np.ma.core.MaskedArray
+            The array containing all the data.
+
         """
         items = _load_all(map(self._index_to_file, range(self.size)))
         mask = self._mask_list()
+
+        if splat_internal:
+            external_shape = self.shape
+            internal_shape = items[0].shape if items[0] is not None else (0,)
+            full_shape = external_shape + internal_shape
+            arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
+            full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
+
+            for external_index in itertools.product(*map(range, external_shape)):
+                external_idx_flat = np.ravel_multi_index(external_index, external_shape)
+                if items[external_idx_flat] is None or items[external_idx_flat] is np.ma.masked:
+                    for internal_index in itertools.product(*map(range, internal_shape)):
+                        full_index = external_index + internal_index
+                        arr[full_index] = np.ma.masked
+                        full_mask[full_index] = True
+                else:
+                    for internal_index in itertools.product(*map(range, internal_shape)):
+                        full_index = external_index + internal_index
+                        arr[full_index] = items[external_idx_flat][internal_index]
+                        full_mask[full_index] = False
+
+            return np.ma.array(arr, mask=full_mask, dtype=object)
+
+        arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
+        arr[:] = items
+        return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
+
+    def to_array(self, splat_internal: bool = False) -> np.ma.core.MaskedArray:
+        """Return a masked numpy array containing all the data.
+
+        The returned numpy array has dtype "object" and a mask for
+        masking out missing data.
+
+        Parameters
+        ----------
+        splat_internal : bool
+            If True, the internal array dimensions will be splatted out.
+
+        Returns
+        -------
+        np.ma.core.MaskedArray
+            The array containing all the data.
+
+        """
+        items = _load_all(map(self._index_to_file, range(self.size)))
+        mask = self._mask_list()
+
+        if splat_internal:
+            external_shape = self.shape
+            internal_shape = items[0].shape if items[0] is not None else (0,)
+            full_shape = external_shape + internal_shape
+            arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
+            full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
+
+            for external_index in itertools.product(*map(range, external_shape)):
+                external_idx_flat = np.ravel_multi_index(external_index, external_shape)
+                if items[external_idx_flat] is None or items[external_idx_flat] is np.ma.masked:
+                    for internal_index in itertools.product(*map(range, internal_shape)):
+                        full_index = external_index + internal_index
+                        arr[full_index] = np.ma.masked
+                        full_mask[full_index] = True
+                else:
+                    for internal_index in itertools.product(*map(range, internal_shape)):
+                        full_index = external_index + internal_index
+                        arr[full_index] = items[external_idx_flat][internal_index]
+                        full_mask[full_index] = False
+
+            return np.ma.array(arr, mask=full_mask, dtype=object)
+
         arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
         arr[:] = items
         return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
