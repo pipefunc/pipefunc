@@ -7,7 +7,7 @@ from __future__ import annotations
 import concurrent.futures
 import itertools
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence, Union
 
 import cloudpickle
 import numpy as np
@@ -40,12 +40,15 @@ class FileArray:
         shape: Sequence[int],
         strides: Sequence[int] | None = None,
         filename_template: str = FILENAME_TEMPLATE,
+        shape_mask: Sequence[bool] | None = None,
     ) -> None:
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
         self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
         self.filename_template = str(filename_template)
+        self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
+        self.internal_shape = None
 
     @property
     def size(self) -> int:
@@ -57,27 +60,42 @@ class FileArray:
         """Return the rank of the array."""
         return len(self.shape)
 
-    def _normalize_key(self, key: tuple[int | slice, ...]) -> tuple[int | slice, ...]:
+    def _normalize_key(
+        self,
+        key: tuple[int | slice, ...],
+        for_dump: bool = False,
+    ) -> tuple[int | slice, ...]:
         if not isinstance(key, tuple):
             key = (key,)
 
-        if len(key) != self.rank:
+        if for_dump:
+            expected_rank = sum(self.shape_mask)
+        else:
+            expected_rank = len(self.shape_mask)
+
+        if len(key) != expected_rank:
             msg = (
-                f"Too many indices for array: array is {self.rank}-dimensional, "
+                f"Too many indices for array: array is {expected_rank}-dimensional, "
                 f"but {len(key)} were indexed"
             )
             raise IndexError(msg)
 
         normalized_key: list[int | slice] = []
-        for axis, (axis_size, k) in enumerate(zip(self.shape, key)):
-            if isinstance(k, slice):
-                normalized_key.append(k)
+        shape_index = 0  # To keep track of the index in the shape
+        for axis, k in enumerate(key):
+            if self.shape_mask[axis]:
+                axis_size = self.shape[shape_index]
+                if isinstance(k, slice):
+                    normalized_key.append(k)
+                else:
+                    normalized_k = k if k >= 0 else (k + axis_size)
+                    if not (0 <= normalized_k < axis_size):
+                        msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
+                        raise IndexError(msg)
+                    normalized_key.append(normalized_k)
+                shape_index += 1  # Only increment when shape_mask[axis] is True
             else:
-                normalized_k = k if k >= 0 else (k + axis_size)
-                if not (0 <= normalized_k < axis_size):
-                    msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
-                    raise IndexError(msg)
-                normalized_key.append(normalized_k)
+                normalized_key.append(k)
 
         return tuple(normalized_key)
 
@@ -108,21 +126,34 @@ class FileArray:
             for i, k in enumerate(key)
         ]
 
-    def __getitem__(self, key: tuple[int | slice, ...]) -> np.ma.core.MaskedArray:
+    def __getitem__(self, key: tuple[Union[int, slice], ...]) -> Any:
+        print(f"Getting item with key: {key}")  # Debugging statement
         key = self._normalize_key(key)
+        print(f"Normalized key: {key}")  # Debugging statement
 
         if any(isinstance(k, slice) for k in key):
             slice_indices = self._slice_indices(key)
             sliced_data = []
+            sliced_mask = []
 
             for index in itertools.product(*slice_indices):
                 file = self._key_to_file(index)
                 if file.is_file():
-                    sliced_data.append(load(file))
+                    sub_array = load(file)
+                    internal_index = tuple(k for k, mask in zip(key, self.shape_mask) if not mask)
+                    if internal_index:
+                        sliced_data.append(sub_array[internal_index])
+                        sliced_mask.append(False)
+                    else:
+                        sliced_data.append(sub_array)
+                        sliced_mask.append(False)
                 else:
                     sliced_data.append(np.ma.masked)
+                    sliced_mask.append(True)
 
-            sliced_array = np.ma.array(sliced_data, dtype=object)
+            print(f"Sliced data: {sliced_data}")  # Debugging statement
+
+            sliced_array = np.ma.masked_array(sliced_data, mask=sliced_mask, dtype=object)
 
             # Determine the new shape based on the sliced dimensions
             new_shape = tuple(
@@ -130,13 +161,20 @@ class FileArray:
                 for k, range_ in zip(key, slice_indices)
             )
             new_shape = tuple(filter(None, new_shape))
+            print(f"New shape: {new_shape}")  # Debugging statement
 
             return sliced_array.reshape(new_shape)
 
         file = self._key_to_file(key)  # type: ignore[arg-type]
         if not file.is_file():
             return np.ma.masked
-        return load(file)
+
+        sub_array = load(file)
+        internal_index = tuple(k for k, mask in zip(key, self.shape_mask) if not mask)
+        print(f"Sub-array: {sub_array}, Internal index: {internal_index}")  # Debugging statement
+        if internal_index:
+            return sub_array[internal_index]
+        return sub_array
 
     def to_array(self) -> np.ma.core.MaskedArray:
         """Return a masked numpy array containing all the data.
@@ -169,10 +207,10 @@ class FileArray:
         Examples
         --------
         >>> arr = FileArray(...)
-        >>> arr.dump((2, 1, 5), dict(a=1, b=2))
+        >>> arr.dump((2, 1, 5), np.array([1, 2, 3]))
 
         """
-        key = self._normalize_key(key)
+        key = self._normalize_key(key, for_dump=True)
         if not any(isinstance(k, slice) for k in key):
             dump(value, self._key_to_file(key))  # type: ignore[arg-type]
             return
