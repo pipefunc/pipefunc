@@ -64,7 +64,7 @@ class FileArray:
         if (shape_mask is None) ^ (internal_shape is None):
             msg = "internal_shape must be provided if shape_mask is provided"
             raise ValueError(msg)
-        if shape_mask is not None and len(shape_mask) != len(shape) + len(internal_shape):
+        if shape_mask is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
         self.folder = Path(folder).absolute()
@@ -145,7 +145,7 @@ class FileArray:
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (self._key_to_file(x) for x in itertools.product(*map(range, self.shape)))
+        return (self._key_to_file(x) for x in self._iterate_shape_indices(self.shape))
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
@@ -170,6 +170,26 @@ class FileArray:
                     slice_indices.append(range(k, k + 1))
                 internal_shape_index += 1
         return slice_indices
+
+    def _iterate_shape_indices(self, shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
+        return itertools.product(*map(range, shape))
+
+    def _construct_full_index(
+        self,
+        external_index: tuple[int, ...],
+        internal_index: tuple[int, ...],
+    ) -> tuple[int, ...]:
+        full_index = []
+        external_idx = 0
+        internal_idx = 0
+        for m in self.shape_mask:
+            if m:
+                full_index.append(external_index[external_idx])
+                external_idx += 1
+            else:
+                full_index.append(internal_index[internal_idx])
+                internal_idx += 1
+        return tuple(full_index)
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         normalized_key = self._normalize_key(key)
@@ -206,9 +226,9 @@ class FileArray:
                 for k, range_ in zip(normalized_key, slice_indices)
                 if isinstance(k, slice)
             )
-            return sliced_array.reshape(new_shape)  # .squeeze()
+            return sliced_array.reshape(new_shape)
 
-        file = self._key_to_file(external_indices)
+        file = self._key_to_file(external_indices)  # type: ignore[arg-type]
         if not file.is_file():
             return np.ma.masked
 
@@ -250,38 +270,18 @@ class FileArray:
         arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in itertools.product(*map(range, self.shape)):
+        for external_index in self._iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
-                for internal_index in itertools.product(*map(range, self.internal_shape)):
-                    full_index = []
-                    external_idx = 0
-                    internal_idx = 0
-                    for m in self.shape_mask:
-                        if m:
-                            full_index.append(external_index[external_idx])
-                            external_idx += 1
-                        else:
-                            full_index.append(internal_index[internal_idx])
-                            internal_idx += 1
-                    full_index = tuple(full_index)  # type: ignore[assignment]
+                for internal_index in self._iterate_shape_indices(self.internal_shape):
+                    full_index = self._construct_full_index(external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in itertools.product(*map(range, self.internal_shape)):
-                    full_index = []
-                    external_idx = 0
-                    internal_idx = 0
-                    for m in self.shape_mask:
-                        if m:
-                            full_index.append(external_index[external_idx])
-                            external_idx += 1
-                        else:
-                            full_index.append(internal_index[internal_idx])
-                            internal_idx += 1
-                    full_index = tuple(full_index)  # type: ignore[assignment]
+                for internal_index in self._iterate_shape_indices(self.internal_shape):
+                    full_index = self._construct_full_index(external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
@@ -305,7 +305,7 @@ class FileArray:
         Examples
         --------
         >>> arr = FileArray(...)
-        >>> arr.dump((2, 1, 5), dict(a=1, b=2)))
+        >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
         key = self._normalize_key(key, for_dump=True)
