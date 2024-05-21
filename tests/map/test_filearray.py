@@ -410,7 +410,7 @@ def test_file_array_with_internal_arrays_splat(tmp_path: Path):
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
 
-    arr = FileArray(folder, shape, shape_mask=shape_mask)
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
@@ -426,6 +426,26 @@ def test_file_array_with_internal_arrays_splat(tmp_path: Path):
     assert np.ma.is_masked(result[0, 1])
     assert np.ma.is_masked(result[1, 0])
     assert np.array_equal(result[1, 1], data2)
+
+
+def test_file_array_with_internal_arrays_splat_different_order(tmp_path: Path):
+    folder = Path(tmp_path)
+    shape = (2, 2)
+    internal_shape = (3, 3, 4)
+    shape_mask = (False, True, True, False, False)
+
+    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
+
+    data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
+    data2 = np.ones(internal_shape)
+
+    arr.dump((0, 0), data1)
+    arr.dump((1, 1), data2)
+
+    # Test retrieving the entire array with splat_internal=True
+    result = arr.to_array(splat_internal=True)
+    expected_shape = (3, 2, 2, 3, 4)
+    assert result.shape == expected_shape
 
 
 # def test_file_array_with_internal_arrays_splat(tmp_path: Path):
@@ -486,6 +506,9 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     data1 = np.array([42, 69])
 
     arr.dump((0,), data1)
+
+    r = arr.to_array()
+    assert r.shape == (1, 2)
 
     result = arr[:, :]
     assert result.shape == (1, 2)
