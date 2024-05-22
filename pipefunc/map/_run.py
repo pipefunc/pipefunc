@@ -579,7 +579,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         output = _execute_single(func, kwargs, run_folder)
 
     # Note that the kwargs still contain the FileArray objects if _execute_map_spec
-    # was used. TODO: Fix this?
+    # was used.
     if isinstance(func.output_name, str):
         return [
             Result(
