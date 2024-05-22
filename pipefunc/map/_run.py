@@ -10,14 +10,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 
-from pipefunc._utils import (
-    at_least_tuple,
-    dump,
-    equal_dicts,
-    handle_error,
-    load,
-    prod,
-)
+from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape, mapspec_dimensions, validate_consistent_axes
 
@@ -30,11 +23,6 @@ if TYPE_CHECKING:
         from typing_extensions import TypeAlias
     else:
         from typing import TypeAlias
-
-    if sys.version_info < (3, 11):  # pragma: no cover
-        pass
-    else:
-        pass
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
@@ -207,12 +195,7 @@ class RunInfo(NamedTuple):
         dump(self._asdict(), path)
 
     @classmethod
-    def load(
-        cls: type[RunInfo],
-        run_folder: str | Path,
-        *,
-        cache: bool = True,
-    ) -> RunInfo:
+    def load(cls: type[RunInfo], run_folder: str | Path, *, cache: bool = True) -> RunInfo:
         path = cls.path(run_folder)
         dct = load(path, cache=cache)
         return cls(**dct)
@@ -282,10 +265,7 @@ def _init_file_arrays(
     ]
 
 
-def _init_result_arrays(
-    output_name: _OUTPUT_TYPE,
-    shape: tuple[int, ...],
-) -> list[np.ndarray]:
+def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -573,10 +553,7 @@ def run(
     return outputs
 
 
-def load_outputs(
-    *output_names: str,
-    run_folder: str | Path,
-) -> Any:
+def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
