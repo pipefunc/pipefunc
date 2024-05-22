@@ -61,7 +61,7 @@ def create_learners(
     run_folder
         The folder to store the run information.
     internal_shapes
-        The manual shapes to use for the run.
+        The internal shapes to use for the run.
     return_output
         Whether to return the output of the function in the learner.
     cleanup
@@ -234,7 +234,7 @@ def create_learners_from_sweep(
         The folder to store the run information. Each sweep run will be stored in
         a subfolder of this folder.
     internal_shapes
-        The manual shapes to use for the run, as expected by `pipeline.map`.
+        The internal shapes to use for the run, as expected by `pipeline.map`.
     parallel
         Whether to run the map in parallel.
     cleanup
