@@ -511,21 +511,8 @@ def map_shapes(
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
-        assert func.mapspec is not None
-        input_shapes = {}
-        for p in func.mapspec.input_names:
-            if shape := shapes.get(p):
-                input_shapes[p] = shape
-            elif p in internal:
-                input_shapes[p] = internal[p]
-            else:
-                msg = (
-                    f"Parameter `{p}` is used in map but its shape"
-                    " cannot be inferred from the inputs."
-                    " Provide the shape manually in `internal_shapes`."
-                )
-                raise ValueError(msg)
-
+        assert func.mapspec is not None  # mypy
+        input_shapes = {p: shapes[p] for p in func.mapspec.input_names if p in shapes}
         output_shapes = {p: internal[p] for p in func.mapspec.output_names if p in internal}
         output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
         shapes[func.output_name] = output_shape
