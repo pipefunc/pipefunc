@@ -28,24 +28,6 @@ def read(name: str | Path) -> bytes:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-def _full_shape(
-    shape: tuple[int, ...],
-    internal_shape: tuple[int, ...],
-    shape_mask: tuple[bool, ...],
-) -> tuple[int, ...]:
-    full_shape = []
-    shape_index = 0
-    internal_shape_index = 0
-    for mask in shape_mask:
-        if mask:
-            full_shape.append(shape[shape_index])
-            shape_index += 1
-        else:
-            full_shape.append(internal_shape[internal_shape_index])
-            internal_shape_index += 1
-    return tuple(full_shape)
-
-
 class FileArray:
     """Array interface to a folder of files on disk.
 
@@ -145,7 +127,7 @@ class FileArray:
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (self._key_to_file(x) for x in self._iterate_shape_indices(self.shape))
+        return (self._key_to_file(x) for x in _iterate_shape_indices(self.shape))
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
@@ -167,26 +149,6 @@ class FileArray:
                 internal_shape_index += 1
 
         return slice_indices
-
-    def _iterate_shape_indices(self, shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
-        return itertools.product(*map(range, shape))
-
-    def _construct_full_index(
-        self,
-        external_index: tuple[int, ...],
-        internal_index: tuple[int, ...],
-    ) -> tuple[int, ...]:
-        full_index = []
-        external_idx = 0
-        internal_idx = 0
-        for m in self.shape_mask:
-            if m:
-                full_index.append(external_index[external_idx])
-                external_idx += 1
-            else:
-                full_index.append(internal_index[internal_idx])
-                internal_idx += 1
-        return tuple(full_index)
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         normalized_key = self._normalize_key(key)
@@ -274,19 +236,20 @@ class FileArray:
         arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in self._iterate_shape_indices(self.shape):
+        for external_index in _iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                for internal_index in self._iterate_shape_indices(self.internal_shape):
-                    full_index = self._construct_full_index(external_index, internal_index)
+                shape_mask = self.shape_mask
+                for internal_index in _iterate_shape_indices(self.internal_shape):
+                    full_index = _construct_full_index(shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in self._iterate_shape_indices(self.internal_shape):
-                    full_index = self._construct_full_index(external_index, internal_index)
+                for internal_index in _iterate_shape_indices(self.internal_shape):
+                    full_index = _construct_full_index(shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
@@ -321,6 +284,46 @@ class FileArray:
         for index in itertools.product(*self._slice_indices(key)):
             file = self._key_to_file(index)
             dump(value, file)
+
+
+def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
+    return itertools.product(*map(range, shape))
+
+
+def _full_shape(
+    shape: tuple[int, ...],
+    internal_shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+) -> tuple[int, ...]:
+    full_shape = []
+    shape_index = 0
+    internal_shape_index = 0
+    for mask in shape_mask:
+        if mask:
+            full_shape.append(shape[shape_index])
+            shape_index += 1
+        else:
+            full_shape.append(internal_shape[internal_shape_index])
+            internal_shape_index += 1
+    return tuple(full_shape)
+
+
+def _construct_full_index(
+    shape_mask: tuple[bool, ...],
+    external_index: tuple[int, ...],
+    internal_index: tuple[int, ...],
+) -> tuple[int, ...]:
+    full_index = []
+    external_idx = 0
+    internal_idx = 0
+    for m in shape_mask:
+        if m:
+            full_index.append(external_index[external_idx])
+            external_idx += 1
+        else:
+            full_index.append(internal_index[internal_idx])
+            internal_idx += 1
+    return tuple(full_index)
 
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:

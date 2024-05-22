@@ -18,8 +18,19 @@ from pipefunc._utils import (
     load,
     prod,
 )
-from pipefunc.map._filearray import FileArray
-from pipefunc.map._mapspec import MapSpec, array_shape, mapspec_dimensions, validate_consistent_axes
+from pipefunc.map._filearray import (
+    FileArray,
+    _construct_full_index,
+    _full_shape,
+    _iterate_shape_indices,
+)
+from pipefunc.map._mapspec import (
+    MapSpec,
+    _shape_to_key,
+    array_shape,
+    mapspec_dimensions,
+    validate_consistent_axes,
+)
 
 if TYPE_CHECKING:
     import sys
@@ -357,13 +368,52 @@ def _update_file_array(
         file_array.dump(output_key, _output)
 
 
+def _indices_to_flat_index(
+    shape: tuple[int, ...],
+    internal_shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+    external_index: tuple[int, ...],
+    internal_index: tuple[int, ...],
+) -> np.int_:
+    full_index = _construct_full_index(shape_mask, external_index, internal_index)
+    full_shape = _full_shape(shape, internal_shape, shape_mask)
+    return np.ravel_multi_index(full_index, full_shape)
+
+
+def _set_output(
+    arr: np.ndarray,
+    output: np.ndarray,
+    linear_index: int,
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+) -> None:
+    external_shape = _external_shape(shape, shape_mask)
+    internal_shape = _internal_shape(shape, shape_mask)
+    external_index = _shape_to_key(external_shape, linear_index)
+    for internal_index in _iterate_shape_indices(internal_shape):
+        flat_index = _indices_to_flat_index(
+            external_shape,
+            internal_shape,
+            shape_mask,
+            external_index,
+            internal_index,
+        )
+        arr[flat_index] = output[internal_index]
+
+
 def _update_result_array(
     result_arrays: list[np.ndarray],
     index: int,
     output: list[Any],
+    shape: tuple[int, ...],
+    mask: tuple[bool, ...],
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
-        result_array[index] = _output
+        if not all(mask):
+            _output = np.asarray(_output)  # In case _output is a list
+            _set_output(result_array, _output, index, shape, mask)
+        else:
+            result_array[index] = _output
 
 
 def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[int], list[int]]:
@@ -408,11 +458,11 @@ def _execute_map_spec(
         outputs_list = [process_index(index) for index in missing]
 
     for index, outputs in zip(missing, outputs_list):
-        _update_result_array(result_arrays, index, outputs)
+        _update_result_array(result_arrays, index, outputs, shape, mask)
 
     for index in existing:
         outputs = [file_array.get_from_index(index) for file_array in file_arrays]
-        _update_result_array(result_arrays, index, outputs)
+        _update_result_array(result_arrays, index, outputs, shape, mask)
 
     result_arrays = [x.reshape(shape) for x in result_arrays]
     return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
