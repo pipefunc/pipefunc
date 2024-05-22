@@ -109,7 +109,7 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
             path = _output_path(output_name, run_folder)
-            dump(output, path)
+            dump(_output, path)
         output = new_output
     else:
         path = _output_path(func.output_name, run_folder)

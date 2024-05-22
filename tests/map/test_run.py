@@ -980,18 +980,31 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         return 2 * sum(x)
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
-        return sum(y)
+    def take_sum(z: list[int]) -> int:
+        return sum(z)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
     assert pipeline.mapspecs_as_strings() == [
         "... -> x[i, unnamed_0], y[i, unnamed_0]",
         "x[i, :] -> z[i]",
     ]
+    shapes, masks = map_shapes(pipeline, {"n": 4}, {"x": (4, 4)})
+    assert shapes == {("x", "y"): (4, 4), "x": (4, 4), "y": (4, 4), "z": (4,)}
+    assert masks == {
+        ("x", "y"): (False, False),
+        "x": (False, False),
+        "y": (False, False),
+        "z": (True,),
+    }
     r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
+    assert r[0].output_name == "x"
     assert r[0].output.tolist() == np.ones((4, 4)).tolist()
-    assert r[1].output.tolist() == [8, 8, 8, 8]
-    assert r[2].output == 32
+    assert r[1].output_name == "y"
+    assert r[1].output.tolist() == np.ones((4, 4)).tolist()
+    assert r[2].output_name == "z"
+    assert r[2].output.tolist() == [8, 8, 8, 8]
+    assert r[3].output_name == "sum"
+    assert r[3].output.tolist() == 32
 
 
 @pytest.mark.xfail(reason="jagged/ragged arrays are not supported (yet?)")
