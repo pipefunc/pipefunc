@@ -20,14 +20,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Literal,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
 
 import networkx as nx
 from tabulate import tabulate
@@ -52,6 +45,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
+from pipefunc.map._run import run
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -271,6 +265,7 @@ class Pipeline:
 
     def _validate_mapspec(self) -> None:
         validate_consistent_axes(self.mapspecs(ordered=False))
+        self._autogen_mapspec_axes()
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
@@ -304,11 +299,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Parameters
@@ -324,15 +315,14 @@ class Pipeline:
 
         """
         if not isinstance(f, PipeFunc):
-            f = PipeFunc(f, output_name=f.__name__)
+            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
-                "Initializing the `Pipeline` using `MapSpec`s and"
-                " `PipeFunc`s modifies the `PipeFunc`s inplace."
+                "Initializing the `Pipeline` using tuples of `PipeFunc`s and `MapSpec`s"
+                " will create a copy of the `PipeFunc`."
             )
             warnings.warn(msg, UserWarning, stacklevel=3)
-
-        if mapspec is not None:
+            f: PipeFunc = f.copy()  # type: ignore[no-redef]
             if isinstance(mapspec, str):
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
@@ -354,12 +344,7 @@ class Pipeline:
         self._init_internal_cache()  # reset cache
         return f
 
-    def drop(
-        self,
-        *,
-        f: PipeFunc | None = None,
-        output_name: _OUTPUT_TYPE | None = None,
-    ) -> None:
+    def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
         """Drop a function from the pipeline.
 
         Parameters
@@ -441,12 +426,7 @@ class Pipeline:
         self._func[output_name] = f
         return f
 
-    def __call__(
-        self,
-        __output_name__: _OUTPUT_TYPE | None = None,
-        /,
-        **kwargs: Any,
-    ) -> Any:
+    def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
@@ -600,7 +580,7 @@ class Pipeline:
         )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (unused := set(kwargs) - set(used_parameters)):
+        if None not in used_parameters and (unused := kwargs.keys() - set(used_parameters)):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
@@ -611,7 +591,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None,
-        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         parallel: bool = True,
         cleanup: bool = True,
@@ -628,7 +608,7 @@ class Pipeline:
         run_folder
             The folder to store the run information. If `None`, a temporary folder
             is created.
-        manual_shapes
+        internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
         parallel
@@ -637,9 +617,7 @@ class Pipeline:
             Whether to clean up the `run_folder` before running the pipeline.
 
         """
-        from pipefunc.map import run
-
-        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
+        return run(self, inputs, run_folder, internal_shapes, cleanup=cleanup, parallel=parallel)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
@@ -795,7 +773,17 @@ class Pipeline:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations[1] for f in gen]
 
-    def add_mapspec_axis(self, parameter: str, axis: str) -> None:
+    def _autogen_mapspec_axes(self) -> set[PipeFunc]:
+        """Generate `MapSpec`s for functions that return arrays with `internal_shapes`."""
+        root_args = self.topological_generations[0]
+        mapspecs = self.mapspecs(ordered=False)
+        non_root_inputs = _find_non_root_axes(mapspecs, root_args)
+        output_names = {at_least_tuple(f.output_name) for f in self.functions}
+        multi_output_mapping = {n: names for names in output_names for n in names if len(names) > 1}
+        _replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
+        return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
+
+    def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec.
 
         Parameters
@@ -808,7 +796,9 @@ class Pipeline:
             existing axis name to zip the parameter with the existing axis.
 
         """
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
+        self._autogen_mapspec_axes()
+        for p in parameter:
+            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
@@ -1387,15 +1377,11 @@ def _sort_key(node: PipeFunc | str) -> str:
     return node
 
 
-def _unique(
-    nodes: Iterable[PipeFunc | str],
-) -> tuple[PipeFunc | str, ...]:
+def _unique(nodes: Iterable[PipeFunc | str]) -> tuple[PipeFunc | str, ...]:
     return tuple(sorted(set(nodes), key=_sort_key))
 
 
-def _filter_funcs(
-    funcs: Iterable[PipeFunc | str],
-) -> list[PipeFunc]:
+def _filter_funcs(funcs: Iterable[PipeFunc | str]) -> list[PipeFunc]:
     return [f for f in funcs if isinstance(f, PipeFunc)]
 
 
@@ -1449,3 +1435,70 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         for o in output_specs:
             dims[o.name] = len(o.axes)
             _add_mapspec_axis(o.name, dims, axis, functions)
+
+
+def _find_non_root_axes(
+    mapspecs: list[MapSpec],
+    root_args: list[str],
+) -> dict[str, list[str | None]]:
+    non_root_inputs: dict[str, list[str | None]] = {}
+    for mapspec in mapspecs:
+        for spec in mapspec.inputs:
+            if spec.name not in root_args:
+                if spec.name not in non_root_inputs:
+                    non_root_inputs[spec.name] = spec.rank * [None]  # type: ignore[assignment]
+                for i, axis in enumerate(spec.axes):
+                    if axis is not None:
+                        non_root_inputs[spec.name][i] = axis
+    return non_root_inputs
+
+
+def _replace_none_in_axes(
+    mapspecs: list[MapSpec],
+    non_root_inputs: dict[str, list[str]],
+    multi_output_mapping: dict[str, tuple[str, ...]],
+) -> None:
+    all_axes_names = {
+        axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
+    }
+
+    i = 0
+    axis_template = "unnamed_{}"
+    for name, axes in non_root_inputs.items():
+        for j, axis in enumerate(axes):
+            if axis is None:
+                while (new_axis := axis_template.format(i)) in all_axes_names:
+                    i += 1
+                non_root_inputs[name][j] = new_axis
+                all_axes_names.add(new_axis)
+                if name in multi_output_mapping:
+                    # If output is a tuple, update its axes with the new axis.
+                    for output_name in multi_output_mapping[name]:
+                        non_root_inputs[output_name][j] = new_axis
+    assert not any(None in axes for axes in non_root_inputs.values())
+
+
+def _create_missing_mapspecs(
+    functions: list[PipeFunc],
+    non_root_inputs: dict[str, set[str]],
+) -> set[PipeFunc]:
+    # Mapping from output_name to PipeFunc for functions without a MapSpec
+    outputs_without_mapspec: dict[str, PipeFunc] = {
+        name: func
+        for func in functions
+        if func.mapspec is None
+        for name in at_least_tuple(func.output_name)
+    }
+
+    missing: set[str] = non_root_inputs.keys() & outputs_without_mapspec.keys()
+    func_with_new_mapspecs = set()
+    for p in missing:
+        func = outputs_without_mapspec[p]
+        if func in func_with_new_mapspecs:
+            continue  # already added a MapSpec because of multiple outputs
+        axes = tuple(non_root_inputs[p])
+        outputs = tuple(ArraySpec(x, axes) for x in at_least_tuple(func.output_name))
+        func.mapspec = MapSpec(inputs=(), outputs=outputs)
+        func_with_new_mapspecs.add(func)
+        print(f"Autogenerated MapSpec for `{func}`: `{func.mapspec}`")
+    return func_with_new_mapspecs

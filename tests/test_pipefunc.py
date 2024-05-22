@@ -9,14 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import (
-    PipeFunc,
-    Pipeline,
-    Sweep,
-    count_sweep,
-    get_precalculation_order,
-    pipefunc,
-)
+from pipefunc import PipeFunc, Pipeline, Sweep, count_sweep, get_precalculation_order, pipefunc
 from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
@@ -181,9 +174,8 @@ def test_different_defaults() -> None:
     def g(c, b=2):
         return c * b
 
-    p = Pipeline([f, g])
     with pytest.raises(ValueError, match="Inconsistent default values"):
-        _ = p.graph
+        Pipeline([f, g])
 
 
 def test_output_name_in_kwargs():
@@ -699,15 +691,15 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
     ]
     assert pipeline._independent_axes_in_mapspecs() == [({f}, {"i"}), ({g}, {"i"})]
 
-    pipeline.add_mapspec_axis("b", "j")
+    pipeline.add_mapspec_axis("b", axis="j")
     assert pipeline.mapspecs_as_strings() == ["a[i], b[j] -> c[i, j]", "x[i], y[i] -> z[i]"]
     assert pipeline._independent_axes_in_mapspecs() == [
         ({f}, {"i", "j"}),
         ({g}, {"i"}),
     ]
 
-    pipeline.add_mapspec_axis("x", "j")
-    pipeline.add_mapspec_axis("y", "j")
+    pipeline.add_mapspec_axis("x", axis="j")
+    pipeline.add_mapspec_axis("y", axis="j")
     assert pipeline.mapspecs_as_strings() == [
         "a[i], b[j] -> c[i, j]",
         "x[i, j], y[i, j] -> z[i, j]",

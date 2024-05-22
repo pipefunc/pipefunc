@@ -81,7 +81,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes={"x": 4},  # 4 should become (4,)
+        internal_shapes={"x": 4},  # 4 should become (4,)
         return_output=True,
     )
     flat_learners = flatten_learners(learners_dicts)
