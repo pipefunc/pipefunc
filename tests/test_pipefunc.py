@@ -698,11 +698,11 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
         "x[i], y[i] -> z[i]",
     ]
 
-    pipeline.add_mapspec_axis("b", "j")
+    pipeline.add_mapspec_axis("b", axis="j")
     assert pipeline.mapspecs_as_strings() == ["a[i], b[j] -> c[i, j]", "x[i], y[i] -> z[i]"]
 
-    pipeline.add_mapspec_axis("x", "j")
-    pipeline.add_mapspec_axis("y", "j")
+    pipeline.add_mapspec_axis("x", axis="j")
+    pipeline.add_mapspec_axis("y", axis="j")
     assert pipeline.mapspecs_as_strings() == [
         "a[i], b[j] -> c[i, j]",
         "x[i, j], y[i, j] -> z[i, j]",
