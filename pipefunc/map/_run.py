@@ -133,7 +133,7 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> None:
     if not RunInfo.path(run_folder).is_file():
         return
@@ -169,7 +169,7 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    internal_shapes: dict[str, int | tuple[int, ...]]
+    internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
 
@@ -184,19 +184,18 @@ class RunInfo(NamedTuple):
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = Path(run_folder)
-        internal_shapes = internal_shapes or {}
         if cleanup:
             cleanup_run_folder(run_folder)
         else:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
-        shapes = map_shapes(pipeline, inputs, internal_shapes)
+        shapes, masks = map_shapes(pipeline, inputs, internal_shapes or {})
         return cls(
             input_paths=input_paths,
-            shapes=shapes.shapes,
+            shapes=shapes,
             internal_shapes=internal_shapes,
-            shape_masks=shapes.masks,
+            shape_masks=masks,
             run_folder=run_folder,
         )
 

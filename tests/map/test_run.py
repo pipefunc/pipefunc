@@ -926,15 +926,6 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     assert results[-1].output.tolist() == [13]
 
     # Do the same but with `add_mapspec_axis` on the first pipeline
-
-    pipeline = Pipeline(
-        [
-            (generate_ints, "... -> x[i]"),
-            (double_it, "x[i] -> y[i]"),
-            side_chain,
-            take_sum,
-        ],
-    )
     assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
     pipeline.add_mapspec_axis("n", axis="j")
     assert pipeline.mapspecs_as_strings() == [
