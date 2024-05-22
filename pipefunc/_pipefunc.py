@@ -142,6 +142,19 @@ class PipeFunc(Generic[T]):
         self.set_profiling(enable=profile)
         self._validate_mapspec()
 
+    def copy(self) -> PipeFunc:
+        return PipeFunc(
+            self.func,
+            self.output_name,
+            output_picker=self.output_picker,
+            renames=self.renames,
+            profile=self.profile,
+            debug=self.debug,
+            cache=self.cache,
+            save_function=self.save_function,
+            mapspec=self.mapspec,
+        )
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
 

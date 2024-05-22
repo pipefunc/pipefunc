@@ -175,7 +175,7 @@ def _execute_iteration_in_map_spec(
         run_info.shape_masks,
         run_folder,
     )
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, file_arrays)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
     return outputs if return_output else None
 
 

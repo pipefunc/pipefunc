@@ -123,15 +123,18 @@ class MapSpec:
         return tuple(x.name for x in self.outputs)
 
     @property
-    def indices(self) -> tuple[str, ...]:
-        """Return the index names for this MapSpec."""
+    def output_indices(self) -> tuple[str, ...]:
+        """Return the index names of the output array."""
         return self.outputs[0].indices  # All outputs have the same indices
+
+    @property
+    def input_indices(self) -> set[str]:
+        """Return the index names of the input arrays."""
+        return {index for x in self.inputs for index in x.indices}
 
     def _output_only_indices(self) -> tuple[str, ...]:
         """Return the indices that are only in the output."""
-        input_indices = {index for x in self.inputs for index in x.indices}
-        output_indices = self.outputs[0].indices
-        return tuple(i for i in output_indices if i not in input_indices)
+        return tuple(i for i in self.output_indices if i not in self.input_indices)
 
     def shape(
         self,
@@ -171,7 +174,11 @@ class MapSpec:
                 internal_shape_index += 1
         return tuple(shape), tuple(mask)
 
-    def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    def output_key(
+        self,
+        shape: tuple[int, ...],
+        linear_index: int,
+    ) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
 
         Parameters
@@ -188,12 +195,10 @@ class MapSpec:
         (3, 1, 2)
 
         """
-        if len(shape) != len(self.indices):
-            msg = f"Expected a shape of length {len(self.indices)}, got {shape}"
+        if len(shape) != len(self.input_indices):
+            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
             raise ValueError(msg)
-        return tuple(
-            (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
-        )
+        return _shape_to_key(shape, linear_index)
 
     def input_keys(
         self,
@@ -216,8 +221,11 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        output_key = self.output_key(shape, linear_index)
-        ids = dict(zip(self.indices, output_key))
+        if len(shape) != len(self.output_indices):
+            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
+            raise ValueError(msg)
+        key = _shape_to_key(shape, linear_index)
+        ids = dict(zip(self.output_indices, key))
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)
             for x in self.inputs
@@ -225,6 +233,8 @@ class MapSpec:
 
     def __str__(self) -> str:
         inputs = ", ".join(map(str, self.inputs))
+        if inputs == "":
+            inputs = "..."
         outputs = ", ".join(map(str, self.outputs))
         return f"{inputs} -> {outputs}"
 
@@ -252,6 +262,12 @@ class MapSpec:
             tuple(x.add_axes(*axis) for x in self.inputs),
             tuple(x.add_axes(*axis) for x in self.outputs),
         )
+
+
+def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    return tuple(
+        (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
+    )
 
 
 def _parse_index_string(index_string: str) -> tuple[str | None, ...]:

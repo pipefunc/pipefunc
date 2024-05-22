@@ -321,15 +321,14 @@ class Pipeline:
 
         """
         if not isinstance(f, PipeFunc):
-            f = PipeFunc(f, output_name=f.__name__)
+            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
-                "Initializing the `Pipeline` using `MapSpec`s and"
-                " `PipeFunc`s modifies the `PipeFunc`s inplace."
+                "Initializing the `Pipeline` using tuples of `PipeFunc`s and `MapSpec`s"
+                " will create a copy of the `PipeFunc`."
             )
             warnings.warn(msg, UserWarning, stacklevel=3)
-
-        if mapspec is not None:
+            f: PipeFunc = f.copy()  # type: ignore[no-redef]
             if isinstance(mapspec, str):
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec

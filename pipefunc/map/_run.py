@@ -98,11 +98,7 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
-def _dump_output(
-    func: PipeFunc,
-    output: Any,
-    run_folder: Path,
-) -> Any:
+def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -242,9 +238,10 @@ def _load_parameter(
     if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
+    external_shape = tuple(s for s, m in zip(shapes[parameter], shape_masks[parameter]) if m)
     return FileArray(
         file_array_path,
-        shapes[parameter],
+        external_shape,
         internal_shapes.get(parameter),
         shape_masks[parameter],
     )
@@ -288,6 +285,11 @@ def _init_file_arrays(
 ) -> list[FileArray]:
     shape_mask = None if all(mask) else mask
     external_shape = tuple(s for s, m in zip(shape, mask) if m)
+    if internal_shape is not None:
+        assert internal_shape == tuple(s for s, m in zip(shape, mask) if not m), (
+            internal_shape,
+            shape,
+        )
     return [
         FileArray(
             _file_array_path(output_name, run_folder),
@@ -332,11 +334,12 @@ def _run_iteration_and_process(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
     file_arrays: list[FileArray],
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, index)
     outputs = _pick_output(func, output)
-    _update_file_array(func, file_arrays, shape, index, outputs)
+    _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
 
 
@@ -344,10 +347,12 @@ def _update_file_array(
     func: PipeFunc,
     file_arrays: list[FileArray],
     shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
     index: int,
     outputs: list[Any],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
+    shape = tuple(s for s, m in zip(shape, shape_mask) if m)
     output_key = func.mapspec.output_key(shape, index)
     for file_array, _output in zip(file_arrays, outputs):
         file_array.dump(output_key, _output)
@@ -394,6 +399,7 @@ def _execute_map_spec(
         func=func,
         kwargs=kwargs,
         shape=shape,
+        shape_mask=mask,
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)

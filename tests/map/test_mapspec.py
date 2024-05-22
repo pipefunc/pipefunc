@@ -102,7 +102,7 @@ def test_mapspec_indices():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
-    assert spec.indices == ("i", "j")
+    assert spec.output_indices == ("i", "j")
 
 
 def test_mapspec_shape():
@@ -313,6 +313,7 @@ def test_validate_consistent_axes():
 
 def test_larger_output_then_input():
     mapspec = MapSpec.from_string("... -> b[j]")
+    assert str(mapspec) == "... -> b[j]"
     assert mapspec.input_names == ()
     assert mapspec.output_names == ("b",)
     shape, mask = mapspec.shape(input_shapes={}, internal_shapes={"b": (3,)})

@@ -232,6 +232,7 @@ class FileArray:
 
         sub_array = load(file)
         if internal_indices:
+            sub_array = np.asarray(sub_array)
             return sub_array[internal_indices]
         return sub_array
 
