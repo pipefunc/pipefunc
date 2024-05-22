@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
+from pipefunc._version import __version__
 from pipefunc.map._filearray import FileArray, _iterate_shape_indices, _select_by_mask
 from pipefunc.map._mapspec import (
     MapSpec,
@@ -171,6 +172,7 @@ class RunInfo(NamedTuple):
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
+    pipefunc_version: str = __version__
 
     @classmethod
     def create(
