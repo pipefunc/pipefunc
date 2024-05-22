@@ -963,7 +963,32 @@ def test_return_2d_from_step(tmp_path: Path) -> None:
         return sum(y)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
-    r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)})
+    r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
+    assert r[0].output.tolist() == np.ones((4, 4)).tolist()
+    assert r[1].output.tolist() == [8, 8, 8, 8]
+    assert r[2].output == 32
+
+
+def test_multi_output_from_step(tmp_path: Path) -> None:
+    @pipefunc(output_name=("x", "y"))
+    def generate_ints(n: int) -> tuple[np.ndarray, np.ndarray]:
+        return np.ones((n, n)), np.ones((n, n))
+
+    @pipefunc(output_name="z", mapspec="x[i, :] -> z[i]")
+    def double_it(x: np.ndarray) -> np.ndarray:
+        assert len(x.shape) == 1
+        return 2 * sum(x)
+
+    @pipefunc(output_name="sum")
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([generate_ints, double_it, take_sum])
+    assert pipeline.mapspecs_as_strings() == [
+        "... -> x[i, unnamed_0], y[i, unnamed_0]",
+        "x[i, :] -> z[i]",
+    ]
+    r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
     assert r[0].output.tolist() == np.ones((4, 4)).tolist()
     assert r[1].output.tolist() == [8, 8, 8, 8]
     assert r[2].output == 32
@@ -991,4 +1016,5 @@ def test_growing_axis(tmp_path: Path) -> None:
         inputs,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         run_folder=tmp_path,
+        parallel=False,
     )
