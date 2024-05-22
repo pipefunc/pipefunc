@@ -19,14 +19,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Literal,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
 
 import networkx as nx
 from tabulate import tabulate
@@ -36,11 +29,7 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import (
-    at_least_tuple,
-    generate_filename_from_dict,
-    handle_error,
-)
+from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.map._mapspec import (
     ArraySpec,

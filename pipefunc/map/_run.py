@@ -10,19 +10,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 
-from pipefunc._utils import (
-    at_least_tuple,
-    dump,
-    equal_dicts,
-    handle_error,
-    load,
-    prod,
-)
-from pipefunc.map._filearray import (
-    FileArray,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
+from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
+from pipefunc.map._filearray import FileArray, _iterate_shape_indices, _select_by_mask
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,

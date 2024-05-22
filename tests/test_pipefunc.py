@@ -9,14 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import (
-    PipeFunc,
-    Pipeline,
-    Sweep,
-    count_sweep,
-    get_precalculation_order,
-    pipefunc,
-)
+from pipefunc import PipeFunc, Pipeline, Sweep, count_sweep, get_precalculation_order, pipefunc
 from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
