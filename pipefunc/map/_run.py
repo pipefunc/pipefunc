@@ -699,8 +699,9 @@ def load_outputs(
 def _validate_mapspec_complete(pipeline: Pipeline | _MockPipeline) -> None:
     root_args = pipeline.topological_generations[0]
     mapspecs = pipeline.mapspecs(ordered=False)
+    # inputs that are not root arguments
     inputs = {name for spec in mapspecs for name in spec.input_names if name not in root_args}
-    func_outputs = {
+    func_outputs = {  # output names of functions without a mapspec
         name
         for func in pipeline.functions
         for name in at_least_tuple(func.output_name)
