@@ -81,7 +81,7 @@ def create_learners(
     for gen in pipeline.topological_generations[1]:
         _learners = {}
         for func in gen:
-            if func.mapspec:
+            if func.mapspec and func.mapspec.inputs:
                 f = functools.partial(
                     _execute_iteration_in_map_spec,
                     func=func,
