@@ -134,10 +134,6 @@ class MapSpec:
         """Return the index names of the input arrays."""
         return {index for x in self.inputs for index in x.indices}
 
-    def _output_only_indices(self) -> tuple[str, ...]:
-        """Return the indices that are only in the output."""
-        return tuple(i for i in self.output_indices if i not in self.input_indices)
-
     def shape(
         self,
         input_shapes: dict[str, tuple[int, ...]],
