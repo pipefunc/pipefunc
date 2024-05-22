@@ -941,3 +941,27 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         parallel=False,
     )
     assert results[-1].output.tolist() == [13]
+
+
+def test_raise_if_missing_output():
+    @pipefunc(output_name="x")
+    def generate_ints(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="sum")
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
+
+    with pytest.raises(ValueError, match="TODO"):
+        # should raise because it needs "... -> x[i]" in first step
+        Pipeline(
+            [
+                generate_ints,
+                (double_it, "x[i] -> y[i]"),
+                take_sum,
+            ],
+        )
