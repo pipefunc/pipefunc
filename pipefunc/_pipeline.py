@@ -1429,7 +1429,6 @@ def _find_non_root_axes(
     mapspecs: list[MapSpec],
     root_args: list[str],
 ) -> dict[str, list[str | None]]:
-    # Find axes for non-root MapSpec inputs
     non_root_inputs: dict[str, list[str | None]] = {}
     for mapspec in mapspecs:
         for spec in mapspec.inputs:
@@ -1443,12 +1442,10 @@ def _find_non_root_axes(
 
 
 def _replace_none_in_axes(mapspecs: list[MapSpec], non_root_inputs: dict[str, list[str]]) -> None:
-    # Names of all axes in the pipeline
     all_axes_names = {
         axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
     }
 
-    # Replace None axes in non_root_inputs with unique names
     i = 0
     axis_template = "unnamed_{}"
     for name, axes in non_root_inputs.items():
@@ -1473,8 +1470,7 @@ def _create_missing_mapspecs(
         for name in at_least_tuple(func.output_name)
     }
 
-    # Get the parameters that don't have a MapSpec
-    missing = non_root_inputs.keys() & outputs_without_mapspec.keys()
+    missing: set[str] = non_root_inputs.keys() & outputs_without_mapspec.keys()
     func_with_new_mapspecs = set()
     for p in missing:
         func = outputs_without_mapspec[p]
