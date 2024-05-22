@@ -20,9 +20,8 @@ from pipefunc._utils import (
 )
 from pipefunc.map._filearray import (
     FileArray,
-    _construct_full_index,
-    _full_shape,
     _iterate_shape_indices,
+    _select_by_mask,
 )
 from pipefunc.map._mapspec import (
     MapSpec,
@@ -375,8 +374,8 @@ def _indices_to_flat_index(
     external_index: tuple[int, ...],
     internal_index: tuple[int, ...],
 ) -> np.int_:
-    full_index = _construct_full_index(shape_mask, external_index, internal_index)
-    full_shape = _full_shape(shape, internal_shape, shape_mask)
+    full_index = _select_by_mask(shape_mask, external_index, internal_index)
+    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
     return np.ravel_multi_index(full_index, full_shape)
 
 

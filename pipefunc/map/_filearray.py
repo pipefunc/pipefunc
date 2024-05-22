@@ -232,7 +232,7 @@ class FileArray:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
-        full_shape = _full_shape(self.shape, self.internal_shape, self.shape_mask)
+        full_shape = _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
         arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
 
@@ -244,12 +244,12 @@ class FileArray:
                 sub_array = np.asarray(sub_array)  # could be a list
                 shape_mask = self.shape_mask
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _construct_full_index(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _construct_full_index(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
@@ -290,40 +290,30 @@ def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
     return itertools.product(*map(range, shape))
 
 
+def _select_by_mask(
+    mask: tuple[bool, ...],
+    tuple1: tuple[int, ...],
+    tuple2: tuple[int, ...],
+) -> tuple[int, ...]:
+    result = []
+    index1 = 0
+    index2 = 0
+    for m in mask:
+        if m:
+            result.append(tuple1[index1])
+            index1 += 1
+        else:
+            result.append(tuple2[index2])
+            index2 += 1
+    return tuple(result)
+
+
 def _full_shape(
     shape: tuple[int, ...],
     internal_shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
 ) -> tuple[int, ...]:
-    full_shape = []
-    shape_index = 0
-    internal_shape_index = 0
-    for mask in shape_mask:
-        if mask:
-            full_shape.append(shape[shape_index])
-            shape_index += 1
-        else:
-            full_shape.append(internal_shape[internal_shape_index])
-            internal_shape_index += 1
-    return tuple(full_shape)
-
-
-def _construct_full_index(
-    shape_mask: tuple[bool, ...],
-    external_index: tuple[int, ...],
-    internal_index: tuple[int, ...],
-) -> tuple[int, ...]:
-    full_index = []
-    external_idx = 0
-    internal_idx = 0
-    for m in shape_mask:
-        if m:
-            full_index.append(external_index[external_idx])
-            external_idx += 1
-        else:
-            full_index.append(internal_index[internal_idx])
-            internal_idx += 1
-    return tuple(full_index)
+    return _select_by_mask(shape_mask, shape, internal_shape)
 
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:

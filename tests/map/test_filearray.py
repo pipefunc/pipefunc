@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import FileArray, _full_shape, _load_all, dump, load
+from pipefunc.map._filearray import FileArray, _load_all, _select_by_mask, dump, load
 
 
 def test_load_and_dump(tmp_path):
@@ -338,7 +338,7 @@ def test_file_array_with_internal_arrays(tmp_path: Path):
     shape_mask = (True, True, False, False, False)
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
     full_shape = (2, 2, 3, 3, 4)
-    assert _full_shape(shape, internal_shape, shape_mask) == full_shape
+    assert _select_by_mask(shape_mask, shape, internal_shape) == full_shape
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
 
@@ -507,7 +507,8 @@ def test_file_array_with_internal_arrays_full_array_different_order(tmp_path: Pa
     arr.dump((1, 1), data2)
 
     assert arr.to_array(splat_internal=False).shape == (2, 2)
-    assert arr.to_array(splat_internal=True).shape == _full_shape(shape, internal_shape, shape_mask)
+    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    assert arr.to_array(splat_internal=True).shape == full_shape
 
     # Test slicing
     result = arr[:, 0, 0, :, :]
@@ -520,7 +521,7 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     shape = (1,)
     internal_shape = (2,)
     shape_mask = (True, False)  # means shape is (1, 2)
-    full_shape = _full_shape(shape, internal_shape, shape_mask)
+    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
     assert full_shape == (1, 2)
 
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
