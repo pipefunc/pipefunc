@@ -965,3 +965,27 @@ def test_raise_if_missing_output():
                 take_sum,
             ],
         )
+
+
+def test_growing_axis(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", mapspec="n[j] -> x[i, j]")
+    def generate_ints(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="sum", mapspec="y[i, j] -> sum[j]")
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([generate_ints, double_it, take_sum])
+    inputs = {"n": [4, 5]}  # TODO: how to deal with this?
+    # The internal_shapes becomes dynamic...
+    internal_shapes = {"x": (4,)}
+    results = pipeline.map(  # noqa: F841
+        inputs,
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        run_folder=tmp_path,
+    )
