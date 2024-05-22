@@ -190,8 +190,6 @@ class FileArray:
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         normalized_key = self._normalize_key(key)
-        external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
-        internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
 
         if any(isinstance(k, slice) for k in normalized_key):
             slice_indices = self._slice_indices(key)
@@ -225,6 +223,9 @@ class FileArray:
                 if isinstance(k, slice)
             )
             return sliced_array.reshape(new_shape)
+
+        external_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if m)
+        internal_indices = tuple(i for i, m in zip(normalized_key, self.shape_mask) if not m)
 
         file = self._key_to_file(external_indices)  # type: ignore[arg-type]
         if not file.is_file():
