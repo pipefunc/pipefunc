@@ -49,6 +49,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
+from pipefunc.map._run import run
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -321,15 +322,14 @@ class Pipeline:
 
         """
         if not isinstance(f, PipeFunc):
-            f = PipeFunc(f, output_name=f.__name__)
+            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
-                "Initializing the `Pipeline` using `MapSpec`s and"
-                " `PipeFunc`s modifies the `PipeFunc`s inplace."
+                "Initializing the `Pipeline` using tuples of `PipeFunc`s and `MapSpec`s"
+                " will create a copy of the `PipeFunc`."
             )
             warnings.warn(msg, UserWarning, stacklevel=3)
-
-        if mapspec is not None:
+            f: PipeFunc = f.copy()  # type: ignore[no-redef]
             if isinstance(mapspec, str):
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
@@ -597,7 +597,7 @@ class Pipeline:
         )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (unused := set(kwargs) - set(used_parameters)):
+        if None not in used_parameters and (unused := kwargs.keys() - set(used_parameters)):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
@@ -634,8 +634,6 @@ class Pipeline:
             Whether to clean up the `run_folder` before running the pipeline.
 
         """
-        from pipefunc.map import run
-
         return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
 
     @functools.cached_property
