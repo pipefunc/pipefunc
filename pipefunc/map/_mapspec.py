@@ -159,7 +159,7 @@ class MapSpec:
         shape = []
         mask = []
         internal_shape_index = 0
-        output = self.outputs[0]
+        output = self.outputs[0]  # All outputs have the same shape
         for index in output.axes:
             assert isinstance(index, str)
             relevant_arrays = [x for x in self.inputs if index in x.indices]
@@ -232,9 +232,7 @@ class MapSpec:
         }
 
     def __str__(self) -> str:
-        inputs = ", ".join(map(str, self.inputs))
-        if inputs == "":
-            inputs = "..."
+        inputs = ", ".join(map(str, self.inputs)) if self.inputs else "..."
         outputs = ", ".join(map(str, self.outputs))
         return f"{inputs} -> {outputs}"
 
@@ -449,7 +447,6 @@ def _validate_shapes(
         raise ValueError(msg)
     for x in inputs:
         x.validate(input_shapes[x.name])
-
     if internal_shapes:
         for output_name in internal_shapes:
             if output_name not in output_names:
@@ -462,16 +459,16 @@ def _get_common_dim(
     index: str,
     input_shapes: dict[str, tuple[int, ...]],
 ) -> int:
-    def _get_dim(array: ArraySpec, index: str, input_shapes: dict[str, tuple[int, ...]]) -> int:
+    def _get_dim(array: ArraySpec, index: str) -> int:
         axis = array.axes.index(index)
         return input_shapes[array.name][axis]
 
-    dims = [_get_dim(x, index, input_shapes) for x in arrays]
-    if any(dim != dims[0] for dim in dims):
+    dim, *rest = (_get_dim(x, index) for x in arrays)
+    if any(dim != x for x in rest):
         arrs = ", ".join(x.name for x in arrays)
         msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
         raise ValueError(msg)
-    return dims[0]
+    return dim
 
 
 def _get_output_dim(
