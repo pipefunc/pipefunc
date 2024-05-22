@@ -1148,6 +1148,8 @@ class Pipeline:
         connected_components = self._connected_components()
         return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
+    # TODO: I realized that one only needs to check the indices of the outputs
+    # and then follow those outputs down the graph making sure they still exist at the end.
     def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
         function_chains = self._group_functions_by_chains()
         mapspec_chains = [
