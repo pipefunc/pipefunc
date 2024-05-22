@@ -355,7 +355,6 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
 def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
     kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
-    # TODO: must do something here
     map_shape, _ = mapspec.shape(kwarg_shapes)
     map_size = np.prod(map_shape)
 
