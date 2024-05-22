@@ -967,6 +967,27 @@ def test_raise_if_missing_output():
         )
 
 
+def test_return_2d_from_step(tmp_path: Path) -> None:
+    @pipefunc(output_name="x")
+    def generate_ints(n: int) -> np.ndarray:
+        return np.ones((n, n))
+
+    @pipefunc(output_name="y", mapspec="x[i, :] -> y[i]")
+    def double_it(x: np.ndarray) -> np.ndarray:
+        assert len(x.shape) == 1
+        return 2 * sum(x)
+
+    @pipefunc(output_name="sum")
+    def take_sum(y: list[int]) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([generate_ints, double_it, take_sum])
+    r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)})
+    assert r[0].output.tolist() == np.ones((4, 4)).tolist()
+    assert r[1].output.tolist() == [8, 8, 8, 8]
+    assert r[2].output == 32
+
+
 def test_growing_axis(tmp_path: Path) -> None:
     @pipefunc(output_name="x", mapspec="n[j] -> x[i, j]")
     def generate_ints(n: int) -> list[int]:

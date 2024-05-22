@@ -50,7 +50,7 @@ class ArraySpec:
             raise ValueError(msg)
         for i in self.axes:
             if not (i is None or i.isidentifier()):
-                msg = f"Index name '{i}' is not a valid Python identifier"
+                msg = f"Index name '{i}' is not a valid Python identifier."
                 raise ValueError(msg)
 
     def __str__(self) -> str:
@@ -70,7 +70,9 @@ class ArraySpec:
     def validate(self, shape: tuple[int, ...]) -> None:
         """Raise an exception if 'shape' is not compatible with this array spec."""
         if len(shape) != self.rank:
-            msg = f"Expecting array of rank {self.rank}, but got array of shape {shape}"
+            msg = (
+                f"Expecting array of rank {self.rank}, but got array of shape {shape} for `{self}`."
+            )
             raise ValueError(msg)
 
     def add_axes(self, *axis: str | None) -> ArraySpec:
