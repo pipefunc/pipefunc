@@ -30,7 +30,7 @@ def test_simple_sweep(tmp_path: Path) -> None:
     assert results[-1].output == 12
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
-    shapes, masks, _ = map_shapes(pipeline, inputs)
+    shapes, masks = map_shapes(pipeline, inputs)
     assert shapes == {"x": (3,), "z": (3,)}
     assert all(all(mask) for mask in masks.values())
 

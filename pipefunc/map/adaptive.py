@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import adaptive
 
-from pipefunc._utils import at_least_tuple, prod
+from pipefunc._utils import prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     RunInfo,
@@ -131,7 +131,6 @@ def _execute_iteration_in_single(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.internal_shapes,
         run_info.shape_masks,
         run_folder,
     )
@@ -156,10 +155,8 @@ def _execute_iteration_in_map_spec(
     Meets the requirements of `adaptive.SequenceLearner`.
     """
     shape = run_info.shapes[func.output_name]
-    name = at_least_tuple(func.output_name)[0]
-    internal_shape = run_info.internal_shapes.get(name)
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, internal_shape, mask, run_folder)
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -171,7 +168,6 @@ def _execute_iteration_in_map_spec(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.internal_shapes,
         run_info.shape_masks,
         run_folder,
     )

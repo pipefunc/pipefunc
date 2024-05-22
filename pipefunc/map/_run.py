@@ -141,8 +141,8 @@ def _compare_to_previous_run_info(
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    shapes = map_shapes(pipeline, inputs, internal_shapes)
-    if shapes.shapes != old.shapes:
+    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
@@ -169,7 +169,7 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    internal_shapes: dict[str, tuple[int, ...]]
+    internal_shapes: dict[str, int | tuple[int, ...]]
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
 
@@ -195,7 +195,7 @@ class RunInfo(NamedTuple):
         return cls(
             input_paths=input_paths,
             shapes=shapes.shapes,
-            internal_shapes=shapes.internal_shapes,
+            internal_shapes=internal_shapes,
             shape_masks=shapes.masks,
             run_folder=run_folder,
         )
@@ -229,7 +229,6 @@ def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> Any:
@@ -238,11 +237,12 @@ def _load_parameter(
     if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
-    external_shape = tuple(s for s, m in zip(shapes[parameter], shape_masks[parameter]) if m)
+    external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
+    internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
     return FileArray(
         file_array_path,
         external_shape,
-        internal_shapes.get(parameter),
+        internal_shape,
         shape_masks[parameter],
     )
 
@@ -251,13 +251,11 @@ def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, internal_shapes, shape_masks, run_folder)
-        for p in func.parameters
+        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
     }
 
 
@@ -276,26 +274,28 @@ def _select_kwargs(
     return selected
 
 
+def _internal_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+    return tuple(s for s, m in zip(shape, mask) if not m)
+
+
+def _external_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+    return tuple(s for s, m in zip(shape, mask) if m)
+
+
 def _init_file_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
-    internal_shape: tuple[int, ...] | None,
     mask: tuple[bool, ...],
     run_folder: Path,
 ) -> list[FileArray]:
-    shape_mask = None if all(mask) else mask
-    external_shape = tuple(s for s, m in zip(shape, mask) if m)
-    if internal_shape is not None:
-        assert internal_shape == tuple(s for s, m in zip(shape, mask) if not m), (
-            internal_shape,
-            shape,
-        )
+    external_shape = _external_shape(shape, mask)
+    internal_shape = _internal_shape(shape, mask)
     return [
         FileArray(
             _file_array_path(output_name, run_folder),
             external_shape,
             internal_shape,
-            shape_mask,
+            mask,
         )
         for output_name in at_least_tuple(output_name)
     ]
@@ -383,7 +383,6 @@ def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    internal_shapes: dict[str, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
     parallel: bool,  # noqa: FBT001
@@ -391,8 +390,7 @@ def _execute_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    internal_shape = internal_shapes.get(at_least_tuple(func.output_name)[0])
-    file_arrays = _init_file_arrays(func.output_name, shape, internal_shape, mask, run_folder)
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = partial(
         _run_iteration_and_process,
@@ -465,7 +463,6 @@ def _execute_single(
 class Shapes(NamedTuple):
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
-    internal_shapes: dict[str, tuple[int, ...]]
 
 
 def map_shapes(
@@ -517,7 +514,7 @@ def map_shapes(
                 masks[output_name] = mask
 
     assert all(k in shapes for k in map_parameters if k not in internal)
-    return Shapes(shapes, masks, internal)
+    return Shapes(shapes, masks)
 
 
 def _maybe_load_file_array(x: Any) -> Any:
@@ -544,7 +541,6 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.internal_shapes,
         run_info.shape_masks,
         run_folder,
     )
@@ -553,7 +549,6 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
             func,
             kwargs,
             run_info.shapes,
-            run_info.internal_shapes,
             run_info.shape_masks,
             run_folder,
             parallel,
@@ -643,7 +638,6 @@ def load_outputs(
             on,
             run_info.input_paths,
             run_info.shapes,
-            run_info.internal_shapes,
             run_info.shape_masks,
             run_folder,
         )
