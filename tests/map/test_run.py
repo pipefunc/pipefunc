@@ -560,7 +560,7 @@ def test_nd_input_list(tmp_path: Path) -> None:
 
 
 def test_add_mapspec_axis(tmp_path: Path) -> None:
-    @pipefunc(output_name="one")
+    @pipefunc(output_name="one", mapspec="a[i], b[j] -> one[i, j]")
     def one(a, b):
         assert isinstance(a, (int, np.float64))
         assert isinstance(b, (int, np.float64))
@@ -575,13 +575,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     def three(two, d):
         return two / d
 
-    pipeline = Pipeline(
-        [
-            (one, "a[i], b[j] -> one[i, j]"),
-            two,
-            three,
-        ],
-    )
+    pipeline = Pipeline([one, two, three])
     inputs = {"a": np.ones((2,)), "b": [1, 1], "d": 1}
     shapes = {"b": (2,), "a": (2,), "one": (2, 2)}
     assert map_shapes(pipeline, inputs) == shapes
@@ -617,11 +611,11 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
 
 
 def test_add_mapspec_axis_unused_parameter() -> None:
-    @pipefunc(output_name="result")
+    @pipefunc(output_name="result", mapspec="a[i] -> result[i]")
     def func(a):
         return a
 
-    pipeline = Pipeline([(func, "a[i] -> result[i]")])
+    pipeline = Pipeline([func])
 
     pipeline.add_mapspec_axis("unused_param", "j")
 
@@ -629,11 +623,11 @@ def test_add_mapspec_axis_unused_parameter() -> None:
 
 
 def test_add_mapspec_axis_complex_pipeline() -> None:
-    @pipefunc(output_name=("out1", "out2"))
+    @pipefunc(output_name=("out1", "out2"), mapspec="a[i], b[j] -> out1[i, j], out2[i, j]")
     def func1(a, b):
         return a + b, a - b
 
-    @pipefunc(output_name="out3")
+    @pipefunc(output_name="out3", mapspec="out1[i, j], c[k] -> out3[i, j, k]")
     def func2(out1, c):
         return out1 * c
 
@@ -641,13 +635,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     def func3(out2, out3):
         return out2 + out3
 
-    pipeline = Pipeline(
-        [
-            (func1, "a[i], b[j] -> out1[i, j], out2[i, j]"),
-            (func2, "out1[i, j], c[k] -> out3[i, j, k]"),
-            func3,
-        ],
-    )
+    pipeline = Pipeline([func1, func2, func3])
 
     pipeline.add_mapspec_axis("a", "l")
 
@@ -661,7 +649,7 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
 
-    @pipefunc(output_name="y")
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int, z: int) -> int:
         assert isinstance(x, int)
         return 2 * x + z
@@ -671,7 +659,7 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
         return sum(y)
 
     pipeline = Pipeline(
-        [generate_ints, (double_it, "x[i] -> y[i]"), take_sum],
+        [generate_ints, double_it, take_sum],
     )
 
     pipeline.add_mapspec_axis("z", "k")
@@ -688,11 +676,11 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
 
 
 def test_add_mapspec_axis_multiple_axes() -> None:
-    @pipefunc(output_name="result")
+    @pipefunc(output_name="result", mapspec="a[i], b[j] -> result[i, j]")
     def func(a, b):
         return a + b
 
-    pipeline = Pipeline([(func, "a[i], b[j] -> result[i, j]")])
+    pipeline = Pipeline([func])
 
     pipeline.add_mapspec_axis("a", "k")
     pipeline.add_mapspec_axis("b", "l")
@@ -701,11 +689,11 @@ def test_add_mapspec_axis_multiple_axes() -> None:
 
 
 def test_add_mapspec_axis_parameter_in_output() -> None:
-    @pipefunc(output_name="result")
+    @pipefunc(output_name="result", mapspec="a[i, j] -> result[i, j]")
     def func(a):
         return a
 
-    pipeline = Pipeline([(func, "a[i, j] -> result[i, j]")])
+    pipeline = Pipeline([func])
 
     pipeline.add_mapspec_axis("a", "k")
 
