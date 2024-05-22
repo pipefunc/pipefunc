@@ -10,14 +10,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 
-from pipefunc._utils import (
-    at_least_tuple,
-    dump,
-    equal_dicts,
-    handle_error,
-    load,
-    prod,
-)
+from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec, array_shape, mapspec_dimensions, validate_consistent_axes
 
@@ -30,11 +23,6 @@ if TYPE_CHECKING:
         from typing_extensions import TypeAlias
     else:
         from typing import TypeAlias
-
-    if sys.version_info < (3, 11):  # pragma: no cover
-        pass
-    else:
-        pass
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 

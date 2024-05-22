@@ -132,7 +132,7 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     if len(d1) != len(d2):
         return False
 
-    if set(d1.keys()) != set(d2.keys()):
+    if d1.keys() != d2.keys():
         return False
 
     errors = []
