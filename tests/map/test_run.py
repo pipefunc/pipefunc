@@ -974,10 +974,10 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
     def generate_ints(n: int) -> tuple[np.ndarray, np.ndarray]:
         return np.ones((n, n)), np.ones((n, n))
 
-    @pipefunc(output_name="z", mapspec="x[i, :] -> z[i]")
-    def double_it(x: np.ndarray) -> np.ndarray:
+    @pipefunc(output_name="z", mapspec="x[i, :], y[i, :] -> z[i]")
+    def double_it(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         assert len(x.shape) == 1
-        return 2 * sum(x)
+        return 2 * sum(x) + 0 * sum(y)
 
     @pipefunc(output_name="sum")
     def take_sum(z: list[int]) -> int:
@@ -986,7 +986,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
     pipeline = Pipeline([generate_ints, double_it, take_sum])
     assert pipeline.mapspecs_as_strings() == [
         "... -> x[i, unnamed_0], y[i, unnamed_0]",
-        "x[i, :] -> z[i]",
+        "x[i, :], y[i, :] -> z[i]",
     ]
     shapes, masks = map_shapes(pipeline, {"n": 4}, {"x": (4, 4)})
     assert shapes == {("x", "y"): (4, 4), "x": (4, 4), "y": (4, 4), "z": (4,)}
