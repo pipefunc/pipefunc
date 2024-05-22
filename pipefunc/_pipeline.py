@@ -608,7 +608,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None,
-        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         parallel: bool = True,
         cleanup: bool = True,
@@ -625,7 +625,7 @@ class Pipeline:
         run_folder
             The folder to store the run information. If `None`, a temporary folder
             is created.
-        manual_shapes
+        internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
         parallel
@@ -634,7 +634,7 @@ class Pipeline:
             Whether to clean up the `run_folder` before running the pipeline.
 
         """
-        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
+        return run(self, inputs, run_folder, internal_shapes, cleanup=cleanup, parallel=parallel)
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:

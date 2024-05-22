@@ -138,15 +138,15 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | tuple[int, ...]],
 ) -> None:
     if not RunInfo.path(run_folder).is_file():
         return
     old = RunInfo.load(run_folder, cache=False)
-    if manual_shapes != old.manual_shapes:
-        msg = "Manual shapes do not match previous run, cannot use `cleanup=False`."
+    if internal_shapes != old.internal_shapes:
+        msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    if map_shapes(pipeline, inputs, manual_shapes) != old.shapes:
+    if map_shapes(pipeline, inputs, internal_shapes) != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
@@ -173,7 +173,7 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
 class RunInfo(NamedTuple):
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    manual_shapes: dict[str, int | tuple[int, ...]]
+    internal_shapes: dict[str, int | tuple[int, ...]]
     run_folder: Path
 
     @classmethod
@@ -182,23 +182,23 @@ class RunInfo(NamedTuple):
         run_folder: str | Path,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = Path(run_folder)
-        manual_shapes = manual_shapes or {}
+        internal_shapes = internal_shapes or {}
         if cleanup:
             cleanup_run_folder(run_folder)
         else:
-            _compare_to_previous_run_info(pipeline, run_folder, inputs, manual_shapes)
+            _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
-        shapes = map_shapes(pipeline, inputs, manual_shapes)
+        shapes = map_shapes(pipeline, inputs, internal_shapes)
         return cls(
             input_paths=input_paths,
             shapes=shapes,
-            manual_shapes=manual_shapes,
+            internal_shapes=internal_shapes,
             run_folder=run_folder,
         )
 
@@ -231,12 +231,12 @@ def _load_parameter(
     parameter: str,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
-    if parameter in manual_shapes or parameter not in shapes:
+    if parameter in internal_shapes or parameter not in shapes:
         return _load_output(parameter, run_folder)
     file_array_path = _file_array_path(parameter, run_folder)
     shape = shapes[parameter]
@@ -247,11 +247,11 @@ def _func_kwargs(
     func: PipeFunc,
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    manual_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | tuple[int, ...]],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, manual_shapes, run_folder)
+        p: _load_parameter(p, input_paths, shapes, internal_shapes, run_folder)
         for p in func.parameters
     }
 
@@ -434,10 +434,10 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> dict[_OUTPUT_TYPE, tuple[int, ...]]:
-    if manual_shapes is None:
-        manual_shapes = {}
+    if internal_shapes is None:
+        internal_shapes = {}
     map_parameters: set[str] = pipeline.map_parameters
 
     input_parameters = set(pipeline.topological_generations[0])
@@ -452,13 +452,13 @@ def map_shapes(
         for p in func.mapspec.input_names:
             if shape := shapes.get(p):
                 input_shapes[p] = shape
-            elif p in manual_shapes:
-                input_shapes[p] = at_least_tuple(manual_shapes[p])
+            elif p in internal_shapes:
+                input_shapes[p] = at_least_tuple(internal_shapes[p])
             else:
                 msg = (
                     f"Parameter `{p}` is used in map but its shape"
                     " cannot be inferred from the inputs."
-                    " Provide the shape manually in `manual_shapes`."
+                    " Provide the shape manually in `internal_shapes`."
                 )
                 raise ValueError(msg)
         output_shape = func.mapspec.shape(input_shapes)
@@ -467,7 +467,7 @@ def map_shapes(
             for output_name in func.output_name:
                 shapes[output_name] = output_shape
 
-    assert all(k in shapes for k in map_parameters if k not in manual_shapes)
+    assert all(k in shapes for k in map_parameters if k not in internal_shapes)
     return shapes
 
 
@@ -495,7 +495,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.manual_shapes,
+        run_info.internal_shapes,
         run_folder,
     )
     if func.mapspec:
@@ -532,7 +532,7 @@ def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -551,7 +551,7 @@ def run(
     run_folder
         The folder to store the run information. If `None`, a temporary folder
         is created.
-    manual_shapes
+    internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
@@ -562,7 +562,7 @@ def run(
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     outputs = []
     for gen in pipeline.topological_generations[1]:
@@ -585,7 +585,7 @@ def load_outputs(
             on,
             run_info.input_paths,
             run_info.shapes,
-            run_info.manual_shapes,
+            run_info.internal_shapes,
             run_folder,
         )
         for on in output_names
