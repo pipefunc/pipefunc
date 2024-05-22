@@ -25,9 +25,7 @@ def _combined_exclude(
     return lambda x: any(func(x) for func in funcs)
 
 
-def _combine_dicts(
-    *maybe_dict: dict[str, Any] | None,
-) -> dict[str, Any] | None:
+def _combine_dicts(*maybe_dict: dict[str, Any] | None) -> dict[str, Any] | None:
     """Combine multiple dictionaries into one."""
     dicts = [d for d in maybe_dict if d is not None]
     if len(dicts) == 0:
@@ -274,10 +272,7 @@ class Sweep:
             derivers=_combine_dicts(self.derivers, other.derivers),  # type: ignore[arg-type]
         )
 
-    def add_derivers(
-        self,
-        **derivers: Callable[[dict[str, Any]], Any],
-    ) -> Sweep:
+    def add_derivers(self, **derivers: Callable[[dict[str, Any]], Any]) -> Sweep:
         """Add derivers to the sweep, which are functions that modify the sweep items.
 
         Parameters
