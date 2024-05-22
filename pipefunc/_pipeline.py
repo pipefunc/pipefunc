@@ -771,7 +771,9 @@ class Pipeline:
         root_args = self.topological_generations[0]
         mapspecs = self.mapspecs(ordered=False)
         non_root_inputs = _find_non_root_axes(mapspecs, root_args)
-        _replace_none_in_axes(mapspecs, non_root_inputs)  # type: ignore[arg-type]
+        output_names = {at_least_tuple(f.output_name) for f in self.functions}
+        multi_output_mapping = {n: names for names in output_names for n in names if len(names) > 1}
+        _replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
         return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
     def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
@@ -1411,7 +1413,11 @@ def _find_non_root_axes(
     return non_root_inputs
 
 
-def _replace_none_in_axes(mapspecs: list[MapSpec], non_root_inputs: dict[str, list[str]]) -> None:
+def _replace_none_in_axes(
+    mapspecs: list[MapSpec],
+    non_root_inputs: dict[str, list[str]],
+    multi_output_mapping: dict[str, tuple[str, ...]],
+) -> None:
     all_axes_names = {
         axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
     }
@@ -1425,6 +1431,10 @@ def _replace_none_in_axes(mapspecs: list[MapSpec], non_root_inputs: dict[str, li
                     i += 1
                 non_root_inputs[name][j] = new_axis
                 all_axes_names.add(new_axis)
+                if name in multi_output_mapping:
+                    # If output is a tuple, update its axes with the new axis.
+                    for output_name in multi_output_mapping[name]:
+                        non_root_inputs[output_name][j] = new_axis
     assert not any(None in axes for axes in non_root_inputs.values())
 
 
