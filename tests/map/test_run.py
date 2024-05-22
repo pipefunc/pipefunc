@@ -242,11 +242,12 @@ def test_simple_from_step(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            (generate_ints, "... -> x[i]"),
+            generate_ints,  # will autogen "... -> x[i]"
             (double_it, "x[i] -> y[i]"),
             take_sum,
         ],
     )
+    assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
     inputs = {"n": 4}
     results = run(
         pipeline,
@@ -324,11 +325,15 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
 
     pipeline = Pipeline(
         [
-            (generate_array, "... -> array[i, j, k]"),
+            generate_array,  # will autogen "... -> array[i, unnamed_0, unnamed_1]"
             (double_it, "array[i, :, :] -> vector[i]"),
             norm,
         ],
     )
+    assert pipeline.mapspecs_as_strings() == [
+        "... -> array[i, unnamed_0, unnamed_1]",
+        "array[i, :, :] -> vector[i]",
+    ]
     inputs = {"shape": (1, 2, 3)}
     internal_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
     results = run(

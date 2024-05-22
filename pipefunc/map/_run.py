@@ -662,7 +662,7 @@ def run(
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    # _validate_mapspec_complete(pipeline)
+    _validate_mapspec_complete(pipeline)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
