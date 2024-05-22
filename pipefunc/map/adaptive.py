@@ -40,7 +40,7 @@ def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     return_output: bool = False,
     cleanup: bool = True,
@@ -60,8 +60,8 @@ def create_learners(
         The inputs to the pipeline, the same as passed to `pipeline.map`.
     run_folder
         The folder to store the run information.
-    manual_shapes
-        The manual shapes to use for the run.
+    internal_shapes
+        The internal shapes to use for the run.
     return_output
         Whether to return the output of the function in the learner.
     cleanup
@@ -75,7 +75,7 @@ def create_learners(
 
     """
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, manual_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
     learners = []
     for gen in pipeline.topological_generations[1]:
@@ -131,7 +131,7 @@ def _execute_iteration_in_single(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.manual_shapes,
+        run_info.internal_shapes,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -167,7 +167,7 @@ def _execute_iteration_in_map_spec(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.manual_shapes,
+        run_info.internal_shapes,
         run_folder,
     )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, file_arrays)
@@ -185,7 +185,7 @@ class _MapWrapper:
     mock_pipeline: _MockPipeline
     inputs: dict[str, Any]
     run_folder: Path
-    manual_shapes: dict[str, int | tuple[int, ...]] | None
+    internal_shapes: dict[str, int | tuple[int, ...]] | None
     parallel: bool
     cleanup: bool
 
@@ -195,7 +195,7 @@ class _MapWrapper:
             self.mock_pipeline,  # type: ignore[arg-type]
             self.inputs,
             self.run_folder,
-            self.manual_shapes,
+            self.internal_shapes,
             parallel=self.parallel,
             cleanup=self.cleanup,
         )
@@ -205,7 +205,7 @@ def create_learners_from_sweep(
     pipeline: Pipeline,
     sweep: Sweep,
     run_folder: str | Path,
-    manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -232,8 +232,8 @@ def create_learners_from_sweep(
     run_folder
         The folder to store the run information. Each sweep run will be stored in
         a subfolder of this folder.
-    manual_shapes
-        The manual shapes to use for the run, as expected by `pipeline.map`.
+    internal_shapes
+        The internal shapes to use for the run, as expected by `pipeline.map`.
     parallel
         Whether to run the map in parallel.
     cleanup
@@ -252,7 +252,7 @@ def create_learners_from_sweep(
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
         mock_pipeline = _MockPipeline.from_pipeline(pipeline)
-        f = _MapWrapper(mock_pipeline, inputs, sweep_run, manual_shapes, parallel, cleanup)
+        f = _MapWrapper(mock_pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup)
         learner = adaptive.SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

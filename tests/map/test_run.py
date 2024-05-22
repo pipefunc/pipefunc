@@ -242,7 +242,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes={"x": (4,)},
+        internal_shapes={"x": (4,)},
         parallel=False,
     )
     assert results[-1].output == 12
@@ -315,18 +315,18 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         ],
     )
     inputs = {"shape": (1, 2, 3)}
-    manual_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
+    internal_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
     results = run(
         pipeline,
         inputs,
         run_folder=tmp_path,
-        manual_shapes=manual_shapes,  # type: ignore[arg-type]
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
     )
     assert results[-1].output == 21.0
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
-    assert map_shapes(pipeline, inputs, manual_shapes) == {"vector": (1,)}
+    assert map_shapes(pipeline, inputs, internal_shapes) == {"vector": (1,)}
 
 
 @dataclass(frozen=True)
@@ -644,7 +644,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
 
 
-def test_mapspec_manual_shapes(tmp_path: Path) -> None:
+def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -668,11 +668,11 @@ def test_mapspec_manual_shapes(tmp_path: Path) -> None:
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
 
     inputs = {"n": 4, "z": [1, 2]}
-    manual_shapes = {"x": 4}
-    results = pipeline.map(inputs, tmp_path, manual_shapes, parallel=False)  # type: ignore[arg-type]
+    internal_shapes = {"x": 4}
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output.tolist() == [16, 20]
     shapes = {"z": (2,), "y": (4, 2), "sum": (2,)}
-    assert map_shapes(pipeline, inputs, manual_shapes) == shapes  # type: ignore[arg-type]
+    assert map_shapes(pipeline, inputs, internal_shapes) == shapes  # type: ignore[arg-type]
 
 
 def test_add_mapspec_axis_multiple_axes() -> None:
