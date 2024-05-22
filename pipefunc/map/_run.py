@@ -203,12 +203,7 @@ class RunInfo(NamedTuple):
         dump(self._asdict(), path)
 
     @classmethod
-    def load(
-        cls: type[RunInfo],
-        run_folder: str | Path,
-        *,
-        cache: bool = True,
-    ) -> RunInfo:
+    def load(cls: type[RunInfo], run_folder: str | Path, *, cache: bool = True) -> RunInfo:
         path = cls.path(run_folder)
         dct = load(path, cache=cache)
         return cls(**dct)
@@ -299,10 +294,7 @@ def _init_file_arrays(
     ]
 
 
-def _init_result_arrays(
-    output_name: _OUTPUT_TYPE,
-    shape: tuple[int, ...],
-) -> list[np.ndarray]:
+def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -477,11 +469,7 @@ def _maybe_load_single_output(
     return None, False
 
 
-def _execute_single(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    run_folder: Path,
-) -> Any:
+def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
     # Load the output if it exists
     output, exists = _maybe_load_single_output(func, run_folder)
     if exists:
@@ -663,10 +651,7 @@ def run(
     return outputs
 
 
-def load_outputs(
-    *output_names: str,
-    run_folder: str | Path,
-) -> Any:
+def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)

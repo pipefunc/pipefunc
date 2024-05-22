@@ -292,11 +292,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Parameters
@@ -341,12 +337,7 @@ class Pipeline:
         self._init_internal_cache()  # reset cache
         return f
 
-    def drop(
-        self,
-        *,
-        f: PipeFunc | None = None,
-        output_name: _OUTPUT_TYPE | None = None,
-    ) -> None:
+    def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
         """Drop a function from the pipeline.
 
         Parameters
@@ -428,12 +419,7 @@ class Pipeline:
         self._func[output_name] = f
         return f
 
-    def __call__(
-        self,
-        __output_name__: _OUTPUT_TYPE | None = None,
-        /,
-        **kwargs: Any,
-    ) -> Any:
+    def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
@@ -1349,15 +1335,11 @@ def _sort_key(node: PipeFunc | str) -> str:
     return node
 
 
-def _unique(
-    nodes: Iterable[PipeFunc | str],
-) -> tuple[PipeFunc | str, ...]:
+def _unique(nodes: Iterable[PipeFunc | str]) -> tuple[PipeFunc | str, ...]:
     return tuple(sorted(set(nodes), key=_sort_key))
 
 
-def _filter_funcs(
-    funcs: Iterable[PipeFunc | str],
-) -> list[PipeFunc]:
+def _filter_funcs(funcs: Iterable[PipeFunc | str]) -> list[PipeFunc]:
     return [f for f in funcs if isinstance(f, PipeFunc)]
 
 

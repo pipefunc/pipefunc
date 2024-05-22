@@ -176,11 +176,7 @@ class MapSpec:
                 internal_shape_index += 1
         return tuple(shape), tuple(mask)
 
-    def output_key(
-        self,
-        shape: tuple[int, ...],
-        linear_index: int,
-    ) -> tuple[int, ...]:
+    def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
 
         Parameters
