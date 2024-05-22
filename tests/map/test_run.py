@@ -676,7 +676,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
 
 
 def test_mapspec_internal_shapes(tmp_path: Path) -> None:
-    @pipefunc(output_name="x")
+    @pipefunc(output_name="x", mapspec="... -> x[i]")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
 
@@ -692,7 +692,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     pipeline = Pipeline([generate_ints, double_it, take_sum])
 
     pipeline.add_mapspec_axis("z", axis="k")
-    assert generate_ints.mapspec is None
+    assert str(generate_ints.mapspec) == "... -> x[i]"
     assert str(double_it.mapspec) == "x[i], z[k] -> y[i, k]"
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
 
@@ -700,9 +700,9 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     internal_shapes = {"x": 4}
     results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output.tolist() == [16, 20]
-    expected = {"z": (2,), "y": (4, 2), "sum": (2,)}
+    expected = {"z": (2,), "x": (4,), "y": (4, 2), "sum": (2,)}
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
-    assert all(all(mask) for mask in masks.values())
+    assert masks == {"z": (True,), "x": (False,), "y": (True, True), "sum": (True,)}
     assert shapes == expected  # type: ignore[arg-type]
 
 
@@ -956,7 +956,7 @@ def test_raise_if_missing_output():
     def take_sum(y: list[int]) -> int:
         return sum(y)
 
-    with pytest.raises(ValueError, match="TODO"):
+    with pytest.raises(ValueError, match="so they must appear"):
         # should raise because it needs "... -> x[i]" in first step
         Pipeline(
             [

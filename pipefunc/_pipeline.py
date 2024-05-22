@@ -267,7 +267,25 @@ class Pipeline:
             del self.topological_generations
 
     def _validate_mapspec(self) -> None:
-        validate_consistent_axes(self.mapspecs(ordered=False))
+        mapspecs = self.mapspecs()
+        validate_consistent_axes(mapspecs)
+        root_args = self.topological_generations[0]
+        inputs = {name for spec in mapspecs for name in spec.input_names if name not in root_args}
+        func_outputs = {
+            name
+            for func in self.functions
+            for name in at_least_tuple(func.output_name)
+            if func.mapspec is None
+        }
+        if missing := inputs & func_outputs:
+            missing_str = ", ".join(sorted(missing))
+            root_args_str = ", ".join(sorted(root_args))
+            msg = (
+                f"Parameter(s) `{missing_str}` appear in a `MapSpec`'s input parameters,"
+                f" however, they are not root arguments (`{root_args_str}`),"
+                " so they must appear in a `MapSpec`'s output too."
+            )
+            raise ValueError(msg)
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
