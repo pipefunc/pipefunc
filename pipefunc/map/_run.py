@@ -526,12 +526,7 @@ def map_shapes(
                 )
                 raise ValueError(msg)
 
-        output_shapes = {}
-        for p in func.mapspec.output_names:
-            if p in internal:
-                shape = internal[p]
-                output_shapes[p] = shape
-
+        output_shapes = {p: internal[p] for p in func.mapspec.output_names if p in internal}
         output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
         shapes[func.output_name] = output_shape
         masks[func.output_name] = mask
