@@ -81,7 +81,7 @@ def create_learners(
     for gen in pipeline.topological_generations[1]:
         _learners = {}
         for func in gen:
-            if func.mapspec:
+            if func.mapspec and func.mapspec.inputs:
                 f = functools.partial(
                     _execute_iteration_in_map_spec,
                     func=func,
@@ -131,7 +131,7 @@ def _execute_iteration_in_single(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.internal_shapes,
+        run_info.shape_masks,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -155,7 +155,8 @@ def _execute_iteration_in_map_spec(
     Meets the requirements of `adaptive.SequenceLearner`.
     """
     shape = run_info.shapes[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, run_folder)
+    mask = run_info.shape_masks[func.output_name]
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -167,10 +168,10 @@ def _execute_iteration_in_map_spec(
         func,
         run_info.input_paths,
         run_info.shapes,
-        run_info.internal_shapes,
+        run_info.shape_masks,
         run_folder,
     )
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, file_arrays)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
     return outputs if return_output else None
 
 

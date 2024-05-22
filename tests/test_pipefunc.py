@@ -9,14 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import (
-    PipeFunc,
-    Pipeline,
-    Sweep,
-    count_sweep,
-    get_precalculation_order,
-    pipefunc,
-)
+from pipefunc import PipeFunc, Pipeline, Sweep, count_sweep, get_precalculation_order, pipefunc
 from pipefunc.exceptions import UnusedParametersError
 
 if TYPE_CHECKING:
@@ -181,9 +174,8 @@ def test_different_defaults() -> None:
     def g(c, b=2):
         return c * b
 
-    p = Pipeline([f, g])
     with pytest.raises(ValueError, match="Inconsistent default values"):
-        _ = p.graph
+        Pipeline([f, g])
 
 
 def test_output_name_in_kwargs():
