@@ -175,7 +175,8 @@ class FileArray:
                     sliced_data.append(np.ma.masked)
                     sliced_mask.append(True)
 
-            sliced_array: np.ndarray = np.array(sliced_data, dtype=object)
+            sliced_array: np.ndarray = np.empty(len(sliced_data), dtype=object)
+            sliced_array[:] = sliced_data
             mask: np.ndarray = np.array(sliced_mask, dtype=bool)
             sliced_array = np.ma.masked_array(sliced_array, mask=mask)
 
