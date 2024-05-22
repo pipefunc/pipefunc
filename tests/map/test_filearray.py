@@ -624,3 +624,15 @@ def test_internal_shape_list(typ: type, tmp_path: Path) -> None:
         assert arr[1, :].tolist() == [3, 4]
     assert arr.to_array().tolist() == [[1, 2], [3, 4]]
     assert arr[:, :].shape == (2, 2)
+
+
+def test_internal_nparray_with_dicts(tmp_path: Path) -> None:
+    arr = FileArray(tmp_path, shape=(2,), internal_shape=(2,), shape_mask=(True, False))
+    arr.dump((0,), np.array([{"a": 1}, {"b": 2}], dtype=object))
+    arr.dump((1,), np.array([{"c": 1}, {"d": 2}], dtype=object))
+    assert arr.to_array().tolist() == [[{"a": 1}, {"b": 2}], [{"c": 1}, {"d": 2}]]
+    assert arr[0, 0] == {"a": 1}
+    assert arr[0, 1] == {"b": 2}
+    assert arr[1, 0] == {"c": 1}
+    assert arr[1, 1] == {"d": 2}
+    assert arr[:, 0].tolist() == [{"a": 1}, {"c": 1}]

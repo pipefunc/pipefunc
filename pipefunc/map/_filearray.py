@@ -296,8 +296,7 @@ def _select_by_mask(
     tuple2: tuple[int, ...],
 ) -> tuple[int, ...]:
     result = []
-    index1 = 0
-    index2 = 0
+    index1, index2 = 0, 0
     for m in mask:
         if m:
             result.append(tuple1[index1])
