@@ -969,6 +969,7 @@ def test_return_2d_from_step(tmp_path: Path) -> None:
     assert r[2].output == 32
 
 
+@pytest.mark.xfail(reason="jagged/ragged arrays are not supported (yet?)")
 def test_growing_axis(tmp_path: Path) -> None:
     @pipefunc(output_name="x", mapspec="n[j] -> x[i, j]")
     def generate_ints(n: int) -> list[int]:
