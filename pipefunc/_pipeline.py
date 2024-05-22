@@ -38,7 +38,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import _validate_mapspec_complete, run
+from pipefunc.map._run import run
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -259,7 +259,6 @@ class Pipeline:
     def _validate_mapspec(self) -> None:
         validate_consistent_axes(self.mapspecs(ordered=False))
         self._autogen_mapspec_axes()
-        _validate_mapspec_complete(self)
 
     def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
         """Return the cache used by the pipeline."""
