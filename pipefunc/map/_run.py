@@ -352,8 +352,8 @@ def _update_file_array(
     outputs: list[Any],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
-    shape = tuple(s for s, m in zip(shape, shape_mask) if m)
-    output_key = func.mapspec.output_key(shape, index)
+    external_shape = _external_shape(shape, shape_mask)
+    output_key = func.mapspec.output_key(external_shape, index)
     for file_array, _output in zip(file_arrays, outputs):
         file_array.dump(output_key, _output)
 
