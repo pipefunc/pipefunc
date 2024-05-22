@@ -19,14 +19,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Literal,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
 
 import networkx as nx
 from tabulate import tabulate
@@ -36,11 +29,7 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import (
-    at_least_tuple,
-    generate_filename_from_dict,
-    handle_error,
-)
+from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.map._mapspec import (
     ArraySpec,
@@ -790,7 +779,7 @@ class Pipeline:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations[1] for f in gen]
 
-    def add_mapspec_axis(self, parameter: str, axis: str) -> None:
+    def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
         """Add a new axis to `parameter`'s MapSpec.
 
         Parameters
@@ -803,7 +792,8 @@ class Pipeline:
             existing axis name to zip the parameter with the existing axis.
 
         """
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
+        for p in parameter:
+            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._init_internal_cache()  # reset cache because mapspecs have changed
 
     def _func_node_colors(
