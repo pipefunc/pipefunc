@@ -645,6 +645,18 @@ def test_list_or_arrays(tmp_path: Path) -> None:
     # list of 2 (4,4) arrays
     value = [np.random.rand(4, 4) for _ in range(2)]  # noqa: NPY002
     arr.dump((0, 0, 0), value)
-    assert np.array_equal(arr[0, 0, 0], value)
-    assert np.array_equal(arr[:, :, :], value)
-    assert np.array_equal(arr[:, 0, 0], value)
+    assert isinstance(arr[0, 0, 0], list)
+    for x in arr[0, 0, 0]:
+        assert isinstance(x, np.ndarray)
+        assert x.shape == (4, 4)
+    r = arr[:, :, :]
+    assert r.shape == (1, 1, 1)
+    assert r.dtype == object
+    assert isinstance(r[0, 0, 0], list)
+    assert np.array_equal(r[0, 0, 0], value)
+
+    r = arr[:, 0, 0]
+    assert r.shape == (1,)
+    assert r.dtype == object
+    assert isinstance(r[0], list)
+    assert np.array_equal(r[0], value)
