@@ -441,10 +441,10 @@ def _validate_shapes(
     internal_shapes: dict[str, tuple[int, ...]] | None,
     output_names: tuple[str, ...],
 ) -> None:
-    if extra_names := set(input_shapes.keys()) - input_names:
+    if extra_names := input_shapes.keys() - input_names:
         msg = f"Got extra array {extra_names} that are not accepted by this map."
         raise ValueError(msg)
-    if missing_names := input_names - set(input_shapes.keys()):
+    if missing_names := input_names - input_shapes.keys():
         msg = f"Inputs expected by this map were not provided: {missing_names}"
         raise ValueError(msg)
     for x in inputs:
