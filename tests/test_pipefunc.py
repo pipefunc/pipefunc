@@ -181,9 +181,8 @@ def test_different_defaults() -> None:
     def g(c, b=2):
         return c * b
 
-    p = Pipeline([f, g])
     with pytest.raises(ValueError, match="Inconsistent default values"):
-        _ = p.graph
+        Pipeline([f, g])
 
 
 def test_output_name_in_kwargs():

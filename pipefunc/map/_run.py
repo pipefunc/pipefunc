@@ -662,6 +662,7 @@ def run(
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    _validate_mapspec_complete(pipeline)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
     run_info.dump(run_folder)
@@ -693,3 +694,24 @@ def load_outputs(
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def _validate_mapspec_complete(pipeline: Pipeline | _MockPipeline) -> None:
+    root_args = pipeline.topological_generations[0]
+    mapspecs = pipeline.mapspecs(ordered=False)
+    inputs = {name for spec in mapspecs for name in spec.input_names if name not in root_args}
+    func_outputs = {
+        name
+        for func in pipeline.functions
+        for name in at_least_tuple(func.output_name)
+        if func.mapspec is None
+    }
+    if missing := inputs & func_outputs:
+        missing_str = ", ".join(sorted(missing))
+        root_args_str = ", ".join(sorted(root_args))
+        msg = (
+            f"Parameter(s) `{missing_str}` appear in a `MapSpec`'s input parameters,"
+            f" however, they are not root arguments (`{root_args_str}`),"
+            " so they must appear in a `MapSpec`'s output too."
+        )
+        raise ValueError(msg)
