@@ -308,14 +308,6 @@ def _select_by_mask(
     return tuple(result)
 
 
-def _full_shape(
-    shape: tuple[int, ...],
-    internal_shape: tuple[int, ...],
-    shape_mask: tuple[bool, ...],
-) -> tuple[int, ...]:
-    return _select_by_mask(shape_mask, shape, internal_shape)
-
-
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
         return read(f) if f.is_file() else None
