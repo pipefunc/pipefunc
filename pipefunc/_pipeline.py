@@ -323,6 +323,7 @@ class Pipeline:
 
         self.functions.append(f)
 
+        # TODO; make cached prop
         self.output_to_func[f.output_name] = f
         if isinstance(f.output_name, tuple):
             for name in f.output_name:
