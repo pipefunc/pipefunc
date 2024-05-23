@@ -27,6 +27,7 @@ def to_xarray(
     *,
     run_folder: str | Path | None = None,
     use_intermediate: bool = False,
+    verbose: bool = True,
 ) -> xr.DataArray:
     """Convert the output data to an `xarray.DataArray`."""
     # Find the target mapspec
@@ -54,15 +55,18 @@ def to_xarray(
                 coords[axis] = (":".join(input_names), multiindex)
                 continue
 
-        input_name = input_names[0]
+        input_name = input_names[0]  # Unpack the single-element list
         if input_name in inputs:
             coords[axis] = (input_name, inputs[input_name])
         elif use_intermediate and run_folder:
             coord_data = load_outputs(input_name, run_folder=run_folder)
             coords[axis] = (input_name, coord_data)
-        else:
-            msg = f"Input '{input_name}' not found in inputs and not available in intermediate results."
-            raise KeyError(msg)
+        elif verbose:
+            msg = (
+                f"Input '{input_name}' not found in `inputs` and `intermediate_results=False`,"
+                f" so coordinate with `{axis=}` cannot be created."
+            )
+            print(msg)
 
     # Create MultiIndexes for each combined axis
     multiindex_coords = dict(coords.values())

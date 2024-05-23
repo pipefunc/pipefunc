@@ -145,4 +145,7 @@ def test_to_xarray_from_step(tmp_path: Path):
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
 
     # Now *without* intermediate results
-    # TODO: Fix this case!
+    da = to_xarray(data, output_name, mapspecs, inputs, use_intermediate=False)
+    assert list(da.dims) == ["i"]
+    assert da.coords == {}
+    assert da.data.tolist() == [0, 2, 4, 6]
