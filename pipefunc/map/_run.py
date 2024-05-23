@@ -128,6 +128,7 @@ def cleanup_run_folder(run_folder: str | Path) -> None:
     run_folder = Path(run_folder)
     shutil.rmtree(run_folder, ignore_errors=True)
 
+
 # TODO use custom eq
 def _compare_to_previous_run_info(
     pipeline: Pipeline,
@@ -164,6 +165,7 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
             raise ValueError(msg)
+
 
 # TODO make dataclass
 class RunInfo(NamedTuple):
@@ -536,7 +538,8 @@ def _load_file_array(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
         kwargs[k] = _maybe_load_file_array(v)
 
- # frozen dataclass?
+
+# frozen dataclass?
 class Result(NamedTuple):
     function: str
     kwargs: dict[str, Any]
