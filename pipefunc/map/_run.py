@@ -63,6 +63,10 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    def mapspecs_as_strings(self) -> list[str]:
+        """Return the MapSpecs for all functions in the pipeline as strings."""
+        return [str(ms) for ms in self.mapspecs()]
+
     @property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
