@@ -470,7 +470,7 @@ class Pipeline:
         used_parameters.update(func_args)
         return func_args
 
-    def _execute_pipeline( # TODO rename _run
+    def _execute_pipeline(  # TODO rename _run
         self,
         *,
         output_name: _OUTPUT_TYPE,
