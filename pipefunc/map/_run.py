@@ -538,7 +538,6 @@ def _load_file_array(kwargs: dict[str, Any]) -> None:
         kwargs[k] = _maybe_load_file_array(v)
 
 
-# frozen dataclass?
 class Result(NamedTuple):
     function: str
     kwargs: dict[str, Any]
