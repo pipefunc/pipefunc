@@ -28,7 +28,7 @@ dependencies:
   # optional-dependencies: docs
   - myst-nb
   - sphinx
-  - furo
+  - sphinx-book-theme
   - myst-parser
   - emoji
   - jupytext
