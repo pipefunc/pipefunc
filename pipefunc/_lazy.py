@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 from typing import TYPE_CHECKING, Any, Generator, Iterable, NamedTuple
 
 import networkx as nx
@@ -135,3 +136,13 @@ def evaluate_lazy(x: Any) -> Any:
     if isinstance(x, set):
         return {evaluate_lazy(v) for v in x}
     return x
+
+
+def maybe_lazy(func):
+    @functools.wraps(func)
+    def wrapper(*args, lazy=False, **kwargs):
+        if lazy:
+            return _LazyFunction(func, args=args, kwargs=kwargs)
+        return func(*args, **kwargs)
+
+    return wrapper
