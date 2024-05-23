@@ -486,7 +486,7 @@ def _get_output_dim(
 def _trace_dependencies(
     output_name: str,
     mapspec_mapping: dict[str, MapSpec],
-) -> dict[str, defaultdict[str, set[str]]]:
+) -> defaultdict[str, set[str]]:
     dependencies: defaultdict[str, set[str]] = defaultdict(set)
     mapspec = mapspec_mapping[output_name]
 
@@ -494,16 +494,12 @@ def _trace_dependencies(
         for axis in input_spec.axes:
             if axis is not None:
                 if input_spec.name in mapspec_mapping:
-                    nested_dependencies = _trace_dependencies(
-                        input_spec.name,
-                        mapspec_mapping,
-                    )
-                    for nested_deps in nested_dependencies.values():
-                        dependencies[axis].update(nested_deps[axis])
+                    nested_dependencies = _trace_dependencies(input_spec.name, mapspec_mapping)
+                    dependencies[axis].update(nested_dependencies[axis])
                 else:
                     dependencies[axis].add(input_spec.name)
 
-    return {output_name: dependencies}
+    return dependencies
 
 
 def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str, ...]]]:
@@ -517,7 +513,7 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
 
     for output_name in mapspec_mapping:
         deps = _trace_dependencies(output_name, mapspec_mapping)
-        all_dependencies.update(deps)
+        all_dependencies[output_name] = deps
 
     return {
         output_name: {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
