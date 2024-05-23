@@ -1098,8 +1098,7 @@ class Pipeline:
     def copy(self) -> Pipeline:
         """Return a copy of the pipeline."""
         return Pipeline(
-            # TODO make copy of functions
-            self.functions,  # type: ignore[arg-type]
+            [f.copy() for f in self.functions],  # type: ignore[arg-type]
             lazy=self.lazy,
             debug=self._debug,
             profile=self._profile,
