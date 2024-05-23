@@ -153,11 +153,7 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     return True
 
 
-def _format_table_row(
-    row: list[str],
-    widths: list[int],
-    seperator: str = " | ",
-) -> str:  # pragma: no cover
+def _format_table_row(row: list[str], widths: list[int], seperator: str = " | ") -> str:
     """Format a row of the table with specified column widths."""
     return seperator.join(f"{cell:<{widths[i]}}" for i, cell in enumerate(row))
 
