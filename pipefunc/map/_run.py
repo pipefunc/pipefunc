@@ -224,7 +224,6 @@ class RunInfo:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self, run_folder: str | Path) -> None:
-        print(asdict(self), "yo")
         path = self.path(run_folder)
         dump(asdict(self), path)
 
