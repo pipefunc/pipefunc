@@ -346,6 +346,28 @@ class Pipeline:
         return output_to_func
 
     @functools.cached_property
+    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
+        """Return a mapping from node names to nodes.
+
+        Returns
+        -------
+        Dict[_OUTPUT_TYPE, PipeFunc | str]
+            A mapping from node names to nodes.
+
+        """
+        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
+        for node in self.graph.nodes:
+            if isinstance(node, PipeFunc):
+                if isinstance(node.output_name, tuple):
+                    for name in node.output_name:
+                        mapping[name] = node
+                mapping[node.output_name] = node
+            else:
+                assert isinstance(node, str)
+                mapping[node] = node
+        return mapping
+
+    @functools.cached_property
     def graph(self) -> nx.DiGraph:
         """Create a directed graph representing the pipeline.
 
@@ -594,28 +616,6 @@ class Pipeline:
         """
         return run(self, inputs, run_folder, internal_shapes, cleanup=cleanup, parallel=parallel)
 
-    @functools.cached_property
-    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
-        """Return a mapping from node names to nodes.
-
-        Returns
-        -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
-            A mapping from node names to nodes.
-
-        """
-        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                if isinstance(node.output_name, tuple):
-                    for name in node.output_name:
-                        mapping[name] = node
-                mapping[node.output_name] = node
-            else:
-                assert isinstance(node, str)
-                mapping[node] = node
-        return mapping
-
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.
 
@@ -743,7 +743,7 @@ class Pipeline:
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         return generations[0], generations[1:]
 
-    @property
+    @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations[1] for f in gen]
