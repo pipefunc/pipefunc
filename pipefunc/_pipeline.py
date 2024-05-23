@@ -625,7 +625,7 @@ class Pipeline:
         run_folder: str | Path,
         use_intermediate: bool = True,
     ) -> xr.Dataset:
-        """Load the output(s) of a pipeline run as an `xarray.Dataset`.
+        """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
 
         Parameters
         ----------
