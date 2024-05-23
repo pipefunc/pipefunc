@@ -51,7 +51,7 @@ def to_xarray(
                     break
             else:
                 multiindex = pd.MultiIndex.from_arrays(arrays, names=input_names)
-                coords[axis] = ("_".join(input_names) + "_zipped", multiindex)
+                coords[axis] = (":".join(input_names), multiindex)
                 continue
 
         input_name = input_names[0]

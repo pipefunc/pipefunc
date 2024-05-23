@@ -68,9 +68,9 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
     da = to_xarray(data, output_name, mapspecs, inputs)
 
     expected_coords = {"x": inputs["x"], "y": inputs["y"], "z": inputs["z"]}
-    expected_dims = ["x_y_zipped", "z"]
+    expected_dims = ["x:y", "z"]
     assert list(da.dims) == expected_dims
-    assert da.coords["x_y_zipped"].to_numpy().tolist() == [(1, 4), (2, 5), (3, 6)]
+    assert da.coords["x:y"].to_numpy().tolist() == [(1, 4), (2, 5), (3, 6)]
     assert da.coords["z"].to_numpy().tolist() == expected_coords["z"]
     assert da.to_numpy().tolist() == [[12, 13], [14, 15], [16, 17]]
 
