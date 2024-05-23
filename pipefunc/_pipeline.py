@@ -217,7 +217,6 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
-        self.output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -235,26 +234,10 @@ class Pipeline:
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
         self._func: dict[_OUTPUT_TYPE, _Function] = {}
-        with contextlib.suppress(AttributeError):
-            del self.graph
-        with contextlib.suppress(AttributeError):
-            del self.root_nodes
-        with contextlib.suppress(AttributeError):
-            del self.leaf_nodes
-        with contextlib.suppress(AttributeError):
-            del self.unique_leaf_node
-        with contextlib.suppress(AttributeError):
-            del self.map_parameters
-        with contextlib.suppress(AttributeError):
-            del self.defaults
-        with contextlib.suppress(AttributeError):
-            del self.node_mapping
-        with contextlib.suppress(AttributeError):
-            del self.all_arg_combinations
-        with contextlib.suppress(AttributeError):
-            del self.all_root_args
-        with contextlib.suppress(AttributeError):
-            del self.topological_generations
+        for k, v in type(self).__dict__.items():
+            if isinstance(v, functools.cached_property):
+                with contextlib.suppress(AttributeError):
+                    delattr(self, k)
 
     def _validate_mapspec(self) -> None:
         validate_consistent_axes(self.mapspecs(ordered=False))
@@ -323,12 +306,6 @@ class Pipeline:
 
         self.functions.append(f)
 
-        # TODO; make cached prop
-        self.output_to_func[f.output_name] = f
-        if isinstance(f.output_name, tuple):
-            for name in f.output_name:
-                self.output_to_func[name] = f
-
         if self.profile is not None:
             f.set_profiling(enable=self.profile)
 
@@ -354,15 +331,20 @@ class Pipeline:
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
-            if isinstance(f.output_name, tuple):
-                for name in f.output_name:
-                    del self.output_to_func[name]
-            else:
-                del self.output_to_func[f.output_name]
         elif output_name is not None:
             f = self.output_to_func[output_name]
             self.drop(f=f)
         self._init_internal_cache()
+
+    @functools.cached_property
+    def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+        output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
+        for f in self.functions:
+            output_to_func[f.output_name] = f
+            if isinstance(f.output_name, tuple):
+                for name in f.output_name:
+                    output_to_func[name] = f
+        return output_to_func
 
     @functools.cached_property
     def graph(self) -> nx.DiGraph:
