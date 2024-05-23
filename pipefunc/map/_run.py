@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
@@ -129,7 +129,6 @@ def cleanup_run_folder(run_folder: str | Path) -> None:
     shutil.rmtree(run_folder, ignore_errors=True)
 
 
-# TODO use custom eq
 def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
@@ -151,7 +150,7 @@ def _compare_to_previous_run_info(
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding without `cleanup`, hoping for the best.",
+            " Proceeding *without* `cleanup`, hoping for the best.",
         )
         return
     if not equal_inputs:
@@ -167,8 +166,8 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
-# TODO make dataclass
-class RunInfo(NamedTuple):
+@dataclass(frozen=True, eq=True)
+class RunInfo:
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
@@ -204,7 +203,7 @@ class RunInfo(NamedTuple):
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
-        dump(self._asdict(), path)
+        dump(asdict(self), path)
 
     @classmethod
     def load(cls: type[RunInfo], run_folder: str | Path, *, cache: bool = True) -> RunInfo:
