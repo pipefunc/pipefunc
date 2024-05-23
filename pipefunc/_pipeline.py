@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import holoviews as hv
+    import xarray as xr
 
     from pipefunc._perf import ProfilingStats
     from pipefunc.map._run import Result
@@ -615,6 +616,43 @@ class Pipeline:
 
         """
         return run(self, inputs, run_folder, internal_shapes, cleanup=cleanup, parallel=parallel)
+
+    def load_xarray_dataset(
+        self,
+        inputs: dict[str, Any],
+        output_names: list[str] | None = None,
+        *,
+        run_folder: str | Path,
+        use_intermediate: bool = True,
+    ) -> xr.Dataset:
+        """Load the output(s) of a pipeline run as an `xarray.Dataset`.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline.
+        run_folder
+            The folder where the pipeline run was stored.
+        output_names
+            The names of the outputs to load. If None, all outputs are loaded.
+        use_intermediate
+            Whether to use intermediate results when loading the dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            An `xarray.Dataset` containing the outputs of the pipeline run.
+
+        """
+        from pipefunc.map.xarray import load_xarray_dataset
+
+        return load_xarray_dataset(
+            self,
+            inputs,
+            run_folder=run_folder,
+            output_names=output_names,
+            use_intermediate=use_intermediate,
+        )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.

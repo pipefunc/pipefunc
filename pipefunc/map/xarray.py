@@ -83,6 +83,7 @@ def load_xarray_dataset(
     *,
     run_folder: str | Path,
     output_names: list[str] | None = None,
+    use_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
     mapspecs = pipeline.mapspecs()
@@ -97,7 +98,7 @@ def load_xarray_dataset(
                 mapspecs,
                 inputs,
                 run_folder=run_folder,
-                use_intermediate=True,
+                use_intermediate=use_intermediate,
             )
             for name, output_data in zip(output_names, data)
         },
