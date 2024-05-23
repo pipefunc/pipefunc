@@ -25,7 +25,6 @@ repos:
           - types-setuptools
           - pandas-stubs
           - types-psutil
-          - types-tabulate
   - repo: https://github.com/kynan/nbstripout
     rev: 0.7.1
     hooks:
