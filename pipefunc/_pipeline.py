@@ -37,7 +37,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import RunInfo, run
 
 if sys.version_info < (3, 10):  # pragma: no cover
     from typing_extensions import TypeAlias
@@ -619,7 +619,6 @@ class Pipeline:
 
     def load_xarray_dataset(
         self,
-        inputs: dict[str, Any],
         output_names: list[str] | None = None,
         *,
         run_folder: str | Path,
@@ -629,8 +628,6 @@ class Pipeline:
 
         Parameters
         ----------
-        inputs
-            The inputs to the pipeline.
         run_folder
             The folder where the pipeline run was stored.
         output_names
@@ -646,9 +643,10 @@ class Pipeline:
         """
         from pipefunc.map.xarray import load_xarray_dataset
 
+        run_info = RunInfo.load(run_folder)
         return load_xarray_dataset(
             self,
-            inputs,
+            run_info.inputs,
             run_folder=run_folder,
             output_names=output_names,
             use_intermediate=use_intermediate,

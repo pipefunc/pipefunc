@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import functools
 import shutil
 import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
@@ -156,8 +156,7 @@ def _compare_to_previous_run_info(
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
-    equal_inputs = equal_dicts(inputs, old_inputs, verbose=True)
+    equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
@@ -213,6 +212,10 @@ class RunInfo:
             mapspecs=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
         )
+
+    @functools.cached_property
+    def inputs(self) -> dict[str, Any]:
+        return {k: _load_input(k, self.input_paths) for k in self.input_paths}
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
@@ -437,7 +440,7 @@ def _execute_map_spec(
     mask = shape_masks[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
-    process_index = partial(
+    process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,

@@ -79,6 +79,9 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     assert shapes == {"x": (3, 4), "y": (3, 4)}
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results2[-1].output.tolist() == [24, 30, 36, 42]
+    # Load the results as xarray
+    ds = pipeline.load_xarray_dataset(run_folder=tmp_path)
+    assert ds.coords.keys() == {"i", "j"}
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
