@@ -163,7 +163,7 @@ def table(rows: list[Any], headers: list[str]) -> str:
     column_widths = [len(header) for header in headers]
     for row in rows:
         for i, x in enumerate(row):
-            column_widths[i] = max(column_widths[i], len(x))
+            column_widths[i] = max(column_widths[i], len(str(x)))
 
     separator_line = [w * "-" for w in column_widths]
     table_rows = [
