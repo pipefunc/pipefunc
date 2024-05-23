@@ -470,7 +470,7 @@ class Pipeline:
         used_parameters.update(func_args)
         return func_args
 
-    def _execute_pipeline(
+    def _execute_pipeline( # TODO rename _run
         self,
         *,
         output_name: _OUTPUT_TYPE,
@@ -883,7 +883,7 @@ class Pipeline:
             "Number of Calls",
         ]
         table_data = []
-
+        # TODO write own table code
         for func_name, stats in self.profiling_stats.items():
             row = [
                 func_name,
@@ -1118,6 +1118,7 @@ class Pipeline:
     def copy(self) -> Pipeline:
         """Return a copy of the pipeline."""
         return Pipeline(
+            # TODO make copy of functions
             self.functions,  # type: ignore[arg-type]
             lazy=self.lazy,
             debug=self._debug,
