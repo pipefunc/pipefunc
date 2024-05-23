@@ -8,7 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._run import load_outputs, map_shapes, run
+from pipefunc.map._run import load_outputs, load_xarray_dataset, map_shapes, run
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -49,6 +49,8 @@ def test_simple(tmp_path: Path) -> None:
     dimensions = pipeline.mapspec_dimensions()
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
+    ds = load_xarray_dataset(run_folder=tmp_path)
+    assert ds["y"].data.tolist() == [0, 2, 4, 6]
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
@@ -80,7 +82,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results2[-1].output.tolist() == [24, 30, 36, 42]
     # Load the results as xarray
-    ds = pipeline.load_xarray_dataset(run_folder=tmp_path)
+    ds = load_xarray_dataset(run_folder=tmp_path)
     assert ds.coords.keys() == {"i", "j"}
 
 
@@ -534,7 +536,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert counters["f"] == 3
     assert counters["g"] == 1
-
+    print("er", inputs)
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
     assert results2[-1].output == 9
     assert results2[-1].output_name == "sum"

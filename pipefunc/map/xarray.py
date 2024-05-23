@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-    from pipefunc._pipeline import Pipeline
-
 
 def to_xarray(
     output_data: np.ndarray,
@@ -78,7 +76,7 @@ def to_xarray(
 
 
 def load_xarray_dataset(
-    pipeline: Pipeline,
+    mapspecs: list[MapSpec],
     inputs: dict[str, Any],
     *,
     run_folder: str | Path,
@@ -86,7 +84,6 @@ def load_xarray_dataset(
     use_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
-    mapspecs = pipeline.mapspecs()
     if output_names is None:
         output_names = [name for ms in mapspecs for name in ms.output_names]
     data = [load_outputs(name, run_folder=run_folder) for name in output_names]

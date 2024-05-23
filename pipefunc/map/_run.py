@@ -24,6 +24,8 @@ from pipefunc.map._mapspec import (
 if TYPE_CHECKING:
     import sys
 
+    import xarray as xr
+
     from pipefunc import PipeFunc, Pipeline
 
     if sys.version_info < (3, 10):  # pragma: no cover
@@ -93,9 +95,9 @@ def _dump_inputs(
     return paths
 
 
-def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
+def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:
     path = input_paths[name]
-    return load(path, cache=True)
+    return load(path, cache=cache)
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:
@@ -149,14 +151,14 @@ def _compare_to_previous_run_info(
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    if pipeline.mapspecs_as_strings() != old.mapspecs:
+    if pipeline.mapspecs_as_strings() != old.mapspecs_as_strings:
         msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
+    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
@@ -164,7 +166,7 @@ def _compare_to_previous_run_info(
         )
         return
     if not equal_inputs:
-        msg = "Inputs do not match previous run, cannot use `cleanup=False`."
+        msg = f"Inputs {inputs}/{old.inputs} do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
 
 
@@ -183,7 +185,7 @@ class RunInfo:
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
-    mapspecs: list[str]
+    mapspecs_as_strings: list[str]
     pipefunc_version: str = __version__
 
     @classmethod
@@ -209,15 +211,20 @@ class RunInfo:
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
-            mapspecs=pipeline.mapspecs_as_strings(),
+            mapspecs_as_strings=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
         )
 
     @functools.cached_property
     def inputs(self) -> dict[str, Any]:
-        return {k: _load_input(k, self.input_paths) for k in self.input_paths}
+        return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
+
+    @functools.cached_property
+    def mapspecs(self) -> list[MapSpec]:
+        return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self, run_folder: str | Path) -> None:
+        print(asdict(self), "yo")
         path = self.path(run_folder)
         dump(asdict(self), path)
 
@@ -668,3 +675,38 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def load_xarray_dataset(
+    run_folder: str | Path,
+    *,
+    output_names: list[str] | None = None,
+    use_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
+
+    Parameters
+    ----------
+    run_folder
+        The folder where the pipeline run was stored.
+    output_names
+        The names of the outputs to load. If None, all outputs are loaded.
+    use_intermediate
+        Whether to use intermediate results when loading the dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        An `xarray.Dataset` containing the outputs of the pipeline run.
+
+    """
+    from pipefunc.map.xarray import load_xarray_dataset
+
+    run_info = RunInfo.load(run_folder)
+    return load_xarray_dataset(
+        run_info.mapspecs,
+        run_info.inputs,
+        run_folder=run_folder,
+        output_names=output_names,
+        use_intermediate=use_intermediate,
+    )
