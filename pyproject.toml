@@ -32,7 +32,6 @@ dependencies = [
     "typing_extensions; python_version <= '3.9'",
     "cloudpickle",
     "numpy",
-    "tabulate",
 ]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler"]
