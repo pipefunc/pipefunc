@@ -143,7 +143,7 @@ def _compare_to_previous_run_info(
         return
     try:
         old = RunInfo.load(run_folder, cache=False)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 # pragma: no cover
         msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
         raise ValueError(msg) from None
     if internal_shapes != old.internal_shapes:
