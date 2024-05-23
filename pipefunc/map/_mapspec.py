@@ -489,7 +489,6 @@ def _trace_dependencies(
 ) -> defaultdict[str, set[str]]:
     dependencies: defaultdict[str, set[str]] = defaultdict(set)
     mapspec = mapspec_mapping[output_name]
-
     for input_spec in mapspec.inputs:
         for axis in input_spec.axes:
             if axis is not None:
@@ -498,7 +497,6 @@ def _trace_dependencies(
                     dependencies[axis].update(nested_dependencies[axis])
                 else:
                     dependencies[axis].add(input_spec.name)
-
     return dependencies
 
 
@@ -510,11 +508,8 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         if mapspec.inputs
     }
     all_dependencies = {}
-
     for output_name in mapspec_mapping:
-        deps = _trace_dependencies(output_name, mapspec_mapping)
-        all_dependencies[output_name] = deps
-
+        all_dependencies[output_name] = _trace_dependencies(output_name, mapspec_mapping)
     return {
         output_name: {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
         for output_name, dependencies in all_dependencies.items()
