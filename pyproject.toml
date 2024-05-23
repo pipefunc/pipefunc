@@ -41,7 +41,7 @@ test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive", "xarray"]
 docs = [
     "myst-nb",
     "sphinx",
-    "furo",
+    "sphinx-book-theme",
     "myst-parser",
     "emoji",
     "jupytext",
