@@ -22,14 +22,13 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
 
 import networkx as nx
-from tabulate import tabulate
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
+from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error, table
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.map._mapspec import (
     ArraySpec,
@@ -900,7 +899,7 @@ class Pipeline:
                 row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
 
         print("Resource Usage Report:")
-        print(tabulate(table_data, headers, tablefmt="grid"))
+        print(table(table_data, headers))
 
     def _identify_combinable_nodes(
         self,
