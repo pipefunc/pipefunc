@@ -536,7 +536,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     assert results[-1].output_name == "sum"
     assert counters["f"] == 3
     assert counters["g"] == 1
-    print("er", inputs)
+
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
     assert results2[-1].output == 9
     assert results2[-1].output_name == "sum"
