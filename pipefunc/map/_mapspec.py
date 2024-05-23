@@ -507,7 +507,4 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         for output_name in mapspec.output_names
         if mapspec.inputs
     }
-    all_dependencies = {}
-    for output_name in mapspec_mapping:
-        all_dependencies[output_name] = _trace_dependencies(output_name, mapspec_mapping)
-    return all_dependencies
+    return {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
