@@ -137,9 +137,16 @@ def _compare_to_previous_run_info(
 ) -> None:
     if not RunInfo.path(run_folder).is_file():
         return
-    old = RunInfo.load(run_folder, cache=False)
+    try:
+        old = RunInfo.load(run_folder, cache=False)
+    except Exception as e:  # noqa: BLE001
+        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
+        raise ValueError(msg) from None
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    if pipeline.mapspecs_as_strings() != old.mapspecs:
+        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
@@ -173,6 +180,7 @@ class RunInfo:
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
+    mapspecs: list[str]
     pipefunc_version: str = __version__
 
     @classmethod
@@ -198,6 +206,7 @@ class RunInfo:
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
+            mapspecs=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
         )
 

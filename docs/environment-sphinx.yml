@@ -25,6 +25,7 @@ dependencies:
   - pytest-cov
   - pandas
   - adaptive
+  - xarray
   # optional-dependencies: docs
   - myst-nb
   - sphinx
@@ -33,3 +34,4 @@ dependencies:
   - emoji
   - jupytext
   - pandas
+  - xarray

@@ -12,6 +12,7 @@ from pipefunc.map._mapspec import (
     array_shape,
     expected_mask,
     shape_to_strides,
+    trace_dependencies,
     validate_consistent_axes,
 )
 
@@ -403,3 +404,105 @@ def test_shape_exceptions():
     mapspec = MapSpec.from_string("a[i] -> b[i, j]")
     with pytest.raises(ValueError, match="Internal shape of `extra` is not accepted by this map."):
         mapspec.shape({"a": (3,)}, internal_shapes={"extra": (3, 4)})
+
+
+def test_trace_dependencies():
+    # Test 1: Single input to single output
+    mapspecs_1 = [
+        MapSpec.from_string("a[i] -> y[i]"),
+    ]
+    deps_1 = trace_dependencies(mapspecs_1)
+    assert deps_1 == {"y": {"i": ("a",)}}
+
+    # Test 2: Multiple inputs to single output
+    mapspecs_2 = [
+        MapSpec.from_string("a[i], b[i] -> y[i]"),
+    ]
+    deps_2 = trace_dependencies(mapspecs_2)
+    assert deps_2 == {"y": {"i": ("a", "b")}}
+
+    # Test 3: Multiple inputs to multiple outputs
+    mapspecs_3 = [
+        MapSpec.from_string("a[i], b[j] -> y[i, j]"),
+        MapSpec.from_string("a[i], y[i, j] -> z[i, j]"),
+    ]
+    deps_3 = trace_dependencies(mapspecs_3)
+    assert deps_3 == {
+        "y": {"i": ("a",), "j": ("b",)},
+        "z": {"i": ("a",), "j": ("b",)},
+    }
+
+    # Test 4: Nested dependencies
+    mapspecs_4 = [
+        MapSpec.from_string("a[i] -> x[i]"),
+        MapSpec.from_string("x[i] -> y[i]"),
+        MapSpec.from_string("y[i] -> z[i]"),
+    ]
+    deps_4 = trace_dependencies(mapspecs_4)
+    assert deps_4 == {
+        "x": {"i": ("a",)},
+        "y": {"i": ("a",)},
+        "z": {"i": ("a",)},
+    }
+
+    # Test 5: Multiple axes
+    mapspecs_5 = [
+        MapSpec.from_string("a[i], b[j] -> y[i, j]"),
+        MapSpec.from_string("y[i, j], c[k] -> z[i, j, k]"),
+    ]
+    deps_5 = trace_dependencies(mapspecs_5)
+    assert deps_5 == {
+        "y": {"i": ("a",), "j": ("b",)},
+        "z": {"i": ("a",), "j": ("b",), "k": ("c",)},
+    }
+
+    # Test 6: Mixed dependencies
+    mapspecs_6 = [
+        MapSpec.from_string("a[i], b[j] -> x[i, j]"),
+        MapSpec.from_string("x[i, j], c[k] -> y[i, j, k]"),
+        MapSpec.from_string("y[i, :, k] -> z[k, i]"),
+    ]
+    deps_6 = trace_dependencies(mapspecs_6)
+    assert deps_6 == {
+        "x": {"i": ("a",), "j": ("b",)},
+        "y": {"i": ("a",), "j": ("b",), "k": ("c",)},
+        "z": {"i": ("a",), "k": ("c",)},
+    }
+
+    # Test 7: Zipped in different MapSpecs
+    mapspecs_7 = [
+        MapSpec.from_string("a[i], b[i] -> x[i]"),
+        MapSpec.from_string("x[i], c[i] -> y[i]"),
+    ]
+    deps_7 = trace_dependencies(mapspecs_7)
+    assert deps_7 == {
+        "x": {"i": ("a", "b")},
+        "y": {"i": ("a", "b", "c")},
+    }
+
+    # Test 8: Zipped in different MapSpecs multi output
+    mapspecs_8 = [
+        MapSpec.from_string("a[i], b[i] -> x[i], unused[i]"),
+        MapSpec.from_string("x[i], c[i] -> y[i]"),
+    ]
+    deps_8 = trace_dependencies(mapspecs_8)
+    assert deps_8 == {
+        "x": {"i": ("a", "b")},
+        "y": {"i": ("a", "b", "c")},
+        "unused": {"i": ("a", "b")},
+    }
+
+    # Test 9: Single mapspec
+    mapspecs_9 = [
+        MapSpec.from_string("x[i] -> y[i]"),
+    ]
+    deps_9 = trace_dependencies(mapspecs_9)
+    assert deps_9 == {"y": {"i": ("x",)}}
+
+    # Test 10: MapSpec from step
+    mapspecs_10 = [
+        MapSpec.from_string("... -> x[i]"),
+        MapSpec.from_string("x[i] -> y[i]"),
+    ]
+    deps_10 = trace_dependencies(mapspecs_10)
+    assert deps_10 == {"y": {"i": ("x",)}}

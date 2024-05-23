@@ -1,6 +1,7 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_filearray.py` for the changes made.
 
 from __future__ import annotations
 

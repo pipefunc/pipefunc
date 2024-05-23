@@ -1,6 +1,7 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_mapspec.py` for the changes made.
 
 from __future__ import annotations
 
@@ -480,3 +481,55 @@ def _get_output_dim(
         msg = f"Internal shape for '{output.name}' must be a tuple of integers."
         raise TypeError(msg)
     return dim
+
+
+def _trace_dependencies(
+    output_name: str,
+    mapspec_mapping: dict[str, MapSpec],
+    visited: dict[str, dict[str, defaultdict[str, set[str]]]],
+) -> dict[str, defaultdict[str, set[str]]]:
+    if output_name in visited:
+        return visited[output_name]
+
+    dependencies: defaultdict[str, set[str]] = defaultdict(set)
+    mapspec = mapspec_mapping.get(output_name)
+
+    if not mapspec:
+        return {output_name: dependencies}
+
+    for input_spec in mapspec.inputs:
+        for axis in input_spec.axes:
+            if axis is not None:
+                if input_spec.name in mapspec_mapping:
+                    nested_dependencies = _trace_dependencies(
+                        input_spec.name,
+                        mapspec_mapping,
+                        visited,
+                    )
+                    for nested_deps in nested_dependencies.values():
+                        dependencies[axis].update(nested_deps[axis])
+                else:
+                    dependencies[axis].add(input_spec.name)
+
+    visited[output_name] = {output_name: dependencies}
+    return visited[output_name]
+
+
+def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str, ...]]]:
+    mapspec_mapping = {
+        output_name: mapspec
+        for mapspec in mapspecs
+        for output_name in mapspec.output_names
+        if mapspec.inputs
+    }
+    all_dependencies = {}
+    visited: dict[str, dict[str, defaultdict[str, set[str]]]] = {}
+
+    for output_name in mapspec_mapping:
+        deps = _trace_dependencies(output_name, mapspec_mapping, visited)
+        all_dependencies.update(deps)
+
+    return {
+        output_name: {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
+        for output_name, dependencies in all_dependencies.items()
+    }
