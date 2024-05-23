@@ -1,3 +1,4 @@
+# This file is part of the pipefunc repository: pipefunc/map/adaptive.py
 """Provides functions to create adaptive learners for a pipeline."""
 
 from __future__ import annotations

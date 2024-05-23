@@ -1,3 +1,5 @@
+# This file is part of the pipefunc repository: pipefunc/map/_run.py
+
 from __future__ import annotations
 
 import shutil
