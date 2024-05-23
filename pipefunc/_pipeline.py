@@ -433,7 +433,7 @@ class Pipeline:
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
-        # Used in _execute_pipeline
+        # Used in _run
         func_args = {}
         for arg in func.parameters:
             if arg in kwargs:
@@ -441,7 +441,7 @@ class Pipeline:
             elif arg in func.defaults:
                 func_args[arg] = func.defaults[arg]
             else:
-                func_args[arg] = self._execute_pipeline(
+                func_args[arg] = self._run(
                     output_name=arg,
                     kwargs=kwargs,
                     all_results=all_results,
@@ -451,7 +451,7 @@ class Pipeline:
         used_parameters.update(func_args)
         return func_args
 
-    def _execute_pipeline(  # TODO rename _run
+    def _run(
         self,
         *,
         output_name: _OUTPUT_TYPE,
@@ -546,7 +546,7 @@ class Pipeline:
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
 
-        self._execute_pipeline(
+        self._run(
             output_name=output_name,
             kwargs=kwargs,
             all_results=all_results,
@@ -863,8 +863,7 @@ class Pipeline:
             "Total Time (%)",
             "Number of Calls",
         ]
-        table_data = []
-        # TODO write own table code
+        rows = []
         for func_name, stats in self.profiling_stats.items():
             row = [
                 func_name,
@@ -874,15 +873,15 @@ class Pipeline:
                 stats.time.average * stats.time.num_executions,
                 stats.time.num_executions,
             ]
-            table_data.append(row)
+            rows.append(row)
 
-        total_time = sum(row[4] for row in table_data)  # type: ignore[misc]
+        total_time = sum(row[4] for row in rows)  # type: ignore[misc]
         if total_time > 0:
-            for row in table_data:
+            for row in rows:
                 row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
 
         print("Resource Usage Report:")
-        print(table(table_data, headers))
+        print(table(rows, headers))
 
     def _identify_combinable_nodes(
         self,
@@ -1145,7 +1144,7 @@ def _update_cache(
     r: Any,
     start_time: float,
 ) -> None:
-    # Used in _execute_pipeline
+    # Used in _run
     if isinstance(cache, HybridCache):
         duration = time.perf_counter() - start_time
         cache.put(cache_key, r, duration)
@@ -1163,7 +1162,7 @@ def _get_result_from_cache(
     used_parameters: set[str | None],
     lazy: bool = False,  # noqa: FBT002, FBT001
 ) -> tuple[bool, bool]:
-    # Used in _execute_pipeline
+    # Used in _run
     result_from_cache = False
     if cache_key is not None and cache_key in cache:
         r = cache.get(cache_key)
@@ -1287,7 +1286,7 @@ def _save_results(
     root_args: tuple[str, ...],
     lazy: bool,  # noqa: FBT001
 ) -> None:
-    # Used in _execute_pipeline
+    # Used in _run
     if func.save_function is None:
         return
     to_save = {k: all_results[k] for k in root_args}
