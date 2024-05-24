@@ -545,6 +545,7 @@ def test_run_info_compare(tmp_path: Path) -> None:
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
     assert results[-1].output.tolist() == [2, 3, 4]
     assert results[-1].output_name == "z"
+    load_xarray_dataset(run_folder=tmp_path)
 
     inputs = {"x": [1, 2, 3, 4]}
     with pytest.raises(ValueError, match="Shapes do not match previous run"):
@@ -683,6 +684,7 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
     assert results[-1].output == list(range(4))
     assert load_outputs("x", run_folder=tmp_path) == list(range(4))
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
@@ -700,6 +702,7 @@ def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [2, 0]]
     assert results[-1].output.shape == (2, 2)
     assert results[-1].output.tolist() == [[2, 0], [2, 0]]
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
@@ -774,6 +777,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         parallel=False,
     )
     assert results[-1].output.tolist() == [13]
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 def test_return_2d_from_step(tmp_path: Path) -> None:
@@ -795,6 +799,7 @@ def test_return_2d_from_step(tmp_path: Path) -> None:
     assert r[0].output.tolist() == np.ones((4, 4)).tolist()
     assert r[1].output.tolist() == [8, 8, 8, 8]
     assert r[2].output == 32
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 def test_multi_output_from_step(tmp_path: Path) -> None:
@@ -833,6 +838,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
     assert r[2].output.tolist() == [8, 8, 8, 8]
     assert r[3].output_name == "sum"
     assert r[3].output.tolist() == 32
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 @pytest.mark.xfail(reason="jagged/ragged arrays are not supported (yet?)")
