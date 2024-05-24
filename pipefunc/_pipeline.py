@@ -208,7 +208,7 @@ class Pipeline:
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
-        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = "lru",
+        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -225,6 +225,8 @@ class Pipeline:
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
+        if cache_type is None and any(f.cache for f in self.functions):
+            cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
 

@@ -581,7 +581,7 @@ def test_used_variable():
     def f1(a, b):
         return a + b
 
-    pipeline = Pipeline([f1])
+    pipeline = Pipeline([f1], cache_type="lru")
     pipeline("c", a=1, b=2)
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
@@ -633,7 +633,7 @@ def test_full_output_cache():
         ran_f2 = True
         return b * c * x
 
-    pipeline = Pipeline([f1, f2])
+    pipeline = Pipeline([f1, f2], cache_type="hybrid")
     f = pipeline.func("d")
     r = f.call_full_output(a=1, b=2, x=3)
     expected = {"a": 1, "b": 2, "c": 3, "d": 18, "x": 3}
