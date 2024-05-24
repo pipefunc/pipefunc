@@ -225,6 +225,8 @@ class Pipeline:
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
+        if cache_type is None and any(f.cache for f in self.functions):
+            cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
 
