@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
-from pipefunc.map.xarray import to_xarray
+from pipefunc.map.xarray import load_xarray
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,14 +18,12 @@ def test_to_xarray_1_dim(tmp_path: Path):
     pipeline = Pipeline([double_it])
     inputs = {"x": [1, 2, 3]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    data = results[-1].output
     output_name = results[-1].output_name
     mapspecs = pipeline.mapspecs()
 
-    da = to_xarray(data, output_name, mapspecs, inputs)
-
+    da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
     expected_coords = {"x": inputs["x"]}
-    expected_dims = ["x"]
+    expected_dims = ["i"]
     assert list(da.dims) == expected_dims
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
     assert da.to_numpy().tolist() == [2, 4, 6]
@@ -39,14 +37,13 @@ def test_to_xarray_2_dim(tmp_path: Path):
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    data = results[-1].output
     output_name = results[-1].output_name
     mapspecs = pipeline.mapspecs()
 
-    da = to_xarray(data, output_name, mapspecs, inputs)
+    da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
 
     expected_coords = {"x": inputs["x"], "y": inputs["y"]}
-    expected_dims = ["x", "y"]
+    expected_dims = ["i", "j"]
     assert list(da.dims) == expected_dims
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
     assert da.coords["y"].to_numpy().tolist() == expected_coords["y"]
@@ -61,14 +58,13 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5, 6], "z": [7, 8]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    data = results[-1].output
     output_name = results[-1].output_name
     mapspecs = pipeline.mapspecs()
 
-    da = to_xarray(data, output_name, mapspecs, inputs)
+    da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
 
     expected_coords = {"x": inputs["x"], "y": inputs["y"], "z": inputs["z"]}
-    expected_dims = ["x:y", "z"]
+    expected_dims = ["i", "j"]
     assert list(da.dims) == expected_dims
     assert da.coords["x:y"].to_numpy().tolist() == [(1, 4), (2, 5), (3, 6)]
     assert da.coords["z"].to_numpy().tolist() == expected_coords["z"]
@@ -87,20 +83,14 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    data = results[-1].output
+
     output_name = results[-1].output_name
     mapspecs = pipeline.mapspecs()
 
-    da = to_xarray(
-        data,
-        output_name,
-        mapspecs,
-        inputs,
-        use_intermediate=True,
-        run_folder=tmp_path,
-    )
+    da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
+
     expected_coords = {"x": inputs["x"]}
-    expected_dims = ["x"]
+    expected_dims = ["i"]
     assert list(da.dims) == expected_dims
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
     assert da.to_numpy().tolist() == [3, 5, 7]
@@ -125,27 +115,18 @@ def test_to_xarray_from_step(tmp_path: Path):
         run_folder=tmp_path,
         parallel=False,
     )
-    data = results[-1].output
     mapspecs = pipeline.mapspecs()
     output_name = results[-1].output_name
 
-    # First *with* intermediate results
-    da = to_xarray(
-        data,
+    da = load_xarray(
         output_name,
         mapspecs,
         inputs,
-        use_intermediate=True,
         run_folder=tmp_path,
     )
+
     x = load_outputs("x", run_folder=tmp_path)
     expected_coords = {"x": x}
-    expected_dims = ["x"]
+    expected_dims = ["i"]
     assert list(da.dims) == expected_dims
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
-
-    # Now *without* intermediate results
-    da = to_xarray(data, output_name, mapspecs, inputs, use_intermediate=False)
-    assert list(da.dims) == ["i"]
-    assert da.coords == {}
-    assert da.data.tolist() == [0, 2, 4, 6]

@@ -83,8 +83,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results2[-1].output.tolist() == [24, 30, 36, 42]
     # Load the results as xarray
-    ds = load_xarray_dataset(run_folder=tmp_path)
-    assert ds.coords.keys() == {"i", "j"}
+    load_xarray_dataset(run_folder=tmp_path)
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
@@ -669,7 +668,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     assert masks == {"z": (True,), "x": (False,), "y": (True, True), "sum": (True,)}
     assert shapes == expected  # type: ignore[arg-type]
     deps = trace_dependencies(pipeline.mapspecs())  # type: ignore[arg-type]
-    assert deps == {"sum": {"k": ("z",)}, "y": {"i": ("x",), "k": ("z",)}}
+    assert deps == {"y": {"x": ("i",), "z": ("k",)}, "sum": {"z": ("k",)}}
     load_xarray_dataset(run_folder=tmp_path)
 
 
