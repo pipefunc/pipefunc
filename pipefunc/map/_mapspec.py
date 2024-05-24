@@ -509,7 +509,7 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         if mapspec.inputs
     }
 
-    # Go from {output_name: {axis: [input_name]}} to {output_name: {input_name: [axis]}}
+    # Go from {output: {axis: list[input]}} to {output: {input: set[axis]}}
     deps = {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
     reordered: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for output_name, dct in deps.items():

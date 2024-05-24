@@ -22,6 +22,8 @@ def load_xarray(
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
     run_folder: str | Path,
+    *,
+    load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
     data = load_outputs(output_name, run_folder=run_folder)
@@ -33,12 +35,16 @@ def load_xarray(
     )
     dims: set[str] = set()
     for name, axes in target_dependencies.items():
-        array = inputs[name] if name in inputs else load_outputs(name, run_folder=run_folder)
+        dims.update(axes)
+        if name in inputs:
+            array = inputs[name]
+        elif load_intermediate:
+            array = load_outputs(name, run_folder=run_folder)
+        else:
+            continue
+
         if axes == axes_mapping[name]:
             coord_mapping[axes][name].append(array)
-            dims.update(axes)
-        else:
-            dims.update(axes)
 
     coords = {}
     for axes, dct in coord_mapping.items():
@@ -60,11 +66,19 @@ def load_xarray_dataset(
     *,
     run_folder: str | Path,
     output_names: list[str] | None = None,
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
     if not output_names:
         output_names = [name for ms in mapspecs for name in ms.output_names]
     data_vars = {
-        name: load_xarray(name, mapspecs, inputs, run_folder=run_folder) for name in output_names
+        name: load_xarray(
+            name,
+            mapspecs,
+            inputs,
+            run_folder=run_folder,
+            load_intermediate=load_intermediate,
+        )
+        for name in output_names
     }
     return xr.Dataset(data_vars)

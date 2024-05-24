@@ -679,6 +679,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
 def load_xarray_dataset(
     *output_name: str,
     run_folder: str | Path,
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
 
@@ -688,6 +689,8 @@ def load_xarray_dataset(
         The names of the outputs to load. If empty, all outputs are loaded.
     run_folder
         The folder where the pipeline run was stored.
+    load_intermediate
+        Whether to load intermediate outputs as coordinates.
 
     Returns
     -------
@@ -703,4 +706,5 @@ def load_xarray_dataset(
         run_info.inputs,
         run_folder=run_folder,
         output_names=output_name,  # type: ignore[arg-type]
+        load_intermediate=load_intermediate,
     )
