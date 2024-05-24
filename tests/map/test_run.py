@@ -281,7 +281,10 @@ def test_simple_from_step(tmp_path: Path) -> None:
     ):
         pipeline("sum", n=4)
     assert pipeline("x", n=4) == list(range(4))
-    load_xarray_dataset(run_folder=tmp_path)
+    ds = load_xarray_dataset("y", run_folder=tmp_path)
+    assert "x" in ds.coords
+    ds = load_xarray_dataset("y", run_folder=tmp_path, load_intermediate=False)
+    assert "x" not in ds.coords
 
 
 @pytest.mark.parametrize("output_picker", [None, dict.__getitem__])
