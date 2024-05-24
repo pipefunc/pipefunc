@@ -140,12 +140,12 @@ def _compare_to_previous_run_info(
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> None:
+) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
     try:
         old = RunInfo.load(run_folder, cache=False)
-    except Exception as e:  # noqa: BLE001 # pragma: no cover
+    except Exception as e:  # noqa: BLE001
         msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
         raise ValueError(msg) from None
     if internal_shapes != old.internal_shapes:
