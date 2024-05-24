@@ -58,11 +58,6 @@ class ArraySpec:
         indices = (":" if x is None else x for x in self.axes)
         return f"{self.name}[{', '.join(indices)}]"
 
-    def latex(self) -> str:
-        # Use LaTeX math mode for the array name, with lower indices for the axes
-        indices = (":" if x is None else x for x in self.axes)
-        return f"{self.name}_{{{','.join(indices)}}}"
-
     @property
     def indices(self) -> tuple[str, ...]:
         """Return the names of the indices for this array spec."""
@@ -235,11 +230,6 @@ class MapSpec:
         inputs = ", ".join(map(str, self.inputs)) if self.inputs else "..."
         outputs = ", ".join(map(str, self.outputs))
         return f"{inputs} -> {outputs}"
-
-    def latex(self) -> str:
-        inputs = ", ".join([i.latex() for i in self.inputs])
-        outputs = ", ".join([o.latex() for o in self.outputs])
-        return f"{inputs} \\rightarrow {outputs}"
 
     @classmethod
     def from_string(cls: type[MapSpec], expr: str) -> MapSpec:
