@@ -166,7 +166,7 @@ def _compare_to_previous_run_info(
         )
         return
     if not equal_inputs:
-        msg = f"Inputs {inputs}/{old.inputs} do not match previous run, cannot use `cleanup=False`."
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
 
 
