@@ -1,6 +1,7 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_mapspec.py` for the changes made.
 
 from __future__ import annotations
 
@@ -480,3 +481,48 @@ def _get_output_dim(
         msg = f"Internal shape for '{output.name}' must be a tuple of integers."
         raise TypeError(msg)
     return dim
+
+
+def _trace_dependencies(
+    output_name: str,
+    mapspec_mapping: dict[str, MapSpec],
+) -> dict[str, tuple[str, ...]]:
+    dependencies: defaultdict[str, set[str]] = defaultdict(set)
+    mapspec = mapspec_mapping[output_name]
+    for input_spec in mapspec.inputs:
+        for axis in input_spec.axes:
+            if axis is not None:
+                if input_spec.name in mapspec_mapping:
+                    nested_dependencies = _trace_dependencies(input_spec.name, mapspec_mapping)
+                    if axis in nested_dependencies:
+                        dependencies[axis].update(nested_dependencies[axis])
+                else:
+                    dependencies[axis].add(input_spec.name)
+    return {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
+
+
+def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str, ...]]]:
+    mapspec_mapping = {
+        output_name: mapspec
+        for mapspec in mapspecs
+        for output_name in mapspec.output_names
+        if mapspec.inputs
+    }
+
+    # Go from {output: {axis: list[input]}} to {output: {input: set[axis]}}
+    deps = {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
+    reordered: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for output_name, dct in deps.items():
+        for index, input_names in dct.items():
+            for input_name in input_names:
+                reordered[output_name][input_name].add(index)
+
+    axes = mapspec_axes(mapspecs)
+
+    def order_like_mapspec_axes(name: str, axes_set: set[str]) -> tuple[str, ...]:
+        return tuple(i for i in axes[name] if i in axes_set)
+
+    return {
+        output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
+        for output_name, dct in reordered.items()
+    }

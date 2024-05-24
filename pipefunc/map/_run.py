@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import functools
 import shutil
 import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
@@ -23,6 +23,8 @@ from pipefunc.map._mapspec import (
 
 if TYPE_CHECKING:
     import sys
+
+    import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
 
@@ -63,6 +65,10 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    def mapspecs_as_strings(self) -> list[str]:
+        """Return the MapSpecs for all functions in the pipeline as strings."""
+        return [str(ms) for ms in self.mapspecs()]
+
     @property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
@@ -89,9 +95,9 @@ def _dump_inputs(
     return paths
 
 
-def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
+def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:
     path = input_paths[name]
-    return load(path, cache=True)
+    return load(path, cache=cache)
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:
@@ -134,19 +140,25 @@ def _compare_to_previous_run_info(
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> None:
+) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
-    old = RunInfo.load(run_folder, cache=False)
+    try:
+        old = RunInfo.load(run_folder, cache=False)
+    except Exception as e:  # noqa: BLE001
+        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
+        raise ValueError(msg) from None
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    if pipeline.mapspecs_as_strings() != old.mapspecs_as_strings:
+        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
-    equal_inputs = equal_dicts(inputs, old_inputs, verbose=True)
+    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
@@ -154,7 +166,7 @@ def _compare_to_previous_run_info(
         )
         return
     if not equal_inputs:
-        msg = "Inputs do not match previous run, cannot use `cleanup=False`."
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
 
 
@@ -173,6 +185,7 @@ class RunInfo:
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
+    mapspecs_as_strings: list[str]
     pipefunc_version: str = __version__
 
     @classmethod
@@ -198,8 +211,17 @@ class RunInfo:
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
+            mapspecs_as_strings=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
         )
+
+    @functools.cached_property
+    def inputs(self) -> dict[str, Any]:
+        return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
+
+    @functools.cached_property
+    def mapspecs(self) -> list[MapSpec]:
+        return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
@@ -424,7 +446,7 @@ def _execute_map_spec(
     mask = shape_masks[func.output_name]
     file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
-    process_index = partial(
+    process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
@@ -652,3 +674,37 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def load_xarray_dataset(
+    *output_name: str,
+    run_folder: str | Path,
+    load_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
+
+    Parameters
+    ----------
+    output_name
+        The names of the outputs to load. If empty, all outputs are loaded.
+    run_folder
+        The folder where the pipeline run was stored.
+    load_intermediate
+        Whether to load intermediate outputs as coordinates.
+
+    Returns
+    -------
+    xr.Dataset
+        An `xarray.Dataset` containing the outputs of the pipeline run.
+
+    """
+    from pipefunc.map.xarray import load_xarray_dataset
+
+    run_info = RunInfo.load(run_folder)
+    return load_xarray_dataset(
+        run_info.mapspecs,
+        run_info.inputs,
+        run_folder=run_folder,
+        output_names=output_name,  # type: ignore[arg-type]
+        load_intermediate=load_intermediate,
+    )

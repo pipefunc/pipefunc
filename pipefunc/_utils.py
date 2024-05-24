@@ -130,9 +130,13 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     and None if there are errors comparing keys and values.
     """
     if len(d1) != len(d2):
+        if verbose:
+            print(f"Not equal lengths: `{len(d1)} != {len(d2)}`")
         return False
 
     if d1.keys() != d2.keys():
+        if verbose:
+            print(f"Not equal keys: `{d1.keys()} != {d2.keys()}`")
         return False
 
     errors = []
