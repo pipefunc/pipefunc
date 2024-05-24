@@ -511,7 +511,7 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
 
     # Go from {output_name: {axis: [input_name]}} to {output_name: {input_name: [axis]}}
     deps = {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
-    reordered = defaultdict(lambda: defaultdict(set))
+    reordered: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for output_name, dct in deps.items():
         for index, input_names in dct.items():
             for input_name in input_names:
@@ -523,6 +523,6 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         return tuple(i for i in axes[name] if i in axes_set)
 
     return {
-        output_name: {name: order_like_mapspec_axes(name, indices) for name, indices in dct.items()}
+        output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
         for output_name, dct in reordered.items()
     }

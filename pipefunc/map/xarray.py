@@ -28,8 +28,10 @@ def load_xarray(
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
-    coord_mapping = defaultdict(lambda: defaultdict(list))
-    dims = set()
+    coord_mapping: dict[tuple[str, ...], dict[str, list[str]]] = defaultdict(
+        lambda: defaultdict(list),
+    )
+    dims: set[str] = set()
     for name, axes in target_dependencies.items():
         array = inputs[name] if name in inputs else load_outputs(name, run_folder=run_folder)
         if axes == axes_mapping[name]:
