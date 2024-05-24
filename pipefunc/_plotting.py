@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import inspect
+import re
 import warnings
 from typing import TYPE_CHECKING
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 
+from pipefunc._utils import at_least_tuple
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     import holoviews as hv
+
+    from pipefunc._pipefunc import PipeFunc
 
 
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
@@ -25,7 +30,7 @@ def _get_graph_layout(graph: nx.DiGraph) -> dict:
         return nx.spring_layout(graph)
 
 
-def visualize(
+def visualize(  # noqa: PLR0912, PLR0915
     graph: nx.DiGraph,
     figsize: tuple[int, int] = (10, 10),
     filename: str | Path | None = None,
@@ -80,10 +85,19 @@ def visualize(
         {node: node for node in arg_nodes},
         font_size=12,
     )
+
+    def func_with_mapspec(func: PipeFunc) -> str:
+        s = str(func)
+        if not func.mapspec:
+            return s
+        for spec in func.mapspec.outputs:
+            s = re.sub(rf"\b{spec.name}\b", str(spec), s)
+        return s
+
     nx.draw_networkx_labels(
         graph,
         pos,
-        {node: f"{node!s}" for node in func_nodes},
+        {node: func_with_mapspec(node) for node in func_nodes},
         font_size=12,
     )
 
@@ -92,35 +106,48 @@ def visualize(
     # Add edge labels with function outputs
     outputs = {}
     inputs = {}
+    outputs_mapspec = {}
+    inputs_mapspec = {}
+
     for edge, attrs in graph.edges.items():
         a, b = edge
         if isinstance(a, str):
             default_value = graph.nodes[a]["default_value"]
-            if default_value is not inspect.Parameter.empty:
+            if b.mapspec and a in b.mapspec.input_names:
+                spec = next(i for i in b.mapspec.inputs if i.name == a)
+                inputs_mapspec[edge] = str(spec)
+            elif default_value is not inspect.Parameter.empty:
                 inputs[edge] = f"{a}={default_value}"
             else:
                 inputs[edge] = a
         else:  # is PipeFunc
-            arg = attrs["arg"]
-            if isinstance(arg, tuple):
-                arg = ", ".join(arg)
-            outputs[edge] = arg
+            output_str = []
+            with_mapspec = False
+            for name in at_least_tuple(attrs["arg"]):
+                if b.mapspec and name in b.mapspec.input_names:
+                    with_mapspec = True
+                    spec = next(i for i in b.mapspec.inputs if i.name == name)
+                    output_str.append(str(spec))
+                else:
+                    output_str.append(name)
+            if with_mapspec:
+                outputs_mapspec[edge] = ", ".join(output_str)
+            else:
+                outputs[edge] = ", ".join(output_str)
 
-    nx.draw_networkx_edge_labels(
-        graph,
-        pos,
-        edge_labels=outputs,
-        font_size=12,
-        font_color="skyblue",
-    )
-
-    nx.draw_networkx_edge_labels(
-        graph,
-        pos,
-        edge_labels=inputs,
-        font_size=12,
-        font_color="lightgreen",
-    )
+    for labels, color in [
+        (outputs, "skyblue"),
+        (outputs_mapspec, "blue"),
+        (inputs, "lightgreen"),
+        (inputs_mapspec, "green"),
+    ]:
+        nx.draw_networkx_edge_labels(
+            graph,
+            pos,
+            edge_labels=labels,
+            font_size=12,
+            font_color=color,
+        )
 
     plt.axis("off")
     plt.tight_layout()
