@@ -62,7 +62,7 @@ def load_xarray_dataset(
     output_names: list[str] | None = None,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
-    if output_names is None:
+    if not output_names:
         output_names = [name for ms in mapspecs for name in ms.output_names]
     data_vars = {
         name: load_xarray(name, mapspecs, inputs, run_folder=run_folder) for name in output_names
