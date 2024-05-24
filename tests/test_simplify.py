@@ -55,7 +55,7 @@ def test_conservatively_combine():
     def f3(b, x, y):
         return x * y * b
 
-    pipeline = Pipeline([f1, f2, f3])
+    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
 
     root_args = pipeline.all_root_args
     assert root_args == {"x": ("a",), "y": ("a", "b"), "z": ("a", "b")}

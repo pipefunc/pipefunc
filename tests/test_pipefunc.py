@@ -590,7 +590,7 @@ def test_used_variable():
     def f(a):
         return a
 
-    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)], cache_type="lru")
+    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)])
     f = pipeline.func("c")
     assert f(a=1) == 1
     assert f(a=1) == 1  # should not raise an error
