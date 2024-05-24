@@ -461,18 +461,19 @@ class Pipeline:
         func_args = {}
         for arg in func.parameters:
             if arg in kwargs:
-                func_args[arg] = kwargs[arg]
+                value = kwargs[arg]
             elif arg in func.defaults:
-                func_args[arg] = func.defaults[arg]
+                value = func.defaults[arg]
             else:
-                func_args[arg] = self._run(
+                value = self._run(
                     output_name=arg,
                     kwargs=kwargs,
                     all_results=all_results,
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
-        used_parameters.update(func_args)
+            func_args[arg] = value
+            used_parameters.add(arg)
         return func_args
 
     def _run(
@@ -484,6 +485,8 @@ class Pipeline:
         full_output: bool,
         used_parameters: set[str | None],
     ) -> Any:
+        if output_name in all_results:
+            return all_results[output_name]
         func = self.output_to_func[output_name]
         assert func.parameters is not None
 
