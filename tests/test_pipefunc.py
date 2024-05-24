@@ -699,3 +699,30 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
         "a[i], b[j] -> c[i, j]",
         "x[i, j], y[i, j] -> z[i, j]",
     ]
+
+
+def test_max_single_execution_per_call() -> None:
+    counter = {"f_c": 0, "f_d": 0, "f_e": 0}
+
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        assert counter["f_c"] == 0
+        counter["f_c"] += 1
+        print("c")
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c, x=1):
+        assert counter["f_d"] == 0
+        counter["f_d"] += 1
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def f_e(c, d, x=1):
+        assert counter["f_e"] == 0
+        counter["f_e"] += 1
+        return c * d * x
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline("e", a=1, b=2, x=3)
+    assert counter == {"f_c": 1, "f_d": 1, "f_e": 1}
