@@ -33,7 +33,7 @@ def to_xarray(
 
     # Trace dependencies
     all_dependencies = trace_dependencies(mapspecs)
-    target_dependencies = all_dependencies[target_mapspec.output_names[0]]
+    target_dependencies = all_dependencies.get(output_name, {})
 
     coords = {}
 
@@ -52,7 +52,7 @@ def to_xarray(
                 multiindex = pd.MultiIndex.from_arrays(arrays, names=input_names)
                 coords[axis] = (":".join(input_names), multiindex)
                 continue
-
+        assert len(input_names) == 1
         input_name = input_names[0]  # Unpack the single-element list
         if input_name in inputs:
             coords[axis] = (input_name, inputs[input_name])

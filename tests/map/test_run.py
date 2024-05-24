@@ -8,6 +8,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
+from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import load_outputs, load_xarray_dataset, map_shapes, run
 
 if TYPE_CHECKING:
@@ -667,6 +668,8 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert masks == {"z": (True,), "x": (False,), "y": (True, True), "sum": (True,)}
     assert shapes == expected  # type: ignore[arg-type]
+    deps = trace_dependencies(pipeline.mapspecs())  # type: ignore[arg-type]
+    assert deps == {"sum": {"k": ("z",)}, "y": {"i": ("x",), "k": ("z",)}}
     load_xarray_dataset(run_folder=tmp_path)
 
 
