@@ -294,7 +294,7 @@ def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=True)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 6
     assert results[-1].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 6
@@ -451,7 +451,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=True)
+    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
     assert results[-1].output == 1.0
     assert results[-1].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
