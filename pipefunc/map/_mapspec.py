@@ -1,10 +1,13 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_mapspec.py` for the changes made.
 
 from __future__ import annotations
 
+import itertools
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,7 +51,7 @@ class ArraySpec:
             raise ValueError(msg)
         for i in self.axes:
             if not (i is None or i.isidentifier()):
-                msg = f"Index name '{i}' is not a valid Python identifier"
+                msg = f"Index name '{i}' is not a valid Python identifier."
                 raise ValueError(msg)
 
     def __str__(self) -> str:
@@ -73,8 +76,18 @@ class ArraySpec:
     def validate(self, shape: tuple[int, ...]) -> None:
         """Raise an exception if 'shape' is not compatible with this array spec."""
         if len(shape) != self.rank:
-            msg = f"Expecting array of rank {self.rank}, but got array of shape {shape}"
+            msg = (
+                f"Expecting array of rank {self.rank}, but got array of shape {shape} for `{self}`."
+            )
             raise ValueError(msg)
+
+    def add_axes(self, *axis: str | None) -> ArraySpec:
+        """Return a new ArraySpec with additional axes."""
+        # check for no duplicate axes
+        if any(ax in self.axes for ax in axis if ax is not None):
+            msg = f"Duplicate axes are not allowed: {axis}"
+            raise ValueError(msg)
+        return ArraySpec(self.name, self.axes + axis)
 
 
 @dataclass(frozen=True)
@@ -103,61 +116,67 @@ class MapSpec:
         output_indices = set(self.outputs[0].indices)
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
-        if extra_indices := output_indices - input_indices:
-            msg = f"Output array has indices that do not appear in the input: {extra_indices}"
-            raise ValueError(msg)
         if unused_indices := input_indices - output_indices:
             msg = f"Input array have indices that do not appear in the output: {unused_indices}"
             raise ValueError(msg)
 
     @property
-    def parameters(self) -> tuple[str, ...]:
+    def input_names(self) -> tuple[str, ...]:
         """Return the parameter names of this mapspec."""
         return tuple(x.name for x in self.inputs)
 
     @property
-    def indices(self) -> tuple[str, ...]:
-        """Return the index names for this MapSpec."""
+    def output_names(self) -> tuple[str, ...]:
+        """Return the names of the output arrays."""
+        return tuple(x.name for x in self.outputs)
+
+    @property
+    def output_indices(self) -> tuple[str, ...]:
+        """Return the index names of the output array."""
         return self.outputs[0].indices  # All outputs have the same indices
 
-    def shape(self, shapes: dict[str, tuple[int, ...]]) -> tuple[int, ...]:
+    @property
+    def input_indices(self) -> set[str]:
+        """Return the index names of the input arrays."""
+        return {index for x in self.inputs for index in x.indices}
+
+    def shape(
+        self,
+        input_shapes: dict[str, tuple[int, ...]],
+        internal_shapes: dict[str, tuple[int, ...]] | None = None,
+    ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
         Parameters
         ----------
-        shapes
+        input_shapes
             Shapes of the inputs, keyed by name.
+        internal_shapes
+            Shapes of the outputs, keyed by name. Provide this only if the output
+            has an axis not shared with any input.
 
         """
-        input_names = {x.name for x in self.inputs}
+        input_names = set(self.input_names)
+        _validate_shapes(input_names, input_shapes, self.inputs, internal_shapes, self.output_names)
 
-        if extra_names := set(shapes.keys()) - input_names:
-            msg = f"Got extra array {extra_names} that are not accepted by this map."
-            raise ValueError(msg)
-        if missing_names := input_names - set(shapes.keys()):
-            msg = f"Inputs expected by this map were not provided: {missing_names}"
-            raise ValueError(msg)
-
-        # Each individual array is of the appropriate rank
-        for x in self.inputs:
-            x.validate(shapes[x.name])
-
-        # Shapes match between array sharing a named index
-
-        def get_dim(array: ArraySpec, index: str) -> int:
-            axis = array.axes.index(index)
-            return shapes[array.name][axis]
-
+        internal_shapes = internal_shapes or {}
         shape = []
-        for index in self.outputs[0].indices:  # All outputs have the same indices
+        mask = []
+        internal_shape_index = 0
+        output = self.outputs[0]  # All outputs have the same shape
+        for index in output.axes:
+            assert isinstance(index, str)
             relevant_arrays = [x for x in self.inputs if index in x.indices]
-            dim, *rest = (get_dim(x, index) for x in relevant_arrays)
-            if any(dim != x for x in rest):
-                msg = f"Dimension mismatch for arrays {relevant_arrays} along {index} axis."
-                raise ValueError(msg)
-            shape.append(dim)
-
-        return tuple(shape)
+            if relevant_arrays:
+                dim = _get_common_dim(relevant_arrays, index, input_shapes)
+                shape.append(dim)
+                mask.append(True)
+            else:
+                dim = _get_output_dim(output, internal_shapes, internal_shape_index)
+                shape.append(dim)
+                mask.append(False)
+                internal_shape_index += 1
+        return tuple(shape), tuple(mask)
 
     def output_key(self, shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
         """Return a key used for indexing the output of this map.
@@ -176,12 +195,10 @@ class MapSpec:
         (3, 1, 2)
 
         """
-        if len(shape) != len(self.indices):
-            msg = f"Expected a shape of length {len(self.indices)}, got {shape}"
+        if len(shape) != len(self.input_indices):
+            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
             raise ValueError(msg)
-        return tuple(
-            (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
-        )
+        return _shape_to_key(shape, linear_index)
 
     def input_keys(
         self,
@@ -204,15 +221,18 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        output_key = self.output_key(shape, linear_index)
-        ids = dict(zip(self.indices, output_key))
+        if len(shape) != len(self.output_indices):
+            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
+            raise ValueError(msg)
+        key = _shape_to_key(shape, linear_index)
+        ids = dict(zip(self.output_indices, key))
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)
             for x in self.inputs
         }
 
     def __str__(self) -> str:
-        inputs = ", ".join(map(str, self.inputs))
+        inputs = ", ".join(map(str, self.inputs)) if self.inputs else "..."
         outputs = ", ".join(map(str, self.outputs))
         return f"{inputs} -> {outputs}"
 
@@ -239,6 +259,19 @@ class MapSpec:
         """Return a faithful representation of a MapSpec as a string."""
         return str(self)
 
+    def add_axes(self, *axis: str | None) -> MapSpec:
+        """Return a new MapSpec with additional axes."""
+        return MapSpec(
+            tuple(x.add_axes(*axis) for x in self.inputs),
+            tuple(x.add_axes(*axis) for x in self.outputs),
+        )
+
+
+def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    return tuple(
+        (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
+    )
+
 
 def _parse_index_string(index_string: str) -> tuple[str | None, ...]:
     indices = (idx.strip() for idx in index_string.split(","))
@@ -246,6 +279,8 @@ def _parse_index_string(index_string: str) -> tuple[str | None, ...]:
 
 
 def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
+    if expr.strip() == "...":
+        return ()
     if "[" not in expr or "]" not in expr:
         msg = (
             f"Invalid expression '{expr.strip()}'. Expected an expression that includes "
@@ -327,7 +362,7 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
 def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
     kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
-    map_shape = mapspec.shape(kwarg_shapes)
+    map_shape, _ = mapspec.shape(kwarg_shapes)
     map_size = np.prod(map_shape)
 
     def is_masked(i: int) -> bool:
@@ -345,6 +380,159 @@ def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
     """Return the number of tasks."""
     if isinstance(mapspec, str):
         mapspec = MapSpec.from_string(mapspec)
-    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.parameters}
+    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.input_names}
     mask = expected_mask(mapspec, mapped_kwargs)
     return num_tasks_from_mask(mask)
+
+
+def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:
+    """Raise an exception if the axes of the mapspecs are inconsistent."""
+    indices: dict[str, set[ArraySpec]] = defaultdict(set)
+    for mapspec in mapspecs:
+        for spec in mapspec.inputs:
+            indices[spec.name].add(spec)
+        for spec in mapspec.outputs:
+            indices[spec.name].add(spec)
+
+    for name, specs in indices.items():
+        specs_str = ", ".join(str(spec) for spec in specs)
+        lengths = {len(spec.axes) for spec in specs}
+        if len(lengths) > 1:
+            msg = (
+                f"MapSpec axes for `{name}` are inconsistent: {specs_str}."
+                " All axes should have the same length."
+            )
+            raise ValueError(msg)
+        axes: dict[int, str] = {}
+        for spec in specs:
+            for i, axis in enumerate(spec.axes):
+                if axis is not None:
+                    if i in axes and axes[i] != axis:
+                        msg = (
+                            f"MapSpec axes for `{name}` are inconsistent: {specs_str}."
+                            " All axes should have the same name at the same index."
+                        )
+                        raise ValueError(msg)
+                    axes[i] = axis
+
+
+def mapspec_dimensions(mapspecs: list[MapSpec]) -> dict[str, int]:
+    """Return the number of dimensions for each array parameter in the pipeline."""
+    return {
+        arrayspec.name: len(arrayspec.axes)
+        for mapspec in mapspecs
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs)
+    }
+
+
+def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
+    """Return the axes for each array parameter in the pipeline."""
+    axes: dict[str, dict[int, str]] = defaultdict(dict)
+    for mapspec in mapspecs:
+        for arrayspec in itertools.chain(mapspec.inputs, mapspec.outputs):
+            for i, axis in enumerate(arrayspec.axes):
+                if axis is not None:
+                    axes[arrayspec.name][i] = axis
+    return {name: tuple(dct[i] for i in range(len(dct))) for name, dct in axes.items()}
+
+
+def _validate_shapes(
+    input_names: set[str],
+    input_shapes: dict[str, tuple[int, ...]],
+    inputs: tuple[ArraySpec, ...],
+    internal_shapes: dict[str, tuple[int, ...]] | None,
+    output_names: tuple[str, ...],
+) -> None:
+    if extra_names := input_shapes.keys() - input_names:
+        msg = f"Got extra array {extra_names} that are not accepted by this map."
+        raise ValueError(msg)
+    if missing_names := input_names - input_shapes.keys():
+        msg = f"Inputs expected by this map were not provided: {missing_names}"
+        raise ValueError(msg)
+    for x in inputs:
+        x.validate(input_shapes[x.name])
+    if internal_shapes:
+        for output_name in internal_shapes:
+            if output_name not in output_names:
+                msg = f"Internal shape of `{output_name}` is not accepted by this map."
+                raise ValueError(msg)
+
+
+def _get_common_dim(
+    arrays: list[ArraySpec],
+    index: str,
+    input_shapes: dict[str, tuple[int, ...]],
+) -> int:
+    def _get_dim(array: ArraySpec, index: str) -> int:
+        axis = array.axes.index(index)
+        return input_shapes[array.name][axis]
+
+    dim, *rest = (_get_dim(x, index) for x in arrays)
+    if any(dim != x for x in rest):
+        arrs = ", ".join(x.name for x in arrays)
+        msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
+        raise ValueError(msg)
+    return dim
+
+
+def _get_output_dim(
+    output: ArraySpec,
+    internal_shapes: dict[str, tuple[int, ...]],
+    internal_shape_index: int,
+) -> int:
+    if output.name not in internal_shapes:
+        msg = f"Internal shape for '{output.name}' is missing."
+        raise ValueError(msg)
+    if internal_shape_index >= len(internal_shapes[output.name]):
+        msg = f"Internal shape for '{output.name}' is too short."
+        raise ValueError(msg)
+    dim = internal_shapes[output.name][internal_shape_index]
+    if not isinstance(dim, int):
+        msg = f"Internal shape for '{output.name}' must be a tuple of integers."
+        raise TypeError(msg)
+    return dim
+
+
+def _trace_dependencies(
+    output_name: str,
+    mapspec_mapping: dict[str, MapSpec],
+) -> dict[str, tuple[str, ...]]:
+    dependencies: defaultdict[str, set[str]] = defaultdict(set)
+    mapspec = mapspec_mapping[output_name]
+    for input_spec in mapspec.inputs:
+        for axis in input_spec.axes:
+            if axis is not None:
+                if input_spec.name in mapspec_mapping:
+                    nested_dependencies = _trace_dependencies(input_spec.name, mapspec_mapping)
+                    if axis in nested_dependencies:
+                        dependencies[axis].update(nested_dependencies[axis])
+                else:
+                    dependencies[axis].add(input_spec.name)
+    return {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
+
+
+def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str, ...]]]:
+    mapspec_mapping = {
+        output_name: mapspec
+        for mapspec in mapspecs
+        for output_name in mapspec.output_names
+        if mapspec.inputs
+    }
+
+    # Go from {output: {axis: list[input]}} to {output: {input: set[axis]}}
+    deps = {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
+    reordered: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for output_name, dct in deps.items():
+        for index, input_names in dct.items():
+            for input_name in input_names:
+                reordered[output_name][input_name].add(index)
+
+    axes = mapspec_axes(mapspecs)
+
+    def order_like_mapspec_axes(name: str, axes_set: set[str]) -> tuple[str, ...]:
+        return tuple(i for i in axes[name] if i in axes_set)
+
+    return {
+        output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
+        for output_name, dct in reordered.items()
+    }

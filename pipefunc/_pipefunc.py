@@ -142,6 +142,19 @@ class PipeFunc(Generic[T]):
         self.set_profiling(enable=profile)
         self._validate_mapspec()
 
+    def copy(self) -> PipeFunc:
+        return PipeFunc(
+            self.func,
+            self.output_name,
+            output_picker=self.output_picker,
+            renames=self.renames,
+            profile=self.profile,
+            debug=self.debug,
+            cache=self.cache,
+            save_function=self.save_function,
+            mapspec=self.mapspec,
+        )
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
 
@@ -286,7 +299,7 @@ class PipeFunc(Generic[T]):
             )
             raise TypeError(msg)
 
-        mapspec_input_names = {x.name for x in self.mapspec.inputs}
+        mapspec_input_names = set(self.mapspec.input_names)
         input_names = set(self.parameters)
         if extra := mapspec_input_names - input_names:
             msg = (
@@ -296,7 +309,7 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        mapspec_output_names = {x.name for x in self.mapspec.outputs}
+        mapspec_output_names = set(self.mapspec.output_names)
         output_names = set(at_least_tuple(self.output_name))
         if mapspec_output_names != output_names:
             msg = (

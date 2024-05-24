@@ -12,6 +12,8 @@ from pipefunc.map._mapspec import (
     array_shape,
     expected_mask,
     shape_to_strides,
+    trace_dependencies,
+    validate_consistent_axes,
 )
 
 
@@ -37,6 +39,11 @@ def test_arrayspec_init():
 def test_arrayspec_str():
     spec = ArraySpec("a", ("i", None, "j"))
     assert str(spec) == "a[i, :, j]"
+    new_spec = spec.add_axes("k")
+    assert str(new_spec) == "a[i, :, j, k]"
+    assert str(spec.add_axes(None)) == "a[i, :, j, :]"
+    with pytest.raises(ValueError, match="Duplicate axes"):
+        new_spec = spec.add_axes("i")
 
 
 def test_arrayspec_indices():
@@ -67,6 +74,10 @@ def test_mapspec_init():
     assert spec.inputs == inputs
     assert spec.outputs == (output,)
 
+    # Add an extra axis to the output
+    spec = MapSpec(inputs, (ArraySpec("q", ("i", "j", "l")),))
+    assert str(spec) == "a[i, j], b[i, j] -> q[i, j, l]"
+
     with pytest.raises(
         ValueError,
         match=re.escape("Output array must have all axes indexed (no ':')."),
@@ -75,29 +86,24 @@ def test_mapspec_init():
 
     with pytest.raises(
         ValueError,
-        match="Output array has indices that do not appear in the input: {'l'}",
-    ):
-        MapSpec(inputs, (ArraySpec("q", ("i", "j", "l")),))
-
-    with pytest.raises(
-        ValueError,
         match="Input array have indices that do not appear in the output: {'k'}",
     ):
         MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), (output,))
 
 
-def test_mapspec_parameters():
+def test_mapspec_input_names():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
-    assert spec.parameters == ("a", "b")
+    assert spec.input_names == ("a", "b")
+    assert spec.output_names == ("q",)
 
 
 def test_mapspec_indices():
     inputs = (ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "j")))
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
-    assert spec.indices == ("i", "j")
+    assert spec.output_indices == ("i", "j")
 
 
 def test_mapspec_shape():
@@ -105,7 +111,8 @@ def test_mapspec_shape():
     output = ArraySpec("q", ("i", "j"))
     spec = MapSpec(inputs, (output,))
     shapes = {"a": (3, 4), "b": (3, 4)}
-    assert spec.shape(shapes) == (3, 4)
+    shape, mask = spec.shape(shapes)
+    assert shape == (3, 4)
 
     with pytest.raises(
         ValueError,
@@ -263,3 +270,252 @@ def test_array_shape():
     # Test with unsupported type
     with pytest.raises(TypeError, match="No array shape defined for type"):
         array_shape(42)
+
+
+def test_mapspec_add_axes():
+    spec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    new_spec = spec.add_axes("k")
+    assert str(new_spec) == "a[i, k], b[j, k] -> c[i, j, k]"
+    with pytest.raises(ValueError, match="Duplicate axes"):
+        spec.add_axes("i")
+
+
+def test_validate_consistent_axes():
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same name at the same index",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i], b[i] -> f[i]"),
+                MapSpec.from_string("f[k], g[k] -> h[k]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="All axes should have the same length",
+    ):
+        validate_consistent_axes(
+            [
+                MapSpec.from_string("a[i] -> f[i]"),
+                MapSpec.from_string("a[i, j] -> g[i, j]"),
+            ],
+        )
+
+    validate_consistent_axes(
+        [
+            MapSpec.from_string("a[i], b[j] -> f[i, j]"),
+            MapSpec.from_string("f[i, j], c[k] -> g[i, j, k]"),
+            MapSpec.from_string("g[i, j, k], d[l] -> h[i, j, k, l]"),
+        ],
+    )
+
+
+def test_larger_output_then_input():
+    mapspec = MapSpec.from_string("... -> b[j]")
+    assert str(mapspec) == "... -> b[j]"
+    assert mapspec.input_names == ()
+    assert mapspec.output_names == ("b",)
+    shape, mask = mapspec.shape(input_shapes={}, internal_shapes={"b": (3,)})
+    assert shape == (3,)
+    assert mask == (False,)
+
+    mapspec = MapSpec.from_string("x[i, j], y[j, k] -> z[i, j, k, l]")
+    assert mapspec.input_names == ("x", "y")
+    assert mapspec.output_names == ("z",)
+    input_shapes = {"x": (2, 3), "y": (3, 4)}
+    shape, mask = mapspec.shape(input_shapes, internal_shapes={"z": (5,)})
+    assert mask == (True, True, True, False)
+    assert shape == (2, 3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    shape, mask = mapspec.shape({"a": (3,)}, internal_shapes={"b": (4,)})
+    assert mask == (True, False)
+    assert shape == (3, 4)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k]")
+    shape, mask = mapspec.shape(
+        input_shapes={"a": (3,), "b": (4,)},
+        internal_shapes={"c": (5,)},
+    )
+    assert mask == (True, True, False)
+    assert shape == (3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
+    input_shapes = {"a": (3,), "b": (4,)}
+    shape, mask = mapspec.shape(input_shapes, internal_shapes={"c": (5, 6)})
+    assert mask == (True, True, False, False)
+    assert shape == (3, 4, 5, 6)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    shape, mask = mapspec.shape(
+        input_shapes={"a": (3,), "b": (4,)},
+        internal_shapes={"c": (...)},
+    )
+    assert mask == (True, True)
+    assert shape == (3, 4)
+
+    mapspec = MapSpec.from_string("a[i, j] -> b[i, j, k, l]")
+    shape, mask = mapspec.shape(input_shapes={"a": (2, 3)}, internal_shapes={"b": (4, 5)})
+    assert mask == (True, True, False, False)
+    assert shape == (2, 3, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i, j, k] -> b[i, j, k, l, m]")
+    input_shapes = {"a": (2, 3, 4)}
+    shape, mask = mapspec.shape(input_shapes, internal_shapes={"b": (5, 6)})
+    assert mask == (True, True, True, False, False)
+    assert shape == (2, 3, 4, 5, 6)
+
+    mapspec = MapSpec.from_string("a[j] -> b[i, j, k, l]")
+    shape, mask = mapspec.shape(input_shapes={"a": (2,)}, internal_shapes={"b": (3, 4, 5)})
+    assert mask == (False, True, False, False)
+    assert shape == (3, 2, 4, 5)
+
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j, k, l]")
+    input_shapes = {"a": (3,), "b": (4,)}
+    shape, mask = mapspec.shape(input_shapes, internal_shapes={"c": (5, 6)})
+    assert mask == (True, True, False, False)
+    assert shape == (3, 4, 5, 6)
+
+
+def test_shape_exceptions():
+    # Extra input arrays
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    with pytest.raises(ValueError, match="Got extra array"):
+        mapspec.shape({"a": (3,), "extra": (3,)}, internal_shapes={"b": (4,)})
+
+    # Missing input arrays
+    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
+    with pytest.raises(ValueError, match="Inputs expected by this map were not provided"):
+        mapspec.shape({"a": (3,)}, internal_shapes={"c": (..., ...)})
+
+    # Dimension mismatch
+    mapspec = MapSpec.from_string("a[i, j], b[j, k] -> c[i, j, k]")
+    with pytest.raises(ValueError, match="Dimension mismatch for arrays"):
+        mapspec.shape({"a": (2, 3), "b": (4, 4)}, internal_shapes={"c": ()})
+
+    # Missing output shapes for unshared axes
+    mapspec = MapSpec.from_string("a[i, j] -> b[i, j, k]")
+    with pytest.raises(ValueError, match="Internal shape for 'b' is too short."):
+        mapspec.shape({"a": (2, 3)}, internal_shapes={"b": ()})
+
+    # Output array not accepted by this map
+    mapspec = MapSpec.from_string("a[i] -> b[i, j]")
+    with pytest.raises(ValueError, match="Internal shape of `extra` is not accepted by this map."):
+        mapspec.shape({"a": (3,)}, internal_shapes={"extra": (3, 4)})
+
+
+def test_trace_dependencies():
+    # Test 1: Single input to single output
+    mapspecs_1 = [
+        MapSpec.from_string("a[i] -> y[i]"),
+    ]
+    deps_1 = trace_dependencies(mapspecs_1)
+    assert deps_1 == {"y": {"a": ("i",)}}
+
+    # Test 2: Multiple inputs to single output
+    mapspecs_2 = [
+        MapSpec.from_string("a[i], b[i] -> y[i]"),
+    ]
+    deps_2 = trace_dependencies(mapspecs_2)
+    assert deps_2 == {"y": {"a": ("i",), "b": ("i",)}}
+
+    # Test 3: Multiple inputs to multiple outputs
+    mapspecs_3 = [
+        MapSpec.from_string("a[i], b[j] -> y[i, j]"),
+        MapSpec.from_string("a[i], y[i, j] -> z[i, j]"),
+    ]
+    deps_3 = trace_dependencies(mapspecs_3)
+    assert deps_3 == {
+        "y": {"a": ("i",), "b": ("j",)},
+        "z": {"a": ("i",), "b": ("j",)},
+    }
+
+    # Test 4: Nested dependencies
+    mapspecs_4 = [
+        MapSpec.from_string("a[i] -> x[i]"),
+        MapSpec.from_string("x[i] -> y[i]"),
+        MapSpec.from_string("y[i] -> z[i]"),
+    ]
+    deps_4 = trace_dependencies(mapspecs_4)
+    assert deps_4 == {
+        "x": {"a": ("i",)},
+        "y": {"a": ("i",)},
+        "z": {"a": ("i",)},
+    }
+
+    # Test 5: Multiple axes
+    mapspecs_5 = [
+        MapSpec.from_string("a[i], b[j] -> y[i, j]"),
+        MapSpec.from_string("y[i, j], c[k] -> z[i, j, k]"),
+    ]
+    deps_5 = trace_dependencies(mapspecs_5)
+    assert deps_5 == {
+        "y": {"a": ("i",), "b": ("j",)},
+        "z": {"a": ("i",), "b": ("j",), "c": ("k",)},
+    }
+
+    # Test 6: Mixed dependencies
+    mapspecs_6 = [
+        MapSpec.from_string("a[i], b[j] -> x[i, j]"),
+        MapSpec.from_string("x[i, j], c[k] -> y[i, j, k]"),
+        MapSpec.from_string("y[i, :, k] -> z[k, i]"),
+    ]
+    deps_6 = trace_dependencies(mapspecs_6)
+    assert deps_6 == {
+        "x": {"a": ("i",), "b": ("j",)},
+        "y": {"a": ("i",), "b": ("j",), "c": ("k",)},
+        "z": {"a": ("i",), "c": ("k",)},
+    }
+
+    # Test 7: Zipped in different MapSpecs
+    mapspecs_7 = [
+        MapSpec.from_string("a[i], b[i] -> x[i]"),
+        MapSpec.from_string("x[i], c[i] -> y[i]"),
+    ]
+    deps_7 = trace_dependencies(mapspecs_7)
+    assert deps_7 == {
+        "x": {"a": ("i",), "b": ("i",)},
+        "y": {"a": ("i",), "b": ("i",), "c": ("i",)},
+    }
+
+    # Test 8: Zipped in different MapSpecs multi output
+    mapspecs_8 = [
+        MapSpec.from_string("a[i], b[i] -> x[i], unused[i]"),
+        MapSpec.from_string("x[i], c[i] -> y[i]"),
+    ]
+    deps_8 = trace_dependencies(mapspecs_8)
+    assert deps_8 == {
+        "x": {"a": ("i",), "b": ("i",)},
+        "unused": {"a": ("i",), "b": ("i",)},
+        "y": {"a": ("i",), "b": ("i",), "c": ("i",)},
+    }
+
+    # Test 9: Single mapspec
+    mapspecs_9 = [
+        MapSpec.from_string("x[i] -> y[i]"),
+    ]
+    deps_9 = trace_dependencies(mapspecs_9)
+    assert deps_9 == {"y": {"x": ("i",)}}
+
+    # Test 10: MapSpec from step
+    mapspecs_10 = [
+        MapSpec.from_string("... -> x[i]"),
+        MapSpec.from_string("x[i] -> y[i]"),
+    ]
+    deps_10 = trace_dependencies(mapspecs_10)
+    assert deps_10 == {"y": {"x": ("i",)}}
+
+    # Test 11: Internal shapes to 2D to 1D
+    mapspecs_11 = [
+        MapSpec.from_string("n[j] -> x[i, j]"),
+        MapSpec.from_string("x[i, j] -> y[i, j]"),
+        MapSpec.from_string("y[:, j] -> sum[j]"),
+    ]
+    deps_11 = trace_dependencies(mapspecs_11)
+    assert deps_11 == {
+        "x": {"n": ("j",)},
+        "y": {"n": ("j",)},
+        "sum": {"n": ("j",)},
+    }

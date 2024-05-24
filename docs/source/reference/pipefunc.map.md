@@ -1,7 +1,7 @@
-## `pipefunc` module
+## `pipefunc.map` module
 
 ```{eval-rst}
-.. automodule:: pipefunc
+.. automodule:: pipefunc.map
     :members:
     :undoc-members:
     :show-inheritance:

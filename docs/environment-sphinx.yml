@@ -14,7 +14,6 @@ dependencies:
   - typing_extensions
   - cloudpickle
   - numpy
-  - tabulate
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -26,11 +25,13 @@ dependencies:
   - pytest-cov
   - pandas
   - adaptive
+  - xarray
   # optional-dependencies: docs
   - myst-nb
   - sphinx
-  - furo
+  - sphinx-book-theme
   - myst-parser
   - emoji
   - jupytext
   - pandas
+  - xarray

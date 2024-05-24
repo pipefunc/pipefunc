@@ -32,20 +32,21 @@ dependencies = [
     "typing_extensions; python_version <= '3.9'",
     "cloudpickle",
     "numpy",
-    "tabulate",
 ]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler"]
+xarray = ["xarray"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive"]
+test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive", "xarray"]
 docs = [
     "myst-nb",
     "sphinx",
-    "furo",
+    "sphinx-book-theme",
     "myst-parser",
     "emoji",
     "jupytext",
-    "pandas",                  # used in example.ipynb
+    "pandas",      # used in example.ipynb
+    "xarray",      # used in example.ipynb
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]

@@ -3,13 +3,7 @@ from itertools import product
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._sweep import (
-    MultiSweep,
-    Sweep,
-    count_sweep,
-    generate_sweep,
-    set_cache_for_sweep,
-)
+from pipefunc._sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
 
 
 @pytest.fixture()
