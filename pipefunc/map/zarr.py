@@ -28,115 +28,6 @@ if TYPE_CHECKING:
 ARRAY_NAME = "data"
 
 
-class CloudPickleGzip(Codec):
-    """Codec to encode data as compressed cloudpickled bytes.
-
-    Useful for encoding an array of Python objects while ensuring compatibility
-    across different Python versions and environments.
-
-    Parameters
-    ----------
-    protocol
-        The protocol used to pickle data.
-    compression_level
-        The compression level used by gzip. Ranges from 0 to 9, with 9 being the highest compression.
-
-    Examples
-    --------
-    >>> from pipefunc.map.zarr import CloudPickleGzip
-    >>> import numpy as np
-    >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
-    >>> f = CloudPickleGzip()
-    >>> f.decode(f.encode(x))
-    array(['foo', 'bar', 'baz'], dtype=object)
-
-    """
-
-    codec_id = "cloudpickle_gzip"
-
-    def __init__(
-        self,
-        protocol: int = cloudpickle.DEFAULT_PROTOCOL,
-        compression_level: int = 9,
-    ) -> None:
-        """Initialize the CloudPickleGzip codec.
-
-        Parameters
-        ----------
-        protocol
-            The protocol used to pickle data, by default cloudpickle.DEFAULT_PROTOCOL
-        compression_level
-            The compression level used by gzip, by default 9
-
-        """
-        self.protocol = protocol
-        self.compression_level = compression_level
-
-    def encode(self, buf: Any) -> bytes:
-        """Encode the input buffer using CloudPickle and gzip compression.
-
-        Parameters
-        ----------
-        buf
-            The input buffer to encode.
-
-        Returns
-        -------
-        The compressed cloudpickled data.
-
-        """
-        data = cloudpickle.dumps(buf, protocol=self.protocol)
-        return gzip.compress(data, compresslevel=self.compression_level)
-
-    def decode(self, buf: np.ndarray, out: np.ndarray | None = None) -> Any:
-        """Decode the input buffer using gzip decompression and CloudPickle.
-
-        Parameters
-        ----------
-        buf
-            The compressed cloudpickled data.
-        out
-            The output array to store the decoded data, by default None
-
-        Returns
-        -------
-        Any
-            The decoded data.
-
-        """
-        buf = ensure_contiguous_ndarray(buf)
-        data = gzip.decompress(buf)  # type: ignore[arg-type]
-        dec = cloudpickle.loads(data)
-
-        if out is not None:
-            np.copyto(out, dec)
-            return out
-        return dec
-
-    def get_config(self) -> dict[str, Any]:
-        """Get the configuration of the codec.
-
-        Returns
-        -------
-        The configuration of the codec.
-
-        """
-        return {
-            "id": self.codec_id,
-            "protocol": self.protocol,
-            "compression_level": self.compression_level,
-        }
-
-    def __repr__(self) -> str:
-        """Return a string representation of the codec."""
-        return (
-            f"CloudPickleGzip(protocol={self.protocol}, compression_level={self.compression_level})"
-        )
-
-
-register_codec(CloudPickleGzip)
-
-
 class ZarrArray(FileArrayBase):
     """Array interface to a Zarr store."""
 
@@ -286,3 +177,112 @@ class ZarrArray(FileArrayBase):
             else:
                 slice_indices.append(range(k, k + 1))
         return slice_indices
+
+
+class CloudPickleGzip(Codec):
+    """Codec to encode data as compressed cloudpickled bytes.
+
+    Useful for encoding an array of Python objects while ensuring compatibility
+    across different Python versions and environments.
+
+    Parameters
+    ----------
+    protocol
+        The protocol used to pickle data.
+    compression_level
+        The compression level used by gzip. Ranges from 0 to 9, with 9 being the highest compression.
+
+    Examples
+    --------
+    >>> from pipefunc.map.zarr import CloudPickleGzip
+    >>> import numpy as np
+    >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
+    >>> f = CloudPickleGzip()
+    >>> f.decode(f.encode(x))
+    array(['foo', 'bar', 'baz'], dtype=object)
+
+    """
+
+    codec_id = "cloudpickle_gzip"
+
+    def __init__(
+        self,
+        protocol: int = cloudpickle.DEFAULT_PROTOCOL,
+        compression_level: int = 9,
+    ) -> None:
+        """Initialize the CloudPickleGzip codec.
+
+        Parameters
+        ----------
+        protocol
+            The protocol used to pickle data, by default cloudpickle.DEFAULT_PROTOCOL
+        compression_level
+            The compression level used by gzip, by default 9
+
+        """
+        self.protocol = protocol
+        self.compression_level = compression_level
+
+    def encode(self, buf: Any) -> bytes:
+        """Encode the input buffer using CloudPickle and gzip compression.
+
+        Parameters
+        ----------
+        buf
+            The input buffer to encode.
+
+        Returns
+        -------
+        The compressed cloudpickled data.
+
+        """
+        data = cloudpickle.dumps(buf, protocol=self.protocol)
+        return gzip.compress(data, compresslevel=self.compression_level)
+
+    def decode(self, buf: np.ndarray, out: np.ndarray | None = None) -> Any:
+        """Decode the input buffer using gzip decompression and CloudPickle.
+
+        Parameters
+        ----------
+        buf
+            The compressed cloudpickled data.
+        out
+            The output array to store the decoded data, by default None
+
+        Returns
+        -------
+        Any
+            The decoded data.
+
+        """
+        buf = ensure_contiguous_ndarray(buf)
+        data = gzip.decompress(buf)  # type: ignore[arg-type]
+        dec = cloudpickle.loads(data)
+
+        if out is not None:
+            np.copyto(out, dec)
+            return out
+        return dec
+
+    def get_config(self) -> dict[str, Any]:
+        """Get the configuration of the codec.
+
+        Returns
+        -------
+        The configuration of the codec.
+
+        """
+        return {
+            "id": self.codec_id,
+            "protocol": self.protocol,
+            "compression_level": self.compression_level,
+        }
+
+    def __repr__(self) -> str:
+        """Return a string representation of the codec."""
+        return (
+            f"CloudPickleGzip(protocol={self.protocol}, compression_level={self.compression_level})"
+        )
+
+
+register_codec(CloudPickleGzip)
