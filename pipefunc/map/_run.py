@@ -12,7 +12,12 @@ import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
-from pipefunc.map._filearray import FileArray, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._filearray import (
+    FileArray,
+    FileArrayBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+)
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
@@ -350,7 +355,7 @@ def _run_iteration_and_process(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    file_arrays: list[FileArray],
+    file_arrays: list[FileArrayBase],
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, index)
     outputs = _pick_output(func, output)
@@ -360,7 +365,7 @@ def _run_iteration_and_process(
 
 def _update_file_array(
     func: PipeFunc,
-    file_arrays: list[FileArray],
+    file_arrays: list[FileArrayBase],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
@@ -421,8 +426,8 @@ def _update_result_array(
             result_array[index] = _output
 
 
-def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[int], list[int]]:
-    masks = (arr._mask_list() for arr in file_arrays)
+def _existing_and_missing_indices(file_arrays: list[FileArrayBase]) -> tuple[list[int], list[int]]:
+    masks = (arr.mask_linear() for arr in file_arrays)
     existing_indices = []
     missing_indices = []
     for i, mask_values in enumerate(zip(*masks)):
@@ -550,7 +555,7 @@ def map_shapes(
 
 
 def _maybe_load_file_array(x: Any) -> Any:
-    if isinstance(x, FileArray):
+    if isinstance(x, FileArrayBase):
         return x.to_array()
     return x
 
@@ -588,7 +593,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
     else:
         output = _execute_single(func, kwargs, run_folder)
 
-    # Note that the kwargs still contain the FileArray objects if _execute_map_spec
+    # Note that the kwargs still contain the FileArrayBase objects if _execute_map_spec
     # was used.
     if isinstance(func.output_name, str):
         return [

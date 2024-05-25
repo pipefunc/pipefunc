@@ -30,7 +30,7 @@ def read(name: str | Path) -> bytes:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-class _FileArrayBase(abc.ABC):
+class FileArrayBase(abc.ABC):
     """Base class for file-based arrays."""
 
     @abc.abstractmethod
@@ -67,10 +67,13 @@ class _FileArrayBase(abc.ABC):
     def mask(self) -> np.ma.core.MaskedArray: ...
 
     @abc.abstractmethod
+    def mask_linear(self) -> list[bool]: ...
+
+    @abc.abstractmethod
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
 
-class FileArray(_FileArrayBase):
+class FileArray(FileArrayBase):
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
@@ -267,7 +270,7 @@ class FileArray(_FileArrayBase):
         if not splat_internal:
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
-            mask = self._mask_list()
+            mask = self.mask_linear()
             return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
 
         if not self.internal_shape:
@@ -296,7 +299,8 @@ class FileArray(_FileArrayBase):
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
 
-    def _mask_list(self) -> list[bool]:
+    def mask_linear(self) -> list[bool]:
+        """Return a list of booleans indicating which elements are missing."""
         return [not self._index_to_file(i).is_file() for i in range(self.size)]
 
     @property
@@ -306,7 +310,7 @@ class FileArray(_FileArrayBase):
         The returned numpy array has dtype "bool" and a mask for
         masking out missing data.
         """
-        mask = self._mask_list()
+        mask = self.mask_linear()
         return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:

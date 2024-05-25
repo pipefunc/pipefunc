@@ -11,7 +11,7 @@ from numcodecs import Pickle
 
 from pipefunc._utils import prod
 from pipefunc.map._filearray import (
-    _FileArrayBase,
+    FileArrayBase,
     _iterate_shape_indices,
     _select_by_mask,
 )
@@ -20,7 +20,7 @@ from pipefunc.map._mapspec import shape_to_strides
 ARRAY_NAME = "data"
 
 
-class ZarrArray(_FileArrayBase):
+class ZarrArray(FileArrayBase):
     """Array interface to a Zarr store."""
 
     def __init__(
@@ -111,6 +111,10 @@ class ZarrArray(_FileArrayBase):
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
         return np.ma.array(self._mask[:], dtype=bool)
+
+    def mask_linear(self) -> list[bool]:
+        """Return a list of booleans indicating which elements are missing."""
+        return list(self.mask.flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the location associated with 'key'.
