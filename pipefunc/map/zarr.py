@@ -81,12 +81,13 @@ class ZarrArray(FileArrayBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.full_shape)
         return self.array[np_index]
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
-        return index < self.size
+        np_index = np.unravel_index(index, self.full_shape)
+        return not self._mask[np_index]
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
