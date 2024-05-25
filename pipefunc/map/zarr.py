@@ -25,9 +25,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-ARRAY_NAME = "data"
-
-
 class ZarrArray(FileArrayBase):
     """Array interface to a Zarr store."""
 
