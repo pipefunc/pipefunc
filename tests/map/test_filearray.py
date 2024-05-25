@@ -2,9 +2,26 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import zarr
 
 from pipefunc._utils import prod
 from pipefunc.map._filearray import FileArray, _load_all, _select_by_mask, dump, load
+from pipefunc.map.zarr import ZarrArray
+
+
+@pytest.fixture(params=["file_array", "zarr_array"])
+def array_type(request, tmp_path: Path):
+    if request.param == "file_array":
+
+        def _array_type(shape, internal_shape=None, shape_mask=None):
+            return FileArray(tmp_path, shape, internal_shape, shape_mask)
+    elif request.param == "zarr_array":
+
+        def _array_type(shape, internal_shape=None, shape_mask=None):
+            store = zarr.MemoryStore()
+            return ZarrArray(store, shape, internal_shape, shape_mask)
+
+    return _array_type
 
 
 def test_load_and_dump(tmp_path):
@@ -23,14 +40,6 @@ def test_file_based_object_array_init(tmp_path: Path):
     assert arr.shape == shape
     assert arr.strides == (12, 4, 1)
     assert arr.filename_template == "__{:d}__.pickle"
-
-
-def test_file_based_object_array_properties(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 3, 4)
-    arr = FileArray(folder, shape)
-    assert arr.size == 24
-    assert arr.rank == 3
 
 
 def test_file_based_object_array_normalize_key(tmp_path: Path):
@@ -71,33 +80,6 @@ def test_file_based_object_array_files(tmp_path: Path):
     assert files[-1] == folder / "__5__.pickle"
 
 
-def test_file_based_object_array_getitem(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 3)
-    arr = FileArray(folder, shape)
-    arr.dump((0, 0), {"a": 1})
-    arr.dump((1, 2), {"b": 2})
-    assert arr[0, 0] == {"a": 1}
-    assert arr[1, 2] == {"b": 2}
-    assert arr[0, 1] is np.ma.masked
-    assert arr[0:1, 0] == {"a": 1}
-
-
-def test_file_based_object_array_to_array(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 3)
-    arr = FileArray(folder, shape)
-    arr.dump((0, 0), {"a": 1})
-    arr.dump((1, 2), {"b": 2})
-    result = arr.to_array()
-    assert result.shape == (2, 3)
-    assert result.dtype == object
-    assert result[0, 0] == {"a": 1}
-    assert result[1, 2] == {"b": 2}
-    assert result[0, 1] is np.ma.masked
-    assert result[1, 0] is np.ma.masked
-
-
 def test_file_based_object_array_dump(tmp_path: Path):
     folder = Path(tmp_path)
     shape = (2, 3)
@@ -118,35 +100,6 @@ def test_load_all(tmp_path):
     dump({"b": 2}, file2)
     result = _load_all([file1, file2, file3])
     assert result == [{"a": 1}, {"b": 2}, None]
-
-
-def test_file_array_getitem_with_slicing(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 3, 4)
-    arr = FileArray(folder, shape)
-    arr.dump((0, 0, 0), {"a": 1})
-    arr.dump((0, 1, 0), {"b": 2})
-    arr.dump((1, 0, 0), {"c": 3})
-    arr.dump((1, 1, 0), {"d": 4})
-
-    # Test slicing along a single axis
-    result = arr[0, :, 0]
-    assert result.shape == (3,)
-    assert result[0] == {"a": 1}
-    assert result[1] == {"b": 2}
-    assert result[2] is np.ma.masked
-
-    # Test slicing along multiple axes
-    result = arr[1, 0:2, 0]
-    assert result.shape == (2,)
-    assert result[0] == {"c": 3}
-    assert result[1] == {"d": 4}
-
-    # Test slicing with step
-    result = arr[0, ::2, 0]
-    assert result.shape == (2,)
-    assert result[0] == {"a": 1}
-    assert result[1] is np.ma.masked
 
 
 def test_file_array_dump_with_slicing(tmp_path: Path):
@@ -202,48 +155,6 @@ def test_file_array_normalize_key_with_slicing(tmp_path: Path):
         arr._normalize_key((0, slice(None), 10))
 
 
-def test_high_dim_with_slicing(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 3, 4, 5)
-    arr = FileArray(folder, shape)
-    np_arr: np.ndarray = np.zeros(shape, dtype=object)
-    np_arr[:] = np.ma.masked
-    keys = [
-        (0, 0, slice(None), 0),
-        (0, 1, slice(None), 0),
-        (1, 0, slice(None), 0),
-        (1, 1, slice(None), 0),
-    ]
-    values = [{"a": 1}, {"b": 2}, {"c": 3}, {"d": 4}]
-    for k, v in zip(keys, values):
-        np_arr[k] = v
-        arr.dump(k, v)
-
-    assert (arr.to_array() == np_arr).all()
-
-    # Test slicing along a single axis
-    result = arr[0, :, :, 0]
-    assert result.shape == (3, 4), result.shape
-    assert result[0, 0] == {"a": 1}
-    assert result[1, 0] == {"b": 2}
-    assert result[2, 0] is np.ma.masked
-
-    # Test slicing along multiple axes
-    result = arr[1, 0:2, :, 0]
-    assert result.shape == (2, 4)
-    assert result[0, 0] == {"c": 3}
-    assert result[1, 0] == {"d": 4}
-
-    # Test slicing with step
-    result = arr[0, ::2, :, 0]
-    result_arr = np_arr[0, ::2, :, 0]
-    assert result.shape == (2, 4)
-    assert result[0, 0] == result_arr[0, 0]
-    assert result[1, 0] is np.ma.masked
-    assert result[0, 1] == result_arr[0, 1]
-    assert result[1, 1] is np.ma.masked
-
-
 def test_slice_indices_with_step_size(tmp_path: Path):
     folder = Path(tmp_path)
     shape = (5, 6, 7)
@@ -277,94 +188,6 @@ def test_key_to_file(tmp_path: Path):
     key = (0, 1, 2)
     file_path = arr._key_to_file(key)
     assert file_path == (folder / "__7__.pickle")
-
-
-def test_sliced_arange(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (3, 4, 5)
-    arr = FileArray(folder, shape)
-    np_arr = np.arange(prod(shape)).reshape(shape)
-    for key in np.ndindex(shape):
-        arr.dump(key, np_arr[key])
-
-    assert (arr[:, :, :] == np_arr[:, :, :]).all()
-    assert (arr[:, ::2, :] == np_arr[:, ::2, :]).all()
-    assert (arr[:, ::3, :] == np_arr[:, ::3, :]).all()
-    assert (arr[:, ::-1, :] == np_arr[:, ::-1, :]).all()
-    assert (arr[:, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
-    assert (arr[1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
-    assert (arr[1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
-    assert (arr[1:, ::-1, ::-1] == np_arr[1:, ::-1, ::-1]).all()
-    assert (arr[1:, ::-1, -1] == np_arr[1:, ::-1, -1]).all()
-    assert (arr[2, ::-1, -1] == np_arr[2, ::-1, -1]).all()
-    assert (arr[:1, :1, -1] == np_arr[:1, :1, -1]).all()
-    assert (arr[:1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
-
-
-def test_sliced_arange_minimal(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (1, 2)
-    arr = FileArray(folder, shape)
-    np_arr = np.arange(prod(shape)).reshape(shape)
-    for key in np.ndindex(shape):
-        arr.dump(key, np_arr[key])
-
-    assert (arr[:, 1] == np_arr[:, 1]).all()
-    assert (arr[0, -1] == np_arr[0, -1]).all()
-    assert (arr[:, -1] == np_arr[:, -1]).all()
-
-
-def test_sliced_arange_minimal2(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 2, 4)
-    arr = FileArray(folder, shape)
-    np_arr = np.arange(prod(shape)).reshape(shape)
-    for key in np.ndindex(shape):
-        arr.dump(key, np_arr[key])
-
-    assert (arr[0, :, 1] == np_arr[0, :, 1]).all()
-    assert (arr[0, 0, -1] == np_arr[0, 0, -1]).all()
-    assert (arr[0, :, -1] == np_arr[0, :, -1]).all()
-    assert (arr[0, ::-1, 0] == np_arr[0, ::-1, 0]).all()
-    assert (arr[0, ::-1, -1] == np_arr[0, ::-1, -1]).all()
-    assert (arr[:, ::-1, -1] == np_arr[:, ::-1, -1]).all()
-    assert (arr[1:, ::-1, -1] == np_arr[1:, ::-1, -1]).all()
-
-
-def test_file_array_with_internal_arrays(tmp_path: Path):
-    folder = Path(tmp_path)
-    shape = (2, 2)
-    internal_shape = (3, 3, 4)
-    shape_mask = (True, True, False, False, False)
-    arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
-    full_shape = (2, 2, 3, 3, 4)
-    assert _select_by_mask(shape_mask, shape, internal_shape) == full_shape
-    data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
-    data2 = np.ones(internal_shape)
-
-    arr.dump((0, 0), data1)
-    arr.dump((1, 1), data2)
-
-    # Test indexing into the internal arrays
-    assert np.array_equal(arr[0, 0, 1, 1, 1], data1[1, 1, 1])
-    assert np.array_equal(arr[1, 1, 2, 2, 2], data2[2, 2, 2])
-
-    # Test slicing that includes internal array dimensions
-    result = arr[0, :, 1, 1, 1]
-    expected: np.ma.masked_array = np.ma.masked_array(
-        [data1[1, 1, 1], np.ma.masked],
-        mask=[False, True],
-        dtype=object,
-    )
-    assert np.ma.allequal(result, expected)
-
-    result = arr[1, :, 2, 2, 2]
-    expected = np.ma.masked_array(
-        [np.ma.masked, data2[2, 2, 2]],
-        mask=[True, False],
-        dtype=object,
-    )
-    assert np.ma.allequal(result, expected)
 
 
 def test_file_array_with_internal_arrays_slicing(tmp_path: Path):

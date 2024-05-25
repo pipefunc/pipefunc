@@ -82,7 +82,6 @@ class FileArray(_FileArrayBase):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
-        strides: tuple[int, ...] | None = None,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         if internal_shape and shape_mask is None:
@@ -94,7 +93,7 @@ class FileArray(_FileArrayBase):
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
-        self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
+        self.strides = shape_to_strides(self.shape)
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
