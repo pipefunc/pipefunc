@@ -58,7 +58,7 @@ class ZarrArray(FileArrayBase):
 
         if object_codec is None:
             object_codec = CloudPickleGzip()
-
+        chunks = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         self.array = zarr.open(
             self.store,
             mode="a",
@@ -66,7 +66,7 @@ class ZarrArray(FileArrayBase):
             shape=self.full_shape,
             dtype=object,
             object_codec=object_codec,
-            chunks=internal_shape or 1,
+            chunks=chunks,
         )
         self._mask = zarr.open(
             self.store,
@@ -76,7 +76,7 @@ class ZarrArray(FileArrayBase):
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
-            chunks=internal_shape or 1,
+            chunks=chunks,
         )
 
     @property
