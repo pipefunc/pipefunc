@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import zarr
@@ -17,6 +17,10 @@ from pipefunc.map._filearray import (
 )
 from pipefunc.map._mapspec import shape_to_strides
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
 ARRAY_NAME = "data"
 
 
@@ -25,7 +29,7 @@ class ZarrArray(FileArrayBase):
 
     def __init__(
         self,
-        store: zarr.Store,
+        store: zarr.Store | str | Path,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
@@ -39,6 +43,8 @@ class ZarrArray(FileArrayBase):
         if internal_shape is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
+        if not isinstance(store, zarr.Store):
+            store = zarr.DirectoryStore(str(store))
         self.store = store
         self.shape = tuple(shape)
         self.strides = shape_to_strides(self.shape)

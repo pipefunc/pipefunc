@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
-import zarr
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
@@ -263,9 +262,8 @@ def _load_parameter(
     file_array_path = _file_array_path(parameter, run_folder)
     external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
     internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
-    store = zarr.DirectoryStore(file_array_path)
     return ZarrArray(
-        store,
+        file_array_path,
         external_shape,
         internal_shape,
         shape_masks[parameter],
@@ -317,7 +315,7 @@ def _init_file_arrays(
     internal_shape = _internal_shape(shape, mask)
     return [
         ZarrArray(
-            zarr.DirectoryStore(_file_array_path(output_name, run_folder)),
+            _file_array_path(output_name, run_folder),
             external_shape,
             internal_shape,
             mask,
