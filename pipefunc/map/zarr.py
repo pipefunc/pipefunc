@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from typing import Any
 
 import numpy as np
@@ -120,7 +121,30 @@ class ZarrArray(_FileArrayBase):
         shape = self.full_shape
         shape_mask = self.shape_mask
         internal_shape = _internal_shape(shape, shape_mask)
-        for internal_index in _iterate_shape_indices(internal_shape):
-            full_index = _select_by_mask(shape_mask, key, internal_index)  # type: ignore[arg-type]
-            self.array[full_index] = value
-            self._mask[full_index] = False
+        print(f"{key=}, {self.full_shape=}")
+        if any(isinstance(k, slice) for k in key):
+            external_indices = itertools.product(*self._slice_indices(key))
+        else:
+            external_indices = [key]
+
+        for external_index in external_indices:
+            for internal_index in _iterate_shape_indices(internal_shape):
+                full_index = _select_by_mask(shape_mask, external_index, internal_index)  # type: ignore[arg-type]
+                print(f"full_index: {full_index}, internal_index: {internal_index}")
+                sub_array = value[internal_index] if self.internal_shape else value
+                self.array[full_index] = sub_array
+                self._mask[full_index] = False
+
+    def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
+        slice_indices = []
+        shape_index = 0
+        print(f"{key=}")
+        for k in key:
+            shape = self.shape
+            index = shape_index
+            if isinstance(k, slice):
+                slice_indices.append(range(*k.indices(shape[index])))
+            else:
+                slice_indices.append(range(k, k + 1))
+        print(f"{slice_indices=}")
+        return slice_indices
