@@ -42,12 +42,12 @@ class _FileArrayBase(abc.ABC):
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def size(self) -> int: ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def rank(self) -> int: ...
 
     @abc.abstractmethod
@@ -62,15 +62,15 @@ class _FileArrayBase(abc.ABC):
     @abc.abstractmethod
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def mask(self) -> np.ma.core.MaskedArray: ...
 
     @abc.abstractmethod
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
 
-class FileArray:
+class FileArray(_FileArrayBase):
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
