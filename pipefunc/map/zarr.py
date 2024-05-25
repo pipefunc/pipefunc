@@ -29,7 +29,7 @@ class ZarrArray(FileArrayBase):
 
     def __init__(
         self,
-        store: zarr.Store | str | Path,
+        store: zarr.storage.Store | str | Path,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
@@ -43,7 +43,7 @@ class ZarrArray(FileArrayBase):
         if internal_shape is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
-        if not isinstance(store, zarr.Store):
+        if not isinstance(store, zarr.storage.Store):
             store = zarr.DirectoryStore(str(store))
         self.store = store
         self.shape = tuple(shape)
