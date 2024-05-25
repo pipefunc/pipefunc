@@ -14,7 +14,6 @@ import zarr
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
 from pipefunc.map._filearray import (
-    FileArray,
     FileArrayBase,
     _iterate_shape_indices,
     _select_by_mask,
@@ -313,12 +312,12 @@ def _init_file_arrays(
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     run_folder: Path,
-) -> list[FileArray]:
+) -> list[ZarrArray]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     return [
-        FileArray(
-            _file_array_path(output_name, run_folder),
+        ZarrArray(
+            zarr.DirectoryStore(_file_array_path(output_name, run_folder)),
             external_shape,
             internal_shape,
             mask,
