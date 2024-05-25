@@ -16,9 +16,6 @@ from pipefunc.map._filearray import (
     _select_by_mask,
 )
 from pipefunc.map._mapspec import shape_to_strides
-from pipefunc.map._run import (
-    _internal_shape,
-)
 
 ARRAY_NAME = "data"
 
@@ -118,32 +115,29 @@ class ZarrArray(_FileArrayBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
-        shape = self.full_shape
         shape_mask = self.shape_mask
-        internal_shape = _internal_shape(shape, shape_mask)
-        print(f"{key=}, {self.full_shape=}")
+        internal_shape = self.internal_shape
+        print(f"{key=}, {self.full_shape=}, {internal_shape=}, {shape_mask=}")
         if any(isinstance(k, slice) for k in key):
             external_indices = itertools.product(*self._slice_indices(key))
         else:
             external_indices = [key]
-
         for external_index in external_indices:
             for internal_index in _iterate_shape_indices(internal_shape):
                 full_index = _select_by_mask(shape_mask, external_index, internal_index)  # type: ignore[arg-type]
-                print(f"full_index: {full_index}, internal_index: {internal_index}")
+                print(
+                    f"full_index: {full_index}, external_index: {external_index}, internal_index: {internal_index}"
+                )
                 sub_array = value[internal_index] if self.internal_shape else value
                 self.array[full_index] = sub_array
                 self._mask[full_index] = False
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
-        shape_index = 0
         print(f"{key=}")
-        for k in key:
-            shape = self.shape
-            index = shape_index
+        for size, k in zip(self.shape, key):
             if isinstance(k, slice):
-                slice_indices.append(range(*k.indices(shape[index])))
+                slice_indices.append(range(*k.indices(size)))
             else:
                 slice_indices.append(range(k, k + 1))
         print(f"{slice_indices=}")
