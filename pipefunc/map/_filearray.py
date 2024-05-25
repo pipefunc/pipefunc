@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import abc
 import concurrent.futures
 import itertools
 from pathlib import Path
@@ -29,7 +30,50 @@ def read(name: str | Path) -> bytes:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-class FileArray:
+class FileArrayBase(abc.ABC):
+    """Base class for file-based arrays."""
+
+    @abc.abstractmethod
+    def __init__(
+        self,
+        folder: str | Path,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+    ) -> None: ...
+
+    @property
+    @abc.abstractmethod
+    def size(self) -> int: ...
+
+    @property
+    @abc.abstractmethod
+    def rank(self) -> int: ...
+
+    @abc.abstractmethod
+    def get_from_index(self, index: int) -> Any: ...
+
+    @abc.abstractmethod
+    def has_index(self, index: int) -> bool: ...
+
+    @abc.abstractmethod
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
+
+    @abc.abstractmethod
+    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
+
+    @property
+    @abc.abstractmethod
+    def mask(self) -> np.ma.core.MaskedArray: ...
+
+    @abc.abstractmethod
+    def mask_linear(self) -> list[bool]: ...
+
+    @abc.abstractmethod
+    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
+
+
+class FileArray(FileArrayBase):
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
@@ -41,7 +85,6 @@ class FileArray:
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
-        strides: tuple[int, ...] | None = None,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         if internal_shape and shape_mask is None:
@@ -53,7 +96,7 @@ class FileArray:
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
-        self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
+        self.strides = shape_to_strides(self.shape)
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
@@ -227,7 +270,7 @@ class FileArray:
         if not splat_internal:
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
-            mask = self._mask_list()
+            mask = self.mask_linear()
             return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
 
         if not self.internal_shape:
@@ -256,7 +299,8 @@ class FileArray:
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
 
-    def _mask_list(self) -> list[bool]:
+    def mask_linear(self) -> list[bool]:
+        """Return a list of booleans indicating which elements are missing."""
         return [not self._index_to_file(i).is_file() for i in range(self.size)]
 
     @property
@@ -266,7 +310,7 @@ class FileArray:
         The returned numpy array has dtype "bool" and a mask for
         masking out missing data.
         """
-        mask = self._mask_list()
+        mask = self.mask_linear()
         return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:

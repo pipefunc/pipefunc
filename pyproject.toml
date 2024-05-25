@@ -36,8 +36,17 @@ dependencies = [
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler"]
 xarray = ["xarray"]
+zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive", "xarray"]
+test = [
+    "pytest",
+    "coverage",
+    "pytest-cov",
+    "pandas",
+    "adaptive",
+    "xarray",
+    "zarr",
+]
 docs = [
     "myst-nb",
     "sphinx",
@@ -45,8 +54,8 @@ docs = [
     "myst-parser",
     "emoji",
     "jupytext",
-    "pandas",      # used in example.ipynb
-    "xarray",      # used in example.ipynb
+    "pandas",            # used in example.ipynb
+    "xarray",            # used in example.ipynb
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
