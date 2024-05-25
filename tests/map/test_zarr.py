@@ -1,6 +1,3 @@
-# test_zarr_array.py
-
-# test_zarr_array.py
 import numpy as np
 import zarr
 
