@@ -90,7 +90,10 @@ class ZarrArray(_FileArrayBase):
         """Return the data associated with the given key."""
         data = self.array[key]
         mask = self._mask[key]
-        return np.ma.masked_array(data, mask=mask, dtype=object)
+        item: np.ma.MaskedArray = np.ma.masked_array(data, mask=mask, dtype=object)
+        if item.shape == () and item.mask:
+            return np.ma.masked
+        return item
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return the array as a NumPy masked array."""
@@ -115,22 +118,34 @@ class ZarrArray(_FileArrayBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
-        shape_mask = self.shape_mask
-        internal_shape = self.internal_shape
-        print(f"{key=}, {self.full_shape=}, {internal_shape=}, {shape_mask=}")
+        if self.internal_shape:
+            assert self.internal_shape == value.shape, (self.internal_shape, value.shape)
         if any(isinstance(k, slice) for k in key):
-            external_indices = itertools.product(*self._slice_indices(key))
-        else:
-            external_indices = [key]
-        for external_index in external_indices:
-            for internal_index in _iterate_shape_indices(internal_shape):
-                full_index = _select_by_mask(shape_mask, external_index, internal_index)  # type: ignore[arg-type]
-                print(
-                    f"full_index: {full_index}, external_index: {external_index}, internal_index: {internal_index}"
-                )
-                sub_array = value[internal_index] if self.internal_shape else value
+            for external_index in itertools.product(*self._slice_indices(key)):
+                if self.internal_shape:
+                    for internal_index in _iterate_shape_indices(self.internal_shape):
+                        full_index = _select_by_mask(
+                            self.shape_mask,
+                            external_index,
+                            internal_index,
+                        )  # type: ignore[arg-type]
+                        sub_array = value[internal_index]
+                        self.array[full_index] = sub_array
+                        self._mask[full_index] = False
+                else:
+                    self.array[external_index] = value
+                    self._mask[external_index] = False
+            return
+
+        if self.internal_shape:
+            for internal_index in _iterate_shape_indices(self.internal_shape):
+                full_index = _select_by_mask(self.shape_mask, key, internal_index)  # type: ignore[arg-type]
+                sub_array = value[internal_index]
                 self.array[full_index] = sub_array
                 self._mask[full_index] = False
+        else:
+            self.array[key] = value
+            self._mask[key] = False
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []

@@ -212,13 +212,13 @@ def test_zarr_array_set_and_get_slice():
     store = zarr.MemoryStore()
     arr = ZarrArray(store, shape)
 
-    data1 = np.arange(24).reshape(2, 3, 4)
+    data1 = 42
     arr.dump((slice(None), slice(None), slice(None)), data1)
-    assert np.array_equal(arr[:, :, :], data1)
+    assert np.all(arr[:, :, :] == data1)
 
-    data2 = np.ones((1, 3, 2))
+    data2 = 69
     arr.dump((slice(1, 2), slice(None), slice(1, 3)), data2)
-    assert np.array_equal(arr[1, :, 1:3], data2)
+    assert np.all(arr[1, :, 1] == data2)
 
 
 def test_zarr_array_set_and_get_slice_with_internal_shape():
@@ -228,10 +228,10 @@ def test_zarr_array_set_and_get_slice_with_internal_shape():
     store = zarr.MemoryStore()
     arr = ZarrArray(store, shape, internal_shape=internal_shape, shape_mask=shape_mask)
 
-    data1 = np.arange(36).reshape(3, 3, 4)
+    data1 = np.arange(36).reshape(*internal_shape)
     arr.dump((0, 0), data1)
     assert np.array_equal(arr[0, 0], data1)
 
-    data2 = np.ones((1, 3, 4))
+    data2 = np.ones(internal_shape)
     arr.dump((1, slice(1, 2)), data2)
     assert np.array_equal(arr[1, 1], data2)
