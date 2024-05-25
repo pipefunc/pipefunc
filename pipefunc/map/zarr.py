@@ -93,8 +93,10 @@ class ZarrArray(FileArrayBase):
         data = self.array[key]
         mask = self._mask[key]
         item: np.ma.MaskedArray = np.ma.masked_array(data, mask=mask, dtype=object)
-        if item.shape == () and item.mask:
-            return np.ma.masked
+        if item.shape == ():
+            if item.mask:
+                return np.ma.masked
+            return item.item()
         return item
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
