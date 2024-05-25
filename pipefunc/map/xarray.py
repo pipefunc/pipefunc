@@ -1,4 +1,4 @@
-"""Provides xarray integration for pipefunc."""
+"""Provides `xarray` integration for `pipefunc`."""
 
 from __future__ import annotations
 
