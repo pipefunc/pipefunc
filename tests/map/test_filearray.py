@@ -5,6 +5,9 @@ import pytest
 
 from pipefunc.map._filearray import FileArray, _load_all, _select_by_mask, dump, load
 
+# The tests for all file array types are in `test_base_filearray.py`!
+# Here are only the tests that are specific to the `FileArray` class.
+
 
 def test_load_and_dump(tmp_path):
     obj = {"a": 1, "b": [2, 3]}

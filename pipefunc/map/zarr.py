@@ -97,6 +97,9 @@ class ZarrArray(_FileArrayBase):
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return the array as a NumPy masked array."""
+        if splat_internal and not self.internal_shape:
+            msg = "internal_shape must be provided if splat_internal is True"
+            raise ValueError(msg)
         if splat_internal is None:
             splat_internal = True
         if not splat_internal:
@@ -118,11 +121,10 @@ class ZarrArray(_FileArrayBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
-        if self.internal_shape:
-            assert self.internal_shape == value.shape, (self.internal_shape, value.shape)
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key)):
                 if self.internal_shape:
+                    value = np.asarray(value)  # in case it's a list
                     for internal_index in _iterate_shape_indices(self.internal_shape):
                         full_index = _select_by_mask(
                             self.shape_mask,
@@ -138,6 +140,7 @@ class ZarrArray(_FileArrayBase):
             return
 
         if self.internal_shape:
+            value = np.asarray(value)  # in case it's a list
             for internal_index in _iterate_shape_indices(self.internal_shape):
                 full_index = _select_by_mask(self.shape_mask, key, internal_index)  # type: ignore[arg-type]
                 sub_array = value[internal_index]
