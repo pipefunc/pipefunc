@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import abc
 import concurrent.futures
 import itertools
 from pathlib import Path
@@ -27,6 +28,46 @@ def read(name: str | Path) -> bytes:
 
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
+
+
+class _FileArrayBase(abc.ABC):
+    """Base class for file-based arrays."""
+
+    @abc.abstractmethod
+    def __init__(
+        self,
+        folder: str | Path,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+    ) -> None: ...
+
+    @abc.abstractmethod
+    @property
+    def size(self) -> int: ...
+
+    @abc.abstractmethod
+    @property
+    def rank(self) -> int: ...
+
+    @abc.abstractmethod
+    def get_from_index(self, index: int) -> Any: ...
+
+    @abc.abstractmethod
+    def has_index(self, index: int) -> bool: ...
+
+    @abc.abstractmethod
+    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
+
+    @abc.abstractmethod
+    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
+
+    @abc.abstractmethod
+    @property
+    def mask(self) -> np.ma.core.MaskedArray: ...
+
+    @abc.abstractmethod
+    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
 
 class FileArray:
