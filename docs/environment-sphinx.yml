@@ -26,6 +26,7 @@ dependencies:
   - pandas
   - adaptive
   - xarray
+  - zarr
   # optional-dependencies: docs
   - myst-nb
   - sphinx
