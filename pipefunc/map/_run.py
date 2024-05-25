@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
+import zarr
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
@@ -25,6 +26,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
+from pipefunc.map.zarr import ZarrArray
 
 if TYPE_CHECKING:
     import sys
@@ -262,8 +264,9 @@ def _load_parameter(
     file_array_path = _file_array_path(parameter, run_folder)
     external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
     internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
-    return FileArray(
-        file_array_path,
+    store = zarr.DirectoryStore(file_array_path)
+    return ZarrArray(
+        store,
         external_shape,
         internal_shape,
         shape_masks[parameter],
@@ -459,7 +462,7 @@ def _execute_map_spec(
         shape_mask=mask,
         file_arrays=file_arrays,
     )
-    existing, missing = _existing_and_missing_indices(file_arrays)
+    existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
     n = len(missing)
     if parallel and n > 1:
         with ProcessPoolExecutor() as ex:

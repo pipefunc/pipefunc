@@ -56,6 +56,7 @@ class ZarrArray(FileArrayBase):
             shape=self.full_shape,
             dtype=object,
             object_codec=object_codec,
+            chunks=internal_shape or 1,
         )
         self._mask = zarr.open(
             self.store,
@@ -65,6 +66,7 @@ class ZarrArray(FileArrayBase):
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
+            chunks=internal_shape or 1,
         )
 
     @property
@@ -156,11 +158,9 @@ class ZarrArray(FileArrayBase):
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
-        print(f"{key=}")
         for size, k in zip(self.shape, key):
             if isinstance(k, slice):
                 slice_indices.append(range(*k.indices(size)))
             else:
                 slice_indices.append(range(k, k + 1))
-        print(f"{slice_indices=}")
         return slice_indices
