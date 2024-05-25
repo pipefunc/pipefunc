@@ -144,15 +144,14 @@ class ZarrArray(FileArrayBase):
             for external_index in itertools.product(*self._slice_indices(key)):
                 if self.internal_shape:
                     value = np.asarray(value)  # in case it's a list
-                    for internal_index in _iterate_shape_indices(self.internal_shape):
-                        full_index = _select_by_mask(
-                            self.shape_mask,
-                            external_index,
-                            internal_index,
-                        )  # type: ignore[arg-type]
-                        sub_array = value[internal_index]
-                        self.array[full_index] = sub_array
-                        self._mask[full_index] = False
+                    assert value.shape == self.internal_shape
+                    full_index = _select_by_mask(
+                        self.shape_mask,
+                        external_index,
+                        (slice(None),) * len(self.internal_shape),
+                    )
+                    self.array[full_index] = value
+                    self._mask[full_index] = False
                 else:
                     self.array[external_index] = value
                     self._mask[external_index] = False
