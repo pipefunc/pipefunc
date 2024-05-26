@@ -85,6 +85,7 @@ class FileArray(FileArrayBase):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        *,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         if internal_shape and shape_mask is None:
