@@ -216,7 +216,7 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        if len(shape) != len(self.output_indices):
+        if len(shape) != len(self.input_indices):
             msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
             raise ValueError(msg)
         key = _shape_to_key(shape, linear_index)
