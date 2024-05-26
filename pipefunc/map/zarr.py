@@ -68,11 +68,11 @@ class ZarrArray(FileArrayBase):
             self.store,
             mode="a",
             path="/mask",
-            shape=self.full_shape,
+            shape=self.shape,
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
-            chunks=chunks,
+            chunks=1,
         )
 
     @property
@@ -92,13 +92,13 @@ class ZarrArray(FileArrayBase):
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
-        np_index = np.unravel_index(index, self.full_shape)
+        np_index = np.unravel_index(index, self.shape)
         return not self._mask[np_index]
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
         data = self.array[key]
-        mask = self._mask[key]
+        mask = self.mask[key]
         item: np.ma.MaskedArray = np.ma.masked_array(data, mask=mask, dtype=object)
         if item.shape == ():
             if item.mask:
@@ -116,16 +116,27 @@ class ZarrArray(FileArrayBase):
         if not splat_internal:
             msg = "splat_internal must be True"
             raise NotImplementedError(msg)
-        return np.ma.array(self.array[:], mask=self._mask[:], dtype=object)
+        return np.ma.array(self.array[:], mask=self.mask, dtype=object)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
-        return np.ma.array(self._mask[:], dtype=bool)
+        # TODO: needs to add internal dims
+        mask = self._mask[:]
+        slc = _select_by_mask(
+            self.shape_mask,
+            (slice(None),) * len(self.shape),
+            (None,) * len(self.internal_shape),
+        )
+        tile_shape = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
+        mask = np.tile(mask[slc], tile_shape)
+        return np.ma.array(mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return list(self.mask.flat)
+        return list(
+            self.mask.flat,
+        )  # TODO: this is surely wrong! needs to not include internal dims
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the location associated with 'key'.
@@ -147,10 +158,9 @@ class ZarrArray(FileArrayBase):
                         (slice(None),) * len(self.internal_shape),
                     )
                     self.array[full_index] = value
-                    self._mask[full_index] = False
                 else:
                     self.array[external_index] = value
-                    self._mask[external_index] = False
+                self._mask[external_index] = False
             return
 
         if self.internal_shape:
@@ -162,10 +172,9 @@ class ZarrArray(FileArrayBase):
                 (slice(None),) * len(self.internal_shape),
             )
             self.array[full_index] = value
-            self._mask[full_index] = False
         else:
             self.array[key] = value
-            self._mask[key] = False
+        self._mask[key] = False
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
