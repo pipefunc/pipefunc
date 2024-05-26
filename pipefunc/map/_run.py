@@ -6,7 +6,7 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -357,7 +357,7 @@ def _run_iteration_and_process(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    file_arrays: list[FileArrayBase],
+    file_arrays: Sequence[FileArrayBase],
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, shape_mask, index)
     outputs = _pick_output(func, output)
@@ -367,7 +367,7 @@ def _run_iteration_and_process(
 
 def _update_file_array(
     func: PipeFunc,
-    file_arrays: list[FileArrayBase],
+    file_arrays: Sequence[FileArrayBase],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
