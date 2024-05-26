@@ -137,9 +137,7 @@ class ZarrArray(FileArrayBase):
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return list(
-            self.mask.flat,
-        )  # TODO: this is surely wrong! needs to not include internal dims
+        return list(self.mask.flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the location associated with 'key'.
