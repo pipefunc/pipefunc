@@ -284,8 +284,9 @@ def _select_kwargs(
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
-    keys = func.mapspec.input_keys(shape, index)
-    input_keys = {k: v[0] if len(v) == 1 else v for k, v in keys.items()}
+    input_keys = {
+        k: v[0] if len(v) == 1 else v for k, v in func.mapspec.input_keys(shape, index).items()
+    }
     selected = {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
     _load_file_array(selected)
     return selected
@@ -351,21 +352,22 @@ def _run_iteration_and_process(
     shape_mask: tuple[bool, ...],
     file_arrays: list[FileArray],
 ) -> list[Any]:
-    external_shape = _external_shape(shape, shape_mask)
-    output = _run_iteration(func, kwargs, external_shape, index)
+    output = _run_iteration(func, kwargs, shape, index)
     outputs = _pick_output(func, output)
-    _update_file_array(func, file_arrays, external_shape, index, outputs)
+    _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
 
 
 def _update_file_array(
     func: PipeFunc,
     file_arrays: list[FileArray],
-    external_shape: tuple[int, ...],
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
     index: int,
     outputs: list[Any],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
+    external_shape = _external_shape(shape, shape_mask)
     output_key = func.mapspec.output_key(external_shape, index)
     for file_array, _output in zip(file_arrays, outputs):
         file_array.dump(output_key, _output)
@@ -453,7 +455,6 @@ def _execute_map_spec(
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)
-    print("existing:", existing, "missing:", missing)
     n = len(missing)
     if parallel and n > 1:
         with ProcessPoolExecutor() as ex:
