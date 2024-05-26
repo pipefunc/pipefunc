@@ -260,7 +260,7 @@ def _load_parameter(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: type[StorageBase],
+    storage_class: type[StorageBase],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
@@ -270,7 +270,7 @@ def _load_parameter(
     file_array_path = _file_array_path(parameter, run_folder)
     external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
     internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
-    return storage(
+    return storage_class(
         file_array_path,
         external_shape,
         internal_shape,
@@ -283,11 +283,11 @@ def _func_kwargs(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: type[StorageBase],
+    storage_class: type[StorageBase],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, storage, run_folder)
+        p: _load_parameter(p, input_paths, shapes, shape_masks, storage_class, run_folder)
         for p in func.parameters
     }
 
@@ -320,13 +320,13 @@ def _init_file_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
-    storage: type[StorageBase],
+    storage_class: type[StorageBase],
     run_folder: Path,
 ) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     return [
-        storage(
+        storage_class(
             _file_array_path(output_name, run_folder),
             external_shape,
             internal_shape,
@@ -456,14 +456,14 @@ def _execute_map_spec(
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: type[StorageBase],
+    storage_class: type[StorageBase],
     run_folder: Path,
     parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage, run_folder)
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage_class, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
