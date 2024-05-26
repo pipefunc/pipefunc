@@ -216,12 +216,13 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        if len(shape) != len(self.output_indices):
-            msg = f"Expected a shape of length {len(self.output_indices)}, got {shape}"
+        ouputs = tuple(n for n in self.output_indices if n in self.input_indices)
+        if len(shape) != len(ouputs):
+            msg = f"Expected a shape of length {len(ouputs)}, got {shape}"
             raise ValueError(msg)
         key = _shape_to_key(shape, linear_index)
-        print(f"{key=}")
-        ids = dict(zip(self.output_indices, key))
+        ids = dict(zip(ouputs, key))
+        print(f"{ouputs=}, {key=}, {ids=}")
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)
             for x in self.inputs
@@ -259,6 +260,7 @@ class MapSpec:
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    # Could use np.unravel_index
     return tuple(
         (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
     )

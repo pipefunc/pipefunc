@@ -647,25 +647,28 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
         return list(range(n))
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double_it(x: int, z: int) -> int:
+    def add(x: int, z: int) -> int:
         assert isinstance(x, int)
-        return 2 * x + z
+        return x + z
 
     @pipefunc(output_name="sum")
     def take_sum(y: list[int]) -> int:
         return sum(y)
 
-    pipeline = Pipeline([generate_ints, double_it, take_sum])
+    pipeline = Pipeline([generate_ints, add, take_sum])
 
     pipeline.add_mapspec_axis("z", axis="k")
     assert str(generate_ints.mapspec) == "... -> x[i]"
-    assert str(double_it.mapspec) == "x[i], z[k] -> y[i, k]"
+    assert str(add.mapspec) == "x[i], z[k] -> y[i, k]"
     assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
 
     inputs = {"n": 4, "z": [1, 2]}
     internal_shapes = {"x": 4}
     results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
-    assert results[-1].output.tolist() == [16, 20]
+    assert load_outputs("x", run_folder=tmp_path) == list(range(4))
+    assert load_outputs("y", run_folder=tmp_path).tolist() == [[1, 2], [2, 3], [3, 4], [4, 5]]
+    assert load_outputs("sum", run_folder=tmp_path).tolist() == [10, 14]
+    assert results[-1].output.tolist() == [10, 14]
     expected = {"z": (2,), "x": (4,), "y": (4, 2), "sum": (2,)}
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert masks == {"z": (True,), "x": (False,), "y": (True, True), "sum": (True,)}
