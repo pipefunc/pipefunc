@@ -216,10 +216,11 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        if len(shape) != len(self.input_indices):
-            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
+        if len(shape) != len(self.output_indices):
+            msg = f"Expected a shape of length {len(self.output_indices)}, got {shape}"
             raise ValueError(msg)
         key = _shape_to_key(shape, linear_index)
+        print(f"{key=}")
         ids = dict(zip(self.output_indices, key))
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)

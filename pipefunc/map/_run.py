@@ -280,14 +280,12 @@ def _func_kwargs(
 def _select_kwargs(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    external_shape: tuple[int, ...],
+    shape: tuple[int, ...],
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
-    input_keys = {
-        k: v[0] if len(v) == 1 else v
-        for k, v in func.mapspec.input_keys(external_shape, index).items()
-    }
+    keys = func.mapspec.input_keys(shape, index)
+    input_keys = {k: v[0] if len(v) == 1 else v for k, v in keys.items()}
     selected = {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
     _load_file_array(selected)
     return selected
@@ -334,10 +332,10 @@ def _pick_output(func: PipeFunc, output: Any) -> list[Any]:
 def _run_iteration(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    external_shape: tuple[int, ...],
+    shape: tuple[int, ...],
     index: int,
 ) -> Any:
-    selected = _select_kwargs(func, kwargs, external_shape, index)
+    selected = _select_kwargs(func, kwargs, shape, index)
     try:
         return func(**selected)
     except Exception as e:
@@ -455,6 +453,7 @@ def _execute_map_spec(
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)
+    print("existing:", existing, "missing:", missing)
     n = len(missing)
     if parallel and n > 1:
         with ProcessPoolExecutor() as ex:

@@ -256,6 +256,18 @@ class FileArray:
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
 
+    def linear_mask_full(self) -> list[bool]:
+        """Return a list of booleans indicating which elements are missing."""
+        full_shape = _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
+        cache = {}
+        mask = []
+        for key in _iterate_shape_indices(full_shape):
+            external_key = tuple(k for k, m in zip(key, self.shape_mask) if m)
+            if external_key not in cache:
+                cache[external_key] = self._key_to_file(external_key).is_file()
+            mask.append(not cache[external_key])
+        return mask
+
     def _mask_list(self) -> list[bool]:
         return [not self._index_to_file(i).is_file() for i in range(self.size)]
 
