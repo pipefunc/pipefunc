@@ -10,12 +10,18 @@ from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import load_outputs, load_xarray_dataset, map_shapes, run
+from pipefunc.map.zarr import ZarrArray  # noqa: F401, RUF100
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_simple(tmp_path: Path) -> None:
+@pytest.fixture(params=["file_array", "zarr"])
+def storage(request):
+    return request.param
+
+
+def test_simple(storage, tmp_path: Path) -> None:
     @pipefunc(output_name="y")
     def double_it(x: int) -> int:
         assert isinstance(x, int)
@@ -42,7 +48,7 @@ def test_simple(tmp_path: Path) -> None:
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "y": (4,)}
     # Test `map` and a tmp run_folder
-    results2 = pipeline.map(inputs, run_folder=None, parallel=False)
+    results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
     assert results2[-1].output == 12
 
     axes = pipeline.mapspec_axes()
@@ -695,7 +701,7 @@ def test_from_step_2_dim_array(tmp_path: Path) -> None:
     load_xarray_dataset(run_folder=tmp_path)
 
 
-def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
+def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> list[int]:
         return [a + b, a - b]
@@ -706,14 +712,14 @@ def test_from_step_2_dim_array_2(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"b": (2,), "c": (2, 2)}
     assert masks == {"b": (True,), "c": (True, False)}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)  # type: ignore[arg-type]
+    results = pipeline.map(inputs, tmp_path, internal_shapes, storage=storage, parallel=False)  # type: ignore[arg-type]
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     assert results[-1].output.shape == (2, 2)
     assert results[-1].output.tolist() == [[2, 0], [3, -1]]
     load_xarray_dataset(run_folder=tmp_path)
 
 
-def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
+def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -745,7 +751,13 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
-    results = pipeline.map(inputs, tmp_path, internal_shapes=internal_shapes, parallel=False)  # type: ignore[arg-type]
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+        storage=storage,
+    )
     assert results[-1].output == 13
 
     # Add an axis `j` to `x`
@@ -767,6 +779,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
+        storage=storage,
     )
     assert results[-1].output.tolist() == [13]
 
@@ -783,6 +796,7 @@ def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
+        storage=storage,
     )
     assert results[-1].output.tolist() == [13]
     load_xarray_dataset(run_folder=tmp_path)
