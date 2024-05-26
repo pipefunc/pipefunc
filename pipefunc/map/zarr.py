@@ -48,7 +48,7 @@ class ZarrArray(StorageBase):
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
         if object_codec is None:
-            object_codec = CloudPickle()
+            object_codec = CloudPickleCodec()
 
         chunks = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         self.array = zarr.open(
@@ -208,11 +208,10 @@ class ZarrArray(StorageBase):
         return slice_indices
 
 
-class CloudPickle(Codec):
+class CloudPickleCodec(Codec):
     """Codec to encode data as cloudpickled bytes.
 
-    Useful for encoding an array of Python objects while ensuring compatibility
-    across different Python versions and environments.
+    Useful for encoding an array of Python objects.
 
     Parameters
     ----------
@@ -221,10 +220,10 @@ class CloudPickle(Codec):
 
     Examples
     --------
-    >>> from pipefunc.map.zarr import CloudPickle
+    >>> from pipefunc.map.zarr import CloudPickleCodec
     >>> import numpy as np
     >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
-    >>> f = CloudPickle()
+    >>> f = CloudPickleCodec()
     >>> f.decode(f.encode(x))
     array(['foo', 'bar', 'baz'], dtype=object)
 
@@ -236,7 +235,7 @@ class CloudPickle(Codec):
         self,
         protocol: int = cloudpickle.DEFAULT_PROTOCOL,
     ) -> None:
-        """Initialize the CloudPickle codec.
+        """Initialize the CloudPickleCodec codec.
 
         Parameters
         ----------
@@ -247,7 +246,7 @@ class CloudPickle(Codec):
         self.protocol = protocol
 
     def encode(self, buf: Any) -> bytes:
-        """Encode the input buffer using CloudPickle.
+        """Encode the input buffer using CloudPickleCodec.
 
         Parameters
         ----------
@@ -262,7 +261,7 @@ class CloudPickle(Codec):
         return cloudpickle.dumps(buf, protocol=self.protocol)
 
     def decode(self, buf: np.ndarray, out: np.ndarray | None = None) -> Any:
-        """Decode the input buffer using CloudPickle.
+        """Decode the input buffer using CloudPickleCodec.
 
         Parameters
         ----------
@@ -300,8 +299,8 @@ class CloudPickle(Codec):
 
     def __repr__(self) -> str:
         """Return a string representation of the codec."""
-        return f"CloudPickle(protocol={self.protocol})"
+        return f"CloudPickleCodec(protocol={self.protocol})"
 
 
-register_codec(CloudPickle)
+register_codec(CloudPickleCodec)
 register_storage(ZarrArray)
