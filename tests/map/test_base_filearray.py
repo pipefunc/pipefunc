@@ -6,7 +6,12 @@ import pytest
 import zarr
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import FileArray, FileArrayBase, _select_by_mask
+from pipefunc.map._filearray import (
+    FileArray,
+    FileArrayBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+)
 from pipefunc.map.zarr import ZarrArray
 
 
@@ -477,3 +482,52 @@ def test_list_or_arrays(array_type) -> None:
     assert r.dtype == object
     assert isinstance(r[0], list)
     assert np.array_equal(r[0], value)
+
+
+def test_compare_equal(tmp_path: Path) -> None:
+    external_shape = (2, 3)
+    internal_shape = (4, 5)
+    zarr_path = tmp_path / "zarr"
+    zarr_path.mkdir()
+    filearray_path = tmp_path / "filearray"
+    z_arr = ZarrArray(
+        zarr_path,
+        external_shape,
+        internal_shape,
+        shape_mask=(True, False, True, False),
+    )
+    f_arr = FileArray(
+        filearray_path,
+        external_shape,
+        internal_shape,
+        shape_mask=(True, False, True, False),
+    )
+    for index in _iterate_shape_indices(external_shape):
+        x = np.random.rand(*internal_shape)  # noqa: NPY002
+        z_arr.dump(key=index, value=x)
+        f_arr.dump(key=index, value=x)
+    assert np.array_equal(z_arr.to_array(), f_arr.to_array())
+    assert np.array_equal(z_arr[:, :, :, :], f_arr[:, :, :, :])
+    assert np.array_equal(z_arr[0, :, :, :], f_arr[0, :, :, :])
+    assert np.array_equal(z_arr[1, :, :, :], f_arr[1, :, :, :])
+    assert np.array_equal(z_arr[0, 0, :, :], f_arr[0, 0, :, :])
+    assert np.array_equal(z_arr[1, 0, :, :], f_arr[1, 0, :, :])
+    assert np.array_equal(z_arr[0, -1, :, :], f_arr[0, -1, :, :])
+    assert z_arr.size == f_arr.size
+    assert z_arr.rank == f_arr.rank
+    assert z_arr.shape == f_arr.shape
+    assert z_arr.internal_shape == f_arr.internal_shape
+    assert z_arr.shape_mask == f_arr.shape_mask
+    assert np.array_equal(z_arr.get_from_index(0), f_arr.get_from_index(0))
+    assert np.array_equal(z_arr.get_from_index(5), f_arr.get_from_index(5))
+    assert z_arr.has_index(0), f_arr.has_index(0)
+    with pytest.raises(ValueError, match="is out of bounds"):
+        z_arr.get_from_index(1_000_000)
+    with pytest.raises(FileNotFoundError, match="No such file or directory"):
+        f_arr.get_from_index(1_000_000)
+
+    assert z_arr.full_shape == f_arr.full_shape
+    assert z_arr.strides == f_arr.strides
+    assert np.array_equal(z_arr.mask[0, 0], f_arr.mask[0, 0])
+    assert np.array_equal(z_arr.mask, f_arr.mask)
+    assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())

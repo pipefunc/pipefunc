@@ -101,7 +101,27 @@ class ZarrArray(FileArrayBase):
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
         data = self.array[key]
-        mask = self.mask[key]  # makes entire mask TODO make more efficient
+
+        if self.internal_shape:
+            mask_key = tuple(x for x, m in zip(key, self.shape_mask) if m)
+            if any(isinstance(k, slice) for k in key):
+                mask = self._mask[mask_key]
+                assert len(key) == len(self.shape_mask)
+                slices = tuple(
+                    slice(None) if m else None
+                    for k, m in zip(key, self.shape_mask)
+                    if isinstance(k, slice)
+                )
+                tile_shape = tuple(
+                    1 if isinstance(sl, slice) else s for sl, s in zip(slices, data.shape)
+                )
+                mask = mask[slices]
+                mask = np.tile(mask, tile_shape)
+            else:
+                mask = self._mask[mask_key]
+        else:
+            mask = self._mask[key]
+
         item: np.ma.MaskedArray = np.ma.masked_array(data, mask=mask, dtype=object)
         if item.shape == ():
             if item.mask:
@@ -119,25 +139,27 @@ class ZarrArray(FileArrayBase):
         if not splat_internal:
             msg = "splat_internal must be True"
             raise NotImplementedError(msg)
-        return np.ma.array(self.array[:], mask=self.mask, dtype=object)
 
-    @property
-    def mask(self) -> np.ma.core.MaskedArray:
-        """Return the mask associated with the array."""
-        # TODO: needs to add internal dims
         mask = self._mask[:]
         slc = _select_by_mask(
             self.shape_mask,
             (slice(None),) * len(self.shape),
-            (None,) * len(self.internal_shape),
+            (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
         tile_shape = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         mask = np.tile(mask[slc], tile_shape)
+
+        return np.ma.array(self.array[:], mask=mask, dtype=object)
+
+    @property
+    def mask(self) -> np.ma.core.MaskedArray:
+        """Return the mask associated with the array."""
+        mask = self._mask[:]
         return np.ma.array(mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return list(self.mask.flat)
+        return list(self._mask[:].flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the location associated with 'key'.
@@ -167,6 +189,7 @@ class ZarrArray(FileArrayBase):
         if self.internal_shape:
             value = np.asarray(value)  # in case it's a list
             assert value.shape == self.internal_shape
+            assert len(key) == len(self.shape)
             full_index = _select_by_mask(
                 self.shape_mask,
                 key,
