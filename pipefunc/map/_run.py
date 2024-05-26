@@ -286,9 +286,9 @@ def _select_kwargs(
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     external_shape = _external_shape(shape, shape_mask)
-    keys = func.mapspec.input_keys(external_shape, index)
-    input_keys = {k: v[0] if len(v) == 1 else v for k, v in keys.items()}
-    selected = {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
+    input_keys = func.mapspec.input_keys(external_shape, index)
+    normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
+    selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
     _load_file_array(selected)
     return selected
 
