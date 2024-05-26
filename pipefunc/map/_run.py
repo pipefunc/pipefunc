@@ -200,10 +200,10 @@ class RunInfo:
         run_folder: str | Path,
         pipeline: Pipeline,
         inputs: dict[str, Any],
+        storage: str,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
-        storage: str = "file_array",
     ) -> RunInfo:
         run_folder = Path(run_folder)
         if cleanup:
@@ -639,6 +639,7 @@ def run(
     inputs: dict[str, Any],
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    storage: str = "file_array",
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -662,13 +663,23 @@ def run(
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
         Whether to run the functions in parallel.
+    storage
+        The storage class to use for the file arrays. The default is `file_array`.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        storage,
+        internal_shapes,
+        cleanup=cleanup,
+    )
     run_info.dump(run_folder)
     outputs = []
     for gen in pipeline.topological_generations[1]:
