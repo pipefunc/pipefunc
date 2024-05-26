@@ -87,8 +87,13 @@ class ZarrArray(FileArrayBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
-        np_index = np.unravel_index(index, self.full_shape)
-        return self.array[np_index]
+        np_index = np.unravel_index(index, self.shape)
+        full_index = _select_by_mask(
+            self.shape_mask,
+            np_index,
+            (slice(None),) * len(self.internal_shape),
+        )
+        return self.array[full_index]
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
