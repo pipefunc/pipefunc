@@ -531,3 +531,25 @@ def test_compare_equal(tmp_path: Path) -> None:
     assert np.array_equal(z_arr.mask[0, 0], f_arr.mask[0, 0])
     assert np.array_equal(z_arr.mask, f_arr.mask)
     assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())
+
+    # Now with a partially filled array and compare masks
+    z_arr = ZarrArray(
+        zarr_path,
+        external_shape,
+        internal_shape,
+        shape_mask=(True, False, True, False),
+    )
+    f_arr = FileArray(
+        filearray_path,
+        external_shape,
+        internal_shape,
+        shape_mask=(True, False, True, False),
+    )
+    for index in _iterate_shape_indices(external_shape):
+        if np.random.rand() < 0.5:  # noqa: NPY002
+            continue
+        x = np.random.rand(*internal_shape)  # noqa: NPY002
+        z_arr.dump(key=index, value=x)
+        f_arr.dump(key=index, value=x)
+    assert np.array_equal(z_arr.mask, f_arr.mask)
+    assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())
