@@ -42,6 +42,7 @@ def create_learners(
     run_folder: str | Path,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
+    storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
@@ -62,6 +63,9 @@ def create_learners(
         The folder to store the run information.
     internal_shapes
         The internal shapes to use for the run.
+    storage
+        The storage class to use for the file arrays. The default is `file_array`.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     return_output
         Whether to return the output of the function in the learner.
     cleanup
@@ -75,7 +79,14 @@ def create_learners(
 
     """
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
+    )
     run_info.dump(run_folder)
     learners = []
     for gen in pipeline.topological_generations[1]:
@@ -132,6 +143,7 @@ def _execute_iteration_in_single(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        run_info.storage_class,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -156,7 +168,8 @@ def _execute_iteration_in_map_spec(
     """
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
+    storage = run_info.storage_class
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage, run_folder)
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -169,6 +182,7 @@ def _execute_iteration_in_map_spec(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        run_info.storage_class,
         run_folder,
     )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
