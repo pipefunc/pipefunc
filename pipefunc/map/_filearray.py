@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import abc
 import concurrent.futures
+import functools
 import itertools
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,6 +33,10 @@ FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 class FileArrayBase(abc.ABC):
     """Base class for file-based arrays."""
+
+    shape: tuple[int, ...]
+    internal_shape: tuple[int, ...]
+    shape_mask: tuple[bool, ...]
 
     @abc.abstractmethod
     def __init__(
@@ -71,6 +76,11 @@ class FileArrayBase(abc.ABC):
 
     @abc.abstractmethod
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
+
+    @functools.cached_property
+    def full_shape(self) -> tuple[int, ...]:
+        """Return the full shape of the array."""
+        return _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
 
 class FileArray(FileArrayBase):
@@ -278,9 +288,8 @@ class FileArray(FileArrayBase):
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
-        full_shape = _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
-        arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
-        full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
+        arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
+        full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
         for external_index in _iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)

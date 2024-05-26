@@ -50,10 +50,10 @@ class ZarrArray(FileArrayBase):
         self.strides = shape_to_strides(self.shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
-        self.full_shape = _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
         if object_codec is None:
             object_codec = CloudPickleGzip()
+
         chunks = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         self.array = zarr.open(
             self.store,
