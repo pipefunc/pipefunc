@@ -18,7 +18,6 @@ from pipefunc.map._filearray import (
     FileArrayBase,
     _select_by_mask,
 )
-from pipefunc.map._mapspec import shape_to_strides
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -47,7 +46,6 @@ class ZarrArray(FileArrayBase):
             store = zarr.DirectoryStore(str(store))
         self.store = store
         self.shape = tuple(shape)
-        self.strides = shape_to_strides(self.shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 

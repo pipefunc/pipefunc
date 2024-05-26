@@ -82,6 +82,11 @@ class FileArrayBase(abc.ABC):
         """Return the full shape of the array."""
         return _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
+    @functools.cached_property
+    def strides(self) -> tuple[int, ...]:
+        """Return the strides of the array."""
+        return shape_to_strides(self.shape)
+
 
 class FileArray(FileArrayBase):
     """Array interface to a folder of files on disk.
@@ -107,7 +112,6 @@ class FileArray(FileArrayBase):
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
-        self.strides = shape_to_strides(self.shape)
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
