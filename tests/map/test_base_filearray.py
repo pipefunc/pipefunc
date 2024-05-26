@@ -6,12 +6,8 @@ import pytest
 import zarr
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import (
-    FileArray,
-    FileArrayBase,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
+from pipefunc.map._filearray import FileArray
+from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 from pipefunc.map.zarr import ZarrArray
 
 
@@ -30,7 +26,7 @@ def array_type(request, tmp_path: Path):
     return _array_type
 
 
-def test_file_based_object_array_getitem(array_type: Callable[..., FileArrayBase]):
+def test_file_based_object_array_getitem(array_type: Callable[..., StorageBase]):
     shape = (2, 3)
     arr = array_type(shape)
     arr.dump((0, 0), {"a": 1})
@@ -41,14 +37,14 @@ def test_file_based_object_array_getitem(array_type: Callable[..., FileArrayBase
     assert arr[0:1, 0] == {"a": 1}
 
 
-def test_file_based_object_array_properties(array_type: Callable[..., FileArrayBase]):
+def test_file_based_object_array_properties(array_type: Callable[..., StorageBase]):
     shape = (2, 3, 4)
     arr = array_type(shape)
     assert arr.size == 24
     assert arr.rank == 3
 
 
-def test_file_based_object_array_to_array(array_type: Callable[..., FileArrayBase]):
+def test_file_based_object_array_to_array(array_type: Callable[..., StorageBase]):
     shape = (2, 3)
     arr = array_type(shape)
     arr.dump((0, 0), {"a": 1})
@@ -62,7 +58,7 @@ def test_file_based_object_array_to_array(array_type: Callable[..., FileArrayBas
     assert result[1, 0] is np.ma.masked
 
 
-def test_file_array_getitem_with_slicing(array_type: Callable[..., FileArrayBase]):
+def test_file_array_getitem_with_slicing(array_type: Callable[..., StorageBase]):
     shape = (2, 3, 4)
     arr = array_type(shape)
     arr.dump((0, 0, 0), {"a": 1})
@@ -90,7 +86,7 @@ def test_file_array_getitem_with_slicing(array_type: Callable[..., FileArrayBase
     assert result[1] is np.ma.masked
 
 
-def test_high_dim_with_slicing(array_type: Callable[..., FileArrayBase]):
+def test_high_dim_with_slicing(array_type: Callable[..., StorageBase]):
     shape = (2, 3, 4, 5)
     arr = array_type(shape)
     np_arr: np.ndarray = np.zeros(shape, dtype=object)
@@ -131,7 +127,7 @@ def test_high_dim_with_slicing(array_type: Callable[..., FileArrayBase]):
     assert result[1, 1] is np.ma.masked
 
 
-def test_sliced_arange(array_type: Callable[..., FileArrayBase]):
+def test_sliced_arange(array_type: Callable[..., StorageBase]):
     shape = (3, 4, 5)
     arr = array_type(shape)
     np_arr = np.arange(prod(shape)).reshape(shape)
@@ -154,7 +150,7 @@ def test_sliced_arange(array_type: Callable[..., FileArrayBase]):
     assert (arr[:1, :1, 5:1:-1] == np_arr[:1, :1, 5:1:-1]).all()
 
 
-def test_sliced_arange_minimal(array_type: Callable[..., FileArrayBase]):
+def test_sliced_arange_minimal(array_type: Callable[..., StorageBase]):
     shape = (1, 2)
     arr = array_type(shape)
     np_arr = np.arange(prod(shape)).reshape(shape)
@@ -166,7 +162,7 @@ def test_sliced_arange_minimal(array_type: Callable[..., FileArrayBase]):
     assert (arr[:, -1] == np_arr[:, -1]).all()
 
 
-def test_sliced_arange_minimal2(array_type: Callable[..., FileArrayBase]):
+def test_sliced_arange_minimal2(array_type: Callable[..., StorageBase]):
     shape = (2, 2, 4)
     arr = array_type(shape)
     np_arr = np.arange(prod(shape)).reshape(shape)
@@ -184,7 +180,7 @@ def test_sliced_arange_minimal2(array_type: Callable[..., FileArrayBase]):
     assert (arr[1:, ::-1, -1] == np_arr[1:, ::-1, -1]).all()
 
 
-def test_file_array_with_internal_arrays(array_type: Callable[..., FileArrayBase]):
+def test_file_array_with_internal_arrays(array_type: Callable[..., StorageBase]):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -219,7 +215,7 @@ def test_file_array_with_internal_arrays(array_type: Callable[..., FileArrayBase
     assert np.ma.allequal(result, expected)
 
 
-def test_file_array_with_internal_arrays_slicing(array_type: Callable[..., FileArrayBase]):
+def test_file_array_with_internal_arrays_slicing(array_type: Callable[..., StorageBase]):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -256,7 +252,7 @@ def test_file_array_with_internal_arrays_slicing(array_type: Callable[..., FileA
     assert np.ma.allequal(result, expected)
 
 
-def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., FileArrayBase]):
+def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., StorageBase]):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -282,7 +278,7 @@ def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., Fi
     assert np.array_equal(result[1, 1], data2)
 
 
-def test_file_array_with_internal_arrays_splat(array_type: Callable[..., FileArrayBase]):
+def test_file_array_with_internal_arrays_splat(array_type: Callable[..., StorageBase]):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -306,7 +302,7 @@ def test_file_array_with_internal_arrays_splat(array_type: Callable[..., FileArr
 
 
 def test_file_array_with_internal_arrays_splat_different_order(
-    array_type: Callable[..., FileArrayBase],
+    array_type: Callable[..., StorageBase],
 ):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
@@ -326,7 +322,7 @@ def test_file_array_with_internal_arrays_splat_different_order(
     assert result.shape == expected_shape
 
 
-def test_file_array_with_internal_arrays_splat_1(array_type: Callable[..., FileArrayBase]):
+def test_file_array_with_internal_arrays_splat_1(array_type: Callable[..., StorageBase]):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (False, True, True, False, False)
@@ -346,7 +342,7 @@ def test_file_array_with_internal_arrays_splat_1(array_type: Callable[..., FileA
 
 
 def test_file_array_with_internal_arrays_full_array_different_order(
-    array_type: Callable[..., FileArrayBase],
+    array_type: Callable[..., StorageBase],
 ):
     shape = (2, 2)
     internal_shape = (3, 3, 4)
@@ -374,7 +370,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(
     assert np.array_equal(result, expected)
 
 
-def test_sliced_arange_splat(array_type: Callable[..., FileArrayBase]):
+def test_sliced_arange_splat(array_type: Callable[..., StorageBase]):
     shape = (1,)
     internal_shape = (3, 4, 5)
     arr = array_type(

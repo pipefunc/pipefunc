@@ -132,6 +132,7 @@ def _execute_iteration_in_single(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        run_info.storage_class,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -169,6 +170,7 @@ def _execute_iteration_in_map_spec(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        run_info.storage_class,
         run_folder,
     )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)

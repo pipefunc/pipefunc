@@ -14,17 +14,16 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
-from pipefunc.map._filearray import (
-    FileArrayBase,
-    _select_by_mask,
-)
+from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class ZarrArray(FileArrayBase):
+class ZarrArray(StorageBase):
     """Array interface to a Zarr store."""
+
+    storage_id = "zarr"
 
     def __init__(
         self,
@@ -317,3 +316,4 @@ class CloudPickleGzip(Codec):
 
 
 register_codec(CloudPickleGzip)
+register_storage(ZarrArray)

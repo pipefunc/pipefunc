@@ -12,17 +12,18 @@ import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
-from pipefunc.map._filearray import (
-    FileArrayBase,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
     array_shape,
     mapspec_dimensions,
     validate_consistent_axes,
+)
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+    storage_registry,
 )
 from pipefunc.map.zarr import ZarrArray
 
@@ -191,6 +192,7 @@ class RunInfo:
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
     mapspecs_as_strings: list[str]
+    storage: str
     pipefunc_version: str = __version__
 
     @classmethod
@@ -202,6 +204,7 @@ class RunInfo:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
+        storage: str = "zarr",
     ) -> RunInfo:
         run_folder = Path(run_folder)
         if cleanup:
@@ -218,7 +221,12 @@ class RunInfo:
             shape_masks=masks,
             mapspecs_as_strings=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
+            storage=storage,
         )
+
+    @property
+    def storage_class(self) -> type[StorageBase]:
+        return storage_registry[self.storage]
 
     @functools.cached_property
     def inputs(self) -> dict[str, Any]:
@@ -253,6 +261,7 @@ def _load_parameter(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    storage: type[StorageBase],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
@@ -262,7 +271,7 @@ def _load_parameter(
     file_array_path = _file_array_path(parameter, run_folder)
     external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
     internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
-    return ZarrArray(
+    return storage(
         file_array_path,
         external_shape,
         internal_shape,
@@ -275,10 +284,12 @@ def _func_kwargs(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    storage: type[StorageBase],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
+        p: _load_parameter(p, input_paths, shapes, shape_masks, storage, run_folder)
+        for p in func.parameters
     }
 
 
@@ -357,7 +368,7 @@ def _run_iteration_and_process(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    file_arrays: Sequence[FileArrayBase],
+    file_arrays: Sequence[StorageBase],
 ) -> list[Any]:
     output = _run_iteration(func, kwargs, shape, shape_mask, index)
     outputs = _pick_output(func, output)
@@ -367,7 +378,7 @@ def _run_iteration_and_process(
 
 def _update_file_array(
     func: PipeFunc,
-    file_arrays: Sequence[FileArrayBase],
+    file_arrays: Sequence[StorageBase],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
@@ -428,7 +439,7 @@ def _update_result_array(
             result_array[index] = _output
 
 
-def _existing_and_missing_indices(file_arrays: list[FileArrayBase]) -> tuple[list[int], list[int]]:
+def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[int], list[int]]:
     masks = (arr.mask_linear() for arr in file_arrays)
     existing_indices = []
     missing_indices = []
@@ -557,7 +568,7 @@ def map_shapes(
 
 
 def _maybe_load_file_array(x: Any) -> Any:
-    if isinstance(x, FileArrayBase):
+    if isinstance(x, StorageBase):
         return x.to_array()
     return x
 
@@ -581,6 +592,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        run_info.storage_class,
         run_folder,
     )
     if func.mapspec and func.mapspec.inputs:
@@ -595,7 +607,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
     else:
         output = _execute_single(func, kwargs, run_folder)
 
-    # Note that the kwargs still contain the FileArrayBase objects if _execute_map_spec
+    # Note that the kwargs still contain the StorageBase objects if _execute_map_spec
     # was used.
     if isinstance(func.output_name, str):
         return [
@@ -675,6 +687,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
             run_info.input_paths,
             run_info.shapes,
             run_info.shape_masks,
+            run_info.storage_class,
             run_folder,
         )
         for on in output_names

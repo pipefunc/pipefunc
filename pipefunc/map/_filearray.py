@@ -5,9 +5,7 @@
 
 from __future__ import annotations
 
-import abc
 import concurrent.futures
-import functools
 import itertools
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -16,10 +14,17 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load, prod
-from pipefunc.map._mapspec import shape_to_strides
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+    register_storage,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+storage_registry: dict[str, type[StorageBase]] = {}
 
 
 def read(name: str | Path) -> bytes:
@@ -31,68 +36,13 @@ def read(name: str | Path) -> bytes:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-class FileArrayBase(abc.ABC):
-    """Base class for file-based arrays."""
-
-    shape: tuple[int, ...]
-    internal_shape: tuple[int, ...]
-    shape_mask: tuple[bool, ...]
-
-    @abc.abstractmethod
-    def __init__(
-        self,
-        folder: str | Path,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
-        shape_mask: tuple[bool, ...] | None = None,
-    ) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def size(self) -> int: ...
-
-    @property
-    @abc.abstractmethod
-    def rank(self) -> int: ...
-
-    @abc.abstractmethod
-    def get_from_index(self, index: int) -> Any: ...
-
-    @abc.abstractmethod
-    def has_index(self, index: int) -> bool: ...
-
-    @abc.abstractmethod
-    def __getitem__(self, key: tuple[int | slice, ...]) -> Any: ...
-
-    @abc.abstractmethod
-    def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray: ...
-
-    @property
-    @abc.abstractmethod
-    def mask(self) -> np.ma.core.MaskedArray: ...
-
-    @abc.abstractmethod
-    def mask_linear(self) -> list[bool]: ...
-
-    @abc.abstractmethod
-    def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
-
-    @functools.cached_property
-    def full_shape(self) -> tuple[int, ...]:
-        """Return the full shape of the array."""
-        return _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
-
-    @functools.cached_property
-    def strides(self) -> tuple[int, ...]:
-        """Return the strides of the array."""
-        return shape_to_strides(self.shape)
-
-
-class FileArray(FileArrayBase):
+class FileArray(StorageBase):
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
     """
+
+    storage_id = "file_array"
 
     def __init__(
         self,
@@ -301,14 +251,13 @@ class FileArray(FileArrayBase):
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                shape_mask = self.shape_mask
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
@@ -346,27 +295,6 @@ class FileArray(FileArrayBase):
             dump(value, file)
 
 
-def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
-    return itertools.product(*map(range, shape))
-
-
-def _select_by_mask(
-    mask: tuple[bool, ...],
-    tuple1: tuple[Any, ...],
-    tuple2: tuple[Any, ...],
-) -> tuple[Any, ...]:
-    result = []
-    index1, index2 = 0, 0
-    for m in mask:
-        if m:
-            result.append(tuple1[index1])
-            index1 += 1
-        else:
-            result.append(tuple2[index2])
-            index2 += 1
-    return tuple(result)
-
-
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
         return read(f) if f.is_file() else None
@@ -378,3 +306,6 @@ def _load_all(filenames: Iterator[Path]) -> list[Any]:
     # as this is pure Python and CPU bound
     with concurrent.futures.ThreadPoolExecutor() as tex:
         return [maybe_load(x) for x in tex.map(maybe_read, filenames)]
+
+
+register_storage(FileArray)
