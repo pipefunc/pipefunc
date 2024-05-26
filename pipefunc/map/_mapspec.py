@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import functools
 import itertools
 import re
 from collections import defaultdict
@@ -130,6 +131,11 @@ class MapSpec:
         """Return the index names of the output array."""
         return self.outputs[0].indices  # All outputs have the same indices
 
+    @functools.cached_property
+    def external_indices(self) -> tuple[str, ...]:
+        """Output indices that are shared with the input indices."""
+        return tuple(n for n in self.output_indices if n in self.input_indices)
+
     @property
     def input_indices(self) -> set[str]:
         """Return the index names of the input arrays."""
@@ -216,11 +222,11 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        if len(shape) != len(self.output_indices):
-            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
+        if len(shape) != len(self.external_indices):
+            msg = f"Expected a shape of length {len(self.external_indices)}, got {shape}"
             raise ValueError(msg)
         key = _shape_to_key(shape, linear_index)
-        ids = dict(zip(self.output_indices, key))
+        ids = dict(zip(self.external_indices, key))
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)
             for x in self.inputs
@@ -258,6 +264,7 @@ class MapSpec:
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    # Could use np.unravel_index
     return tuple(
         (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
     )
