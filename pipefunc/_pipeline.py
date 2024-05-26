@@ -595,6 +595,7 @@ class Pipeline:
         run_folder: str | Path | None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
+        storage: str = "file_array",
         parallel: bool = True,
         cleanup: bool = True,
     ) -> list[Result]:
@@ -613,13 +614,24 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
+        storage
+            The storage class to use for the file arrays. The default is `file_array`.
+            Can use any registered storage class. See `pipefunc.map.storage_registry`.
         parallel
             Whether to run the functions in parallel.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
 
         """
-        return run(self, inputs, run_folder, internal_shapes, cleanup=cleanup, parallel=parallel)
+        return run(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes,
+            parallel=parallel,
+            storage=storage,
+            cleanup=cleanup,
+        )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.

@@ -200,9 +200,9 @@ class RunInfo:
         run_folder: str | Path,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        storage: str,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
+        storage: str,
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = Path(run_folder)
@@ -639,9 +639,9 @@ def run(
     inputs: dict[str, Any],
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-    storage: str = "file_array",
     *,
     parallel: bool = True,
+    storage: str = "file_array",
     cleanup: bool = True,
 ) -> list[Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
@@ -676,8 +676,8 @@ def run(
         run_folder,
         pipeline,
         inputs,
-        storage,
         internal_shapes,
+        storage=storage,
         cleanup=cleanup,
     )
     run_info.dump(run_folder)

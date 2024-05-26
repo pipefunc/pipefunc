@@ -83,8 +83,8 @@ def create_learners(
         run_folder,
         pipeline,
         inputs,
-        storage,
         internal_shapes,
+        storage=storage,
         cleanup=cleanup,
     )
     run_info.dump(run_folder)
