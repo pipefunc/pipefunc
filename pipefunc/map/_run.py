@@ -25,7 +25,6 @@ from pipefunc.map._storage_base import (
     _select_by_mask,
     storage_registry,
 )
-from pipefunc.map.zarr import ZarrArray
 
 if TYPE_CHECKING:
     import sys
@@ -204,7 +203,7 @@ class RunInfo:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         cleanup: bool = True,
-        storage: str = "zarr",
+        storage: str = "file_array",
     ) -> RunInfo:
         run_folder = Path(run_folder)
         if cleanup:
@@ -321,12 +320,13 @@ def _init_file_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    storage: type[StorageBase],
     run_folder: Path,
-) -> list[ZarrArray]:
+) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     return [
-        ZarrArray(
+        storage(
             _file_array_path(output_name, run_folder),
             external_shape,
             internal_shape,
@@ -456,13 +456,14 @@ def _execute_map_spec(
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    storage: type[StorageBase],
     run_folder: Path,
     parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage, run_folder)
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
@@ -601,6 +602,7 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
             kwargs,
             run_info.shapes,
             run_info.shape_masks,
+            run_info.storage_class,
             run_folder,
             parallel,
         )

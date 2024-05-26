@@ -157,7 +157,8 @@ def _execute_iteration_in_map_spec(
     """
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
+    storage = run_info.storage_class
+    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage, run_folder)
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
