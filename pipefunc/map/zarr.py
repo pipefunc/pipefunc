@@ -103,7 +103,7 @@ class ZarrArray(FileArrayBase):
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
         data = self.array[key]
-        mask = self.mask[key]
+        mask = self.mask[key]  # makes entire mask TODO make more efficient
         item: np.ma.MaskedArray = np.ma.masked_array(data, mask=mask, dtype=object)
         if item.shape == ():
             if item.mask:
