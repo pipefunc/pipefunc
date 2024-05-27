@@ -227,7 +227,7 @@ class RunInfo:
     def storage_class(self) -> type[StorageBase]:
         return storage_registry[self.storage]
 
-    def init_storage(self) -> dict[str, StorageBase]:
+    def init_store(self) -> dict[str, StorageBase]:
         return _init_storage(
             self.mapspecs,
             self.storage_class,
@@ -269,14 +269,14 @@ def _load_parameter(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: dict[str, StorageBase],
+    store: dict[str, StorageBase],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
     if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
-    return storage[parameter]
+    return store[parameter]
 
 
 def _func_kwargs(
@@ -284,11 +284,11 @@ def _func_kwargs(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: dict[str, StorageBase],
+    store: dict[str, StorageBase],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, storage, run_folder)
+        p: _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
         for p in func.parameters
     }
 
@@ -457,14 +457,14 @@ def _execute_map_spec(
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    storage: dict[str, StorageBase],
+    store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
     result_arrays = _init_result_arrays(func.output_name, shape)
-    file_arrays = [storage[output_name] for output_name in at_least_tuple(func.output_name)]
+    file_arrays = [store[output_name] for output_name in at_least_tuple(func.output_name)]
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -589,7 +589,7 @@ class Result(NamedTuple):
 def _run_function(
     func: PipeFunc,
     run_folder: Path,
-    storage: dict[str, StorageBase],
+    store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
 ) -> list[Result]:
     run_info = RunInfo.load(run_folder)
@@ -598,7 +598,7 @@ def _run_function(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
-        storage,
+        store,
         run_folder,
     )
     if func.mapspec and func.mapspec.inputs:
@@ -607,7 +607,7 @@ def _run_function(
             kwargs,
             run_info.shapes,
             run_info.shape_masks,
-            storage,
+            store,
             parallel,
         )
     else:
@@ -647,7 +647,7 @@ def run(
     parallel: bool = True,
     storage: str = "file_array",
     cleanup: bool = True,
-) -> list[Result]:
+) -> tuple[list[Result], dict[str, StorageBase]]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
     Parameters
@@ -686,13 +686,13 @@ def run(
     )
     run_info.dump(run_folder)
     outputs = []
-    storage_map = run_info.init_storage()
+    store = run_info.init_store()
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder, storage_map, parallel)
+            _outputs = _run_function(func, run_folder, store, parallel)
             outputs.extend(_outputs)
-    return outputs, storage_map
+    return outputs, store
 
 
 def _init_storage(
@@ -702,7 +702,7 @@ def _init_storage(
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, StorageBase]:
-    storage = {}
+    store: dict[str, StorageBase] = {}
     for mapspec in mapspecs:
         output_names = mapspec.output_names
         shape = shapes[output_names[0]]
@@ -714,10 +714,9 @@ def _init_storage(
             storage_class,
             run_folder,
         )
-        storage[output_names] = arrays
         for output_name, arr in zip(output_names, arrays):
-            storage[output_name] = arr
-    return storage
+            store[output_name] = arr
+    return store
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -730,7 +729,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
             run_info.input_paths,
             run_info.shapes,
             run_info.shape_masks,
-            run_info.init_storage(),
+            run_info.init_store(),
             run_folder,
         )
         for on in output_names

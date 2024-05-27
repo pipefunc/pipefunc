@@ -209,17 +209,20 @@ class ZarrArray(StorageBase):
 
 
 class ZarrMemory(ZarrArray):
+    """Array interface to an in-memory Zarr store."""
+
     storage_id = "zarr_memory"
 
     def __init__(
         self,
-        _,  # store
+        _: Any,  # store
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         object_codec: Any = None,
     ) -> None:
+        """Initialize the ZarrMemory."""
         super().__init__(
             store=zarr.MemoryStore(),
             shape=shape,

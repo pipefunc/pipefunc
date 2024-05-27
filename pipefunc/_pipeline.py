@@ -45,6 +45,8 @@ else:
     from typing import TypeAlias
 
 if TYPE_CHECKING:
+    from pipefunc.map._storage_base import StorageBase
+
     if sys.version_info < (3, 9):  # pragma: no cover
         from typing import Callable
     else:
@@ -606,7 +608,7 @@ class Pipeline:
         storage: str = "file_array",
         parallel: bool = True,
         cleanup: bool = True,
-    ) -> list[Result]:
+    ) -> tuple[list[Result], dict[str, StorageBase]]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
         Parameters

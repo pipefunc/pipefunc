@@ -713,8 +713,12 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     assert shapes == {"b": (2,), "c": (2, 2)}
     assert masks == {"b": (True,), "c": (True, False)}
     results, store = pipeline.map(
-        inputs, tmp_path, internal_shapes, storage=storage, parallel=False
-    )  # type: ignore[arg-type]
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        storage=storage,
+        parallel=False,
+    )
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     assert results[-1].output.shape == (2, 2)
     assert results[-1].output.tolist() == [[2, 0], [3, -1]]
