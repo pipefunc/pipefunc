@@ -608,6 +608,7 @@ class Pipeline:
         storage: str = "file_array",
         parallel: bool = True,
         cleanup: bool = True,
+        return_store: bool = False,
     ) -> tuple[list[Result], dict[str, StorageBase]]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -631,6 +632,8 @@ class Pipeline:
             Whether to run the functions in parallel.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
+        return_store
+            TODO
 
         """
         return run(
@@ -641,6 +644,7 @@ class Pipeline:
             parallel=parallel,
             storage=storage,
             cleanup=cleanup,
+            return_store=return_store,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
