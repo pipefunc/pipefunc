@@ -463,8 +463,8 @@ def _execute_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    result_arrays = _init_result_arrays(func.output_name, shape)
     file_arrays = [store[output_name] for output_name in at_least_tuple(func.output_name)]
+    result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
