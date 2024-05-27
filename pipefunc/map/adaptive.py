@@ -9,18 +9,18 @@ from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import adaptive
 
-from pipefunc._utils import prod
+from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     RunInfo,
     _execute_single,
     _func_kwargs,
-    _init_file_arrays,
     _maybe_load_single_output,
     _MockPipeline,
     _run_iteration_and_process,
     run,
 )
+from pipefunc.map._storage_base import StorageBase
 
 if TYPE_CHECKING:
     import sys
@@ -88,6 +88,7 @@ def create_learners(
         cleanup=cleanup,
     )
     run_info.dump(run_folder)
+    storage_map = run_info.init_storage()
     learners = []
     for gen in pipeline.topological_generations[1]:
         _learners = {}
@@ -98,6 +99,7 @@ def create_learners(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
+                    storage=storage_map,
                     return_output=return_output,
                 )
                 sequence = list(range(prod(run_info.shapes[func.output_name])))
@@ -107,6 +109,7 @@ def create_learners(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
+                    storage=storage_map,
                     return_output=return_output,
                 )
                 sequence = [None]  # type: ignore[list-item]
@@ -128,6 +131,7 @@ def _execute_iteration_in_single(
     func: PipeFunc,
     run_info: RunInfo,
     run_folder: Path,
+    storage: dict[str, StorageBase],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -143,7 +147,7 @@ def _execute_iteration_in_single(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
-        run_info.storage_class,
+        storage,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -155,6 +159,7 @@ def _execute_iteration_in_map_spec(
     func: PipeFunc,
     run_info: RunInfo,
     run_folder: Path,
+    storage: dict[str, StorageBase],
     *,
     return_output: bool = False,
 ) -> list[Any] | None:
@@ -168,8 +173,7 @@ def _execute_iteration_in_map_spec(
     """
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    storage = run_info.storage_class
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, storage, run_folder)
+    file_arrays = [storage[o] for o in at_least_tuple(func.output_name)]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -182,7 +186,7 @@ def _execute_iteration_in_map_spec(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
-        run_info.storage_class,
+        storage,
         run_folder,
     )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
