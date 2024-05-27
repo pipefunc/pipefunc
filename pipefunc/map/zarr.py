@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import itertools
-from typing import TYPE_CHECKING, Any
+import multiprocessing
+from pathlib import Path
+from typing import Any
 
 import cloudpickle
 import numpy as np
@@ -12,11 +14,8 @@ from numcodecs.abc import Codec
 from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
-from pipefunc._utils import prod
+from pipefunc._utils import dump, load, prod
 from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class ZarrArray(StorageBase):
@@ -302,5 +301,43 @@ class CloudPickleCodec(Codec):
         return f"CloudPickleCodec(protocol={self.protocol})"
 
 
+def _shared_memory_file(folder: str | Path) -> str:
+    """Create a shared memory file."""
+    folder = Path(folder)
+    return (folder / "shared_memory").absolute()
+
+
+class ZarrSharedMemory(ZarrArray):
+    """Array interface to a Zarr store backed by shared memory."""
+
+    storage_id = "zarr_shared_memory"
+
+    def __init__(
+        self,
+        folder: str,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+        *,
+        object_codec: Any = None,
+    ) -> None:
+        """Initialize the ZarrSharedMemory."""
+        path = _shared_memory_file(folder)
+        if path.exists():
+            store = load(path)
+        else:
+            store = multiprocessing.Manager().dict()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            dump(store, path)
+        super().__init__(
+            store,
+            shape,
+            internal_shape=internal_shape,
+            shape_mask=shape_mask,
+            object_codec=object_codec,
+        )
+
+
 register_codec(CloudPickleCodec)
 register_storage(ZarrArray)
+register_storage(ZarrSharedMemory)
