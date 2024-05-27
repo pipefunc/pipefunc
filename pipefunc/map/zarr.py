@@ -208,6 +208,27 @@ class ZarrArray(StorageBase):
         return slice_indices
 
 
+class ZarrMemory(ZarrArray):
+    storage_id = "zarr_memory"
+
+    def __init__(
+        self,
+        _,  # store
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+        *,
+        object_codec: Any = None,
+    ) -> None:
+        super().__init__(
+            store=zarr.MemoryStore(),
+            shape=shape,
+            internal_shape=internal_shape,
+            shape_mask=shape_mask,
+            object_codec=object_codec,
+        )
+
+
 class CloudPickleCodec(Codec):
     """Codec to encode data as cloudpickled bytes.
 
@@ -304,3 +325,4 @@ class CloudPickleCodec(Codec):
 
 register_codec(CloudPickleCodec)
 register_storage(ZarrArray)
+register_storage(ZarrMemory)
