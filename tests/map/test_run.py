@@ -10,7 +10,7 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import load_outputs, load_xarray_dataset, map_shapes, run
+from pipefunc.map._run import RunInfo, load_outputs, load_xarray_dataset, map_shapes, run
 from pipefunc.map._storage_base import storage_registry
 from pipefunc.map.zarr import ZarrFileArray  # noqa: F401, RUF100
 
@@ -62,6 +62,11 @@ def test_simple(storage, tmp_path: Path) -> None:
     assert all(dimensions[k] == len(v) for k, v in axes.items())
     ds = load_xarray_dataset(run_folder=tmp_path)
     assert ds["y"].data.tolist() == [0, 2, 4, 6]
+
+    run_info = RunInfo.load(tmp_path)
+    run_info.dump(tmp_path)
+    run_info2 = RunInfo.load(tmp_path)
+    assert run_info2 == run_info
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:

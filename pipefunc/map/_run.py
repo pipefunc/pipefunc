@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import json
 import shutil
 import tempfile
 from collections import OrderedDict
@@ -151,7 +152,7 @@ def _compare_to_previous_run_info(
     if not RunInfo.path(run_folder).is_file():
         return
     try:
-        old = RunInfo.load(run_folder, cache=False)
+        old = RunInfo.load(run_folder)
     except Exception as e:  # noqa: BLE001
         msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
         raise ValueError(msg) from None
@@ -252,17 +253,32 @@ class RunInfo:
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
-        dump(asdict(self), path)
+        data = asdict(self)
+        data["shapes"] = list(data["shapes"].items())
+        data["shape_masks"] = list(data["shape_masks"].items())
+        data["run_folder"] = str(data["run_folder"])
+        data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
+        with path.open("w") as f:
+            json.dump(data, f, indent=4)
 
     @classmethod
-    def load(cls: type[RunInfo], run_folder: str | Path, *, cache: bool = True) -> RunInfo:
+    def load(cls: type[RunInfo], run_folder: str | Path) -> RunInfo:
         path = cls.path(run_folder)
-        dct = load(path, cache=cache)
-        return cls(**dct)
+        with path.open() as f:
+            data = json.load(f)
+        data["shapes"] = {_maybe_tuple(k): tuple(v) for k, v in data["shapes"]}
+        data["shape_masks"] = {_maybe_tuple(k): v for k, v in data["shape_masks"]}
+        data["run_folder"] = Path(data["run_folder"])
+        data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
+        return cls(**data)
 
     @staticmethod
     def path(run_folder: str | Path) -> Path:
-        return Path(run_folder) / "run_info.cloudpickle"
+        return Path(run_folder) / "run_info.json"
+
+
+def _maybe_tuple(x: Any) -> tuple[Any, ...] | Any:
+    return tuple(x) if isinstance(x, list) else x
 
 
 def _file_array_path(output_name: str, run_folder: Path) -> Path:
