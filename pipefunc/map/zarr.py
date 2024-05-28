@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import itertools
 import multiprocessing.managers
-import shutil
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any
 
 import cloudpickle
 import numpy as np
@@ -234,26 +233,6 @@ class _SharedDictStore(zarr.storage.KVStore):
             shared_dict = multiprocessing.Manager().dict()
         super().__init__(mutablemapping=shared_dict)
 
-    def listdir(self, path: str | None = None) -> list[str]:
-        """List the keys in the store."""
-        if path is None:
-            return list(self._mutable_mapping.keys())
-        raise NotImplementedError
-
-    def rmdir(self, path: str | None = None) -> None:
-        """Remove keys from the store."""
-        self._mutable_mapping.clear()
-        if path is not None:
-            shutil.rmtree(path)
-
-    def getsize(self, path: str | None = None) -> NoReturn:
-        """Get the size of the value associated with the given key."""
-        raise NotImplementedError
-
-    def clear(self) -> None:
-        """Clear all keys and values from the store."""
-        self._mutable_mapping.clear()
-
 
 class ZarrMemory(ZarrArray):
     """Array interface to an in-memory Zarr store."""
@@ -286,19 +265,19 @@ class ZarrMemory(ZarrArray):
     @property
     def persistent_store(self) -> zarr.storage.Store | None:
         """Return the persistent store."""
-        if self.folder is None:
+        if self.folder is None:  # pragma: no cover
             return None
         return zarr.DirectoryStore(self.folder)
 
     def persist(self) -> None:
         """Persist the memory storage to disk."""
-        if self.folder is None:
+        if self.folder is None:  # pragma: no cover
             return
         zarr.convenience.copy_store(self.store, self.persistent_store)
 
     def load(self) -> None:
         """Load the memory storage from disk."""
-        if self.folder is None:
+        if self.folder is None:  # pragma: no cover
             return
         if not self.folder.exists():
             return

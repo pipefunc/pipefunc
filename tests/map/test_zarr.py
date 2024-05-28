@@ -18,6 +18,7 @@ def test_zarr_array_properties():
     arr = ZarrArray(folder=None, store=store, shape=shape)
     assert arr.size == 24
     assert arr.rank == 3
+    assert str(arr.array.filters[0]) == "CloudPickleCodec(protocol=5)"
 
 
 def test_zarr_array_getitem():
