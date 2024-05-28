@@ -45,6 +45,8 @@ else:
     from typing import TypeAlias
 
 if TYPE_CHECKING:
+    from concurrent.futures import Executor
+
     if sys.version_info < (3, 9):  # pragma: no cover
         from typing import Callable
     else:
@@ -604,6 +606,7 @@ class Pipeline:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         parallel: bool = True,
+        executor: Executor | None = None,
         storage: str = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -625,6 +628,9 @@ class Pipeline:
             You will receive an exception if the shapes cannot be inferred and need to be provided.
         parallel
             Whether to run the functions in parallel.
+        executor
+            The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
+            is used. Only relevant if `parallel=True`.
         storage
             The storage class to use for the file arrays. The default is `file_array`.
             Can use any registered storage class. See `pipefunc.map.storage_registry`.
@@ -641,6 +647,7 @@ class Pipeline:
             run_folder,
             internal_shapes,
             parallel=parallel,
+            executor=executor,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
