@@ -901,3 +901,9 @@ def test_growing_axis(tmp_path: Path) -> None:
 def test_storage_options():
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
         Pipeline([lambda x: x]).map({}, None, storage="invalid")
+
+    with pytest.raises(
+        ValueError,
+        match="Parallel execution is not supported with `zarr_memory` storage",
+    ):
+        Pipeline([lambda x: x]).map({}, None, storage="zarr_memory", parallel=True)
