@@ -56,6 +56,7 @@ docs = [
     "jupytext",
     "pandas",            # used in example.ipynb
     "xarray",            # used in example.ipynb
+    "zarr",
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
