@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import itertools
-from typing import TYPE_CHECKING, Any
+import multiprocessing.managers
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import cloudpickle
 import numpy as np
@@ -16,7 +18,7 @@ from pipefunc._utils import prod
 from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    import collections.abc
 
 
 class ZarrArray(StorageBase):
@@ -208,6 +210,74 @@ class ZarrArray(StorageBase):
         return slice_indices
 
 
+class SharedDictStore(zarr.storage.Store):
+    """Custom Store subclass using a shared dictionary."""
+
+    def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
+        """Initialize the SharedDictStore.
+
+        Parameters
+        ----------
+        shared_dict : multiprocessing.managers.DictProxy | None, optional
+            Shared dictionary to use as the underlying storage, by default None
+            If None, a new shared dictionary will be created.
+
+        """
+        if shared_dict is None:
+            manager = multiprocessing.Manager()
+            shared_dict = manager.dict()
+        self.shared_dict = shared_dict
+
+    def __getitem__(self, key: str) -> bytes:
+        """Get the value associated with the given key."""
+        return self.shared_dict[key]
+
+    def __setitem__(self, key: str, value: bytes) -> None:
+        """Set the value associated with the given key."""
+        self.shared_dict[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        """Delete the value associated with the given key."""
+        del self.shared_dict[key]
+
+    def __contains__(self, key: str) -> bool:
+        """Check if the given key exists in the store."""
+        return key in self.shared_dict
+
+    def keys(self) -> list[str]:
+        """Return an iterable of keys in the store."""
+        return self.shared_dict.keys()
+
+    def __iter__(self) -> collections.abc.Iterator[str]:
+        """Return an iterator over the keys in the store."""
+        return iter(self.shared_dict)
+
+    def __len__(self) -> int:
+        """Return the number of keys in the store."""
+        return len(self.shared_dict)
+
+    def listdir(self, path: str | None = None) -> list[str]:
+        """List the keys in the store."""
+        if path is None:
+            return list(self.shared_dict.keys())
+        raise NotImplementedError
+
+    def rmdir(self, path: str | None = None) -> None:
+        """Remove keys from the store."""
+        if path is None:
+            self.shared_dict.clear()
+        else:
+            raise NotImplementedError
+
+    def getsize(self, path: str | None = None) -> NoReturn:
+        """Get the size of the value associated with the given key."""
+        raise NotImplementedError
+
+    def clear(self) -> None:
+        """Clear all keys and values from the store."""
+        self.shared_dict.clear()
+
+
 class ZarrMemory(ZarrArray):
     """Array interface to an in-memory Zarr store."""
 
@@ -215,16 +285,19 @@ class ZarrMemory(ZarrArray):
 
     def __init__(
         self,
-        _: Any,  # store
+        store: zarr.storage.Store | None,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         object_codec: Any = None,
+        shared: bool = True,
     ) -> None:
         """Initialize the ZarrMemory."""
+        if store is None or isinstance(store, Path):
+            store = SharedDictStore() if shared else zarr.MemoryStore()
         super().__init__(
-            store=zarr.MemoryStore(),
+            store=store,
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
