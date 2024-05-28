@@ -241,6 +241,14 @@ class Pipeline:
                     delattr(self, k)
 
     def _validate_mapspec(self) -> None:
+        """Validate the MapSpecs for all functions in the pipeline."""
+        for f in self.functions:
+            if f.mapspec and at_least_tuple(f.output_name) != f.mapspec.output_names:
+                msg = (
+                    f"The output_name of the function `{f}` does not match the output_names"
+                    f" in the MapSpec: `{f.output_name}` != `{f.mapspec.output_names}`."
+                )
+                raise ValueError(msg)
         validate_consistent_axes(self.mapspecs(ordered=False))
         self._autogen_mapspec_axes()
 
@@ -598,7 +606,7 @@ class Pipeline:
         storage: str = "file_array",
         parallel: bool = True,
         cleanup: bool = True,
-    ) -> list[Result]:
+    ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
         Parameters

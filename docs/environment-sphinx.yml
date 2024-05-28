@@ -36,3 +36,4 @@ dependencies:
   - jupytext
   - pandas
   - xarray
+  - zarr
