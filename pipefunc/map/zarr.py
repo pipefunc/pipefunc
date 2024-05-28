@@ -300,6 +300,8 @@ class ZarrMemory(ZarrArray):
         """Load the memory storage from disk."""
         if self.folder is None:
             return
+        if not self.folder.exists():
+            return
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
 

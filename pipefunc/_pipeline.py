@@ -605,7 +605,7 @@ class Pipeline:
         *,
         parallel: bool = True,
         storage: str = "file_array",
-        persist_memory: bool = False,
+        persist_memory: bool = True,
         cleanup: bool = True,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
