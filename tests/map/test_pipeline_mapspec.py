@@ -192,3 +192,15 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
     assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
     assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
+
+
+def test_multiple_outputs_order() -> None:
+    @pipefunc(output_name=("out1", "out2"), mapspec="a[i] -> out2[i], out1[i]")
+    def func(a):
+        return a, a + 1
+
+    with pytest.raises(
+        ValueError,
+        match="does not match the output_names in the MapSpec",
+    ):
+        Pipeline([func])
