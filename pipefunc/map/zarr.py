@@ -18,10 +18,10 @@ from pipefunc._utils import prod
 from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
 
 
-class ZarrArray(StorageBase):
+class ZarrFileArray(StorageBase):
     """Array interface to a Zarr store."""
 
-    storage_id = "zarr"
+    storage_id = "zarr_file_array"
 
     def __init__(
         self,
@@ -33,7 +33,7 @@ class ZarrArray(StorageBase):
         store: zarr.storage.Store | str | Path | None = None,
         object_codec: Any = None,
     ) -> None:
-        """Initialize the ZarrArray."""
+        """Initialize the ZarrFileArray."""
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
             raise ValueError(msg)
@@ -169,7 +169,7 @@ class ZarrArray(StorageBase):
 
         Examples
         --------
-        >>> arr = ZarrArray(...)
+        >>> arr = ZarrFileArray(...)
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
@@ -234,7 +234,7 @@ class _SharedDictStore(zarr.storage.KVStore):
         super().__init__(mutablemapping=shared_dict)
 
 
-class ZarrMemory(ZarrArray):
+class ZarrMemory(ZarrFileArray):
     """Array interface to an in-memory Zarr store."""
 
     storage_id = "zarr_memory"
@@ -407,6 +407,6 @@ class CloudPickleCodec(Codec):
 
 
 register_codec(CloudPickleCodec)
-register_storage(ZarrArray)
+register_storage(ZarrFileArray)
 register_storage(ZarrMemory)
 register_storage(ZarrSharedMemory)

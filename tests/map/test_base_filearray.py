@@ -8,7 +8,7 @@ import zarr
 from pipefunc._utils import prod
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
-from pipefunc.map.zarr import ZarrArray
+from pipefunc.map.zarr import ZarrFileArray
 
 
 @pytest.fixture(params=["file_array", "zarr_array"])
@@ -21,7 +21,7 @@ def array_type(request, tmp_path: Path):
 
         def _array_type(shape, internal_shape=None, shape_mask=None):
             store = zarr.MemoryStore()
-            return ZarrArray(None, shape, internal_shape, shape_mask, store=store)
+            return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
 
     return _array_type
 
@@ -137,8 +137,8 @@ def test_sliced_arange(array_type: Callable[..., StorageBase]):
     assert (arr[:, :, :] == np_arr[:, :, :]).all()
     assert (arr[:, ::2, :] == np_arr[:, ::2, :]).all()
     assert (arr[:, ::3, :] == np_arr[:, ::3, :]).all()
-    if isinstance(arr, ZarrArray):
-        return  # ZarrArray does not support negative step
+    if isinstance(arr, ZarrFileArray):
+        return  # ZarrFileArray does not support negative step
     assert (arr[:, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[:, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
     assert (arr[1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
@@ -172,8 +172,8 @@ def test_sliced_arange_minimal2(array_type: Callable[..., StorageBase]):
     assert (arr[0, :, 1] == np_arr[0, :, 1]).all()
     assert (arr[0, 0, -1] == np_arr[0, 0, -1]).all()
     assert (arr[0, :, -1] == np_arr[0, :, -1]).all()
-    if isinstance(arr, ZarrArray):
-        return  # ZarrArray does not support negative step
+    if isinstance(arr, ZarrFileArray):
+        return  # ZarrFileArray does not support negative step
     assert (arr[0, ::-1, 0] == np_arr[0, ::-1, 0]).all()
     assert (arr[0, ::-1, -1] == np_arr[0, ::-1, -1]).all()
     assert (arr[:, ::-1, -1] == np_arr[:, ::-1, -1]).all()
@@ -266,7 +266,7 @@ def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., St
     arr.dump((1, 1), data2)
 
     # Test retrieving the entire array
-    if isinstance(arr, ZarrArray):
+    if isinstance(arr, ZarrFileArray):
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
         return
@@ -356,7 +356,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(
     arr.dump((0, 0), data1)
     arr.dump((1, 1), data2)
 
-    if isinstance(arr, ZarrArray):
+    if isinstance(arr, ZarrFileArray):
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
     else:
@@ -392,8 +392,8 @@ def test_sliced_arange_splat(array_type: Callable[..., StorageBase]):
     assert (arr[0, 1:, ::2, -1] == np_arr[1:, ::2, -1]).all()
     assert (arr[0, 2, ::2, -1] == np_arr[2, ::2, -1]).all()
     assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
-    if isinstance(arr, ZarrArray):
-        return  # ZarrArray does not support negative step
+    if isinstance(arr, ZarrFileArray):
+        return  # ZarrFileArray does not support negative step
     assert (arr[0, :, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[0, :, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
     assert (arr[0, 1:, ::-1, ::2] == np_arr[1:, ::-1, ::2]).all()
@@ -461,7 +461,7 @@ def test_list_or_arrays(array_type) -> None:
     if isinstance(arr, FileArray):
         assert isinstance(arr[0, 0, 0], list)
     else:
-        assert isinstance(arr, ZarrArray)
+        assert isinstance(arr, ZarrFileArray)
         assert isinstance(arr[0, 0, 0], np.ndarray)
         assert arr[0, 0, 0].shape == (2, 4, 4)
     for x in arr[0, 0, 0]:  # type: ignore[attr-defined]
@@ -486,7 +486,7 @@ def test_compare_equal(tmp_path: Path) -> None:
     zarr_path = tmp_path / "zarr"
     zarr_path.mkdir()
     filearray_path = tmp_path / "filearray"
-    z_arr = ZarrArray(
+    z_arr = ZarrFileArray(
         zarr_path,
         external_shape,
         internal_shape,
@@ -529,7 +529,7 @@ def test_compare_equal(tmp_path: Path) -> None:
     assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())
 
     # Now with a partially filled array and compare masks
-    z_arr = ZarrArray(
+    z_arr = ZarrFileArray(
         zarr_path,
         external_shape,
         internal_shape,
