@@ -21,7 +21,7 @@ def array_type(request, tmp_path: Path):
 
         def _array_type(shape, internal_shape=None, shape_mask=None):
             store = zarr.MemoryStore()
-            return ZarrArray(store, shape, internal_shape, shape_mask)
+            return ZarrArray(None, shape, internal_shape, shape_mask, store=store)
 
     return _array_type
 

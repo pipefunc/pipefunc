@@ -99,6 +99,9 @@ class StorageBase(abc.ABC):
         """Return the strides of the array."""
         return shape_to_strides(self.shape)
 
+    def persist(self) -> None:  # noqa: B027
+        """Persist the storage."""
+
 
 def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> None:
     """Register a StorageBase class.

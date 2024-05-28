@@ -328,10 +328,7 @@ def _init_file_arrays(
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     output_names = at_least_tuple(output_name)
-    if storage_class.storage_id in {"zarr_memory"}:
-        paths = [None] * len(output_names)
-    else:
-        paths = [_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    paths = [_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
     return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import itertools
 import multiprocessing.managers
+import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import Any, NoReturn
 
 import cloudpickle
 import numpy as np
@@ -17,9 +18,6 @@ from numcodecs.registry import register_codec
 from pipefunc._utils import prod
 from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
 
-if TYPE_CHECKING:
-    import collections.abc
-
 
 class ZarrArray(StorageBase):
     """Array interface to a Zarr store."""
@@ -28,11 +26,12 @@ class ZarrArray(StorageBase):
 
     def __init__(
         self,
-        store: zarr.storage.Store | str | Path,
+        folder: str | Path | None,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
+        store: zarr.storage.Store | str | Path | None = None,
         object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrArray."""
@@ -42,8 +41,9 @@ class ZarrArray(StorageBase):
         if internal_shape is not None and len(shape_mask) != len(shape) + len(internal_shape):  # type: ignore[arg-type]
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
+        self.folder = Path(folder) if folder is not None else folder
         if not isinstance(store, zarr.storage.Store):
-            store = zarr.DirectoryStore(str(store))
+            store = zarr.DirectoryStore(str(self.folder))
         self.store = store
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
@@ -210,64 +210,37 @@ class ZarrArray(StorageBase):
         return slice_indices
 
 
-class SharedDictStore(zarr.storage.Store):
+class SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
-    def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
+    def __init__(
+        self,
+        shared_dict: multiprocessing.managers.DictProxy | None = None,
+    ) -> None:
         """Initialize the SharedDictStore.
 
         Parameters
         ----------
-        shared_dict : multiprocessing.managers.DictProxy | None, optional
+        shared_dict
             Shared dictionary to use as the underlying storage, by default None
             If None, a new shared dictionary will be created.
 
         """
         if shared_dict is None:
-            manager = multiprocessing.Manager()
-            shared_dict = manager.dict()
-        self.shared_dict = shared_dict
-
-    def __getitem__(self, key: str) -> bytes:
-        """Get the value associated with the given key."""
-        return self.shared_dict[key]
-
-    def __setitem__(self, key: str, value: bytes) -> None:
-        """Set the value associated with the given key."""
-        self.shared_dict[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        """Delete the value associated with the given key."""
-        del self.shared_dict[key]
-
-    def __contains__(self, key: str) -> bool:
-        """Check if the given key exists in the store."""
-        return key in self.shared_dict
-
-    def keys(self) -> list[str]:
-        """Return an iterable of keys in the store."""
-        return self.shared_dict.keys()
-
-    def __iter__(self) -> collections.abc.Iterator[str]:
-        """Return an iterator over the keys in the store."""
-        return iter(self.shared_dict)
-
-    def __len__(self) -> int:
-        """Return the number of keys in the store."""
-        return len(self.shared_dict)
+            shared_dict = multiprocessing.Manager().dict()
+        super().__init__(mutablemapping=shared_dict)
 
     def listdir(self, path: str | None = None) -> list[str]:
         """List the keys in the store."""
         if path is None:
-            return list(self.shared_dict.keys())
+            return list(self._mutable_mapping.keys())
         raise NotImplementedError
 
     def rmdir(self, path: str | None = None) -> None:
         """Remove keys from the store."""
-        if path is None:
-            self.shared_dict.clear()
-        else:
-            raise NotImplementedError
+        self._mutable_mapping.clear()
+        if path is not None:
+            shutil.rmtree(path)
 
     def getsize(self, path: str | None = None) -> NoReturn:
         """Get the size of the value associated with the given key."""
@@ -275,7 +248,7 @@ class SharedDictStore(zarr.storage.Store):
 
     def clear(self) -> None:
         """Clear all keys and values from the store."""
-        self.shared_dict.clear()
+        self._mutable_mapping.clear()
 
 
 class ZarrMemory(ZarrArray):
@@ -285,24 +258,38 @@ class ZarrMemory(ZarrArray):
 
     def __init__(
         self,
-        store: zarr.storage.Store | None,
+        folder: str | Path | None,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
+        store: zarr.storage.Store | None = None,
         object_codec: Any = None,
         shared: bool = True,
     ) -> None:
         """Initialize the ZarrMemory."""
-        if store is None or isinstance(store, Path):
+        if store is None:
             store = SharedDictStore() if shared else zarr.MemoryStore()
         super().__init__(
-            store=store,
+            folder=folder,
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
+            store=store,
             object_codec=object_codec,
         )
+
+    def persist(self) -> None:
+        """Persist the memory storage to disk."""
+        if self.folder is None:
+            return
+        dest = zarr.DirectoryStore(self.folder)
+        zarr.convenience.copy_store(self.store, dest)
+
+    def load(self) -> None:
+        """Load the memory storage from disk."""
+        src = zarr.DirectoryStore(self.folder)
+        zarr.convenience.copy_store(src, self.store)
 
 
 class CloudPickleCodec(Codec):
