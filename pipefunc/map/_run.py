@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+import functools
+import json
 import shutil
 import tempfile
-from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
-from functools import partial
+from collections import OrderedDict
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, handle_error, load, prod
 from pipefunc._version import __version__
-from pipefunc.map._filearray import FileArray, _iterate_shape_indices, _select_by_mask
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
@@ -20,9 +22,17 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+    storage_registry,
+)
 
 if TYPE_CHECKING:
     import sys
+
+    import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
 
@@ -63,6 +73,10 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    def mapspecs_as_strings(self) -> list[str]:
+        """Return the MapSpecs for all functions in the pipeline as strings."""
+        return [str(ms) for ms in self.mapspecs()]
+
     @property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
@@ -89,9 +103,9 @@ def _dump_inputs(
     return paths
 
 
-def _load_input(name: str, input_paths: dict[str, Path]) -> Any:
+def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:
     path = input_paths[name]
-    return load(path, cache=True)
+    return load(path, cache=cache)
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:
@@ -134,27 +148,33 @@ def _compare_to_previous_run_info(
     run_folder: Path,
     inputs: dict[str, Any],
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> None:
+) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
-    old = RunInfo.load(run_folder, cache=False)
+    try:
+        old = RunInfo.load(run_folder)
+    except Exception as e:  # noqa: BLE001
+        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
+        raise ValueError(msg) from None
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    if pipeline.mapspecs_as_strings() != old.mapspecs_as_strings:
+        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    old_inputs = {k: _load_input(k, old.input_paths) for k in inputs}
-    equal_inputs = equal_dicts(inputs, old_inputs, verbose=True)
+    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding without `cleanup`, hoping for the best.",
+            " Proceeding *without* `cleanup`, hoping for the best.",
         )
         return
     if not equal_inputs:
-        msg = "Inputs do not match previous run, cannot use `cleanup=False`."
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
 
 
@@ -166,12 +186,15 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
-class RunInfo(NamedTuple):
+@dataclass(frozen=True, eq=True)
+class RunInfo:
     input_paths: dict[str, Path]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path
+    mapspecs_as_strings: list[str]
+    storage: str
     pipefunc_version: str = __version__
 
     @classmethod
@@ -182,6 +205,7 @@ class RunInfo(NamedTuple):
         inputs: dict[str, Any],
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
+        storage: str,
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = Path(run_folder)
@@ -197,22 +221,73 @@ class RunInfo(NamedTuple):
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
+            mapspecs_as_strings=pipeline.mapspecs_as_strings(),
             run_folder=run_folder,
+            storage=storage,
         )
+
+    @property
+    def storage_class(self) -> type[StorageBase]:
+        if self.storage not in storage_registry:
+            available = ", ".join(storage_registry.keys())
+            msg = f"Storage class `{self.storage}` not found, only `{available}` available."
+            raise ValueError(msg)
+        return storage_registry[self.storage]
+
+    def init_store(self) -> dict[str, StorageBase]:
+        return _init_storage(
+            self.mapspecs,
+            self.storage_class,
+            self.shapes,
+            self.shape_masks,
+            self.run_folder,
+        )
+
+    @functools.cached_property
+    def inputs(self) -> dict[str, Any]:
+        return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
+
+    @functools.cached_property
+    def mapspecs(self) -> list[MapSpec]:
+        return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
-        dump(self._asdict(), path)
+        data = asdict(self)
+        data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
+        data["shapes"] = {",".join(at_least_tuple(k)): v for k, v in data["shapes"].items()}
+        data["shape_masks"] = {
+            ",".join(at_least_tuple(k)): v for k, v in data["shape_masks"].items()
+        }
+        data["run_folder"] = str(data["run_folder"])
+        with path.open("w") as f:
+            json.dump(data, f, indent=4)
 
     @classmethod
-    def load(cls: type[RunInfo], run_folder: str | Path, *, cache: bool = True) -> RunInfo:
+    def load(cls: type[RunInfo], run_folder: str | Path) -> RunInfo:
         path = cls.path(run_folder)
-        dct = load(path, cache=cache)
-        return cls(**dct)
+        with path.open() as f:
+            data = json.load(f)
+        data["shapes"] = {_maybe_tuple(k): tuple(v) for k, v in data["shapes"].items()}
+        data["shape_masks"] = {_maybe_tuple(k): tuple(v) for k, v in data["shape_masks"].items()}
+        if data["internal_shapes"] is not None:
+            data["internal_shapes"] = {
+                k: tuple(v) if isinstance(v, list) else v
+                for k, v in data["internal_shapes"].items()
+            }
+        data["run_folder"] = Path(data["run_folder"])
+        data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
+        return cls(**data)
 
     @staticmethod
     def path(run_folder: str | Path) -> Path:
-        return Path(run_folder) / "run_info.cloudpickle"
+        return Path(run_folder) / "run_info.json"
+
+
+def _maybe_tuple(x: str) -> tuple[str, ...] | str:
+    if "," in x:
+        return tuple(x.split(","))
+    return x
 
 
 def _file_array_path(output_name: str, run_folder: Path) -> Path:
@@ -225,21 +300,14 @@ def _load_parameter(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    store: dict[str, StorageBase],
     run_folder: Path,
 ) -> Any:
     if parameter in input_paths:
         return _load_input(parameter, input_paths)
     if parameter not in shapes or not any(shape_masks[parameter]):
         return _load_output(parameter, run_folder)
-    file_array_path = _file_array_path(parameter, run_folder)
-    external_shape = _external_shape(shapes[parameter], shape_masks[parameter])
-    internal_shape = _internal_shape(shapes[parameter], shape_masks[parameter])
-    return FileArray(
-        file_array_path,
-        external_shape,
-        internal_shape,
-        shape_masks[parameter],
-    )
+    return store[parameter]
 
 
 def _func_kwargs(
@@ -247,10 +315,12 @@ def _func_kwargs(
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    store: dict[str, StorageBase],
     run_folder: Path,
 ) -> dict[str, Any]:
     return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, run_folder) for p in func.parameters
+        p: _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
+        for p in func.parameters
     }
 
 
@@ -258,13 +328,14 @@ def _select_kwargs(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
-    input_keys = {
-        k: v[0] if len(v) == 1 else v for k, v in func.mapspec.input_keys(shape, index).items()
-    }
-    selected = {k: v[input_keys[k]] if k in input_keys else v for k, v in kwargs.items()}
+    external_shape = _external_shape(shape, shape_mask)
+    input_keys = func.mapspec.input_keys(external_shape, index)
+    normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
+    selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
     _load_file_array(selected)
     return selected
 
@@ -281,19 +352,14 @@ def _init_file_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    storage_class: type[StorageBase],
     run_folder: Path,
-) -> list[FileArray]:
+) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
-    return [
-        FileArray(
-            _file_array_path(output_name, run_folder),
-            external_shape,
-            internal_shape,
-            mask,
-        )
-        for output_name in at_least_tuple(output_name)
-    ]
+    output_names = at_least_tuple(output_name)
+    paths = [_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
 def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
@@ -311,9 +377,10 @@ def _run_iteration(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
     index: int,
 ) -> Any:
-    selected = _select_kwargs(func, kwargs, shape, index)
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
     try:
         return func(**selected)
     except Exception as e:
@@ -327,9 +394,9 @@ def _run_iteration_and_process(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    file_arrays: list[FileArray],
+    file_arrays: Sequence[StorageBase],
 ) -> list[Any]:
-    output = _run_iteration(func, kwargs, shape, index)
+    output = _run_iteration(func, kwargs, shape, shape_mask, index)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
@@ -337,7 +404,7 @@ def _run_iteration_and_process(
 
 def _update_file_array(
     func: PipeFunc,
-    file_arrays: list[FileArray],
+    file_arrays: Sequence[StorageBase],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
@@ -398,8 +465,8 @@ def _update_result_array(
             result_array[index] = _output
 
 
-def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[int], list[int]]:
-    masks = (arr._mask_list() for arr in file_arrays)
+def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[int], list[int]]:
+    masks = (arr.mask_linear() for arr in file_arrays)
     existing_indices = []
     missing_indices = []
     for i, mask_values in enumerate(zip(*masks)):
@@ -410,20 +477,30 @@ def _existing_and_missing_indices(file_arrays: list[FileArray]) -> tuple[list[in
     return existing_indices, missing_indices
 
 
+@contextmanager
+def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, None, None]:
+    if executor is None:
+        with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
+            yield new_executor
+    else:
+        yield executor
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    run_folder: Path,
+    store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
+    executor: Executor | None,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
+    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     result_arrays = _init_result_arrays(func.output_name, shape)
-    process_index = partial(
+    process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
@@ -431,10 +508,10 @@ def _execute_map_spec(
         shape_mask=mask,
         file_arrays=file_arrays,
     )
-    existing, missing = _existing_and_missing_indices(file_arrays)
+    existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
     n = len(missing)
     if parallel and n > 1:
-        with ProcessPoolExecutor() as ex:
+        with _maybe_executor(executor) as ex:
             outputs_list = list(ex.map(process_index, missing))
     else:
         outputs_list = [process_index(index) for index in missing]
@@ -527,7 +604,7 @@ def map_shapes(
 
 
 def _maybe_load_file_array(x: Any) -> Any:
-    if isinstance(x, FileArray):
+    if isinstance(x, StorageBase):
         return x.to_array()
     return x
 
@@ -542,15 +619,23 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
+    store: StorageBase | None
 
 
-def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Result]:  # noqa: FBT001
+def _run_function(
+    func: PipeFunc,
+    run_folder: Path,
+    store: dict[str, StorageBase],
+    parallel: bool,  # noqa: FBT001
+    executor: Executor | None,
+) -> dict[str, Result]:
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
         func,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        store,
         run_folder,
     )
     if func.mapspec and func.mapspec.inputs:
@@ -559,28 +644,36 @@ def _run_function(func: PipeFunc, run_folder: Path, parallel: bool) -> list[Resu
             kwargs,
             run_info.shapes,
             run_info.shape_masks,
-            run_folder,
+            store,
             parallel,
+            executor,
         )
     else:
         output = _execute_single(func, kwargs, run_folder)
 
-    # Note that the kwargs still contain the FileArray objects if _execute_map_spec
+    # Note that the kwargs still contain the StorageBase objects if _execute_map_spec
     # was used.
     if isinstance(func.output_name, str):
-        return [
-            Result(
+        return {
+            func.output_name: Result(
                 function=func.__name__,
                 kwargs=kwargs,
                 output_name=func.output_name,
                 output=output,
+                store=store.get(func.output_name),
             ),
-        ]
+        }
 
-    return [
-        Result(function=func.__name__, kwargs=kwargs, output_name=output_name, output=_output)
+    return {
+        output_name: Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=output_name,
+            output=_output,
+            store=store.get(output_name),
+        )
         for output_name, _output in zip(func.output_name, output)
-    ]
+    }
 
 
 def _ensure_run_folder(run_folder: str | Path | None) -> Path:
@@ -597,8 +690,11 @@ def run(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
+    executor: Executor | None = None,
+    storage: str = "file_array",
+    persist_memory: bool = True,
     cleanup: bool = True,
-) -> list[Result]:
+) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
     Parameters
@@ -618,21 +714,67 @@ def run(
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
         Whether to run the functions in parallel.
+    executor
+        The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
+        is used. Only relevant if `parallel=True`.
+    storage
+        The storage class to use for the file arrays. The default is `file_array`.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    if parallel and storage == "zarr_memory":
+        msg = (
+            "Parallel execution is not supported with `zarr_memory` storage."
+            " Use a file based storage or `zarr_shared_memory`."
+        )
+        raise ValueError(msg)
     run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
+    )
     run_info.dump(run_folder)
-    outputs = []
+    outputs = OrderedDict()
+    store = run_info.init_store()
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder, parallel)
-            outputs.extend(_outputs)
+            _outputs = _run_function(func, run_folder, store, parallel, executor)
+            outputs.update(_outputs)
+
+    if persist_memory:  # Only relevant for memory based storage
+        for arr in store.values():
+            arr.persist()
+
     return outputs
+
+
+def _init_storage(
+    mapspecs: list[MapSpec],
+    storage_class: type[StorageBase],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    run_folder: Path,
+) -> dict[str, StorageBase]:
+    store: dict[str, StorageBase] = {}
+    for mapspec in mapspecs:
+        output_names = mapspec.output_names
+        shape = shapes[output_names[0]]
+        mask = shape_masks[output_names[0]]
+        arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
+        for output_name, arr in zip(output_names, arrays):
+            store[output_name] = arr
+    return store
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -641,13 +783,48 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_info = RunInfo.load(run_folder)
     outputs = [
         _load_parameter(
-            on,
+            output_name,
             run_info.input_paths,
             run_info.shapes,
             run_info.shape_masks,
+            run_info.init_store(),
             run_folder,
         )
-        for on in output_names
+        for output_name in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def load_xarray_dataset(
+    *output_name: str,
+    run_folder: str | Path,
+    load_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
+
+    Parameters
+    ----------
+    output_name
+        The names of the outputs to load. If empty, all outputs are loaded.
+    run_folder
+        The folder where the pipeline run was stored.
+    load_intermediate
+        Whether to load intermediate outputs as coordinates.
+
+    Returns
+    -------
+    xr.Dataset
+        An `xarray.Dataset` containing the outputs of the pipeline run.
+
+    """
+    from pipefunc.map.xarray import load_xarray_dataset
+
+    run_info = RunInfo.load(run_folder)
+    return load_xarray_dataset(
+        run_info.mapspecs,
+        run_info.inputs,
+        run_folder=run_folder,
+        output_names=output_name,  # type: ignore[arg-type]
+        load_intermediate=load_intermediate,
+    )

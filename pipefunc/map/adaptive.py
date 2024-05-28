@@ -9,13 +9,12 @@ from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import adaptive
 
-from pipefunc._utils import prod
+from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     RunInfo,
     _execute_single,
     _func_kwargs,
-    _init_file_arrays,
     _maybe_load_single_output,
     _MockPipeline,
     _run_iteration_and_process,
@@ -26,6 +25,7 @@ if TYPE_CHECKING:
     import sys
 
     from pipefunc import PipeFunc, Pipeline, Sweep
+    from pipefunc.map._storage_base import StorageBase
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
@@ -42,6 +42,7 @@ def create_learners(
     run_folder: str | Path,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
+    storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
@@ -62,6 +63,9 @@ def create_learners(
         The folder to store the run information.
     internal_shapes
         The internal shapes to use for the run.
+    storage
+        The storage class to use for the file arrays. The default is `file_array`.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     return_output
         Whether to return the output of the function in the learner.
     cleanup
@@ -75,8 +79,16 @@ def create_learners(
 
     """
     run_folder = Path(run_folder)
-    run_info = RunInfo.create(run_folder, pipeline, inputs, internal_shapes, cleanup=cleanup)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
+    )
     run_info.dump(run_folder)
+    store = run_info.init_store()
     learners = []
     for gen in pipeline.topological_generations[1]:
         _learners = {}
@@ -87,6 +99,7 @@ def create_learners(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
+                    store=store,
                     return_output=return_output,
                 )
                 sequence = list(range(prod(run_info.shapes[func.output_name])))
@@ -96,6 +109,7 @@ def create_learners(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
+                    store=store,
                     return_output=return_output,
                 )
                 sequence = [None]  # type: ignore[list-item]
@@ -117,6 +131,7 @@ def _execute_iteration_in_single(
     func: PipeFunc,
     run_info: RunInfo,
     run_folder: Path,
+    store: dict[str, StorageBase],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -132,6 +147,7 @@ def _execute_iteration_in_single(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        store,
         run_folder,
     )
     result = _execute_single(func, kwargs, run_folder)
@@ -143,6 +159,7 @@ def _execute_iteration_in_map_spec(
     func: PipeFunc,
     run_info: RunInfo,
     run_folder: Path,
+    store: dict[str, StorageBase],
     *,
     return_output: bool = False,
 ) -> list[Any] | None:
@@ -156,7 +173,7 @@ def _execute_iteration_in_map_spec(
     """
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = _init_file_arrays(func.output_name, shape, mask, run_folder)
+    file_arrays = [store[o] for o in at_least_tuple(func.output_name)]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -169,6 +186,7 @@ def _execute_iteration_in_map_spec(
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
+        store,
         run_folder,
     )
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)

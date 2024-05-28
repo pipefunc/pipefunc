@@ -1,9 +1,11 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_mapspec.py` for the changes made.
 
 from __future__ import annotations
 
+import functools
 import itertools
 import re
 from collections import defaultdict
@@ -129,6 +131,11 @@ class MapSpec:
         """Return the index names of the output array."""
         return self.outputs[0].indices  # All outputs have the same indices
 
+    @functools.cached_property
+    def external_indices(self) -> tuple[str, ...]:
+        """Output indices that are shared with the input indices."""
+        return tuple(n for n in self.output_indices if n in self.input_indices)
+
     @property
     def input_indices(self) -> set[str]:
         """Return the index names of the input arrays."""
@@ -215,11 +222,11 @@ class MapSpec:
         {'x': (3, 1), 'y': (1, slice(None, None, None), 2)}
 
         """
-        if len(shape) != len(self.output_indices):
-            msg = f"Expected a shape of length {len(self.input_indices)}, got {shape}"
+        if len(shape) != len(self.external_indices):
+            msg = f"Expected a shape of length {len(self.external_indices)}, got {shape}"
             raise ValueError(msg)
         key = _shape_to_key(shape, linear_index)
-        ids = dict(zip(self.output_indices, key))
+        ids = dict(zip(self.external_indices, key))
         return {
             x.name: tuple(slice(None) if ax is None else ids[ax] for ax in x.axes)
             for x in self.inputs
@@ -257,6 +264,7 @@ class MapSpec:
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
+    # Could use np.unravel_index
     return tuple(
         (linear_index // stride) % dim for stride, dim in zip(shape_to_strides(shape), shape)
     )
@@ -480,3 +488,48 @@ def _get_output_dim(
         msg = f"Internal shape for '{output.name}' must be a tuple of integers."
         raise TypeError(msg)
     return dim
+
+
+def _trace_dependencies(
+    output_name: str,
+    mapspec_mapping: dict[str, MapSpec],
+) -> dict[str, tuple[str, ...]]:
+    dependencies: defaultdict[str, set[str]] = defaultdict(set)
+    mapspec = mapspec_mapping[output_name]
+    for input_spec in mapspec.inputs:
+        for axis in input_spec.axes:
+            if axis is not None:
+                if input_spec.name in mapspec_mapping:
+                    nested_dependencies = _trace_dependencies(input_spec.name, mapspec_mapping)
+                    if axis in nested_dependencies:
+                        dependencies[axis].update(nested_dependencies[axis])
+                else:
+                    dependencies[axis].add(input_spec.name)
+    return {axis: tuple(sorted(inputs)) for axis, inputs in dependencies.items()}
+
+
+def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str, ...]]]:
+    mapspec_mapping = {
+        output_name: mapspec
+        for mapspec in mapspecs
+        for output_name in mapspec.output_names
+        if mapspec.inputs
+    }
+
+    # Go from {output: {axis: list[input]}} to {output: {input: set[axis]}}
+    deps = {name: _trace_dependencies(name, mapspec_mapping) for name in mapspec_mapping}
+    reordered: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for output_name, dct in deps.items():
+        for index, input_names in dct.items():
+            for input_name in input_names:
+                reordered[output_name][input_name].add(index)
+
+    axes = mapspec_axes(mapspecs)
+
+    def order_like_mapspec_axes(name: str, axes_set: set[str]) -> tuple[str, ...]:
+        return tuple(i for i in axes[name] if i in axes_set)
+
+    return {
+        output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
+        for output_name, dct in reordered.items()
+    }

@@ -132,9 +132,13 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     and None if there are errors comparing keys and values.
     """
     if len(d1) != len(d2):
+        if verbose:
+            print(f"Not equal lengths: `{len(d1)} != {len(d2)}`")
         return False
 
     if d1.keys() != d2.keys():
+        if verbose:
+            print(f"Not equal keys: `{d1.keys()} != {d2.keys()}`")
         return False
 
     errors = []
@@ -179,3 +183,28 @@ def common_in_sets(sets: list[set[Any]]) -> set[Any]:
     for s in sets[1:]:
         common.intersection_update(s)
     return common
+
+
+def _format_table_row(row: list[str], widths: list[int], seperator: str = " | ") -> str:
+    """Format a row of the table with specified column widths."""
+    return seperator.join(f"{cell:<{widths[i]}}" for i, cell in enumerate(row))
+
+
+def table(rows: list[Any], headers: list[str]) -> str:
+    """Create a printable table from a list of rows and headers."""
+    column_widths = [len(header) for header in headers]
+    for row in rows:
+        for i, x in enumerate(row):
+            column_widths[i] = max(column_widths[i], len(str(x)))
+
+    separator_line = [w * "-" for w in column_widths]
+    table_rows = [
+        _format_table_row(separator_line, column_widths, seperator="-+-"),
+        _format_table_row(headers, column_widths),
+        _format_table_row(["-" * width for width in column_widths], column_widths),
+    ]
+    for row in rows:
+        table_rows.append(_format_table_row(row, column_widths))  # noqa: PERF401
+    table_rows.append(_format_table_row(separator_line, column_widths, seperator="-+-"))
+
+    return "\n".join(table_rows)

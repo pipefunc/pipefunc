@@ -1,6 +1,7 @@
 # This file is part of the pipefunc package.
 # Originally, it is based on code from the `aiida-dynamic-workflows` package.
 # Its license can be found in the LICENSE file in this folder.
+# See `git diff 98a1736 pipefunc/map/_filearray.py` for the changes made.
 
 from __future__ import annotations
 
@@ -13,10 +14,17 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load, prod
-from pipefunc.map._mapspec import shape_to_strides
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _iterate_shape_indices,
+    _select_by_mask,
+    register_storage,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+storage_registry: dict[str, type[StorageBase]] = {}
 
 
 def read(name: str | Path) -> bytes:
@@ -28,11 +36,13 @@ def read(name: str | Path) -> bytes:
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
-class FileArray:
+class FileArray(StorageBase):
     """Array interface to a folder of files on disk.
 
     __getitem__ returns "np.ma.masked" for non-existent files.
     """
+
+    storage_id = "file_array"
 
     def __init__(
         self,
@@ -40,7 +50,7 @@ class FileArray:
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
-        strides: tuple[int, ...] | None = None,
+        *,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
         if internal_shape and shape_mask is None:
@@ -52,7 +62,6 @@ class FileArray:
         self.folder = Path(folder).absolute()
         self.folder.mkdir(parents=True, exist_ok=True)
         self.shape = tuple(shape)
-        self.strides = shape_to_strides(self.shape) if strides is None else tuple(strides)
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
@@ -226,16 +235,15 @@ class FileArray:
         if not splat_internal:
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
-            mask = self._mask_list()
+            mask = self.mask_linear()
             return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
 
         if not self.internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
-        full_shape = _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
-        arr = np.empty(full_shape, dtype=object)  # type: ignore[var-annotated]
-        full_mask = np.empty(full_shape, dtype=bool)  # type: ignore[var-annotated]
+        arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
+        full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
         for external_index in _iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)
@@ -243,19 +251,19 @@ class FileArray:
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                shape_mask = self.shape_mask
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
                 for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(shape_mask, external_index, internal_index)
+                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.array(arr, mask=full_mask, dtype=object)
 
-    def _mask_list(self) -> list[bool]:
+    def mask_linear(self) -> list[bool]:
+        """Return a list of booleans indicating which elements are missing."""
         return [not self._index_to_file(i).is_file() for i in range(self.size)]
 
     @property
@@ -265,7 +273,7 @@ class FileArray:
         The returned numpy array has dtype "bool" and a mask for
         masking out missing data.
         """
-        mask = self._mask_list()
+        mask = self.mask_linear()
         return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
@@ -287,27 +295,6 @@ class FileArray:
             dump(value, file)
 
 
-def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
-    return itertools.product(*map(range, shape))
-
-
-def _select_by_mask(
-    mask: tuple[bool, ...],
-    tuple1: tuple[int, ...],
-    tuple2: tuple[int, ...],
-) -> tuple[int, ...]:
-    result = []
-    index1, index2 = 0, 0
-    for m in mask:
-        if m:
-            result.append(tuple1[index1])
-            index1 += 1
-        else:
-            result.append(tuple2[index2])
-            index2 += 1
-    return tuple(result)
-
-
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
         return read(f) if f.is_file() else None
@@ -319,3 +306,6 @@ def _load_all(filenames: Iterator[Path]) -> list[Any]:
     # as this is pure Python and CPU bound
     with concurrent.futures.ThreadPoolExecutor() as tex:
         return [maybe_load(x) for x in tex.map(maybe_read, filenames)]
+
+
+register_storage(FileArray)
