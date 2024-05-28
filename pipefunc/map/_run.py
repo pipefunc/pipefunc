@@ -455,7 +455,7 @@ def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[
 @contextmanager
 def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, None, None]:
     if executor is None:
-        with ProcessPoolExecutor() as new_executor:
+        with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
     else:
         yield executor
