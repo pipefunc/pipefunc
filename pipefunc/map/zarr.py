@@ -269,11 +269,10 @@ class ZarrMemory(ZarrArray):
         *,
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
-        shared: bool = True,
     ) -> None:
         """Initialize the ZarrMemory."""
         if store is None:
-            store = _SharedDictStore() if shared else zarr.MemoryStore()
+            store = zarr.MemoryStore()
         super().__init__(
             folder=folder,
             shape=shape,
@@ -301,8 +300,35 @@ class ZarrMemory(ZarrArray):
         """Load the memory storage from disk."""
         if self.folder is None:
             return
-        self.store.clear()
-        zarr.convenience.copy_store(self.persistent_store, self.store)
+        zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
+
+
+class ZarrSharedMemory(ZarrMemory):
+    """Array interface to a shared memory Zarr store."""
+
+    storage_id = "zarr_shared_memory"
+
+    def __init__(
+        self,
+        folder: str | Path | None,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+        *,
+        store: zarr.storage.Store | None = None,
+        object_codec: Any = None,
+    ) -> None:
+        """Initialize the ZarrMemory."""
+        if store is None:
+            store = _SharedDictStore()
+        super().__init__(
+            folder=folder,
+            shape=shape,
+            internal_shape=internal_shape,
+            shape_mask=shape_mask,
+            store=store,
+            object_codec=object_codec,
+        )
 
 
 class CloudPickleCodec(Codec):
@@ -402,3 +428,4 @@ class CloudPickleCodec(Codec):
 register_codec(CloudPickleCodec)
 register_storage(ZarrArray)
 register_storage(ZarrMemory)
+register_storage(ZarrSharedMemory)

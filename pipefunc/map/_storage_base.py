@@ -100,7 +100,7 @@ class StorageBase(abc.ABC):
         return shape_to_strides(self.shape)
 
     def persist(self) -> None:  # noqa: B027
-        """Persist the storage."""
+        """Save a memory-based storage to disk."""
 
 
 def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> None:
