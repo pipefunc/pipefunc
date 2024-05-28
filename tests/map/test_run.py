@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -907,3 +908,13 @@ def test_storage_options():
         match="Parallel execution is not supported with `zarr_memory` storage",
     ):
         Pipeline([lambda x: x]).map({}, None, storage="zarr_memory", parallel=True)
+
+
+def test_custom_executor():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x
+
+    pipeline = Pipeline([f])
+    results = pipeline.map({"x": [1, 2]}, None, executor=ThreadPoolExecutor())
+    assert results["y"].output.tolist() == [1, 2]

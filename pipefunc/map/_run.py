@@ -4,10 +4,11 @@ import functools
 import shutil
 import tempfile
 from collections import OrderedDict
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -451,6 +452,15 @@ def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[
     return existing_indices, missing_indices
 
 
+@contextmanager
+def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, None, None]:
+    if executor is None:
+        with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
+            yield new_executor
+    else:
+        yield executor
+
+
 def _execute_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -458,6 +468,7 @@ def _execute_map_spec(
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
+    executor: Executor | None,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -475,7 +486,7 @@ def _execute_map_spec(
     existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
     n = len(missing)
     if parallel and n > 1:
-        with ProcessPoolExecutor() as ex:
+        with _maybe_executor(executor) as ex:
             outputs_list = list(ex.map(process_index, missing))
     else:
         outputs_list = [process_index(index) for index in missing]
@@ -591,6 +602,7 @@ def _run_function(
     run_folder: Path,
     store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
+    executor: Executor | None,
 ) -> dict[str, Result]:
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
@@ -609,6 +621,7 @@ def _run_function(
             run_info.shape_masks,
             store,
             parallel,
+            executor,
         )
     else:
         output = _execute_single(func, kwargs, run_folder)
@@ -652,6 +665,7 @@ def run(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
+    executor: Executor | None = None,
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -675,6 +689,9 @@ def run(
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
         Whether to run the functions in parallel.
+    executor
+        The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
+        is used. Only relevant if `parallel=True`.
     storage
         The storage class to use for the file arrays. The default is `file_array`.
     persist_memory
@@ -707,7 +724,7 @@ def run(
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder, store, parallel)
+            _outputs = _run_function(func, run_folder, store, parallel, executor)
             outputs.update(_outputs)
 
     if persist_memory:  # Only relevant for memory based storage
