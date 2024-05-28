@@ -26,9 +26,9 @@ def test_simple_sweep(tmp_path: Path) -> None:
     pipeline = Pipeline([add, take_sum])
 
     inputs = {"x": [1, 2, 3], "y": 2}
-    results, store = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    assert results[-1].output == 12
-    assert results[-1].output_name == "sum"
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    assert results["sum"].output == 12
+    assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     shapes, masks = map_shapes(pipeline, inputs)
     assert shapes == {"x": (3,), "z": (3,)}
@@ -37,4 +37,4 @@ def test_simple_sweep(tmp_path: Path) -> None:
     sweep = Sweep({"y": [42, 69]}, constants={"x": [1, 2, 3]})
     for i, combo in enumerate(sweep.generate()):
         run_folder = tmp_path / f"sweep_{i}"
-        results, store = pipeline.map(combo, run_folder=run_folder, parallel=False)
+        results = pipeline.map(combo, run_folder=run_folder, parallel=False)

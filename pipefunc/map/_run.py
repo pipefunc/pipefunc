@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import shutil
 import tempfile
+from collections import OrderedDict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -463,7 +464,7 @@ def _execute_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
-    file_arrays = [store[output_name] for output_name in at_least_tuple(func.output_name)]
+    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
@@ -584,6 +585,7 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
+    store: StorageBase | None
 
 
 def _run_function(
@@ -591,7 +593,7 @@ def _run_function(
     run_folder: Path,
     store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
-) -> list[Result]:
+) -> dict[str, Result]:
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
         func,
@@ -616,19 +618,26 @@ def _run_function(
     # Note that the kwargs still contain the StorageBase objects if _execute_map_spec
     # was used.
     if isinstance(func.output_name, str):
-        return [
-            Result(
+        return {
+            func.output_name: Result(
                 function=func.__name__,
                 kwargs=kwargs,
                 output_name=func.output_name,
                 output=output,
+                store=store.get(func.output_name),
             ),
-        ]
+        }
 
-    return [
-        Result(function=func.__name__, kwargs=kwargs, output_name=output_name, output=_output)
+    return {
+        output_name: Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=output_name,
+            output=_output,
+            store=store.get(output_name),
+        )
         for output_name, _output in zip(func.output_name, output)
-    ]
+    }
 
 
 def _ensure_run_folder(run_folder: str | Path | None) -> Path:
@@ -647,7 +656,7 @@ def run(
     parallel: bool = True,
     storage: str = "file_array",
     cleanup: bool = True,
-) -> tuple[list[Result], dict[str, StorageBase]]:
+) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
     Parameters
@@ -685,14 +694,14 @@ def run(
         cleanup=cleanup,
     )
     run_info.dump(run_folder)
-    outputs = []
+    outputs = OrderedDict()
     store = run_info.init_store()
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
             _outputs = _run_function(func, run_folder, store, parallel)
-            outputs.extend(_outputs)
-    return outputs, store
+            outputs.update(_outputs)
+    return outputs
 
 
 def _init_storage(

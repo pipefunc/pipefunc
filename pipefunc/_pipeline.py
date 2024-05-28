@@ -45,8 +45,6 @@ else:
     from typing import TypeAlias
 
 if TYPE_CHECKING:
-    from pipefunc.map._storage_base import StorageBase
-
     if sys.version_info < (3, 9):  # pragma: no cover
         from typing import Callable
     else:
@@ -608,8 +606,7 @@ class Pipeline:
         storage: str = "file_array",
         parallel: bool = True,
         cleanup: bool = True,
-        return_store: bool = False,
-    ) -> tuple[list[Result], dict[str, StorageBase]]:
+    ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
         Parameters
@@ -632,8 +629,6 @@ class Pipeline:
             Whether to run the functions in parallel.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
-        return_store
-            TODO
 
         """
         return run(
@@ -644,7 +639,6 @@ class Pipeline:
             parallel=parallel,
             storage=storage,
             cleanup=cleanup,
-            return_store=return_store,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
