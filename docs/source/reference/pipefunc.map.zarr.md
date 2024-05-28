@@ -1,4 +1,4 @@
-## `pipefunc.map` module
+## `pipefunc.map.zarr` module
 
 ```{eval-rst}
 .. automodule:: pipefunc.map.zarr
