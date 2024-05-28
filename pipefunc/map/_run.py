@@ -226,6 +226,10 @@ class RunInfo:
 
     @property
     def storage_class(self) -> type[StorageBase]:
+        if self.storage not in storage_registry:
+            available = ", ".join(storage_registry.keys())
+            msg = f"Storage class `{self.storage}` not found, only `{available}` available."
+            raise ValueError(msg)
         return storage_registry[self.storage]
 
     def init_store(self) -> dict[str, StorageBase]:
@@ -327,15 +331,9 @@ def _init_file_arrays(
 ) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
-    return [
-        storage_class(
-            _file_array_path(output_name, run_folder),
-            external_shape,
-            internal_shape,
-            mask,
-        )
-        for output_name in at_least_tuple(output_name)
-    ]
+    output_names = at_least_tuple(output_name)
+    paths = [_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
 def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
@@ -655,6 +653,7 @@ def run(
     *,
     parallel: bool = True,
     storage: str = "file_array",
+    persist_memory: bool = True,
     cleanup: bool = True,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
@@ -678,12 +677,21 @@ def run(
         Whether to run the functions in parallel.
     storage
         The storage class to use for the file arrays. The default is `file_array`.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    if parallel and storage == "zarr_memory":
+        msg = (
+            "Parallel execution is not supported with `zarr_memory` storage."
+            " Use a file based storage or `zarr_shared_memory`."
+        )
+        raise ValueError(msg)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -701,6 +709,11 @@ def run(
         for func in gen:
             _outputs = _run_function(func, run_folder, store, parallel)
             outputs.update(_outputs)
+
+    if persist_memory:  # Only relevant for memory based storage
+        for arr in store.values():
+            arr.persist()
+
     return outputs
 
 
@@ -716,13 +729,7 @@ def _init_storage(
         output_names = mapspec.output_names
         shape = shapes[output_names[0]]
         mask = shape_masks[output_names[0]]
-        arrays = _init_file_arrays(
-            output_names,
-            shape,
-            mask,
-            storage_class,
-            run_folder,
-        )
+        arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
         for output_name, arr in zip(output_names, arrays):
             store[output_name] = arr
     return store
@@ -734,14 +741,14 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_info = RunInfo.load(run_folder)
     outputs = [
         _load_parameter(
-            on,
+            output_name,
             run_info.input_paths,
             run_info.shapes,
             run_info.shape_masks,
             run_info.init_store(),
             run_folder,
         )
-        for on in output_names
+        for output_name in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs

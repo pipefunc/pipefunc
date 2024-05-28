@@ -603,8 +603,9 @@ class Pipeline:
         run_folder: str | Path | None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        storage: str = "file_array",
         parallel: bool = True,
+        storage: str = "file_array",
+        persist_memory: bool = True,
         cleanup: bool = True,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
@@ -622,11 +623,14 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
+        parallel
+            Whether to run the functions in parallel.
         storage
             The storage class to use for the file arrays. The default is `file_array`.
             Can use any registered storage class. See `pipefunc.map.storage_registry`.
-        parallel
-            Whether to run the functions in parallel.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
 
@@ -638,6 +642,7 @@ class Pipeline:
             internal_shapes,
             parallel=parallel,
             storage=storage,
+            persist_memory=persist_memory,
             cleanup=cleanup,
         )
 

@@ -10,13 +10,16 @@ from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import load_outputs, load_xarray_dataset, map_shapes, run
+from pipefunc.map._storage_base import storage_registry
 from pipefunc.map.zarr import ZarrArray  # noqa: F401, RUF100
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+storage_options = list(storage_registry)
 
-@pytest.fixture(params=["file_array", "zarr"])
+
+@pytest.fixture(params=storage_options)
 def storage(request):
     return request.param
 
@@ -719,9 +722,9 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
         storage=storage,
         parallel=False,
     )
-    assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     assert results["c"].output.shape == (2, 2)
     assert results["c"].output.tolist() == [[2, 0], [3, -1]]
+    assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     load_xarray_dataset(run_folder=tmp_path)
 
 
@@ -893,3 +896,14 @@ def test_growing_axis(tmp_path: Path) -> None:
         run_folder=tmp_path,
         parallel=False,
     )
+
+
+def test_storage_options():
+    with pytest.raises(ValueError, match="Storage class `invalid` not found"):
+        Pipeline([lambda x: x]).map({}, None, storage="invalid")
+
+    with pytest.raises(
+        ValueError,
+        match="Parallel execution is not supported with `zarr_memory` storage",
+    ):
+        Pipeline([lambda x: x]).map({}, None, storage="zarr_memory", parallel=True)
