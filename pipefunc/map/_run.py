@@ -649,6 +649,7 @@ def run(
     *,
     parallel: bool = True,
     storage: str = "file_array",
+    persist_memory: bool = True,
     cleanup: bool = True,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
@@ -672,6 +673,9 @@ def run(
         Whether to run the functions in parallel.
     storage
         The storage class to use for the file arrays. The default is `file_array`.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
@@ -695,6 +699,11 @@ def run(
         for func in gen:
             _outputs = _run_function(func, run_folder, store, parallel)
             outputs.update(_outputs)
+
+    if persist_memory:
+        for arr in store.values():
+            arr.persist()
+
     return outputs
 
 

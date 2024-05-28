@@ -210,14 +210,14 @@ class ZarrArray(StorageBase):
         return slice_indices
 
 
-class SharedDictStore(zarr.storage.KVStore):
+class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
     def __init__(
         self,
         shared_dict: multiprocessing.managers.DictProxy | None = None,
     ) -> None:
-        """Initialize the SharedDictStore.
+        """Initialize the _SharedDictStore.
 
         Parameters
         ----------
@@ -269,7 +269,7 @@ class ZarrMemory(ZarrArray):
     ) -> None:
         """Initialize the ZarrMemory."""
         if store is None:
-            store = SharedDictStore() if shared else zarr.MemoryStore()
+            store = _SharedDictStore() if shared else zarr.MemoryStore()
         super().__init__(
             folder=folder,
             shape=shape,
@@ -288,6 +288,8 @@ class ZarrMemory(ZarrArray):
 
     def load(self) -> None:
         """Load the memory storage from disk."""
+        if self.folder is None:
+            return
         src = zarr.DirectoryStore(self.folder)
         zarr.convenience.copy_store(src, self.store)
 
