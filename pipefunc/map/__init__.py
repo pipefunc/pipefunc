@@ -18,6 +18,6 @@ __all__ = [
 ]
 
 with _suppress(ImportError):
-    from pipefunc.map.zarr import ZarrArray, ZarrMemory
+    from pipefunc.map.zarr import ZarrArray
 
-    __all__ += ["ZarrArray", "ZarrMemory"]
+    __all__ += ["ZarrArray"]

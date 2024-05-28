@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@pytest.fixture(params=["file_array", "zarr", "zarr_memory"])
+@pytest.fixture(params=["file_array", "zarr"])
 def storage(request):
     return request.param
 
