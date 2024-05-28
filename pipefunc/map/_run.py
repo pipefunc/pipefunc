@@ -28,6 +28,7 @@ from pipefunc.map._storage_base import (
 )
 
 if TYPE_CHECKING:
+    import concurrent.futures
     import sys
 
     import xarray as xr
@@ -458,6 +459,7 @@ def _execute_map_spec(
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
+    executor: concurrent.futures.Executor | None,
 ) -> np.ndarray | list[np.ndarray]:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -475,8 +477,11 @@ def _execute_map_spec(
     existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
     n = len(missing)
     if parallel and n > 1:
-        with ProcessPoolExecutor() as ex:
-            outputs_list = list(ex.map(process_index, missing))
+        if executor is None:
+            with ProcessPoolExecutor() as executor:
+                outputs_list = list(executor.map(process_index, missing))
+        else:  # don't shutdown the executor
+            outputs_list = list(executor.map(process_index, missing))
     else:
         outputs_list = [process_index(index) for index in missing]
 
@@ -591,6 +596,7 @@ def _run_function(
     run_folder: Path,
     store: dict[str, StorageBase],
     parallel: bool,  # noqa: FBT001
+    executor: concurrent.futures.Executor | None,
 ) -> dict[str, Result]:
     run_info = RunInfo.load(run_folder)
     kwargs = _func_kwargs(
@@ -609,6 +615,7 @@ def _run_function(
             run_info.shape_masks,
             store,
             parallel,
+            executor,
         )
     else:
         output = _execute_single(func, kwargs, run_folder)
@@ -652,6 +659,7 @@ def run(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
+    executor: concurrent.futures.Executor | None = None,
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -675,6 +683,9 @@ def run(
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     parallel
         Whether to run the functions in parallel.
+    executor
+        The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
+        is used. Only relevant if `parallel=True`.
     storage
         The storage class to use for the file arrays. The default is `file_array`.
     persist_memory
@@ -707,7 +718,7 @@ def run(
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder, store, parallel)
+            _outputs = _run_function(func, run_folder, store, parallel, executor)
             outputs.update(_outputs)
 
     if persist_memory:  # Only relevant for memory based storage
