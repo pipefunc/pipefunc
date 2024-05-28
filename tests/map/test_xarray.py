@@ -18,7 +18,7 @@ def test_to_xarray_1_dim(tmp_path: Path):
     pipeline = Pipeline([double_it])
     inputs = {"x": [1, 2, 3]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    output_name = results[-1].output_name
+    output_name = results["y"].output_name
     mapspecs = pipeline.mapspecs()
 
     da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
@@ -37,7 +37,7 @@ def test_to_xarray_2_dim(tmp_path: Path):
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    output_name = results[-1].output_name
+    output_name = results["z"].output_name
     mapspecs = pipeline.mapspecs()
 
     da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
@@ -58,7 +58,7 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5, 6], "z": [7, 8]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    output_name = results[-1].output_name
+    output_name = results["r"].output_name
     mapspecs = pipeline.mapspecs()
 
     da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
@@ -84,7 +84,7 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
     inputs = {"x": [1, 2, 3]}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
 
-    output_name = results[-1].output_name
+    output_name = results["z"].output_name
     mapspecs = pipeline.mapspecs()
 
     da = load_xarray(output_name, mapspecs, inputs, run_folder=tmp_path)
@@ -116,7 +116,7 @@ def test_to_xarray_from_step(tmp_path: Path):
         parallel=False,
     )
     mapspecs = pipeline.mapspecs()
-    output_name = results[-1].output_name
+    output_name = results["y"].output_name
 
     da = load_xarray(
         output_name,

@@ -27,8 +27,8 @@ def test_simple_sweep(tmp_path: Path) -> None:
 
     inputs = {"x": [1, 2, 3], "y": 2}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    assert results[-1].output == 12
-    assert results[-1].output_name == "sum"
+    assert results["sum"].output == 12
+    assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     shapes, masks = map_shapes(pipeline, inputs)
     assert shapes == {"x": (3,), "z": (3,)}

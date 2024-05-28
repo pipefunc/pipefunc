@@ -1,5 +1,7 @@
 """pipefunc.map: Modules that handle MapSpecs and its runs."""
 
+from contextlib import suppress as _suppress
+
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import load_outputs, load_xarray_dataset, run
@@ -14,3 +16,8 @@ __all__ = [
     "run",
     "StorageBase",
 ]
+
+with _suppress(ImportError):
+    from pipefunc.map.zarr import ZarrArray, ZarrMemory
+
+    __all__ += ["ZarrArray", "ZarrMemory"]
