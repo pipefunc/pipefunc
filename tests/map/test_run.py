@@ -896,3 +896,8 @@ def test_growing_axis(tmp_path: Path) -> None:
         run_folder=tmp_path,
         parallel=False,
     )
+
+
+def test_storage_options():
+    with pytest.raises(ValueError, match="Storage class `invalid` not found"):
+        Pipeline([lambda x: x]).map({}, None, storage="invalid")
