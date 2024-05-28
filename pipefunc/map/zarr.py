@@ -146,7 +146,11 @@ class ZarrArray(StorageBase):
             (slice(None),) * len(self.shape),
             (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
-        tile_shape = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
+        tile_shape = _select_by_mask(
+            self.shape_mask,
+            (1,) * len(self.shape),
+            self.internal_shape,
+        )
         mask = np.tile(mask[slc], tile_shape)
 
         return np.ma.array(self.array[:], mask=mask, dtype=object)
@@ -278,20 +282,27 @@ class ZarrMemory(ZarrArray):
             store=store,
             object_codec=object_codec,
         )
+        self.load()
+
+    @property
+    def persistent_store(self) -> zarr.storage.Store | None:
+        """Return the persistent store."""
+        if self.folder is None:
+            return None
+        return zarr.DirectoryStore(self.folder)
 
     def persist(self) -> None:
         """Persist the memory storage to disk."""
         if self.folder is None:
             return
-        dest = zarr.DirectoryStore(self.folder)
-        zarr.convenience.copy_store(self.store, dest)
+        zarr.convenience.copy_store(self.store, self.persistent_store)
 
     def load(self) -> None:
         """Load the memory storage from disk."""
         if self.folder is None:
             return
-        src = zarr.DirectoryStore(self.folder)
-        zarr.convenience.copy_store(src, self.store)
+        self.store.clear()
+        zarr.convenience.copy_store(self.persistent_store, self.store)
 
 
 class CloudPickleCodec(Codec):
