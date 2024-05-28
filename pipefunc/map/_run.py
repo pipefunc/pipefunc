@@ -254,12 +254,12 @@ class RunInfo:
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
         data = asdict(self)
+        data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
         data["shapes"] = {",".join(at_least_tuple(k)): v for k, v in data["shapes"].items()}
         data["shape_masks"] = {
             ",".join(at_least_tuple(k)): v for k, v in data["shape_masks"].items()
         }
         data["run_folder"] = str(data["run_folder"])
-        data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
         with path.open("w") as f:
             json.dump(data, f, indent=4)
 
