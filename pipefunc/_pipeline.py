@@ -15,7 +15,6 @@ from __future__ import annotations
 import contextlib
 import functools
 import inspect
-import itertools
 import sys
 import time
 import warnings
@@ -31,10 +30,8 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import (
     at_least_tuple,
-    common_in_sets,
     generate_filename_from_dict,
     handle_error,
-    join_overlapping_sets,
     table,
 )
 from pipefunc.exceptions import UnusedParametersError
@@ -1179,13 +1176,6 @@ class Pipeline:
             cache_kwargs=self._cache_kwargs,
         )
 
-    def _independent_parameters(self: Pipeline) -> list[set[str]]:
-        """Return the sets of input and output parameters that are independent."""
-        # Note: could use `_connected_components` instead of `join_overlapping_sets`
-        # Not used ATM...
-        sets = [set(f.parameters) | set(at_least_tuple(f.output_name)) for f in self.functions]
-        return join_overlapping_sets(sets)
-
     def _connected_components(self) -> list[set[PipeFunc | str]]:
         """Return the connected components of the pipeline graph."""
         return list(nx.connected_components(self.graph.to_undirected()))
@@ -1218,25 +1208,6 @@ class Pipeline:
                     independent.setdefault(axis, set()).add(func)
 
         return dict(independent)
-
-    # TODO: I realized that one only needs to check the indices of the outputs
-    # and then follow those outputs down the graph making sure they still exist at the end.
-    def _independent_axes_in_mapspecs_old(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
-        function_chains = self._group_functions_by_chains()
-        mapspec_chains = [
-            [f.mapspec for f in functions if f.mapspec] for functions in function_chains
-        ]
-        common_axes: list[tuple[set[PipeFunc], set[str]]] = []
-        for function_chain, mapspec_chain in zip(function_chains, mapspec_chains):
-            if len(function_chain) != len(mapspec_chain):
-                # if not all functions have mapspecs, there are no independent axes
-                continue
-            outputs = itertools.chain.from_iterable([spec.outputs for spec in mapspec_chain])
-            axes: list[set[str]] = [set(spec.axes) for spec in outputs]  # type: ignore[arg-type]
-            sets = common_in_sets(axes)
-            if sets:
-                common_axes.append((function_chain, sets))  # type: ignore[arg-type]
-        return common_axes
 
 
 def _update_all_results(
