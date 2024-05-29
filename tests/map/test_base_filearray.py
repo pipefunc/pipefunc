@@ -6,12 +6,13 @@ import pytest
 import zarr
 
 from pipefunc._utils import prod
+from pipefunc.map._dict_store import DictStore
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 from pipefunc.map.zarr import ZarrFileArray
 
 
-@pytest.fixture(params=["file_array", "zarr_array"])
+@pytest.fixture(params=["file_array", "zarr_array", "dict"])
 def array_type(request, tmp_path: Path):
     if request.param == "file_array":
 
@@ -22,6 +23,10 @@ def array_type(request, tmp_path: Path):
         def _array_type(shape, internal_shape=None, shape_mask=None):
             store = zarr.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
+    elif request.param == "dict":
+
+        def _array_type(shape, internal_shape=None, shape_mask=None):
+            return DictStore(None, shape, internal_shape, shape_mask)
 
     return _array_type
 
@@ -458,10 +463,9 @@ def test_list_or_arrays(array_type) -> None:
     # list of 2 (4,4) arrays
     value = [np.random.rand(4, 4) for _ in range(2)]  # noqa: NPY002
     arr.dump((0, 0, 0), value)
-    if isinstance(arr, FileArray):
+    if not isinstance(arr, ZarrFileArray):
         assert isinstance(arr[0, 0, 0], list)
     else:
-        assert isinstance(arr, ZarrFileArray)
         assert isinstance(arr[0, 0, 0], np.ndarray)
         assert arr[0, 0, 0].shape == (2, 4, 4)
     for x in arr[0, 0, 0]:  # type: ignore[attr-defined]

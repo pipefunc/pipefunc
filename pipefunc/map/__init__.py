@@ -2,12 +2,14 @@
 
 from contextlib import suppress as _suppress
 
+from pipefunc.map._dict_store import DictStore
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import load_outputs, load_xarray_dataset, run
 from pipefunc.map._storage_base import StorageBase, register_storage
 
 __all__ = [
+    "DictStore",
     "FileArray",
     "load_outputs",
     "load_xarray_dataset",

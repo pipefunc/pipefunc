@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import cloudpickle
 import numpy as np
 
-from pipefunc._utils import dump, load, prod
+from pipefunc._utils import dump, load
 from pipefunc.map._storage_base import (
     StorageBase,
     _iterate_shape_indices,
@@ -65,16 +65,6 @@ class FileArray(StorageBase):
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
-
-    @property
-    def size(self) -> int:
-        """Return number of elements in the array."""
-        return prod(self.shape)
-
-    @property
-    def rank(self) -> int:
-        """Return the rank of the array."""
-        return len(self.shape)
 
     def _normalize_key(
         self,

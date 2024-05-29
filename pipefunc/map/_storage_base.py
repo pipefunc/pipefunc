@@ -10,6 +10,7 @@ import functools
 import itertools
 from typing import TYPE_CHECKING, Any
 
+from pipefunc._utils import prod
 from pipefunc.map._mapspec import shape_to_strides
 
 if TYPE_CHECKING:
@@ -60,12 +61,14 @@ class StorageBase(abc.ABC):
     ) -> None: ...
 
     @property
-    @abc.abstractmethod
-    def size(self) -> int: ...
+    def size(self) -> int:
+        """Return number of elements in the array."""
+        return prod(self.shape)
 
     @property
-    @abc.abstractmethod
-    def rank(self) -> int: ...
+    def rank(self) -> int:
+        """Return the rank of the array."""
+        return len(self.shape)
 
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...
