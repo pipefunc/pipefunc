@@ -391,6 +391,7 @@ def test_tuple_outputs(tmp_path: Path):
     assert pipeline.cache.cache[key].evaluate() == (6, 1)
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
+    assert pipeline.func_dependents("c") == [("d", "e"), ("g", "h"), "i"]
 
     assert (
         pipeline.func_dependencies("g")

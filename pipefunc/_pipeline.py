@@ -711,6 +711,22 @@ class Pipeline:
 
         return sorted(_predecessors(output_name), key=at_least_tuple)
 
+    def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+        """Return the functions that depend on a specific input/output."""
+
+        def _successors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+            succs = set()
+            if isinstance(x, (str, tuple)):
+                x = self.node_mapping[x]
+            for succ in self.graph.successors(x):
+                if isinstance(succ, PipeFunc):
+                    succs.add(succ.output_name)
+                    for s in _successors(succ):
+                        succs.add(s)
+            return succs  # type: ignore[return-value]
+
+        return sorted(_successors(name), key=at_least_tuple)
+
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
