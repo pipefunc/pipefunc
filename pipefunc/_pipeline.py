@@ -1195,9 +1195,33 @@ class Pipeline:
         connected_components = self._connected_components()
         return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
+    def _independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+        dependencies = self.func_dependencies(output_name)
+        root_args = set(self.root_args(output_name))
+        args = set()
+        root_funcs = set()
+        for _output_name in dependencies:
+            func = self.node_mapping[_output_name]
+            common = root_args & set(func.parameters)
+            if common:
+                args.update(common)
+                root_funcs.add(func)
+        mapspec = self.output_to_func[output_name].mapspec
+        if mapspec is None:
+            return set()
+        output_axes = set(mapspec.output_indices)
+        independent = set()
+        for axis in output_axes:
+            for func in root_funcs:
+                if not func.mapspec:
+                    continue
+                if axis in func.mapspec.input_indices:
+                    independent.add(axis)
+        return independent
+
     # TODO: I realized that one only needs to check the indices of the outputs
     # and then follow those outputs down the graph making sure they still exist at the end.
-    def _independent_axes_in_mapspecs(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
+    def _independent_axes_in_mapspecs_old(self: Pipeline) -> list[tuple[set[PipeFunc], set[str]]]:
         function_chains = self._group_functions_by_chains()
         mapspec_chains = [
             [f.mapspec for f in functions if f.mapspec] for functions in function_chains
