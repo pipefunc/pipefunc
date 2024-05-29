@@ -1195,10 +1195,10 @@ class Pipeline:
         connected_components = self._connected_components()
         return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
-    def _independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+    def _independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> dict[str, set[PipeFunc]]:
         mapspec = self.output_to_func[output_name].mapspec
         if mapspec is None:
-            return set()
+            return {}
 
         root_args = set(self.root_args(output_name))
         root_funcs = set()
@@ -1209,16 +1209,15 @@ class Pipeline:
             if common:
                 root_funcs.add(func)
 
-        output_axes = set(mapspec.output_indices)
-        independent = set()
-        for axis in output_axes:
+        independent: dict[str, set[PipeFunc]] = {}
+        for axis in mapspec.output_indices:
             for func in root_funcs:
                 if not func.mapspec:
                     continue
                 if axis in func.mapspec.input_indices:
-                    independent.add(axis)
+                    independent.setdefault(axis, set()).add(func)
 
-        return independent
+        return dict(independent)
 
     # TODO: I realized that one only needs to check the indices of the outputs
     # and then follow those outputs down the graph making sure they still exist at the end.
