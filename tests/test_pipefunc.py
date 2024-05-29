@@ -576,6 +576,16 @@ def test_drop_from_pipeline():
     assert "d" in pipeline.output_to_func
     pipeline.drop(f=f2)
 
+    pipeline = Pipeline([f1, f2, f3])
+
+    @pipefunc(output_name="e")
+    def f4(c, d, x=1):
+        return c * d * x
+
+    pipeline.replace(f4)
+    assert len(pipeline.functions) == 3
+    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
+
 
 def test_used_variable():
     @pipefunc(output_name="c")
