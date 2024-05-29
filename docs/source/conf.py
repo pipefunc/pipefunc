@@ -21,7 +21,7 @@ import pipefunc  # noqa: E402, isort:skip
 
 project = "pipefunc"
 author = "Bas Nijholt"
-copyright = f"2023, {author}"
+copyright = f"2024, {author}"
 
 version = ".".join(pipefunc.__version__.split(".")[:3])
 release = version
