@@ -68,6 +68,9 @@ def test_simple(storage, tmp_path: Path) -> None:
     run_info2 = RunInfo.load(tmp_path)
     assert run_info2 == run_info
 
+    with pytest.raises(ValueError, match="Pipeline is fully connected"):
+        pipeline.split_disconnected()
+
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
     @pipefunc(output_name="y")

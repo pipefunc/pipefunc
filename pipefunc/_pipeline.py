@@ -28,7 +28,12 @@ from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error, table
+from pipefunc._utils import (
+    at_least_tuple,
+    generate_filename_from_dict,
+    handle_error,
+    table,
+)
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.map._mapspec import (
     ArraySpec,
@@ -687,21 +692,47 @@ class Pipeline:
         self._root_args[output_name] = root_args
         return root_args
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
-        """Return the functions required to compute a specific output."""
+    def _traverse_graph(
+        self,
+        start: _OUTPUT_TYPE | PipeFunc,
+        direction: Literal["predecessors", "successors"],
+    ) -> list[_OUTPUT_TYPE]:
+        visited = set()
 
-        def _predecessors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
-            preds = set()
+        def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+            results = set()
             if isinstance(x, (str, tuple)):
                 x = self.node_mapping[x]
-            for pred in self.graph.predecessors(x):
-                if isinstance(pred, PipeFunc):
-                    preds.add(pred.output_name)
-                    for p in _predecessors(pred):
-                        preds.add(p)
-            return preds  # type: ignore[return-value]
+            for neighbor in getattr(self.graph, direction)(x):
+                if isinstance(neighbor, PipeFunc):
+                    output_name = neighbor.output_name
+                    if output_name not in visited:
+                        visited.add(output_name)
+                        results.add(output_name)
+                        results.update(_traverse(neighbor))
+            return results  # type: ignore[return-value]
 
-        return sorted(_predecessors(output_name), key=at_least_tuple)
+        return sorted(_traverse(start), key=at_least_tuple)
+
+    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+        """Return the functions required to compute a specific output.
+
+        See Also
+        --------
+        func_predecessors
+
+        """
+        return self._traverse_graph(output_name, "predecessors")
+
+    def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+        """Return the functions that depend on a specific input/output.
+
+        See Also
+        --------
+        func_successors
+
+        """
+        return self._traverse_graph(name, "successors")
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
@@ -1142,6 +1173,88 @@ class Pipeline:
             cache_type=self._cache_type,
             cache_kwargs=self._cache_kwargs,
         )
+
+    def _connected_components(self) -> list[set[PipeFunc | str]]:
+        """Return the connected components of the pipeline graph."""
+        return list(nx.connected_components(self.graph.to_undirected()))
+
+    def split_disconnected(self: Pipeline, **pipeline_kwargs: Any) -> tuple[Pipeline, ...]:
+        """Split disconnected components of the pipeline into separate pipelines.
+
+        Parameters
+        ----------
+        pipeline_kwargs
+            Keyword arguments to pass to the `Pipeline` constructor.
+
+        Returns
+        -------
+        Tuple of fully connected `Pipeline` objects.
+
+        """
+        connected_components = self._connected_components()
+        pipefunc_lists = [
+            [x.copy() for x in xs if isinstance(x, PipeFunc)] for xs in connected_components
+        ]
+        if len(pipefunc_lists) == 1:
+            msg = "Pipeline is fully connected, no need to split."
+            raise ValueError(msg)
+        return tuple(Pipeline(pfs, **pipeline_kwargs) for pfs in pipefunc_lists)  # type: ignore[arg-type]
+
+    def _axis_in_root_arg(
+        self,
+        axis: str,
+        output_name: _OUTPUT_TYPE,
+        root_args: tuple[str, ...] | None = None,
+        visited: set[_OUTPUT_TYPE] | None = None,
+        result: set[bool] | None = None,
+    ) -> bool:
+        if root_args is None:
+            root_args = self.root_args(output_name)
+        if visited is None:
+            visited = set()
+        if result is None:
+            result = set()
+        if output_name in visited:
+            return None  # type: ignore[return-value]
+
+        visited.add(output_name)
+        visited.update(at_least_tuple(output_name))
+
+        func = self.output_to_func[output_name]
+        assert func.mapspec is not None
+        if axis not in func.mapspec.output_indices:  # pragma: no cover
+            msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
+            raise ValueError(msg)
+
+        if axis not in func.mapspec.input_indices:
+            # Axis was in output but not in input
+            result.add(False)  # noqa: FBT003
+
+        axes = self.mapspec_axes()
+        for name in func.mapspec.input_names:
+            if axis not in axes[name]:
+                continue
+            if name in root_args:
+                if axis in axes[name]:
+                    result.add(True)  # noqa: FBT003
+            else:
+                self._axis_in_root_arg(axis, name, root_args, visited, result)
+
+        return all(result)
+
+    def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+        """Return the axes that are both in the output and in the root arguments.
+
+        Identifies axes that are cross-products and can be computed independently.
+        """
+        func = self.output_to_func[output_name]
+        if func.mapspec is None:
+            return set()
+        return {
+            axis
+            for axis in func.mapspec.output_indices
+            if self._axis_in_root_arg(axis, output_name)
+        }
 
 
 def _update_all_results(
