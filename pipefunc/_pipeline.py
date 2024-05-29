@@ -696,7 +696,13 @@ class Pipeline:
         return root_args
 
     def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
-        """Return the functions required to compute a specific output."""
+        """Return the functions required to compute a specific output.
+
+        See Also
+        --------
+        func_predecessors
+
+        """
 
         def _predecessors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
             preds = set()
@@ -712,7 +718,13 @@ class Pipeline:
         return sorted(_predecessors(output_name), key=at_least_tuple)
 
     def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
-        """Return the functions that depend on a specific input/output."""
+        """Return the functions that depend on a specific input/output.
+
+        See Also
+        --------
+        func_successors
+
+        """
 
         def _successors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
             succs = set()
