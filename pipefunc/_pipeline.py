@@ -347,6 +347,25 @@ class Pipeline:
             self.drop(f=f)
         self._init_internal_cache()
 
+    def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
+        """Replace a function in the pipeline with another function.
+
+        Parameters
+        ----------
+        new
+            The function to add to the pipeline.
+        old
+            The function to replace in the pipeline. If None, `old` is
+            assumed to be the function with the same output name as `new`.
+
+        """
+        if old is None:
+            self.drop(output_name=new.output_name)
+        else:
+            self.drop(f=old)
+        self.add(new)
+        self._init_internal_cache()
+
     @functools.cached_property
     def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
         output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
