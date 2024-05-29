@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import hashlib
-import itertools
 import json
 import math
 import operator
@@ -12,7 +11,6 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 import cloudpickle
-import networkx as nx
 import numpy as np
 
 
@@ -157,32 +155,6 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
         warnings.warn(f"Errors comparing keys and values: {errors}", stacklevel=3)
         return None
     return True
-
-
-def join_overlapping_sets(sets: list[set]) -> list[set]:
-    """Join overlapping sets in a list of sets."""
-    if len(sets) <= 1:
-        return sets
-    G = nx.Graph()  # noqa: N806
-    for idx, s in enumerate(sets):
-        G.add_node(idx, elements=s)
-    for i, j in itertools.combinations(range(len(sets)), 2):
-        if not sets[i].isdisjoint(sets[j]):
-            G.add_edge(i, j)
-    return [
-        {item for idx in component for item in sets[idx]}
-        for component in nx.connected_components(G)
-    ]
-
-
-def common_in_sets(sets: list[set[Any]]) -> set[Any]:
-    """Identify the items in sets that are common to all sets."""
-    if not sets:
-        return set()
-    common = sets[0]
-    for s in sets[1:]:
-        common.intersection_update(s)
-    return common
 
 
 def _format_table_row(row: list[str], widths: list[int], seperator: str = " | ") -> str:
