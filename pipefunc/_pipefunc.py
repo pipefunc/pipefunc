@@ -69,6 +69,8 @@ class PipeFunc(Generic[T]):
         If None, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
+    defaults
+        Set defaults for parameters. Overwrites any current defaults.
     profile
         Flag indicating whether the wrapped function should be profiled.
     debug
@@ -108,6 +110,7 @@ class PipeFunc(Generic[T]):
         *,
         output_picker: Callable[[str, Any], Any] | None = None,
         renames: dict[str, str] | None = None,
+        defaults: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
@@ -133,10 +136,11 @@ class PipeFunc(Generic[T]):
         self._inverse_renames: dict[str, str] = {v: k for k, v in self.renames.items()}
         parameters = inspect.signature(func).parameters
         self.parameters: list[str] = [self.renames.get(k, k) for k in parameters]
+        self._defaults = defaults or {}
         self.defaults: dict[str, Any] = {
-            self.renames.get(k, k): v.default
+            self.renames.get(k, k): self._defaults.get(k, v.default)
             for k, v in parameters.items()
-            if v.default is not inspect.Parameter.empty
+            if v.default is not inspect.Parameter.empty or k in self._defaults
         }
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
@@ -343,6 +347,8 @@ def pipefunc(
         If None, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
+    defaults
+        Set defaults for parameters. Overwrites any current defaults.
     profile
         Flag indicating whether the decorated function should be profiled.
     debug
