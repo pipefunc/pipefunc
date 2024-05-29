@@ -692,6 +692,28 @@ class Pipeline:
         self._root_args[output_name] = root_args
         return root_args
 
+    def _traverse_graph(
+        self,
+        start: _OUTPUT_TYPE | PipeFunc,
+        direction: Literal["predecessors", "successors"],
+    ) -> list[_OUTPUT_TYPE]:
+        visited = set()
+
+        def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+            results = set()
+            if isinstance(x, (str, tuple)):
+                x = self.node_mapping[x]
+            for neighbor in getattr(self.graph, direction)(x):
+                if isinstance(neighbor, PipeFunc):
+                    output_name = neighbor.output_name
+                    if output_name not in visited:
+                        visited.add(output_name)
+                        results.add(output_name)
+                        results.update(_traverse(neighbor))
+            return results  # type: ignore[return-value]
+
+        return sorted(_traverse(start), key=at_least_tuple)
+
     def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output.
 
@@ -700,19 +722,7 @@ class Pipeline:
         func_predecessors
 
         """
-
-        def _predecessors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
-            preds = set()
-            if isinstance(x, (str, tuple)):
-                x = self.node_mapping[x]
-            for pred in self.graph.predecessors(x):
-                if isinstance(pred, PipeFunc):
-                    preds.add(pred.output_name)
-                    for p in _predecessors(pred):
-                        preds.add(p)
-            return preds  # type: ignore[return-value]
-
-        return sorted(_predecessors(output_name), key=at_least_tuple)
+        return self._traverse_graph(output_name, "predecessors")
 
     def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
         """Return the functions that depend on a specific input/output.
@@ -722,19 +732,7 @@ class Pipeline:
         func_successors
 
         """
-
-        def _successors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
-            succs = set()
-            if isinstance(x, (str, tuple)):
-                x = self.node_mapping[x]
-            for succ in self.graph.successors(x):
-                if isinstance(succ, PipeFunc):
-                    succs.add(succ.output_name)
-                    for s in _successors(succ):
-                        succs.add(s)
-            return succs  # type: ignore[return-value]
-
-        return sorted(_successors(name), key=at_least_tuple)
+        return self._traverse_graph(name, "successors")
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
