@@ -1188,9 +1188,9 @@ class Pipeline:
     def _axis_in_root_arg(
         self,
         axis: str,
-        output_name: str,
+        output_name: _OUTPUT_TYPE,
         root_args: tuple[str, ...] | None = None,
-        visited: set[str] | None = None,
+        visited: set[_OUTPUT_TYPE] | None = None,
         result: set[bool] | None = None,
     ) -> bool:
         if root_args is None:
@@ -1199,29 +1199,38 @@ class Pipeline:
             visited = set()
         if result is None:
             result = set()
+        if output_name in visited:
+            return None  # type: ignore[return-value]
+
         visited.add(output_name)
+        visited.update(at_least_tuple(output_name))
+
         func = self.output_to_func[output_name]
+        assert func.mapspec is not None
         if axis not in func.mapspec.output_indices:
             msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
             raise ValueError(msg)
 
         if axis not in func.mapspec.input_indices:
             # Axis was in output but not in input
-            result.add(False)
+            result.add(False)  # noqa: FBT003
 
-        for spec in func.mapspec.inputs:
-            if spec.name in visited:
+        axes = self.mapspec_axes()
+        for name in func.mapspec.input_names:
+            if axis not in axes[name]:
                 continue
-            if spec.name in root_args:
-                if axis in spec.indices:
-                    result.add(True)
+            if name in root_args:
+                if axis in axes[name]:
+                    result.add(True)  # noqa: FBT003
             else:
-                self._axis_in_root_arg(axis, spec.name, root_args, visited, result)
+                self._axis_in_root_arg(axis, name, root_args, visited, result)
 
         return all(result)
 
     def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
         func = self.output_to_func[output_name]
+        if func.mapspec is None:
+            return set()
         return {
             axis
             for axis in func.mapspec.output_indices

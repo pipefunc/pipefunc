@@ -655,7 +655,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     assert results["three"].output.tolist() == [[4.0, 4.0], [4.0, 4.0], [4.0, 4.0]]
     load_xarray_dataset(run_folder=tmp_path)
 
-    assert pipeline._independent_axes_in_mapspecs() == [({one, two, three}, {"l"})]
+    assert pipeline.independent_axes_in_mapspecs("three") == {"k", "l"}
 
 
 def test_mapspec_internal_shapes(tmp_path: Path) -> None:
@@ -695,7 +695,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     load_xarray_dataset(run_folder=tmp_path)
 
 
-def test_reusing_axis_names() -> None:
+def test_disconnected_independent_axes() -> None:
     @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
     def f(a: int, b: int):
         return a + b
@@ -704,15 +704,33 @@ def test_reusing_axis_names() -> None:
     def g(x, y):
         return x + y
 
-    # TODO: this doesn't fail ATM but should it?
-    with pytest.raises(
-        ValueError,
-        match="Axis name `i` is used in multiple functions",
-    ):
-        Pipeline([f, g])
+    pipeline = Pipeline([f, g])
+    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
+    assert pipeline.independent_axes_in_mapspecs("c") == {"i"}
 
-    # TODO: write a pipeline where we do map-reduce and then another map-reduce
-    # reusing the same axis names and consider what *should* happen
+
+def test_reusing_axis_names_and_double_map_reduce(tmp_path: Path) -> None:
+    pipeline = Pipeline(
+        [
+            PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]"),
+            PipeFunc(lambda y, z: y + z, "yz", mapspec="y[i] -> yz[i]"),
+            PipeFunc(lambda yz: sum(yz), "sum_"),  # first map-reduce
+            PipeFunc(lambda sum_: [sum_, sum_], "duplication", mapspec="... -> duplication[i]"),
+            PipeFunc(lambda duplication: sum(duplication), "sum_final"),  # second map-reduce
+        ],
+    )
+    internal_shapes = {"duplication": (2,)}
+    results = pipeline.map(
+        {"x": [1, 2, 3], "z": 1},
+        run_folder=tmp_path,
+        parallel=False,
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+    )
+    assert results["y"].output.tolist() == [1, 2, 3]
+    assert results["yz"].output.tolist() == [2, 3, 4]
+    assert results["sum_"].output == 9
+    assert results["sum_final"].output == 18
+    assert pipeline.independent_axes_in_mapspecs("sum_final") == set()
 
 
 def test_from_step_2_dim_array(tmp_path: Path) -> None:
@@ -977,3 +995,7 @@ def test_independent_axes_2():
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
     assert pipeline.independent_axes_in_mapspecs("r") == set()
+
+    pipeline.add_mapspec_axis("x", axis="k")
+    assert pipeline.mapspecs_as_strings() == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
+    assert pipeline.independent_axes_in_mapspecs("r") == {"k"}
