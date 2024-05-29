@@ -708,6 +708,10 @@ def test_disconnected_independent_axes() -> None:
     assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
     assert pipeline.independent_axes_in_mapspecs("c") == {"i"}
 
+    pipeline1, pipeline2 = pipeline.split_disconnected()
+    assert len(pipeline1.functions) == 1
+    assert len(pipeline2.functions) == 1
+
 
 def test_reusing_axis_names_and_double_map_reduce(tmp_path: Path) -> None:
     pipeline = Pipeline(

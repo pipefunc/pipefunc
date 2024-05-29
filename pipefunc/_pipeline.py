@@ -1178,10 +1178,27 @@ class Pipeline:
         """Return the connected components of the pipeline graph."""
         return list(nx.connected_components(self.graph.to_undirected()))
 
-    def _group_functions_by_chains(self: Pipeline) -> list[set[PipeFunc]]:
-        """Group functions by independent chains / disconnected subgraphs."""
+    def split_disconnected(self: Pipeline, **pipeline_kwargs: Any) -> tuple[Pipeline, ...]:
+        """Split disconnected components of the pipeline into separate pipelines.
+
+        Parameters
+        ----------
+        pipeline_kwargs
+            Keyword arguments to pass to the `Pipeline` constructor.
+
+        Returns
+        -------
+        Tuple of fully connected `Pipeline` objects.
+
+        """
         connected_components = self._connected_components()
-        return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
+        pipefunc_lists = [
+            [x.copy() for x in xs if isinstance(x, PipeFunc)] for xs in connected_components
+        ]
+        if len(pipefunc_lists) == 1:
+            msg = "Pipeline is fully connected, no need to split."
+            raise ValueError(msg)
+        return tuple(Pipeline(pfs, **pipeline_kwargs) for pfs in pipefunc_lists)  # type: ignore[arg-type]
 
     def _axis_in_root_arg(
         self,
