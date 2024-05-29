@@ -1243,6 +1243,10 @@ class Pipeline:
         return all(result)
 
     def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+        """Return the axes that are both in the output and in the root arguments.
+
+        Identifies axes that are cross-products and can be computed independently.
+        """
         func = self.output_to_func[output_name]
         if func.mapspec is None:
             return set()
