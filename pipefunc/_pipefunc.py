@@ -319,6 +319,13 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+    def bind(self, parameter: str, value: Any) -> None:
+        """Bind a parameter to a specific value.
+
+        When the function is called, the parameter will be set to the provided value,
+        even when the function is called with a different value.
+        """
+
 
 def pipefunc(
     output_name: _OUTPUT_TYPE,
