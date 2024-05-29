@@ -1185,29 +1185,40 @@ class Pipeline:
         connected_components = self._connected_components()
         return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
-    def _independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> dict[str, set[PipeFunc]]:
-        mapspec = self.output_to_func[output_name].mapspec
-        if mapspec is None:
-            return {}
+    def _axis_in_root_arg(
+        self,
+        axis: str,
+        output_name: str,
+        root_args: set[str] | None = None,
+        visited: set[str] | None = None,
+    ) -> bool:
+        if root_args is None:
+            root_args = self.root_args(output_name)
+        if visited is None:
+            visited = set()
+        visited.add(output_name)
+        func = self.output_to_func[output_name]
+        if axis not in func.mapspec.output_indices:
+            msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
+            raise ValueError(msg)
 
-        root_args = set(self.root_args(output_name))
-        root_funcs = set()
-        for _output_name in self.func_dependencies(output_name):
-            func = self.node_mapping[_output_name]
-            assert isinstance(func, PipeFunc)
-            common = root_args & set(func.parameters)
-            if common:
-                root_funcs.add(func)
+        for spec in func.mapspec.inputs:
+            if spec.name in visited:
+                continue
+            if spec.name in root_args:
+                if axis in spec.indices:
+                    return True
+            else:
+                return self._axis_in_root_arg(axis, spec.name, root_args, visited)
+        return False
 
-        independent: dict[str, set[PipeFunc]] = {}
-        for axis in mapspec.output_indices:
-            for func in root_funcs:
-                if not func.mapspec:
-                    continue
-                if axis in func.mapspec.input_indices:
-                    independent.setdefault(axis, set()).add(func)
-
-        return dict(independent)
+    def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+        func = self.output_to_func[output_name]
+        return {
+            axis
+            for axis in func.mapspec.output_indices
+            if self._axis_in_root_arg(axis, output_name)
+        }
 
 
 def _update_all_results(

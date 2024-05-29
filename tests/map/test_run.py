@@ -945,3 +945,35 @@ def test_custom_executor():
     pipeline = Pipeline([f])
     results = pipeline.map({"x": [1, 2]}, None, executor=ThreadPoolExecutor())
     assert results["y"].output.tolist() == [1, 2]
+
+
+def test_independent_axes_1():
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int):
+        return a + b
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i, k]")
+    def g(x, y):
+        return x + y
+
+    output_name = "c"
+    self = Pipeline([f, g])
+    assert self.independent_axes_in_mapspecs(output_name) == {"i"}
+
+
+def test_independent_axes_2():
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="z[i], y[i] -> r[i]")
+    def g(y, z):
+        return y + z
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
+    internal_shapes = {"y": (3,)}
+    r = pipeline.map(inputs, None, internal_shapes=internal_shapes, parallel=False)
+    assert r["y"].output == [1, 2, 3]
+    assert r["r"].output.tolist() == [4, 6, 8]
+    assert pipeline.independent_axes_in_mapspecs("r") == {}
