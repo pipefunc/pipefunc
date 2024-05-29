@@ -1196,19 +1196,19 @@ class Pipeline:
         return [{x for x in xs if isinstance(x, PipeFunc)} for xs in connected_components]
 
     def _independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
-        dependencies = self.func_dependencies(output_name)
-        root_args = set(self.root_args(output_name))
-        args = set()
-        root_funcs = set()
-        for _output_name in dependencies:
-            func = self.node_mapping[_output_name]
-            common = root_args & set(func.parameters)
-            if common:
-                args.update(common)
-                root_funcs.add(func)
         mapspec = self.output_to_func[output_name].mapspec
         if mapspec is None:
             return set()
+
+        root_args = set(self.root_args(output_name))
+        root_funcs = set()
+        for _output_name in self.func_dependencies(output_name):
+            func = self.node_mapping[_output_name]
+            assert isinstance(func, PipeFunc)
+            common = root_args & set(func.parameters)
+            if common:
+                root_funcs.add(func)
+
         output_axes = set(mapspec.output_indices)
         independent = set()
         for axis in output_axes:
@@ -1217,6 +1217,7 @@ class Pipeline:
                     continue
                 if axis in func.mapspec.input_indices:
                     independent.add(axis)
+
         return independent
 
     # TODO: I realized that one only needs to check the indices of the outputs
