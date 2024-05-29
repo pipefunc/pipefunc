@@ -1189,7 +1189,7 @@ class Pipeline:
         self,
         axis: str,
         output_name: str,
-        root_args: set[str] | None = None,
+        root_args: tuple[str, ...] | None = None,
         visited: set[str] | None = None,
         result: set[bool] | None = None,
     ) -> bool:
