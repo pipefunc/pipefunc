@@ -1222,7 +1222,7 @@ class Pipeline:
 
         func = self.output_to_func[output_name]
         assert func.mapspec is not None
-        if axis not in func.mapspec.output_indices:
+        if axis not in func.mapspec.output_indices:  # pragma: no cover
             msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
             raise ValueError(msg)
 
