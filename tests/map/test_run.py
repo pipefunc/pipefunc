@@ -976,4 +976,4 @@ def test_independent_axes_2():
     r = pipeline.map(inputs, None, internal_shapes=internal_shapes, parallel=False)
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
-    assert pipeline.independent_axes_in_mapspecs("r") == {}
+    assert pipeline.independent_axes_in_mapspecs("r") == set()

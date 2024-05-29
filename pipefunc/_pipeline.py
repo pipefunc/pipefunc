@@ -1191,26 +1191,34 @@ class Pipeline:
         output_name: str,
         root_args: set[str] | None = None,
         visited: set[str] | None = None,
+        result: set[bool] | None = None,
     ) -> bool:
         if root_args is None:
             root_args = self.root_args(output_name)
         if visited is None:
             visited = set()
+        if result is None:
+            result = set()
         visited.add(output_name)
         func = self.output_to_func[output_name]
         if axis not in func.mapspec.output_indices:
             msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
             raise ValueError(msg)
 
+        if axis not in func.mapspec.input_indices:
+            # Axis was in output but not in input
+            result.add(False)
+
         for spec in func.mapspec.inputs:
             if spec.name in visited:
                 continue
             if spec.name in root_args:
                 if axis in spec.indices:
-                    return True
+                    result.add(True)
             else:
-                return self._axis_in_root_arg(axis, spec.name, root_args, visited)
-        return False
+                self._axis_in_root_arg(axis, spec.name, root_args, visited, result)
+
+        return all(result)
 
     def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
         func = self.output_to_func[output_name]
