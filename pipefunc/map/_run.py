@@ -87,7 +87,7 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
-def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
+def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> tuple[Any, ...]:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -99,12 +99,10 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> Any:
             new_output.append(_output)
             path = _output_path(output_name, run_folder)
             dump(_output, path)
-        output = new_output
-    else:
-        path = _output_path(func.output_name, run_folder)
-        dump(output, path)
-
-    return output
+        return tuple(new_output)
+    path = _output_path(func.output_name, run_folder)
+    dump(output, path)
+    return (output,)
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
@@ -326,6 +324,12 @@ def _maybe_parallel_map(
         return map(func, sequence)
 
 
+def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
+    if executor:
+        return executor.submit(func, *args)
+    return func(*args)
+
+
 def _maybe_load_single_output(
     func: PipeFunc,
     run_folder: Path,
@@ -448,9 +452,11 @@ def run(
     _check_parallel(parallel, store)
     if parallel and executor is None:
         executor = ProcessPoolExecutor()
+
     for gen in pipeline.topological_generations[1]:
         tasks: dict[PipeFunc, Any] = {}
-        # These evaluations *can* happen in parallel
+
+        # First submit all calls
         for func in gen:
             kwargs = _func_kwargs(
                 func,
@@ -470,12 +476,10 @@ def run(
                 )
                 r = _maybe_parallel_map(args.process_index, args.missing, executor)
                 tasks[func] = r, args
-            else:  # noqa: PLR5501
-                if executor:
-                    tasks[func] = executor.submit(_submit_single, func, kwargs, run_folder)
-                else:
-                    tasks[func] = _submit_single(func, kwargs, run_folder)
+            else:
+                tasks[func] = _maybe_submit(_submit_single, executor, func, kwargs, run_folder)
 
+        # Then process the results
         for func in gen:
             _outputs = _process_task(func, tasks[func], executor, run_folder, store, kwargs)
             outputs.update(_outputs)
@@ -506,24 +510,13 @@ def _process_task(
             outputs = [file_array.get_from_index(index) for file_array in args.file_arrays]
             _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
-        result_arrays = [x.reshape(args.shape) for x in args.result_arrays]
-        output = result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
+        output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
-        output = task.result() if executor else task
-        _dump_output(func, output, run_folder)
+        r = task.result() if executor else task
+        output = _dump_output(func, r, run_folder)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
-    if isinstance(func.output_name, str):
-        return {
-            func.output_name: Result(
-                function=func.__name__,
-                kwargs=kwargs,
-                output_name=func.output_name,
-                output=output,
-                store=store.get(func.output_name),
-            ),
-        }
     return {
         output_name: Result(
             function=func.__name__,
@@ -532,7 +525,7 @@ def _process_task(
             output=_output,
             store=store.get(output_name),
         )
-        for output_name, _output in zip(func.output_name, output)
+        for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
 
 
