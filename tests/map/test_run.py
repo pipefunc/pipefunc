@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -1010,3 +1010,30 @@ def test_independent_axes_2():
     pipeline.add_mapspec_axis("x", axis="k")
     assert pipeline.mapspecs_as_strings() == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
     assert pipeline.independent_axes_in_mapspecs("r") == {"k"}
+
+
+def test_parallel():
+    @pipefunc(output_name="double", mapspec="x[i] -> double[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="half", mapspec="x[i] -> half[i]")
+    def half_it(x: int) -> int:
+        return x // 2
+
+    @pipefunc(output_name="sum")
+    def take_sum(half: np.ndarray, double: np.ndarray) -> int:
+        return sum(half + double)
+
+    pipeline = Pipeline([double_it, half_it, take_sum])
+    inputs = {"x": [0, 1, 2, 3]}
+    run_folder = "my_run_folder"
+    executor = ProcessPoolExecutor(max_workers=2)  # Use 2 processes
+    results = pipeline.map(
+        inputs,
+        run_folder=run_folder,
+        parallel=True,
+        executor=executor,
+        storage="shared_memory_dict",
+    )
+    assert results["sum"].output == 14

@@ -46,7 +46,9 @@ class DictArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
-        self._dict: dict[tuple[int, ...], Any] = mapping or {}  # type: ignore[assignment]
+        if mapping is None:
+            mapping = {}
+        self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
         self.load()
 
     def get_from_index(self, index: int) -> Any:
