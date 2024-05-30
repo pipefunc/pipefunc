@@ -6,7 +6,7 @@ import pytest
 import zarr
 
 from pipefunc._utils import prod
-from pipefunc.map._dict_store import DictStore
+from pipefunc.map._dictarray import DictArray
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 from pipefunc.map.zarr import ZarrFileArray
@@ -26,7 +26,7 @@ def array_type(request, tmp_path: Path):
     elif request.param == "dict":
 
         def _array_type(shape, internal_shape=None, shape_mask=None):
-            return DictStore(None, shape, internal_shape, shape_mask)
+            return DictArray(None, shape, internal_shape, shape_mask)
 
     return _array_type
 
@@ -501,7 +501,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         internal_shape,
         shape_mask=(True, False, True, False),
     )
-    d_arr = DictStore(
+    d_arr = DictArray(
         None,
         external_shape,
         internal_shape,
@@ -555,7 +555,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         internal_shape,
         shape_mask=(True, False, True, False),
     )
-    dict_arr = DictStore(
+    dict_arr = DictArray(
         None,
         external_shape,
         internal_shape,

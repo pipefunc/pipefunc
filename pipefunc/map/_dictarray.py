@@ -17,7 +17,7 @@ from pipefunc.map._storage_base import (
 )
 
 
-class DictStore(StorageBase):
+class DictArray(StorageBase):
     """A `numpy.ndarray` backed by a `dict` with internal structure."""
 
     storage_id = "dict"
@@ -160,7 +160,7 @@ class DictStore(StorageBase):
 
         Examples
         --------
-        >>> arr = DictStore(...)
+        >>> arr = DictArray(...)
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
@@ -179,7 +179,7 @@ class DictStore(StorageBase):
 
     def _path(self) -> Path:
         assert self.folder is not None
-        return self.folder / "dict_store.cloudpickle"
+        return self.folder / "dict_array.cloudpickle"
 
     def persist(self) -> None:
         """Persist the dict storage to disk."""
@@ -206,4 +206,4 @@ def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
     return np.tile(x, shape)
 
 
-register_storage(DictStore)
+register_storage(DictArray)
