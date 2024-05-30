@@ -71,7 +71,6 @@ class DictArray(StorageBase):
             for i, index in enumerate(
                 itertools.product(*self._slice_indices(key, self.full_shape)),
             ):
-                j = np.unravel_index(i, shape)
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
@@ -85,6 +84,7 @@ class DictArray(StorageBase):
                         value = self._dict[external_key]
                     else:
                         value = self._internal_mask()
+                j = np.unravel_index(i, shape)
                 data[j] = value
             new_shape = tuple(
                 len(range(*k.indices(s)))
