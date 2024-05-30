@@ -239,7 +239,7 @@ class _SharedDictStore(zarr.storage.KVStore):
         super().__init__(mutablemapping=shared_dict)
 
 
-class ZarrMemory(ZarrFileArray):
+class ZarrMemoryArray(ZarrFileArray):
     """Array interface to an in-memory Zarr store."""
 
     storage_id = "zarr_memory"
@@ -294,7 +294,7 @@ class ZarrMemory(ZarrFileArray):
         return False
 
 
-class ZarrSharedMemory(ZarrMemory):
+class ZarrSharedMemoryArray(ZarrMemoryArray):
     """Array interface to a shared memory Zarr store."""
 
     storage_id = "zarr_shared_memory"
@@ -423,5 +423,5 @@ class CloudPickleCodec(Codec):
 
 register_codec(CloudPickleCodec)
 register_storage(ZarrFileArray)
-register_storage(ZarrMemory)
-register_storage(ZarrSharedMemory)
+register_storage(ZarrMemoryArray)
+register_storage(ZarrSharedMemoryArray)

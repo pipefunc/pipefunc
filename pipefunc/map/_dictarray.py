@@ -217,7 +217,7 @@ def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
     return np.tile(x, shape)
 
 
-class SharedMemory(DictArray):
+class SharedMemoryDictArray(DictArray):
     """Array interface to a shared memory dict store."""
 
     storage_id = "shared_memory_dict"
@@ -250,4 +250,4 @@ class SharedMemory(DictArray):
 
 
 register_storage(DictArray)
-register_storage(SharedMemory)
+register_storage(SharedMemoryDictArray)
