@@ -70,7 +70,8 @@ class PipeFunc(Generic[T]):
     renames
         A dictionary mapping from original argument names to new argument names.
     defaults
-        Set defaults for parameters. Overwrites any current defaults.
+        Set defaults for parameters. Overwrites any current defaults. Must be in terms
+        of the renamed argument names.
     profile
         Flag indicating whether the wrapped function should be profiled.
     debug
@@ -375,7 +376,8 @@ def pipefunc(
     renames
         A dictionary mapping from original argument names to new argument names.
     defaults
-        Set defaults for parameters. Overwrites any current defaults.
+        Set defaults for parameters. Overwrites any current defaults. Must be in terms
+        of the renamed argument names.
     profile
         Flag indicating whether the decorated function should be profiled.
     debug
