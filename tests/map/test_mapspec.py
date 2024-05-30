@@ -17,7 +17,7 @@ from pipefunc.map._mapspec import (
 )
 
 
-def testshape_to_strides():
+def test_shape_to_strides():
     assert shape_to_strides((3, 4, 5)) == (20, 5, 1)
     assert shape_to_strides(()) == ()
     assert shape_to_strides((1,)) == (1,)
