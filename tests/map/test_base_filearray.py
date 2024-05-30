@@ -165,6 +165,8 @@ def test_sliced_arange_minimal(array_type: Callable[..., StorageBase]):
     assert (arr[:, 1] == np_arr[:, 1]).all()
     assert (arr[0, -1] == np_arr[0, -1]).all()
     assert (arr[:, -1] == np_arr[:, -1]).all()
+    if not isinstance(arr, ZarrFileArray):
+        assert (arr[:, ::-1] == np_arr[:, ::-1]).all()
 
 
 def test_sliced_arange_minimal2(array_type: Callable[..., StorageBase]):

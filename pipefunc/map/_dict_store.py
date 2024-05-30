@@ -8,7 +8,12 @@ from typing import Any
 
 import numpy as np
 
-from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _normalize_key,
+    _select_by_mask,
+    register_storage,
+)
 
 
 class DictStore(StorageBase):
@@ -53,7 +58,7 @@ class DictStore(StorageBase):
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
-        print()
+        key = _normalize_key(key, self.shape, self.internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
         if any(isinstance(k, slice) for k in key):
             shape = tuple(
@@ -62,11 +67,10 @@ class DictStore(StorageBase):
             )
             print(shape)
             data: np.ndarray = np.empty(shape, dtype=object)
-            for index in itertools.product(*self._slice_indices(key, self.full_shape)):
-                print(f"index: {index}")
-                j = tuple(
-                    i // (k.step or 1) if isinstance(k, slice) else 0 for i, k in zip(index, key)
-                )
+            for i, index in enumerate(
+                itertools.product(*self._slice_indices(key, self.full_shape)),
+            ):
+                j = np.unravel_index(i, shape)
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)

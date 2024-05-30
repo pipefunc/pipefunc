@@ -17,6 +17,7 @@ from pipefunc._utils import dump, load
 from pipefunc.map._storage_base import (
     StorageBase,
     _iterate_shape_indices,
+    _normalize_key,
     _select_by_mask,
     register_storage,
 )
@@ -72,40 +73,13 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        if not isinstance(key, tuple):
-            key = (key,)
-
-        expected_rank = sum(self.shape_mask) if for_dump else len(self.shape_mask)
-
-        if len(key) != expected_rank:
-            msg = (
-                f"Too many indices for array: array is {expected_rank}-dimensional, "
-                f"but {len(key)} were indexed"
-            )
-            raise IndexError(msg)
-
-        normalized_key: list[int | slice] = []
-        shape_index = 0
-        internal_shape_index = 0
-
-        for axis, (mask, k) in enumerate(zip(self.shape_mask, key)):
-            if mask:
-                axis_size = self.shape[shape_index]
-                shape_index += 1
-            else:
-                axis_size = self.internal_shape[internal_shape_index]
-                internal_shape_index += 1
-
-            if isinstance(k, slice):
-                normalized_key.append(k)
-            else:
-                normalized_k = k if k >= 0 else (k + axis_size)
-                if not (0 <= normalized_k < axis_size):
-                    msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
-                    raise IndexError(msg)
-                normalized_key.append(normalized_k)
-
-        return tuple(normalized_key)
+        return _normalize_key(
+            key,
+            self.shape,
+            self.internal_shape,
+            self.shape_mask,
+            for_dump=for_dump,
+        )
 
     def _index_to_file(self, index: int) -> Path:
         """Return the filename associated with the given index."""
