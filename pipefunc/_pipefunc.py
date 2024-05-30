@@ -194,11 +194,10 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
-        print("input kwargs", kwargs, "defaults", self.defaults)
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         kwargs.update(defaults)
-        print("kwargs", kwargs)
+
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
