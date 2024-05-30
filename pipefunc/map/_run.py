@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline import _Generations
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
@@ -49,7 +50,7 @@ class _MockPipeline:
 
     defaults: dict[str, Any]
     map_parameters: set[str]
-    topological_generations: tuple[list[str], list[list[PipeFunc]]]
+    topological_generations: _Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
@@ -450,7 +451,7 @@ def run(
     _check_parallel(parallel, store)
 
     with _maybe_executor(executor, parallel) as ex:
-        for gen in pipeline.topological_generations[1]:
+        for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(gen, run_info, run_folder, store, outputs, ex)
 
     if persist_memory:  # Only relevant for memory based storage

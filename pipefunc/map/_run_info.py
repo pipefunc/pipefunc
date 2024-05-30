@@ -41,7 +41,7 @@ def map_shapes(
 
     map_parameters: set[str] = pipeline.map_parameters
 
-    input_parameters = set(pipeline.topological_generations[0])
+    input_parameters = set(pipeline.topological_generations.root_args)
 
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
