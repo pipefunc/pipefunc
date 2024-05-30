@@ -10,6 +10,7 @@ import functools
 import itertools
 from typing import TYPE_CHECKING, Any
 
+from pipefunc._utils import prod
 from pipefunc.map._mapspec import shape_to_strides
 
 if TYPE_CHECKING:
@@ -60,12 +61,14 @@ class StorageBase(abc.ABC):
     ) -> None: ...
 
     @property
-    @abc.abstractmethod
-    def size(self) -> int: ...
+    def size(self) -> int:
+        """Return number of elements in the array."""
+        return prod(self.shape)
 
     @property
-    @abc.abstractmethod
-    def rank(self) -> int: ...
+    def rank(self) -> int:
+        """Return the rank of the array."""
+        return len(self.shape)
 
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...
@@ -123,3 +126,47 @@ def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> N
     if storage_id is None:
         storage_id = cls.storage_id
     storage_registry[storage_id] = cls
+
+
+def _normalize_key(
+    key: tuple[int | slice, ...],
+    shape: tuple[int, ...],
+    internal_shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+    *,
+    for_dump: bool = False,
+) -> tuple[int | slice, ...]:
+    if not isinstance(key, tuple):
+        key = (key,)
+
+    expected_rank = sum(shape_mask) if for_dump else len(shape_mask)
+
+    if len(key) != expected_rank:
+        msg = (
+            f"Too many indices for array: array is {expected_rank}-dimensional, "
+            f"but {len(key)} were indexed"
+        )
+        raise IndexError(msg)
+
+    normalized_key: list[int | slice] = []
+    shape_index = 0
+    internal_shape_index = 0
+
+    for axis, (mask, k) in enumerate(zip(shape_mask, key)):
+        if mask:
+            axis_size = shape[shape_index]
+            shape_index += 1
+        else:
+            axis_size = internal_shape[internal_shape_index]
+            internal_shape_index += 1
+
+        if isinstance(k, slice):
+            normalized_key.append(k)
+        else:
+            normalized_k = k if k >= 0 else (k + axis_size)
+            if not (0 <= normalized_k < axis_size):
+                msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
+                raise IndexError(msg)
+            normalized_key.append(normalized_k)
+
+    return tuple(normalized_key)

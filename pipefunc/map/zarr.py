@@ -152,13 +152,13 @@ class ZarrFileArray(StorageBase):
         )
         mask = np.tile(mask[slc], tile_shape)
 
-        return np.ma.array(self.array[:], mask=mask, dtype=object)
+        return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
         mask = self._mask[:]
-        return np.ma.array(mask, dtype=bool)
+        return np.ma.MaskedArray(mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
@@ -213,14 +213,14 @@ class ZarrFileArray(StorageBase):
         return slice_indices
 
 
-class _SharedDictStore(zarr.storage.KVStore):
+class _SharedDictArray(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
     def __init__(
         self,
         shared_dict: multiprocessing.managers.DictProxy | None = None,
     ) -> None:
-        """Initialize the _SharedDictStore.
+        """Initialize the _SharedDictArray.
 
         Parameters
         ----------
@@ -301,7 +301,7 @@ class ZarrSharedMemory(ZarrMemory):
     ) -> None:
         """Initialize the ZarrMemory."""
         if store is None:
-            store = _SharedDictStore()
+            store = _SharedDictArray()
         super().__init__(
             folder=folder,
             shape=shape,

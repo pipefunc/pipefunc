@@ -186,7 +186,7 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)
 
     data1 = np.array([42, 69])
-    expected_full = np.ma.array(data1, mask=False, dtype=object).reshape(full_shape)
+    expected_full = np.ma.MaskedArray(data1, mask=False, dtype=object).reshape(full_shape)
 
     arr.dump((0,), data1)
 
@@ -213,11 +213,11 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     result = arr[:, :]
     assert result.shape == full_shape
     expected = data1.reshape(1, 2)
-    expected = np.ma.array(expected, mask=False, dtype=object)
+    expected = np.ma.MaskedArray(expected, mask=False, dtype=object)
     assert np.array_equal(result, expected)
 
     result = arr[0, :]
     assert result.shape == (2,), result.shape
     expected = data1
-    expected = np.ma.array(expected, mask=False, dtype=object)
+    expected = np.ma.MaskedArray(expected, mask=False, dtype=object)
     assert np.array_equal(result, expected)
