@@ -159,11 +159,11 @@ def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> li
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
-def _pick_output(func: PipeFunc, output: Any) -> list[Any]:
-    return [
+def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
+    return tuple(
         (func.output_picker(output, output_name) if func.output_picker is not None else output)
         for output_name in at_least_tuple(func.output_name)
-    ]
+    )
 
 
 def _run_iteration(
@@ -188,7 +188,7 @@ def _run_iteration_and_process(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     file_arrays: Sequence[StorageBase],
-) -> list[Any]:
+) -> tuple[Any, ...]:
     output = _run_iteration(func, kwargs, shape, shape_mask, index)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
@@ -201,7 +201,7 @@ def _update_file_array(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
-    outputs: list[Any],
+    outputs: tuple[Any, ...],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
     external_shape = _external_shape(shape, shape_mask)
@@ -280,7 +280,7 @@ def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, Non
 
 
 class _MapSpecArgs(NamedTuple):
-    process_index: functools.partial[list[Any]]
+    process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
     result_arrays: list[np.ndarray]
@@ -481,7 +481,7 @@ def run(
 
         # Then process the results
         for func in gen:
-            _outputs = _process_task(func, tasks[func], executor, run_folder, store, kwargs)
+            _outputs = _process_task(func, tasks[func], run_folder, store, kwargs, executor)
             outputs.update(_outputs)
 
     if persist_memory:  # Only relevant for memory based storage
@@ -494,10 +494,10 @@ def run(
 def _process_task(
     func: PipeFunc,
     task: Any,
-    executor: Executor | None,
     run_folder: Path,
     store: dict[str, StorageBase],
     kwargs: dict[str, Any],
+    executor: Executor | None = None,
 ) -> dict[str, Result]:
     if func.mapspec and func.mapspec.inputs:
         output_list, args = task

@@ -15,6 +15,7 @@ from pipefunc.map._run import (
     _func_kwargs,
     _maybe_load_single_output,
     _MockPipeline,
+    _process_task,
     _run_iteration_and_process,
     _submit_single,
     run,
@@ -150,8 +151,18 @@ def _execute_iteration_in_single(
         store,
         run_folder,
     )
-    result = _submit_single(func, kwargs, run_folder)
-    return result if return_output else None
+    task = _submit_single(func, kwargs, run_folder)
+    result = _process_task(
+        func,
+        task,
+        run_folder,
+        store,
+        kwargs,
+    )
+    if not return_output:
+        return None
+    output = tuple(result[name].output for name in at_least_tuple(func.output_name))
+    return output if isinstance(func.output_name, tuple) else output[0]
 
 
 def _execute_iteration_in_map_spec(
@@ -162,7 +173,7 @@ def _execute_iteration_in_map_spec(
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
-) -> list[Any] | None:
+) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
     Performs a single iteration of the code in `_execute_map_spec`, however,
@@ -178,7 +189,7 @@ def _execute_iteration_in_map_spec(
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
             return None
-        return [arr.get_from_index(index) for arr in file_arrays]
+        return tuple(arr.get_from_index(index) for arr in file_arrays)
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(

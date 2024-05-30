@@ -41,15 +41,15 @@ def test_basic(tmp_path: Path) -> None:
     assert len(flat_learners) == 2
     adaptive.runner.simple(flat_learners["z"])
     assert flat_learners["z"].data == {
-        0: [2],
-        1: [3],
-        2: [4],
-        3: [3],
-        4: [4],
-        5: [5],
-        6: [4],
-        7: [5],
-        8: [6],
+        0: (2,),
+        1: (3,),
+        2: (4,),
+        3: (3,),
+        4: (4,),
+        5: (5,),
+        6: (4,),
+        7: (5,),
+        8: (6,),
     }
     adaptive.runner.simple(flat_learners["prod"])
     assert flat_learners["prod"].data == {0: 172800}
@@ -89,7 +89,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     adaptive.runner.simple(flat_learners["x"])
     assert flat_learners["x"].data == {0: [0, 1, 2, 3]}
     adaptive.runner.simple(flat_learners["y"])
-    assert flat_learners["y"].data == {0: [0], 1: [2], 2: [4], 3: [6]}
+    assert flat_learners["y"].data == {0: (0,), 1: (2,), 2: (4,), 3: (6,)}
     adaptive.runner.simple(flat_learners["sum"])
     assert flat_learners["sum"].data == {0: 12}
 
