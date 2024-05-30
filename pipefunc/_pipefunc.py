@@ -146,13 +146,12 @@ class PipeFunc(Generic[T]):
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
         parameters = inspect.signature(self.func).parameters
-        if extra := set(self._defaults) - set(parameters):
+        if extra := set(self._defaults) - set(self.parameters):
             allowed = ", ".join(parameters)
             msg = (
                 f"Unexpected default arguments: `{extra}`."
                 f" The allowed arguments are: `{allowed}`."
-                " Defaults must be in terms of the original argument names,"
-                " before any renaming."
+                " Defaults must be in terms of the renamed argument names."
             )
             raise ValueError(msg)
         defaults = {}
@@ -195,10 +194,11 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
-        for k, v in self.defaults.items():
-            kwargs.setdefault(k, v)
+        print("input kwargs", kwargs, "defaults", self.defaults)
+        defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
-
+        kwargs.update(defaults)
+        print("kwargs", kwargs)
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
