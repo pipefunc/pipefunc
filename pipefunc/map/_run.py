@@ -442,48 +442,58 @@ def run(
         cleanup=cleanup,
     )
     run_info.dump(run_folder)
-    outputs = OrderedDict()
+    outputs: dict[str, Result] = OrderedDict()
     store = run_info.init_store()
     _check_parallel(parallel, store)
-    if parallel and executor is None:
-        executor = ProcessPoolExecutor()
 
-    for gen in pipeline.topological_generations[1]:
-        tasks: dict[PipeFunc, Any] = {}
-
-        # First submit all calls
-        for func in gen:
-            kwargs = _func_kwargs(
-                func,
-                run_info.input_paths,
-                run_info.shapes,
-                run_info.shape_masks,
-                store,
-                run_folder,
-            )
-            if func.mapspec and func.mapspec.inputs:
-                args = _prepare_submit_map_spec(
-                    func,
-                    kwargs,
-                    run_info.shapes,
-                    run_info.shape_masks,
-                    store,
-                )
-                r = _maybe_parallel_map(args.process_index, args.missing, executor)
-                tasks[func] = r, args
-            else:
-                tasks[func] = _maybe_submit(_submit_single, executor, func, kwargs, run_folder)
-
-        # Then process the results
-        for func in gen:
-            _outputs = _process_task(func, tasks[func], run_folder, store, kwargs, executor)
-            outputs.update(_outputs)
+    with _maybe_executor(executor) as executor:
+        for gen in pipeline.topological_generations[1]:
+            _run_and_process_generation(gen, run_info, run_folder, store, outputs, executor)
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
             arr.persist()
 
     return outputs
+
+
+def _run_and_process_generation(
+    generation: list[PipeFunc],
+    run_info: RunInfo,
+    run_folder: Path,
+    store: dict[str, StorageBase],
+    outputs: dict[str, Result],
+    executor: Executor | None,
+) -> None:
+    tasks: dict[PipeFunc, Any] = {}
+
+    # First submit all calls
+    for func in generation:
+        kwargs = _func_kwargs(
+            func,
+            run_info.input_paths,
+            run_info.shapes,
+            run_info.shape_masks,
+            store,
+            run_folder,
+        )
+        if func.mapspec and func.mapspec.inputs:
+            args = _prepare_submit_map_spec(
+                func,
+                kwargs,
+                run_info.shapes,
+                run_info.shape_masks,
+                store,
+            )
+            r = _maybe_parallel_map(args.process_index, args.missing, executor)
+            tasks[func] = r, args
+        else:
+            tasks[func] = _maybe_submit(_submit_single, executor, func, kwargs, run_folder)
+
+    # Then process the results
+    for func in generation:
+        _outputs = _process_task(func, tasks[func], run_folder, store, kwargs, executor)
+        outputs.update(_outputs)
 
 
 def _process_task(
