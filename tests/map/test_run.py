@@ -70,6 +70,8 @@ def test_simple(storage, tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Pipeline is fully connected"):
         pipeline.split_disconnected()
+    assert results["y"].store is not None
+    assert isinstance(results["y"].store.parallelizable, bool)
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
