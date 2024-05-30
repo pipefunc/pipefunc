@@ -313,15 +313,10 @@ def _prepare_submit_map_spec(
     return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
 
 
-def _maybe_parallel_map(
-    func: Callable[..., Any],
-    sequence: Sequence,
-    executor: Executor | None,
-) -> Any:
+def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
     if executor is not None:
-        return executor.map(func, sequence)
-    else:  # noqa: RET505
-        return map(func, sequence)
+        return executor.map(func, seq)
+    return map(func, seq)
 
 
 def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
