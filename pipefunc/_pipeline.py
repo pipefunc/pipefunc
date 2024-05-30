@@ -1131,7 +1131,7 @@ class Pipeline:
                 # Disable saving for all functions that are being combined
                 for f_ in funcs:
                     f_.save_function = None
-                f_pipefunc.parameters = list(inputs)
+                f_pipefunc.parameters = tuple(inputs)
                 new_functions.append(f_pipefunc)
             elif f not in skip:
                 new_functions.append(f)

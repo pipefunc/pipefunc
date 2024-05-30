@@ -742,3 +742,34 @@ def test_max_single_execution_per_call() -> None:
     pipeline = Pipeline([f_c, f_d, f_e])
     pipeline("e", a=1, b=2, x=3)
     assert counter == {"f_c": 1, "f_d": 1, "f_e": 1}
+
+
+def test_setting_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 2}, renames={"a": "a1"})
+    def f(a, b=1):
+        return a + b
+
+    assert f.parameters == ("a1", "b")
+    assert f.defaults == {"b": 2}
+    with pytest.raises(ValueError, match="Unexpected keyword arguments"):
+        f(a=0)
+
+    assert f(a1=0) == 2
+
+    pipeline = Pipeline([f])
+    assert pipeline("c", a1=0) == 2
+    assert pipeline("c", a1="a1", b="b") == "a1b"
+
+    @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
+    def g(a):
+        return a
+
+    with pytest.raises(ValueError, match="Unexpected default arguments"):
+        _ = g.defaults
+
+    @pipefunc(output_name="c", defaults={"a": "a_new", "b": "b_new"}, renames={"a": "b", "b": "a"})
+    def h(a="a", b="b"):
+        return a, b
+
+    assert h() == ("b_new", "a_new")
+    assert h(a="aa", b="bb") == ("bb", "aa")
