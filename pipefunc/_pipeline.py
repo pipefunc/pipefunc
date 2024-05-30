@@ -19,7 +19,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Union
 
 import networkx as nx
 
@@ -824,11 +824,11 @@ class Pipeline:
         return leaf_nodes[0]
 
     @functools.cached_property
-    def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
+    def topological_generations(self) -> _Generations:
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return generations[0], generations[1:]
+        return _Generations(generations[0], generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
@@ -1274,6 +1274,11 @@ class Pipeline:
             for axis in func.mapspec.output_indices
             if self._axis_in_root_arg(axis, output_name)
         }
+
+
+class _Generations(NamedTuple):
+    root_args: list[str]
+    function_lists: list[list[PipeFunc]]
 
 
 def _update_all_results(
