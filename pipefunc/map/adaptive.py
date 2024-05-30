@@ -12,7 +12,6 @@ import adaptive
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
-    RunInfo,
     _execute_single,
     _func_kwargs,
     _maybe_load_single_output,
@@ -20,6 +19,7 @@ from pipefunc.map._run import (
     _run_iteration_and_process,
     run,
 )
+from pipefunc.map._run_info import RunInfo
 
 if TYPE_CHECKING:
     import sys
