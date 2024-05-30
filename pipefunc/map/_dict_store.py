@@ -146,10 +146,9 @@ class DictStore(StorageBase):
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
-        mask: np.ndarray = np.ones(self.shape, dtype=bool)
+        mask: np.ndarray = np.full(self.shape, fill_value=True, dtype=bool)
         for external_index in self._dict:
             mask[external_index] = False
-        print(mask)
         return np.ma.MaskedArray(mask, mask=mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:

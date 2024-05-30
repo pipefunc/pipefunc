@@ -489,17 +489,14 @@ def test_list_or_arrays(array_type) -> None:
 def test_compare_equal(tmp_path: Path) -> None:
     external_shape = (2, 3)
     internal_shape = (4, 5)
-    zarr_path = tmp_path / "zarr"
-    zarr_path.mkdir()
-    filearray_path = tmp_path / "filearray"
     z_arr = ZarrFileArray(
-        zarr_path,
+        tmp_path / "zarr",
         external_shape,
         internal_shape,
         shape_mask=(True, False, True, False),
     )
     f_arr = FileArray(
-        filearray_path,
+        tmp_path / "filearray",
         external_shape,
         internal_shape,
         shape_mask=(True, False, True, False),
@@ -544,15 +541,16 @@ def test_compare_equal(tmp_path: Path) -> None:
         d_arr.get_from_index(1_000_000)
     with pytest.raises(FileNotFoundError, match="No such file or directory"):
         f_arr.get_from_index(1_000_000)
+
     # Now with a partially filled array and compare masks
     z_arr = ZarrFileArray(
-        zarr_path,
+        tmp_path / "zarr2",
         external_shape,
         internal_shape,
         shape_mask=(True, False, True, False),
     )
     f_arr = FileArray(
-        filearray_path,
+        tmp_path / "filearray2",
         external_shape,
         internal_shape,
         shape_mask=(True, False, True, False),
@@ -572,6 +570,6 @@ def test_compare_equal(tmp_path: Path) -> None:
             arr.dump(key=index, value=x)
     base_arr = arrs[0]
     for arr in arrs[1:]:
-        assert np.array_equal(base_arr.mask, arr.mask), arr
+        assert np.ma.allequal(base_arr.mask, arr.mask), arr
         assert np.array_equal(base_arr.mask_linear(), arr.mask_linear()), arr
-        assert np.array_equal(base_arr.to_array(), arr.to_array()), arr
+        assert np.ma.allequal(base_arr.to_array(), arr.to_array()), arr
