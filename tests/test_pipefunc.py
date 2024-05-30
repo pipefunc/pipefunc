@@ -758,6 +758,7 @@ def test_setting_defaults() -> None:
 
     pipeline = Pipeline([f])
     assert pipeline("c", a1=0) == 2
+    assert pipeline("c", a1="a1", b="b") == "a1b"
 
     @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
     def g(a):
