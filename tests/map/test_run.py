@@ -10,9 +10,9 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import RunInfo, load_outputs, load_xarray_dataset, map_shapes, run
+from pipefunc.map._run import load_outputs, load_xarray_dataset, run
+from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import storage_registry
-from pipefunc.map.zarr import ZarrFileArray  # noqa: F401, RUF100
 
 if TYPE_CHECKING:
     from pathlib import Path
