@@ -65,7 +65,6 @@ class DictStore(StorageBase):
                 len(range(*k.indices(s))) if isinstance(k, slice) else 1
                 for s, k in zip(self.full_shape, key)
             )
-            print(shape)
             data: np.ndarray = np.empty(shape, dtype=object)
             for i, index in enumerate(
                 itertools.product(*self._slice_indices(key, self.full_shape)),
@@ -84,7 +83,6 @@ class DictStore(StorageBase):
                         value = self._dict[external_key]
                     else:
                         value = self._internal_mask()
-                print(f"j: {j}, value: {value}")
                 data[j] = value
             new_shape = tuple(
                 len(range(*k.indices(s)))
@@ -118,7 +116,7 @@ class DictStore(StorageBase):
         """Return the array as a NumPy masked array."""
         if splat_internal is None:
             splat_internal = bool(self.internal_shape)
-        if not splat_internal or not self.internal_shape:
+        if not splat_internal:
             data: np.ndarray = np.empty(self.shape, dtype=object)
             mask: np.ndarray = np.ones(self.shape, dtype=bool)
             for external_index, value in self._dict.items():
@@ -126,7 +124,10 @@ class DictStore(StorageBase):
                 mask[external_index] = False
             return np.ma.masked_array(data, mask, dtype=object)
         assert splat_internal
-        assert self.internal_shape
+        if not self.internal_shape:
+            msg = "internal_shape must be provided if splat_internal is True"
+            raise ValueError(msg)
+
         data = np.ma.empty(self.full_shape, dtype=object)
         mask = np.ones(self.full_shape, dtype=bool)
         for external_index, value in self._dict.items():
