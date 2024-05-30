@@ -200,7 +200,7 @@ class FileArray(StorageBase):
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
             mask = self.mask_linear()
-            return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
+            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.shape)
 
         if not self.internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
@@ -224,7 +224,7 @@ class FileArray(StorageBase):
                     full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
-        return np.ma.array(arr, mask=full_mask, dtype=object)
+        return np.ma.MaskedArray(arr, mask=full_mask, dtype=object)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
@@ -238,7 +238,7 @@ class FileArray(StorageBase):
         masking out missing data.
         """
         mask = self.mask_linear()
-        return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
+        return np.ma.MaskedArray(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the file associated with 'key'.

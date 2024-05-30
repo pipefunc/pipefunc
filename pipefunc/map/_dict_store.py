@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from pipefunc._utils import dump, load
 from pipefunc.map._storage_base import (
     StorageBase,
     _normalize_key,
@@ -40,6 +41,7 @@ class DictStore(StorageBase):
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
         self._dict: dict[tuple[int, ...], Any] = {}
+        self.load()
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
@@ -99,7 +101,8 @@ class DictStore(StorageBase):
         else:
             return self._internal_mask()
         if internal_key:
-            return data[internal_key]
+            arr = np.asarray(data)
+            return arr[internal_key]
         return data
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
@@ -117,19 +120,19 @@ class DictStore(StorageBase):
         if splat_internal is None:
             splat_internal = bool(self.internal_shape)
         if not splat_internal:
-            data: np.ndarray = np.empty(self.shape, dtype=object)
-            mask: np.ndarray = np.ones(self.shape, dtype=bool)
+            data: np.ndarray = _masked_empty(self.shape)
+            mask: np.ndarray = np.full(self.shape, fill_value=True, dtype=bool)
             for external_index, value in self._dict.items():
                 data[external_index] = value
                 mask[external_index] = False
-            return np.ma.masked_array(data, mask, dtype=object)
+            return np.ma.MaskedArray(data, mask=mask, dtype=object)
         assert splat_internal
         if not self.internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
-        data = np.ma.empty(self.full_shape, dtype=object)
-        mask = np.ones(self.full_shape, dtype=bool)
+        data = _masked_empty(self.full_shape)
+        mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
             full_index = _select_by_mask(
                 self.shape_mask,
@@ -138,7 +141,7 @@ class DictStore(StorageBase):
             )
             data[full_index] = value
             mask[full_index] = False
-        return np.ma.masked_array(data, mask, dtype=object)
+        return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
@@ -146,18 +149,19 @@ class DictStore(StorageBase):
         mask: np.ndarray = np.ones(self.shape, dtype=bool)
         for external_index in self._dict:
             mask[external_index] = False
-        return np.ma.masked_array(mask, mask, dtype=bool)
+        print(mask)
+        return np.ma.MaskedArray(mask, mask=mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return list(self.mask[:].flat)
+        return list(self.mask.data[:].flat)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the location associated with 'key'.
 
         Examples
         --------
-        >>> arr = ZarrFileArray(...)
+        >>> arr = DictStore(...)
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
@@ -173,6 +177,34 @@ class DictStore(StorageBase):
             return
 
         self._dict[key] = value  # type: ignore[index]
+
+    def _path(self) -> Path:
+        assert self.folder is not None
+        return self.folder / "dict_store.cloudpickle"
+
+    def persist(self) -> None:
+        """Persist the dict storage to disk."""
+        if self.folder is None:  # pragma: no cover
+            return
+        path = self._path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        dump(self._dict, path)
+
+    def load(self) -> None:
+        """Load the dict storage from disk."""
+        if self.folder is None:  # pragma: no cover
+            return
+        if not self.folder.exists():
+            return
+        self._dict = load(self._path())
+
+
+def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
+    # This is a workaround for the fact that setting `x[:] = np.ma.masked`
+    # sets the elements to 0.0.
+    x: np.ndarray = np.empty((1,), dtype=object)
+    x[0] = np.ma.masked
+    return np.tile(x, shape)
 
 
 register_storage(DictStore)

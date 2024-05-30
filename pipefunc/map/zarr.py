@@ -152,13 +152,13 @@ class ZarrFileArray(StorageBase):
         )
         mask = np.tile(mask[slc], tile_shape)
 
-        return np.ma.array(self.array[:], mask=mask, dtype=object)
+        return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
         mask = self._mask[:]
-        return np.ma.array(mask, dtype=bool)
+        return np.ma.MaskedArray(mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""

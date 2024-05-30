@@ -510,7 +510,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         internal_shape,
         shape_mask=(True, False, True, False),
     )
-    arrs = [z_arr, f_arr, d_arr]
+    arrs = [f_arr, z_arr, d_arr]
     for index in _iterate_shape_indices(external_shape):
         x = np.random.rand(*internal_shape)  # noqa: NPY002
         for arr in arrs:
@@ -563,7 +563,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         internal_shape,
         shape_mask=(True, False, True, False),
     )
-    arrs = [z_arr, f_arr, dict_arr]
+    arrs = [f_arr, z_arr, dict_arr]
     for index in _iterate_shape_indices(external_shape):
         if np.random.rand() < 0.5:  # noqa: NPY002
             continue
@@ -572,6 +572,6 @@ def test_compare_equal(tmp_path: Path) -> None:
             arr.dump(key=index, value=x)
     base_arr = arrs[0]
     for arr in arrs[1:]:
-        assert np.array_equal(base_arr.mask, arr.mask)
-        assert np.array_equal(base_arr.mask_linear(), arr.mask_linear())
-        assert np.array_equal(base_arr.to_array(), arr.to_array())
+        assert np.array_equal(base_arr.mask, arr.mask), arr
+        assert np.array_equal(base_arr.mask_linear(), arr.mask_linear()), arr
+        assert np.array_equal(base_arr.to_array(), arr.to_array()), arr
