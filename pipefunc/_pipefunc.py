@@ -157,12 +157,10 @@ class PipeFunc(Generic[T]):
         defaults = {}
         for original_name, v in parameters.items():
             new_name = self.renames.get(original_name, original_name)
-            print(f"{original_name=}, new_name: {new_name}")
             if original_name in self._defaults:
                 defaults[new_name] = self._defaults[original_name]
             elif v.default is not inspect.Parameter.empty:
                 defaults[new_name] = v.default
-        print(f"{defaults=}")
         return defaults
 
     def copy(self) -> PipeFunc:
