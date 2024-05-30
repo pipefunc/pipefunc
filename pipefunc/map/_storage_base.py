@@ -92,6 +92,10 @@ class StorageBase(abc.ABC):
     @abc.abstractmethod
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
+    @property
+    @abc.abstractmethod
+    def parallelizable(self) -> bool: ...
+
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""

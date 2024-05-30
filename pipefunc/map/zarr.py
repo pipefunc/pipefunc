@@ -212,6 +212,11 @@ class ZarrFileArray(StorageBase):
                 slice_indices.append(range(k, k + 1))
         return slice_indices
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
+
 
 class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
@@ -220,7 +225,7 @@ class _SharedDictStore(zarr.storage.KVStore):
         self,
         shared_dict: multiprocessing.managers.DictProxy | None = None,
     ) -> None:
-        """Initialize the _SharedDictArray.
+        """Initialize the _SharedDictStore.
 
         Parameters
         ----------
@@ -283,6 +288,11 @@ class ZarrMemory(ZarrFileArray):
             return
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return False
+
 
 class ZarrSharedMemory(ZarrMemory):
     """Array interface to a shared memory Zarr store."""
@@ -310,6 +320,11 @@ class ZarrSharedMemory(ZarrMemory):
             store=store,
             object_codec=object_codec,
         )
+
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
 
 
 class CloudPickleCodec(Codec):
