@@ -231,7 +231,7 @@ class SharedMemoryDictArray(DictArray):
         *,
         mapping: DictProxy[tuple[int, ...], Any] | None = None,
     ) -> None:
-        """Initialize the ZarrMemory."""
+        """Initialize the SharedMemoryDictArray."""
         if mapping is None:
             manager = multiprocessing.Manager()
             mapping = manager.dict()

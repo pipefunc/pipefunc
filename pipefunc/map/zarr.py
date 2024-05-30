@@ -254,7 +254,7 @@ class ZarrMemoryArray(ZarrFileArray):
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
     ) -> None:
-        """Initialize the ZarrMemory."""
+        """Initialize the ZarrMemoryArray."""
         if store is None:
             store = zarr.MemoryStore()
         super().__init__(
@@ -309,7 +309,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
     ) -> None:
-        """Initialize the ZarrMemory."""
+        """Initialize the ZarrSharedMemoryArray."""
         if store is None:
             store = _SharedDictStore()
         super().__init__(
