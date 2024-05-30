@@ -161,6 +161,7 @@ class DictStore(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        key = _normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key, self.shape)):
                 if self.internal_shape:
