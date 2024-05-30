@@ -12,11 +12,11 @@ import adaptive
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
-    _execute_single,
     _func_kwargs,
     _maybe_load_single_output,
     _MockPipeline,
     _run_iteration_and_process,
+    _submit_single,
     run,
 )
 from pipefunc.map._run_info import RunInfo
@@ -150,7 +150,7 @@ def _execute_iteration_in_single(
         store,
         run_folder,
     )
-    result = _execute_single(func, kwargs, run_folder)
+    result = _submit_single(func, kwargs, run_folder)
     return result if return_output else None
 
 

@@ -7,7 +7,7 @@ from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generator, NamedTuple, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Generator, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -281,15 +281,23 @@ def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, Non
         yield executor
 
 
-def _execute_map_spec(
+class _MapSpecArgs(NamedTuple):
+    process_index: functools.partial[list[Any]]
+    existing: list[int]
+    missing: list[int]
+    result_arrays: list[np.ndarray]
+    shape: tuple[int, ...]
+    mask: tuple[bool, ...]
+    file_arrays: list[StorageBase]
+
+
+def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
-    parallel: bool,  # noqa: FBT001
-    executor: Executor | None,
-) -> np.ndarray | list[np.ndarray]:
+) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
@@ -304,22 +312,18 @@ def _execute_map_spec(
         file_arrays=file_arrays,
     )
     existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
-    n = len(missing)
-    if parallel and n > 1:
-        with _maybe_executor(executor) as ex:
-            outputs_list = list(ex.map(process_index, missing))
-    else:
-        outputs_list = [process_index(index) for index in missing]
+    return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
 
-    for index, outputs in zip(missing, outputs_list):
-        _update_result_array(result_arrays, index, outputs, shape, mask)
 
-    for index in existing:
-        outputs = [file_array.get_from_index(index) for file_array in file_arrays]
-        _update_result_array(result_arrays, index, outputs, shape, mask)
-
-    result_arrays = [x.reshape(shape) for x in result_arrays]
-    return result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
+def _maybe_parallel_map(
+    func: Callable[..., Any],
+    sequence: Sequence,
+    executor: Executor | None,
+) -> Any:
+    if executor is not None:
+        return executor.map(func, sequence)
+    else:  # noqa: RET505
+        return map(func, sequence)
 
 
 def _maybe_load_single_output(
@@ -343,7 +347,7 @@ def _maybe_load_single_output(
     return None, False
 
 
-def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+def _submit_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
     # Load the output if it exists
     output, exists = _maybe_load_single_output(func, run_folder)
     if exists:
@@ -352,11 +356,10 @@ def _execute_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) ->
     # Otherwise, run the function
     _load_file_array(kwargs)
     try:
-        output = func(**kwargs)
+        return func(**kwargs)
     except Exception as e:
         handle_error(e, func, kwargs)
         raise  # handle_error raises but mypy doesn't know that
-    return _dump_output(func, output, run_folder)
 
 
 def _maybe_load_file_array(x: Any) -> Any:
@@ -376,60 +379,6 @@ class Result(NamedTuple):
     output_name: str
     output: Any
     store: StorageBase | None
-
-
-def _run_function(
-    func: PipeFunc,
-    run_folder: Path,
-    store: dict[str, StorageBase],
-    parallel: bool,  # noqa: FBT001
-    executor: Executor | None,
-) -> dict[str, Result]:
-    run_info = RunInfo.load(run_folder)
-    kwargs = _func_kwargs(
-        func,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        store,
-        run_folder,
-    )
-    if func.mapspec and func.mapspec.inputs:
-        output = _execute_map_spec(
-            func,
-            kwargs,
-            run_info.shapes,
-            run_info.shape_masks,
-            store,
-            parallel,
-            executor,
-        )
-    else:
-        output = _execute_single(func, kwargs, run_folder)
-
-    # Note that the kwargs still contain the StorageBase objects if _execute_map_spec
-    # was used.
-    if isinstance(func.output_name, str):
-        return {
-            func.output_name: Result(
-                function=func.__name__,
-                kwargs=kwargs,
-                output_name=func.output_name,
-                output=output,
-                store=store.get(func.output_name),
-            ),
-        }
-
-    return {
-        output_name: Result(
-            function=func.__name__,
-            kwargs=kwargs,
-            output_name=output_name,
-            output=_output,
-            store=store.get(output_name),
-        )
-        for output_name, _output in zip(func.output_name, output)
-    }
 
 
 def _ensure_run_folder(run_folder: str | Path | None) -> Path:
@@ -497,10 +446,38 @@ def run(
     outputs = OrderedDict()
     store = run_info.init_store()
     _check_parallel(parallel, store)
+    if parallel and executor is None:
+        executor = ProcessPoolExecutor()
     for gen in pipeline.topological_generations[1]:
+        tasks: dict[PipeFunc, Any] = {}
         # These evaluations *can* happen in parallel
         for func in gen:
-            _outputs = _run_function(func, run_folder, store, parallel, executor)
+            kwargs = _func_kwargs(
+                func,
+                run_info.input_paths,
+                run_info.shapes,
+                run_info.shape_masks,
+                store,
+                run_folder,
+            )
+            if func.mapspec and func.mapspec.inputs:
+                args = _prepare_submit_map_spec(
+                    func,
+                    kwargs,
+                    run_info.shapes,
+                    run_info.shape_masks,
+                    store,
+                )
+                r = _maybe_parallel_map(args.process_index, args.missing, executor)
+                tasks[func] = r, args
+            else:  # noqa: PLR5501
+                if executor:
+                    tasks[func] = executor.submit(_submit_single, func, kwargs, run_folder)
+                else:
+                    tasks[func] = _submit_single(func, kwargs, run_folder)
+
+        for func in gen:
+            _outputs = _process_task(func, tasks[func], executor, run_folder, store, kwargs)
             outputs.update(_outputs)
 
     if persist_memory:  # Only relevant for memory based storage
@@ -508,6 +485,55 @@ def run(
             arr.persist()
 
     return outputs
+
+
+def _process_task(
+    func: PipeFunc,
+    task: Any,
+    executor: Executor | None,
+    run_folder: Path,
+    store: dict[str, StorageBase],
+    kwargs: dict[str, Any],
+) -> dict[str, Result]:
+    if func.mapspec and func.mapspec.inputs:
+        output_list, args = task
+        outputs_list = list(output_list)
+
+        for index, outputs in zip(args.missing, outputs_list):
+            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+
+        for index in args.existing:
+            outputs = [file_array.get_from_index(index) for file_array in args.file_arrays]
+            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+
+        result_arrays = [x.reshape(args.shape) for x in args.result_arrays]
+        output = result_arrays if isinstance(func.output_name, tuple) else result_arrays[0]
+    else:
+        output = task.result() if executor else task
+        _dump_output(func, output, run_folder)
+
+    # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
+    # was used.
+    if isinstance(func.output_name, str):
+        return {
+            func.output_name: Result(
+                function=func.__name__,
+                kwargs=kwargs,
+                output_name=func.output_name,
+                output=output,
+                store=store.get(func.output_name),
+            ),
+        }
+    return {
+        output_name: Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=output_name,
+            output=_output,
+            store=store.get(output_name),
+        )
+        for output_name, _output in zip(func.output_name, output)
+    }
 
 
 def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
