@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import itertools
+import multiprocessing
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, MutableMapping
 
 import numpy as np
 
@@ -15,6 +16,9 @@ from pipefunc.map._storage_base import (
     _select_by_mask,
     register_storage,
 )
+
+if TYPE_CHECKING:
+    from multiprocessing.managers import DictProxy
 
 
 class DictArray(StorageBase):
@@ -28,6 +32,8 @@ class DictArray(StorageBase):
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        *,
+        mapping: MutableMapping[tuple[int, ...], Any] | None = None,
     ) -> None:
         """Create a `numpy.ndarray` backed by a `dict`."""
         if internal_shape and shape_mask is None:
@@ -40,7 +46,7 @@ class DictArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
-        self._dict: dict[tuple[int, ...], Any] = {}
+        self._dict: dict[tuple[int, ...], Any] = mapping or {}  # type: ignore[assignment]
         self.load()
 
     def get_from_index(self, index: int) -> Any:
@@ -197,6 +203,11 @@ class DictArray(StorageBase):
             return
         self._dict = load(self._path())
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return False
+
 
 def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
     # This is a workaround for the fact that setting `x[:] = np.ma.masked`
@@ -206,4 +217,37 @@ def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
     return np.tile(x, shape)
 
 
+class SharedMemoryDictArray(DictArray):
+    """Array interface to a shared memory dict store."""
+
+    storage_id = "shared_memory_dict"
+
+    def __init__(
+        self,
+        folder: str | Path | None,
+        shape: tuple[int, ...],
+        internal_shape: tuple[int, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None,
+        *,
+        mapping: DictProxy[tuple[int, ...], Any] | None = None,
+    ) -> None:
+        """Initialize the ZarrMemory."""
+        if mapping is None:
+            manager = multiprocessing.Manager()
+            mapping = manager.dict()
+        super().__init__(
+            folder=folder,
+            shape=shape,
+            internal_shape=internal_shape,
+            shape_mask=shape_mask,
+            mapping=mapping,
+        )
+
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
+
+
 register_storage(DictArray)
+register_storage(SharedMemoryDictArray)

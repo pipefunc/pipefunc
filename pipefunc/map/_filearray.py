@@ -258,6 +258,11 @@ class FileArray(StorageBase):
             file = self._key_to_file(index)
             dump(value, file)
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
+
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:

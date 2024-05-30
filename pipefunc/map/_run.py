@@ -728,12 +728,6 @@ def run(
 
     """
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    if parallel and storage == "zarr_memory":
-        msg = (
-            "Parallel execution is not supported with `zarr_memory` storage."
-            " Use a file based storage or `zarr_shared_memory`."
-        )
-        raise ValueError(msg)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -746,6 +740,7 @@ def run(
     run_info.dump(run_folder)
     outputs = OrderedDict()
     store = run_info.init_store()
+    _check_parallel(parallel, store)
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
@@ -757,6 +752,19 @@ def run(
             arr.persist()
 
     return outputs
+
+
+def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
+    if not parallel:
+        return
+    # Assumes all storage classes are the same! Might change in the future.
+    storage = next(iter(store.values()))
+    if not storage.parallelizable:
+        msg = (
+            f"Parallel execution is not supported with `{storage.storage_id}` storage."
+            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+        )
+        raise ValueError(msg)
 
 
 def _init_storage(
