@@ -740,12 +740,7 @@ def run(
     run_info.dump(run_folder)
     outputs = OrderedDict()
     store = run_info.init_store()
-    if parallel and _allows_parallel(store):
-        msg = (
-            f"Parallel execution is not supported with `{storage}` storage."
-            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
-        )
-        raise ValueError(msg)
+    _check_parallel(parallel, store)
     for gen in pipeline.topological_generations[1]:
         # These evaluations *can* happen in parallel
         for func in gen:
@@ -759,10 +754,17 @@ def run(
     return outputs
 
 
-def _allows_parallel(store: dict[str, StorageBase]) -> bool:
+def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
+    if not parallel:
+        return
     # Assumes all storage classes are the same! Might change in the future.
     storage = next(iter(store.values()))
-    return storage.parallelizable
+    if not storage.parallelizable:
+        msg = (
+            f"Parallel execution is not supported with `{storage.storage_id}` storage."
+            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+        )
+        raise ValueError(msg)
 
 
 def _init_storage(

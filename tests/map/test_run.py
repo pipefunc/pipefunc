@@ -955,11 +955,13 @@ def test_storage_options():
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
         Pipeline([lambda x: x]).map({}, None, storage="invalid")
 
+    pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
+    inputs = {"x": [1, 2, 3]}
     with pytest.raises(
         ValueError,
         match="Parallel execution is not supported with `zarr_memory` storage",
     ):
-        Pipeline([lambda x: x]).map({}, None, storage="zarr_memory", parallel=True)
+        pipeline.map(inputs, None, storage="zarr_memory", parallel=True)
 
 
 def test_custom_executor():
