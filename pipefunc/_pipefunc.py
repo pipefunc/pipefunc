@@ -13,6 +13,7 @@ the resource usage of the pipeline functions.
 from __future__ import annotations
 
 import contextlib
+import datetime
 import functools
 import inspect
 import os
@@ -204,8 +205,9 @@ class PipeFunc(Generic[T]):
 
         if self.debug:
             func_str = format_function_call(self.func.__name__, (), kwargs)
+            now = datetime.datetime.now()  # noqa: DTZ005
             msg = (
-                f"Function returning '{self.output_name}' was invoked"
+                f"{now} - Function returning '{self.output_name}' was invoked"
                 f" as `{func_str}` and returned `{result}`."
             )
             if self.profiling_stats is not None:
