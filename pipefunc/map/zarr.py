@@ -213,7 +213,7 @@ class ZarrFileArray(StorageBase):
         return slice_indices
 
 
-class _SharedDictArray(zarr.storage.KVStore):
+class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
     def __init__(
@@ -301,7 +301,7 @@ class ZarrSharedMemory(ZarrMemory):
     ) -> None:
         """Initialize the ZarrMemory."""
         if store is None:
-            store = _SharedDictArray()
+            store = _SharedDictStore()
         super().__init__(
             folder=folder,
             shape=shape,
