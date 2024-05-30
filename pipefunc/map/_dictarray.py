@@ -134,7 +134,6 @@ class DictArray(StorageBase):
                 data[external_index] = value
                 mask[external_index] = False
             return np.ma.MaskedArray(data, mask=mask, dtype=object)
-        assert splat_internal
         if not self.internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
