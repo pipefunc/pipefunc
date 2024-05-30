@@ -53,20 +53,26 @@ class DictStore(StorageBase):
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
+        print()
         assert len(key) == len(self.full_shape)
         if any(isinstance(k, slice) for k in key):
             shape = tuple(
                 len(range(*k.indices(s))) if isinstance(k, slice) else 1
                 for s, k in zip(self.full_shape, key)
             )
+            print(shape)
             data: np.ndarray = np.empty(shape, dtype=object)
             for index in itertools.product(*self._slice_indices(key, self.full_shape)):
-                j = tuple(i if isinstance(k, slice) else 0 for i, k in zip(index, key))
+                print(f"index: {index}")
+                j = tuple(
+                    i // (k.step or 1) if isinstance(k, slice) else 0 for i, k in zip(index, key)
+                )
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
                 if self.internal_shape:
                     internal_key = tuple(x for x, m in zip(index, self.shape_mask) if not m)
                     if external_key in self._dict:
-                        value = self._dict[external_key][internal_key]
+                        arr = np.asarray(self._dict[external_key])
+                        value = arr[internal_key]
                     else:
                         value = self._internal_mask()[internal_key]
                 else:  # noqa: PLR5501
@@ -74,6 +80,7 @@ class DictStore(StorageBase):
                         value = self._dict[external_key]
                     else:
                         value = self._internal_mask()
+                print(f"j: {j}, value: {value}")
                 data[j] = value
             new_shape = tuple(
                 len(range(*k.indices(s)))
