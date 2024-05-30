@@ -17,7 +17,7 @@ from pipefunc.map._mapspec import (
 )
 
 
-def testshape_to_strides():
+def test_shape_to_strides():
     assert shape_to_strides((3, 4, 5)) == (20, 5, 1)
     assert shape_to_strides(()) == ()
     assert shape_to_strides((1,)) == (1,)
@@ -214,8 +214,8 @@ def test_expected_mask():
 
     # Test with masked arrays
     inputs = {
-        "a": np.ma.array([1, 2, 3], mask=[False, True, False]),
-        "b": np.ma.array(
+        "a": np.ma.MaskedArray([1, 2, 3], mask=[False, True, False]),
+        "b": np.ma.MaskedArray(
             [[4, 5], [6, 7], [8, 9]],
             mask=[[False, False], [True, True], [False, False]],
         ),
@@ -242,7 +242,7 @@ def test_expected_mask():
 
 def test_array_mask():
     # Test with masked array
-    arr = np.ma.array([1, 2, 3], mask=[False, True, False])
+    arr = np.ma.MaskedArray([1, 2, 3], mask=[False, True, False])
     assert np.array_equal(array_mask(arr), [False, True, False])
 
     # Test with unmasked array

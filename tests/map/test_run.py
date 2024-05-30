@@ -68,6 +68,11 @@ def test_simple(storage, tmp_path: Path) -> None:
     run_info2 = RunInfo.load(tmp_path)
     assert run_info2 == run_info
 
+    with pytest.raises(ValueError, match="Pipeline is fully connected"):
+        pipeline.split_disconnected()
+    assert results["y"].store is not None
+    assert isinstance(results["y"].store.parallelizable, bool)
+
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
@@ -655,6 +660,8 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     assert results["three"].output.tolist() == [[4.0, 4.0], [4.0, 4.0], [4.0, 4.0]]
     load_xarray_dataset(run_folder=tmp_path)
 
+    assert pipeline.independent_axes_in_mapspecs("three") == {"k", "l"}
+
 
 def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     @pipefunc(output_name="x", mapspec="... -> x[i]")
@@ -691,6 +698,48 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     deps = trace_dependencies(pipeline.mapspecs())  # type: ignore[arg-type]
     assert deps == {"y": {"x": ("i",), "z": ("k",)}, "sum": {"z": ("k",)}}
     load_xarray_dataset(run_folder=tmp_path)
+
+
+def test_disconnected_independent_axes() -> None:
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int):
+        return a + b
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def g(x, y):
+        return x + y
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
+    assert pipeline.independent_axes_in_mapspecs("c") == {"i"}
+
+    pipeline1, pipeline2 = pipeline.split_disconnected()
+    assert len(pipeline1.functions) == 1
+    assert len(pipeline2.functions) == 1
+
+
+def test_reusing_axis_names_and_double_map_reduce(tmp_path: Path) -> None:
+    pipeline = Pipeline(
+        [
+            PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]"),
+            PipeFunc(lambda y, z: y + z, "yz", mapspec="y[i] -> yz[i]"),
+            PipeFunc(lambda yz: sum(yz), "sum_"),  # first map-reduce
+            PipeFunc(lambda sum_: [sum_, sum_], "duplication", mapspec="... -> duplication[i]"),
+            PipeFunc(lambda duplication: sum(duplication), "sum_final"),  # second map-reduce
+        ],
+    )
+    internal_shapes = {"duplication": (2,)}
+    results = pipeline.map(
+        {"x": [1, 2, 3], "z": 1},
+        run_folder=tmp_path,
+        parallel=False,
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+    )
+    assert results["y"].output.tolist() == [1, 2, 3]
+    assert results["yz"].output.tolist() == [2, 3, 4]
+    assert results["sum_"].output == 9
+    assert results["sum_final"].output == 18
+    assert pipeline.independent_axes_in_mapspecs("sum_final") == set()
 
 
 def test_from_step_2_dim_array(tmp_path: Path) -> None:
@@ -908,11 +957,13 @@ def test_storage_options():
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
         Pipeline([lambda x: x]).map({}, None, storage="invalid")
 
+    pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
+    inputs = {"x": [1, 2, 3]}
     with pytest.raises(
         ValueError,
         match="Parallel execution is not supported with `zarr_memory` storage",
     ):
-        Pipeline([lambda x: x]).map({}, None, storage="zarr_memory", parallel=True)
+        pipeline.map(inputs, None, storage="zarr_memory", parallel=True)
 
 
 def test_custom_executor():
@@ -923,3 +974,39 @@ def test_custom_executor():
     pipeline = Pipeline([f])
     results = pipeline.map({"x": [1, 2]}, None, executor=ThreadPoolExecutor())
     assert results["y"].output.tolist() == [1, 2]
+
+
+def test_independent_axes_1():
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int):
+        return a + b
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i, k]")
+    def g(x, y):
+        return x + y
+
+    output_name = "c"
+    self = Pipeline([f, g])
+    assert self.independent_axes_in_mapspecs(output_name) == {"i"}
+
+
+def test_independent_axes_2():
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="z[i], y[i] -> r[i]")
+    def g(y, z):
+        return y + z
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
+    internal_shapes = {"y": (3,)}
+    r = pipeline.map(inputs, None, internal_shapes=internal_shapes, parallel=False)
+    assert r["y"].output == [1, 2, 3]
+    assert r["r"].output.tolist() == [4, 6, 8]
+    assert pipeline.independent_axes_in_mapspecs("r") == set()
+
+    pipeline.add_mapspec_axis("x", axis="k")
+    assert pipeline.mapspecs_as_strings() == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
+    assert pipeline.independent_axes_in_mapspecs("r") == {"k"}

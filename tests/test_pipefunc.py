@@ -391,6 +391,7 @@ def test_tuple_outputs(tmp_path: Path):
     assert pipeline.cache.cache[key].evaluate() == (6, 1)
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).evaluate().g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
+    assert pipeline.func_dependents("c") == [("d", "e"), ("g", "h"), "i"]
 
     assert (
         pipeline.func_dependencies("g")
@@ -676,9 +677,9 @@ def test_pickle_pipefunc():
 
 
 def test_independent_axes_in_mapspecs_with_disconnected_chains():
-    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    @pipefunc(output_name=("c", "d"), mapspec="a[i] -> c[i], d[i]")
     def f(a: int, b: int):
-        return a + b
+        return a + b, 1
 
     @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
     def g(x, y):
@@ -686,19 +687,34 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
 
     pipeline = Pipeline([f, g])
     assert pipeline.mapspecs_as_strings() == [
-        "a[i] -> c[i]",
+        "a[i] -> c[i], d[i]",
         "x[i], y[i] -> z[i]",
     ]
+    assert pipeline.independent_axes_in_mapspecs("c") == {"i"}
+    assert pipeline.independent_axes_in_mapspecs("d") == {"i"}
+    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i"}
+    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
 
     pipeline.add_mapspec_axis("b", axis="j")
-    assert pipeline.mapspecs_as_strings() == ["a[i], b[j] -> c[i, j]", "x[i], y[i] -> z[i]"]
+    assert pipeline.mapspecs_as_strings() == [
+        "a[i], b[j] -> c[i, j], d[i, j]",
+        "x[i], y[i] -> z[i]",
+    ]
+    assert pipeline.independent_axes_in_mapspecs("c") == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs("d") == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
 
     pipeline.add_mapspec_axis("x", axis="j")
     pipeline.add_mapspec_axis("y", axis="j")
     assert pipeline.mapspecs_as_strings() == [
-        "a[i], b[j] -> c[i, j]",
+        "a[i], b[j] -> c[i, j], d[i, j]",
         "x[i, j], y[i, j] -> z[i, j]",
     ]
+    assert pipeline.independent_axes_in_mapspecs("c") == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs("d") == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
+    assert pipeline.independent_axes_in_mapspecs("z") == {"i", "j"}
 
 
 def test_max_single_execution_per_call() -> None:

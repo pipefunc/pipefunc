@@ -62,7 +62,7 @@ dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
-repository = "https://github.com/basnijholt/pipefunc"
+repository = "https://github.com/pipefunc/pipefunc"
 
 [project.readme]
 content-type = "text/markdown"

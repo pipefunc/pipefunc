@@ -5,12 +5,12 @@
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![pytest](https://github.com/basnijholt/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/basnijholt/pipefunc/actions/workflows/pytest.yml)
+[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
-[![Coverage](https://img.shields.io/codecov/c/github/basnijholt/pipefunc)](https://codecov.io/gh/basnijholt/pipefunc)
+[![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
 [![Documentation](https://readthedocs.org/projects/pipefunc/badge/?version=latest)](https://pipefunc.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://img.shields.io/conda/dn/conda-forge/pipefunc.svg)](https://anaconda.org/conda-forge/pipefunc)
-[![GitHub](https://img.shields.io/github/stars/basnijholt/pipefunc.svg?style=social)](https://github.com/basnijholt/pipefunc/stargazers)
+[![GitHub](https://img.shields.io/github/stars/pipefunc/pipefunc.svg?style=social)](https://github.com/pipefunc/pipefunc/stargazers)
 
 
 ![](https://user-images.githubusercontent.com/6897215/253785642-cf2a6941-2ea6-41b0-8225-b3e52e94c4de.png)
@@ -130,7 +130,7 @@ Here the `mapspec` argument is used to specify the mapping between the inputs an
 
 ## :notebook: Jupyter Notebook Example
 
-See the detailed usage example and more in our [example.ipynb](https://github.com/basnijholt/pipefunc/blob/main/example.ipynb).
+See the detailed usage example and more in our [example.ipynb](https://github.com/pipefunc/pipefunc/blob/main/example.ipynb).
 
 ## :computer: Installation
 
@@ -149,13 +149,13 @@ pip install "pipefunc[plotting]"
 or install **main** with:
 
 ```bash
-pip install -U https://github.com/basnijholt/pipefunc/archive/main.zip
+pip install -U https://github.com/pipefunc/pipefunc/archive/main.zip
 ```
 
 or clone the repository and do a dev install (recommended for dev):
 
 ```bash
-git clone git@github.com:basnijholt/pipefunc.git
+git clone git@github.com:pipefunc/pipefunc.git
 cd pipefunc
 pip install -e ".[dev,test,plotting]"
 ```

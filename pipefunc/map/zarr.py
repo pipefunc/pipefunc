@@ -152,13 +152,13 @@ class ZarrFileArray(StorageBase):
         )
         mask = np.tile(mask[slc], tile_shape)
 
-        return np.ma.array(self.array[:], mask=mask, dtype=object)
+        return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
         mask = self._mask[:]
-        return np.ma.array(mask, dtype=bool)
+        return np.ma.MaskedArray(mask, dtype=bool)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
@@ -212,6 +212,11 @@ class ZarrFileArray(StorageBase):
                 slice_indices.append(range(k, k + 1))
         return slice_indices
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
+
 
 class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
@@ -234,7 +239,7 @@ class _SharedDictStore(zarr.storage.KVStore):
         super().__init__(mutablemapping=shared_dict)
 
 
-class ZarrMemory(ZarrFileArray):
+class ZarrMemoryArray(ZarrFileArray):
     """Array interface to an in-memory Zarr store."""
 
     storage_id = "zarr_memory"
@@ -249,7 +254,7 @@ class ZarrMemory(ZarrFileArray):
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
     ) -> None:
-        """Initialize the ZarrMemory."""
+        """Initialize the ZarrMemoryArray."""
         if store is None:
             store = zarr.MemoryStore()
         super().__init__(
@@ -283,8 +288,13 @@ class ZarrMemory(ZarrFileArray):
             return
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return False
 
-class ZarrSharedMemory(ZarrMemory):
+
+class ZarrSharedMemoryArray(ZarrMemoryArray):
     """Array interface to a shared memory Zarr store."""
 
     storage_id = "zarr_shared_memory"
@@ -299,7 +309,7 @@ class ZarrSharedMemory(ZarrMemory):
         store: zarr.storage.Store | None = None,
         object_codec: Any = None,
     ) -> None:
-        """Initialize the ZarrMemory."""
+        """Initialize the ZarrSharedMemoryArray."""
         if store is None:
             store = _SharedDictStore()
         super().__init__(
@@ -310,6 +320,11 @@ class ZarrSharedMemory(ZarrMemory):
             store=store,
             object_codec=object_codec,
         )
+
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
 
 
 class CloudPickleCodec(Codec):
@@ -408,5 +423,5 @@ class CloudPickleCodec(Codec):
 
 register_codec(CloudPickleCodec)
 register_storage(ZarrFileArray)
-register_storage(ZarrMemory)
-register_storage(ZarrSharedMemory)
+register_storage(ZarrMemoryArray)
+register_storage(ZarrSharedMemoryArray)
