@@ -271,8 +271,11 @@ def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[
 
 
 @contextmanager
-def _maybe_executor(executor: Executor | None = None) -> Generator[Executor, None, None]:
-    if executor is None:
+def _maybe_executor(
+    executor: Executor | None,
+    parallel: bool,  # noqa: FBT001
+) -> Generator[Executor | None, None, None]:
+    if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
     else:
@@ -446,9 +449,9 @@ def run(
     store = run_info.init_store()
     _check_parallel(parallel, store)
 
-    with _maybe_executor(executor) as executor:
+    with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations[1]:
-            _run_and_process_generation(gen, run_info, run_folder, store, outputs, executor)
+            _run_and_process_generation(gen, run_info, run_folder, store, outputs, ex)
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -505,8 +508,8 @@ def _process_task(
     executor: Executor | None = None,
 ) -> dict[str, Result]:
     if func.mapspec and func.mapspec.inputs:
-        output_list, args = task
-        outputs_list = list(output_list)
+        r, args = task
+        outputs_list = list(r)
 
         for index, outputs in zip(args.missing, outputs_list):
             _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
