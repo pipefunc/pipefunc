@@ -486,7 +486,7 @@ def test_list_or_arrays(array_type) -> None:
     assert np.array_equal(r[0], value)
 
 
-def test_compare_equal(tmp_path: Path) -> None:  # noqa: PLR0915
+def test_compare_equal(tmp_path: Path) -> None:
     external_shape = (2, 3)
     internal_shape = (4, 5)
     zarr_path = tmp_path / "zarr"
@@ -510,59 +510,40 @@ def test_compare_equal(tmp_path: Path) -> None:  # noqa: PLR0915
         internal_shape,
         shape_mask=(True, False, True, False),
     )
+    arrs = [z_arr, f_arr, d_arr]
     for index in _iterate_shape_indices(external_shape):
         x = np.random.rand(*internal_shape)  # noqa: NPY002
-        z_arr.dump(key=index, value=x)
-        f_arr.dump(key=index, value=x)
-        d_arr.dump(key=index, value=x)
-    assert np.array_equal(z_arr.to_array(), f_arr.to_array())
-    assert np.array_equal(d_arr.to_array(), f_arr.to_array())
-    assert np.array_equal(z_arr[:, :, :, :], f_arr[:, :, :, :])
-    assert np.array_equal(d_arr[:, :, :, :], f_arr[:, :, :, :])
-    assert np.array_equal(z_arr[0, :, :, :], f_arr[0, :, :, :])
-    assert np.array_equal(d_arr[0, :, :, :], f_arr[0, :, :, :])
-    assert np.array_equal(z_arr[1, :, :, :], f_arr[1, :, :, :])
-    assert np.array_equal(d_arr[1, :, :, :], f_arr[1, :, :, :])
-    assert np.array_equal(z_arr[0, 0, :, :], f_arr[0, 0, :, :])
-    assert np.array_equal(d_arr[0, 0, :, :], f_arr[0, 0, :, :])
-    assert np.array_equal(z_arr[1, 0, :, :], f_arr[1, 0, :, :])
-    assert np.array_equal(d_arr[1, 0, :, :], f_arr[1, 0, :, :])
-    assert np.array_equal(z_arr[0, -1, :, :], f_arr[0, -1, :, :])
-    assert np.array_equal(d_arr[0, -1, :, :], f_arr[0, -1, :, :])
-    assert z_arr.size == f_arr.size
-    assert d_arr.size == f_arr.size
-    assert z_arr.rank == f_arr.rank
-    assert d_arr.rank == f_arr.rank
-    assert z_arr.shape == f_arr.shape
-    assert d_arr.shape == f_arr.shape
-    assert z_arr.internal_shape == f_arr.internal_shape
-    assert d_arr.internal_shape == f_arr.internal_shape
-    assert z_arr.shape_mask == f_arr.shape_mask
-    assert d_arr.shape_mask == f_arr.shape_mask
-    assert np.array_equal(z_arr.get_from_index(0), f_arr.get_from_index(0))
-    assert np.array_equal(d_arr.get_from_index(0), f_arr.get_from_index(0))
-    assert np.array_equal(z_arr.get_from_index(5), f_arr.get_from_index(5))
-    assert np.array_equal(d_arr.get_from_index(5), f_arr.get_from_index(5))
-    assert z_arr.has_index(0), f_arr.has_index(0)
-    assert d_arr.has_index(0), f_arr.has_index(0)
+        for arr in arrs:
+            arr.dump(key=index, value=x)
+    base_arr = arrs[0]
+    for arr in arrs[1:]:
+        assert np.array_equal(base_arr.to_array(), arr.to_array())
+        assert np.array_equal(base_arr[:, :, :, :], arr[:, :, :, :])
+        assert np.array_equal(base_arr[0, :, :, :], arr[0, :, :, :])
+        assert np.array_equal(base_arr[1, :, :, :], arr[1, :, :, :])
+        assert np.array_equal(base_arr[0, 0, :, :], arr[0, 0, :, :])
+        assert np.array_equal(base_arr[1, 0, :, :], arr[1, 0, :, :])
+        assert np.array_equal(base_arr[0, -1, :, :], arr[0, -1, :, :])
+        assert base_arr.size == arr.size
+        assert base_arr.rank == arr.rank
+        assert base_arr.shape == arr.shape
+        assert base_arr.internal_shape == arr.internal_shape
+        assert base_arr.shape_mask == arr.shape_mask
+        assert np.array_equal(base_arr.get_from_index(0), arr.get_from_index(0))
+        assert np.array_equal(base_arr.get_from_index(5), arr.get_from_index(5))
+        assert base_arr.has_index(0), arr.has_index(0)
+        assert base_arr.full_shape == arr.full_shape
+        assert base_arr.strides == arr.strides
+        assert np.array_equal(base_arr.mask[0, 0], arr.mask[0, 0])
+        assert np.array_equal(base_arr.mask, arr.mask)
+        assert np.array_equal(base_arr.mask_linear(), arr.mask_linear())
+
     with pytest.raises(ValueError, match="is out of bounds"):
         z_arr.get_from_index(1_000_000)
     with pytest.raises(ValueError, match="is out of bounds"):
         d_arr.get_from_index(1_000_000)
     with pytest.raises(FileNotFoundError, match="No such file or directory"):
         f_arr.get_from_index(1_000_000)
-
-    assert z_arr.full_shape == f_arr.full_shape
-    assert d_arr.full_shape == f_arr.full_shape
-    assert z_arr.strides == f_arr.strides
-    assert d_arr.strides == f_arr.strides
-    assert np.array_equal(z_arr.mask[0, 0], f_arr.mask[0, 0])
-    assert np.array_equal(d_arr.mask[0, 0], f_arr.mask[0, 0])
-    assert np.array_equal(z_arr.mask, f_arr.mask)
-    assert np.array_equal(d_arr.mask, f_arr.mask)
-    assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())
-    assert np.array_equal(d_arr.mask_linear(), f_arr.mask_linear())
-
     # Now with a partially filled array and compare masks
     z_arr = ZarrFileArray(
         zarr_path,
@@ -582,13 +563,15 @@ def test_compare_equal(tmp_path: Path) -> None:  # noqa: PLR0915
         internal_shape,
         shape_mask=(True, False, True, False),
     )
+    arrs = [z_arr, f_arr, dict_arr]
     for index in _iterate_shape_indices(external_shape):
         if np.random.rand() < 0.5:  # noqa: NPY002
             continue
         x = np.random.rand(*internal_shape)  # noqa: NPY002
-        z_arr.dump(key=index, value=x)
-        f_arr.dump(key=index, value=x)
-        dict_arr.dump(key=index, value=x)
-    assert np.array_equal(z_arr.mask, f_arr.mask)
-    assert np.array_equal(z_arr.mask_linear(), f_arr.mask_linear())
-    assert np.array_equal(z_arr.to_array(), f_arr.to_array())
+        for arr in arrs:
+            arr.dump(key=index, value=x)
+    base_arr = arrs[0]
+    for arr in arrs[1:]:
+        assert np.array_equal(base_arr.mask, arr.mask)
+        assert np.array_equal(base_arr.mask_linear(), arr.mask_linear())
+        assert np.array_equal(base_arr.to_array(), arr.to_array())
