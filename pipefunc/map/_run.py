@@ -619,7 +619,8 @@ def _validate_complete_inputs(
     """
     if output_name is None:
         root_args = set(pipeline.topological_generations.root_args)
-    else:
+    else:  # pragma: no cover
+        # TODO: this case becomes relevant when #127 is implemented
         root_args = set(pipeline.root_args(output_name))
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
