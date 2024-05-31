@@ -33,7 +33,7 @@ def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
 def generate_environment_yml(
     data: dict,
     name: str,
-    sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
+    sections: tuple[str, ...] = ("test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "pip"),
     filename: str | None = "environment.yml",
     pip_deps: list[str] | None = None,
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc",
-        sections=("test", "plotting"),
+        sections=("test", "plotting", "xarray", "zarr"),
         filename="environment.yml",
     )
 
