@@ -98,7 +98,7 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc-sphinx",
-        sections=(),
+        sections=("plotting",),
         filename="docs/environment-sphinx.yml",
-        pip_deps=[".[docs]"],
+        pip_deps=["../.[docs]"],
     )

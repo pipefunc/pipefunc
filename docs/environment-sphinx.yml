@@ -14,5 +14,10 @@ dependencies:
   - typing_extensions
   - cloudpickle
   - numpy
+  # optional-dependencies: plotting
+  - matplotlib
+  - pygraphviz
+  - holoviews
+  - bokeh
   - pip:
-    - .[docs]
+    - ../.[docs]
