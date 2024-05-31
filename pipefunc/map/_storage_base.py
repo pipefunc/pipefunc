@@ -60,16 +60,6 @@ class StorageBase(abc.ABC):
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
 
-    @property
-    def size(self) -> int:
-        """Return number of elements in the array."""
-        return prod(self.shape)
-
-    @property
-    def rank(self) -> int:
-        """Return the rank of the array."""
-        return len(self.shape)
-
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...
 
@@ -95,6 +85,16 @@ class StorageBase(abc.ABC):
     @property
     @abc.abstractmethod
     def parallelizable(self) -> bool: ...
+
+    @property
+    def size(self) -> int:
+        """Return number of elements in the array."""
+        return prod(self.shape)
+
+    @property
+    def rank(self) -> int:
+        """Return the rank of the array."""
+        return len(self.shape)
 
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
