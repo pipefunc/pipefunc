@@ -265,6 +265,8 @@ def _existing_and_missing_indices(
     file_arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
 ) -> tuple[list[int], list[int]]:
+    # TODO: likely this can be more efficient if `fixed_indices` are used, because
+    # now we compute the full mask.
     masks = (arr.mask_linear() for arr in file_arrays)
     if fixed_mask is None:
         fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
@@ -309,7 +311,7 @@ def _prepare_submit_map_spec(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
-    fixed_axes: dict[str, int | slice] | None,
+    fixed_indices: dict[str, int | slice] | None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -324,20 +326,21 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         file_arrays=file_arrays,
     )
-    fixed_mask = _mask_fixed_axes(fixed_axes, func.mapspec, shape, mask)
+    fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
     return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
 
 
 def _mask_fixed_axes(
-    fixed_axes: dict[str, int | slice] | None,
+    fixed_indices: dict[str, int | slice] | None,
     mapspec: MapSpec,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
-    if fixed_axes is None:
+    # TODO: see note in `_existing_and_missing_indices` about efficiency
+    if fixed_indices is None:
         return None
-    key = tuple(fixed_axes.get(axis, slice(None)) for axis in mapspec.output_indices)
+    key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[key] = True
@@ -429,7 +432,7 @@ def run(
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
-    fixed_axes: dict[str, int | slice] | None = None,
+    fixed_indices: dict[str, int | slice] | None = None,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -461,7 +464,7 @@ def run(
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
-    fixed_axes
+    fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
 
@@ -491,7 +494,7 @@ def run(
                 run_folder,
                 store,
                 outputs,
-                fixed_axes,
+                fixed_indices,
                 ex,
             )
 
@@ -508,7 +511,7 @@ def _run_and_process_generation(
     run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
-    fixed_axes: dict[str, int | slice] | None,
+    fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
     tasks: dict[PipeFunc, Any] = {}
@@ -530,7 +533,7 @@ def _run_and_process_generation(
                 run_info.shapes,
                 run_info.shape_masks,
                 store,
-                fixed_axes,
+                fixed_indices,
             )
             r = _maybe_parallel_map(args.process_index, args.missing, executor)
             tasks[func] = r, args

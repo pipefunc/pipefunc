@@ -1037,3 +1037,51 @@ def test_parallel():
         storage="shared_memory_dict",
     )
     assert results["sum"].output == 14
+
+
+def test_fixed_indices(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def f(x: int, y: int) -> int:
+        return x + y
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [1, 2, 3], "y": [4, 5, 6]}
+    results = pipeline.map(inputs, tmp_path, fixed_indices={"i": slice(1, None)}, parallel=False)
+    assert results["z"].output.tolist() == [None, 7, 9]
+    assert results["z"].store is not None
+    assert results["z"].store.mask.mask.tolist() == [True, False, False]
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i, j] -> z[i, j]")
+    def g(x: int, y: int) -> tuple[int, int]:
+        return (x, y)
+
+    pipeline = Pipeline([g])
+    y = np.array([[4, 5], [6, 7], [8, 9]])
+    assert y.shape == (3, 2)
+    inputs = {"x": [1, 2, 3], "y": y}  # type: ignore[dict-item]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": slice(1, None), "j": 0},
+        parallel=False,
+    )
+    assert y[slice(1, None), 0].tolist() == [6, 8]
+    assert results["z"].output.tolist() == [
+        [None, None],
+        [(2, 6), None],
+        [(3, 8), None],
+    ]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": slice(2, 0, -1), "j": slice(1, None)},
+        parallel=False,
+    )
+    assert y[slice(2, 0, -1), slice(1, None)].tolist() == [[9], [7]]
+    assert results["z"].output.tolist() == [
+        [None, None],
+        [None, (2, 7)],
+        [None, (3, 9)],
+    ]
