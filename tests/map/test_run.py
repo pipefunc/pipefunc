@@ -1112,3 +1112,18 @@ def test_fixed_indices(tmp_path: Path) -> None:
             fixed_indices={"not_an_index": 0},
             parallel=False,
         )
+
+
+def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int, y: int) -> int:
+        return x + y
+
+    @pipefunc(output_name="z")
+    def g(y: np.ndarray) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    with pytest.raises(ValueError, match="Cannot fix index `i` for reduction"):
+        pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False)

@@ -102,32 +102,50 @@ def create_learners(
     for gen in pipeline.topological_generations.function_lists:
         _learners = {}
         for func in gen:
-            if func.mapspec and func.mapspec.inputs:
-                f = functools.partial(
-                    _execute_iteration_in_map_spec,
-                    func=func,
-                    run_info=run_info,
-                    run_folder=run_folder,
-                    store=store,
-                    return_output=return_output,
-                )
-                shape = run_info.shapes[func.output_name]
-                mask = run_info.shape_masks[func.output_name]
-                sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
-            else:
-                f = functools.partial(
-                    _execute_iteration_in_single,
-                    func=func,
-                    run_info=run_info,
-                    run_folder=run_folder,
-                    store=store,
-                    return_output=return_output,
-                )
-                sequence = [None]  # type: ignore[list-item,assignment]
-            learner = adaptive.SequenceLearner(f, sequence)
-            _learners[func.output_name] = learner
+            _learners[func.output_name] = _learner(
+                func=func,
+                run_info=run_info,
+                run_folder=run_folder,
+                store=store,
+                fixed_indices=fixed_indices,
+                return_output=return_output,
+            )
         learners.append(_learners)
     return learners
+
+
+def _learner(
+    func: PipeFunc,
+    run_info: RunInfo,
+    run_folder: Path,
+    store: dict[str, StorageBase],
+    fixed_indices: dict[str, int | slice] | None,
+    *,
+    return_output: bool,
+) -> adaptive.SequenceLearner:
+    if func.mapspec and func.mapspec.inputs:
+        f = functools.partial(
+            _execute_iteration_in_map_spec,
+            func=func,
+            run_info=run_info,
+            run_folder=run_folder,
+            store=store,
+            return_output=return_output,
+        )
+        shape = run_info.shapes[func.output_name]
+        mask = run_info.shape_masks[func.output_name]
+        sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
+    else:
+        f = functools.partial(
+            _execute_iteration_in_single,
+            func=func,
+            run_info=run_info,
+            run_folder=run_folder,
+            store=store,
+            return_output=return_output,
+        )
+        sequence = [None]  # type: ignore[list-item,assignment]
+    return adaptive.SequenceLearner(f, sequence)
 
 
 def _sequence(
