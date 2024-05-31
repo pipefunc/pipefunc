@@ -1125,5 +1125,5 @@ def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
-    with pytest.raises(ValueError, match="Cannot fix index `i` for reduction"):
+    with pytest.raises(ValueError, match="Axis `i` in `y` is reduced"):
         pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False)

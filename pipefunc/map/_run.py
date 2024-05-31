@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import tempfile
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -477,7 +477,7 @@ def run(
     # TODO: implement setting `output_name`, see #127
     _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    _validate_fixed_indices(fixed_indices, inputs, pipeline.mapspec_axes())
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -682,11 +682,12 @@ def _validate_complete_inputs(
 def _validate_fixed_indices(
     fixed_indices: dict[str, int | slice] | None,
     inputs: dict[str, Any],
-    mapspec_axes: dict[str, tuple[str, ...]],
+    pipeline: Pipeline,
 ) -> None:
     if fixed_indices is None:
         return
     extra = set(fixed_indices)
+    mapspec_axes = pipeline.mapspec_axes()
     for parameter, axes_ in mapspec_axes.items():
         for axis in axes_:
             if axis in fixed_indices:
@@ -704,3 +705,49 @@ def _validate_fixed_indices(
     if extra:
         msg = f"Got extra `fixed_indices`: `{extra}` that are not accepted by this map."
         raise ValueError(msg)
+
+    reduced_axes = _reduced_axes(pipeline)
+
+    for name, axes_set in reduced_axes.items():
+        if reduced := set(axes_set) & set(fixed_indices):
+            reduced_str = ", ".join(reduced)
+            msg = f"Axis `{reduced_str}` in `{name}` is reduced and cannot be in `fixed_indices`."
+            raise ValueError(msg)
+
+
+def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
+    # TODO: check the overlap between this an `independent_axes_in_mapspecs`.
+    # It might be that this function could be used instead.
+    reduced_axes: dict[str, set[str]] = defaultdict(set)
+    axes = pipeline.mapspec_axes()
+    for name in pipeline.map_parameters:
+        for func in pipeline.functions:
+            if _is_parameter_reduced_by_function(func, name):
+                reduced_axes[name].update(axes[name])
+            elif _is_parameter_partially_reduced_by_function(func, name):
+                _axes = _get_partially_reduced_axes(func, name, axes)
+                reduced_axes[name].update(_axes)
+    return dict(reduced_axes)
+
+
+def _is_parameter_reduced_by_function(func: PipeFunc, name: str) -> bool:
+    return name in func.parameters and (
+        func.mapspec is None or name not in func.mapspec.input_names
+    )
+
+
+def _is_parameter_partially_reduced_by_function(func: PipeFunc, name: str) -> bool:
+    if func.mapspec is None or name not in func.mapspec.input_names:
+        return False
+    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
+    return None in spec.axes
+
+
+def _get_partially_reduced_axes(
+    func: PipeFunc,
+    name: str,
+    axes: dict[str, tuple[str, ...]],
+) -> tuple[str, ...]:
+    assert func.mapspec is not None
+    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
+    return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
