@@ -48,6 +48,7 @@ test = [
     "zarr",
 ]
 docs = [
+    # TODO unpin myst-nb when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
     "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
     "sphinx",
     "sphinx-book-theme",
