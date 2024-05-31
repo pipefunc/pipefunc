@@ -8,6 +8,7 @@ import pytest
 
 from pipefunc import Pipeline, Sweep, pipefunc
 from pipefunc.map import load_outputs
+from pipefunc.map._run_info import RunInfo
 from pipefunc.map.adaptive import create_learners, create_learners_from_sweep, flatten_learners
 
 if TYPE_CHECKING:
@@ -226,3 +227,10 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
     assert len(flat_learners) == 1
     adaptive.runner.simple(flat_learners["z"])
     assert flat_learners["z"].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    run_info = RunInfo.load(run_folder=tmp_path)
+    store = run_info.init_store()
+    assert store["z"].to_array().tolist() == [
+        [(1, 1), (1, 2), (1, 3)],
+        [None, None, None],
+        [None, None, None],
+    ]
