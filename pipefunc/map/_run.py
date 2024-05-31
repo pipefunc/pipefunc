@@ -17,6 +17,7 @@ from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
+    mapspec_axes,
     mapspec_dimensions,
     validate_consistent_axes,
 )
@@ -75,6 +76,10 @@ class _MockPipeline:
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
+
+    def mapspec_axes(self) -> dict[str, tuple[str, ...]]:
+        """Return the axes for each array parameter in the pipeline."""
+        return mapspec_axes(self.mapspecs())
 
     @property
     def sorted_functions(self) -> list[PipeFunc]:
@@ -336,7 +341,9 @@ def _mask_fixed_axes(
     mapspec: MapSpec,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-) -> np.flatiter[npt.NDArray[np.bool_]] | None:
+    *,
+    to_array: bool = False,
+) -> np.flatiter[npt.NDArray[np.bool_]] | npt.NDArray[np.bool_] | None:
     # TODO: see note in `_existing_and_missing_indices` about efficiency
     if fixed_indices is None:
         return None
@@ -344,7 +351,10 @@ def _mask_fixed_axes(
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[key] = True
-    return select.flat
+    flat = select.flat
+    if to_array:
+        return np.array(flat)
+    return flat
 
 
 def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:

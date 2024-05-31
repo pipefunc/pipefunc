@@ -13,6 +13,7 @@ from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     _func_kwargs,
+    _mask_fixed_axes,
     _maybe_load_single_output,
     _MockPipeline,
     _process_task,
@@ -24,6 +25,9 @@ from pipefunc.map._run_info import RunInfo
 
 if TYPE_CHECKING:
     import sys
+
+    import numpy as np
+    import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline, Sweep
     from pipefunc.map._storage_base import StorageBase
@@ -46,6 +50,7 @@ def create_learners(
     storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -71,6 +76,9 @@ def create_learners(
         Whether to return the output of the function in the learner.
     cleanup
         Whether to clean up the `run_folder`.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
 
     Returns
     -------
@@ -95,6 +103,15 @@ def create_learners(
         _learners = {}
         for func in gen:
             if func.mapspec and func.mapspec.inputs:
+                shape = run_info.shapes[func.output_name]
+                mask = run_info.shape_masks[func.output_name]
+                fixed_mask = _mask_fixed_axes(
+                    fixed_indices,
+                    func.mapspec,
+                    shape,
+                    mask,
+                    to_array=True,
+                )
                 f = functools.partial(
                     _execute_iteration_in_map_spec,
                     func=func,
@@ -102,8 +119,9 @@ def create_learners(
                     run_folder=run_folder,
                     store=store,
                     return_output=return_output,
+                    fixed_mask=fixed_mask,
                 )
-                sequence = list(range(prod(run_info.shapes[func.output_name])))
+                sequence = list(range(prod(shape)))
             else:
                 f = functools.partial(
                     _execute_iteration_in_single,
@@ -173,6 +191,7 @@ def _execute_iteration_in_map_spec(
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
+    fixed_mask: npt.NDArray[np.bool_] | None = None,
 ) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
@@ -182,9 +201,9 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    shape = run_info.shapes[func.output_name]
-    mask = run_info.shape_masks[func.output_name]
     file_arrays = [store[o] for o in at_least_tuple(func.output_name)]
+    if fixed_mask is not None and fixed_mask[index]:
+        return None
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -200,6 +219,8 @@ def _execute_iteration_in_map_spec(
         store,
         run_folder,
     )
+    shape = run_info.shapes[func.output_name]
+    mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
     return outputs if return_output else None
 
