@@ -14,26 +14,5 @@ dependencies:
   - typing_extensions
   - cloudpickle
   - numpy
-  # optional-dependencies: plotting
-  - matplotlib
-  - pygraphviz
-  - holoviews
-  - bokeh
-  # optional-dependencies: test
-  - pytest
-  - coverage
-  - pytest-cov
-  - pandas
-  - adaptive
-  - xarray
-  - zarr
-  # optional-dependencies: docs
-  - myst-nb
-  - sphinx
-  - sphinx-book-theme
-  - myst-parser
-  - emoji
-  - jupytext
-  - pandas
-  - xarray
-  - zarr
+  - pip:
+    - .[docs]

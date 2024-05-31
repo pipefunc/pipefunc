@@ -49,7 +49,7 @@ test = [
     "zarr",
 ]
 docs = [
-    "myst-nb",
+    "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
     "sphinx",
     "sphinx-book-theme",
     "myst-parser",

@@ -36,10 +36,11 @@ def generate_environment_yml(
     sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "pip"),
     filename: str | None = "environment.yml",
+    pip_deps: list[str] | None = None,
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
-    pip_deps = []
-
+    if pip_deps is None:
+        pip_deps = []
     dependencies = clean_deps(data["project"]["dependencies"])
     pip_deps += generate_pip_deps(dependencies)
 
@@ -97,6 +98,7 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc-sphinx",
-        sections=("test", "docs", "plotting"),
+        sections=(),
         filename="docs/environment-sphinx.yml",
+        pip_deps=[".[docs]"],
     )
