@@ -17,7 +17,6 @@ from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
-    mapspec_axes,
     mapspec_dimensions,
     validate_consistent_axes,
 )
@@ -76,10 +75,6 @@ class _MockPipeline:
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
-
-    def mapspec_axes(self) -> dict[str, tuple[str, ...]]:
-        """Return the axes for each array parameter in the pipeline."""
-        return mapspec_axes(self.mapspecs())
 
     @property
     def sorted_functions(self) -> list[PipeFunc]:
