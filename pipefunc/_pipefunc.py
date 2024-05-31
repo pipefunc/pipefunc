@@ -134,7 +134,6 @@ class PipeFunc(Generic[T]):
             )
         self._profile = profile
         self.renames: dict[str, str] = renames or {}
-        self._inverse_renames: dict[str, str] = {v: k for k, v in self.renames.items()}
         self._defaults = defaults or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
@@ -164,6 +163,60 @@ class PipeFunc(Generic[T]):
             elif v.default is not inspect.Parameter.empty:
                 defaults[new_name] = v.default
         return defaults
+
+    @functools.cached_property
+    def _inverse_renames(self) -> dict[str, str]:
+        return {v: k for k, v in self.renames.items()}
+
+    def _reset_internal_cache(self) -> None:
+        for k, v in type(self).__dict__.items():
+            if isinstance(v, functools.cached_property):
+                with contextlib.suppress(AttributeError):
+                    delattr(self, k)
+
+    def apply_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Apply defaults to the provided keyword arguments.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If `False`, the new
+            defaults will be added to the existing defaults.
+
+        Returns
+        -------
+        The keyword arguments with defaults applied.
+
+        """
+        if overwrite:
+            self._defaults = defaults.copy()
+        else:
+            self._defaults.update(defaults)
+        self._reset_internal_cache()
+
+    def apply_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+        """Apply renames to function arguments for the wrapped function.
+
+        Parameters
+        ----------
+        renames
+            A dictionary of renames for the function arguments.
+        overwrite
+            Whether to overwrite the existing renames. If `False`, the new
+            renames will be added to the existing renames.
+
+        Returns
+        -------
+        The keyword arguments with renames applied.
+
+        """
+        if overwrite:
+            self.renames = renames.copy()
+        else:
+            self.renames.update(renames)
+        self._reset_internal_cache()
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
