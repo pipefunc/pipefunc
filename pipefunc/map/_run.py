@@ -395,6 +395,7 @@ def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
+    output_name: _OUTPUT_TYPE | None = None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
@@ -417,6 +418,8 @@ def run(
     run_folder
         The folder to store the run information. If `None`, a temporary folder
         is created.
+    output_name
+        The output to calculate. If `None`, the entire pipeline is run and all outputs are computed.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
