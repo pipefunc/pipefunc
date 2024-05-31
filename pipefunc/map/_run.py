@@ -495,13 +495,13 @@ def run(
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
-                gen,
-                run_info,
-                run_folder,
-                store,
-                outputs,
-                fixed_indices,
-                ex,
+                generation=gen,
+                run_info=run_info,
+                run_folder=run_folder,
+                store=store,
+                outputs=outputs,
+                fixed_indices=fixed_indices,
+                executor=ex,
             )
 
     if persist_memory:  # Only relevant for memory based storage
