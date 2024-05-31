@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import adaptive
+import numpy as np
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -26,7 +27,6 @@ from pipefunc.map._run_info import RunInfo
 if TYPE_CHECKING:
     import sys
 
-    import numpy as np
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline, Sweep
@@ -103,15 +103,6 @@ def create_learners(
         _learners = {}
         for func in gen:
             if func.mapspec and func.mapspec.inputs:
-                shape = run_info.shapes[func.output_name]
-                mask = run_info.shape_masks[func.output_name]
-                fixed_mask = _mask_fixed_axes(
-                    fixed_indices,
-                    func.mapspec,
-                    shape,
-                    mask,
-                    to_array=True,
-                )
                 f = functools.partial(
                     _execute_iteration_in_map_spec,
                     func=func,
@@ -119,9 +110,10 @@ def create_learners(
                     run_folder=run_folder,
                     store=store,
                     return_output=return_output,
-                    fixed_mask=fixed_mask,
                 )
-                sequence = list(range(prod(shape)))
+                shape = run_info.shapes[func.output_name]
+                mask = run_info.shape_masks[func.output_name]
+                sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
             else:
                 f = functools.partial(
                     _execute_iteration_in_single,
@@ -131,11 +123,27 @@ def create_learners(
                     store=store,
                     return_output=return_output,
                 )
-                sequence = [None]  # type: ignore[list-item]
+                sequence = [None]  # type: ignore[list-item,assignment]
             learner = adaptive.SequenceLearner(f, sequence)
             _learners[func.output_name] = learner
         learners.append(_learners)
     return learners
+
+
+def _sequence(
+    fixed_indices: dict[str, int | slice] | None,
+    mapspec: MapSpec,
+    shape: tuple[int, ...],
+    mask: tuple[bool, ...],
+) -> npt.NDArray[np.int_]:
+    if fixed_indices is None:
+        return np.arange(prod(shape))
+    fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
+    assert fixed_mask is not None
+    assert len(fixed_mask) == prod(shape)
+    full_sequence = np.arange(len(fixed_mask))
+
+    return full_sequence[fixed_mask]
 
 
 def flatten_learners(
@@ -191,7 +199,6 @@ def _execute_iteration_in_map_spec(
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
-    fixed_mask: npt.NDArray[np.bool_] | None = None,
 ) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
@@ -202,8 +209,6 @@ def _execute_iteration_in_map_spec(
     Meets the requirements of `adaptive.SequenceLearner`.
     """
     file_arrays = [store[o] for o in at_least_tuple(func.output_name)]
-    if fixed_mask is not None and fixed_mask[index]:
-        return None
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:

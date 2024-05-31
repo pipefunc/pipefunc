@@ -341,9 +341,7 @@ def _mask_fixed_axes(
     mapspec: MapSpec,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    *,
-    to_array: bool = False,
-) -> np.flatiter[npt.NDArray[np.bool_]] | npt.NDArray[np.bool_] | None:
+) -> np.flatiter[npt.NDArray[np.bool_]] | None:
     # TODO: see note in `_existing_and_missing_indices` about efficiency
     if fixed_indices is None:
         return None
@@ -351,10 +349,7 @@ def _mask_fixed_axes(
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[key] = True
-    flat = select.flat
-    if to_array:
-        return np.array(flat)
-    return flat
+    return select.flat
 
 
 def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
