@@ -270,8 +270,8 @@ def _existing_and_missing_indices(
     file_arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
 ) -> tuple[list[int], list[int]]:
-    # TODO: likely this can be more efficient if `fixed_indices` are used, because
-    # now we compute the full mask.
+    # TODO: when `fixed_indices` are used we could be more efficient by not
+    # computing the full mask.
     masks = (arr.mask_linear() for arr in file_arrays)
     if fixed_mask is None:
         fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
@@ -707,7 +707,6 @@ def _validate_fixed_indices(
         raise ValueError(msg)
 
     reduced_axes = _reduced_axes(pipeline)
-
     for name, axes_set in reduced_axes.items():
         if reduced := set(axes_set) & set(fixed_indices):
             reduced_str = ", ".join(reduced)
