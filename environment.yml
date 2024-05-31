@@ -14,6 +14,10 @@ dependencies:
   - typing_extensions
   - cloudpickle
   - numpy
+  # optional-dependencies: xarray
+  - xarray
+  # optional-dependencies: zarr
+  - zarr
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz

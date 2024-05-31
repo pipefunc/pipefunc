@@ -91,7 +91,7 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners = []
-    for gen in pipeline.topological_generations[1]:
+    for gen in pipeline.topological_generations.function_lists:
         _learners = {}
         for func in gen:
             if func.mapspec and func.mapspec.inputs:

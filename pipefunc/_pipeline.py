@@ -19,7 +19,7 @@ import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Union
 
 import networkx as nx
 
@@ -824,20 +824,27 @@ class Pipeline:
         return leaf_nodes[0]
 
     @functools.cached_property
-    def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
+    def topological_generations(self) -> _Generations:
+        """Return the functions in the pipeline grouped by topological generation.
+
+        Simply calls `nx.topological_generations` on the `pipeline.graph`. Then
+        groups the functions in the pipeline by generation. The first generation
+        contains the root arguments, while the subsequent generations contain
+        the functions in topological order.
+        """
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return generations[0], generations[1:]
+        return _Generations(generations[0], generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
-        return [f for gen in self.topological_generations[1] for f in gen]
+        return [f for gen in self.topological_generations.function_lists for f in gen]
 
     def _autogen_mapspec_axes(self) -> set[PipeFunc]:
         """Generate `MapSpec`s for functions that return arrays with `internal_shapes`."""
-        root_args = self.topological_generations[0]
+        root_args = self.topological_generations.root_args
         mapspecs = self.mapspecs(ordered=False)
         non_root_inputs = _find_non_root_axes(mapspecs, root_args)
         output_names = {at_least_tuple(f.output_name) for f in self.functions}
@@ -1274,6 +1281,11 @@ class Pipeline:
             for axis in func.mapspec.output_indices
             if self._axis_in_root_arg(axis, output_name)
         }
+
+
+class _Generations(NamedTuple):
+    root_args: list[str]
+    function_lists: list[list[PipeFunc]]
 
 
 def _update_all_results(

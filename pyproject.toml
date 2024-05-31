@@ -48,16 +48,16 @@ test = [
     "zarr",
 ]
 docs = [
-    "myst-nb",
+    # TODO unpin myst-nb when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
+    "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
     "sphinx",
     "sphinx-book-theme",
     "myst-parser",
     "emoji",
     "jupytext",
-    "pandas",            # used in example.ipynb
-    "xarray",            # used in example.ipynb
-    "zarr",
+    "pipefunc[all]",
 ]
+all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
