@@ -1085,3 +1085,11 @@ def test_fixed_indices(tmp_path: Path) -> None:
         [None, (2, 7)],
         [None, (3, 9)],
     ]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": 2, "j": 0},
+        parallel=False,
+    )
+    assert results["z"].output.tolist() == [[None, None], [None, None], [(3, 8), None]]
