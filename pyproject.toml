@@ -38,6 +38,7 @@ adaptive = ["adaptive", "adaptive-scheduler"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
 test = [
     "pytest",
     "coverage",
@@ -54,11 +55,7 @@ docs = [
     "myst-parser",
     "emoji",
     "jupytext",
-    "pandas",            # used in example.ipynb
-    "xarray",            # used in example.ipynb
-    "zarr",              # for API docs
-    "adaptive",          # for API docs
-    "holoviews",         # used in example.ipynb
+    "pipefunc[all]",
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 [project.urls]
