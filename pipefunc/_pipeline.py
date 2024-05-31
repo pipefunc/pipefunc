@@ -780,7 +780,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def map_parameters(self) -> set[str]:
+    def mapspec_parameters(self) -> set[str]:
         return {
             name
             for mapspec in self.mapspecs()
