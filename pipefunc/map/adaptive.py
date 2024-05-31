@@ -20,6 +20,7 @@ from pipefunc.map._run import (
     _process_task,
     _run_iteration_and_process,
     _submit_single,
+    _validate_fixed_indices,
     run,
 )
 from pipefunc.map._run_info import RunInfo
@@ -99,6 +100,7 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners = []
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     for gen in pipeline.topological_generations.function_lists:
         _learners = {}
         for func in gen:

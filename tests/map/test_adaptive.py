@@ -234,3 +234,12 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
         [None, None, None],
         [None, None, None],
     ]
+
+    with pytest.raises(ValueError, match="Got extra `fixed_indices`: `{'not_exist'}`"):
+        create_learners(
+            pipeline,
+            inputs,
+            run_folder=tmp_path,
+            return_output=True,
+            fixed_indices={"not_exist": 0},
+        )
