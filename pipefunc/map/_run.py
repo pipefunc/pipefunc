@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import tempfile
 from collections import OrderedDict
 from concurrent.futures import Executor, ProcessPoolExecutor
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generator, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.map._mapspec import (
@@ -259,11 +261,19 @@ def _update_result_array(
             result_array[index] = _output
 
 
-def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[int], list[int]]:
+def _existing_and_missing_indices(
+    file_arrays: list[StorageBase],
+    fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
+) -> tuple[list[int], list[int]]:
     masks = (arr.mask_linear() for arr in file_arrays)
+    if fixed_mask is None:
+        fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
+
     existing_indices = []
     missing_indices = []
-    for i, mask_values in enumerate(zip(*masks)):
+    for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
+        if not select:
+            continue
         if any(mask_values):  # rerun if any of the outputs are missing
             missing_indices.append(i)
         else:
@@ -299,6 +309,7 @@ def _prepare_submit_map_spec(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
+    fixed_axes: dict[str, int | slice] | None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -313,8 +324,24 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         file_arrays=file_arrays,
     )
-    existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
+    fixed_mask = _mask_fixed_axes(fixed_axes, func.mapspec, shape, mask)
+    existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
     return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
+
+
+def _mask_fixed_axes(
+    fixed_axes: dict[str, int | slice] | None,
+    mapspec: MapSpec,
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+) -> np.flatiter[npt.NDArray[np.bool_]] | None:
+    if fixed_axes is None:
+        return None
+    key = tuple(fixed_axes.get(axis, slice(None)) for axis in mapspec.output_indices)
+    external_shape = _external_shape(shape, shape_mask)
+    select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
+    select[key] = True
+    return select.flat
 
 
 def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
@@ -402,6 +429,7 @@ def run(
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
+    fixed_axes: dict[str, int | slice] | None = None,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -433,6 +461,9 @@ def run(
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
+    fixed_axes
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
 
     """
     # TODO: implement setting `output_name`, see #127
@@ -454,7 +485,15 @@ def run(
 
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
-            _run_and_process_generation(gen, run_info, run_folder, store, outputs, ex)
+            _run_and_process_generation(
+                gen,
+                run_info,
+                run_folder,
+                store,
+                outputs,
+                fixed_axes,
+                ex,
+            )
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -469,6 +508,7 @@ def _run_and_process_generation(
     run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
+    fixed_axes: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
     tasks: dict[PipeFunc, Any] = {}
@@ -490,6 +530,7 @@ def _run_and_process_generation(
                 run_info.shapes,
                 run_info.shape_masks,
                 store,
+                fixed_axes,
             )
             r = _maybe_parallel_map(args.process_index, args.missing, executor)
             tasks[func] = r, args

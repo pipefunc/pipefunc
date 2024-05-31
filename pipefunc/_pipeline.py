@@ -634,6 +634,7 @@ class Pipeline:
         storage: str = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
+        fixed_axes: dict[str, int | slice] | None = None,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -663,6 +664,9 @@ class Pipeline:
             Does not have any effect when file based storage is used.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
+        fixed_axes
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
 
         """
         return run(
@@ -675,6 +679,7 @@ class Pipeline:
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
+            fixed_axes=fixed_axes,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
