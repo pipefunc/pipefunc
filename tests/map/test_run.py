@@ -1116,8 +1116,8 @@ def test_fixed_indices(tmp_path: Path) -> None:
 
 def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def f(x: int, y: int) -> int:
-        return x + y
+    def f(x: int) -> int:
+        return x
 
     @pipefunc(output_name="z")
     def g(y: np.ndarray) -> int:

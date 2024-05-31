@@ -701,7 +701,6 @@ def _validate_fixed_indices(
             except IndexError as e:
                 msg = f"Fixed index `{key}` for parameter `{parameter}` is out of bounds."
                 raise IndexError(msg) from e
-
     if extra:
         msg = f"Got extra `fixed_indices`: `{extra}` that are not accepted by this map."
         raise ValueError(msg)
