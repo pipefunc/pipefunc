@@ -435,7 +435,8 @@ def run(
         Whether to clean up the `run_folder` before running the pipeline.
 
     """
-    _validate_complete_inputs(pipeline, inputs)
+    # TODO: implement setting `output_name`, see #127
+    _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
