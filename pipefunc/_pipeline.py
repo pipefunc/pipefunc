@@ -825,6 +825,13 @@ class Pipeline:
 
     @functools.cached_property
     def topological_generations(self) -> _Generations:
+        """Return the functions in the pipeline grouped by topological generation.
+
+        Simply calls `nx.topological_generations` on the `pipeline.graph`. Then
+        groups the functions in the pipeline by generation. The first generation
+        contains the root arguments, while the subsequent generations contain
+        the functions in topological order.
+        """
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
