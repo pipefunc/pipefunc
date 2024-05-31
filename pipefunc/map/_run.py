@@ -342,7 +342,6 @@ def _mask_fixed_axes(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
-    # TODO: see note in `_existing_and_missing_indices` about efficiency
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
@@ -696,7 +695,6 @@ def _validate_fixed_indices(
             key = tuple(fixed_indices.get(axis, slice(None)) for axis in axes_)
             if len(key) == 1:
                 key = key[0]  # type: ignore[assignment]
-
             try:
                 inputs[parameter][key]
             except IndexError as e:
