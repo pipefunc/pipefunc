@@ -472,6 +472,7 @@ def run(
     # TODO: implement setting `output_name`, see #127
     _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    _validate_fixed_indices(fixed_indices, inputs, pipeline.mapspec_axes())
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -670,4 +671,32 @@ def _validate_complete_inputs(
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
         msg = f"Missing inputs: {missing_args}"
+        raise ValueError(msg)
+
+
+def _validate_fixed_indices(
+    fixed_indices: dict[str, int | slice] | None,
+    inputs: dict[str, Any],
+    mapspec_axes: dict[str, tuple[str, ...]],
+) -> None:
+    if fixed_indices is None:
+        return
+    extra = set(fixed_indices)
+    for parameter, axes_ in mapspec_axes.items():
+        for axis in axes_:
+            if axis in fixed_indices:
+                extra.discard(axis)
+        if parameter in inputs:
+            key = tuple(fixed_indices.get(axis, slice(None)) for axis in axes_)
+            if len(key) == 1:
+                key = key[0]  # type: ignore[assignment]
+
+            try:
+                inputs[parameter][key]
+            except IndexError as e:
+                msg = f"Fixed index `{key}` for parameter `{parameter}` is out of bounds."
+                raise IndexError(msg) from e
+
+    if extra:
+        msg = f"Got extra `fixed_indices`: `{extra}` that are not accepted by this map."
         raise ValueError(msg)

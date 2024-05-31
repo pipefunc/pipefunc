@@ -1093,3 +1093,22 @@ def test_fixed_indices(tmp_path: Path) -> None:
         parallel=False,
     )
     assert results["z"].output.tolist() == [[None, None], [None, None], [(3, 8), None]]
+
+    with pytest.raises(IndexError, match="Fixed index `2000` for parameter `x` is out of bounds"):
+        pipeline.map(
+            inputs,
+            tmp_path,
+            fixed_indices={"i": 2000, "j": 1},
+            parallel=False,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Got extra `fixed_indices`: `{'not_an_index'}` that are not",
+    ):
+        pipeline.map(
+            inputs,
+            tmp_path,
+            fixed_indices={"not_an_index": 0},
+            parallel=False,
+        )
