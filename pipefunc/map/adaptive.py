@@ -88,6 +88,7 @@ def create_learners(
     above, the learners have to be executed in order.
 
     """
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = Path(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -100,7 +101,6 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners = []
-    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     for gen in pipeline.topological_generations.function_lists:
         _learners = {}
         for func in gen:
