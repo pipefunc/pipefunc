@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generator, Tuple, Union
 
-import adaptive
 import numpy as np
+from adaptive import SequenceLearner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -55,7 +55,10 @@ def create_learners(
     return_output: bool = False,
     cleanup: bool = True,
     split_independent_axes: bool = False,
-) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
+) -> dict[
+    tuple[tuple[str, int], ...] | None,
+    list[dict[_OUTPUT_TYPE, SequenceLearner]],
+]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
     Creates a learner for each function node in the graph. Which means that
@@ -85,6 +88,7 @@ def create_learners(
 
     Returns
     -------
+        TODO: FIX THIS DESCRIPTION
         A list of dictionaries where the keys are the output names of the
         functions and the values are the corresponding adaptive learners. As noted
         above, the learners have to be executed in order.
@@ -101,7 +105,10 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners = []
+    learners: dict[
+        tuple[tuple[str, int], ...] | None,
+        list[dict[_OUTPUT_TYPE, SequenceLearner]],
+    ] = {}
     iterator = _maybe_iterate_axes(pipeline, inputs, split_independent_axes)
     for fixed_indices in iterator:
         for gen in pipeline.topological_generations.function_lists:
@@ -115,7 +122,8 @@ def create_learners(
                     fixed_indices=fixed_indices,
                     return_output=return_output,
                 )
-            learners.append(_learners)
+            key = tuple(sorted(fixed_indices.items())) if fixed_indices else None
+            learners.setdefault(key, []).append(_learners)
     return learners
 
 
@@ -127,7 +135,7 @@ def _learner(
     fixed_indices: dict[str, int | slice] | None,
     *,
     return_output: bool,
-) -> adaptive.SequenceLearner:
+) -> SequenceLearner:
     if func.mapspec and func.mapspec.inputs:
         f = functools.partial(
             _execute_iteration_in_map_spec,
@@ -150,7 +158,7 @@ def _learner(
             return_output=return_output,
         )
         sequence = [None]  # type: ignore[list-item,assignment]
-    return adaptive.SequenceLearner(f, sequence)
+    return SequenceLearner(f, sequence)
 
 
 def _sequence(
@@ -170,8 +178,8 @@ def _sequence(
 
 
 def flatten_learners(
-    learners_dicts: list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]],
-) -> dict[_OUTPUT_TYPE, adaptive.SequenceLearner]:
+    learners_dicts: list[dict[_OUTPUT_TYPE, SequenceLearner]],
+) -> dict[_OUTPUT_TYPE, SequenceLearner]:
     """Flatten the list of dictionaries of learners into a single dictionary."""
     return {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
 
@@ -288,7 +296,7 @@ def create_learners_from_sweep(
     *,
     parallel: bool = True,
     cleanup: bool = True,
-) -> tuple[list[adaptive.SequenceLearner], list[Path]]:
+) -> tuple[list[SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
     Creates an `adaptive.SequenceLearner` for each sweep run. These learners
@@ -332,7 +340,7 @@ def create_learners_from_sweep(
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
         mock_pipeline = _MockPipeline.from_pipeline(pipeline)
         f = _MapWrapper(mock_pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup)
-        learner = adaptive.SequenceLearner(f, sequence=[None])
+        learner = SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)
     return learners, folders
