@@ -235,8 +235,7 @@ class Sweep:
 
         Returns
         -------
-        Sweep
-            A new Sweep object representing the Cartesian product of the sweeps.
+        A new Sweep object representing the Cartesian product of the sweeps.
 
         Examples
         --------
@@ -286,8 +285,7 @@ class Sweep:
 
         Returns
         -------
-        Sweep
-            A new Sweep object with the added derivers.
+        A new Sweep object with the added derivers.
 
         Examples
         --------

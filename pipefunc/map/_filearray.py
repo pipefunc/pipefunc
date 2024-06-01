@@ -187,8 +187,7 @@ class FileArray(StorageBase):
 
         Returns
         -------
-        np.ma.core.MaskedArray
-            The array containing all the data.
+        The array containing all the data.
 
         """
         if splat_internal is None:

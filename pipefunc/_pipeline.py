@@ -112,8 +112,7 @@ class _Function:
 
         Returns
         -------
-        Any
-            The return value of the pipeline function.
+        The return value of the pipeline function.
 
         """
         return self.pipeline.run(output_name=self.output_name, kwargs=kwargs)
@@ -128,8 +127,7 @@ class _Function:
 
         Returns
         -------
-        Any
-            The return value of the pipeline function.
+        The return value of the pipeline function.
 
         """
         return self.pipeline.run(self.output_name, full_output=True, kwargs=kwargs)
@@ -144,8 +142,7 @@ class _Function:
 
         Returns
         -------
-        Any
-            The return value of the pipeline function.
+        The return value of the pipeline function.
 
         """
         return self(**kwargs)
@@ -445,8 +442,7 @@ class Pipeline:
 
         Returns
         -------
-        Callable[..., Any]
-            The composed function that can be called with keyword arguments.
+        The composed function that can be called with keyword arguments.
 
         """
         if f := self._func.get(output_name):
@@ -584,9 +580,8 @@ class Pipeline:
 
         Returns
         -------
-        Any
-            The return value of the pipeline or a dictionary mapping function
-            names to their return values if full_output is True.
+        The return value of the pipeline or a dictionary mapping function
+        names to their return values if full_output is True.
 
         """
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
@@ -684,9 +679,8 @@ class Pipeline:
 
         Returns
         -------
-        Set[Tuple[str, ...]]
-            A set of tuples containing possible argument combinations.
-            The tuples are sorted in lexicographical order.
+        A set of tuples containing possible argument combinations.
+        The tuples are sorted in lexicographical order.
 
         """
         if r := self._arg_combinations.get(output_name):
@@ -756,9 +750,8 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
-            A dictionary mapping function names to sets of tuples containing
-            possible argument combinations.
+        A dictionary mapping function names to sets of tuples containing
+        possible argument combinations.
 
         """
         return {
@@ -1001,10 +994,9 @@ class Pipeline:
 
         Returns
         -------
-        dict[PipeFunc, set[PipeFunc]]
-            A dictionary where each key is a PipeFunc that can be
-            combined with others. The value associated with each key is a set of
-            PipeFuncs that can be combined with the key function.
+        A dictionary where each key is a PipeFunc that can be
+        combined with others. The value associated with each key is a set of
+        PipeFuncs that can be combined with the key function.
 
         Notes
         -----
@@ -1085,8 +1077,7 @@ class Pipeline:
 
         Returns
         -------
-        Pipeline
-            The simplified version of the pipeline.
+        The simplified version of the pipeline.
 
         Notes
         -----

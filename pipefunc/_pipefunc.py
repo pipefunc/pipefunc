@@ -183,8 +183,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
-            The return value of the wrapped function.
+        The return value of the wrapped function.
 
         """
         if extra := set(kwargs) - set(self.parameters):
@@ -242,9 +241,8 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        AbstractContextManager
-            A ResourceProfiler instance if profiling is enabled, or a
-            nullcontext if disabled.
+        A ResourceProfiler instance if profiling is enabled, or a
+        nullcontext if disabled.
 
         """
         if self.profiling_stats is not None:
@@ -261,8 +259,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
-            The value of the attribute.
+        The value of the attribute.
 
         """
         return getattr(self.func, name)
@@ -272,8 +269,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
-            A string representation of the PipeFunc instance.
+        A string representation of the PipeFunc instance.
 
         """
         outputs = ", ".join(at_least_tuple(self.output_name))
@@ -284,8 +280,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
-            A string representation of the PipeFunc instance.
+        A string representation of the PipeFunc instance.
 
         """
         return f"PipeFunc({self.func.__name__})"
@@ -299,8 +294,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        state : dict
-            A dictionary containing the picklable state of the object.
+        A dictionary containing the picklable state of the object.
 
         """
         state = {k: v for k, v in self.__dict__.items() if k != "func"}
@@ -412,8 +406,7 @@ def pipefunc(
 
         Returns
         -------
-        PipeFunc
-            The wrapped function with the specified return identifier.
+        The wrapped function with the specified return identifier.
 
         """
         return PipeFunc(

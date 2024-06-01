@@ -391,8 +391,7 @@ class CloudPickleCodec(Codec):
 
         Returns
         -------
-        Any
-            The decoded data.
+        The decoded data.
 
         """
         buf = ensure_contiguous_ndarray(buf)

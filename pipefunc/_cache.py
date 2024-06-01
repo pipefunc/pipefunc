@@ -136,9 +136,8 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        Any
-            The value associated with the key if the key is present in the cache,
-            otherwise None.
+        The value associated with the key if the key is present in the cache,
+        otherwise None.
 
         """
         if key not in self._cache_dict:
@@ -217,7 +216,6 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        bool
             True if the key is present in the cache, otherwise False.
 
         """
@@ -231,7 +229,6 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        str
             A string representation of the HybridCache.
 
         """
