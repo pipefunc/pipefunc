@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import PipeFunc, Pipeline, Sweep, count_sweep, get_precalculation_order, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
 if TYPE_CHECKING:
     from pathlib import Path
