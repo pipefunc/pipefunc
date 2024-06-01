@@ -581,7 +581,7 @@ class Pipeline:
         Returns
         -------
             The return value of the pipeline or a dictionary mapping function
-            names to their return values if full_output is True.
+            names to their return values if `full_output` is True.
 
         """
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
