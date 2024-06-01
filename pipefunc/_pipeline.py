@@ -12,7 +12,6 @@ the resource usage of the pipeline functions.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import inspect
 import sys
@@ -29,6 +28,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
 from pipefunc._utils import (
     at_least_tuple,
+    clear_cached_properties,
     generate_filename_from_dict,
     handle_error,
     table,
@@ -239,10 +239,7 @@ class Pipeline:
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
         self._func: dict[_OUTPUT_TYPE, _Function] = {}
-        for k, v in type(self).__dict__.items():
-            if isinstance(v, functools.cached_property):
-                with contextlib.suppress(AttributeError):
-                    delattr(self, k)
+        clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
