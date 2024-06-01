@@ -216,7 +216,7 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-            True if the key is present in the cache, otherwise False.
+        True if the key is present in the cache, otherwise False.
 
         """
         return key in self._cache_dict
@@ -229,7 +229,7 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-            A string representation of the HybridCache.
+        A string representation of the HybridCache.
 
         """
         cache_str = f"Cache: {self._cache_dict}\n"
