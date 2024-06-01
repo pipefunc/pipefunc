@@ -592,8 +592,8 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
-        if p := self.map_parameters & set(self.func_dependencies(output_name)):
-            inputs = self.map_parameters & set(self.root_args(output_name))
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
@@ -780,7 +780,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def mapspec_parameters(self) -> set[str]:
+    def mapspec_names(self) -> set[str]:
         return {
             name
             for mapspec in self.mapspecs()

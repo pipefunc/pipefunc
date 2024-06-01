@@ -49,14 +49,14 @@ class _MockPipeline:
     """
 
     defaults: dict[str, Any]
-    map_parameters: set[str]
+    mapspec_names: set[str]
     topological_generations: _Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
         return cls(
             defaults=pipeline.defaults,
-            map_parameters=pipeline.map_parameters,
+            mapspec_names=pipeline.mapspec_names,
             topological_generations=pipeline.topological_generations,
         )
 
