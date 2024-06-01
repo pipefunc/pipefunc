@@ -57,6 +57,7 @@ docs = [
     "jupytext",
     "sphinx_autodoc_typehints",
     "pipefunc[all]",
+    "pytest-xdist",
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
 all = ["pipefunc[dev,adaptive,xarray,zarr,plotting,test]"]
