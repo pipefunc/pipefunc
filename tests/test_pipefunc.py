@@ -864,3 +864,4 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     # Call functions within pipeline with updated defaults and renames
     assert pipeline("x", a2=3) == 6
     assert pipeline("y", c=2, d2=3) == 6
+    assert pipeline("y") == 4 * 666
