@@ -137,7 +137,7 @@ class HybridCache(_CacheBase):
         Returns
         -------
             The value associated with the key if the key is present in the cache,
-        otherwise None.
+            otherwise None.
 
         """
         if key not in self._cache_dict:
