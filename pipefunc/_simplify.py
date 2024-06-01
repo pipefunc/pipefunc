@@ -79,9 +79,8 @@ def _combine_nodes(
 
     Returns
     -------
-    Dict[PipeFunc, Set[PipeFunc]]
-        A simplified dictionary where each node only depends on nodes
-        that cannot be further combined.
+    A simplified dictionary where each node only depends on nodes
+    that cannot be further combined.
 
     """
     combinable_nodes = OrderedDict(combinable_nodes)

@@ -89,7 +89,7 @@ class PipeFunc(Generic[T]):
 
     Returns
     -------
-        The identifier for the output of the wrapped function.
+    The identifier for the output of the wrapped function.
 
     Examples
     --------
@@ -390,9 +390,8 @@ def pipefunc(
 
     Returns
     -------
-    Callable[[Callable[..., Any]], PipeFunc]
-        A decorator function that takes the original function and output_name a
-        PipeFunc instance with the specified return identifier.
+    A decorator function that takes the original function and output_name a
+    PipeFunc instance with the specified return identifier.
 
     """
 

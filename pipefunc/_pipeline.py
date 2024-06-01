@@ -1427,10 +1427,9 @@ def _compute_cache_key(
 
     Returns
     -------
-    _CACHE_KEY_TYPE | None
-        A tuple containing the output name and a tuple of root input keys
-        and their corresponding values, or None if the cache key computation
-        is skipped.
+    A tuple containing the output name and a tuple of root input keys
+    and their corresponding values, or None if the cache key computation
+    is skipped.
 
     """
     cache_key_items = []
