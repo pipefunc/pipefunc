@@ -1,3 +1,5 @@
+"""Provides the `pipefunc.sweep` module, for creating and managing parameter sweeps."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -103,6 +105,15 @@ class Sweep:
         self.derivers = derivers
 
     def generate(self) -> Generator[dict[str, Any], None, None]:  # noqa: PLR0912
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         if not self.items:
             return  # If there are no items, return an empty generator
 
@@ -328,10 +339,20 @@ class MultiSweep(Sweep):
         self.sweeps = list(sweeps)
 
     def generate(self) -> Generator[dict[str, Any], None, None]:
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         for sweep in self.sweeps:
             yield from sweep.generate()
 
     def __len__(self) -> int:
+        """Return the number of unique combinations in the sweep."""
         return sum(len(sweep) for sweep in self.sweeps)
 
     def list(self) -> list[dict[str, Any]]:

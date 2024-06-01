@@ -127,6 +127,7 @@ ignore = [
     "TD003",   # Missing issue link on the line following this TODO
     "FIX002",  # Line contains TODO"
     "E501",    # Line too long
+    "D107",    # Missing docstring in `__init__`
 ]
 
 [tool.ruff.lint.per-file-ignores]
