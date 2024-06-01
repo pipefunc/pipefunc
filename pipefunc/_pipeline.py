@@ -387,8 +387,7 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
-            A mapping from node names to nodes.
+        A mapping from node names to nodes.
 
         """
         mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
@@ -409,9 +408,8 @@ class Pipeline:
 
         Returns
         -------
-        nx.DiGraph
-            A directed graph with nodes representing functions and edges
-            representing dependencies between functions.
+        A directed graph with nodes representing functions and edges
+        representing dependencies between functions.
 
         """
         _check_consistent_defaults(self.functions)
@@ -475,8 +473,7 @@ class Pipeline:
 
         Returns
         -------
-        Any
-            The return value of the pipeline.
+        The return value of the pipeline.
 
         """
         if __output_name__ is None:

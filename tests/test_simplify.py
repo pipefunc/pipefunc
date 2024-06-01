@@ -135,7 +135,7 @@ def test_identify_combinable_nodes2():
         return a + f2 + f6
 
     pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
-    m = pipeline.node_mapping
+    m = pipeline.output_to_func
 
     expected = {m["f6"]: {m["f1"], m["f3"], m["f4"], m["f5"]}}
     combinable_nodes = pipeline._identify_combinable_nodes("f7")
