@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 
 import cloudpickle
 
-from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
+from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 9):  # pragma: no cover
@@ -134,7 +134,6 @@ class PipeFunc(Generic[T]):
             )
         self._profile = profile
         self.renames: dict[str, str] = renames or {}
-        self._inverse_renames: dict[str, str] = {v: k for k, v in self.renames.items()}
         self._defaults = defaults or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
@@ -159,11 +158,61 @@ class PipeFunc(Generic[T]):
         defaults = {}
         for original_name, v in parameters.items():
             new_name = self.renames.get(original_name, original_name)
-            if original_name in self._defaults:
-                defaults[new_name] = self._defaults[original_name]
+            if new_name in self._defaults:
+                defaults[new_name] = self._defaults[new_name]
             elif v.default is not inspect.Parameter.empty:
                 defaults[new_name] = v.default
         return defaults
+
+    @functools.cached_property
+    def _inverse_renames(self) -> dict[str, str]:
+        return {v: k for k, v in self.renames.items()}
+
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If `False`, the new
+            defaults will be added to the existing defaults.
+
+        """
+        if overwrite:
+            self._defaults = defaults.copy()
+        else:
+            self._defaults = dict(self._defaults, **defaults)
+        clear_cached_properties(self)
+
+    def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+        """Update renames to function arguments for the wrapped function.
+
+        Parameters
+        ----------
+        renames
+            A dictionary of renames for the function arguments.
+        overwrite
+            Whether to overwrite the existing renames. If `False`, the new
+            renames will be added to the existing renames.
+
+        """
+        old_inverse = self._inverse_renames
+        if overwrite:
+            self.renames = renames.copy()
+        else:
+            self.renames = dict(self.renames, **renames)
+
+        # Update defaults with new renames
+        new_defaults = {}
+        for name, value in self._defaults.items():
+            if original_name := old_inverse.get(name):
+                name = self.renames.get(original_name, original_name)  # noqa: PLW2901
+            new_defaults[name] = value
+        self._defaults = new_defaults
+
+        clear_cached_properties(self)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
@@ -183,7 +232,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The return value of the wrapped function.
 
         """
@@ -195,8 +243,8 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         kwargs.update(defaults)
+        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
             args = evaluate_lazy(args)
@@ -242,7 +290,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        AbstractContextManager
             A ResourceProfiler instance if profiling is enabled, or a
             nullcontext if disabled.
 
@@ -261,7 +308,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The value of the attribute.
 
         """
@@ -272,7 +318,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -284,7 +329,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -299,7 +343,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        state : dict
             A dictionary containing the picklable state of the object.
 
         """
@@ -315,7 +358,7 @@ class PipeFunc(Generic[T]):
 
         Parameters
         ----------
-        state : dict
+        state
             A dictionary containing the picklable state of the object.
 
         """
@@ -396,7 +439,6 @@ def pipefunc(
 
     Returns
     -------
-    Callable[[Callable[..., Any]], PipeFunc]
         A decorator function that takes the original function and output_name a
         PipeFunc instance with the specified return identifier.
 
@@ -412,7 +454,6 @@ def pipefunc(
 
         Returns
         -------
-        PipeFunc
             The wrapped function with the specified return identifier.
 
         """

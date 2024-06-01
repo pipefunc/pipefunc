@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import PipeFunc, Pipeline, Sweep, count_sweep, get_precalculation_order, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -783,3 +784,84 @@ def test_setting_defaults() -> None:
 
     assert h() == ("b_new", "a_new")
     assert h(a="aa", b="bb") == ("bb", "aa")
+
+
+def test_update_defaults_and_renames() -> None:
+    @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
+    def f(a=42, b=69):
+        return a + b
+
+    # Test initial parameters and defaults
+    assert f.parameters == ("a1", "b")
+    assert f.defaults == {"a1": 42, "b": 1}
+
+    # Update defaults
+    f.update_defaults({"b": 2})
+    assert f.defaults == {"a1": 42, "b": 2}
+
+    # Call function with updated defaults
+    assert f(a1=3) == 5
+
+    # Overwrite defaults
+    f.update_defaults({"a1": 1, "b": 3}, overwrite=True)
+    assert f.defaults == {"a1": 1, "b": 3}
+    assert f.parameters == ("a1", "b")
+
+    # Call function with new defaults
+    assert f(a1=2) == 5
+    assert f() == 4
+    assert f(a1=2, b=3) == 5
+
+    # Update renames
+    f.update_renames({"a": "a2"})
+    assert f.parameters == ("a2", "b")
+
+    # Call function with updated renames
+    assert f(a2=4) == 7
+    assert f(b=0) == 1
+
+    # Overwrite renames
+    f.update_renames({"a": "a3"}, overwrite=True)
+    assert f.parameters == ("a3", "b")
+
+    # Call function with new renames
+    assert f(a3=1) == 4
+
+    pipeline = Pipeline([f])
+    assert pipeline("c", a3=1) == 4
+    assert pipeline("c", a3=2, b=3) == 5
+
+
+def test_update_defaults_and_renames_with_pipeline() -> None:
+    @pipefunc(output_name="x", defaults={"b": 1}, renames={"a": "a1"})
+    def f(a=42, b=69):
+        return a + b
+
+    @pipefunc(output_name="y", defaults={"c": 2}, renames={"d": "d1"})
+    def g(c=999, d=666):
+        return c * d
+
+    pipeline = Pipeline([f, g])
+
+    # Test initial pipeline parameters and defaults
+    assert f.parameters == ("a1", "b")
+    assert f.defaults == {"a1": 42, "b": 1}
+    assert g.parameters == ("c", "d1")
+    assert g.defaults == {"c": 2, "d1": 666}
+
+    # Update defaults and renames within pipeline
+    f.update_defaults({"b": 3})
+    f.update_renames({"a": "a2"})
+    g.update_defaults({"c": 4})
+    g.update_renames({"d": "d2"})
+
+    # Test updated pipeline parameters and defaults
+    assert f.parameters == ("a2", "b")
+    assert f.defaults == {"a2": 42, "b": 3}
+    assert g.parameters == ("c", "d2")
+    assert g.defaults == {"c": 4, "d2": 666}
+
+    # Call functions within pipeline with updated defaults and renames
+    assert pipeline("x", a2=3) == 6
+    assert pipeline("y", c=2, d2=3) == 6
+    assert pipeline("y") == 4 * 666

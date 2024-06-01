@@ -51,14 +51,14 @@ class _MockPipeline:
     """
 
     defaults: dict[str, Any]
-    map_parameters: set[str]
+    mapspec_names: set[str]
     topological_generations: _Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
         return cls(
             defaults=pipeline.defaults,
-            map_parameters=pipeline.map_parameters,
+            mapspec_names=pipeline.mapspec_names,
             topological_generations=pipeline.topological_generations,
         )
 
@@ -634,7 +634,6 @@ def load_xarray_dataset(
 
     Returns
     -------
-    xr.Dataset
         An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """
@@ -712,7 +711,7 @@ def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
     # It might be that this function could be used instead.
     reduced_axes: dict[str, set[str]] = defaultdict(set)
     axes = pipeline.mapspec_axes()
-    for name in pipeline.map_parameters:
+    for name in pipeline.mapspec_names:
         for func in pipeline.functions:
             if _is_parameter_reduced_by_function(func, name):
                 reduced_axes[name].update(axes[name])

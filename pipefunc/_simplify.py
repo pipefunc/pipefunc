@@ -79,7 +79,6 @@ def _combine_nodes(
 
     Returns
     -------
-    Dict[PipeFunc, Set[PipeFunc]]
         A simplified dictionary where each node only depends on nodes
         that cannot be further combined.
 
@@ -124,10 +123,10 @@ def _get_signature(
 
     Returns
     -------
-    all_inputs : dict[PipeFunc, set[str]]
+    all_inputs
         Dictionary where keys are nodes and values are sets of parameter
         names that the node and its dependent nodes require.
-    all_outputs : dict[PipeFunc, set[str]]
+    all_outputs
         Dictionary where keys are nodes and values are sets of output names
         that the node and its dependent nodes produce, plus additional output
         names based on the dependency relationships in the graph.
