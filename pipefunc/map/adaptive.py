@@ -54,6 +54,7 @@ def create_learners(
     storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
+    split_independent_axes: bool = False,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -79,9 +80,8 @@ def create_learners(
         Whether to return the output of the function in the learner.
     cleanup
         Whether to clean up the `run_folder`.
-    fixed_indices
-        A dictionary mapping axes names to indices that should be fixed for the run.
-        If not provided, all indices are iterated over.
+    split_independent_axes
+        Whether to split the independent axes into separate learners.
 
     Returns
     -------
@@ -102,11 +102,8 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners = []
-    independent_axes = _identify_cross_product_axes(pipeline)
-    mapspec_axes = pipeline.mapspec_axes()
-    shapes = map_shapes(pipeline, inputs).shapes
-    for fixed_indices in _iterate_axes(independent_axes, inputs, mapspec_axes, shapes):
-        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+    iterator = _maybe_iterate_axes(pipeline, inputs, split_independent_axes)
+    for fixed_indices in iterator:
         for gen in pipeline.topological_generations.function_lists:
             _learners = {}
             for func in gen:
@@ -383,3 +380,19 @@ def _iterate_axes(
     shape = tuple(x for axis in axes for x in shape_dct[axis])
     for indices in _iterate_shape_indices(shape):
         yield dict(zip(axes, indices))
+
+
+def _maybe_iterate_axes(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    split_independent_axes: bool,  # noqa: FBT001
+) -> Generator[dict[str, Any] | None, None, None]:
+    if not split_independent_axes:
+        yield None
+        return
+    independent_axes = _identify_cross_product_axes(pipeline)
+    mapspec_axes = pipeline.mapspec_axes()
+    shapes = map_shapes(pipeline, inputs).shapes
+    for fixed_indices in _iterate_axes(independent_axes, inputs, mapspec_axes, shapes):
+        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+        yield fixed_indices

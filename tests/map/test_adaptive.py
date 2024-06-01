@@ -207,7 +207,7 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
     assert counters["take_sum"] == 4
 
 
-def test_basic_with_fixed_indices(tmp_path: Path) -> None:
+def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
     def add(x: int, y: int) -> tuple[int, int]:
         assert isinstance(x, int)
@@ -222,10 +222,11 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
         inputs,
         run_folder=tmp_path,
         return_output=True,
-        fixed_indices={"i": 0},
+        split_independent_axes=True,
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 1
+    assert len(flat_learners["z"]) == 9
     adaptive.runner.simple(flat_learners["z"])
     assert flat_learners["z"].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
     run_info = RunInfo.load(run_folder=tmp_path)
@@ -235,12 +236,3 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
         [None, None, None],
         [None, None, None],
     ]
-
-    with pytest.raises(ValueError, match="Got extra `fixed_indices`: `{'not_exist'}`"):
-        create_learners(
-            pipeline,
-            inputs,
-            run_folder=tmp_path,
-            return_output=True,
-            fixed_indices={"not_exist": 0},
-        )
