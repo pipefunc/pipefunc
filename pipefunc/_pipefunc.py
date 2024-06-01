@@ -168,8 +168,8 @@ class PipeFunc(Generic[T]):
     def _inverse_renames(self) -> dict[str, str]:
         return {v: k for k, v in self.renames.items()}
 
-    def apply_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
-        """Apply defaults to the provided keyword arguments.
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
 
         Parameters
         ----------
@@ -190,8 +190,8 @@ class PipeFunc(Generic[T]):
             self._defaults.update(defaults)
         clear_cached_properties(self)
 
-    def apply_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
-        """Apply renames to function arguments for the wrapped function.
+    def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+        """Update renames to function arguments for the wrapped function.
 
         Parameters
         ----------
