@@ -651,7 +651,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
 
     # Run the pipeline
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": [1, 1]}
-    assert pipeline.map_parameters == {"one", "a", "three", "two", "b", "d"}
+    assert pipeline.mapspec_names == {"one", "a", "three", "two", "b", "d"}
     expected = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3, 2), "three": (3, 2), "d": (2,)}
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
@@ -955,7 +955,7 @@ def test_growing_axis(tmp_path: Path) -> None:
 
 def test_storage_options():
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
-        Pipeline([lambda x: x]).map({}, None, storage="invalid")
+        Pipeline([lambda x: x]).map({"x": 1}, None, storage="invalid")
 
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}

@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 
 import cloudpickle
 
-from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 9):  # pragma: no cover
@@ -236,7 +236,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The return value of the wrapped function.
 
         """
@@ -295,7 +294,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        AbstractContextManager
             A ResourceProfiler instance if profiling is enabled, or a
             nullcontext if disabled.
 
@@ -314,7 +312,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The value of the attribute.
 
         """
@@ -325,7 +322,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -337,7 +333,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -352,7 +347,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        state : dict
             A dictionary containing the picklable state of the object.
 
         """
@@ -368,7 +362,7 @@ class PipeFunc(Generic[T]):
 
         Parameters
         ----------
-        state : dict
+        state
             A dictionary containing the picklable state of the object.
 
         """
@@ -449,7 +443,6 @@ def pipefunc(
 
     Returns
     -------
-    Callable[[Callable[..., Any]], PipeFunc]
         A decorator function that takes the original function and output_name a
         PipeFunc instance with the specified return identifier.
 
@@ -465,7 +458,6 @@ def pipefunc(
 
         Returns
         -------
-        PipeFunc
             The wrapped function with the specified return identifier.
 
         """

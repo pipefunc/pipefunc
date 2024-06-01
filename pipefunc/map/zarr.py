@@ -374,7 +374,7 @@ class CloudPickleCodec(Codec):
 
         Returns
         -------
-        The cloudpickled data.
+            The cloudpickled data.
 
         """
         return cloudpickle.dumps(buf, protocol=self.protocol)
@@ -391,7 +391,6 @@ class CloudPickleCodec(Codec):
 
         Returns
         -------
-        Any
             The decoded data.
 
         """
@@ -408,7 +407,7 @@ class CloudPickleCodec(Codec):
 
         Returns
         -------
-        The configuration of the codec.
+            The configuration of the codec.
 
         """
         return {

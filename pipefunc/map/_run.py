@@ -49,14 +49,14 @@ class _MockPipeline:
     """
 
     defaults: dict[str, Any]
-    map_parameters: set[str]
+    mapspec_names: set[str]
     topological_generations: _Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
         return cls(
             defaults=pipeline.defaults,
-            map_parameters=pipeline.map_parameters,
+            mapspec_names=pipeline.mapspec_names,
             topological_generations=pipeline.topological_generations,
         )
 
@@ -435,6 +435,8 @@ def run(
         Whether to clean up the `run_folder` before running the pipeline.
 
     """
+    # TODO: implement setting `output_name`, see #127
+    _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
@@ -588,7 +590,6 @@ def load_xarray_dataset(
 
     Returns
     -------
-    xr.Dataset
         An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """
@@ -602,3 +603,26 @@ def load_xarray_dataset(
         output_names=output_name,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
+
+
+def _validate_complete_inputs(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    output_name: _OUTPUT_TYPE | None = None,
+) -> None:
+    """Validate that all required inputs are provided.
+
+    Note that `output_name is None` means that all outputs are required!
+    This is in contrast to some other functions, where `None` means that the `pipeline.unique_leaf_node`
+    is used.
+    """
+    if output_name is None:
+        root_args = set(pipeline.topological_generations.root_args)
+    else:  # pragma: no cover
+        # TODO: this case becomes relevant when #127 is implemented
+        root_args = set(pipeline.root_args(output_name))
+    inputs_with_defaults = set(inputs) | set(pipeline.defaults)
+    if missing := root_args - set(inputs_with_defaults):
+        missing_args = ", ".join(missing)
+        msg = f"Missing inputs: {missing_args}"
+        raise ValueError(msg)

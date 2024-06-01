@@ -1,3 +1,5 @@
+"""Provides the `pipefunc.lazy` module, which contains functions for lazy evaluation."""
+
 from __future__ import annotations
 
 import contextlib

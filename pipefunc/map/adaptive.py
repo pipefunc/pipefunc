@@ -25,8 +25,9 @@ from pipefunc.map._run_info import RunInfo
 if TYPE_CHECKING:
     import sys
 
-    from pipefunc import PipeFunc, Pipeline, Sweep
+    from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
+    from pipefunc.sweep import Sweep
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
@@ -74,9 +75,9 @@ def create_learners(
 
     Returns
     -------
-    A list of dictionaries where the keys are the output names of the
-    functions and the values are the corresponding adaptive learners. As noted
-    above, the learners have to be executed in order.
+        A list of dictionaries where the keys are the output names of the
+        functions and the values are the corresponding adaptive learners. As noted
+        above, the learners have to be executed in order.
 
     """
     run_folder = Path(run_folder)
@@ -271,8 +272,8 @@ def create_learners_from_sweep(
 
     Returns
     -------
-    A tuple of lists where the first list contains the learners and the second
-    list contains the run folders for each sweep run.
+        A tuple of lists where the first list contains the learners and the second
+        list contains the run folders for each sweep run.
 
     """
     run_folder = Path(run_folder)

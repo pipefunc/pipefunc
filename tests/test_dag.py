@@ -3,18 +3,17 @@ from collections import defaultdict
 import networkx as nx
 
 import pipefunc
-import pipefunc._lazy
-from pipefunc._lazy import TaskGraph, _LazyFunction, construct_dag
+from pipefunc.lazy import TaskGraph, _LazyFunction, construct_dag
 
 
 def test_construct_dag():
-    assert pipefunc._lazy._TASK_GRAPH is None
+    assert pipefunc.lazy._TASK_GRAPH is None
     with construct_dag() as dag:
         assert isinstance(dag, TaskGraph)
         assert isinstance(dag.graph, nx.DiGraph)
         assert dag.mapping == {}
-        assert pipefunc._lazy._TASK_GRAPH is dag
-    assert pipefunc._lazy._TASK_GRAPH is None
+        assert pipefunc.lazy._TASK_GRAPH is dag
+    assert pipefunc.lazy._TASK_GRAPH is None
 
 
 def test_lazy_function_without_dag():
@@ -97,7 +96,7 @@ def test_lazy_pipeline():
     assert r2["c"].evaluate() == 3
     assert r2["d"].evaluate() == 6
     assert r2["e"].evaluate() == 18
-    assert pipefunc.evaluate_lazy(r2) == {"a": 1, "b": 2, "c": 3, "d": 6, "e": 18}
+    assert pipefunc.lazy.evaluate_lazy(r2) == {"a": 1, "b": 2, "c": 3, "d": 6, "e": 18}
     assert r3.evaluate() == 18
     assert str(r1) == "f3(c=f1(a=1, b=2), d=f2(b=2, c=f1(a=1, b=2), x=1), x=1)"
 
@@ -141,7 +140,7 @@ def test_running_dag_pipeline():
             lazy_func = dag.mapping[node]
             name = lazy_func.func.__name__
             r = lazy_func.evaluate()
-            kwargs = pipefunc.evaluate_lazy(lazy_func.kwargs)
+            kwargs = pipefunc.lazy.evaluate_lazy(lazy_func.kwargs)
             results[name].append((kwargs, r))
 
     assert results == {

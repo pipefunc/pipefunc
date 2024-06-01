@@ -9,7 +9,6 @@ from pipefunc._utils import (
     format_args,
     format_function_call,
     format_kwargs,
-    join_overlapping_sets,
     load,
 )
 
@@ -228,51 +227,3 @@ def test_equal_dicts():
 
     with pytest.warns(Warning, match="Errors comparing keys"):
         assert equal_dicts({"a": A()}, {"a": A()}, verbose=True) is None
-
-
-def test_single_set():
-    sets = [{1, 2, 3}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2, 3}]
-
-
-def test_no_overlap():
-    sets = [{1, 2, 3}, {4, 5, 6}, {7, 8, 9}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2, 3}, {4, 5, 6}, {7, 8, 9}]
-
-
-def test_complete_overlap():
-    sets = [{1, 2, 3}, {3, 4, 5}, {5, 6, 7}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2, 3, 4, 5, 6, 7}]
-
-
-def test_partial_overlap():
-    sets = [{1, 2}, {2, 3}, {4, 5}, {5, 6}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2, 3}, {4, 5, 6}]
-
-
-def test_disconnected_sets():
-    sets = [{1, 2}, {3, 4}, {5, 6}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2}, {3, 4}, {5, 6}]
-
-
-def test_no_sets():
-    sets = []
-    result = join_overlapping_sets(sets)
-    assert result == []
-
-
-def test_single_element_sets():
-    sets = [{1}, {2}, {3}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1}, {2}, {3}]
-
-
-def test_all_identical_sets():
-    sets = [{1, 2}, {1, 2}, {1, 2}]
-    result = join_overlapping_sets(sets)
-    assert result == [{1, 2}]

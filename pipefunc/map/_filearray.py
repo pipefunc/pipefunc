@@ -181,13 +181,12 @@ class FileArray(StorageBase):
 
         Parameters
         ----------
-        splat_internal : bool
+        splat_internal
             If True, the internal array dimensions will be splatted out.
             If None, it will happen if and only if `internal_shape` is provided.
 
         Returns
         -------
-        np.ma.core.MaskedArray
             The array containing all the data.
 
         """

@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Uni
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
@@ -35,6 +34,7 @@ from pipefunc._utils import (
     table,
 )
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -112,7 +112,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -128,7 +127,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -144,7 +142,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -387,7 +384,6 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
             A mapping from node names to nodes.
 
         """
@@ -409,7 +405,6 @@ class Pipeline:
 
         Returns
         -------
-        nx.DiGraph
             A directed graph with nodes representing functions and edges
             representing dependencies between functions.
 
@@ -447,7 +442,6 @@ class Pipeline:
 
         Returns
         -------
-        Callable[..., Any]
             The composed function that can be called with keyword arguments.
 
         """
@@ -475,7 +469,6 @@ class Pipeline:
 
         Returns
         -------
-        Any
             The return value of the pipeline.
 
         """
@@ -587,13 +580,12 @@ class Pipeline:
 
         Returns
         -------
-        Any
             The return value of the pipeline or a dictionary mapping function
-            names to their return values if full_output is True.
+            names to their return values if `full_output` is True.
 
         """
-        if p := self.map_parameters & set(self.func_dependencies(output_name)):
-            inputs = self.map_parameters & set(self.root_args(output_name))
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
@@ -687,7 +679,6 @@ class Pipeline:
 
         Returns
         -------
-        Set[Tuple[str, ...]]
             A set of tuples containing possible argument combinations.
             The tuples are sorted in lexicographical order.
 
@@ -759,7 +750,6 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
             A dictionary mapping function names to sets of tuples containing
             possible argument combinations.
 
@@ -780,7 +770,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def map_parameters(self) -> set[str]:
+    def mapspec_names(self) -> set[str]:
         return {
             name
             for mapspec in self.mapspecs()
@@ -1004,7 +994,6 @@ class Pipeline:
 
         Returns
         -------
-        dict[PipeFunc, set[PipeFunc]]
             A dictionary where each key is a PipeFunc that can be
             combined with others. The value associated with each key is a set of
             PipeFuncs that can be combined with the key function.
@@ -1088,7 +1077,6 @@ class Pipeline:
 
         Returns
         -------
-        Pipeline
             The simplified version of the pipeline.
 
         Notes
@@ -1214,7 +1202,7 @@ class Pipeline:
 
         Returns
         -------
-        Tuple of fully connected `Pipeline` objects.
+            Tuple of fully connected `Pipeline` objects.
 
         """
         connected_components = self._connected_components()
@@ -1439,7 +1427,6 @@ def _compute_cache_key(
 
     Returns
     -------
-    _CACHE_KEY_TYPE | None
         A tuple containing the output name and a tuple of root input keys
         and their corresponding values, or None if the cache key computation
         is skipped.
