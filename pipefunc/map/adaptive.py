@@ -117,6 +117,7 @@ def create_learners(
     ] = {}
     iterator = _maybe_iterate_axes(pipeline, inputs, fixed_indices, split_independent_axes)  # type: ignore[assignment]
     for fixed_indices in iterator:
+        key = tuple(sorted(fixed_indices.items())) if fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
             _learners = {}
             for func in gen:
@@ -128,7 +129,6 @@ def create_learners(
                     fixed_indices=fixed_indices,
                     return_output=return_output,
                 )
-            key = tuple(sorted(fixed_indices.items())) if fixed_indices else None
             learners.setdefault(key, []).append(_learners)
     return learners
 
