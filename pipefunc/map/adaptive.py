@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, Tuple, Union
 
 import adaptive
 import numpy as np
@@ -24,7 +24,8 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo
+from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
     import sys
@@ -53,7 +54,6 @@ def create_learners(
     storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
-    fixed_indices: dict[str, int | slice] | None = None,
 ) -> list[dict[_OUTPUT_TYPE, adaptive.SequenceLearner]]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -90,7 +90,6 @@ def create_learners(
         above, the learners have to be executed in order.
 
     """
-    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = Path(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -103,18 +102,23 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners = []
-    for gen in pipeline.topological_generations.function_lists:
-        _learners = {}
-        for func in gen:
-            _learners[func.output_name] = _learner(
-                func=func,
-                run_info=run_info,
-                run_folder=run_folder,
-                store=store,
-                fixed_indices=fixed_indices,
-                return_output=return_output,
-            )
-        learners.append(_learners)
+    independent_axes = _identify_cross_product_axes(pipeline)
+    mapspec_axes = pipeline.mapspec_axes()
+    shapes = map_shapes(pipeline, inputs).shapes
+    for fixed_indices in _iterate_axes(independent_axes, inputs, mapspec_axes, shapes):
+        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+        for gen in pipeline.topological_generations.function_lists:
+            _learners = {}
+            for func in gen:
+                _learners[func.output_name] = _learner(
+                    func=func,
+                    run_info=run_info,
+                    run_folder=run_folder,
+                    store=store,
+                    fixed_indices=fixed_indices,
+                    return_output=return_output,
+                )
+            learners.append(_learners)
     return learners
 
 
@@ -352,3 +356,30 @@ def _identify_cross_product_axes(pipeline: Pipeline) -> set[str]:
     # If this assert ever fails, perhaps we need `possible_axes - impossible_axes`?
     assert not (possible_axes & impossible_axes)
     return possible_axes
+
+
+def _axes_to_parameters(mapspec_axes: dict[str, tuple[str, ...]]) -> dict[str, set[str]]:
+    axes_to_parameter: dict[str, set[str]] = {}
+    for parameter, _axes in mapspec_axes.items():
+        for axis in _axes:
+            axes_to_parameter.setdefault(axis, set()).add(parameter)
+    return axes_to_parameter
+
+
+def _iterate_axes(
+    independent_axes: set[str],
+    inputs: dict[str, Any],
+    mapspec_axes: dict[str, tuple[str, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+) -> Generator[dict[str, Any], None, None]:
+    axes = tuple(independent_axes)
+    axes_to_parameters = _axes_to_parameters(mapspec_axes)
+    shape_dct = {}
+    for axis in axes:
+        parameters = axes_to_parameters[axis]
+        parameter = next(p for p in parameters if p in inputs)
+        shape_dct[axis] = shapes[parameter]
+    assert all(len(v) == 1 for v in shape_dct.values())
+    shape = tuple(x for axis in axes for x in shape_dct[axis])
+    for indices in _iterate_shape_indices(shape):
+        yield dict(zip(axes, indices))
