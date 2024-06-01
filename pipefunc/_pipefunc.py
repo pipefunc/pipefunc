@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 
 import cloudpickle
 
-from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
 if sys.version_info < (3, 9):  # pragma: no cover
