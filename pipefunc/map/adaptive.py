@@ -54,9 +54,10 @@ def create_learners(
     storage: str = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
     split_independent_axes: bool = False,
 ) -> dict[
-    tuple[tuple[str, int], ...] | None,
+    tuple[tuple[str, int | slice], ...] | None,
     list[dict[_OUTPUT_TYPE, SequenceLearner]],
 ]:
     """Create adaptive learners for a single `Pipeline.map` call.
@@ -83,15 +84,20 @@ def create_learners(
         Whether to return the output of the function in the learner.
     cleanup
         Whether to clean up the `run_folder`.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
     split_independent_axes
-        Whether to split the independent axes into separate learners.
+        Whether to split the independent axes into separate learners. Do not use
+        in conjunction with `fixed_indices`.
 
     Returns
     -------
-        TODO: FIX THIS DESCRIPTION
-        A list of dictionaries where the keys are the output names of the
+        A dictionary where the keys are the fixed indices, e.g., `(("i", 0), ("j", 0))`,
+        and the values are lists of dictionaries where the keys are the output names of the
         functions and the values are the corresponding adaptive learners. As noted
-        above, the learners have to be executed in order.
+        above, the learners have to be executed in order. If `fixed_indices` is `None` and
+        `split_independent_axes` is `False`, then the only key is `None`.
 
     """
     run_folder = Path(run_folder)
@@ -106,10 +112,15 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners: dict[
-        tuple[tuple[str, int], ...] | None,
+        tuple[tuple[str, int | slice], ...] | None,
         list[dict[_OUTPUT_TYPE, SequenceLearner]],
     ] = {}
-    iterator = _maybe_iterate_axes(pipeline, inputs, split_independent_axes)
+    if fixed_indices:
+        assert not split_independent_axes
+        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+        iterator = [fixed_indices]
+    else:
+        iterator = _maybe_iterate_axes(pipeline, inputs, split_independent_axes)  # type: ignore[assignment]
     for fixed_indices in iterator:
         for gen in pipeline.topological_generations.function_lists:
             _learners = {}
@@ -178,10 +189,18 @@ def _sequence(
 
 
 def flatten_learners(
-    learners_dicts: list[dict[_OUTPUT_TYPE, SequenceLearner]],
-) -> dict[_OUTPUT_TYPE, SequenceLearner]:
+    learners_dicts: dict[
+        tuple[tuple[str, int | slice], ...] | None,
+        list[dict[_OUTPUT_TYPE, SequenceLearner]],
+    ],
+) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
     """Flatten the list of dictionaries of learners into a single dictionary."""
-    return {k: v for learner_dict in learners_dicts for k, v in learner_dict.items()}
+    flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
+    for learners in learners_dicts.values():
+        for learner_dict in learners:
+            for output_name, learner in learner_dict.items():
+                flat_learners.setdefault(output_name, []).append(learner)
+    return flat_learners
 
 
 def _execute_iteration_in_single(

@@ -41,8 +41,8 @@ def test_basic(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 2
-    adaptive.runner.simple(flat_learners["z"])
-    assert flat_learners["z"].data == {
+    adaptive.runner.simple(flat_learners["z"][0])
+    assert flat_learners["z"][0].data == {
         0: (2,),
         1: (3,),
         2: (4,),
@@ -53,8 +53,8 @@ def test_basic(tmp_path: Path) -> None:
         7: (5,),
         8: (6,),
     }
-    adaptive.runner.simple(flat_learners["prod"])
-    assert flat_learners["prod"].data == {0: 172800}
+    adaptive.runner.simple(flat_learners["prod"][0])
+    assert flat_learners["prod"][0].data == {0: 172800}
 
 
 def test_simple_from_step(tmp_path: Path) -> None:
@@ -88,12 +88,12 @@ def test_simple_from_step(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 3
-    adaptive.runner.simple(flat_learners["x"])
-    assert flat_learners["x"].data == {0: [0, 1, 2, 3]}
-    adaptive.runner.simple(flat_learners["y"])
-    assert flat_learners["y"].data == {0: (0,), 1: (2,), 2: (4,), 3: (6,)}
-    adaptive.runner.simple(flat_learners["sum"])
-    assert flat_learners["sum"].data == {0: 12}
+    adaptive.runner.simple(flat_learners["x"][0])
+    assert flat_learners["x"][0].data == {0: [0, 1, 2, 3]}
+    adaptive.runner.simple(flat_learners["y"][0])
+    assert flat_learners["y"][0].data == {0: (0,), 1: (2,), 2: (4,), 3: (6,)}
+    adaptive.runner.simple(flat_learners["sum"][0])
+    assert flat_learners["sum"][0].data == {0: 12}
 
 
 @pytest.mark.parametrize("return_output", [True, False])
@@ -125,8 +125,9 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
         cleanup=True,
     )
     flat_learners = flatten_learners(learners_dicts)
-    for learner in flat_learners.values():
-        adaptive.runner.simple(learner)
+    for learners in flat_learners.values():
+        for learner in learners:
+            adaptive.runner.simple(learner)
     assert counters["add"] == 4
     assert counters["take_sum"] == 1
 
@@ -139,8 +140,9 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
         cleanup=False,
     )
     flat_learners = flatten_learners(learners_dicts)
-    for learner in flat_learners.values():
-        adaptive.runner.simple(learner)
+    for learners in flat_learners.values():
+        for learner in learners:
+            adaptive.runner.simple(learner)
     assert counters["add"] == 4
     assert counters["take_sum"] == 1
 
@@ -207,6 +209,45 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
     assert counters["take_sum"] == 4
 
 
+def test_basic_with_fixed_indices(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
+    def add(x: int, y: int) -> tuple[int, int]:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x, y
+
+    pipeline = Pipeline([add])
+
+    inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
+    learners_dicts = create_learners(
+        pipeline,
+        inputs,
+        run_folder=tmp_path,
+        return_output=True,
+        fixed_indices={"i": 0},
+    )
+    flat_learners = flatten_learners(learners_dicts)
+    assert len(flat_learners) == 1
+    adaptive.runner.simple(flat_learners["z"][0])
+    assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    run_info = RunInfo.load(run_folder=tmp_path)
+    store = run_info.init_store()
+    assert store["z"].to_array().tolist() == [
+        [(1, 1), (1, 2), (1, 3)],
+        [None, None, None],
+        [None, None, None],
+    ]
+
+    with pytest.raises(ValueError, match="Got extra `fixed_indices`: `{'not_exist'}`"):
+        create_learners(
+            pipeline,
+            inputs,
+            run_folder=tmp_path,
+            return_output=True,
+            fixed_indices={"not_exist": 0},
+        )
+
+
 def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
     def add(x: int, y: int) -> tuple[int, int]:
@@ -226,9 +267,9 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 1
-    assert len(flat_learners["z"]) == 9
-    adaptive.runner.simple(flat_learners["z"])
-    assert flat_learners["z"].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    assert len(flat_learners["z"][0]) == 9
+    adaptive.runner.simple(flat_learners["z"][0])
+    assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
     assert store["z"].to_array().tolist() == [
