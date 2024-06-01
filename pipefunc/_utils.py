@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import functools
 import hashlib
 import json
@@ -180,3 +181,11 @@ def table(rows: list[Any], headers: list[str]) -> str:
     table_rows.append(_format_table_row(separator_line, column_widths, seperator="-+-"))
 
     return "\n".join(table_rows)
+
+
+def clear_cached_properties(obj: object) -> None:
+    """Clear all `functools.cached_property`s from an object."""
+    for k, v in type(obj).__dict__.items():
+        if isinstance(v, functools.cached_property):
+            with contextlib.suppress(AttributeError):
+                delattr(obj, k)

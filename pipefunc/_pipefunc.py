@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 import cloudpickle
 
 from pipefunc._perf import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
@@ -168,12 +168,6 @@ class PipeFunc(Generic[T]):
     def _inverse_renames(self) -> dict[str, str]:
         return {v: k for k, v in self.renames.items()}
 
-    def _clear_cached_properties(self) -> None:
-        for k, v in type(self).__dict__.items():
-            if isinstance(v, functools.cached_property):
-                with contextlib.suppress(AttributeError):
-                    delattr(self, k)
-
     def apply_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Apply defaults to the provided keyword arguments.
 
@@ -194,7 +188,7 @@ class PipeFunc(Generic[T]):
             self._defaults = defaults.copy()
         else:
             self._defaults.update(defaults)
-        self._clear_cached_properties()
+        clear_cached_properties(self)
 
     def apply_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
         """Apply renames to function arguments for the wrapped function.
@@ -216,7 +210,7 @@ class PipeFunc(Generic[T]):
             self.renames = renames.copy()
         else:
             self.renames.update(renames)
-        self._clear_cached_properties()
+        clear_cached_properties(self)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
