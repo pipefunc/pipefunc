@@ -168,7 +168,7 @@ class PipeFunc(Generic[T]):
     def _inverse_renames(self) -> dict[str, str]:
         return {v: k for k, v in self.renames.items()}
 
-    def _reset_internal_cache(self) -> None:
+    def _clear_cached_properties(self) -> None:
         for k, v in type(self).__dict__.items():
             if isinstance(v, functools.cached_property):
                 with contextlib.suppress(AttributeError):
@@ -194,7 +194,7 @@ class PipeFunc(Generic[T]):
             self._defaults = defaults.copy()
         else:
             self._defaults.update(defaults)
-        self._reset_internal_cache()
+        self._clear_cached_properties()
 
     def apply_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
         """Apply renames to function arguments for the wrapped function.
@@ -216,7 +216,7 @@ class PipeFunc(Generic[T]):
             self.renames = renames.copy()
         else:
             self.renames.update(renames)
-        self._reset_internal_cache()
+        self._clear_cached_properties()
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
