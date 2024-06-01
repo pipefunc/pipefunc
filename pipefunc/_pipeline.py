@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Uni
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._lazy import _LazyFunction, task_graph
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
@@ -35,6 +34,7 @@ from pipefunc._utils import (
     table,
 )
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
