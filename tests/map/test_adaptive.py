@@ -267,13 +267,14 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 1
-    assert len(flat_learners["z"][0]) == 9
-    adaptive.runner.simple(flat_learners["z"][0])
-    assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    assert len(flat_learners["z"]) == 9
+    for learner in flat_learners["z"][:-3]:
+        adaptive.runner.simple(learner)
+    assert flat_learners["z"][0].data == {0: ((1, 1),)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
     assert store["z"].to_array().tolist() == [
         [(1, 1), (1, 2), (1, 3)],
-        [None, None, None],
+        [(2, 1), (2, 2), (2, 3)],
         [None, None, None],
     ]
