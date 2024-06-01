@@ -18,6 +18,7 @@ from pipefunc.map._run import (
     _maybe_load_single_output,
     _MockPipeline,
     _process_task,
+    _reduced_axes,
     _run_iteration_and_process,
     _submit_single,
     _validate_fixed_indices,
@@ -334,3 +335,20 @@ def create_learners_from_sweep(
         learners.append(learner)
         folders.append(sweep_run)
     return learners, folders
+
+
+def _identify_cross_product_axes(pipeline: Pipeline) -> set[str]:
+    reduced = _reduced_axes(pipeline)
+    impossible_axes: set[str] = set()
+    for func in pipeline.leaf_nodes:
+        for name in pipeline.func_dependencies(func):
+            for _name in at_least_tuple(name):
+                if _name in reduced:
+                    impossible_axes.update(reduced[_name])
+    possible_axes: set[str] = set()
+    for func in pipeline.leaf_nodes:
+        axes = pipeline.independent_axes_in_mapspecs(func.output_name)
+        possible_axes.update(axes)
+    # If this assert ever fails, perhaps we need `possible_axes - impossible_axes`?
+    assert not (possible_axes & impossible_axes)
+    return possible_axes

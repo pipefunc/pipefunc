@@ -726,7 +726,7 @@ class Pipeline:
 
         return sorted(_traverse(start), key=at_least_tuple)
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+    def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output.
 
         See Also
@@ -736,7 +736,7 @@ class Pipeline:
         """
         return self._traverse_graph(output_name, "predecessors")
 
-    def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+    def func_dependents(self, name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         """Return the functions that depend on a specific input/output.
 
         See Also
