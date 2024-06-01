@@ -492,6 +492,8 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     load_xarray_dataset(run_folder=tmp_path)
 
     assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
+    pipeline.add_mapspec_axis("x", axis="i")
+    assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
 
 
 def test_pipeline_with_defaults(tmp_path: Path) -> None:
