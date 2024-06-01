@@ -179,10 +179,6 @@ class PipeFunc(Generic[T]):
             Whether to overwrite the existing defaults. If `False`, the new
             defaults will be added to the existing defaults.
 
-        Returns
-        -------
-        The keyword arguments with defaults applied.
-
         """
         if overwrite:
             self._defaults = defaults.copy()
@@ -200,10 +196,6 @@ class PipeFunc(Generic[T]):
         overwrite
             Whether to overwrite the existing renames. If `False`, the new
             renames will be added to the existing renames.
-
-        Returns
-        -------
-        The keyword arguments with renames applied.
 
         """
         old_inverse = self._inverse_renames
