@@ -10,7 +10,7 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import load_outputs, load_xarray_dataset, run
+from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import storage_registry
 
@@ -490,6 +490,8 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     assert results["average_charge"].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
     load_xarray_dataset(run_folder=tmp_path)
+
+    assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
 
 
 def test_pipeline_with_defaults(tmp_path: Path) -> None:
