@@ -6,9 +6,10 @@ import adaptive
 import numpy as np
 import pytest
 
-from pipefunc import Pipeline, Sweep, pipefunc
+from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map.adaptive import create_learners, create_learners_from_sweep, flatten_learners
+from pipefunc.sweep import Sweep
 
 if TYPE_CHECKING:
     from pathlib import Path

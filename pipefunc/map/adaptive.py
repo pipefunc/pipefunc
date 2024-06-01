@@ -25,8 +25,9 @@ from pipefunc.map._run_info import RunInfo
 if TYPE_CHECKING:
     import sys
 
-    from pipefunc import PipeFunc, Pipeline, Sweep
+    from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
+    from pipefunc.sweep import Sweep
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
