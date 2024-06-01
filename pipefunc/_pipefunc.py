@@ -158,8 +158,8 @@ class PipeFunc(Generic[T]):
         defaults = {}
         for original_name, v in parameters.items():
             new_name = self.renames.get(original_name, original_name)
-            if original_name in self._defaults:
-                defaults[new_name] = self._defaults[original_name]
+            if new_name in self._defaults:
+                defaults[new_name] = self._defaults[new_name]
             elif v.default is not inspect.Parameter.empty:
                 defaults[new_name] = v.default
         return defaults
@@ -187,7 +187,7 @@ class PipeFunc(Generic[T]):
         if overwrite:
             self._defaults = defaults.copy()
         else:
-            self._defaults.update(defaults)
+            self._defaults = dict(self._defaults, **defaults)
         clear_cached_properties(self)
 
     def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
@@ -206,10 +206,22 @@ class PipeFunc(Generic[T]):
         The keyword arguments with renames applied.
 
         """
+        old_renames = self.renames
         if overwrite:
             self.renames = renames.copy()
         else:
-            self.renames.update(renames)
+            self.renames = dict(self.renames, **renames)
+
+        # Update defaults with new renames
+        new_defaults = {}
+        for param, value in self._defaults.items():
+            for old_name, new_name in old_renames.items():
+                if param == new_name:
+                    param = self.renames.get(old_name, old_name)
+                    break
+            new_defaults[param] = value
+        self._defaults = new_defaults
+
         clear_cached_properties(self)
 
     def copy(self) -> PipeFunc:
@@ -241,8 +253,8 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         kwargs.update(defaults)
+        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
             args = evaluate_lazy(args)

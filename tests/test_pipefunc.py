@@ -805,6 +805,7 @@ def test_update_defaults_and_renames() -> None:
     # Overwrite defaults
     f.update_defaults({"a1": 1, "b": 3}, overwrite=True)
     assert f.defaults == {"a1": 1, "b": 3}
+    assert f.parameters == ("a1", "b")
 
     # Call function with new defaults
     assert f(a1=2) == 5
@@ -815,6 +816,7 @@ def test_update_defaults_and_renames() -> None:
 
     # Call function with updated renames
     assert f(a2=4) == 7
+    assert f(b=0) == 1
 
     # Overwrite renames
     f.update_renames({"a": "a3"}, overwrite=True)
