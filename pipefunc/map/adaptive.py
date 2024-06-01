@@ -115,12 +115,7 @@ def create_learners(
         tuple[tuple[str, int | slice], ...] | None,
         list[dict[_OUTPUT_TYPE, SequenceLearner]],
     ] = {}
-    if fixed_indices:
-        assert not split_independent_axes
-        _validate_fixed_indices(fixed_indices, inputs, pipeline)
-        iterator = [fixed_indices]
-    else:
-        iterator = _maybe_iterate_axes(pipeline, inputs, split_independent_axes)  # type: ignore[assignment]
+    iterator = _maybe_iterate_axes(pipeline, inputs, fixed_indices, split_independent_axes)  # type: ignore[assignment]
     for fixed_indices in iterator:
         for gen in pipeline.topological_generations.function_lists:
             _learners = {}
@@ -177,15 +172,13 @@ def _sequence(
     mapspec: MapSpec,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
-) -> npt.NDArray[np.int_]:
+) -> npt.NDArray[np.int_] | range:
     if fixed_indices is None:
-        return np.arange(prod(shape))
+        return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
     assert len(fixed_mask) == prod(shape)
-    full_sequence = np.arange(len(fixed_mask))
-
-    return full_sequence[fixed_mask]
+    return np.flatnonzero(fixed_mask)
 
 
 def flatten_learners(
@@ -412,8 +405,14 @@ def _iterate_axes(
 def _maybe_iterate_axes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
+    fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
 ) -> Generator[dict[str, Any] | None, None, None]:
+    if fixed_indices:
+        assert not split_independent_axes
+        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+        yield fixed_indices
+        return
     if not split_independent_axes:
         yield None
         return
