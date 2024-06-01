@@ -590,7 +590,7 @@ def load_xarray_dataset(
 
     Returns
     -------
-    An `xarray.Dataset` containing the outputs of the pipeline run.
+        An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """
     from pipefunc.map.xarray import load_xarray_dataset

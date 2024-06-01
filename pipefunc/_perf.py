@@ -47,7 +47,7 @@ class ResourceStats:
 
         Returns
         -------
-        The standard deviation of the execution times.
+            The standard deviation of the execution times.
 
         """
         if self.num_executions < 2:  # noqa: PLR2004
@@ -104,7 +104,7 @@ class ResourceProfiler:
 
         Returns
         -------
-        The profiler instance.
+            The profiler instance.
 
         """
         self.thread = threading.Thread(target=self.measure_resources)

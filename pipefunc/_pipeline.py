@@ -112,7 +112,7 @@ class _Function:
 
         Returns
         -------
-        The return value of the pipeline function.
+            The return value of the pipeline function.
 
         """
         return self.pipeline.run(output_name=self.output_name, kwargs=kwargs)
@@ -127,7 +127,7 @@ class _Function:
 
         Returns
         -------
-        The return value of the pipeline function.
+            The return value of the pipeline function.
 
         """
         return self.pipeline.run(self.output_name, full_output=True, kwargs=kwargs)
@@ -142,7 +142,7 @@ class _Function:
 
         Returns
         -------
-        The return value of the pipeline function.
+            The return value of the pipeline function.
 
         """
         return self(**kwargs)
@@ -384,7 +384,7 @@ class Pipeline:
 
         Returns
         -------
-        A mapping from node names to nodes.
+            A mapping from node names to nodes.
 
         """
         mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
@@ -405,8 +405,8 @@ class Pipeline:
 
         Returns
         -------
-        A directed graph with nodes representing functions and edges
-        representing dependencies between functions.
+            A directed graph with nodes representing functions and edges
+            representing dependencies between functions.
 
         """
         _check_consistent_defaults(self.functions)
@@ -442,7 +442,7 @@ class Pipeline:
 
         Returns
         -------
-        The composed function that can be called with keyword arguments.
+            The composed function that can be called with keyword arguments.
 
         """
         if f := self._func.get(output_name):
@@ -469,7 +469,7 @@ class Pipeline:
 
         Returns
         -------
-        The return value of the pipeline.
+            The return value of the pipeline.
 
         """
         if __output_name__ is None:
@@ -580,8 +580,8 @@ class Pipeline:
 
         Returns
         -------
-        The return value of the pipeline or a dictionary mapping function
-        names to their return values if full_output is True.
+            The return value of the pipeline or a dictionary mapping function
+            names to their return values if full_output is True.
 
         """
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
@@ -679,8 +679,8 @@ class Pipeline:
 
         Returns
         -------
-        A set of tuples containing possible argument combinations.
-        The tuples are sorted in lexicographical order.
+            A set of tuples containing possible argument combinations.
+            The tuples are sorted in lexicographical order.
 
         """
         if r := self._arg_combinations.get(output_name):
@@ -750,8 +750,8 @@ class Pipeline:
 
         Returns
         -------
-        A dictionary mapping function names to sets of tuples containing
-        possible argument combinations.
+            A dictionary mapping function names to sets of tuples containing
+            possible argument combinations.
 
         """
         return {
@@ -994,9 +994,9 @@ class Pipeline:
 
         Returns
         -------
-        A dictionary where each key is a PipeFunc that can be
-        combined with others. The value associated with each key is a set of
-        PipeFuncs that can be combined with the key function.
+            A dictionary where each key is a PipeFunc that can be
+            combined with others. The value associated with each key is a set of
+            PipeFuncs that can be combined with the key function.
 
         Notes
         -----
@@ -1077,7 +1077,7 @@ class Pipeline:
 
         Returns
         -------
-        The simplified version of the pipeline.
+            The simplified version of the pipeline.
 
         Notes
         -----
@@ -1202,7 +1202,7 @@ class Pipeline:
 
         Returns
         -------
-        Tuple of fully connected `Pipeline` objects.
+            Tuple of fully connected `Pipeline` objects.
 
         """
         connected_components = self._connected_components()
@@ -1427,9 +1427,9 @@ def _compute_cache_key(
 
     Returns
     -------
-    A tuple containing the output name and a tuple of root input keys
-    and their corresponding values, or None if the cache key computation
-    is skipped.
+        A tuple containing the output name and a tuple of root input keys
+        and their corresponding values, or None if the cache key computation
+        is skipped.
 
     """
     cache_key_items = []

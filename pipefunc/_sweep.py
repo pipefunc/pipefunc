@@ -66,8 +66,8 @@ class Sweep:
 
     Returns
     -------
-    A list of dictionaries, each representing a specific combination
-    of dimension values.
+        A list of dictionaries, each representing a specific combination
+        of dimension values.
 
     Examples
     --------
@@ -234,7 +234,7 @@ class Sweep:
 
         Returns
         -------
-        A new Sweep object representing the Cartesian product of the sweeps.
+            A new Sweep object representing the Cartesian product of the sweeps.
 
         Examples
         --------
@@ -284,7 +284,7 @@ class Sweep:
 
         Returns
         -------
-        A new Sweep object with the added derivers.
+            A new Sweep object with the added derivers.
 
         Examples
         --------
@@ -313,7 +313,7 @@ class MultiSweep(Sweep):
 
     Returns
     -------
-    A MultiSweep object containing the concatenated sweeps.
+        A MultiSweep object containing the concatenated sweeps.
 
     Examples
     --------
@@ -404,8 +404,8 @@ def generate_sweep(
 
     Returns
     -------
-    A list of dictionaries, each representing a specific combination
-    of dimension values.
+        A list of dictionaries, each representing a specific combination
+        of dimension values.
 
     Examples
     --------
@@ -455,9 +455,9 @@ def count_sweep(
 
     Returns
     -------
-    A dictionary where the keys are the names of the arguments and the
-    values are dictionaries where the keys are the argument combinations
-    and the values are the number of times that combination is used.
+        A dictionary where the keys are the names of the arguments and the
+        values are dictionaries where the keys are the argument combinations
+        and the values are the number of times that combination is used.
 
     """
     if isinstance(sweep, Sweep):
@@ -530,7 +530,7 @@ def get_precalculation_order(
 
     Returns
     -------
-    The ordered list of functions to be precalculated and cached.
+        The ordered list of functions to be precalculated and cached.
 
     """
 
@@ -563,8 +563,8 @@ def _get_nested_value(d: dict, keys: list) -> Any:
 
     Returns
     -------
-    The value found at the nested location in the dictionary specified by
-    the list of keys.
+        The value found at the nested location in the dictionary specified by
+        the list of keys.
 
     Raises
     ------
@@ -648,9 +648,9 @@ def get_min_sweep_sets(
 
     Returns
     -------
-    A tuple where the first element is a list of the minimal set of argument
-    combinations for each function in the execution order and the second
-    element is a nested dictionary that represents the sweep combinations.
+        A tuple where the first element is a list of the minimal set of argument
+        combinations for each function in the execution order and the second
+        element is a nested dictionary that represents the sweep combinations.
 
     """
     root_args = pipeline.root_args(output_name)

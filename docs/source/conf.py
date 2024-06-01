@@ -115,5 +115,7 @@ shutil.copy(nb, nb_docs_folder)
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
 
+napoleon_numpy_returns_no_rtype = True
+
 def setup(app) -> None:
     pass

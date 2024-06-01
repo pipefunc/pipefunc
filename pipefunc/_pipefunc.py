@@ -89,7 +89,7 @@ class PipeFunc(Generic[T]):
 
     Returns
     -------
-    The identifier for the output of the wrapped function.
+        The identifier for the output of the wrapped function.
 
     Examples
     --------
@@ -183,7 +183,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        The return value of the wrapped function.
+            The return value of the wrapped function.
 
         """
         if extra := set(kwargs) - set(self.parameters):
@@ -241,8 +241,8 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        A ResourceProfiler instance if profiling is enabled, or a
-        nullcontext if disabled.
+            A ResourceProfiler instance if profiling is enabled, or a
+            nullcontext if disabled.
 
         """
         if self.profiling_stats is not None:
@@ -259,7 +259,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        The value of the attribute.
+            The value of the attribute.
 
         """
         return getattr(self.func, name)
@@ -269,7 +269,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        A string representation of the PipeFunc instance.
+            A string representation of the PipeFunc instance.
 
         """
         outputs = ", ".join(at_least_tuple(self.output_name))
@@ -280,7 +280,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        A string representation of the PipeFunc instance.
+            A string representation of the PipeFunc instance.
 
         """
         return f"PipeFunc({self.func.__name__})"
@@ -294,7 +294,7 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        A dictionary containing the picklable state of the object.
+            A dictionary containing the picklable state of the object.
 
         """
         state = {k: v for k, v in self.__dict__.items() if k != "func"}
@@ -309,7 +309,7 @@ class PipeFunc(Generic[T]):
 
         Parameters
         ----------
-        state : dict
+        state
             A dictionary containing the picklable state of the object.
 
         """
@@ -390,8 +390,8 @@ def pipefunc(
 
     Returns
     -------
-    A decorator function that takes the original function and output_name a
-    PipeFunc instance with the specified return identifier.
+        A decorator function that takes the original function and output_name a
+        PipeFunc instance with the specified return identifier.
 
     """
 
@@ -405,7 +405,7 @@ def pipefunc(
 
         Returns
         -------
-        The wrapped function with the specified return identifier.
+            The wrapped function with the specified return identifier.
 
         """
         return PipeFunc(
