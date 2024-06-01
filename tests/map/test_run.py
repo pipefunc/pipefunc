@@ -1127,3 +1127,14 @@ def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
     inputs = {"x": [1, 2, 3]}
     with pytest.raises(ValueError, match="Axis `i` in `y` is reduced"):
         pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False)
+
+
+def test_missing_inputs():
+    @pipefunc(output_name="y")
+    def f(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {}
+    with pytest.raises(ValueError, match="Missing inputs"):
+        pipeline.map(inputs, None, parallel=False)
