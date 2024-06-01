@@ -500,12 +500,12 @@ def set_cache_for_sweep(
 ) -> None:
     """Set the cache for a sweep of a pipeline."""
     # Disable for the output node
-    pipeline.node_mapping[output_name].cache = False  # type: ignore[union-attr]
+    pipeline.output_to_func[output_name].cache = False  # type: ignore[union-attr]
     cnt = count_sweep(output_name, sweep, pipeline)
     max_executions = {k: max(v.values()) for k, v in cnt.items()}
     for _output_name, n in max_executions.items():
         enable_cache = n >= min_executions
-        func = pipeline.node_mapping[_output_name]
+        func = pipeline.output_to_func[_output_name]
         if verbose:
             print(f"Setting cache for '{_output_name}' to {enable_cache} (n={n})")
         func.cache = enable_cache  # type: ignore[union-attr]

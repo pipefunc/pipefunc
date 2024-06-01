@@ -387,8 +387,7 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
-            A mapping from node names to nodes.
+        A mapping from node names to nodes.
 
         """
         mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
@@ -409,9 +408,8 @@ class Pipeline:
 
         Returns
         -------
-        nx.DiGraph
-            A directed graph with nodes representing functions and edges
-            representing dependencies between functions.
+        A directed graph with nodes representing functions and edges
+        representing dependencies between functions.
 
         """
         _check_consistent_defaults(self.functions)
@@ -475,8 +473,7 @@ class Pipeline:
 
         Returns
         -------
-        Any
-            The return value of the pipeline.
+        The return value of the pipeline.
 
         """
         if __output_name__ is None:
@@ -592,8 +589,8 @@ class Pipeline:
             names to their return values if full_output is True.
 
         """
-        if p := self.map_parameters & set(self.func_dependencies(output_name)):
-            inputs = self.map_parameters & set(self.root_args(output_name))
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
@@ -780,7 +777,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def map_parameters(self) -> set[str]:
+    def mapspec_names(self) -> set[str]:
         return {
             name
             for mapspec in self.mapspecs()

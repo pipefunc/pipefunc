@@ -39,12 +39,12 @@ def map_shapes(
         internal_shapes = {}
     internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
 
-    map_parameters: set[str] = pipeline.map_parameters
+    mapspec_names: set[str] = pipeline.mapspec_names
 
     input_parameters = set(pipeline.topological_generations.root_args)
 
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
-        p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
+        p: array_shape(inputs[p]) for p in input_parameters if p in mapspec_names
     }
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
@@ -60,7 +60,7 @@ def map_shapes(
                 shapes[output_name] = output_shape
                 masks[output_name] = mask
 
-    assert all(k in shapes for k in map_parameters if k not in internal)
+    assert all(k in shapes for k in mapspec_names if k not in internal)
     return Shapes(shapes, masks)
 
 
