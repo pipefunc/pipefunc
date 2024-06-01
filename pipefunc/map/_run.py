@@ -590,7 +590,6 @@ def load_xarray_dataset(
 
     Returns
     -------
-    xr.Dataset
         An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """

@@ -66,7 +66,6 @@ class Sweep:
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -235,7 +234,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object representing the Cartesian product of the sweeps.
 
         Examples
@@ -286,7 +284,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object with the added derivers.
 
         Examples
@@ -316,7 +313,6 @@ class MultiSweep(Sweep):
 
     Returns
     -------
-    MultiSweep
         A MultiSweep object containing the concatenated sweeps.
 
     Examples
@@ -408,7 +404,6 @@ def generate_sweep(
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -460,7 +455,6 @@ def count_sweep(
 
     Returns
     -------
-    dict
         A dictionary where the keys are the names of the arguments and the
         values are dictionaries where the keys are the argument combinations
         and the values are the number of times that combination is used.
@@ -536,7 +530,6 @@ def get_precalculation_order(
 
     Returns
     -------
-    list[PipeFunc]
         The ordered list of functions to be precalculated and cached.
 
     """
@@ -570,7 +563,6 @@ def _get_nested_value(d: dict, keys: list) -> Any:
 
     Returns
     -------
-    Any
         The value found at the nested location in the dictionary specified by
         the list of keys.
 
@@ -656,7 +648,6 @@ def get_min_sweep_sets(
 
     Returns
     -------
-    Tuple[List[Any], dict]
         A tuple where the first element is a list of the minimal set of argument
         combinations for each function in the execution order and the second
         element is a nested dictionary that represents the sweep combinations.

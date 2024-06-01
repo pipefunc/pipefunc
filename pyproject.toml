@@ -55,6 +55,7 @@ docs = [
     "myst-parser",
     "emoji",
     "jupytext",
+    "sphinx_autodoc_typehints",
     "pipefunc[all]",
 ]
 dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]

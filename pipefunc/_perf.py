@@ -47,7 +47,6 @@ class ResourceStats:
 
         Returns
         -------
-        float
             The standard deviation of the execution times.
 
         """
@@ -105,7 +104,6 @@ class ResourceProfiler:
 
         Returns
         -------
-        ResourceProfiler
             The profiler instance.
 
         """
