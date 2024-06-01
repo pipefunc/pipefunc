@@ -358,7 +358,7 @@ def create_learners_from_sweep(
     return learners, folders
 
 
-def _identify_cross_product_axes(pipeline: Pipeline) -> set[str]:
+def _identify_cross_product_axes(pipeline: Pipeline) -> tuple[str, ...]:
     reduced = _reduced_axes(pipeline)
     impossible_axes: set[str] = set()
     for func in pipeline.leaf_nodes:
@@ -372,7 +372,7 @@ def _identify_cross_product_axes(pipeline: Pipeline) -> set[str]:
         possible_axes.update(axes)
     # If this assert ever fails, perhaps we need `possible_axes - impossible_axes`?
     assert not (possible_axes & impossible_axes)
-    return possible_axes
+    return tuple(sorted(possible_axes))
 
 
 def _axes_to_parameters(mapspec_axes: dict[str, tuple[str, ...]]) -> dict[str, set[str]]:
@@ -384,22 +384,21 @@ def _axes_to_parameters(mapspec_axes: dict[str, tuple[str, ...]]) -> dict[str, s
 
 
 def _iterate_axes(
-    independent_axes: set[str],
+    independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
 ) -> Generator[dict[str, Any], None, None]:
-    axes = tuple(independent_axes)
     axes_to_parameters = _axes_to_parameters(mapspec_axes)
     shape_dct = {}
-    for axis in axes:
+    for axis in independent_axes:
         parameters = axes_to_parameters[axis]
         parameter = next(p for p in parameters if p in inputs)
         shape_dct[axis] = shapes[parameter]
     assert all(len(v) == 1 for v in shape_dct.values())
-    shape = tuple(x for axis in axes for x in shape_dct[axis])
+    shape = tuple(x for axis in independent_axes for x in shape_dct[axis])
     for indices in _iterate_shape_indices(shape):
-        yield dict(zip(axes, indices))
+        yield dict(zip(independent_axes, indices))
 
 
 def _maybe_iterate_axes(
