@@ -188,5 +188,4 @@ def clear_cached_properties(obj: object) -> None:
     for k, v in type(obj).__dict__.items():
         if isinstance(v, functools.cached_property):
             with contextlib.suppress(AttributeError):
-                print(f"Deleting cached property: {k}")
                 delattr(obj, k)

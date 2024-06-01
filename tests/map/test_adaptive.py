@@ -8,6 +8,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
+from pipefunc.map._run_info import RunInfo
 from pipefunc.map.adaptive import create_learners, create_learners_from_sweep, flatten_learners
 from pipefunc.sweep import Sweep
 
@@ -204,3 +205,42 @@ def test_create_learners_from_sweep(tmp_path: Path) -> None:
         adaptive.runner.simple(learner)
     assert counters["add"] == 20
     assert counters["take_sum"] == 4
+
+
+def test_basic_with_fixed_indices(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
+    def add(x: int, y: int) -> tuple[int, int]:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x, y
+
+    pipeline = Pipeline([add])
+
+    inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
+    learners_dicts = create_learners(
+        pipeline,
+        inputs,
+        run_folder=tmp_path,
+        return_output=True,
+        fixed_indices={"i": 0},
+    )
+    flat_learners = flatten_learners(learners_dicts)
+    assert len(flat_learners) == 1
+    adaptive.runner.simple(flat_learners["z"])
+    assert flat_learners["z"].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    run_info = RunInfo.load(run_folder=tmp_path)
+    store = run_info.init_store()
+    assert store["z"].to_array().tolist() == [
+        [(1, 1), (1, 2), (1, 3)],
+        [None, None, None],
+        [None, None, None],
+    ]
+
+    with pytest.raises(ValueError, match="Got extra `fixed_indices`: `{'not_exist'}`"):
+        create_learners(
+            pipeline,
+            inputs,
+            run_folder=tmp_path,
+            return_output=True,
+            fixed_indices={"not_exist": 0},
+        )
