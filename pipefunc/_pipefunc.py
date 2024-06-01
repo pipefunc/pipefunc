@@ -206,7 +206,7 @@ class PipeFunc(Generic[T]):
         The keyword arguments with renames applied.
 
         """
-        old_renames = self.renames
+        old_inverse = self._inverse_renames
         if overwrite:
             self.renames = renames.copy()
         else:
@@ -214,12 +214,10 @@ class PipeFunc(Generic[T]):
 
         # Update defaults with new renames
         new_defaults = {}
-        for param, value in self._defaults.items():
-            for old_name, new_name in old_renames.items():
-                if param == new_name:
-                    param = self.renames.get(old_name, old_name)
-                    break
-            new_defaults[param] = value
+        for name, value in self._defaults.items():
+            if original_name := old_inverse.get(name):
+                name = self.renames.get(original_name, original_name)  # noqa: PLW2901
+            new_defaults[name] = value
         self._defaults = new_defaults
 
         clear_cached_properties(self)

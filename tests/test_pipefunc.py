@@ -809,6 +809,8 @@ def test_update_defaults_and_renames() -> None:
 
     # Call function with new defaults
     assert f(a1=2) == 5
+    assert f() == 4
+    assert f(a1=2, b=3) == 5
 
     # Update renames
     f.update_renames({"a": "a2"})
