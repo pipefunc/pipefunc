@@ -4,7 +4,7 @@ from pathlib import Path
 
 try:
     import versioningit
-except ImportError:
+except ImportError:  # pragma: no cover
     import importlib.metadata
 
     __version__ = importlib.metadata.version("pipefunc")
