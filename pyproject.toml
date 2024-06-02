@@ -26,7 +26,6 @@ classifiers = [
 dependencies = [
     "networkx",
     "psutil",
-    "versioningit",
     "cloudpickle",
     "numpy",
 ]
@@ -43,6 +42,7 @@ test = [
     "adaptive",
     "xarray",
     "zarr",
+    "versioningit",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
@@ -54,11 +54,11 @@ docs = [
     "emoji",
     "jupytext",
     "sphinx-autodoc-typehints",
-    "pipefunc[all]",
     "pytest-xdist",
+    "versioningit",
 ]
-dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
-all = ["pipefunc[dev,adaptive,xarray,zarr,plotting,test]"]
+dev = ["black[jupyter]", "pre-commit", "ruff", "mypy", "versioningit"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,test,docs,dev]"]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
