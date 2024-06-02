@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generator, Tuple, Union
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
 import numpy as np
 from adaptive import SequenceLearner
@@ -29,6 +29,7 @@ from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
     import sys
+    from collections.abc import Generator
 
     import numpy.typing as npt
 

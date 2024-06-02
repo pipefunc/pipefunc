@@ -1,5 +1,6 @@
-from pathlib import Path
-from typing import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -10,6 +11,10 @@ from pipefunc.map._dictarray import DictArray
 from pipefunc.map._filearray import FileArray
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 from pipefunc.map.zarr import ZarrFileArray
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 @pytest.fixture(params=["file_array", "zarr_array", "dict"])

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Generator, Hashable, Iterable, Iterator, Mapping, Sequence
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 

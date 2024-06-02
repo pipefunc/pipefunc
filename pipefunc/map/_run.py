@@ -8,7 +8,7 @@ from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generator, NamedTuple, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -29,6 +29,7 @@ from pipefunc.map._storage_base import (
 
 if TYPE_CHECKING:
     import sys
+    from collections.abc import Callable, Generator, Sequence
 
     import xarray as xr
 

@@ -6,7 +6,7 @@ import pickle
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Hashable
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 

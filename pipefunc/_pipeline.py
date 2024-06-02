@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Tuple, Union
 
 import networkx as nx
 
@@ -45,6 +45,7 @@ from pipefunc.map._run import run
 
 if TYPE_CHECKING:
     import sys
+    from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -57,11 +58,6 @@ if TYPE_CHECKING:
         from typing_extensions import TypeAlias
     else:
         from typing import TypeAlias
-
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]

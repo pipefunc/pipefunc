@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 import tomllib
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 PIP_ONLY_DEPS: set[str] = set()
 

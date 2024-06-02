@@ -3,20 +3,13 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, Any, Generator, Iterable, NamedTuple
+from collections.abc import Callable, Generator, Iterable
+from typing import Any, NamedTuple
 
 import networkx as nx
 
 from pipefunc._cache import SimpleCache
 from pipefunc._utils import format_function_call
-
-if TYPE_CHECKING:
-    import sys
-
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
 
 
 class _LazyFunction:

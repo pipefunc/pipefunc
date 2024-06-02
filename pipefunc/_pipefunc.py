@@ -17,7 +17,7 @@ import datetime
 import functools
 import inspect
 import os
-import sys
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
 
 import cloudpickle
@@ -27,12 +27,8 @@ from pipefunc._utils import at_least_tuple, clear_cached_properties, format_func
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
-if sys.version_info < (3, 9):  # pragma: no cover
-    from typing import Callable
-else:
-    from collections.abc import Callable
-
 if TYPE_CHECKING:
+    import sys
     from pathlib import Path
 
     if sys.version_info < (3, 10):  # pragma: no cover

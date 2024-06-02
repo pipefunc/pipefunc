@@ -11,6 +11,7 @@ from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
     import sys
+    from collections.abc import Callable
 
     import networkx as nx
 
@@ -21,11 +22,6 @@ if TYPE_CHECKING:
         from typing_extensions import TypeAlias
     else:
         from typing import TypeAlias
-
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
