@@ -1249,7 +1249,7 @@ class Pipeline:
             # Axis was in output but not in input
             result.add(False)  # noqa: FBT003
 
-        axes = self.mapspec_axes()
+        axes = self.mapspec_axes
         for name in func.mapspec.input_names:
             if axis not in axes[name]:
                 continue

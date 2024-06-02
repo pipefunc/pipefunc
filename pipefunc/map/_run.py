@@ -680,7 +680,7 @@ def _validate_fixed_indices(
     if fixed_indices is None:
         return
     extra = set(fixed_indices)
-    mapspec_axes = pipeline.mapspec_axes()
+    mapspec_axes = pipeline.mapspec_axes
     for parameter, axes_ in mapspec_axes.items():
         for axis in axes_:
             if axis in fixed_indices:
@@ -710,7 +710,7 @@ def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
     # TODO: check the overlap between this an `independent_axes_in_mapspecs`.
     # It might be that this function could be used instead.
     reduced_axes: dict[str, set[str]] = defaultdict(set)
-    axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     for name in pipeline.mapspec_names:
         for func in pipeline.functions:
             if _is_parameter_reduced_by_function(func, name):

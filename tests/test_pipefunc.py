@@ -697,7 +697,7 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
         return x + y
 
     pipeline = Pipeline([f, g])
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "a[i] -> c[i], d[i]",
         "x[i], y[i] -> z[i]",
     ]
@@ -707,7 +707,7 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
     assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
 
     pipeline.add_mapspec_axis("b", axis="j")
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "a[i], b[j] -> c[i, j], d[i, j]",
         "x[i], y[i] -> z[i]",
     ]
@@ -718,7 +718,7 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
 
     pipeline.add_mapspec_axis("x", axis="j")
     pipeline.add_mapspec_axis("y", axis="j")
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "a[i], b[j] -> c[i, j], d[i, j]",
         "x[i, j], y[i, j] -> z[i, j]",
     ]

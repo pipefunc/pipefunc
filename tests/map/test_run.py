@@ -55,9 +55,9 @@ def test_simple(storage, tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
     assert results2["sum"].output == 12
 
-    axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     assert axes == {"x": ("i",), "y": ("i",)}
-    dimensions = pipeline.mapspec_dimensions()
+    dimensions = pipeline.mapspec_dimensions
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
     ds = load_xarray_dataset(run_folder=tmp_path)
@@ -275,7 +275,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
             take_sum,
         ],
     )
-    assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
+    assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     inputs = {"n": 4}
     results = run(
         pipeline,
@@ -363,7 +363,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
             norm,
         ],
     )
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "... -> array[i, unnamed_0, unnamed_1]",
         "array[i, :, :] -> vector[i]",
     ]
@@ -815,7 +815,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
 
     inputs = {"n": 4, "z": 1}
     internal_shapes = {"x": (4,)}
-    assert pipeline.mapspec_axes() == {"x": ("i",), "y": ("i",)}
+    assert pipeline.mapspec_axes == {"x": ("i",), "y": ("i",)}
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
@@ -852,9 +852,9 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
     assert results["sum"].output.tolist() == [13]
 
     # Do the same but with `add_mapspec_axis` on the first pipeline
-    assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
+    assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     pipeline.add_mapspec_axis("n", axis="j")
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "n[j] -> x[i, j]",
         "x[i, j] -> y[i, j]",
         "y[:, j] -> sum[j]",
@@ -907,7 +907,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         return sum(z)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "... -> x[i, unnamed_0], y[i, unnamed_0]",
         "x[i, :], y[i, :] -> z[i]",
     ]
@@ -1012,7 +1012,7 @@ def test_independent_axes_2():
     assert pipeline.independent_axes_in_mapspecs("r") == set()
 
     pipeline.add_mapspec_axis("x", axis="k")
-    assert pipeline.mapspecs_as_strings() == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
+    assert pipeline.mapspecs_as_strings == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
     assert pipeline.independent_axes_in_mapspecs("r") == {"k"}
 
 
