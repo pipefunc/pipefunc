@@ -10,7 +10,6 @@ dependencies:
   # from pyproject.toml
   - networkx
   - psutil
-  - versioningit
   - cloudpickle
   - numpy
   # optional-dependencies: xarray
@@ -30,3 +29,4 @@ dependencies:
   - adaptive
   - xarray
   - zarr
+  - versioningit
