@@ -127,7 +127,7 @@ def create_learners(
                     run_info=run_info,
                     run_folder=run_folder,
                     store=store,
-                    fixed_indices=fixed_indices,
+                    fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
                 )
             learners.setdefault(key, []).append(_learners)
