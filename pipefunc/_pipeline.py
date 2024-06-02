@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Uni
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc._perf import resources_report
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
@@ -31,7 +32,6 @@ from pipefunc._utils import (
     clear_cached_properties,
     generate_filename_from_dict,
     handle_error,
-    table,
 )
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
@@ -943,34 +943,7 @@ class Pipeline:
         if not self.profiling_stats:
             msg = "Profiling is not enabled."
             raise ValueError(msg)
-
-        headers = [
-            "Function",
-            "Avg CPU Usage (%)",
-            "Max Memory Usage (MB)",
-            "Avg Time (s)",
-            "Total Time (%)",
-            "Number of Calls",
-        ]
-        rows = []
-        for func_name, stats in self.profiling_stats.items():
-            row = [
-                func_name,
-                f"{stats.cpu.average:.2f}",
-                f"{stats.memory.max / (1024 * 1024):.2f}",
-                f"{stats.time.average:.2e}",
-                stats.time.average * stats.time.num_executions,
-                stats.time.num_executions,
-            ]
-            rows.append(row)
-
-        total_time = sum(row[4] for row in rows)  # type: ignore[misc]
-        if total_time > 0:
-            for row in rows:
-                row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
-
-        print("Resource Usage Report:")
-        print(table(rows, headers))
+        resources_report(self.profiling_stats)
 
     def _identify_combinable_nodes(
         self,
