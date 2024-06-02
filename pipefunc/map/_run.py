@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
+
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 
 
