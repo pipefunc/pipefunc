@@ -791,14 +791,17 @@ class Pipeline:
         functions = self.sorted_functions if ordered else self.functions
         return [f.mapspec for f in functions if f.mapspec]
 
+    @functools.cached_property
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
 
+    @functools.cached_property
     def mapspec_dimensions(self: Pipeline) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
 
+    @functools.cached_property
     def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
