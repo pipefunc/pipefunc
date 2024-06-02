@@ -814,6 +814,7 @@ def test_update_defaults_and_renames() -> None:
 
     # Update renames
     f.update_renames({"a": "a2"})
+    assert f.renames == {"a": "a2"}
     assert f.parameters == ("a2", "b")
 
     # Call function with updated renames

@@ -133,19 +133,44 @@ class PipeFunc(Generic[T]):
                 output_name=self.output_name,
             )
         self._profile = profile
-        self.renames: dict[str, str] = renames or {}
+        self._renames: dict[str, str] = renames or {}
         self._defaults = defaults or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
 
+    @property
+    def renames(self) -> dict[str, str]:
+        """Return the renames for the function arguments.
+
+        See Also
+        --------
+        update_renames
+            Update the `renames` via this method.
+
+        """
+        # Is a property to prevent users mutating the renames directly
+        return self._renames
+
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
         parameters = inspect.signature(self.func).parameters
-        return tuple(self.renames.get(k, k) for k in parameters)
+        return tuple(self._renames.get(k, k) for k in parameters)
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
+        """Return the defaults for the function arguments.
+
+        Returns
+        -------
+            A dictionary of default values for the keyword arguments.
+
+        See Also
+        --------
+        update_defaults
+            Update the `defaults` via this method.
+
+        """
         parameters = inspect.signature(self.func).parameters
         if extra := set(self._defaults) - set(self.parameters):
             allowed = ", ".join(parameters)
@@ -157,7 +182,7 @@ class PipeFunc(Generic[T]):
             raise ValueError(msg)
         defaults = {}
         for original_name, v in parameters.items():
-            new_name = self.renames.get(original_name, original_name)
+            new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
                 defaults[new_name] = self._defaults[new_name]
             elif v.default is not inspect.Parameter.empty:
@@ -166,7 +191,7 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def _inverse_renames(self) -> dict[str, str]:
-        return {v: k for k, v in self.renames.items()}
+        return {v: k for k, v in self._renames.items()}
 
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
@@ -200,15 +225,15 @@ class PipeFunc(Generic[T]):
         """
         old_inverse = self._inverse_renames
         if overwrite:
-            self.renames = renames.copy()
+            self._renames = renames.copy()
         else:
-            self.renames = dict(self.renames, **renames)
+            self._renames = dict(self._renames, **renames)
 
         # Update defaults with new renames
         new_defaults = {}
         for name, value in self._defaults.items():
             if original_name := old_inverse.get(name):
-                name = self.renames.get(original_name, original_name)  # noqa: PLW2901
+                name = self._renames.get(original_name, original_name)  # noqa: PLW2901
             new_defaults[name] = value
         self._defaults = new_defaults
 
@@ -219,7 +244,7 @@ class PipeFunc(Generic[T]):
             self.func,
             self.output_name,
             output_picker=self.output_picker,
-            renames=self.renames,
+            renames=self._renames,
             defaults=self.defaults,
             profile=self.profile,
             debug=self.debug,
@@ -409,7 +434,7 @@ def pipefunc(
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
-    """A decorator for tagging pipeline functions with a return identifier.
+    """A decorator that wraps a function in a PipeFunc instance.
 
     Parameters
     ----------
