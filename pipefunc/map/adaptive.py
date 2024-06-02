@@ -62,10 +62,11 @@ def create_learners(
 ]:
     """Create adaptive learners for a single `Pipeline.map` call.
 
-    Creates a learner for each function node in the graph. Which means that
-    the returned lists of learners have to be executed in order.
-    If a single list contains multiple learners, they can be executed in
-    parallel.
+    Creates a learner for each function node in the graph. All learners
+    in the values of the outer dictionaries are fully independent of each
+    other and can be executed in parallel. The lists of dictionaries of learners
+    need to be executed in order. All the learners in the same dictionary are
+    independent of each other and can be executed in parallel.
 
     Parameters
     ----------
