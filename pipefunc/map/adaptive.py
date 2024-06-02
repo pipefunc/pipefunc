@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner
+from adaptive import BaseLearner, SequenceLearner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -411,3 +411,6 @@ def _maybe_iterate_axes(
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
+
+
+class ArrayLearner(BaseLearner): ...
