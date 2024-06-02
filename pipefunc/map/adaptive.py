@@ -391,15 +391,16 @@ def _iterate_axes(
     mapspec_axes: dict[str, tuple[str, ...]],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
 ) -> Generator[dict[str, Any], None, None]:
-    axes_to_parameters = _axes_to_parameters(mapspec_axes)
-    shape_dct = {}
+    shape: list[int] = []
     for axis in independent_axes:
-        parameters = axes_to_parameters[axis]
-        parameter = next(p for p in parameters if p in inputs)
-        shape_dct[axis] = shapes[parameter]
-    assert all(len(v) == 1 for v in shape_dct.values())
-    shape = tuple(x for axis in independent_axes for x in shape_dct[axis])
-    for indices in _iterate_shape_indices(shape):
+        parameter, dim = next(
+            (p, axes.index(axis))
+            for p, axes in mapspec_axes.items()
+            if axis in axes and p in inputs
+        )
+        shape.append(shapes[parameter][dim])
+
+    for indices in _iterate_shape_indices(tuple(shape)):
         yield dict(zip(independent_axes, indices))
 
 
