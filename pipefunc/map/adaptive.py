@@ -361,17 +361,18 @@ def create_learners_from_sweep(
 
 def _identify_cross_product_axes(pipeline: Pipeline) -> tuple[str, ...]:
     reduced = _reduced_axes(pipeline)
-    impossible_axes: set[str] = set()
+    impossible_axes: set[str] = set()  # Constructing this as a safety measure (for assert below)
     for func in pipeline.leaf_nodes:
-        for name in pipeline.func_dependencies(func):
-            for _name in at_least_tuple(name):
-                if _name in reduced:
-                    impossible_axes.update(reduced[_name])
+        for output_name in pipeline.func_dependencies(func):
+            for name in at_least_tuple(output_name):
+                if name in reduced:
+                    impossible_axes.update(reduced[name])
+
     possible_axes: set[str] = set()
     for func in pipeline.leaf_nodes:
         axes = pipeline.independent_axes_in_mapspecs(func.output_name)
         possible_axes.update(axes)
-    # If this assert ever fails, perhaps we need `possible_axes - impossible_axes`?
+
     assert not (possible_axes & impossible_axes)
     return tuple(sorted(possible_axes))
 
