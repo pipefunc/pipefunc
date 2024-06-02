@@ -45,6 +45,13 @@ from pipefunc.map._run import run
 
 if TYPE_CHECKING:
     import sys
+    from concurrent.futures import Executor
+    from pathlib import Path
+
+    import holoviews as hv
+
+    from pipefunc._perf import ProfilingStats
+    from pipefunc.map._run import Result
 
     if sys.version_info < (3, 10):  # pragma: no cover
         from typing_extensions import TypeAlias
@@ -56,13 +63,6 @@ if TYPE_CHECKING:
     else:
         from collections.abc import Callable
 
-    from concurrent.futures import Executor
-    from pathlib import Path
-
-    import holoviews as hv
-
-    from pipefunc._perf import ProfilingStats
-    from pipefunc.map._run import Result
 
 _OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
