@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Generator, Hashable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable
 from itertools import product
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +12,8 @@ import networkx as nx
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Hashable, Iterator, Mapping, Sequence
+
     from pipefunc._pipeline import _OUTPUT_TYPE, PipeFunc, Pipeline
 
 
