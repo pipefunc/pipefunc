@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-import sys
 import warnings
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Tuple, Union
@@ -10,13 +9,13 @@ import networkx as nx
 
 from pipefunc._utils import at_least_tuple
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
-
-
 if TYPE_CHECKING:
+    import sys
+
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
     if sys.version_info < (3, 9):  # pragma: no cover
         from typing import Callable
     else:

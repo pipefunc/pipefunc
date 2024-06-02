@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import functools
 import inspect
-import sys
 import time
 import warnings
 from collections import defaultdict
@@ -26,11 +25,7 @@ from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._perf import resources_report
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
-from pipefunc._simplify import (
-    _func_node_colors,
-    _identify_combinable_nodes,
-    simplified_pipeline,
-)
+from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
@@ -48,19 +43,20 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import run
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
-
 if TYPE_CHECKING:
-    from concurrent.futures import Executor
+    import sys
+
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from typing_extensions import TypeAlias
+    else:
+        from typing import TypeAlias
 
     if sys.version_info < (3, 9):  # pragma: no cover
         from typing import Callable
     else:
         from collections.abc import Callable
 
+    from concurrent.futures import Executor
     from pathlib import Path
 
     import holoviews as hv
