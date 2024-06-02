@@ -52,8 +52,15 @@ docs = [
     "pytest-xdist",
     "versioningit",
 ]
-dev = ["black[jupyter]", "pre-commit", "ruff", "mypy", "versioningit"]
-all = ["pipefunc[adaptive,xarray,zarr,plotting,test,docs,dev]"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
+dev = [  # all + dev deps
+    "black[jupyter]",
+    "pre-commit",
+    "ruff",
+    "mypy",
+    "versioningit",
+    "pipefunc[all,test,docs,dev]",
+]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
