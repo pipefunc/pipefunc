@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import multiprocessing
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, MutableMapping
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -18,6 +18,7 @@ from pipefunc.map._storage_base import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
     from multiprocessing.managers import DictProxy
 
 
