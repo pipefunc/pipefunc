@@ -9,10 +9,13 @@ import operator
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:

@@ -5,7 +5,7 @@ requires = ["setuptools", "wheel", "versioningit"]
 [project]
 name = "pipefunc"
 description = "A Python library for defining, managing, and executing function pipelines."
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dynamic = ["version"]
 maintainers = [{ name = "Bas Nijholt", email = "bas@nijho.lt" }]
 license = { text = "MIT" }
@@ -17,8 +17,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -29,7 +27,6 @@ dependencies = [
     "networkx",
     "psutil",
     "versioningit",
-    "typing_extensions; python_version <= '3.9'",
     "cloudpickle",
     "numpy",
 ]
@@ -107,7 +104,7 @@ omit = ["pipefunc/_plotting.py"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -140,4 +137,4 @@ ignore = [
 max-complexity = 18
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
