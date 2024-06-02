@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
 
 import networkx as nx
 
@@ -60,8 +60,8 @@ if TYPE_CHECKING:
         from typing import TypeAlias
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
-_CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
 class _Function:

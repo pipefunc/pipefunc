@@ -18,7 +18,7 @@ import functools
 import inspect
 import os
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 import cloudpickle
 
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 MAX_PARAMS_LEN = 15
 
 

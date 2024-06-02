@@ -8,7 +8,7 @@ from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
         from typing import TypeAlias
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 @dataclass

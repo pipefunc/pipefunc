@@ -5,7 +5,7 @@ import json
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Union
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     else:
         from typing import TypeAlias
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 class Shapes(NamedTuple):

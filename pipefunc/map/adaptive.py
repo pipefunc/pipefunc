@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 from adaptive import SequenceLearner
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         from typing import TypeAlias
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 def create_learners(

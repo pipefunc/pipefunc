@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import networkx as nx
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         from typing import TypeAlias
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 def _wrap_dict_to_tuple(
