@@ -279,3 +279,43 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
         [(2, 1), (2, 2), (2, 3), (2, 4)],
         [(3, 1), None, None, None],  # only last 3 missing because of `[:-3]` above
     ]
+
+
+def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="sum")
+    def take_sum(y) -> int:
+        assert isinstance(y, np.ndarray)
+        return sum(y)
+
+    pipeline = Pipeline(
+        [
+            (double_it, "x[i] -> y[i]"),
+            take_sum,
+        ],
+    )
+    pipeline.add_mapspec_axis("x", axis="j")
+
+    inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]])}
+    results = pipeline.map(inputs, tmp_path, parallel=False)
+    learners = create_learners(
+        pipeline,
+        inputs,
+        tmp_path,
+        return_output=True,
+        split_independent_axes=True,
+    )
+    flat_learners = flatten_learners(learners)
+    for learners_list in flat_learners.values():
+        for learner in learners_list:
+            adaptive.runner.simple(learner)
+    assert results["sum"].output.tolist() == [0, 4, 8, 12]
+    assert [learner.data for learner in flat_learners["sum"]] == [
+        {0: (0,)},
+        {0: (4,)},
+        {0: (8,)},
+        {0: (12,)},
+    ]
