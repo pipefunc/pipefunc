@@ -45,14 +45,15 @@ test = [
     "zarr",
 ]
 docs = [
-    # TODO unpin myst-nb when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
-    "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
+    # TODO: unpin myst-nb in .github/update-environment.py
+    # when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
+    "myst-nb",
     "sphinx",
     "sphinx-book-theme",
     "myst-parser",
     "emoji",
     "jupytext",
-    "sphinx_autodoc_typehints",
+    "sphinx-autodoc-typehints",
     "pipefunc[all]",
     "pytest-xdist",
 ]

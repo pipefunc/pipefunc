@@ -9,17 +9,28 @@ import tomllib
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PIP_ONLY_DEPS: set[str] = set()
+PIP_ONLY_DEPS: set[str] = {"myst-nb"}
+REPLACE_DEPS: dict[str, str] = {
+    "myst-nb": "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
+}
+SKIP_DEPS: set[str] = {"pipefunc"}
 
 
 def clean_deps(deps: Iterable[str]) -> list[str]:
     """Remove version constraints from dependencies."""
-    return [dep.split(";", 1)[0] for dep in deps]
+    return [strip_extras(dep.split(";", 1)[0]) for dep in deps]
 
 
 def generate_pip_deps(deps: list[str]) -> list[str]:
     """Generate pip only dependencies from a list."""
-    return [dep for dep in deps if dep in PIP_ONLY_DEPS]
+    return [
+        REPLACE_DEPS.get(dep, dep) for dep in deps if dep in PIP_ONLY_DEPS and dep not in SKIP_DEPS
+    ]
+
+
+def strip_extras(dep: str) -> str:
+    """Strip extras from a dependency."""
+    return dep.split("[", 1)[0].strip()
 
 
 def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
@@ -57,7 +68,7 @@ def generate_environment_yml(
 
     # Required deps from pyproject.toml
     env_yaml += write_deps(
-        [dep for dep in dependencies if dep not in PIP_ONLY_DEPS],
+        [REPLACE_DEPS.get(dep, dep) for dep in dependencies if dep not in PIP_ONLY_DEPS],
         "from pyproject.toml",
     )
 
@@ -67,7 +78,7 @@ def generate_environment_yml(
             group_deps = clean_deps(data["project"]["optional-dependencies"][group])
             pip_deps += generate_pip_deps(group_deps)
             env_yaml += write_deps(
-                [dep for dep in group_deps if dep not in PIP_ONLY_DEPS],
+                [REPLACE_DEPS.get(dep, dep) for dep in group_deps if dep not in PIP_ONLY_DEPS],
                 f"optional-dependencies: {group}",
             )
 
@@ -101,7 +112,6 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc-sphinx",
-        sections=("plotting", "xarray", "zarr"),
+        sections=("plotting", "xarray", "zarr", "docs"),
         filename="docs/environment-sphinx.yml",
-        pip_deps=["../.[docs]"],
     )
