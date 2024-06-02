@@ -411,8 +411,8 @@ def _maybe_iterate_axes(
         yield None
         return
     independent_axes = _identify_cross_product_axes(pipeline)
-    mapspec_axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     shapes = map_shapes(pipeline, inputs).shapes
-    for fixed_indices in _iterate_axes(independent_axes, inputs, mapspec_axes, shapes):
+    for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices

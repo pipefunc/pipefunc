@@ -86,7 +86,7 @@ def _compare_to_previous_run_info(
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    if pipeline.mapspecs_as_strings() != old.mapspecs_as_strings:
+    if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
         msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
@@ -106,7 +106,7 @@ def _compare_to_previous_run_info(
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = pipeline.mapspec_dimensions()
+    input_dimensions = pipeline.mapspec_dimensions
     for name, value in inputs.items():
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
@@ -148,7 +148,7 @@ class RunInfo:
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
-            mapspecs_as_strings=pipeline.mapspecs_as_strings(),
+            mapspecs_as_strings=pipeline.mapspecs_as_strings,
             run_folder=run_folder,
             storage=storage,
         )

@@ -72,6 +72,7 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    @functools.cached_property
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
@@ -81,6 +82,7 @@ class _MockPipeline:
         """Return the functions in the pipeline in topological order."""
         return self.functions
 
+    @functools.cached_property
     def mapspec_dimensions(self) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
@@ -680,8 +682,8 @@ def _validate_fixed_indices(
     if fixed_indices is None:
         return
     extra = set(fixed_indices)
-    mapspec_axes = pipeline.mapspec_axes()
-    for parameter, axes_ in mapspec_axes.items():
+    axes = pipeline.mapspec_axes
+    for parameter, axes_ in axes.items():
         for axis in axes_:
             if axis in fixed_indices:
                 extra.discard(axis)
@@ -710,7 +712,7 @@ def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
     # TODO: check the overlap between this an `independent_axes_in_mapspecs`.
     # It might be that this function could be used instead.
     reduced_axes: dict[str, set[str]] = defaultdict(set)
-    axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     for name in pipeline.mapspec_names:
         for func in pipeline.functions:
             if _is_parameter_reduced_by_function(func, name):
