@@ -680,8 +680,8 @@ def _validate_fixed_indices(
     if fixed_indices is None:
         return
     extra = set(fixed_indices)
-    mapspec_axes = pipeline.mapspec_axes
-    for parameter, axes_ in mapspec_axes.items():
+    axes = pipeline.mapspec_axes
+    for parameter, axes_ in axes.items():
         for axis in axes_:
             if axis in fixed_indices:
                 extra.discard(axis)
