@@ -23,12 +23,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = [
-    "networkx",
-    "psutil",
-    "cloudpickle",
-    "numpy",
-]
+dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler"]
 xarray = ["xarray"]
