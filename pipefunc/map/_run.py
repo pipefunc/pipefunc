@@ -21,11 +21,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
-from pipefunc.map._storage_base import (
-    StorageBase,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
+from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
     import sys

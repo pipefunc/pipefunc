@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Generator, Iterable
-from typing import Any, NamedTuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import networkx as nx
 
 from pipefunc._cache import SimpleCache
 from pipefunc._utils import format_function_call
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
 
 
 class _LazyFunction:
