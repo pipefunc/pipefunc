@@ -10,7 +10,6 @@ dependencies:
   # from pyproject.toml
   - networkx
   - psutil
-  - versioningit
   - cloudpickle
   - numpy
   # optional-dependencies: xarray
@@ -29,7 +28,7 @@ dependencies:
   - emoji
   - jupytext
   - sphinx-autodoc-typehints
-  - pipefunc
   - pytest-xdist
+  - versioningit
   - pip:
     - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip

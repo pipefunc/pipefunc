@@ -143,7 +143,7 @@ conda install pipefunc
 or from PyPI:
 
 ```bash
-pip install "pipefunc[plotting]"
+pip install "pipefunc[all]"
 ```
 
 or install **main** with:
@@ -157,7 +157,7 @@ or clone the repository and do a dev install (recommended for dev):
 ```bash
 git clone git@github.com:pipefunc/pipefunc.git
 cd pipefunc
-pip install -e ".[dev,test,plotting]"
+pip install -e ".[dev]"
 ```
 
 ## :hammer_and_wrench: Development
