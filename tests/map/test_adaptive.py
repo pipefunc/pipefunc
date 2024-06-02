@@ -249,15 +249,15 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
 
 
 def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
-    @pipefunc(output_name="z", mapspec="x[i], y[j] -> z[i, j]")
+    @pipefunc(output_name="z", mapspec="x[i], y[i, j] -> z[i, j]")
     def add(x: int, y: int) -> tuple[int, int]:
         assert isinstance(x, int)
-        assert isinstance(y, int)
+        assert isinstance(y, np.int_)
         return x, y
 
     pipeline = Pipeline([add])
 
-    inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
+    inputs = {"x": [1, 2, 3], "y": np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])}
     learners_dicts = create_learners(
         pipeline,
         inputs,
@@ -267,14 +267,14 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 1
-    assert len(flat_learners["z"]) == 9
+    assert len(flat_learners["z"]) == 12
     for learner in flat_learners["z"][:-3]:
         adaptive.runner.simple(learner)
     assert flat_learners["z"][0].data == {0: ((1, 1),)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
     assert store["z"].to_array().tolist() == [
-        [(1, 1), (1, 2), (1, 3)],
-        [(2, 1), (2, 2), (2, 3)],
-        [None, None, None],
+        [(1, 1), (1, 2), (1, 3), (1, 4)],
+        [(2, 1), (2, 2), (2, 3), (2, 4)],
+        [(3, 1), None, None, None],  # only last 3 missing because of `[:-3]` above
     ]

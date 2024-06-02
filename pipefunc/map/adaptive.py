@@ -377,14 +377,6 @@ def _identify_cross_product_axes(pipeline: Pipeline) -> tuple[str, ...]:
     return tuple(sorted(possible_axes))
 
 
-def _axes_to_parameters(mapspec_axes: dict[str, tuple[str, ...]]) -> dict[str, set[str]]:
-    axes_to_parameter: dict[str, set[str]] = {}
-    for parameter, _axes in mapspec_axes.items():
-        for axis in _axes:
-            axes_to_parameter.setdefault(axis, set()).add(parameter)
-    return axes_to_parameter
-
-
 def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
