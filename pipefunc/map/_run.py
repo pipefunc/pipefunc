@@ -72,6 +72,7 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    @functools.cached_property
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
@@ -81,6 +82,7 @@ class _MockPipeline:
         """Return the functions in the pipeline in topological order."""
         return self.functions
 
+    @functools.cached_property
     def mapspec_dimensions(self) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
