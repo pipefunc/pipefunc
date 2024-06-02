@@ -8,7 +8,7 @@ from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -24,18 +24,12 @@ from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _l
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
-    import sys
     from collections.abc import Callable, Generator, Sequence
 
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline import _Generations
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]

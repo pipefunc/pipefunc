@@ -18,7 +18,7 @@ import functools
 import inspect
 import os
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, Union
 
 import cloudpickle
 
@@ -28,13 +28,7 @@ from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
 
 if TYPE_CHECKING:
-    import sys
     from pathlib import Path
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
 
 T = TypeVar("T", bound=Callable[..., Any])

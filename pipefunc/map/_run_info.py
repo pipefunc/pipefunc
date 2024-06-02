@@ -5,7 +5,7 @@ import json
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -13,14 +13,7 @@ from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._storage_base import StorageBase, storage_registry
 
 if TYPE_CHECKING:
-    import sys
-
     from pipefunc import Pipeline
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 

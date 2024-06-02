@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import networkx as nx
 
@@ -44,7 +44,6 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import run
 
 if TYPE_CHECKING:
-    import sys
     from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
@@ -53,11 +52,6 @@ if TYPE_CHECKING:
 
     from pipefunc._perf import ProfilingStats
     from pipefunc.map._run import Result
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]

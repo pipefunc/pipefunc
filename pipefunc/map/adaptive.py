@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, TypeAlias, Union
 
 import numpy as np
 from adaptive import SequenceLearner
@@ -28,7 +28,6 @@ from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
-    import sys
     from collections.abc import Generator
 
     import numpy.typing as npt
@@ -36,11 +35,6 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
     from pipefunc.sweep import Sweep
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
