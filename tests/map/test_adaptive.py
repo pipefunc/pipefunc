@@ -88,6 +88,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     )
     flat_learners = flatten_learners(learners_dicts)
     assert len(flat_learners) == 3
+    assert sum(len(learners) for learners in flat_learners.values()) == 3
     adaptive.runner.simple(flat_learners["x"][0])
     assert flat_learners["x"][0].data == {0: [0, 1, 2, 3]}
     adaptive.runner.simple(flat_learners["y"][0])
