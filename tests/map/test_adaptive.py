@@ -320,7 +320,7 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
         {0: (12,)},
     ]
     assert len(learners) == 4
-    assert learners.keys() == [
+    assert list(learners.keys()) == [
         (("j", 0),),
         (("j", 1),),
         (("j", 2),),
