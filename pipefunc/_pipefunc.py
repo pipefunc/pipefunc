@@ -234,6 +234,7 @@ class PipeFunc(Generic[T]):
         """
         self._validate_update(renames, "renames")
         old_inverse = self._inverse_renames
+        bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
         if overwrite:
             self._renames = renames.copy()
         else:
@@ -246,6 +247,13 @@ class PipeFunc(Generic[T]):
                 name = self._renames.get(original_name, original_name)  # noqa: PLW2901
             new_defaults[name] = value
         self._defaults = new_defaults
+
+        # Update bound with new renames
+        new_bound = {}
+        for name, value in bound_original.items():
+            new_name = self._renames.get(name, name)
+            new_bound[new_name] = value
+        self._bound = new_bound
 
         clear_cached_properties(self)
 

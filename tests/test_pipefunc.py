@@ -835,8 +835,11 @@ def test_update_defaults_and_renames_and_bound() -> None:
     f.update_bound({"a3": "yolo", "b": "swag"})
     assert f(a3=88, b=1) == "yoloswag"
     assert f.bound == {"a3": "yolo", "b": "swag"}
+    f.update_renames({"a3": "a4"})
+    assert f.bound == {"a4": "yolo", "b": "swag"}
     f.update_bound({}, overwrite=True)
-    assert f(a3=88, b=1) == 89
+    assert f(a4=88, b=1) == 89
+    f.update_renames({"a4": "a4"})
 
 
 def test_validate_update_defaults_and_renames_and_bound() -> None:
