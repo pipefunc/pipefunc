@@ -414,39 +414,6 @@ def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     return Path(run_folder)
 
 
-def _maybe_partial_pipeline(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    output_name: _OUTPUT_TYPE | None,
-) -> Pipeline:
-    if output_name is not None:
-        output_names = {f.output_name for f in pipeline.functions}
-        if output_name not in output_names:
-            msg = f"Output name `{output_name}` not found in pipeline. Did you mean one of `{output_names}`?"
-            raise ValueError(msg)
-
-    root_args = pipeline.topological_generations.root_args
-    input_names = set(inputs) | set(pipeline.defaults)
-    missing = set(root_args) - input_names
-    if not missing and output_name is None:
-        return pipeline
-
-    pipeline = pipeline.copy()
-    for name in inputs:
-        if name in pipeline.output_to_func:
-            print(f"dropping {name=}")
-            pipeline.drop(output_name=name)
-
-    if output_name is not None:
-        func = pipeline.output_to_func[output_name]
-        while pipeline.leaf_nodes != [func]:
-            for f in pipeline.leaf_nodes:
-                if f.output_name != output_name:
-                    print(f"dropping {f.output_name=}")
-                    pipeline.drop(f=f)
-    return pipeline
-
-
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
