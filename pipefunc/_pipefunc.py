@@ -29,7 +29,6 @@ from pipefunc.map._mapspec import MapSpec
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from types import MappingProxyType
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -166,15 +165,16 @@ class PipeFunc(Generic[T]):
         return tuple(self._renames.get(k, k) for k in self.original_parameters)
 
     @functools.cached_property
-    def original_parameters(self) -> MappingProxyType[str, inspect.Parameter]:
+    def original_parameters(self) -> dict[str, inspect.Parameter]:
         """Return the original (before renames) parameters of the wrapped function.
 
         Returns
         -------
-            A mapping of the original parameters of the wrapped function.
+            A mapping of the original parameters of the wrapped function to their
+            respective `inspect.Parameter` objects.
 
         """
-        return inspect.signature(self.func).parameters
+        return dict(inspect.signature(self.func).parameters)
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
