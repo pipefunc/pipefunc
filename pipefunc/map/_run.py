@@ -419,6 +419,7 @@ def _pipeline_with_output(pipeline: Pipeline, output_name: _OUTPUT_TYPE) -> Pipe
 
     dependencies = pipeline.func_dependencies(output_name)
     new_functions = [pipeline.output_to_func[name] for name in dependencies]
+    new_functions.append(pipeline.output_to_func[output_name])
     return Pipeline(
         new_functions,  # type: ignore[arg-type]
         lazy=pipeline.lazy,
@@ -480,7 +481,8 @@ def run(
         If not provided, all indices are iterated over.
 
     """
-    pipeline = _pipeline_with_output(pipeline, output_name) if output_name else pipeline
+    if output_name is not None:
+        pipeline = _pipeline_with_output(pipeline, output_name)
     _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
