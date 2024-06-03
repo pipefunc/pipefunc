@@ -786,7 +786,7 @@ def test_setting_defaults() -> None:
     assert h(a="aa", b="bb") == ("bb", "aa")
 
 
-def test_update_defaults_and_renames() -> None:
+def test_update_defaults_and_renames_and_bound() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):
         return a + b
@@ -831,6 +831,12 @@ def test_update_defaults_and_renames() -> None:
     pipeline = Pipeline([f])
     assert pipeline("c", a3=1) == 4
     assert pipeline("c", a3=2, b=3) == 5
+
+    f.update_bound({"a3": "yolo", "b": "swag"})
+    assert f(a3=88, b=1) == "yoloswag"
+    assert f.bound == {"a3": "yolo", "b": "swag"}
+    f.update_bound({}, overwrite=True)
+    assert f(a3=88, b=1) == 89
 
 
 def test_update_defaults_and_renames_with_pipeline() -> None:

@@ -103,6 +103,7 @@ class PipeFunc(Generic[T]):
         output_picker: Callable[[str, Any], Any] | None = None,
         renames: dict[str, str] | None = None,
         defaults: dict[str, Any] | None = None,
+        bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
@@ -125,6 +126,7 @@ class PipeFunc(Generic[T]):
         self._profile = profile
         self._renames: dict[str, str] = renames or {}
         self._defaults = defaults or {}
+        self._bound = bound or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
@@ -141,6 +143,19 @@ class PipeFunc(Generic[T]):
         """
         # Is a property to prevent users mutating the renames directly
         return self._renames
+
+    @property
+    def bound(self) -> dict[str, Any]:
+        """Return the bound arguments for the function. These are arguments that are fixed.
+
+        See Also
+        --------
+        update_bound
+            Update the `bound` via this method.
+
+        """
+        # Is a property to prevent users mutating the bound directly
+        return self._bound
 
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
@@ -229,6 +244,14 @@ class PipeFunc(Generic[T]):
 
         clear_cached_properties(self)
 
+    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = True) -> None:
+        if overwrite:
+            self._bound = bound.copy()
+        else:
+            self._bound = dict(self._bound, **bound)
+
+        clear_cached_properties(self)
+
     def copy(self) -> PipeFunc:
         return PipeFunc(
             self.func,
@@ -260,6 +283,7 @@ class PipeFunc(Generic[T]):
             raise ValueError(msg)
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
         kwargs.update(defaults)
+        kwargs.update(self._bound)
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
@@ -410,13 +434,6 @@ class PipeFunc(Generic[T]):
                 f" `{mapspec_output_names} != {output_names}`."
             )
             raise ValueError(msg)
-
-    def bind(self, parameter: str, value: Any) -> None:
-        """Bind a parameter to a specific value.
-
-        When the function is called, the parameter will be set to the provided value,
-        even when the function is called with a different value.
-        """
 
 
 def pipefunc(
