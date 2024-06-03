@@ -272,7 +272,7 @@ class PipeFunc(Generic[T]):
     def _validate_update(self, update: dict[str, Any], name: str) -> None:
         if extra := set(update) - set(self.parameters):
             msg = (
-                f"Unexpected {name} arguments: `{extra}`."
+                f"Unexpected `{name}` arguments: `{extra}`."
                 f" The allowed arguments are: `{self.parameters}`."
                 f" The provided arguments are: `{update}`."
             )
