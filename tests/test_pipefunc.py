@@ -889,11 +889,21 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
 
 
 @pytest.mark.parametrize("output_name", [("a.1", "b"), "#a", "1"])
-def test_invalid_output_name(output_name):
+def test_invalid_output_name_identifier(output_name):
     with pytest.raises(
         ValueError,
         match="The `output_name` should contain/be valid Python identifier",
     ):
 
         @pipefunc(output_name=output_name)
+        def f(): ...
+
+
+def test_invalid_output_name():
+    with pytest.raises(
+        TypeError,
+        match="The output name should be a string or a tuple of strings",
+    ):
+
+        @pipefunc(output_name=["a"])
         def f(): ...
