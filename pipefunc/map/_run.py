@@ -465,9 +465,9 @@ def run(
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
     allow_intermediate_inputs
-        Whether to allow partial runs. If `True`, the pipeline will run even if not all
-        required inputs are provided. If `False`, an exception is raised if not all
-        inputs are provided.
+        Whether to allow partial runs. If `True`, a subpipeline is created with the
+        specified inputs, using `Pipeline.subpipeline`. If `False`, all root arguments
+        must be provided, and an exception is raised if any are missing.
 
     """
     if allow_intermediate_inputs or output_names is not None:
