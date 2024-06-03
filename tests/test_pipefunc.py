@@ -945,3 +945,9 @@ def test_subpipeline():
     partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
     assert partial.topological_generations.root_args == ["c"]
     assert [f.output_name for f in partial.functions] == ["h"]
+
+    with pytest.raises(
+        ValueError,
+        match="At least one of `inputs` or `output_names` should be provided",
+    ):
+        pipeline.subpipeline()
