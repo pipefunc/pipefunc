@@ -460,7 +460,7 @@ def run(
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
-    allow_partial: bool = False,
+    allow_intermediate_inputs: bool = False,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -497,14 +497,15 @@ def run(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
-    allow_partial
+    allow_intermediate_inputs
         Whether to allow partial runs. If `True`, the pipeline will run even if not all
         required inputs are provided. If `False`, an exception is raised if not all
         inputs are provided.
 
     """
-    if allow_partial or output_names is not None:
+    if allow_intermediate_inputs or output_names is not None:
         pipeline = pipeline.partial_pipeline(set(inputs), output_names)
+
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -701,7 +702,11 @@ def _validate_complete_inputs(
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
-        msg = f"Missing inputs: `{missing_args}`. Set `allow_partial=True` to allow partial runs."
+        msg = f"Missing inputs: `{missing_args}`. Set `allow_intermediate_inputs=True` to allow partial runs."
+        raise ValueError(msg)
+    if extra := set(inputs_with_defaults) - root_args:
+        extra_args = ", ".join(extra)
+        msg = f"Got extra inputs: `{extra_args}` that are not accepted by this pipeline."
         raise ValueError(msg)
 
 

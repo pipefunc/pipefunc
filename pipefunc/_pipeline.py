@@ -615,7 +615,7 @@ class Pipeline:
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
-        allow_partial: bool = False,
+        allow_intermediate_inputs: bool = False,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -650,7 +650,7 @@ class Pipeline:
         fixed_indices
             A dictionary mapping axes names to indices that should be fixed for the run.
             If not provided, all indices are iterated over.
-        allow_partial
+        allow_intermediate_inputs
             Whether to allow partial runs. If `True`, the pipeline will run even if not all
             required inputs are provided. If `False`, an exception is raised if not all
             inputs are provided.
@@ -668,7 +668,7 @@ class Pipeline:
             persist_memory=persist_memory,
             cleanup=cleanup,
             fixed_indices=fixed_indices,
-            allow_partial=allow_partial,
+            allow_intermediate_inputs=allow_intermediate_inputs,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1100,9 +1100,18 @@ class Pipeline:
             input_nodes,
             output_nodes,
         )
+
         drop = [f for f in pipeline.functions if f not in between]
         for f in drop:
             pipeline.drop(f=f)
+
+        if inputs is not None:
+            for f in pipeline.functions:
+                arg_combos = [set(x) for x in pipeline.arg_combinations(f.output_name)]
+                if not any(set(inputs).issuperset(args) for args in arg_combos):
+                    msg = f"Cannot construct a partial pipeline with only `{inputs=}`."
+                    raise ValueError(msg)
+
         return pipeline
 
 
