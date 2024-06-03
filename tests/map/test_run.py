@@ -1177,12 +1177,22 @@ def test_map_with_partial(tmp_path: Path) -> None:
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["z"].output == 6
 
+    # Run via subpipeline and map with partial inputs
     partial = pipeline.subpipeline({"y"})
-    r = partial.map({"y": results["y"].output}, tmp_path)
+    inputs1 = {"y": results["y"].output}
+    r = partial.map(inputs1, tmp_path)
+    assert len(r) == 1
+    assert r["z"].output == 6
+
+    r = pipeline.map(inputs1, tmp_path, allow_intermediate_inputs=True)
     assert len(r) == 1
     assert r["z"].output == 6
 
     partial = pipeline.subpipeline(output_names={"y"})
     r = partial.map(inputs, tmp_path)
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
+
+    r = pipeline.map(inputs, tmp_path, output_names={"y"})
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
