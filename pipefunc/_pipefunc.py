@@ -29,6 +29,7 @@ from pipefunc.map._mapspec import MapSpec
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import MappingProxyType
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -162,8 +163,18 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
-        parameters = inspect.signature(self.func).parameters
-        return tuple(self._renames.get(k, k) for k in parameters)
+        return tuple(self._renames.get(k, k) for k in self.original_parameters)
+
+    @functools.cached_property
+    def original_parameters(self) -> MappingProxyType[str, inspect.Parameter]:
+        """Return the original (before renames) parameters of the wrapped function.
+
+        Returns
+        -------
+            A mapping of the original parameters of the wrapped function.
+
+        """
+        return inspect.signature(self.func).parameters
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
@@ -213,7 +224,7 @@ class PipeFunc(Generic[T]):
             defaults will be added to the existing defaults.
 
         """
-        self._validate_update(defaults, "defaults")
+        self._validate_update(defaults, "defaults", self.parameters)
         if overwrite:
             self._defaults = defaults.copy()
         else:
@@ -232,7 +243,7 @@ class PipeFunc(Generic[T]):
             renames will be added to the existing renames.
 
         """
-        self._validate_update(renames, "renames")
+        self._validate_update(renames, "renames", self.original_parameters)  # type: ignore[arg-type]
         old_inverse = self._inverse_renames
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
         if overwrite:
@@ -269,7 +280,7 @@ class PipeFunc(Generic[T]):
             bound arguments will be added to the existing bound arguments.
 
         """
-        self._validate_update(bound, "bound")
+        self._validate_update(bound, "bound", self.parameters)
         if overwrite:
             self._bound = bound.copy()
         else:
@@ -277,11 +288,16 @@ class PipeFunc(Generic[T]):
 
         clear_cached_properties(self)
 
-    def _validate_update(self, update: dict[str, Any], name: str) -> None:
-        if extra := set(update) - set(self.parameters):
+    def _validate_update(
+        self,
+        update: dict[str, Any],
+        name: str,
+        parameters: tuple[str, ...],
+    ) -> None:
+        if extra := set(update) - set(parameters):
             msg = (
                 f"Unexpected `{name}` arguments: `{extra}`."
-                f" The allowed arguments are: `{self.parameters}`."
+                f" The allowed arguments are: `{parameters}`."
                 f" The provided arguments are: `{update}`."
             )
             raise ValueError(msg)
