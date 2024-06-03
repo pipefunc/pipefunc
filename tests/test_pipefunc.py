@@ -928,7 +928,7 @@ def test_partial_pipeline():
     partial = pipeline.partial_pipeline(output_names=[("c", "d")])
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
-    with pytest.raises(ValueError, match="Cannot construct a partial pipeline"):
+    with pytest.raises(ValueError, match="Can1not construct a partial pipeline"):
         partial = pipeline.partial_pipeline(inputs=["a"])
 
     @pipefunc(output_name="h")

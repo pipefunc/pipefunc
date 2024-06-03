@@ -1103,9 +1103,9 @@ class Pipeline:
         if inputs is not None:
             new_root_args = set(pipeline.topological_generations.root_args)
             if not new_root_args.issubset(inputs):
-                output_names = {f.output_name for f in output_nodes}
+                outputs = {f.output_name for f in pipeline.functions}
                 msg = (
-                    f"Cannot construct a partial pipeline with {output_names=}"
+                    f"Cannot construct a partial pipeline with `{outputs=}`"
                     f" and `{inputs=}`, it would require `{new_root_args}`."
                 )
                 raise ValueError(msg)
