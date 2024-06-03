@@ -1144,6 +1144,12 @@ def test_missing_inputs():
     with pytest.raises(ValueError, match="Missing inputs"):
         pipeline.map(inputs, None, parallel=False)
 
+    with pytest.raises(
+        ValueError,
+        match="Got extra inputs: `not_used` that are not accepted by this pipeline",
+    ):
+        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False)
+
 
 def test_map_without_mapspec(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
