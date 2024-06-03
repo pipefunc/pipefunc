@@ -1095,11 +1095,7 @@ class Pipeline:
         else:
             output_nodes = set(pipeline.leaf_nodes)
 
-        between: set[str | PipeFunc] = _find_nodes_between(
-            pipeline.graph,
-            input_nodes,
-            output_nodes,
-        )
+        between = _find_nodes_between(pipeline.graph, input_nodes, output_nodes)
 
         drop = [f for f in pipeline.functions if f not in between]
         for f in drop:
