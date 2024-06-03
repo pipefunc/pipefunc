@@ -133,6 +133,7 @@ class PipeFunc(Generic[T]):
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
+        self._validate_names()
 
     @property
     def renames(self) -> dict[str, str]:
@@ -301,6 +302,26 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{update}`."
             )
             raise ValueError(msg)
+
+        for name in update:
+            if not name.isidentifier():
+                msg = f"The `{name}` keys should be a valid Python identifier, not `{name}`."
+                raise TypeError(msg)
+
+    def _validate_names(self) -> None:
+        self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
+        self._validate_update(self._defaults, "defaults", self.parameters)
+        self._validate_update(self._bound, "bound", self.parameters)
+        if not isinstance(self.output_name, str | tuple):
+            msg = (
+                f"The output name should be a string or a tuple of strings,"
+                f" not {type(self.output_name)}."
+            )
+            raise TypeError(msg)
+        for name in at_least_tuple(self.output_name):
+            if not name.isidentifier():
+                msg = f"The `output_name` should be a valid Python identifier, not `{name}`."
+                raise TypeError(msg)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
