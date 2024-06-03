@@ -164,7 +164,7 @@ class PipeFunc(Generic[T]):
     def parameters(self) -> tuple[str, ...]:
         return tuple(self._renames.get(k, k) for k in self.original_parameters)
 
-    @functools.cached_property
+    @property
     def original_parameters(self) -> dict[str, inspect.Parameter]:
         """Return the original (before renames) parameters of the wrapped function.
 
