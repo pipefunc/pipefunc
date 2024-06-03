@@ -839,6 +839,19 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a3=88, b=1) == 89
 
 
+def test_validate_update_defaults_and_renames_and_bound() -> None:
+    @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
+    def f(a=42, b=69):
+        return a + b
+
+    with pytest.raises(ValueError, match="The allowed arguments are"):
+        f.update_defaults({"does_not_exist": 1})
+    with pytest.raises(ValueError, match="The allowed arguments are"):
+        f.update_renames({"does_not_exist": "1"})
+    with pytest.raises(ValueError, match="The allowed arguments are"):
+        f.update_bound({"does_not_exist": 1})
+
+
 def test_update_defaults_and_renames_with_pipeline() -> None:
     @pipefunc(output_name="x", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):

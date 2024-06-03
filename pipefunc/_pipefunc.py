@@ -63,6 +63,9 @@ class PipeFunc(Generic[T]):
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
+    bound
+        Bind arguments to the function. These are arguments that are fixed. Even when
+        providing different values, the bound values will be used.
     profile
         Flag indicating whether the wrapped function should be profiled.
     debug
@@ -154,7 +157,7 @@ class PipeFunc(Generic[T]):
             Update the `bound` via this method.
 
         """
-        # Is a property to prevent users mutating the bound directly
+        # Is a property to prevent users mutating `bound` directly
         return self._bound
 
     @functools.cached_property
@@ -210,6 +213,7 @@ class PipeFunc(Generic[T]):
             defaults will be added to the existing defaults.
 
         """
+        self._validate_update(defaults, "defaults")
         if overwrite:
             self._defaults = defaults.copy()
         else:
@@ -228,6 +232,7 @@ class PipeFunc(Generic[T]):
             renames will be added to the existing renames.
 
         """
+        self._validate_update(renames, "renames")
         old_inverse = self._inverse_renames
         if overwrite:
             self._renames = renames.copy()
@@ -245,12 +250,33 @@ class PipeFunc(Generic[T]):
         clear_cached_properties(self)
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = True) -> None:
+        """Update the bound arguments for the function that are fixed.
+
+        Parameters
+        ----------
+        bound
+            A dictionary of bound arguments for the function.
+        overwrite
+            Whether to overwrite the existing bound arguments. If `False`, the new
+            bound arguments will be added to the existing bound arguments.
+
+        """
+        self._validate_update(bound, "bound")
         if overwrite:
             self._bound = bound.copy()
         else:
             self._bound = dict(self._bound, **bound)
 
         clear_cached_properties(self)
+
+    def _validate_update(self, update: dict[str, Any], name: str) -> None:
+        if extra := set(update) - set(self.parameters):
+            msg = (
+                f"Unexpected {name} arguments: `{extra}`."
+                f" The allowed arguments are: `{self.parameters}`."
+                f" The provided arguments are: `{update}`."
+            )
+            raise ValueError(msg)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
