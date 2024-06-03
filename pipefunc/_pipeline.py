@@ -1085,18 +1085,17 @@ class Pipeline:
             msg = "At least one of `inputs` or `output_names` should be provided."
             raise ValueError(msg)
         pipeline = self.copy()
-        if inputs is not None:
-            input_nodes = {pipeline.node_mapping[input_] for input_ in inputs}
-        else:
-            input_nodes = set(pipeline.topological_generations.root_args)
-
-        if output_names is not None:
-            output_nodes = {pipeline.node_mapping[output] for output in output_names}
-        else:
-            output_nodes = set(pipeline.leaf_nodes)
-
+        input_nodes: set[str | PipeFunc] = (
+            set(pipeline.topological_generations.root_args)
+            if inputs is None
+            else {pipeline.node_mapping[n] for n in inputs}
+        )
+        output_nodes: set[PipeFunc] = (
+            set(pipeline.leaf_nodes)
+            if output_names is None
+            else {pipeline.node_mapping[n] for n in output_names}  # type: ignore[misc]
+        )
         between = _find_nodes_between(pipeline.graph, input_nodes, output_nodes)
-
         drop = [f for f in pipeline.functions if f not in between]
         for f in drop:
             pipeline.drop(f=f)
