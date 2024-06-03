@@ -1077,8 +1077,8 @@ class Pipeline:
 
     def partial_pipeline(
         self,
-        inputs: set[str] | None,
-        output_names: set[_OUTPUT_TYPE] | None,
+        inputs: set[str] | None = None,
+        output_names: set[_OUTPUT_TYPE] | None = None,
     ) -> Pipeline:
         """Returns a new `Pipeline` that only contains the nodes between inputs and outputs."""
         if inputs is None and output_names is None:

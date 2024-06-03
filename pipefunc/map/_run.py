@@ -472,7 +472,6 @@ def run(
     """
     if allow_intermediate_inputs or output_names is not None:
         pipeline = pipeline.partial_pipeline(set(inputs), output_names)
-
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -655,10 +654,7 @@ def load_xarray_dataset(
     )
 
 
-def _validate_complete_inputs(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-) -> None:
+def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
     """Validate that all required inputs are provided.
 
     Note that `output_name is None` means that all outputs are required!
@@ -669,7 +665,7 @@ def _validate_complete_inputs(
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
-        msg = f"Missing inputs: `{missing_args}`. Set `allow_intermediate_inputs=True` to allow partial runs."
+        msg = f"Missing inputs: `{missing_args}`."
         raise ValueError(msg)
     if extra := set(inputs_with_defaults) - root_args:
         extra_args = ", ".join(extra)
