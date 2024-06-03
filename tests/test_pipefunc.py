@@ -909,7 +909,7 @@ def test_invalid_output_name():
         def f(): ...
 
 
-def test_partial_pipeline():
+def test_subpipeline():
     @pipefunc(output_name=("c", "d"))
     def f(a: int, b: int):
         return a + b, 1
@@ -919,29 +919,29 @@ def test_partial_pipeline():
         return x + y
 
     pipeline = Pipeline([f, g])
-    partial = pipeline.partial_pipeline(inputs=["a", "b"])
+    partial = pipeline.subpipeline(inputs=["a", "b"])
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
-    partial = pipeline.partial_pipeline(inputs=["a", "b", "x", "y"])
+    partial = pipeline.subpipeline(inputs=["a", "b", "x", "y"])
     assert [f.output_name for f in partial.functions] == [("c", "d"), "z"]
 
-    partial = pipeline.partial_pipeline(output_names=[("c", "d")])
+    partial = pipeline.subpipeline(output_names=[("c", "d")])
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
     with pytest.raises(ValueError, match="Can1not construct a partial pipeline"):
-        partial = pipeline.partial_pipeline(inputs=["a"])
+        partial = pipeline.subpipeline(inputs=["a"])
 
     @pipefunc(output_name="h")
     def h(c):
         return c
 
     pipeline = Pipeline([f, g, h])
-    partial = pipeline.partial_pipeline(inputs=["a", "b"])
+    partial = pipeline.subpipeline(inputs=["a", "b"])
     assert [f.output_name for f in partial.functions] == [("c", "d"), "h"]
 
-    partial = pipeline.partial_pipeline(output_names=["h"])
+    partial = pipeline.subpipeline(output_names=["h"])
     assert partial.topological_generations.root_args == ["a", "b"]
 
-    partial = pipeline.partial_pipeline(output_names=["h"], inputs=["c"])
+    partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
     assert partial.topological_generations.root_args == ["c"]
     assert [f.output_name for f in partial.functions] == ["h"]

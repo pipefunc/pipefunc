@@ -471,7 +471,7 @@ def run(
 
     """
     if allow_intermediate_inputs or output_names is not None:
-        pipeline = pipeline.partial_pipeline(set(inputs), output_names)
+        pipeline = pipeline.subpipeline(set(inputs), output_names)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)

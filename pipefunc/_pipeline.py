@@ -1075,16 +1075,62 @@ class Pipeline:
             if self._axis_in_root_arg(axis, output_name)
         }
 
-    def partial_pipeline(
+    def subpipeline(
         self,
         inputs: set[str] | None = None,
         output_names: set[_OUTPUT_TYPE] | None = None,
     ) -> Pipeline:
-        """Returns a new `Pipeline` that only contains the nodes between inputs and outputs."""
+        """Create a new pipeline containing only the nodes between the specified inputs and outputs.
+
+        Parameters
+        ----------
+        inputs
+            Set of input names to include in the subpipeline. If None, all root nodes of the
+            original pipeline will be used as inputs. Default is None.
+        output_names
+            Set of output names to include in the subpipeline. If None, all leaf nodes of the
+            original pipeline will be used as outputs. Default is None.
+
+        Returns
+        -------
+            A new pipeline containing only the nodes and connections between the specified
+            inputs and outputs.
+
+        Notes
+        -----
+        The subpipeline is created by copying the original pipeline and then removing the nodes
+        that are not part of the path from the specified inputs to the specified outputs. The
+        resulting subpipeline will have the same behavior as the original pipeline for the
+        selected inputs and outputs.
+
+        If `inputs` is provided, the subpipeline will use those nodes as the new root nodes. If
+        `output_names` is provided, the subpipeline will use those nodes as the new leaf nodes.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+        ... def f(x: int) -> int:
+        ...     return x
+        ...
+        >>> @pipefunc(output_name="z")
+        ... def g(y: np.ndarray) -> int:
+        ...     return sum(y)
+        ...
+        >>> pipeline = Pipeline([f, g])
+        >>> inputs = {"x": [1, 2, 3]}
+        >>> results = pipeline.map(inputs, "tmp_path")
+        >>> partial = pipeline.subpipeline({"y"})
+        >>> r = partial.map({"y": results["y"].output}, "tmp_path")
+        >>> assert len(r) == 1
+        >>> assert r["z"].output == 6
+
+        """
         if inputs is None and output_names is None:
             msg = "At least one of `inputs` or `output_names` should be provided."
             raise ValueError(msg)
+
         pipeline = self.copy()
+
         input_nodes: set[str | PipeFunc] = (
             set(pipeline.topological_generations.root_args)
             if inputs is None
