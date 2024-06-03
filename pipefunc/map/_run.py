@@ -588,9 +588,7 @@ def _process_task(
 
 
 def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
-    if not parallel:
-        return
-    if not store:
+    if not parallel or not store:
         return
     # Assumes all storage classes are the same! Might change in the future.
     storage = next(iter(store.values()))
