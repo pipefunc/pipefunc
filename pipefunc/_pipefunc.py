@@ -128,8 +128,8 @@ class PipeFunc(Generic[T]):
             )
         self._profile = profile
         self._renames: dict[str, str] = renames or {}
-        self._defaults = defaults or {}
-        self._bound = bound or {}
+        self._defaults: dict[str, Any] = defaults or {}
+        self._bound: dict[str, Any] = bound or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
@@ -192,14 +192,6 @@ class PipeFunc(Generic[T]):
 
         """
         parameters = inspect.signature(self.func).parameters
-        if extra := set(self._defaults) - set(self.parameters):
-            allowed = ", ".join(parameters)
-            msg = (
-                f"Unexpected default arguments: `{extra}`."
-                f" The allowed arguments are: `{allowed}`."
-                " Defaults must be in terms of the renamed argument names."
-            )
-            raise ValueError(msg)
         defaults = {}
         for original_name, v in parameters.items():
             new_name = self._renames.get(original_name, original_name)
@@ -303,10 +295,8 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        for name in update:
-            if not name.isidentifier():
-                msg = f"The `{name}` keys should be a valid Python identifier, not `{name}`."
-                raise TypeError(msg)
+        for key in update:
+            _validate_identifier(key, name)
 
     def _validate_names(self) -> None:
         self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
@@ -319,9 +309,7 @@ class PipeFunc(Generic[T]):
             )
             raise TypeError(msg)
         for name in at_least_tuple(self.output_name):
-            if not name.isidentifier():
-                msg = f"The `output_name` should be a valid Python identifier, not `{name}`."
-                raise TypeError(msg)
+            _validate_identifier("output_name", name)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
@@ -583,3 +571,9 @@ def pipefunc(
         )
 
     return decorator
+
+
+def _validate_identifier(name: str, value: Any) -> None:
+    if not name.isidentifier():
+        msg = f"The `{name}` should contain valid Python identifier(s), not `{value}`."
+        raise TypeError(msg)

@@ -771,12 +771,11 @@ def test_setting_defaults() -> None:
     assert pipeline("c", a1=0) == 2
     assert pipeline("c", a1="a1", b="b") == "a1b"
 
-    @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
-    def g(a):
-        return a
+    with pytest.raises(ValueError, match="Unexpected `defaults` arguments"):
 
-    with pytest.raises(ValueError, match="Unexpected default arguments"):
-        _ = g.defaults
+        @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
+        def g(a):
+            return a
 
     @pipefunc(output_name="c", defaults={"a": "a_new", "b": "b_new"}, renames={"a": "b", "b": "a"})
     def h(a="a", b="b"):

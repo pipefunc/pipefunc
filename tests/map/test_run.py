@@ -958,8 +958,9 @@ def test_growing_axis(tmp_path: Path) -> None:
 
 
 def test_storage_options():
+    f = PipeFunc(lambda x: x, "y")
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
-        Pipeline([lambda x: x]).map({"x": 1}, None, storage="invalid")
+        Pipeline([f]).map({"x": 1}, None, storage="invalid")
 
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}
