@@ -414,6 +414,21 @@ def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     return Path(run_folder)
 
 
+def _pipeline_with_output(pipeline: Pipeline, output_name: _OUTPUT_TYPE) -> Pipeline:
+    from pipefunc import Pipeline
+
+    dependencies = pipeline.func_dependencies(output_name)
+    new_functions = [pipeline.output_to_func[name] for name in dependencies]
+    return Pipeline(
+        new_functions,  # type: ignore[arg-type]
+        lazy=pipeline.lazy,
+        debug=pipeline._debug,
+        profile=pipeline._profile,
+        cache_type=pipeline._cache_type,
+        cache_kwargs=pipeline._cache_kwargs,
+    )
+
+
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -465,7 +480,7 @@ def run(
         If not provided, all indices are iterated over.
 
     """
-    # TODO: implement setting `output_name`, see #127
+    pipeline = _pipeline_with_output(pipeline, output_name) if output_name else pipeline
     _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
