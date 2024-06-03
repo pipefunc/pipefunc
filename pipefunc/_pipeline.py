@@ -1101,11 +1101,14 @@ class Pipeline:
             pipeline.drop(f=f)
 
         if inputs is not None:
-            for f in pipeline.functions:
-                arg_combos = [set(x) for x in pipeline.arg_combinations(f.output_name)]
-                if not any(set(inputs).issuperset(args) for args in arg_combos):
-                    msg = f"Cannot construct a partial pipeline with only `{inputs=}`."
-                    raise ValueError(msg)
+            new_root_args = set(pipeline.topological_generations.root_args)
+            if not new_root_args.issubset(inputs):
+                output_names = {f.output_name for f in output_nodes}
+                msg = (
+                    f"Cannot construct a partial pipeline with {output_names=}"
+                    f" and `{inputs=}`, it would require `{new_root_args}`."
+                )
+                raise ValueError(msg)
 
         return pipeline
 
