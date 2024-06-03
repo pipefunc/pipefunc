@@ -12,6 +12,8 @@ dependencies:
   - psutil
   - cloudpickle
   - numpy
+  # optional-dependencies: adaptive
+  - adaptive
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
