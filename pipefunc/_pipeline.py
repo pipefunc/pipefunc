@@ -606,8 +606,8 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None,
-        output_name: _OUTPUT_TYPE | None = None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        output_names: set[_OUTPUT_TYPE] | None = None,
         *,
         parallel: bool = True,
         executor: Executor | None = None,
@@ -615,6 +615,7 @@ class Pipeline:
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
+        allow_partial: bool = False,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -628,11 +629,11 @@ class Pipeline:
         run_folder
             The folder to store the run information. If `None`, a temporary folder
             is created.
-        output_name
-            The output to calculate. If `None`, the entire pipeline is run and all outputs are computed.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
+        output_names
+            The output(s) to calculate. If `None`, the entire pipeline is run and all outputs are computed.
         parallel
             Whether to run the functions in parallel.
         executor
@@ -649,20 +650,25 @@ class Pipeline:
         fixed_indices
             A dictionary mapping axes names to indices that should be fixed for the run.
             If not provided, all indices are iterated over.
+        allow_partial
+            Whether to allow partial runs. If `True`, the pipeline will run even if not all
+            required inputs are provided. If `False`, an exception is raised if not all
+            inputs are provided.
 
         """
         return run(
             self,
             inputs,
             run_folder,
-            output_name,
-            internal_shapes,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
             parallel=parallel,
             executor=executor,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
             fixed_indices=fixed_indices,
+            allow_partial=allow_partial,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1069,6 +1075,36 @@ class Pipeline:
             if self._axis_in_root_arg(axis, output_name)
         }
 
+    def partial_pipeline(
+        self,
+        inputs: set[str] | None,
+        output_names: set[_OUTPUT_TYPE] | None,
+    ) -> Pipeline:
+        """Returns a new `Pipeline` that only contains the nodes between inputs and outputs."""
+        if inputs is None and output_names is None:
+            msg = "At least one of `inputs` or `output_names` should be provided."
+            raise ValueError(msg)
+        pipeline = self.copy()
+        if inputs is not None:
+            input_nodes = {pipeline.node_mapping[input_] for input_ in inputs}
+        else:
+            input_nodes = set(pipeline.topological_generations.root_args)
+
+        if output_names is not None:
+            output_nodes = {pipeline.node_mapping[output] for output in output_names}
+        else:
+            output_nodes = set(pipeline.leaf_nodes)
+
+        between: set[str | PipeFunc] = _find_nodes_between(
+            pipeline.graph,
+            input_nodes,
+            output_nodes,
+        )
+        drop = [f for f in pipeline.functions if f not in between]
+        for f in drop:
+            pipeline.drop(f=f)
+        return pipeline
+
 
 class _Generations(NamedTuple):
     root_args: list[str]
@@ -1434,3 +1470,18 @@ def _traverse_graph(
         return results  # type: ignore[return-value]
 
     return sorted(_traverse(start), key=at_least_tuple)
+
+
+def _find_nodes_between(
+    graph: nx.DiGraph,
+    input_nodes: set[Any],
+    output_nodes: set[Any],
+) -> set[Any]:
+    reachable_from_inputs = set()
+    for input_node in input_nodes:
+        reachable_from_inputs.update(nx.descendants(graph, input_node))
+    reachable_to_outputs = set()
+    for output_node in output_nodes:
+        reachable_to_outputs.update(nx.ancestors(graph, output_node))
+    reachable_to_outputs.update(output_nodes)
+    return reachable_from_inputs & reachable_to_outputs

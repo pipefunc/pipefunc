@@ -414,28 +414,45 @@ def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     return Path(run_folder)
 
 
-def _pipeline_with_output(pipeline: Pipeline, output_name: _OUTPUT_TYPE) -> Pipeline:
-    from pipefunc import Pipeline
+def _maybe_partial_pipeline(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    output_name: _OUTPUT_TYPE | None,
+) -> Pipeline:
+    if output_name is not None:
+        output_names = {f.output_name for f in pipeline.functions}
+        if output_name not in output_names:
+            msg = f"Output name `{output_name}` not found in pipeline. Did you mean one of `{output_names}`?"
+            raise ValueError(msg)
 
-    dependencies = pipeline.func_dependencies(output_name)
-    new_functions = [pipeline.output_to_func[name] for name in dependencies]
-    new_functions.append(pipeline.output_to_func[output_name])
-    return Pipeline(
-        new_functions,  # type: ignore[arg-type]
-        lazy=pipeline.lazy,
-        debug=pipeline._debug,
-        profile=pipeline._profile,
-        cache_type=pipeline._cache_type,
-        cache_kwargs=pipeline._cache_kwargs,
-    )
+    root_args = pipeline.topological_generations.root_args
+    input_names = set(inputs) | set(pipeline.defaults)
+    missing = set(root_args) - input_names
+    if not missing and output_name is None:
+        return pipeline
+
+    pipeline = pipeline.copy()
+    for name in inputs:
+        if name in pipeline.output_to_func:
+            print(f"dropping {name=}")
+            pipeline.drop(output_name=name)
+
+    if output_name is not None:
+        func = pipeline.output_to_func[output_name]
+        while pipeline.leaf_nodes != [func]:
+            for f in pipeline.leaf_nodes:
+                if f.output_name != output_name:
+                    print(f"dropping {f.output_name=}")
+                    pipeline.drop(f=f)
+    return pipeline
 
 
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    output_name: _OUTPUT_TYPE | None = None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    output_names: set[_OUTPUT_TYPE] | None = None,
     *,
     parallel: bool = True,
     executor: Executor | None = None,
@@ -443,6 +460,7 @@ def run(
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
+    allow_partial: bool = False,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -458,11 +476,11 @@ def run(
     run_folder
         The folder to store the run information. If `None`, a temporary folder
         is created.
-    output_name
-        The output to calculate. If `None`, the entire pipeline is run and all outputs are computed.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
+    output_names
+        The output(s) to calculate. If `None`, the entire pipeline is run and all outputs are computed.
     parallel
         Whether to run the functions in parallel.
     executor
@@ -479,11 +497,15 @@ def run(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
+    allow_partial
+        Whether to allow partial runs. If `True`, the pipeline will run even if not all
+        required inputs are provided. If `False`, an exception is raised if not all
+        inputs are provided.
 
     """
-    if output_name is not None:
-        pipeline = _pipeline_with_output(pipeline, output_name)
-    _validate_complete_inputs(pipeline, inputs, output_name=None)
+    if allow_partial or output_names is not None:
+        pipeline = pipeline.partial_pipeline(set(inputs), output_names)
+    _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = _ensure_run_folder(run_folder)
@@ -601,6 +623,8 @@ def _process_task(
 def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
     if not parallel:
         return
+    if not store:
+        return
     # Assumes all storage classes are the same! Might change in the future.
     storage = next(iter(store.values()))
     if not storage.parallelizable:
@@ -666,7 +690,6 @@ def load_xarray_dataset(
 def _validate_complete_inputs(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    output_name: _OUTPUT_TYPE | None = None,
 ) -> None:
     """Validate that all required inputs are provided.
 
@@ -674,15 +697,11 @@ def _validate_complete_inputs(
     This is in contrast to some other functions, where `None` means that the `pipeline.unique_leaf_node`
     is used.
     """
-    if output_name is None:
-        root_args = set(pipeline.topological_generations.root_args)
-    else:  # pragma: no cover
-        # TODO: this case becomes relevant when #127 is implemented
-        root_args = set(pipeline.root_args(output_name))
+    root_args = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
-        msg = f"Missing inputs: {missing_args}"
+        msg = f"Missing inputs: `{missing_args}`. Set `allow_partial=True` to allow partial runs."
         raise ValueError(msg)
 
 

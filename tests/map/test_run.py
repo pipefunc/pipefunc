@@ -1143,3 +1143,14 @@ def test_missing_inputs():
     inputs = {}
     with pytest.raises(ValueError, match="Missing inputs"):
         pipeline.map(inputs, None, parallel=False)
+
+
+def test_map_without_mapspec(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def f(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {"x": 1}
+    results = pipeline.map(inputs, tmp_path)
+    assert results["y"].output == 1
