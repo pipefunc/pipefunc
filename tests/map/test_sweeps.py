@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from pipefunc import Pipeline, Sweep, pipefunc
-from pipefunc.map._run import load_outputs, map_shapes
+from pipefunc import Pipeline, pipefunc
+from pipefunc.map._run import load_outputs
+from pipefunc.map._run_info import map_shapes
+from pipefunc.sweep import Sweep
 
 if TYPE_CHECKING:
     from pathlib import Path

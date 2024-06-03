@@ -27,12 +27,12 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
     assert str(f_d.mapspec) == "c[i], b[i], x[j] -> d[i, j]"
     assert str(f_e.mapspec) == "d[i, j], c[i], x[j] -> e[i, j]"
 
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "a[i], b[i] -> c[i]",
         "c[i], b[i], x[j] -> d[i, j]",
         "d[i, j], c[i], x[j] -> e[i, j]",
     ]
-    axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     assert axes == {
         "a": ("i",),
         "b": ("i",),
@@ -41,7 +41,7 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
         "d": ("i", "j"),
         "e": ("i", "j"),
     }
-    dimensions = pipeline.mapspec_dimensions()
+    dimensions = pipeline.mapspec_dimensions
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
 
@@ -68,7 +68,7 @@ def test_adding_axes_to_mapspec_less_pipeline() -> None:
     assert str(f_d.mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
     assert str(f_e.mapspec) == "d[i, j, k], c[i, j], x[k] -> e[i, j, k]"
 
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "a[i], b[j] -> c[i, j]",
         "c[i, j], b[j], x[k] -> d[i, j, k]",
         "d[i, j, k], c[i, j], x[k] -> e[i, j, k]",

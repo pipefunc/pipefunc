@@ -1,15 +1,19 @@
+"""Provides the `pipefunc.sweep` module, for creating and managing parameter sweeps."""
+
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+
     from pipefunc._pipeline import _OUTPUT_TYPE, PipeFunc, Pipeline
 
 
@@ -66,7 +70,6 @@ class Sweep:
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -104,6 +107,15 @@ class Sweep:
         self.derivers = derivers
 
     def generate(self) -> Generator[dict[str, Any], None, None]:  # noqa: PLR0912
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         if not self.items:
             return  # If there are no items, return an empty generator
 
@@ -235,7 +247,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object representing the Cartesian product of the sweeps.
 
         Examples
@@ -286,7 +297,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object with the added derivers.
 
         Examples
@@ -316,7 +326,6 @@ class MultiSweep(Sweep):
 
     Returns
     -------
-    MultiSweep
         A MultiSweep object containing the concatenated sweeps.
 
     Examples
@@ -332,10 +341,20 @@ class MultiSweep(Sweep):
         self.sweeps = list(sweeps)
 
     def generate(self) -> Generator[dict[str, Any], None, None]:
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         for sweep in self.sweeps:
             yield from sweep.generate()
 
     def __len__(self) -> int:
+        """Return the number of unique combinations in the sweep."""
         return sum(len(sweep) for sweep in self.sweeps)
 
     def list(self) -> list[dict[str, Any]]:
@@ -408,7 +427,6 @@ def generate_sweep(
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -460,7 +478,6 @@ def count_sweep(
 
     Returns
     -------
-    dict
         A dictionary where the keys are the names of the arguments and the
         values are dictionaries where the keys are the argument combinations
         and the values are the number of times that combination is used.
@@ -500,12 +517,12 @@ def set_cache_for_sweep(
 ) -> None:
     """Set the cache for a sweep of a pipeline."""
     # Disable for the output node
-    pipeline.node_mapping[output_name].cache = False  # type: ignore[union-attr]
+    pipeline.output_to_func[output_name].cache = False  # type: ignore[union-attr]
     cnt = count_sweep(output_name, sweep, pipeline)
     max_executions = {k: max(v.values()) for k, v in cnt.items()}
     for _output_name, n in max_executions.items():
         enable_cache = n >= min_executions
-        func = pipeline.node_mapping[_output_name]
+        func = pipeline.output_to_func[_output_name]
         if verbose:
             print(f"Setting cache for '{_output_name}' to {enable_cache} (n={n})")
         func.cache = enable_cache  # type: ignore[union-attr]
@@ -536,7 +553,6 @@ def get_precalculation_order(
 
     Returns
     -------
-    list[PipeFunc]
         The ordered list of functions to be precalculated and cached.
 
     """
@@ -570,7 +586,6 @@ def _get_nested_value(d: dict, keys: list) -> Any:
 
     Returns
     -------
-    Any
         The value found at the nested location in the dictionary specified by
         the list of keys.
 
@@ -656,7 +671,6 @@ def get_min_sweep_sets(
 
     Returns
     -------
-    Tuple[List[Any], dict]
         A tuple where the first element is a list of the minimal set of argument
         combinations for each function in the execution order and the second
         element is a nested dictionary that represents the sweep combinations.

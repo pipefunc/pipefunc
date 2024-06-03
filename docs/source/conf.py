@@ -21,7 +21,7 @@ import pipefunc  # noqa: E402, isort:skip
 
 project = "pipefunc"
 author = "Bas Nijholt"
-copyright = f"2023, {author}"
+copyright = f"2024, {author}"
 
 version = ".".join(pipefunc.__version__.split(".")[:3])
 release = version
@@ -37,6 +37,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
+    "sphinx_autodoc_typehints",
     "myst_nb",
 ]
 
@@ -111,6 +112,8 @@ nb_docs_folder = docs_path / "source" / "notebooks"
 nb_docs_folder.mkdir(exist_ok=True)
 shutil.copy(nb, nb_docs_folder)
 
+# Group into single streams to prevent multiple output boxes
+nb_merge_streams = True
 
 def setup(app) -> None:
     pass

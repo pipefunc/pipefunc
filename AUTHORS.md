@@ -1,2 +1,3 @@
-# The authors of `pipefunc` are:
+# The authors of `pipefunc`
+
 - [Bas Nijholt](http://nijho.lt) ([@basnijholt](https://github.com/basnijholt))

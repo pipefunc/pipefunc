@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._simplify import _combine_nodes, _get_signature
+from pipefunc._simplify import _combine_nodes, _get_signature, _identify_combinable_nodes
 
 
 def test_identify_combinable_nodes():
@@ -24,16 +24,20 @@ def test_identify_combinable_nodes():
         pass
 
     pipeline = Pipeline([f_d, f_e, f_i, f_gg])
-    combinable_nodes = pipeline._identify_combinable_nodes(
-        "i",
+    combinable_nodes = _identify_combinable_nodes(
+        pipeline.output_to_func["i"],
+        pipeline.graph,
+        pipeline.all_root_args,
         conservatively_combine=True,
     )
     assert combinable_nodes == {f_gg: {f_e}}
     sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
     assert sig_in == {f_gg: {"a", "x"}}
     assert sig_out == {f_gg: {"gg", "h", "g"}}
-    combinable_nodes = pipeline._identify_combinable_nodes(
-        "i",
+    combinable_nodes = _identify_combinable_nodes(
+        pipeline.output_to_func["i"],
+        pipeline.graph,
+        pipeline.all_root_args,
         conservatively_combine=False,
     )
     assert combinable_nodes == {f_gg: {f_e}, f_i: {f_d}}
@@ -61,8 +65,10 @@ def test_conservatively_combine():
     assert root_args == {"x": ("a",), "y": ("a", "b"), "z": ("a", "b")}
 
     # Test with conservatively_combine=True
-    combinable_nodes_true = pipeline._identify_combinable_nodes(
-        "z",
+    combinable_nodes_true = _identify_combinable_nodes(
+        pipeline.output_to_func["z"],
+        pipeline.graph,
+        pipeline.all_root_args,
         conservatively_combine=True,
     )
     assert combinable_nodes_true == {}
@@ -80,8 +86,10 @@ def test_conservatively_combine():
     assert "f3" in function_names_true
 
     # Test with conservatively_combine=False
-    combinable_nodes_false = pipeline._identify_combinable_nodes(
-        "z",
+    combinable_nodes_false = _identify_combinable_nodes(
+        pipeline.output_to_func["z"],
+        pipeline.graph,
+        pipeline.all_root_args,
         conservatively_combine=False,
     )
     assert combinable_nodes_false == {f3: {f2}}
@@ -99,7 +107,7 @@ def test_conservatively_combine():
 
     # Check that the combined function has the expected input and output arguments
     combined_f3 = next(f for f in simplified_functions_false if f.__name__ == "combined_f3")
-    assert combined_f3.parameters == ["b", "x"]
+    assert combined_f3.parameters == ("b", "x")
     assert combined_f3.output_name == "z"
 
     # Check that the simplified pipeline produces the same output as the original pipeline
@@ -135,10 +143,14 @@ def test_identify_combinable_nodes2():
         return a + f2 + f6
 
     pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
-    m = pipeline.node_mapping
+    m = pipeline.output_to_func
 
     expected = {m["f6"]: {m["f1"], m["f3"], m["f4"], m["f5"]}}
-    combinable_nodes = pipeline._identify_combinable_nodes("f7")
+    combinable_nodes = _identify_combinable_nodes(
+        pipeline.output_to_func["f7"],
+        pipeline.graph,
+        pipeline.all_root_args,
+    )
     simplified_combinable_nodes = _combine_nodes(combinable_nodes)
     assert simplified_combinable_nodes == expected
 
@@ -166,7 +178,7 @@ def test_identify_combinable_nodes2():
 
     # Check that the combined function has the expected input and output arguments
     combined_f6 = next(f for f in simplified_functions if f.__name__ == "combined_f6")
-    assert combined_f6.parameters == ["a", "b", "c", "d"]
+    assert combined_f6.parameters == ("a", "b", "c", "d")
     assert combined_f6.output_name == "f6"
 
     # Check that the simplified pipeline produces the same output as the original pipeline

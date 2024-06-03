@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import cloudpickle
 import numpy as np
 import pytest

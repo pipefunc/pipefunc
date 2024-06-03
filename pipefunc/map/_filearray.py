@@ -13,10 +13,11 @@ from typing import TYPE_CHECKING, Any
 import cloudpickle
 import numpy as np
 
-from pipefunc._utils import dump, load, prod
+from pipefunc._utils import dump, load
 from pipefunc.map._storage_base import (
     StorageBase,
     _iterate_shape_indices,
+    _normalize_key,
     _select_by_mask,
     register_storage,
 )
@@ -66,56 +67,19 @@ class FileArray(StorageBase):
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
-    @property
-    def size(self) -> int:
-        """Return number of elements in the array."""
-        return prod(self.shape)
-
-    @property
-    def rank(self) -> int:
-        """Return the rank of the array."""
-        return len(self.shape)
-
     def _normalize_key(
         self,
         key: tuple[int | slice, ...],
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        if not isinstance(key, tuple):
-            key = (key,)
-
-        expected_rank = sum(self.shape_mask) if for_dump else len(self.shape_mask)
-
-        if len(key) != expected_rank:
-            msg = (
-                f"Too many indices for array: array is {expected_rank}-dimensional, "
-                f"but {len(key)} were indexed"
-            )
-            raise IndexError(msg)
-
-        normalized_key: list[int | slice] = []
-        shape_index = 0
-        internal_shape_index = 0
-
-        for axis, (mask, k) in enumerate(zip(self.shape_mask, key)):
-            if mask:
-                axis_size = self.shape[shape_index]
-                shape_index += 1
-            else:
-                axis_size = self.internal_shape[internal_shape_index]
-                internal_shape_index += 1
-
-            if isinstance(k, slice):
-                normalized_key.append(k)
-            else:
-                normalized_k = k if k >= 0 else (k + axis_size)
-                if not (0 <= normalized_k < axis_size):
-                    msg = f"Index {k} is out of bounds for axis {axis} with size {axis_size}"
-                    raise IndexError(msg)
-                normalized_key.append(normalized_k)
-
-        return tuple(normalized_key)
+        return _normalize_key(
+            key,
+            self.shape,
+            self.internal_shape,
+            self.shape_mask,
+            for_dump=for_dump,
+        )
 
     def _index_to_file(self, index: int) -> Path:
         """Return the filename associated with the given index."""
@@ -217,13 +181,12 @@ class FileArray(StorageBase):
 
         Parameters
         ----------
-        splat_internal : bool
+        splat_internal
             If True, the internal array dimensions will be splatted out.
             If None, it will happen if and only if `internal_shape` is provided.
 
         Returns
         -------
-        np.ma.core.MaskedArray
             The array containing all the data.
 
         """
@@ -236,7 +199,7 @@ class FileArray(StorageBase):
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
             mask = self.mask_linear()
-            return np.ma.array(arr, mask=mask, dtype=object).reshape(self.shape)
+            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.shape)
 
         if not self.internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
@@ -260,7 +223,7 @@ class FileArray(StorageBase):
                     full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
-        return np.ma.array(arr, mask=full_mask, dtype=object)
+        return np.ma.MaskedArray(arr, mask=full_mask, dtype=object)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
@@ -274,7 +237,7 @@ class FileArray(StorageBase):
         masking out missing data.
         """
         mask = self.mask_linear()
-        return np.ma.array(mask, mask=mask, dtype=bool).reshape(self.shape)
+        return np.ma.MaskedArray(mask, mask=mask, dtype=bool).reshape(self.shape)
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         """Dump 'value' into the file associated with 'key'.
@@ -293,6 +256,11 @@ class FileArray(StorageBase):
         for index in itertools.product(*self._slice_indices(key)):
             file = self._key_to_file(index)
             dump(value, file)
+
+    @property
+    def parallelizable(self) -> bool:
+        """Return whether the storage is parallelizable."""
+        return True
 
 
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
