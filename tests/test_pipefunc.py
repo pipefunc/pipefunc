@@ -886,3 +886,14 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     assert pipeline("x", a2=3) == 6
     assert pipeline("y", c=2, d2=3) == 6
     assert pipeline("y") == 4 * 666
+
+
+@pytest.mark.parametrize("output_name", [("a.1", "b"), "#a", "1"])
+def test_invalid_output_name(output_name):
+    with pytest.raises(
+        ValueError,
+        match="The `output_name` should contain/be valid Python identifier",
+    ):
+
+        @pipefunc(output_name=output_name)
+        def f(): ...

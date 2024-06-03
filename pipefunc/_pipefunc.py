@@ -65,7 +65,8 @@ class PipeFunc(Generic[T]):
         of the renamed argument names.
     bound
         Bind arguments to the function. These are arguments that are fixed. Even when
-        providing different values, the bound values will be used.
+        providing different values, the bound values will be used. Must be in terms of
+        the renamed argument names.
     profile
         Flag indicating whether the wrapped function should be profiled.
     debug
@@ -226,6 +227,8 @@ class PipeFunc(Generic[T]):
 
     def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
         """Update renames to function arguments for the wrapped function.
+
+        Note that renames *must* be in terms of the original argument names.
 
         Parameters
         ----------
@@ -574,6 +577,6 @@ def pipefunc(
 
 
 def _validate_identifier(name: str, value: Any) -> None:
-    if not name.isidentifier():
-        msg = f"The `{name}` should contain valid Python identifier(s), not `{value}`."
-        raise TypeError(msg)
+    if not value.isidentifier():
+        msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."
+        raise ValueError(msg)
