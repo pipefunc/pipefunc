@@ -1154,3 +1154,29 @@ def test_map_without_mapspec(tmp_path: Path) -> None:
     inputs = {"x": 1}
     results = pipeline.map(inputs, tmp_path)
     assert results["y"].output == 1
+
+
+def test_map_with_partial(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="z")
+    def g(y: np.ndarray) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    results = pipeline.map(inputs, tmp_path)
+    assert results["y"].output.tolist() == [1, 2, 3]
+    assert results["z"].output == 6
+
+    partial = pipeline.partial_pipeline({"y"})
+    r = partial.map({"y": results["y"].output}, tmp_path)
+    assert len(r) == 1
+    assert r["z"].output == 6
+
+    partial = pipeline.partial_pipeline(output_names={"y"})
+    r = partial.map(inputs, tmp_path)
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
