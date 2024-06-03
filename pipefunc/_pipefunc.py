@@ -309,6 +309,7 @@ class PipeFunc(Generic[T]):
             output_picker=self.output_picker,
             renames=self._renames,
             defaults=self.defaults,
+            bound=self._bound,
             profile=self.profile,
             debug=self.debug,
             cache=self.cache,
