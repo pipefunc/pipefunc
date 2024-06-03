@@ -5,7 +5,7 @@ import json
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -13,16 +13,9 @@ from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._storage_base import StorageBase, storage_registry
 
 if TYPE_CHECKING:
-    import sys
-
     from pipefunc import Pipeline
 
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
-
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 class Shapes(NamedTuple):
@@ -39,12 +32,12 @@ def map_shapes(
         internal_shapes = {}
     internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
 
-    map_parameters: set[str] = pipeline.map_parameters
+    mapspec_names: set[str] = pipeline.mapspec_names
 
     input_parameters = set(pipeline.topological_generations.root_args)
 
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
-        p: array_shape(inputs[p]) for p in input_parameters if p in map_parameters
+        p: array_shape(inputs[p]) for p in input_parameters if p in mapspec_names
     }
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
@@ -60,7 +53,7 @@ def map_shapes(
                 shapes[output_name] = output_shape
                 masks[output_name] = mask
 
-    assert all(k in shapes for k in map_parameters if k not in internal)
+    assert all(k in shapes for k in mapspec_names if k not in internal)
     return Shapes(shapes, masks)
 
 
@@ -86,7 +79,7 @@ def _compare_to_previous_run_info(
     if internal_shapes != old.internal_shapes:
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    if pipeline.mapspecs_as_strings() != old.mapspecs_as_strings:
+    if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
         msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
@@ -106,7 +99,7 @@ def _compare_to_previous_run_info(
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = pipeline.mapspec_dimensions()
+    input_dimensions = pipeline.mapspec_dimensions
     for name, value in inputs.items():
         if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
@@ -148,7 +141,7 @@ class RunInfo:
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
-            mapspecs_as_strings=pipeline.mapspecs_as_strings(),
+            mapspecs_as_strings=pipeline.mapspecs_as_strings,
             run_folder=run_folder,
             storage=storage,
         )

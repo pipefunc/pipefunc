@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import tempfile
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generator, NamedTuple, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.map._mapspec import (
@@ -19,26 +21,18 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
-from pipefunc.map._storage_base import (
-    StorageBase,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
+from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
-    import sys
+    from collections.abc import Callable, Generator, Sequence
 
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline import _Generations
 
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 @dataclass
@@ -49,14 +43,14 @@ class _MockPipeline:
     """
 
     defaults: dict[str, Any]
-    map_parameters: set[str]
+    mapspec_names: set[str]
     topological_generations: _Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
         return cls(
             defaults=pipeline.defaults,
-            map_parameters=pipeline.map_parameters,
+            mapspec_names=pipeline.mapspec_names,
             topological_generations=pipeline.topological_generations,
         )
 
@@ -70,6 +64,7 @@ class _MockPipeline:
         functions = self.functions  # topologically ordered
         return [f.mapspec for f in functions if f.mapspec]
 
+    @functools.cached_property
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
@@ -79,6 +74,7 @@ class _MockPipeline:
         """Return the functions in the pipeline in topological order."""
         return self.functions
 
+    @functools.cached_property
     def mapspec_dimensions(self) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
@@ -259,11 +255,21 @@ def _update_result_array(
             result_array[index] = _output
 
 
-def _existing_and_missing_indices(file_arrays: list[StorageBase]) -> tuple[list[int], list[int]]:
+def _existing_and_missing_indices(
+    file_arrays: list[StorageBase],
+    fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
+) -> tuple[list[int], list[int]]:
+    # TODO: when `fixed_indices` are used we could be more efficient by not
+    # computing the full mask.
     masks = (arr.mask_linear() for arr in file_arrays)
+    if fixed_mask is None:
+        fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
+
     existing_indices = []
     missing_indices = []
-    for i, mask_values in enumerate(zip(*masks)):
+    for i, (*mask_values, select) in enumerate(zip(*masks, fixed_mask)):  # type: ignore[arg-type]
+        if not select:
+            continue
         if any(mask_values):  # rerun if any of the outputs are missing
             missing_indices.append(i)
         else:
@@ -299,6 +305,7 @@ def _prepare_submit_map_spec(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
+    fixed_indices: dict[str, int | slice] | None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
@@ -313,8 +320,24 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         file_arrays=file_arrays,
     )
-    existing, missing = _existing_and_missing_indices(file_arrays)  # type: ignore[arg-type]
+    fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
+    existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
     return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
+
+
+def _mask_fixed_axes(
+    fixed_indices: dict[str, int | slice] | None,
+    mapspec: MapSpec,
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+) -> np.flatiter[npt.NDArray[np.bool_]] | None:
+    if fixed_indices is None:
+        return None
+    key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
+    external_shape = _external_shape(shape, shape_mask)
+    select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
+    select[key] = True
+    return select.flat
 
 
 def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
@@ -403,6 +426,7 @@ def run(
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -436,9 +460,15 @@ def run(
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the `run_folder` before running the pipeline.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
 
     """
+    # TODO: implement setting `output_name`, see #127
+    _validate_complete_inputs(pipeline, inputs, output_name=None)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
@@ -455,7 +485,15 @@ def run(
 
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
-            _run_and_process_generation(gen, run_info, run_folder, store, outputs, ex)
+            _run_and_process_generation(
+                generation=gen,
+                run_info=run_info,
+                run_folder=run_folder,
+                store=store,
+                outputs=outputs,
+                fixed_indices=fixed_indices,
+                executor=ex,
+            )
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -470,6 +508,7 @@ def _run_and_process_generation(
     run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
+    fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
     tasks: dict[PipeFunc, Any] = {}
@@ -491,6 +530,7 @@ def _run_and_process_generation(
                 run_info.shapes,
                 run_info.shape_masks,
                 store,
+                fixed_indices,
             )
             r = _maybe_parallel_map(args.process_index, args.missing, executor)
             tasks[func] = r, args
@@ -591,7 +631,6 @@ def load_xarray_dataset(
 
     Returns
     -------
-    xr.Dataset
         An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """
@@ -605,3 +644,98 @@ def load_xarray_dataset(
         output_names=output_name,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
+
+
+def _validate_complete_inputs(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    output_name: _OUTPUT_TYPE | None = None,
+) -> None:
+    """Validate that all required inputs are provided.
+
+    Note that `output_name is None` means that all outputs are required!
+    This is in contrast to some other functions, where `None` means that the `pipeline.unique_leaf_node`
+    is used.
+    """
+    if output_name is None:
+        root_args = set(pipeline.topological_generations.root_args)
+    else:  # pragma: no cover
+        # TODO: this case becomes relevant when #127 is implemented
+        root_args = set(pipeline.root_args(output_name))
+    inputs_with_defaults = set(inputs) | set(pipeline.defaults)
+    if missing := root_args - set(inputs_with_defaults):
+        missing_args = ", ".join(missing)
+        msg = f"Missing inputs: {missing_args}"
+        raise ValueError(msg)
+
+
+def _validate_fixed_indices(
+    fixed_indices: dict[str, int | slice] | None,
+    inputs: dict[str, Any],
+    pipeline: Pipeline,
+) -> None:
+    if fixed_indices is None:
+        return
+    extra = set(fixed_indices)
+    axes = pipeline.mapspec_axes
+    for parameter, axes_ in axes.items():
+        for axis in axes_:
+            if axis in fixed_indices:
+                extra.discard(axis)
+        if parameter in inputs:
+            key = tuple(fixed_indices.get(axis, slice(None)) for axis in axes_)
+            if len(key) == 1:
+                key = key[0]  # type: ignore[assignment]
+            try:
+                inputs[parameter][key]
+            except IndexError as e:
+                msg = f"Fixed index `{key}` for parameter `{parameter}` is out of bounds."
+                raise IndexError(msg) from e
+    if extra:
+        msg = f"Got extra `fixed_indices`: `{extra}` that are not accepted by this map."
+        raise ValueError(msg)
+
+    reduced_axes = _reduced_axes(pipeline)
+    for name, axes_set in reduced_axes.items():
+        if reduced := set(axes_set) & set(fixed_indices):
+            reduced_str = ", ".join(reduced)
+            msg = f"Axis `{reduced_str}` in `{name}` is reduced and cannot be in `fixed_indices`."
+            raise ValueError(msg)
+
+
+def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
+    # TODO: check the overlap between this an `independent_axes_in_mapspecs`.
+    # It might be that this function could be used instead.
+    reduced_axes: dict[str, set[str]] = defaultdict(set)
+    axes = pipeline.mapspec_axes
+    for name in pipeline.mapspec_names:
+        for func in pipeline.functions:
+            if _is_parameter_reduced_by_function(func, name):
+                reduced_axes[name].update(axes[name])
+            elif _is_parameter_partially_reduced_by_function(func, name):
+                _axes = _get_partially_reduced_axes(func, name, axes)
+                reduced_axes[name].update(_axes)
+    return dict(reduced_axes)
+
+
+def _is_parameter_reduced_by_function(func: PipeFunc, name: str) -> bool:
+    return name in func.parameters and (
+        func.mapspec is None or name not in func.mapspec.input_names
+    )
+
+
+def _is_parameter_partially_reduced_by_function(func: PipeFunc, name: str) -> bool:
+    if func.mapspec is None or name not in func.mapspec.input_names:
+        return False
+    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
+    return None in spec.axes
+
+
+def _get_partially_reduced_axes(
+    func: PipeFunc,
+    name: str,
+    axes: dict[str, tuple[str, ...]],
+) -> tuple[str, ...]:
+    assert func.mapspec is not None
+    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
+    return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)

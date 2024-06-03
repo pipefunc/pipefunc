@@ -17,32 +17,22 @@ import datetime
 import functools
 import inspect
 import os
-import sys
-from typing import TYPE_CHECKING, Any, Generic, Tuple, TypeVar, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, Union
 
 import cloudpickle
 
-from pipefunc._lazy import evaluate_lazy
 from pipefunc._perf import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple, format_function_call
+from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
+from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import MapSpec
-
-if sys.version_info < (3, 9):  # pragma: no cover
-    from typing import Callable
-else:
-    from collections.abc import Callable
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from typing_extensions import TypeAlias
-    else:
-        from typing import TypeAlias
-
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 MAX_PARAMS_LEN = 15
 
 
@@ -73,6 +63,10 @@ class PipeFunc(Generic[T]):
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
+    bound
+        Bind arguments to the function. These are arguments that are fixed. Even when
+        providing different values, the bound values will be used. Must be in terms of
+        the renamed argument names.
     profile
         Flag indicating whether the wrapped function should be profiled.
     debug
@@ -113,6 +107,7 @@ class PipeFunc(Generic[T]):
         output_picker: Callable[[str, Any], Any] | None = None,
         renames: dict[str, str] | None = None,
         defaults: dict[str, Any] | None = None,
+        bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
@@ -133,44 +128,200 @@ class PipeFunc(Generic[T]):
                 output_name=self.output_name,
             )
         self._profile = profile
-        self.renames: dict[str, str] = renames or {}
-        self._inverse_renames: dict[str, str] = {v: k for k, v in self.renames.items()}
-        self._defaults = defaults or {}
+        self._renames: dict[str, str] = renames or {}
+        self._defaults: dict[str, Any] = defaults or {}
+        self._bound: dict[str, Any] = bound or {}
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
+        self._validate_names()
+
+    @property
+    def renames(self) -> dict[str, str]:
+        """Return the renames for the function arguments.
+
+        See Also
+        --------
+        update_renames
+            Update the `renames` via this method.
+
+        """
+        # Is a property to prevent users mutating the renames directly
+        return self._renames
+
+    @property
+    def bound(self) -> dict[str, Any]:
+        """Return the bound arguments for the function. These are arguments that are fixed.
+
+        See Also
+        --------
+        update_bound
+            Update the `bound` via this method.
+
+        """
+        # Is a property to prevent users mutating `bound` directly
+        return self._bound
 
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
-        parameters = inspect.signature(self.func).parameters
-        return tuple(self.renames.get(k, k) for k in parameters)
+        return tuple(self._renames.get(k, k) for k in self.original_parameters)
+
+    @property
+    def original_parameters(self) -> dict[str, inspect.Parameter]:
+        """Return the original (before renames) parameters of the wrapped function.
+
+        Returns
+        -------
+            A mapping of the original parameters of the wrapped function to their
+            respective `inspect.Parameter` objects.
+
+        """
+        return dict(inspect.signature(self.func).parameters)
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
+        """Return the defaults for the function arguments.
+
+        Returns
+        -------
+            A dictionary of default values for the keyword arguments.
+
+        See Also
+        --------
+        update_defaults
+            Update the `defaults` via this method.
+
+        """
         parameters = inspect.signature(self.func).parameters
-        if extra := set(self._defaults) - set(self.parameters):
-            allowed = ", ".join(parameters)
-            msg = (
-                f"Unexpected default arguments: `{extra}`."
-                f" The allowed arguments are: `{allowed}`."
-                " Defaults must be in terms of the renamed argument names."
-            )
-            raise ValueError(msg)
         defaults = {}
         for original_name, v in parameters.items():
-            new_name = self.renames.get(original_name, original_name)
-            if original_name in self._defaults:
-                defaults[new_name] = self._defaults[original_name]
+            new_name = self._renames.get(original_name, original_name)
+            if new_name in self._defaults:
+                defaults[new_name] = self._defaults[new_name]
             elif v.default is not inspect.Parameter.empty:
                 defaults[new_name] = v.default
         return defaults
+
+    @functools.cached_property
+    def _inverse_renames(self) -> dict[str, str]:
+        return {v: k for k, v in self._renames.items()}
+
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If `False`, the new
+            defaults will be added to the existing defaults.
+
+        """
+        self._validate_update(defaults, "defaults", self.parameters)
+        if overwrite:
+            self._defaults = defaults.copy()
+        else:
+            self._defaults = dict(self._defaults, **defaults)
+        clear_cached_properties(self)
+
+    def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+        """Update renames to function arguments for the wrapped function.
+
+        Note that renames *must* be in terms of the original argument names.
+
+        Parameters
+        ----------
+        renames
+            A dictionary of renames for the function arguments.
+        overwrite
+            Whether to overwrite the existing renames. If `False`, the new
+            renames will be added to the existing renames.
+
+        """
+        self._validate_update(renames, "renames", self.original_parameters)  # type: ignore[arg-type]
+        old_inverse = self._inverse_renames
+        bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
+        if overwrite:
+            self._renames = renames.copy()
+        else:
+            self._renames = dict(self._renames, **renames)
+
+        # Update defaults with new renames
+        new_defaults = {}
+        for name, value in self._defaults.items():
+            if original_name := old_inverse.get(name):
+                name = self._renames.get(original_name, original_name)  # noqa: PLW2901
+            new_defaults[name] = value
+        self._defaults = new_defaults
+
+        # Update bound with new renames
+        new_bound = {}
+        for name, value in bound_original.items():
+            new_name = self._renames.get(name, name)
+            new_bound[new_name] = value
+        self._bound = new_bound
+
+        clear_cached_properties(self)
+
+    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = True) -> None:
+        """Update the bound arguments for the function that are fixed.
+
+        Parameters
+        ----------
+        bound
+            A dictionary of bound arguments for the function.
+        overwrite
+            Whether to overwrite the existing bound arguments. If `False`, the new
+            bound arguments will be added to the existing bound arguments.
+
+        """
+        self._validate_update(bound, "bound", self.parameters)
+        if overwrite:
+            self._bound = bound.copy()
+        else:
+            self._bound = dict(self._bound, **bound)
+
+        clear_cached_properties(self)
+
+    def _validate_update(
+        self,
+        update: dict[str, Any],
+        name: str,
+        parameters: tuple[str, ...],
+    ) -> None:
+        if extra := set(update) - set(parameters):
+            msg = (
+                f"Unexpected `{name}` arguments: `{extra}`."
+                f" The allowed arguments are: `{parameters}`."
+                f" The provided arguments are: `{update}`."
+            )
+            raise ValueError(msg)
+
+        for key in update:
+            _validate_identifier(key, name)
+
+    def _validate_names(self) -> None:
+        self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
+        self._validate_update(self._defaults, "defaults", self.parameters)
+        self._validate_update(self._bound, "bound", self.parameters)
+        if not isinstance(self.output_name, str | tuple):
+            msg = (
+                f"The output name should be a string or a tuple of strings,"
+                f" not {type(self.output_name)}."
+            )
+            raise TypeError(msg)
+        for name in at_least_tuple(self.output_name):
+            _validate_identifier("output_name", name)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
             self.func,
             self.output_name,
             output_picker=self.output_picker,
-            renames=self.renames,
+            renames=self._renames,
+            defaults=self.defaults,
+            bound=self._bound,
             profile=self.profile,
             debug=self.debug,
             cache=self.cache,
@@ -183,7 +334,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The return value of the wrapped function.
 
         """
@@ -195,8 +345,9 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
         kwargs.update(defaults)
+        kwargs.update(self._bound)
+        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
             args = evaluate_lazy(args)
@@ -242,7 +393,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        AbstractContextManager
             A ResourceProfiler instance if profiling is enabled, or a
             nullcontext if disabled.
 
@@ -261,7 +411,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        Any
             The value of the attribute.
 
         """
@@ -272,7 +421,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -284,7 +432,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        str
             A string representation of the PipeFunc instance.
 
         """
@@ -299,7 +446,6 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-        state : dict
             A dictionary containing the picklable state of the object.
 
         """
@@ -315,7 +461,7 @@ class PipeFunc(Generic[T]):
 
         Parameters
         ----------
-        state : dict
+        state
             A dictionary containing the picklable state of the object.
 
         """
@@ -365,7 +511,7 @@ def pipefunc(
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
-    """A decorator for tagging pipeline functions with a return identifier.
+    """A decorator that wraps a function in a PipeFunc instance.
 
     Parameters
     ----------
@@ -396,7 +542,6 @@ def pipefunc(
 
     Returns
     -------
-    Callable[[Callable[..., Any]], PipeFunc]
         A decorator function that takes the original function and output_name a
         PipeFunc instance with the specified return identifier.
 
@@ -412,7 +557,6 @@ def pipefunc(
 
         Returns
         -------
-        PipeFunc
             The wrapped function with the specified return identifier.
 
         """
@@ -430,3 +574,9 @@ def pipefunc(
         )
 
     return decorator
+
+
+def _validate_identifier(name: str, value: Any) -> None:
+    if not value.isidentifier():
+        msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."
+        raise ValueError(msg)

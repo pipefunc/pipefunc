@@ -26,8 +26,8 @@ def shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
 
     Returns
     -------
-    The strides for each dimension, where each stride is the product of
-    subsequent dimension sizes.
+        The strides for each dimension, where each stride is the product of
+        subsequent dimension sizes.
 
     """
     strides = []
@@ -303,7 +303,7 @@ def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
 
     Returns
     -------
-    A boolean array where each element is False, indicating no masking by default.
+        A boolean array where each element is False, indicating no masking by default.
 
     Raises
     ------
@@ -345,7 +345,7 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
 
     Returns
     -------
-    The shape of 'x' as a tuple of integers.
+        The shape of 'x' as a tuple of integers.
 
     """
     if hasattr(x, "shape"):

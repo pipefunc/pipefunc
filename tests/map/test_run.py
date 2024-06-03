@@ -10,7 +10,7 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import load_outputs, load_xarray_dataset, run
+from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import storage_registry
 
@@ -55,9 +55,9 @@ def test_simple(storage, tmp_path: Path) -> None:
     results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
     assert results2["sum"].output == 12
 
-    axes = pipeline.mapspec_axes()
+    axes = pipeline.mapspec_axes
     assert axes == {"x": ("i",), "y": ("i",)}
-    dimensions = pipeline.mapspec_dimensions()
+    dimensions = pipeline.mapspec_dimensions
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
     ds = load_xarray_dataset(run_folder=tmp_path)
@@ -275,7 +275,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
             take_sum,
         ],
     )
-    assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
+    assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     inputs = {"n": 4}
     results = run(
         pipeline,
@@ -363,7 +363,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
             norm,
         ],
     )
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "... -> array[i, unnamed_0, unnamed_1]",
         "array[i, :, :] -> vector[i]",
     ]
@@ -490,6 +490,10 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     assert results["average_charge"].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
     load_xarray_dataset(run_folder=tmp_path)
+
+    assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
+    pipeline.add_mapspec_axis("x", axis="i")
+    assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
 
 
 def test_pipeline_with_defaults(tmp_path: Path) -> None:
@@ -651,7 +655,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
 
     # Run the pipeline
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": [1, 1]}
-    assert pipeline.map_parameters == {"one", "a", "three", "two", "b", "d"}
+    assert pipeline.mapspec_names == {"one", "a", "three", "two", "b", "d"}
     expected = {"b": (2,), "a": (2, 3), "one": (2, 2, 3), "two": (3, 2), "three": (3, 2), "d": (2,)}
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
@@ -811,7 +815,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
 
     inputs = {"n": 4, "z": 1}
     internal_shapes = {"x": (4,)}
-    assert pipeline.mapspec_axes() == {"x": ("i",), "y": ("i",)}
+    assert pipeline.mapspec_axes == {"x": ("i",), "y": ("i",)}
     shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
@@ -848,9 +852,9 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
     assert results["sum"].output.tolist() == [13]
 
     # Do the same but with `add_mapspec_axis` on the first pipeline
-    assert pipeline.mapspecs_as_strings() == ["... -> x[i]", "x[i] -> y[i]"]
+    assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     pipeline.add_mapspec_axis("n", axis="j")
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "n[j] -> x[i, j]",
         "x[i, j] -> y[i, j]",
         "y[:, j] -> sum[j]",
@@ -903,7 +907,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         return sum(z)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
-    assert pipeline.mapspecs_as_strings() == [
+    assert pipeline.mapspecs_as_strings == [
         "... -> x[i, unnamed_0], y[i, unnamed_0]",
         "x[i, :], y[i, :] -> z[i]",
     ]
@@ -954,8 +958,9 @@ def test_growing_axis(tmp_path: Path) -> None:
 
 
 def test_storage_options():
+    f = PipeFunc(lambda x: x, "y")
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
-        Pipeline([lambda x: x]).map({}, None, storage="invalid")
+        Pipeline([f]).map({"x": 1}, None, storage="invalid")
 
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}
@@ -1008,7 +1013,7 @@ def test_independent_axes_2():
     assert pipeline.independent_axes_in_mapspecs("r") == set()
 
     pipeline.add_mapspec_axis("x", axis="k")
-    assert pipeline.mapspecs_as_strings() == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
+    assert pipeline.mapspecs_as_strings == ["x[k] -> y[i, k]", "z[i], y[i, k] -> r[i, k]"]
     assert pipeline.independent_axes_in_mapspecs("r") == {"k"}
 
 
@@ -1037,3 +1042,104 @@ def test_parallel():
         storage="shared_memory_dict",
     )
     assert results["sum"].output == 14
+
+
+def test_fixed_indices(tmp_path: Path) -> None:
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def f(x: int, y: int) -> int:
+        return x + y
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [1, 2, 3], "y": [4, 5, 6]}
+    results = pipeline.map(inputs, tmp_path, fixed_indices={"i": slice(1, None)}, parallel=False)
+    assert results["z"].output.tolist() == [None, 7, 9]
+    assert results["z"].store is not None
+    assert results["z"].store.mask.mask.tolist() == [True, False, False]
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i, j] -> z[i, j]")
+    def g(x: int, y: int) -> tuple[int, int]:
+        return (x, y)
+
+    pipeline = Pipeline([g])
+    y = np.array([[4, 5], [6, 7], [8, 9]])
+    assert y.shape == (3, 2)
+    inputs = {"x": [1, 2, 3], "y": y}  # type: ignore[dict-item]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": slice(1, None), "j": 0},
+        parallel=False,
+    )
+    assert y[slice(1, None), 0].tolist() == [6, 8]
+    assert results["z"].output.tolist() == [
+        [None, None],
+        [(2, 6), None],
+        [(3, 8), None],
+    ]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": slice(2, 0, -1), "j": slice(1, None)},
+        parallel=False,
+    )
+    assert y[slice(2, 0, -1), slice(1, None)].tolist() == [[9], [7]]
+    assert results["z"].output.tolist() == [
+        [None, None],
+        [None, (2, 7)],
+        [None, (3, 9)],
+    ]
+
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        fixed_indices={"i": 2, "j": 0},
+        parallel=False,
+    )
+    assert results["z"].output.tolist() == [[None, None], [None, None], [(3, 8), None]]
+
+    with pytest.raises(IndexError, match="Fixed index `2000` for parameter `x` is out of bounds"):
+        pipeline.map(
+            inputs,
+            tmp_path,
+            fixed_indices={"i": 2000, "j": 1},
+            parallel=False,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Got extra `fixed_indices`: `{'not_an_index'}` that are not",
+    ):
+        pipeline.map(
+            inputs,
+            tmp_path,
+            fixed_indices={"not_an_index": 0},
+            parallel=False,
+        )
+
+
+def test_fixed_indices_with_reduction(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="z")
+    def g(y: np.ndarray) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    with pytest.raises(ValueError, match="Axis `i` in `y` is reduced"):
+        pipeline.map(inputs, tmp_path, fixed_indices={"i": 1}, parallel=False)
+
+
+def test_missing_inputs():
+    @pipefunc(output_name="y")
+    def f(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {}
+    with pytest.raises(ValueError, match="Missing inputs"):
+        pipeline.map(inputs, None, parallel=False)

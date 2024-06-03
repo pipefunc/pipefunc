@@ -6,7 +6,7 @@ import pickle
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Hashable
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 
@@ -136,7 +136,6 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        Any
             The value associated with the key if the key is present in the cache,
             otherwise None.
 
@@ -217,7 +216,6 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        bool
             True if the key is present in the cache, otherwise False.
 
         """
@@ -231,7 +229,6 @@ class HybridCache(_CacheBase):
 
         Returns
         -------
-        str
             A string representation of the HybridCache.
 
         """

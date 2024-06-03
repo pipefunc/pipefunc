@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from pipefunc._utils import table
+
 if TYPE_CHECKING:
     import sys
 
@@ -47,7 +49,6 @@ class ResourceStats:
 
         Returns
         -------
-        float
             The standard deviation of the execution times.
 
         """
@@ -105,7 +106,6 @@ class ResourceProfiler:
 
         Returns
         -------
-        ResourceProfiler
             The profiler instance.
 
         """
@@ -156,3 +156,34 @@ class ResourceProfiler:
             self.stats.memory.update(memory)
             self.stats.cpu.update(cpu_percent)
             self.stop_event.wait(self.interval)
+
+
+def resources_report(profiling_stats: dict[str, ProfilingStats]) -> None:
+    """Display the resource usage report for each function in `profiling_stats`."""
+    headers = [
+        "Function",
+        "Avg CPU Usage (%)",
+        "Max Memory Usage (MB)",
+        "Avg Time (s)",
+        "Total Time (%)",
+        "Number of Calls",
+    ]
+    rows = []
+    for func_name, stats in profiling_stats.items():
+        row = [
+            func_name,
+            f"{stats.cpu.average:.2f}",
+            f"{stats.memory.max / (1024 * 1024):.2f}",
+            f"{stats.time.average:.2e}",
+            stats.time.average * stats.time.num_executions,
+            stats.time.num_executions,
+        ]
+        rows.append(row)
+
+    total_time = sum(row[4] for row in rows)  # type: ignore[misc]
+    if total_time > 0:
+        for row in rows:
+            row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
+
+    print("Resource Usage Report:")
+    print(table(rows, headers))

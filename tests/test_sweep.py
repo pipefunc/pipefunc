@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from itertools import product
 
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
+from pipefunc.sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
 
 
 @pytest.fixture()
@@ -88,9 +90,9 @@ def test_set_cache_for_sweep(pipeline):
     ]
     output_name = "e"
     set_cache_for_sweep(output_name, pipeline, sweep, verbose=True)
-    assert pipeline.node_mapping["c"].cache is True
-    assert pipeline.node_mapping["d"].cache is True
-    assert pipeline.node_mapping["e"].cache is False
+    assert pipeline.output_to_func["c"].cache is True
+    assert pipeline.output_to_func["d"].cache is True
+    assert pipeline.output_to_func["e"].cache is False
 
 
 def test_sweep_with_exclude():

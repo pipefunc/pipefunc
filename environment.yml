@@ -10,10 +10,10 @@ dependencies:
   # from pyproject.toml
   - networkx
   - psutil
-  - versioningit
-  - typing_extensions
   - cloudpickle
   - numpy
+  # optional-dependencies: adaptive
+  - adaptive
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
@@ -31,3 +31,4 @@ dependencies:
   - adaptive
   - xarray
   - zarr
+  - versioningit

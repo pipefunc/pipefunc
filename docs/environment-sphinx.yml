@@ -10,10 +10,10 @@ dependencies:
   # from pyproject.toml
   - networkx
   - psutil
-  - versioningit
-  - typing_extensions
   - cloudpickle
   - numpy
+  # optional-dependencies: adaptive
+  - adaptive
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
@@ -23,5 +23,14 @@ dependencies:
   - pygraphviz
   - holoviews
   - bokeh
+  # optional-dependencies: docs
+  - sphinx
+  - sphinx-book-theme
+  - myst-parser
+  - emoji
+  - jupytext
+  - sphinx-autodoc-typehints
+  - pytest-xdist
+  - versioningit
   - pip:
-    - ../.[docs]
+    - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip

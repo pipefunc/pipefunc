@@ -12,29 +12,28 @@ the resource usage of the pipeline functions.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import inspect
-import sys
 import time
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Literal, NamedTuple, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._lazy import _LazyFunction, task_graph
+from pipefunc._perf import resources_report
 from pipefunc._pipefunc import PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
-from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
+from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
     at_least_tuple,
+    clear_cached_properties,
     generate_filename_from_dict,
     handle_error,
-    table,
 )
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -44,19 +43,9 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import run
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
-
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
-
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
-
     from pathlib import Path
 
     import holoviews as hv
@@ -64,8 +53,9 @@ if TYPE_CHECKING:
     from pipefunc._perf import ProfilingStats
     from pipefunc.map._run import Result
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
-_CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
+
+_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
 class _Function:
@@ -112,7 +102,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -128,7 +117,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -144,7 +132,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -242,10 +229,7 @@ class Pipeline:
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
         self._func: dict[_OUTPUT_TYPE, _Function] = {}
-        for k, v in type(self).__dict__.items():
-            if isinstance(v, functools.cached_property):
-                with contextlib.suppress(AttributeError):
-                    delattr(self, k)
+        clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
@@ -387,7 +371,6 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
             A mapping from node names to nodes.
 
         """
@@ -409,7 +392,6 @@ class Pipeline:
 
         Returns
         -------
-        nx.DiGraph
             A directed graph with nodes representing functions and edges
             representing dependencies between functions.
 
@@ -447,7 +429,6 @@ class Pipeline:
 
         Returns
         -------
-        Callable[..., Any]
             The composed function that can be called with keyword arguments.
 
         """
@@ -475,7 +456,6 @@ class Pipeline:
 
         Returns
         -------
-        Any
             The return value of the pipeline.
 
         """
@@ -587,13 +567,12 @@ class Pipeline:
 
         Returns
         -------
-        Any
             The return value of the pipeline or a dictionary mapping function
-            names to their return values if full_output is True.
+            names to their return values if `full_output` is True.
 
         """
-        if p := self.map_parameters & set(self.func_dependencies(output_name)):
-            inputs = self.map_parameters & set(self.root_args(output_name))
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
                 f"Cannot execute pipeline to get `{output_name}` because `{p}`"
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
@@ -635,6 +614,7 @@ class Pipeline:
         storage: str = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
     ) -> dict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -666,6 +646,9 @@ class Pipeline:
             Does not have any effect when file based storage is used.
         cleanup
             Whether to clean up the `run_folder` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
 
         """
         return run(
@@ -679,6 +662,7 @@ class Pipeline:
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
+            fixed_indices=fixed_indices,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -691,7 +675,6 @@ class Pipeline:
 
         Returns
         -------
-        Set[Tuple[str, ...]]
             A set of tuples containing possible argument combinations.
             The tuples are sorted in lexicographical order.
 
@@ -715,29 +698,7 @@ class Pipeline:
         self._root_args[output_name] = root_args
         return root_args
 
-    def _traverse_graph(
-        self,
-        start: _OUTPUT_TYPE | PipeFunc,
-        direction: Literal["predecessors", "successors"],
-    ) -> list[_OUTPUT_TYPE]:
-        visited = set()
-
-        def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
-            results = set()
-            if isinstance(x, (str, tuple)):
-                x = self.node_mapping[x]
-            for neighbor in getattr(self.graph, direction)(x):
-                if isinstance(neighbor, PipeFunc):
-                    output_name = neighbor.output_name
-                    if output_name not in visited:
-                        visited.add(output_name)
-                        results.add(output_name)
-                        results.update(_traverse(neighbor))
-            return results  # type: ignore[return-value]
-
-        return sorted(_traverse(start), key=at_least_tuple)
-
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+    def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         """Return the functions required to compute a specific output.
 
         See Also
@@ -745,9 +706,9 @@ class Pipeline:
         func_predecessors
 
         """
-        return self._traverse_graph(output_name, "predecessors")
+        return _traverse_graph(output_name, "predecessors", self.graph, self.node_mapping)
 
-    def func_dependents(self, name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
+    def func_dependents(self, name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         """Return the functions that depend on a specific input/output.
 
         See Also
@@ -755,7 +716,7 @@ class Pipeline:
         func_successors
 
         """
-        return self._traverse_graph(name, "successors")
+        return _traverse_graph(name, "successors", self.graph, self.node_mapping)
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
@@ -763,7 +724,6 @@ class Pipeline:
 
         Returns
         -------
-        Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
             A dictionary mapping function names to sets of tuples containing
             possible argument combinations.
 
@@ -784,7 +744,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def map_parameters(self) -> set[str]:
+    def mapspec_names(self) -> set[str]:
         return {
             name
             for mapspec in self.mapspecs()
@@ -803,14 +763,17 @@ class Pipeline:
         functions = self.sorted_functions if ordered else self.functions
         return [f.mapspec for f in functions if f.mapspec]
 
+    @functools.cached_property
     def mapspecs_as_strings(self) -> list[str]:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
 
+    @functools.cached_property
     def mapspec_dimensions(self: Pipeline) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
 
+    @functools.cached_property
     def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
@@ -882,27 +845,13 @@ class Pipeline:
     ) -> list[str]:
         if output_name is None:
             output_name = self.unique_leaf_node.output_name
-
-        func_node_colors = []
-        combinable_nodes = self._identify_combinable_nodes(
-            output_name=output_name,
+        combinable_nodes = _identify_combinable_nodes(
+            self.output_to_func[output_name],
+            self.graph,
+            self.all_root_args,
             conservatively_combine=conservatively_combine,
         )
-        combinable_nodes = _combine_nodes(combinable_nodes)
-        node_sets = [{k, *v} for k, v in combinable_nodes.items()]
-        color_index = len(node_sets)  # for non-combinable nodes
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                i = next(
-                    (i for i, nodes in enumerate(node_sets) if node in nodes),
-                    None,
-                )
-                if i is not None:
-                    func_node_colors.append(f"C{i}")
-                else:
-                    func_node_colors.append(f"C{color_index}")
-                    color_index += 1
-        return func_node_colors
+        return _func_node_colors(self.functions, combinable_nodes)
 
     def visualize(
         self,
@@ -952,112 +901,7 @@ class Pipeline:
         if not self.profiling_stats:
             msg = "Profiling is not enabled."
             raise ValueError(msg)
-
-        headers = [
-            "Function",
-            "Avg CPU Usage (%)",
-            "Max Memory Usage (MB)",
-            "Avg Time (s)",
-            "Total Time (%)",
-            "Number of Calls",
-        ]
-        rows = []
-        for func_name, stats in self.profiling_stats.items():
-            row = [
-                func_name,
-                f"{stats.cpu.average:.2f}",
-                f"{stats.memory.max / (1024 * 1024):.2f}",
-                f"{stats.time.average:.2e}",
-                stats.time.average * stats.time.num_executions,
-                stats.time.num_executions,
-            ]
-            rows.append(row)
-
-        total_time = sum(row[4] for row in rows)  # type: ignore[misc]
-        if total_time > 0:
-            for row in rows:
-                row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
-
-        print("Resource Usage Report:")
-        print(table(rows, headers))
-
-    def _identify_combinable_nodes(
-        self,
-        output_name: _OUTPUT_TYPE,
-        *,
-        conservatively_combine: bool = False,
-    ) -> dict[PipeFunc, set[PipeFunc]]:
-        """Identify which function nodes can be combined into a single function.
-
-        This method identifies the PipeFuncs in the execution graph that
-        can be combined into a single function. The criterion for combinability
-        is that the functions share the same root arguments.
-
-        Parameters
-        ----------
-        output_name
-            The name of the output from the pipeline function we are starting
-            the search from. It is used to get the starting function in the
-            pipeline.
-        conservatively_combine
-            If True, only combine a function node with its predecessors if all
-            of its predecessors have the same root arguments as the function
-            node itself. If False, combine a function node with its predecessors
-            if any of its predecessors have the same root arguments as the
-            function node.
-
-        Returns
-        -------
-        dict[PipeFunc, set[PipeFunc]]
-            A dictionary where each key is a PipeFunc that can be
-            combined with others. The value associated with each key is a set of
-            PipeFuncs that can be combined with the key function.
-
-        Notes
-        -----
-        This function works by performing a depth-first search through the
-        pipeline's execution graph. Starting from the PipeFunc
-        corresponding to the `output_name`, it goes through each predecessor in
-        the graph (functions that need to be executed before the current one).
-        For each predecessor function, it recursively checks if it can be
-        combined with others by comparing their root arguments.
-
-        If a function's root arguments are identical to the head function's root
-        arguments, it is considered combinable and added to the set of
-        combinable functions for the head. If `conservatively_combine=True` and
-        all predecessor functions are combinable, the head function and its set
-        of combinable functions are added to the `combinable_nodes` dictionary.
-        If `conservatively_combine=False` and any predecessor function is
-        combinable, the head function and its set of combinable functions are
-        added to the `combinable_nodes` dictionary.
-
-        The function 'head' in the nested function `_recurse` represents the
-        current function being checked in the execution graph.
-
-        """
-        # Nested function _recurse performs the depth-first search and updates the
-        # `combinable_nodes` dictionary.
-
-        def _recurse(head: PipeFunc) -> None:
-            head_args = self.root_args(head.output_name)
-            funcs = set()
-            i = 0
-            for node in self.graph.predecessors(head):
-                if isinstance(node, (tuple, str)):  # node is root_arg
-                    continue
-                i += 1
-                _recurse(node)
-                node_args = self.root_args(node.output_name)
-                if node_args == head_args:
-                    funcs.add(node)
-            if funcs and (not conservatively_combine or i == len(funcs)):
-                combinable_nodes[head] = funcs
-
-        combinable_nodes: dict[PipeFunc, set[PipeFunc]] = {}
-        func = self.node_mapping[output_name]
-        assert isinstance(func, PipeFunc)
-        _recurse(func)
-        return combinable_nodes
+        resources_report(self.profiling_stats)
 
     def simplified_pipeline(
         self,
@@ -1080,9 +924,8 @@ class Pipeline:
         ----------
         output_name
             The name of the output from the pipeline function we are starting
-            the simplification from. It is used to get the starting function in the
-            pipeline. If None, the unique tip of the pipeline graph is used (if
-            there is one).
+            the simplification from. If None, the unique tip of the pipeline
+            graph is used (if there is one).
         conservatively_combine
             If True, only combine a function node with its predecessors if all
             of its predecessors have the same root arguments as the function
@@ -1092,80 +935,20 @@ class Pipeline:
 
         Returns
         -------
-        Pipeline
             The simplified version of the pipeline.
-
-        Notes
-        -----
-        The pipeline simplification process works in the following way:
-
-        1.  Identify combinable function nodes in the execution graph by
-            checking if they share the same root arguments.
-        2.  Simplify the dictionary of combinable nodes by replacing any nodes
-            that can be combined with their dependencies.
-        3.  Generate the set of nodes to be skipped (those that will be merged).
-        4.  Get the input and output signatures for the combined nodes.
-        5.  Create new pipeline functions for the combined nodes, and add them
-            to the list of new functions.
-        6.  Add the remaining (non-combinable) functions to the list of new
-            functions.
-        7.  Generate a new pipeline with the new functions.
-
-        This process can significantly simplify complex pipelines, making them
-        easier to understand and potentially improving performance by simplifying
-        function calls.
 
         """
         if output_name is None:
             output_name = self.unique_leaf_node.output_name
-        combinable_nodes = self._identify_combinable_nodes(
-            output_name,
+        return simplified_pipeline(
+            functions=self.functions,
+            graph=self.graph,
+            all_root_args=self.all_root_args,
+            node_mapping=self.node_mapping,
+            func_dependencies=self.func_dependencies(output_name),
+            output_name=output_name,
             conservatively_combine=conservatively_combine,
         )
-        if not combinable_nodes:
-            warnings.warn(
-                "No combinable nodes found, the pipeline cannot be simplified.",
-                UserWarning,
-                stacklevel=2,
-            )
-        # Simplify the combinable_nodes dictionary by replacing any nodes that
-        # can be combined with their own dependencies, so that each key in the
-        # dictionary only depends on nodes that cannot be further combined.
-        combinable_nodes = _combine_nodes(combinable_nodes)
-        skip = set.union(*combinable_nodes.values()) if combinable_nodes else set()
-        in_sig, out_sig = _get_signature(combinable_nodes, self.graph)
-        m = self.node_mapping
-        predecessors = [m[o] for o in self.func_dependencies(output_name)]
-        head = self.node_mapping[output_name]
-        new_functions = []
-        for f in self.functions:
-            if f != head and f not in predecessors:
-                continue
-            if f in combinable_nodes:
-                inputs = tuple(sorted(in_sig[f]))
-                outputs = tuple(sorted(out_sig[f]))
-                if len(outputs) == 1:
-                    outputs = outputs[0]  # type: ignore[assignment]
-                funcs = [f, *combinable_nodes[f]]
-                mini_pipeline = Pipeline(funcs)  # type: ignore[arg-type]
-                func = mini_pipeline.func(f.output_name).call_full_output
-                f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
-                f_combined.__name__ = f"combined_{f.__name__}"
-                f_pipefunc = PipeFunc(
-                    f_combined,
-                    outputs,
-                    profile=f.profile,
-                    cache=f.cache,
-                    save_function=f.save_function,
-                )
-                # Disable saving for all functions that are being combined
-                for f_ in funcs:
-                    f_.save_function = None
-                f_pipefunc.parameters = tuple(inputs)
-                new_functions.append(f_pipefunc)
-            elif f not in skip:
-                new_functions.append(f)
-        return Pipeline(new_functions)  # type: ignore[arg-type]
 
     @functools.cached_property
     def leaf_nodes(self) -> list[PipeFunc]:
@@ -1218,7 +1001,7 @@ class Pipeline:
 
         Returns
         -------
-        Tuple of fully connected `Pipeline` objects.
+            Tuple of fully connected `Pipeline` objects.
 
         """
         connected_components = self._connected_components()
@@ -1260,7 +1043,7 @@ class Pipeline:
             # Axis was in output but not in input
             result.add(False)  # noqa: FBT003
 
-        axes = self.mapspec_axes()
+        axes = self.mapspec_axes
         for name in func.mapspec.input_names:
             if axis not in axes[name]:
                 continue
@@ -1443,7 +1226,6 @@ def _compute_cache_key(
 
     Returns
     -------
-    _CACHE_KEY_TYPE | None
         A tuple containing the output name and a tuple of root input keys
         and their corresponding values, or None if the cache key computation
         is skipped.
@@ -1628,3 +1410,27 @@ def _create_missing_mapspecs(
         func_with_new_mapspecs.add(func)
         print(f"Autogenerated MapSpec for `{func}`: `{func.mapspec}`")
     return func_with_new_mapspecs
+
+
+def _traverse_graph(
+    start: _OUTPUT_TYPE | PipeFunc,
+    direction: Literal["predecessors", "successors"],
+    graph: nx.DiGraph,
+    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
+) -> list[_OUTPUT_TYPE]:
+    visited = set()
+
+    def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+        results = set()
+        if isinstance(x, (str, tuple)):
+            x = node_mapping[x]
+        for neighbor in getattr(graph, direction)(x):
+            if isinstance(neighbor, PipeFunc):
+                output_name = neighbor.output_name
+                if output_name not in visited:
+                    visited.add(output_name)
+                    results.add(output_name)
+                    results.update(_traverse(neighbor))
+        return results  # type: ignore[return-value]
+
+    return sorted(_traverse(start), key=at_least_tuple)
