@@ -1143,3 +1143,56 @@ def test_missing_inputs():
     inputs = {}
     with pytest.raises(ValueError, match="Missing inputs"):
         pipeline.map(inputs, None, parallel=False)
+
+    with pytest.raises(
+        ValueError,
+        match="Got extra inputs: `not_used` that are not accepted by this pipeline",
+    ):
+        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False)
+
+
+def test_map_without_mapspec(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def f(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {"x": 1}
+    results = pipeline.map(inputs, tmp_path)
+    assert results["y"].output == 1
+
+
+def test_map_with_partial(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="z")
+    def g(y: np.ndarray) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    results = pipeline.map(inputs, tmp_path)
+    assert results["y"].output.tolist() == [1, 2, 3]
+    assert results["z"].output == 6
+
+    # Run via subpipeline and map with partial inputs
+    partial = pipeline.subpipeline({"y"})
+    inputs1 = {"y": results["y"].output}
+    r = partial.map(inputs1, tmp_path)
+    assert len(r) == 1
+    assert r["z"].output == 6
+
+    r = pipeline.map(inputs1, tmp_path, allow_intermediate_inputs=True)
+    assert len(r) == 1
+    assert r["z"].output == 6
+
+    partial = pipeline.subpipeline(output_names={"y"})
+    r = partial.map(inputs, tmp_path)
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]
+
+    r = pipeline.map(inputs, tmp_path, output_names={"y"})
+    assert len(r) == 1
+    assert r["y"].output.tolist() == [1, 2, 3]

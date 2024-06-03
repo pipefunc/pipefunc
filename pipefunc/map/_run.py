@@ -420,12 +420,14 @@ def run(
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
+    output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | None = None,
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
+    allow_intermediate_inputs: bool = False,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given `inputs`.
 
@@ -444,6 +446,8 @@ def run(
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
+    output_names
+        The output(s) to calculate. If `None`, the entire pipeline is run and all outputs are computed.
     parallel
         Whether to run the functions in parallel.
     executor
@@ -460,10 +464,15 @@ def run(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
+    allow_intermediate_inputs
+        If `True`, a subpipeline is created with the specified inputs, using
+        `Pipeline.subpipeline`. If `False`, all root arguments must be provided,
+        and an exception is raised if any are missing.
 
     """
-    # TODO: implement setting `output_name`, see #127
-    _validate_complete_inputs(pipeline, inputs, output_name=None)
+    if allow_intermediate_inputs or output_names is not None:
+        pipeline = pipeline.subpipeline(set(inputs), output_names)
+    _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_folder = _ensure_run_folder(run_folder)
@@ -579,7 +588,7 @@ def _process_task(
 
 
 def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
-    if not parallel:
+    if not parallel or not store:
         return
     # Assumes all storage classes are the same! Might change in the future.
     storage = next(iter(store.values()))
@@ -643,26 +652,22 @@ def load_xarray_dataset(
     )
 
 
-def _validate_complete_inputs(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    output_name: _OUTPUT_TYPE | None = None,
-) -> None:
+def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
     """Validate that all required inputs are provided.
 
     Note that `output_name is None` means that all outputs are required!
     This is in contrast to some other functions, where `None` means that the `pipeline.unique_leaf_node`
     is used.
     """
-    if output_name is None:
-        root_args = set(pipeline.topological_generations.root_args)
-    else:  # pragma: no cover
-        # TODO: this case becomes relevant when #127 is implemented
-        root_args = set(pipeline.root_args(output_name))
+    root_args = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
-        msg = f"Missing inputs: {missing_args}"
+        msg = f"Missing inputs: `{missing_args}`."
+        raise ValueError(msg)
+    if extra := set(inputs_with_defaults) - root_args:
+        extra_args = ", ".join(extra)
+        msg = f"Got extra inputs: `{extra_args}` that are not accepted by this pipeline."
         raise ValueError(msg)
 
 
