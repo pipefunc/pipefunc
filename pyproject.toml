@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler"]
+adaptive = ["adaptive"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]

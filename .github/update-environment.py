@@ -100,11 +100,12 @@ if __name__ == "__main__":
     with open("pyproject.toml") as f:  # noqa: PTH123
         data = tomllib.loads(f.read())
 
+    sections = ("adaptive", "plotting", "xarray", "zarr")
     # Generate environment.yml
     generate_environment_yml(
         data,
         name="pipefunc",
-        sections=("test", "plotting", "xarray", "zarr"),
+        sections=("test", *sections),
         filename="environment.yml",
     )
 
@@ -112,6 +113,6 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc-sphinx",
-        sections=("plotting", "xarray", "zarr", "docs"),
+        sections=("docs", *sections),
         filename="docs/environment-sphinx.yml",
     )
