@@ -771,12 +771,11 @@ def test_setting_defaults() -> None:
     assert pipeline("c", a1=0) == 2
     assert pipeline("c", a1="a1", b="b") == "a1b"
 
-    @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
-    def g(a):
-        return a
+    with pytest.raises(ValueError, match="Unexpected `defaults` arguments"):
 
-    with pytest.raises(ValueError, match="Unexpected default arguments"):
-        _ = g.defaults
+        @pipefunc(output_name="b", defaults={"a": 2}, renames={"a": "a1"})
+        def g(a):
+            return a
 
     @pipefunc(output_name="c", defaults={"a": "a_new", "b": "b_new"}, renames={"a": "b", "b": "a"})
     def h(a="a", b="b"):
@@ -887,3 +886,24 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     assert pipeline("x", a2=3) == 6
     assert pipeline("y", c=2, d2=3) == 6
     assert pipeline("y") == 4 * 666
+
+
+@pytest.mark.parametrize("output_name", [("a.1", "b"), "#a", "1"])
+def test_invalid_output_name_identifier(output_name):
+    with pytest.raises(
+        ValueError,
+        match="The `output_name` should contain/be valid Python identifier",
+    ):
+
+        @pipefunc(output_name=output_name)
+        def f(): ...
+
+
+def test_invalid_output_name():
+    with pytest.raises(
+        TypeError,
+        match="The output name should be a string or a tuple of strings",
+    ):
+
+        @pipefunc(output_name=["a"])
+        def f(): ...
