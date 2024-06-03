@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner
+from adaptive import BalancingLearner, SequenceLearner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -411,3 +411,27 @@ def _maybe_iterate_axes(
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
+
+
+def _to_balancing_learner(
+    learners_dicts: list[dict[_OUTPUT_TYPE, SequenceLearner]],
+) -> BalancingLearner:
+    balancing_learners = []
+    for learner_dct in learners_dicts:
+        learners = list(learner_dct.values())
+        if len(learners) == 1:
+            balancing_learners.append(learners[0])
+        else:
+            learner = BalancingLearner(learners, strategy="sequential")
+            balancing_learners.append(learner)
+    return BalancingLearner(balancing_learners, strategy="sequential")
+
+
+def to_balancing_learners(
+    learners_dicts: dict[
+        tuple[tuple[str, int | slice], ...] | None,
+        list[dict[_OUTPUT_TYPE, SequenceLearner]],
+    ],
+) -> dict[tuple[tuple[str, int | slice], ...] | None, BalancingLearner]:
+    """Convert the dictionary returned by `create_learners` to a dictionary of balancing learners."""
+    return {k: _to_balancing_learner(v) for k, v in learners_dicts.items()}
