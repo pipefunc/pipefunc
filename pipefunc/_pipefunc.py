@@ -545,6 +545,22 @@ def pipefunc(
         A decorator function that takes the original function and ``output_name`` and
         creates a `PipeFunc` instance with the specified return identifier.
 
+    See Also
+    --------
+    PipeFunc
+        A function wrapper class for pipeline functions with additional attributes.
+
+    Examples
+    --------
+    >>> @pipefunc(output_name="c")
+    ... def add(a, b):
+    ...     return a + b
+    >>> add(a=1, b=2)
+    3
+    >>> add.update_renames({"a": "x", "b": "y"})
+    >>> add(x=1, y=2)
+    3
+
     """
 
     def decorator(f: Callable[..., Any]) -> PipeFunc:
