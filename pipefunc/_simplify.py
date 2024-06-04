@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import inspect
 import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, TypeAlias, Union
+from typing import TYPE_CHECKING, TypeAlias, Union
 
 import networkx as nx
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._pipefunc import NestedPipeFunc
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     import networkx as nx
 
     from pipefunc._pipefunc import PipeFunc
@@ -19,31 +16,6 @@ if TYPE_CHECKING:
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
-
-
-def _wrap_dict_to_tuple(
-    func: Callable[..., Any],
-    inputs: tuple[str, ...],
-    output_name: str | tuple[str, ...],
-) -> Callable[..., Any]:
-    sig = inspect.signature(func)
-    new_params = [
-        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in inputs
-    ]
-    new_sig = sig.replace(parameters=new_params)
-
-    def call(*args: Any, **kwargs: Any) -> Any:
-        """Call the pipeline function with the root arguments."""
-        bound = new_sig.bind(*args, **kwargs)
-        bound.apply_defaults()
-        r = func(**bound.arguments)
-        if isinstance(output_name, tuple):
-            return tuple(r[k] for k in output_name)
-        return r[output_name]
-
-    call.__signature__ = new_sig  # type: ignore[attr-defined]
-
-    return call
 
 
 def _identify_combinable_nodes(
@@ -182,60 +154,6 @@ def _combine_nodes(
     return dict(combinable_nodes)
 
 
-def _get_signature(
-    combinable_nodes: dict[PipeFunc, set[PipeFunc]],
-    graph: nx.DiGraph,
-) -> tuple[dict[PipeFunc, set[str]], dict[PipeFunc, set[str]]]:
-    """Retrieve the inputs and outputs for the signature of the combinable nodes.
-
-    This function generates a mapping of the inputs and outputs required for
-    each node in the combinable_nodes dictionary. For each node, it collects
-    the outputs of all nodes it depends on and the parameters it and its
-    dependent nodes require. In addition, it considers additional outputs
-    based on the dependencies in the graph. It then filters these lists to
-    ensure that no parameter is considered an output and no output is
-    considered a parameter.
-
-    Parameters
-    ----------
-    combinable_nodes
-        Dictionary containing the nodes that can be combined together.
-        The keys of the dictionary are the nodes that can be combined,
-        and the values are sets of nodes that they depend on.
-    graph
-        The directed graph of the pipeline functions. Each node represents a
-        function, and each edge represents a dependency relationship between
-        functions.
-
-    Returns
-    -------
-    all_inputs
-        Dictionary where keys are nodes and values are sets of parameter
-        names that the node and its dependent nodes require.
-    all_outputs
-        Dictionary where keys are nodes and values are sets of output names
-        that the node and its dependent nodes produce, plus additional output
-        names based on the dependency relationships in the graph.
-
-    """
-    all_inputs = {}
-    all_outputs = {}
-    for node, to_replace in combinable_nodes.items():
-        outputs = set(at_least_tuple(node.output_name))
-        parameters = set(node.parameters)
-        additional_outputs = set()  # parameters that are outputs to other functions
-        for f in to_replace:
-            outputs |= set(at_least_tuple(f.output_name))
-            parameters |= set(f.parameters)
-            for successor in graph.successors(f):
-                if successor not in to_replace and successor != node:
-                    edge = graph.edges[f, successor]
-                    additional_outputs |= set(at_least_tuple(edge["arg"]))
-        all_outputs[node] = (outputs - parameters) | additional_outputs
-        all_inputs[node] = parameters - outputs
-    return all_inputs, all_outputs
-
-
 def _func_node_colors(
     functions: list[PipeFunc],
     combinable_nodes: dict[PipeFunc, set[PipeFunc]],
@@ -262,7 +180,6 @@ def simplified_pipeline(
     graph: nx.DiGraph,
     all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
     node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
-    func_dependencies: list[_OUTPUT_TYPE],
     output_name: _OUTPUT_TYPE,
     *,
     conservatively_combine: bool = False,
@@ -323,36 +240,13 @@ def simplified_pipeline(
     # can be combined with their own dependencies, so that each key in the
     # dictionary only depends on nodes that cannot be further combined.
     combinable_nodes = _combine_nodes(combinable_nodes)
-    skip = set.union(*combinable_nodes.values()) if combinable_nodes else set()
-    in_sig, out_sig = _get_signature(combinable_nodes, graph)
-    predecessors = [node_mapping[o] for o in func_dependencies]
-    head = node_mapping[output_name]
-    new_functions = []
-    for f in functions:
-        if f != head and f not in predecessors:
-            continue
-        if f in combinable_nodes:
-            inputs = tuple(sorted(in_sig[f]))
-            outputs = tuple(sorted(out_sig[f]))
-            if len(outputs) == 1:
-                outputs = outputs[0]  # type: ignore[assignment]
-            funcs = [f, *combinable_nodes[f]]
-            mini_pipeline = Pipeline(funcs)  # type: ignore[arg-type]
-            pfunc = mini_pipeline.func(f.output_name).call_full_output
-            f_combined = _wrap_dict_to_tuple(pfunc, inputs, outputs)
-            f_combined.__name__ = f"combined_{f.__name__}"
-            f_pipefunc = PipeFunc(
-                f_combined,
-                outputs,
-                profile=f.profile,
-                cache=f.cache,
-                save_function=f.save_function,
-            )
-            # Disable saving for all functions that are being combined
-            for f_ in funcs:
-                f_.save_function = None
-            f_pipefunc.parameters = tuple(inputs)
-            new_functions.append(f_pipefunc)
-        elif f not in skip:
-            new_functions.append(f)
-    return Pipeline(new_functions)  # type: ignore[arg-type]
+
+    to_combine_flat = list(combinable_nodes.keys())
+    for v in combinable_nodes.values():
+        to_combine_flat.extend(v)
+
+    simple = Pipeline([f for f in functions if f not in to_combine_flat])
+    for base, combine in combinable_nodes.items():
+        nested = NestedPipeFunc([base, *combine], output_name=base.output_name)
+        simple.add(nested)
+    return simple

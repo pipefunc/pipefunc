@@ -829,7 +829,6 @@ class Pipeline:
             graph=self.graph,
             all_root_args=self.all_root_args,
             node_mapping=self.node_mapping,
-            func_dependencies=self.func_dependencies(output_name),
             output_name=output_name,
             conservatively_combine=conservatively_combine,
         )
