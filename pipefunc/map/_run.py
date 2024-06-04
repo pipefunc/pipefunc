@@ -29,10 +29,165 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline import _Generations
+    from pipefunc._pipeline import Generations
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+
+
+def run(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path | None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    output_names: set[_OUTPUT_TYPE] | None = None,
+    parallel: bool = True,
+    executor: Executor | None = None,
+    storage: str = "file_array",
+    persist_memory: bool = True,
+    cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
+    auto_subpipeline: bool = False,
+) -> dict[str, Result]:
+    """Run a pipeline with `MapSpec` functions for given ``inputs``.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to run.
+    inputs
+        The inputs to the pipeline. The keys should be the names of the input
+        parameters of the pipeline functions and the values should be the
+        corresponding input data, these are either single values for functions without ``mapspec``
+        or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+    run_folder
+        The folder to store the run information. If ``None``, a temporary folder
+        is created.
+    internal_shapes
+        The shapes for intermediary outputs that cannot be inferred from the inputs.
+        You will receive an exception if the shapes cannot be inferred and need to be provided.
+    output_names
+        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+    parallel
+        Whether to run the functions in parallel.
+    executor
+        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+        is used. Only relevant if ``parallel=True``.
+    storage
+        The storage class to use for the file arrays. Can use any registered storage class.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+    cleanup
+        Whether to clean up the ``run_folder`` before running the pipeline.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
+    auto_subpipeline
+        If ``True``, a subpipeline is created with the specified ``inputs``, using
+        `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+        of providing the root arguments. If ``False``, all root arguments must be provided,
+        and an exception is raised if any are missing.
+
+    """
+    if auto_subpipeline or output_names is not None:
+        pipeline = pipeline.subpipeline(set(inputs), output_names)
+    _validate_complete_inputs(pipeline, inputs)
+    validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
+    run_folder = _ensure_run_folder(run_folder)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
+    )
+    run_info.dump(run_folder)
+    outputs: dict[str, Result] = OrderedDict()
+    store = run_info.init_store()
+    _check_parallel(parallel, store)
+
+    with _maybe_executor(executor, parallel) as ex:
+        for gen in pipeline.topological_generations.function_lists:
+            _run_and_process_generation(
+                generation=gen,
+                run_info=run_info,
+                run_folder=run_folder,
+                store=store,
+                outputs=outputs,
+                fixed_indices=fixed_indices,
+                executor=ex,
+            )
+
+    if persist_memory:  # Only relevant for memory based storage
+        for arr in store.values():
+            arr.persist()
+
+    return outputs
+
+
+class Result(NamedTuple):
+    function: str
+    kwargs: dict[str, Any]
+    output_name: str
+    output: Any
+    store: StorageBase | None
+
+
+def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
+    """Load the outputs of a run."""
+    run_folder = Path(run_folder)
+    run_info = RunInfo.load(run_folder)
+    outputs = [
+        _load_parameter(
+            output_name,
+            run_info.input_paths,
+            run_info.shapes,
+            run_info.shape_masks,
+            run_info.init_store(),
+            run_folder,
+        )
+        for output_name in output_names
+    ]
+    outputs = [_maybe_load_file_array(o) for o in outputs]
+    return outputs[0] if len(output_names) == 1 else outputs
+
+
+def load_xarray_dataset(
+    *output_name: str,
+    run_folder: str | Path,
+    load_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
+
+    Parameters
+    ----------
+    output_name
+        The names of the outputs to load. If empty, all outputs are loaded.
+    run_folder
+        The folder where the pipeline run was stored.
+    load_intermediate
+        Whether to load intermediate outputs as coordinates.
+
+    Returns
+    -------
+        An `xarray.Dataset` containing the outputs of the pipeline run.
+
+    """
+    from pipefunc.map.xarray import load_xarray_dataset
+
+    run_info = RunInfo.load(run_folder)
+    return load_xarray_dataset(
+        run_info.mapspecs,
+        run_info.inputs,
+        run_folder=run_folder,
+        output_names=output_name,  # type: ignore[arg-type]
+        load_intermediate=load_intermediate,
+    )
 
 
 @dataclass
@@ -44,7 +199,7 @@ class _MockPipeline:
 
     defaults: dict[str, Any]
     mapspec_names: set[str]
-    topological_generations: _Generations
+    topological_generations: Generations
 
     @classmethod
     def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
@@ -399,114 +554,11 @@ def _load_file_array(kwargs: dict[str, Any]) -> None:
         kwargs[k] = _maybe_load_file_array(v)
 
 
-class Result(NamedTuple):
-    function: str
-    kwargs: dict[str, Any]
-    output_name: str
-    output: Any
-    store: StorageBase | None
-
-
 def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     if run_folder is None:
         tmp_dir = tempfile.mkdtemp()
         run_folder = Path(tmp_dir)
     return Path(run_folder)
-
-
-def run(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    run_folder: str | Path | None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-    *,
-    output_names: set[_OUTPUT_TYPE] | None = None,
-    parallel: bool = True,
-    executor: Executor | None = None,
-    storage: str = "file_array",
-    persist_memory: bool = True,
-    cleanup: bool = True,
-    fixed_indices: dict[str, int | slice] | None = None,
-    auto_subpipeline: bool = False,
-) -> dict[str, Result]:
-    """Run a pipeline with `MapSpec` functions for given ``inputs``.
-
-    Parameters
-    ----------
-    pipeline
-        The pipeline to run.
-    inputs
-        The inputs to the pipeline. The keys should be the names of the input
-        parameters of the pipeline functions and the values should be the
-        corresponding input data, these are either single values for functions without ``mapspec``
-        or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
-    run_folder
-        The folder to store the run information. If ``None``, a temporary folder
-        is created.
-    internal_shapes
-        The shapes for intermediary outputs that cannot be inferred from the inputs.
-        You will receive an exception if the shapes cannot be inferred and need to be provided.
-    output_names
-        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
-    parallel
-        Whether to run the functions in parallel.
-    executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
-    storage
-        The storage class to use for the file arrays. Can use any registered storage class.
-    persist_memory
-        Whether to write results to disk when memory based storage is used.
-        Does not have any effect when file based storage is used.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
-    cleanup
-        Whether to clean up the ``run_folder`` before running the pipeline.
-    fixed_indices
-        A dictionary mapping axes names to indices that should be fixed for the run.
-        If not provided, all indices are iterated over.
-    auto_subpipeline
-        If ``True``, a subpipeline is created with the specified ``inputs``, using
-        `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
-        of providing the root arguments. If ``False``, all root arguments must be provided,
-        and an exception is raised if any are missing.
-
-    """
-    if auto_subpipeline or output_names is not None:
-        pipeline = pipeline.subpipeline(set(inputs), output_names)
-    _validate_complete_inputs(pipeline, inputs)
-    validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(
-        run_folder,
-        pipeline,
-        inputs,
-        internal_shapes,
-        storage=storage,
-        cleanup=cleanup,
-    )
-    run_info.dump(run_folder)
-    outputs: dict[str, Result] = OrderedDict()
-    store = run_info.init_store()
-    _check_parallel(parallel, store)
-
-    with _maybe_executor(executor, parallel) as ex:
-        for gen in pipeline.topological_generations.function_lists:
-            _run_and_process_generation(
-                generation=gen,
-                run_info=run_info,
-                run_folder=run_folder,
-                store=store,
-                outputs=outputs,
-                fixed_indices=fixed_indices,
-                executor=ex,
-            )
-
-    if persist_memory:  # Only relevant for memory based storage
-        for arr in store.values():
-            arr.persist()
-
-    return outputs
 
 
 def _run_and_process_generation(
@@ -599,58 +651,6 @@ def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # n
             " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
         )
         raise ValueError(msg)
-
-
-def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
-    """Load the outputs of a run."""
-    run_folder = Path(run_folder)
-    run_info = RunInfo.load(run_folder)
-    outputs = [
-        _load_parameter(
-            output_name,
-            run_info.input_paths,
-            run_info.shapes,
-            run_info.shape_masks,
-            run_info.init_store(),
-            run_folder,
-        )
-        for output_name in output_names
-    ]
-    outputs = [_maybe_load_file_array(o) for o in outputs]
-    return outputs[0] if len(output_names) == 1 else outputs
-
-
-def load_xarray_dataset(
-    *output_name: str,
-    run_folder: str | Path,
-    load_intermediate: bool = True,
-) -> xr.Dataset:
-    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
-
-    Parameters
-    ----------
-    output_name
-        The names of the outputs to load. If empty, all outputs are loaded.
-    run_folder
-        The folder where the pipeline run was stored.
-    load_intermediate
-        Whether to load intermediate outputs as coordinates.
-
-    Returns
-    -------
-        An `xarray.Dataset` containing the outputs of the pipeline run.
-
-    """
-    from pipefunc.map.xarray import load_xarray_dataset
-
-    run_info = RunInfo.load(run_folder)
-    return load_xarray_dataset(
-        run_info.mapspecs,
-        run_info.inputs,
-        run_folder=run_folder,
-        output_names=output_name,  # type: ignore[arg-type]
-        load_intermediate=load_intermediate,
-    )
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:

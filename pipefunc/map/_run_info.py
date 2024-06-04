@@ -57,55 +57,6 @@ def map_shapes(
     return Shapes(shapes, masks)
 
 
-def _cleanup_run_folder(run_folder: str | Path) -> None:
-    """Remove the run folder and its contents."""
-    run_folder = Path(run_folder)
-    shutil.rmtree(run_folder, ignore_errors=True)
-
-
-def _compare_to_previous_run_info(
-    pipeline: Pipeline,
-    run_folder: Path,
-    inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> None:  # pragma: no cover
-    if not RunInfo.path(run_folder).is_file():
-        return
-    try:
-        old = RunInfo.load(run_folder)
-    except Exception as e:  # noqa: BLE001
-        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
-        raise ValueError(msg) from None
-    if internal_shapes != old.internal_shapes:
-        msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
-        raise ValueError(msg)
-    if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
-        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
-        raise ValueError(msg)
-    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
-    if shapes != old.shapes:
-        msg = "Shapes do not match previous run, cannot use `cleanup=False`."
-        raise ValueError(msg)
-    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
-    if equal_inputs is None:
-        print(
-            "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best.",
-        )
-        return
-    if not equal_inputs:
-        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
-        raise ValueError(msg)
-
-
-def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    input_dimensions = pipeline.mapspec_dimensions
-    for name, value in inputs.items():
-        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
-            msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
-            raise ValueError(msg)
-
-
 @dataclass(frozen=True, eq=True)
 class RunInfo:
     input_paths: dict[str, Path]
@@ -202,6 +153,55 @@ class RunInfo:
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+
+def _cleanup_run_folder(run_folder: str | Path) -> None:
+    """Remove the run folder and its contents."""
+    run_folder = Path(run_folder)
+    shutil.rmtree(run_folder, ignore_errors=True)
+
+
+def _compare_to_previous_run_info(
+    pipeline: Pipeline,
+    run_folder: Path,
+    inputs: dict[str, Any],
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+) -> None:  # pragma: no cover
+    if not RunInfo.path(run_folder).is_file():
+        return
+    try:
+        old = RunInfo.load(run_folder)
+    except Exception as e:  # noqa: BLE001
+        msg = f"Could not load previous run info: {e}, cannot use `cleanup=False`."
+        raise ValueError(msg) from None
+    if internal_shapes != old.internal_shapes:
+        msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
+        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    if shapes != old.shapes:
+        msg = "Shapes do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
+    if equal_inputs is None:
+        print(
+            "Could not compare new `inputs` to `inputs` from previous run."
+            " Proceeding *without* `cleanup`, hoping for the best.",
+        )
+        return
+    if not equal_inputs:
+        msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
+
+
+def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
+    input_dimensions = pipeline.mapspec_dimensions
+    for name, value in inputs.items():
+        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
+            msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
+            raise ValueError(msg)
 
 
 def _maybe_tuple(x: str) -> tuple[str, ...] | str:
