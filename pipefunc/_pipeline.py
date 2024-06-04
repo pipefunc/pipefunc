@@ -113,7 +113,7 @@ class Pipeline:
         # Internal Pipeline cache
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
-        self._func: dict[_OUTPUT_TYPE, _Function] = {}
+        self._func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = {}
         clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
@@ -304,7 +304,7 @@ class Pipeline:
                     g.add_edge(arg, f, arg=arg)
         return g
 
-    def func(self, output_name: _OUTPUT_TYPE) -> _Function:
+    def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -321,7 +321,7 @@ class Pipeline:
             return f
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
-        f = _Function(self, output_name, root_args=root_args)
+        f = _PipelineAsFunc(self, output_name, root_args=root_args)
         self._func[output_name] = f
         return f
 
@@ -1042,7 +1042,7 @@ class Generations(NamedTuple):
     function_lists: list[list[PipeFunc]]
 
 
-class _Function:
+class _PipelineAsFunc:
     """Wrapper class for a pipeline function.
 
     Parameters

@@ -232,7 +232,7 @@ def test_pipe_func_and_execution():
 
     pipeline = Pipeline([pipe_func1, pipe_func2, pipe_func3], debug=True, profile=True)
 
-    # Create _Function instances
+    # Create _PipelineAsFunc instances
     function1 = pipeline.func("out1")
     function2 = pipeline.func("out2")
     function3 = pipeline.func("out3")
@@ -539,13 +539,13 @@ pipeline = Pipeline([test_function])
 
 
 def test_function_pickling():
-    # Get the _Function instance from the pipeline
+    # Get the _PipelineAsFunc instance from the pipeline
     func = pipeline.func("test_function")
 
-    # Pickle the _Function instance
+    # Pickle the _PipelineAsFunc instance
     pickled_func = pickle.dumps(func)
 
-    # Unpickle the _Function instance
+    # Unpickle the _PipelineAsFunc instance
     unpickled_func = pickle.loads(pickled_func)  # noqa: S301
 
     # Assert that the unpickled instance has the same attributes
