@@ -460,7 +460,7 @@ def run(
         Does not have any effect when file based storage is used.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
-        Whether to clean up the ``run_folder``` before running the pipeline.
+        Whether to clean up the ``run_folder`` before running the pipeline.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
