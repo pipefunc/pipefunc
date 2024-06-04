@@ -208,8 +208,8 @@ class Pipeline:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
         self.lazy = lazy
-        self._debug = debug
-        self._profile = profile
+        self.debug = debug
+        self.profile = profile
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
