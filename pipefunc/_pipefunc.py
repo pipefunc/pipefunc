@@ -1,13 +1,9 @@
 """PipeFunc: A Python library for defining, managing, and executing function pipelines.
 
-This module provides an implementation of a Pipeline class, which allows you
-to easily define, manage, and execute a sequence of functions, where each
-function may depend on the outputs of other functions. The pipeline is
-represented as a directed graph, where nodes represent functions and edges
-represent dependencies between functions. The Pipeline class provides methods
-for adding functions to the pipeline, executing the pipeline for specific
-output values, visualizing the pipeline as a directed graph, and profiling
-the resource usage of the pipeline functions.
+This module implements the `PipeFunc` class, which is a function wrapper class for
+pipeline functions with additional attributes. It also provides a decorator `pipefunc`
+that wraps a function in a `PipeFunc` instance.
+These `PipeFunc` objects are used to construct a `pipefunc.Pipeline`.
 """
 
 from __future__ import annotations
