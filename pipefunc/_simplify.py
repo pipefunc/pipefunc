@@ -86,21 +86,21 @@ def _identify_combinable_nodes(
     -----
     This function works by performing a depth-first search through the
     pipeline's execution graph. Starting from the PipeFunc
-    corresponding to the `output_name`, it goes through each predecessor in
+    corresponding to the ``output_name``, it goes through each predecessor in
     the graph (functions that need to be executed before the current one).
     For each predecessor function, it recursively checks if it can be
     combined with others by comparing their root arguments.
 
     If a function's root arguments are identical to the head function's root
     arguments, it is considered combinable and added to the set of
-    combinable functions for the head. If `conservatively_combine=True` and
+    combinable functions for the head. If ``conservatively_combine=True`` and
     all predecessor functions are combinable, the head function and its set
-    of combinable functions are added to the `combinable_nodes` dictionary.
-    If `conservatively_combine=False` and any predecessor function is
+    of combinable functions are added to the ``combinable_nodes`` dictionary.
+    If ``conservatively_combine=False`` and any predecessor function is
     combinable, the head function and its set of combinable functions are
-    added to the `combinable_nodes` dictionary.
+    added to the ``combinable_nodes`` dictionary.
 
-    The function 'head' in the nested function `_recurse` represents the
+    The function 'head' in the nested function ``_recurse`` represents the
     current function being checked in the execution graph.
 
     """

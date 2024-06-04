@@ -327,7 +327,7 @@ class Pipeline:
 
         """
         if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or ``output_name`` should be provided."
+            msg = "One of `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
@@ -344,8 +344,8 @@ class Pipeline:
         new
             The function to add to the pipeline.
         old
-            The function to replace in the pipeline. If None, `old` is
-            assumed to be the function with the same output name as `new`.
+            The function to replace in the pipeline. If None, ``old`` is
+            assumed to be the function with the same output name as ``new``.
 
         """
         if old is None:
@@ -651,9 +651,9 @@ class Pipeline:
             A dictionary mapping axes names to indices that should be fixed for the run.
             If not provided, all indices are iterated over.
         auto_subpipeline
-            If `True`, a subpipeline is created with the specified ``inputs``, using
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
-            of providing the root arguments. If `False`, all root arguments must be provided,
+            of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
 
         """

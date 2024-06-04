@@ -56,7 +56,7 @@ class PipeFunc(Generic[T]):
         The identifier for the output of the wrapped function.
     output_picker
         A function that takes the output of the wrapped function as first argument
-        and the output_name (str) as second argument, and returns the desired output.
+        and the ``output_name`` (str) as second argument, and returns the desired output.
         If ``None``, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
@@ -519,7 +519,7 @@ def pipefunc(
         The identifier for the output of the decorated function.
     output_picker
         A function that takes the output of the wrapped function as first argument
-        and the output_name (str) as second argument, and returns the desired output.
+        and the ``output_name`` (str) as second argument, and returns the desired output.
         If ``None``, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
