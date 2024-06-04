@@ -801,7 +801,7 @@ class Pipeline:
     def topological_generations(self) -> _Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
-        Simply calls `networkx.topological_generations` on the ``pipeline.graph``. Then
+        Simply calls `networkx.topological_generations` on the `pipeline.graph`. Then
         groups the functions in the pipeline by generation. The first generation
         contains the root arguments, while the subsequent generations contain
         the functions in topological order.
@@ -817,7 +817,7 @@ class Pipeline:
         return [f for gen in self.topological_generations.function_lists for f in gen]
 
     def _autogen_mapspec_axes(self) -> set[PipeFunc]:
-        """Generate `MapSpec`s for functions that return arrays with `internal_shapes`."""
+        """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
         root_args = self.topological_generations.root_args
         mapspecs = self.mapspecs(ordered=False)
         non_root_inputs = _find_non_root_axes(mapspecs, root_args)
@@ -827,7 +827,7 @@ class Pipeline:
         return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
     def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
-        """Add a new axis to `parameter`'s MapSpec.
+        """Add a new axis to ``parameter``'s `MapSpec`.
 
         Parameters
         ----------

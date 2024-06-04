@@ -465,9 +465,9 @@ def run(
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
     auto_subpipeline
-        If `True`, a subpipeline is created with the specified ``inputs``, using
+        If ``True``, a subpipeline is created with the specified ``inputs``, using
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
-        of providing the root arguments. If `False`, all root arguments must be provided,
+        of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
 
     """
@@ -657,8 +657,8 @@ def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> Non
     """Validate that all required inputs are provided.
 
     Note that `output_name is None` means that all outputs are required!
-    This is in contrast to some other functions, where ``None`` means that the `pipeline.unique_leaf_node`
-    is used.
+    This is in contrast to some other functions, where ``None`` means that the
+    `pipeline.unique_leaf_node` is used.
     """
     root_args = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = set(inputs) | set(pipeline.defaults)
