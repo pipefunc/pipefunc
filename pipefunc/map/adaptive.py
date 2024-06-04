@@ -74,26 +74,26 @@ def create_learners(
     internal_shapes
         The internal shapes to use for the run.
     storage
-        The storage class to use for the file arrays. The default is `file_array`.
+        The storage class to use for the file arrays.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        Whether to clean up the `run_folder`.
+        Whether to clean up the ``run_folder```.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
     split_independent_axes
         Whether to split the independent axes into separate learners. Do not use
-        in conjunction with `fixed_indices`.
+        in conjunction with ``fixed_indices``.
 
     Returns
     -------
-        A dictionary where the keys are the fixed indices, e.g., `(("i", 0), ("j", 0))`,
+        A dictionary where the keys are the fixed indices, e.g., ``(("i", 0), ("j", 0))``,
         and the values are lists of dictionaries where the keys are the output names of the
         functions and the values are the corresponding adaptive learners. As noted
-        above, the learners have to be executed in order. If `fixed_indices` is `None` and
-        `split_independent_axes` is `False`, then the only key is `None`.
+        above, the learners have to be executed in order. If ``fixed_indices`` is ``None`` and
+        ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
     run_folder = Path(run_folder)
@@ -322,7 +322,7 @@ def create_learners_from_sweep(
     pipeline
         The pipeline to create learners for.
     sweep
-        The sweep to create learners for, must generate `input` dictionaries as
+        The sweep to create learners for, must generate ``input`` dictionaries as
         expected by `pipeline.map`.
     run_folder
         The folder to store the run information. Each sweep run will be stored in
@@ -332,7 +332,7 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        Whether to clean up the `run_folder`.
+        Whether to clean up the ``run_folder```.
 
     Returns
     -------

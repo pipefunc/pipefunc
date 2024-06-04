@@ -184,10 +184,10 @@ class Pipeline:
         Flag indicating whether the pipeline should be lazy.
     debug
         Flag indicating whether debug information should be printed.
-        If None, the value of each PipeFunc's debug attribute is used.
+        If ``None``, the value of each PipeFunc's debug attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
-        If None, the value of each PipeFunc's profile attribute is used.
+        If ``None``, the value of each PipeFunc's profile attribute is used.
     cache_type
         The type of cache to use.
     cache_kwargs
@@ -286,7 +286,7 @@ class Pipeline:
             Flag indicating whether profiling information should be collected.
         mapspec
             This is a specification for mapping that dictates how input values should
-            be merged together. If None, the default behavior is that the input directly
+            be merged together. If ``None``, the default behavior is that the input directly
             maps to the output.
 
         """
@@ -344,8 +344,8 @@ class Pipeline:
         new
             The function to add to the pipeline.
         old
-            The function to replace in the pipeline. If None, `old` is
-            assumed to be the function with the same output name as `new`.
+            The function to replace in the pipeline. If None, ``old`` is
+            assumed to be the function with the same output name as ``new``.
 
         """
         if old is None:
@@ -449,8 +449,8 @@ class Pipeline:
             The identifier for the return value of the pipeline.
             Is None by default, in which case the unique leaf node is used.
             This parameter is positional-only and the strange name is used
-            to avoid conflicts with the `output_name` argument that might be
-            passed via `kwargs`.
+            to avoid conflicts with the ``output_name`` argument that might be
+            passed via ``kwargs``.
         kwargs
             Keyword arguments to be passed to the pipeline functions.
 
@@ -568,7 +568,7 @@ class Pipeline:
         Returns
         -------
             The return value of the pipeline or a dictionary mapping function
-            names to their return values if `full_output` is True.
+            names to their return values if ``full_output`` is ``True``.
 
         """
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
@@ -615,44 +615,45 @@ class Pipeline:
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
-        allow_intermediate_inputs: bool = False,
+        auto_subpipeline: bool = False,
     ) -> dict[str, Result]:
-        """Run a pipeline with `MapSpec` functions for given `inputs`.
+        """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters
         ----------
         inputs
             The inputs to the pipeline. The keys should be the names of the input
             parameters of the pipeline functions and the values should be the
-            corresponding input data, these are either single values for functions without `mapspec`
-            or lists of values or `numpy.ndarray`s for functions with `mapspec`.
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
         run_folder
-            The folder to store the run information. If `None`, a temporary folder
+            The folder to store the run information. If ``None``, a temporary folder
             is created.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
         output_names
-            The output(s) to calculate. If `None`, the entire pipeline is run and all outputs are computed.
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
             Whether to run the functions in parallel.
         executor
-            The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
-            is used. Only relevant if `parallel=True`.
+            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+            is used. Only relevant if ``parallel=True``.
         storage
-            The storage class to use for the file arrays. The default is `file_array`.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for the file arrays. Can use any registered storage class.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
+            Can use any registered storage class. See `pipefunc.map.storage_registry`.
         cleanup
-            Whether to clean up the `run_folder` before running the pipeline.
+            Whether to clean up the ``run_folder``` before running the pipeline.
         fixed_indices
             A dictionary mapping axes names to indices that should be fixed for the run.
             If not provided, all indices are iterated over.
-        allow_intermediate_inputs
-            If `True`, a subpipeline is created with the specified inputs, using
-            `Pipeline.subpipeline`. If `False`, all root arguments must be provided,
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
 
         """
@@ -668,7 +669,7 @@ class Pipeline:
             persist_memory=persist_memory,
             cleanup=cleanup,
             fixed_indices=fixed_indices,
-            allow_intermediate_inputs=allow_intermediate_inputs,
+            auto_subpipeline=auto_subpipeline,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -800,7 +801,7 @@ class Pipeline:
     def topological_generations(self) -> _Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
-        Simply calls `nx.topological_generations` on the `pipeline.graph`. Then
+        Simply calls `networkx.topological_generations` on the `pipeline.graph`. Then
         groups the functions in the pipeline by generation. The first generation
         contains the root arguments, while the subsequent generations contain
         the functions in topological order.
@@ -816,7 +817,7 @@ class Pipeline:
         return [f for gen in self.topological_generations.function_lists for f in gen]
 
     def _autogen_mapspec_axes(self) -> set[PipeFunc]:
-        """Generate `MapSpec`s for functions that return arrays with `internal_shapes`."""
+        """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
         root_args = self.topological_generations.root_args
         mapspecs = self.mapspecs(ordered=False)
         non_root_inputs = _find_non_root_axes(mapspecs, root_args)
@@ -826,7 +827,7 @@ class Pipeline:
         return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
     def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
-        """Add a new axis to `parameter`'s MapSpec.
+        """Add a new axis to ``parameter``'s `MapSpec`.
 
         Parameters
         ----------
@@ -834,7 +835,7 @@ class Pipeline:
             The parameter to add an axis to.
         axis
             The axis to add to the `MapSpec` of all functions that depends on
-            `parameter`. Provide a new axis name to add a new axis or an
+            ``parameter``. Provide a new axis name to add a new axis or an
             existing axis name to zip the parameter with the existing axis.
 
         """
@@ -930,7 +931,7 @@ class Pipeline:
         ----------
         output_name
             The name of the output from the pipeline function we are starting
-            the simplification from. If None, the unique tip of the pipeline
+            the simplification from. If ``None``, the unique tip of the pipeline
             graph is used (if there is one).
         conservatively_combine
             If True, only combine a function node with its predecessors if all
@@ -1085,11 +1086,11 @@ class Pipeline:
         Parameters
         ----------
         inputs
-            Set of input names to include in the subpipeline. If None, all root nodes of the
-            original pipeline will be used as inputs. Default is None.
+            Set of input names to include in the subpipeline. If ``None``, all root nodes of the
+            original pipeline will be used as inputs.
         output_names
-            Set of output names to include in the subpipeline. If None, all leaf nodes of the
-            original pipeline will be used as outputs. Default is None.
+            Set of output names to include in the subpipeline. If ``None``, all leaf nodes of the
+            original pipeline will be used as outputs.
 
         Returns
         -------
@@ -1103,8 +1104,8 @@ class Pipeline:
         resulting subpipeline will have the same behavior as the original pipeline for the
         selected inputs and outputs.
 
-        If `inputs` is provided, the subpipeline will use those nodes as the new root nodes. If
-        `output_names` is provided, the subpipeline will use those nodes as the new leaf nodes.
+        If ``inputs`` is provided, the subpipeline will use those nodes as the new root nodes. If
+        ``output_names`` is provided, the subpipeline will use those nodes as the new leaf nodes.
 
         Examples
         --------

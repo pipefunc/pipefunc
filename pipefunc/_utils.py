@@ -41,7 +41,7 @@ def generate_filename_from_dict(obj: dict[str, Any], suffix: str = ".pickle") ->
 def load(path: Path, *, cache: bool = False) -> Any:
     """Load a cloudpickled object from a path.
 
-    If `cache` is True, the object will be cached in memory.
+    If ``cache`` is ``True``, the object will be cached in memory.
     """
     if cache:
         cache_key = _get_cache_key(path)

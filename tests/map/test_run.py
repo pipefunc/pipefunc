@@ -1184,7 +1184,7 @@ def test_map_with_partial(tmp_path: Path) -> None:
     assert len(r) == 1
     assert r["z"].output == 6
 
-    r = pipeline.map(inputs1, tmp_path, allow_intermediate_inputs=True)
+    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True)
     assert len(r) == 1
     assert r["z"].output == 6
 
