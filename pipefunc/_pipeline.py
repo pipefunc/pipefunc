@@ -58,121 +58,6 @@ _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
-class _Function:
-    """Wrapper class for a pipeline function.
-
-    Parameters
-    ----------
-    pipeline
-        The pipeline to which the function belongs.
-    output_name
-        The identifier for the return value of the pipeline function.
-    root_args
-        The names of the pipeline function's root inputs.
-
-    """
-
-    __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
-
-    def __init__(
-        self,
-        pipeline: Pipeline,
-        output_name: _OUTPUT_TYPE,
-        root_args: tuple[str, ...],
-    ) -> None:
-        """Initialize the function wrapper."""
-        self.pipeline = pipeline
-        self.output_name = output_name
-        self.root_args = root_args
-        self._call_with_root_args: Callable[..., Any] | None = None
-
-    @property
-    def call_with_root_args(self) -> Callable[..., Any]:
-        if self._call_with_root_args is None:
-            self._call_with_root_args = self._create_call_with_root_args_method()
-        return self._call_with_root_args
-
-    def __call__(self, **kwargs: Any) -> Any:
-        """Call the pipeline function with the given arguments.
-
-        Parameters
-        ----------
-        kwargs
-            Keyword arguments to be passed to the pipeline function.
-
-        Returns
-        -------
-            The return value of the pipeline function.
-
-        """
-        return self.pipeline.run(output_name=self.output_name, kwargs=kwargs)
-
-    def call_full_output(self, **kwargs: Any) -> dict[str, Any]:
-        """Call the pipeline function with the given arguments and return all outputs.
-
-        Parameters
-        ----------
-        kwargs
-            Keyword arguments to be passed to the pipeline function.
-
-        Returns
-        -------
-            The return value of the pipeline function.
-
-        """
-        return self.pipeline.run(self.output_name, full_output=True, kwargs=kwargs)
-
-    def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
-        """Call the pipeline function with the given arguments.
-
-        Parameters
-        ----------
-        kwargs
-            Keyword arguments to be passed to the pipeline function.
-
-        Returns
-        -------
-            The return value of the pipeline function.
-
-        """
-        return self(**kwargs)
-
-    def __getstate__(self) -> dict:
-        """Prepare the state of the current object for pickling."""
-        state = {slot: getattr(self, slot) for slot in self.__slots__}
-        state["_call_with_root_args"] = None  # don't pickle the execute method
-        return state
-
-    def __setstate__(self, state: dict) -> None:
-        """Restore the state of the current object from the provided state."""
-        for slot in self.__slots__:
-            setattr(self, slot, state[slot])
-        # Initialize _call_with_root_args if necessary
-        self._call_with_root_args = None
-
-    def _create_call_with_parameters_method(
-        self,
-        parameters: tuple[str, ...],
-    ) -> Callable[..., Any]:
-        sig = inspect.signature(self.__call__)
-        new_params = [
-            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in parameters
-        ]
-        new_sig = sig.replace(parameters=new_params)
-
-        def call(*args: Any, **kwargs: Any) -> Any:
-            """Call the pipeline function with the root arguments."""
-            bound = new_sig.bind(*args, **kwargs)
-            bound.apply_defaults()
-            return self(**bound.arguments)
-
-        call.__signature__ = new_sig  # type: ignore[attr-defined]
-        return call
-
-    def _create_call_with_root_args_method(self) -> Callable[..., Any]:
-        return self._create_call_with_parameters_method(self.root_args)
-
-
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
 
@@ -228,7 +113,7 @@ class Pipeline:
         # Internal Pipeline cache
         self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
         self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
-        self._func: dict[_OUTPUT_TYPE, _Function] = {}
+        self._func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = {}
         clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
@@ -419,7 +304,7 @@ class Pipeline:
                     g.add_edge(arg, f, arg=arg)
         return g
 
-    def func(self, output_name: _OUTPUT_TYPE) -> _Function:
+    def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -436,7 +321,7 @@ class Pipeline:
             return f
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
-        f = _Function(self, output_name, root_args=root_args)
+        f = _PipelineAsFunc(self, output_name, root_args=root_args)
         self._func[output_name] = f
         return f
 
@@ -790,7 +675,7 @@ class Pipeline:
         return leaf_nodes[0]
 
     @functools.cached_property
-    def topological_generations(self) -> _Generations:
+    def topological_generations(self) -> Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
         Simply calls `networkx.topological_generations` on the `pipeline.graph`. Then
@@ -801,7 +686,7 @@ class Pipeline:
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return _Generations(generations[0], generations[1:])
+        return Generations(generations[0], generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
@@ -1152,9 +1037,124 @@ class Pipeline:
         return pipeline
 
 
-class _Generations(NamedTuple):
+class Generations(NamedTuple):
     root_args: list[str]
     function_lists: list[list[PipeFunc]]
+
+
+class _PipelineAsFunc:
+    """Wrapper class for a pipeline function.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to which the function belongs.
+    output_name
+        The identifier for the return value of the pipeline function.
+    root_args
+        The names of the pipeline function's root inputs.
+
+    """
+
+    __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
+
+    def __init__(
+        self,
+        pipeline: Pipeline,
+        output_name: _OUTPUT_TYPE,
+        root_args: tuple[str, ...],
+    ) -> None:
+        """Initialize the function wrapper."""
+        self.pipeline = pipeline
+        self.output_name = output_name
+        self.root_args = root_args
+        self._call_with_root_args: Callable[..., Any] | None = None
+
+    @property
+    def call_with_root_args(self) -> Callable[..., Any]:
+        if self._call_with_root_args is None:
+            self._call_with_root_args = self._create_call_with_root_args_method()
+        return self._call_with_root_args
+
+    def __call__(self, **kwargs: Any) -> Any:
+        """Call the pipeline function with the given arguments.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments to be passed to the pipeline function.
+
+        Returns
+        -------
+            The return value of the pipeline function.
+
+        """
+        return self.pipeline.run(output_name=self.output_name, kwargs=kwargs)
+
+    def call_full_output(self, **kwargs: Any) -> dict[str, Any]:
+        """Call the pipeline function with the given arguments and return all outputs.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments to be passed to the pipeline function.
+
+        Returns
+        -------
+            The return value of the pipeline function.
+
+        """
+        return self.pipeline.run(self.output_name, full_output=True, kwargs=kwargs)
+
+    def call_with_dict(self, kwargs: dict[str, Any]) -> Any:
+        """Call the pipeline function with the given arguments.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments to be passed to the pipeline function.
+
+        Returns
+        -------
+            The return value of the pipeline function.
+
+        """
+        return self(**kwargs)
+
+    def __getstate__(self) -> dict:
+        """Prepare the state of the current object for pickling."""
+        state = {slot: getattr(self, slot) for slot in self.__slots__}
+        state["_call_with_root_args"] = None  # don't pickle the execute method
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore the state of the current object from the provided state."""
+        for slot in self.__slots__:
+            setattr(self, slot, state[slot])
+        # Initialize _call_with_root_args if necessary
+        self._call_with_root_args = None
+
+    def _create_call_with_parameters_method(
+        self,
+        parameters: tuple[str, ...],
+    ) -> Callable[..., Any]:
+        sig = inspect.signature(self.__call__)
+        new_params = [
+            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in parameters
+        ]
+        new_sig = sig.replace(parameters=new_params)
+
+        def call(*args: Any, **kwargs: Any) -> Any:
+            """Call the pipeline function with the root arguments."""
+            bound = new_sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            return self(**bound.arguments)
+
+        call.__signature__ = new_sig  # type: ignore[attr-defined]
+        return call
+
+    def _create_call_with_root_args_method(self) -> Callable[..., Any]:
+        return self._create_call_with_parameters_method(self.root_args)
 
 
 def _update_all_results(
