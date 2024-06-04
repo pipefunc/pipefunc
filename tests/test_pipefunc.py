@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import PipeFunc, Pipeline, pipefunc
+from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
@@ -60,6 +60,15 @@ def test_pipeline_and_all_arg_combinations() -> None:
     for params in all_args["e"]:
         _kw = {k: kw[k] for k in params}
         assert fe(**_kw) == kw["e"]
+
+    # Test NestedPipeFunc
+    f_nested = NestedPipeFunc([f1, f2])
+    assert f_nested.output_name == ("c", "d")
+    assert f_nested.parameters == ("a", "b", "x")
+    assert f_nested.defaults == {"x": 1}
+    assert f_nested(a=2, b=3) == (5, 15)
+    pipeline = Pipeline([f_nested, f3])
+    assert pipeline("e", a=2, b=3, x=1) == 75
 
 
 def test_pipeline_and_all_arg_combinations_lazy() -> None:
@@ -727,6 +736,12 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains():
     assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
     assert pipeline.independent_axes_in_mapspecs("z") == {"i", "j"}
 
+    with pytest.raises(
+        ValueError,
+        match="The provided `pipefuncs` should have only one leaf node, not 2.",
+    ):
+        NestedPipeFunc([f, g])
+
 
 def test_max_single_execution_per_call() -> None:
     counter = {"f_c": 0, "f_d": 0, "f_e": 0}
@@ -951,3 +966,128 @@ def test_subpipeline():
         match="At least one of `inputs` or `output_names` should be provided",
     ):
         pipeline.subpipeline()
+
+
+def test_nested_func() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    def h(g, x):  # noqa: ARG001
+        return g
+
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")])
+    assert str(nf) == "NestedPipeFunc_f_g(...) → f, g"
+    assert repr(nf) == "NestedPipeFunc(pipefuncs=[PipeFunc(f), PipeFunc(g)])"
+    assert nf(a=1, b=2) == (3, 3)
+
+    nf = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", mapspec="a[i], b[i] -> f[i]"),
+            PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
+        ],
+    )
+    assert str(nf.mapspec) == "a[i], b[i] -> f[i], g[i]"
+    nf_copy = nf.copy()
+    assert str(nf.mapspec) == str(nf_copy.mapspec)
+
+    # Test not returning all outputs by providing a output_name
+    nf = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", mapspec="a[i], b[i] -> f[i]"),
+            PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
+        ],
+        output_name="g",
+    )
+    assert str(nf.mapspec) == "a[i], b[i] -> g[i]"
+    assert nf(a=1, b=2) == 3
+
+    # Check all exceptions
+    with pytest.raises(ValueError, match="The provided `output_name` should"):
+        nf = NestedPipeFunc(
+            [PipeFunc(f, "f"), PipeFunc(g, "g")],
+            output_name="not_exist",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine MapSpecs with different input and output mappings",
+    ):
+        NestedPipeFunc(
+            [
+                PipeFunc(f, "f", mapspec="... -> f[i]"),
+                PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine a mix of None and MapSpec instances",
+    ):
+        NestedPipeFunc(
+            [
+                PipeFunc(f, "f", mapspec="... -> f[i]"),
+                PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
+                PipeFunc(h, "z", mapspec=None),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine MapSpecs with different input mappings",
+    ):
+        NestedPipeFunc(
+            [
+                PipeFunc(f, "f", mapspec="a[i], b[j] -> f[i, j]"),
+                PipeFunc(g, "g", mapspec="f[i, :] -> g[i]"),
+            ],
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine MapSpecs with different output mappings",
+    ):
+        NestedPipeFunc(
+            [
+                PipeFunc(f, "f", mapspec="a[i], b[j] -> f[i, j]"),
+                PipeFunc(g, "g", mapspec="f[i, j] -> g[j, i]"),
+            ],
+        )
+
+    with pytest.raises(ValueError, match="should have at least two"):
+        NestedPipeFunc([PipeFunc(f, "f")])
+
+    with pytest.raises(
+        TypeError,
+        match="All elements in `pipefuncs` should be instances of `PipeFunc`.",
+    ):
+        NestedPipeFunc([f, PipeFunc(g, "g")])  # type: ignore[list-item]
+
+
+def test_nested_func_renames_defaults_and_bound() -> None:
+    def f(a, b=99):
+        return a + b
+
+    def g(f):
+        return f
+
+    # Test renaming
+    nf = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", mapspec="a[i], b[i] -> f[i]"),
+            PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
+        ],
+        output_name="g",
+    )
+
+    assert nf.renames == {}
+    nf.update_renames({"a": "a1", "b": "b1"})
+    assert nf.renames == {"a": "a1", "b": "b1"}
+    assert nf(a1=1, b1=2) == 3
+    assert nf(a1=1) == 100
+    nf.update_defaults({"b1": 2, "a1": 2})
+    assert nf() == 4
+    nf.update_bound({"a1": "a", "b1": "b"})
+    assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now

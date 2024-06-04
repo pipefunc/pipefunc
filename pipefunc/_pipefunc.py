@@ -17,7 +17,7 @@ import datetime
 import functools
 import inspect
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, Union
 
 import cloudpickle
@@ -25,7 +25,7 @@ import cloudpickle
 from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
 from pipefunc.lazy import evaluate_lazy
-from pipefunc.map._mapspec import MapSpec
+from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,15 +34,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound=Callable[..., Any])
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 MAX_PARAMS_LEN = 15
-
-
-def _default_output_picker(
-    output: Any,
-    name: str,
-    output_name: _OUTPUT_TYPE,
-) -> Any:
-    """Default output picker function for tuples."""
-    return output[output_name.index(name)]
 
 
 class PipeFunc(Generic[T]):
@@ -123,13 +114,8 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.save_function = save_function
-        self.mapspec = MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
-        self.output_picker: Callable[[Any, str], Any] | None = output_picker
-        if output_picker is None and isinstance(output_name, tuple):
-            self.output_picker = functools.partial(
-                _default_output_picker,
-                output_name=self.output_name,
-            )
+        self.mapspec = _maybe_mapspec(mapspec)
+        self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self._profile = profile
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
@@ -195,7 +181,7 @@ class PipeFunc(Generic[T]):
             Update the ``defaults`` via this method.
 
         """
-        parameters = inspect.signature(self.func).parameters
+        parameters = self.original_parameters
         defaults = {}
         for original_name, v in parameters.items():
             new_name = self._renames.get(original_name, original_name)
@@ -208,6 +194,18 @@ class PipeFunc(Generic[T]):
     @functools.cached_property
     def _inverse_renames(self) -> dict[str, str]:
         return {v: k for k, v in self._renames.items()}
+
+    @functools.cached_property
+    def output_picker(self) -> Callable[[Any, str], Any] | None:
+        """Return the output picker function for the wrapped function.
+
+        The output picker function takes the output of the wrapped function as first
+        argument and the ``output_name`` (str) as second argument, and returns the
+        desired output.
+        """
+        if self._output_picker is None and isinstance(self.output_name, tuple):
+            return functools.partial(_default_output_picker, output_name=self.output_name)
+        return self._output_picker
 
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
@@ -226,7 +224,7 @@ class PipeFunc(Generic[T]):
             self._defaults = defaults.copy()
         else:
             self._defaults = dict(self._defaults, **defaults)
-        clear_cached_properties(self)
+        clear_cached_properties(self, PipeFunc)
 
     def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
         """Update renames to function arguments for the wrapped function.
@@ -265,7 +263,7 @@ class PipeFunc(Generic[T]):
             new_bound[new_name] = value
         self._bound = new_bound
 
-        clear_cached_properties(self)
+        clear_cached_properties(self, PipeFunc)
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = True) -> None:
         """Update the bound arguments for the function that are fixed.
@@ -285,7 +283,7 @@ class PipeFunc(Generic[T]):
         else:
             self._bound = dict(self._bound, **bound)
 
-        clear_cached_properties(self)
+        clear_cached_properties(self, PipeFunc)
 
     def _validate_update(
         self,
@@ -321,11 +319,11 @@ class PipeFunc(Generic[T]):
         return PipeFunc(
             self.func,
             self.output_name,
-            output_picker=self.output_picker,
+            output_picker=self._output_picker,
             renames=self._renames,
-            defaults=self.defaults,
+            defaults=self._defaults,
             bound=self._bound,
-            profile=self.profile,
+            profile=self._profile,
             debug=self.debug,
             cache=self.cache,
             save_function=self.save_function,
@@ -595,7 +593,190 @@ def pipefunc(
     return decorator
 
 
+class NestedPipeFunc(PipeFunc):
+    """Combine multiple `PipeFunc` instances into a single function with an internal `Pipeline`.
+
+    Parameters
+    ----------
+    pipefuncs
+        A sequence of at least 2 `PipeFunc` instances to combine into a single function.
+    output_name
+        The identifier for the output of the wrapped function. If ``None``, it is automatically
+        constructed from all the output names of the `PipeFunc` instances.
+    mapspec
+        `~pipefunc.map.MapSpec` for the joint function. If ``None``, the mapspec is inferred
+        from the individual `PipeFunc` instances. None of the `MapsSpec` instances should
+        have a reduction and all should use identical axes.
+
+    Attributes
+    ----------
+    pipefuncs
+        List of `PipeFunc` instances (copies of input) that are used in the internal ``pipeline``.
+    pipeline
+        The `Pipeline` instance that manages the `PipeFunc` instances.
+
+    Notes
+    -----
+    The `NestedPipeFunc` class is a subclass of the `PipeFunc` class that allows you to
+    combine multiple `PipeFunc` instances into a single function that has an internal
+    `~pipefunc.Pipeline` instance.
+
+    """
+
+    def __init__(
+        self,
+        pipefuncs: Sequence[PipeFunc],
+        *,
+        output_name: _OUTPUT_TYPE | None = None,
+        mapspec: str | MapSpec | None = None,
+    ) -> None:
+        from pipefunc import Pipeline
+
+        _validate_pipefuncs(pipefuncs)
+        self.pipefuncs: list[PipeFunc] = [f.copy() for f in pipefuncs]
+        self.pipeline = Pipeline(self.pipefuncs)  # type: ignore[arg-type]
+        _validate_single_leaf_node(self.pipeline.leaf_nodes)
+        _validate_output_name(output_name, self._all_outputs)
+        self.output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self.debug = False  # The underlying PipeFuncs will handle this
+        self.cache = any(f.cache for f in self.pipefuncs)
+        self.save_function = None
+        self._output_picker = None
+        self._profile = False
+        self._renames: dict[str, str] = {}
+        self._defaults: dict[str, Any] = {
+            k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
+        }
+        self._bound: dict[str, Any] = {}
+        self.profiling_stats = None
+        self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
+        for f in self.pipefuncs:
+            f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
+        self._validate_mapspec()
+        self._validate_names()
+
+    def copy(self) -> NestedPipeFunc:
+        # Pass the mapspec to the new instance because we set
+        # the child mapspecs to None in the __init__
+        return NestedPipeFunc(self.pipefuncs, output_name=self.output_name, mapspec=self.mapspec)
+
+    def _combine_mapspecs(self) -> MapSpec | None:
+        mapspecs = [f.mapspec for f in self.pipefuncs]
+        if all(m is None for m in mapspecs):
+            return None
+        _validate_combinable_mapspecs(mapspecs)
+        axes = mapspec_axes(mapspecs)  # type: ignore[arg-type]
+        return MapSpec(
+            tuple(ArraySpec(n, axes[n]) for n in self.parameters),
+            tuple(ArraySpec(n, axes[n]) for n in at_least_tuple(self.output_name)),
+        )
+
+    @functools.cached_property
+    def original_parameters(self) -> dict[str, Any]:
+        parameters = set(self._all_inputs) - set(self._all_outputs)
+        return {k: inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY) for k in sorted(parameters)}
+
+    @functools.cached_property
+    def _all_outputs(self) -> tuple[str, ...]:
+        outputs: set[str] = set()
+        for f in self.pipefuncs:
+            outputs.update(at_least_tuple(f.output_name))
+        return tuple(sorted(outputs))
+
+    @functools.cached_property
+    def _all_inputs(self) -> tuple[str, ...]:
+        inputs: set[str] = set()
+        for f in self.pipefuncs:
+            inputs.update(f.parameters)
+        return tuple(sorted(inputs))
+
+    @functools.cached_property
+    def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
+        func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
+        return _NestedFuncWrapper(func.call_full_output, self.output_name)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(pipefuncs={self.pipefuncs})"
+
+
+class _NestedFuncWrapper:
+    """Wrapper class for nested functions.
+
+    Takes a function that returns a dictionary and returns a tuple of values in the
+    order specified by the output_name.
+    """
+
+    def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
+        self.func: Callable[..., dict[str, Any]] = func
+        self.output_name: _OUTPUT_TYPE = output_name
+        self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        result_dict = self.func(*args, **kwds)
+        if isinstance(self.output_name, str):
+            return result_dict[self.output_name]
+        return tuple(result_dict[name] for name in self.output_name)
+
+
 def _validate_identifier(name: str, value: Any) -> None:
     if not value.isidentifier():
         msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."
         raise ValueError(msg)
+
+
+def _validate_pipefuncs(pipefuncs: Sequence[PipeFunc]) -> None:
+    if not all(isinstance(f, PipeFunc) for f in pipefuncs):
+        msg = "All elements in `pipefuncs` should be instances of `PipeFunc`."
+        raise TypeError(msg)
+
+    if len(pipefuncs) < 2:  # noqa: PLR2004
+        msg = "The provided `pipefuncs` should have at least two `PipeFunc`s."
+        raise ValueError(msg)
+
+
+def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
+    if len(leaf_nodes) > 1:
+        msg = f"The provided `pipefuncs` should have only one leaf node, not {len(leaf_nodes)}."
+        raise ValueError(msg)
+
+
+def _validate_output_name(output_name: _OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
+    if output_name is None:
+        return
+    if not all(x in all_outputs for x in at_least_tuple(output_name)):
+        msg = f"The provided `output_name` should be a subset of the combined output names: {all_outputs}."
+        raise ValueError(msg)
+
+
+def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
+    if any(m is None for m in mapspecs):
+        msg = "Cannot combine a mix of None and MapSpec instances."
+        raise ValueError(msg)
+    assert len(mapspecs) > 1
+
+    first = mapspecs[0]
+    assert first is not None
+    for m in mapspecs:
+        assert m is not None
+        if m.input_indices != set(m.output_indices):
+            msg = "Cannot combine MapSpecs with different input and output mappings."
+            raise ValueError(msg)
+        if m.input_indices != first.input_indices:
+            msg = "Cannot combine MapSpecs with different input mappings."
+            raise ValueError(msg)
+        if m.output_indices != first.output_indices:
+            msg = "Cannot combine MapSpecs with different output mappings."
+            raise ValueError(msg)
+
+
+def _default_output_picker(
+    output: Any,
+    name: str,
+    output_name: _OUTPUT_TYPE,
+) -> Any:
+    """Default output picker function for tuples."""
+    return output[output_name.index(name)]
+
+
+def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
+    return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec

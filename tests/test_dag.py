@@ -129,7 +129,12 @@ def test_running_dag_pipeline():
         assert cache is dag.cache
 
     assert dag.mapping
-    assert dag.cache.cache.keys() == {("c", (("a", 1), ("b", 2)))}
+    expected = [
+        ("c", (("a", 1), ("b", 2))),
+        ("d", (("a", 1), ("b", 2), ("x", 1))),
+        ("e", (("a", 1), ("b", 2), ("x", 1))),
+    ]
+    assert list(dag.cache.cache) == expected
 
     # Test doing something with the graph. Note that is not a good way of using the graph!
     # I have yet to figure out how to best use the graph.
@@ -147,13 +152,6 @@ def test_running_dag_pipeline():
 
     assert results == {
         "f1": [({"a": 1, "b": 2}, 3)],
-        # Don't worry, the results "should" be from cache
-        "f2": [
-            ({"b": 2, "c": 3, "x": 1}, 6),
-            ({"b": 2, "c": 3, "x": 1}, 6),
-        ],
-        "f3": [
-            ({"c": 3, "d": 6, "x": 1}, 18),
-            ({"c": 3, "d": 6, "x": 1}, 18),
-        ],
+        "f2": [({"b": 2, "c": 3, "x": 1}, 6)],
+        "f3": [({"c": 3, "d": 6, "x": 1}, 18)],
     }
