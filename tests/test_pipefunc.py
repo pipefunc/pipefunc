@@ -892,7 +892,7 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
 def test_invalid_output_name_identifier(output_name):
     with pytest.raises(
         ValueError,
-        match="The `output_name` should contain/be valid Python identifier",
+        match="The ``output_name`` should contain/be valid Python identifier",
     ):
 
         @pipefunc(output_name=output_name)

@@ -57,7 +57,7 @@ class PipeFunc(Generic[T]):
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the output_name (str) as second argument, and returns the desired output.
-        If None, the output of the wrapped function is returned as is.
+        If ``None``, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
     defaults
@@ -78,7 +78,7 @@ class PipeFunc(Generic[T]):
         If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
-        be merged together. If None, the default behavior is that the input directly
+        be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
 
     Returns
@@ -143,7 +143,7 @@ class PipeFunc(Generic[T]):
         See Also
         --------
         update_renames
-            Update the `renames` via this method.
+            Update the ``renames`` via this method.
 
         """
         # Is a property to prevent users mutating the renames directly
@@ -156,7 +156,7 @@ class PipeFunc(Generic[T]):
         See Also
         --------
         update_bound
-            Update the `bound` via this method.
+            Update the ``bound`` parameters via this method.
 
         """
         # Is a property to prevent users mutating `bound` directly
@@ -189,7 +189,7 @@ class PipeFunc(Generic[T]):
         See Also
         --------
         update_defaults
-            Update the `defaults` via this method.
+            Update the ``defaults`` via this method.
 
         """
         parameters = inspect.signature(self.func).parameters
@@ -214,7 +214,7 @@ class PipeFunc(Generic[T]):
         defaults
             A dictionary of default values for the keyword arguments.
         overwrite
-            Whether to overwrite the existing defaults. If `False`, the new
+            Whether to overwrite the existing defaults. If ``False``, the new
             defaults will be added to the existing defaults.
 
         """
@@ -235,7 +235,7 @@ class PipeFunc(Generic[T]):
         renames
             A dictionary of renames for the function arguments.
         overwrite
-            Whether to overwrite the existing renames. If `False`, the new
+            Whether to overwrite the existing renames. If ``False``, the new
             renames will be added to the existing renames.
 
         """
@@ -272,7 +272,7 @@ class PipeFunc(Generic[T]):
         bound
             A dictionary of bound arguments for the function.
         overwrite
-            Whether to overwrite the existing bound arguments. If `False`, the new
+            Whether to overwrite the existing bound arguments. If ``False``, the new
             bound arguments will be added to the existing bound arguments.
 
         """
@@ -393,8 +393,8 @@ class PipeFunc(Generic[T]):
 
         Returns
         -------
-            A ResourceProfiler instance if profiling is enabled, or a
-            nullcontext if disabled.
+            A `ResourceProfiler` instance if profiling is enabled, or a
+            `nullcontext` if disabled.
 
         """
         if self.profiling_stats is not None:
@@ -520,7 +520,7 @@ def pipefunc(
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the output_name (str) as second argument, and returns the desired output.
-        If None, the output of the wrapped function is returned as is.
+        If ``None``, the output of the wrapped function is returned as is.
     renames
         A dictionary mapping from original argument names to new argument names.
     defaults
@@ -537,13 +537,13 @@ def pipefunc(
         If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
-        be merged together. If None, the default behavior is that the input directly
+        be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
 
     Returns
     -------
-        A decorator function that takes the original function and output_name a
-        PipeFunc instance with the specified return identifier.
+        A decorator function that takes the original function and ``output_name`` and
+        creates a `PipeFunc` instance with the specified return identifier.
 
     """
 

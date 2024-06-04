@@ -184,10 +184,10 @@ class Pipeline:
         Flag indicating whether the pipeline should be lazy.
     debug
         Flag indicating whether debug information should be printed.
-        If None, the value of each PipeFunc's debug attribute is used.
+        If ``None``, the value of each PipeFunc's debug attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
-        If None, the value of each PipeFunc's profile attribute is used.
+        If ``None``, the value of each PipeFunc's profile attribute is used.
     cache_type
         The type of cache to use.
     cache_kwargs
@@ -286,7 +286,7 @@ class Pipeline:
             Flag indicating whether profiling information should be collected.
         mapspec
             This is a specification for mapping that dictates how input values should
-            be merged together. If None, the default behavior is that the input directly
+            be merged together. If ``None``, the default behavior is that the input directly
             maps to the output.
 
         """
@@ -327,7 +327,7 @@ class Pipeline:
 
         """
         if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or `output_name` should be provided."
+            msg = "One of `f` or ``output_name`` should be provided."
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
@@ -449,8 +449,8 @@ class Pipeline:
             The identifier for the return value of the pipeline.
             Is None by default, in which case the unique leaf node is used.
             This parameter is positional-only and the strange name is used
-            to avoid conflicts with the `output_name` argument that might be
-            passed via `kwargs`.
+            to avoid conflicts with the ``output_name`` argument that might be
+            passed via ``kwargs``.
         kwargs
             Keyword arguments to be passed to the pipeline functions.
 
@@ -568,7 +568,7 @@ class Pipeline:
         Returns
         -------
             The return value of the pipeline or a dictionary mapping function
-            names to their return values if `full_output` is True.
+            names to their return values if ``full_output`` is ``True``.
 
         """
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
@@ -617,7 +617,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
     ) -> dict[str, Result]:
-        """Run a pipeline with `MapSpec` functions for given `inputs`.
+        """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters
         ----------
@@ -801,7 +801,7 @@ class Pipeline:
     def topological_generations(self) -> _Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
-        Simply calls `nx.topological_generations` on the `pipeline.graph`. Then
+        Simply calls `networkx.topological_generations` on the ``pipeline.graph``. Then
         groups the functions in the pipeline by generation. The first generation
         contains the root arguments, while the subsequent generations contain
         the functions in topological order.
@@ -835,7 +835,7 @@ class Pipeline:
             The parameter to add an axis to.
         axis
             The axis to add to the `MapSpec` of all functions that depends on
-            `parameter`. Provide a new axis name to add a new axis or an
+            ``parameter``. Provide a new axis name to add a new axis or an
             existing axis name to zip the parameter with the existing axis.
 
         """
@@ -931,7 +931,7 @@ class Pipeline:
         ----------
         output_name
             The name of the output from the pipeline function we are starting
-            the simplification from. If None, the unique tip of the pipeline
+            the simplification from. If ``None``, the unique tip of the pipeline
             graph is used (if there is one).
         conservatively_combine
             If True, only combine a function node with its predecessors if all
@@ -1086,11 +1086,11 @@ class Pipeline:
         Parameters
         ----------
         inputs
-            Set of input names to include in the subpipeline. If None, all root nodes of the
-            original pipeline will be used as inputs. Default is None.
+            Set of input names to include in the subpipeline. If ``None``, all root nodes of the
+            original pipeline will be used as inputs.
         output_names
-            Set of output names to include in the subpipeline. If None, all leaf nodes of the
-            original pipeline will be used as outputs. Default is None.
+            Set of output names to include in the subpipeline. If ``None``, all leaf nodes of the
+            original pipeline will be used as outputs.
 
         Returns
         -------
@@ -1104,8 +1104,8 @@ class Pipeline:
         resulting subpipeline will have the same behavior as the original pipeline for the
         selected inputs and outputs.
 
-        If `inputs` is provided, the subpipeline will use those nodes as the new root nodes. If
-        `output_names` is provided, the subpipeline will use those nodes as the new leaf nodes.
+        If ``inputs`` is provided, the subpipeline will use those nodes as the new root nodes. If
+        ``output_names`` is provided, the subpipeline will use those nodes as the new leaf nodes.
 
         Examples
         --------
