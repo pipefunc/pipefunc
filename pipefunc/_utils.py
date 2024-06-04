@@ -186,9 +186,16 @@ def table(rows: list[Any], headers: list[str]) -> str:
     return "\n".join(table_rows)
 
 
-def clear_cached_properties(obj: object) -> None:
-    """Clear all `functools.cached_property`s from an object."""
-    for k, v in type(obj).__dict__.items():
-        if isinstance(v, functools.cached_property):
-            with contextlib.suppress(AttributeError):
-                delattr(obj, k)
+def clear_cached_properties(obj: object, until_type: type | None = None) -> None:
+    """Clear all `functools.cached_property`s from an object and its super types."""
+    cls = type(obj)
+    if until_type is None:
+        until_type = cls
+    while True:
+        for k, v in cls.__dict__.items():
+            if isinstance(v, functools.cached_property):
+                with contextlib.suppress(AttributeError):
+                    delattr(obj, k)
+        if cls is object or cls is until_type or cls.__base__ is None:
+            break
+        cls = cls.__base__

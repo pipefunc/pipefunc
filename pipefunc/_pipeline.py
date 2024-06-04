@@ -466,7 +466,7 @@ class Pipeline:
     def _get_func_args(
         self,
         func: PipeFunc,
-        kwargs: dict[str, Any],
+        kwargs: dict[str, Any],  # Includes defaults
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
@@ -476,8 +476,6 @@ class Pipeline:
         for arg in func.parameters:
             if arg in kwargs:
                 value = kwargs[arg]
-            elif arg in func.defaults:
-                value = func.defaults[arg]
             else:
                 value = self._run(
                     output_name=arg,
@@ -506,9 +504,9 @@ class Pipeline:
 
         cache = self._current_cache()
         use_cache = (func.cache and cache is not None) or task_graph() is not None
-
         root_args = self.root_args(output_name)
         result_from_cache = False
+        kwargs = dict(self.defaults, **kwargs)  # must include defaults to get cache_key
         if use_cache:
             assert cache is not None
             cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
@@ -525,13 +523,7 @@ class Pipeline:
             if return_now:
                 return all_results[output_name]
 
-        func_args = self._get_func_args(
-            func,
-            kwargs,
-            all_results,
-            full_output,
-            used_parameters,
-        )
+        func_args = self._get_func_args(func, kwargs, all_results, full_output, used_parameters)
 
         if result_from_cache:
             assert full_output
