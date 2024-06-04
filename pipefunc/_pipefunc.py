@@ -91,11 +91,14 @@ class PipeFunc(Generic[T]):
     ...     return a + 1, b + 1
     >>> add_one_func = PipeFunc(
     ...     add_one,
-    ...     output_name="a_plus_one",
+    ...     output_name="c",
     ...     renames={"a": "x", "b": "y"},
     ... )
     >>> add_one_func(x=1, y=2)
     (2, 3)
+    >>> add_one_func.update_defaults({"x": 1, "y": 1})
+    >>> add_one_func()
+    (2, 2)
 
     """
 
