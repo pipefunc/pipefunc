@@ -427,9 +427,9 @@ def run(
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
-    allow_intermediate_inputs: bool = False,
+    auto_subpipeline: bool = False,
 ) -> dict[str, Result]:
-    """Run a pipeline with `MapSpec` functions for given `inputs`.
+    """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
     ----------
@@ -438,39 +438,40 @@ def run(
     inputs
         The inputs to the pipeline. The keys should be the names of the input
         parameters of the pipeline functions and the values should be the
-        corresponding input data, these are either single values for functions without `mapspec`
-        or lists of values or `numpy.ndarray`s for functions with `mapspec`.
+        corresponding input data, these are either single values for functions without ``mapspec``
+        or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
     run_folder
-        The folder to store the run information. If `None`, a temporary folder
+        The folder to store the run information. If ``None``, a temporary folder
         is created.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
     output_names
-        The output(s) to calculate. If `None`, the entire pipeline is run and all outputs are computed.
+        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
         Whether to run the functions in parallel.
     executor
-        The executor to use for parallel execution. If `None`, a `ProcessPoolExecutor`
-        is used. Only relevant if `parallel=True`.
+        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+        is used. Only relevant if ``parallel=True``.
     storage
-        The storage class to use for the file arrays. The default is `file_array`.
+        The storage class to use for the file arrays. Can use any registered storage class.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
-        Whether to clean up the `run_folder` before running the pipeline.
+        Whether to clean up the ``run_folder``` before running the pipeline.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
-    allow_intermediate_inputs
-        If `True`, a subpipeline is created with the specified inputs, using
-        `Pipeline.subpipeline`. If `False`, all root arguments must be provided,
+    auto_subpipeline
+        If `True`, a subpipeline is created with the specified ``inputs``, using
+        `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+        of providing the root arguments. If `False`, all root arguments must be provided,
         and an exception is raised if any are missing.
 
     """
-    if allow_intermediate_inputs or output_names is not None:
+    if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
@@ -656,7 +657,7 @@ def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> Non
     """Validate that all required inputs are provided.
 
     Note that `output_name is None` means that all outputs are required!
-    This is in contrast to some other functions, where `None` means that the `pipeline.unique_leaf_node`
+    This is in contrast to some other functions, where ``None`` means that the `pipeline.unique_leaf_node`
     is used.
     """
     root_args = set(pipeline.topological_generations.root_args)

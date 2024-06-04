@@ -79,7 +79,7 @@ def create_learners(
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        Whether to clean up the `run_folder`.
+        Whether to clean up the ``run_folder```.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -92,8 +92,8 @@ def create_learners(
         A dictionary where the keys are the fixed indices, e.g., `(("i", 0), ("j", 0))`,
         and the values are lists of dictionaries where the keys are the output names of the
         functions and the values are the corresponding adaptive learners. As noted
-        above, the learners have to be executed in order. If `fixed_indices` is `None` and
-        `split_independent_axes` is `False`, then the only key is `None`.
+        above, the learners have to be executed in order. If `fixed_indices` is ``None`` and
+        `split_independent_axes` is `False`, then the only key is ``None``.
 
     """
     run_folder = Path(run_folder)
@@ -332,7 +332,7 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        Whether to clean up the `run_folder`.
+        Whether to clean up the ``run_folder```.
 
     Returns
     -------
