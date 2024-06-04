@@ -428,6 +428,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    trace_log: bool,
 ) -> dict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
