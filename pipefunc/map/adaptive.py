@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 import numpy as np
 from adaptive import SequenceLearner, runner
 
+from pipefunc._pipefunc import _maybe_resources
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
@@ -31,11 +32,11 @@ from pipefunc.map._storage_base import _iterate_shape_indices
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    import adaptive_scheduler
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
+    from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
 
@@ -82,10 +83,72 @@ class LearnersDict(LearnersDictType):
             for learner in learner_list:
                 runner.simple(learner)
 
-    def to_slurm_run(self) -> adaptive_scheduler.RunManager:
+    def to_slurm_run(
+        self,
+        run_folder: str | Path,
+        default_resources: dict | Resources | None,
+    ) -> AdaptiveSchedulerDetails:
         """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
-        msg = "This function is not implemented yet."
-        raise NotImplementedError(msg)
+        default_resources = _maybe_resources(default_resources)
+        run_folder = Path(run_folder)
+        learners: list[SequenceLearner] = []
+        fnames: list[Path] = []
+        cores_per_node: list[int] = []
+        num_nodes: list[int] = []
+        extra_scheduler: list[list[str]] = []
+        partition: list[str] = []
+        dependencies: dict[int, list[int]] = {}
+        for k, learners_lists in self.data.items():
+            prev_indices: list[int] = []
+            for learner_list in learners_lists:
+                indices: list[int] = []
+                for learner in learner_list:
+                    learners.append(learner.learner)
+                    fnames.append(run_folder / str(learner.pipefunc.output_name) / f"{k}.pickle")
+                    r = learner.pipefunc.resources or default_resources
+                    if r is None:
+                        msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
+                        raise ValueError(msg)
+                    cores = r.num_cpus or r.num_cpus_per_node
+                    assert isinstance(cores, int)
+                    cores_per_node.append(cores)
+                    num_nodes.append(r.num_nodes or 1)
+                    _extra_scheduler = []
+                    if r.memory:
+                        _extra_scheduler.append(f"--mem={r.memory}")
+                    if r.num_gpus:
+                        _extra_scheduler.append(f"--gres=gpu:{r.num_gpus}")
+                    if r.wall_time:
+                        _extra_scheduler.append(f"--time={r.wall_time}")
+                    if r.queue:
+                        _extra_scheduler.append(f"--partition={r.queue}")
+                    partition.append(f"--partition={r.partition}")
+                    extra_scheduler.append(_extra_scheduler)
+                    i = len(learners) - 1
+                    indices.append(i)
+                    dependencies[i] = prev_indices
+                prev_indices = indices
+        return AdaptiveSchedulerDetails(
+            learners=learners,
+            fnames=fnames,
+            dependencies=dependencies,
+            nodes=tuple(num_nodes),
+            cores_per_node=tuple(cores_per_node),
+            extra_scheduler=tuple(extra_scheduler),
+            partition=tuple(partition),
+        )
+
+
+class AdaptiveSchedulerDetails(NamedTuple):
+    """Details for the adaptive scheduler."""
+
+    learners: list[SequenceLearner]
+    fnames: list[Path]
+    dependencies: dict[int, list[int]]
+    nodes: tuple[int, ...]
+    cores_per_node: tuple[int, ...]
+    extra_scheduler: tuple[list[str], ...]
+    partition: tuple[str, ...]
 
 
 def create_learners(
