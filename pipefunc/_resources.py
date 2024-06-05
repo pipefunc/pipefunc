@@ -85,7 +85,7 @@ class Resources:
             msg = "num_cpus_per_node must be a positive integer."
             raise ValueError(msg)
         if self.memory is not None and not self._is_valid_memory(self.memory):
-            msg = "memory must be a valid string (e.g., '2GB', '500MB')."
+            msg = f"memory must be a valid string (e.g., '2GB', '500MB'), not '{self.memory}'."
             raise ValueError(msg)
         if self.wall_time is not None and not self._is_valid_wall_time(self.wall_time):
             msg = "wall_time must be a valid string (e.g., '2:00:00', '48:00:00')."
@@ -137,7 +137,7 @@ class Resources:
     @staticmethod
     def _convert_to_gb(memory: str) -> float:
         units = {"B": 1e-9, "KB": 1e-6, "MB": 1e-3, "GB": 1, "TB": 1e3, "PB": 1e6}
-        match = re.match(r"(\d+(?:\.\d+)?)\s*([KMGTP]?B)", memory.upper())
+        match = re.match(r"^(\d+(?:\.\d+)?)([KMGTP]?B)$", memory.upper())
         if match:
             value, unit = match.groups()
             return float(value) * units[unit]
