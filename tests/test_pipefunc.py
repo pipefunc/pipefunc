@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, Resources, pipefunc
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
@@ -1091,3 +1091,61 @@ def test_nested_func_renames_defaults_and_bound() -> None:
     assert nf() == 4
     nf.update_bound({"a1": "a", "b1": "b"})
     assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now
+
+
+def test_nested_pipefunc_with_resources() -> None:
+    def f(a, b=99):
+        return a + b
+
+    def g(f):
+        return f
+
+    # Test the resources are combined correctly
+    nf = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+        ],
+        output_name="g",
+    )
+    assert isinstance(nf.resources, Resources)
+    assert nf.resources.num_cpus == 2
+    assert nf.resources.memory == "2GB"
+
+    # Test that the resources specified in NestedPipeFunc are used
+    nf2 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+        ],
+        output_name="g",
+        resources={"memory": "3GB", "num_cpus": 3},
+    )
+    assert isinstance(nf2.resources, Resources)
+    assert nf2.resources.num_cpus == 3
+    assert nf2.resources.memory == "3GB"
+
+    # Test that the resources specified in PipeFunc are used, with the other None
+    nf3 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources=None),
+        ],
+        output_name="g",
+    )
+    assert isinstance(nf3.resources, Resources)
+    assert nf3.resources.num_cpus == 2
+    assert nf3.resources.memory == "1GB"
+
+    # Test that Resources instance in NestedPipeFunc is used
+    nf3 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources=None),
+        ],
+        output_name="g",
+        resources=Resources(num_cpus=3, memory="3GB"),
+    )
+    assert isinstance(nf3.resources, Resources)
+    assert nf3.resources.num_cpus == 3
+    assert nf3.resources.memory == "3GB"
