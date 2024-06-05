@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import functools
+from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner
+from adaptive import SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -30,6 +31,7 @@ from pipefunc.map._storage_base import _iterate_shape_indices
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    import adaptive_scheduler
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
@@ -38,6 +40,52 @@ if TYPE_CHECKING:
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+
+
+class LearnerPipeFunc(NamedTuple):
+    """A tuple with `~adaptive.SequenceLearner` and `~pipefunc.PipeFunc`."""
+
+    learner: SequenceLearner
+    pipefunc: PipeFunc
+
+
+class AxisIndex(NamedTuple):
+    """A named tuple to store the axis and index for a fixed axis."""
+
+    axis: str
+    idx: int | slice  # not called `index` to avoid shadowing the built-in
+
+
+LearnersDictType: TypeAlias = UserDict[tuple[AxisIndex, ...] | None, list[list[LearnerPipeFunc]]]
+
+
+class LearnersDict(LearnersDictType):
+    """A dictionary of adaptive learners for a pipeline."""
+
+    def __init__(self, learners_dict: LearnersDictType | None = None) -> None:
+        """Create a dictionary of adaptive learners for a pipeline."""
+        super().__init__(learners_dict or {})
+
+    def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
+        """Flatten the learners into a dictionary with the output names as keys."""
+        flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
+        for learners_lists in self.data.values():
+            for learners in learners_lists:
+                for learner_with_pipefunc in learners:
+                    output_name = learner_with_pipefunc.pipefunc.output_name
+                    flat_learners.setdefault(output_name, []).append(learner_with_pipefunc.learner)
+        return flat_learners
+
+    def simple_run(self) -> None:
+        """Run all the learners in the dictionary in order using `adaptive.runner.simple`."""
+        for learner_list in self.flatten().values():
+            for learner in learner_list:
+                runner.simple(learner)
+
+    def to_slurm_run(self) -> adaptive_scheduler.RunManager:
+        """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
+        msg = "This function is not implemented yet."
+        raise NotImplementedError(msg)
 
 
 def create_learners(
@@ -51,16 +99,13 @@ def create_learners(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     split_independent_axes: bool = False,
-) -> dict[
-    tuple[tuple[str, int | slice], ...] | None,
-    list[dict[_OUTPUT_TYPE, SequenceLearner]],
-]:
+) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
     Creates a learner for each function node in the graph. All learners
-    in the values of the outer dictionaries are fully independent of each
-    other and can be executed in parallel. The lists of dictionaries of learners
-    need to be executed in order. All the learners in the same dictionary are
+    in the values of the dictionary are fully independent of each
+    other and can be executed in parallel. The lists of lists of learners
+    need to be executed in order. All the learners in the inner list are
     independent of each other and can be executed in parallel.
 
     Parameters
@@ -90,9 +135,9 @@ def create_learners(
     Returns
     -------
         A dictionary where the keys are the fixed indices, e.g., ``(("i", 0), ("j", 0))``,
-        and the values are lists of dictionaries where the keys are the output names of the
-        functions and the values are the corresponding adaptive learners. As noted
-        above, the learners have to be executed in order. If ``fixed_indices`` is ``None`` and
+        and the values are lists of lists of learner. The learners
+        in the inner list can be executed in parallel, but the outer lists need
+        to be executed in order. If ``fixed_indices`` is ``None`` and
         ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
@@ -107,17 +152,14 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: dict[
-        tuple[tuple[str, int | slice], ...] | None,
-        list[dict[_OUTPUT_TYPE, SequenceLearner]],
-    ] = {}
+    learners: LearnersDict = LearnersDict()
     iterator = _maybe_iterate_axes(pipeline, inputs, fixed_indices, split_independent_axes)  # type: ignore[assignment]
     for fixed_indices in iterator:
-        key = tuple(sorted(fixed_indices.items())) if fixed_indices else None
+        key = _key(fixed_indices) if fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
-            _learners = {}
+            _learners = []
             for func in gen:
-                _learners[func.output_name] = _learner(
+                learner = _learner(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
@@ -125,6 +167,7 @@ def create_learners(
                     fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
                 )
+                _learners.append(LearnerPipeFunc(learner, func))
             learners.setdefault(key, []).append(_learners)
     return learners
 
@@ -163,6 +206,10 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
+def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+    return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
+
+
 def _sequence(
     fixed_indices: dict[str, int | slice] | None,
     mapspec: MapSpec,
@@ -175,21 +222,6 @@ def _sequence(
     assert fixed_mask is not None
     assert len(fixed_mask) == prod(shape)
     return np.flatnonzero(fixed_mask)
-
-
-def flatten_learners(
-    learners_dicts: dict[
-        tuple[tuple[str, int | slice], ...] | None,
-        list[dict[_OUTPUT_TYPE, SequenceLearner]],
-    ],
-) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
-    """Flatten the list of dictionaries of learners into a single dictionary."""
-    flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
-    for learners in learners_dicts.values():
-        for learner_dict in learners:
-            for output_name, learner in learner_dict.items():
-                flat_learners.setdefault(output_name, []).append(learner)
-    return flat_learners
 
 
 def _execute_iteration_in_single(
