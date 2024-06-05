@@ -14,6 +14,7 @@ dependencies:
   - numpy
   # optional-dependencies: adaptive
   - adaptive
+  - adaptive-scheduler
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
