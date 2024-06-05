@@ -1,3 +1,5 @@
+"""Provides the `pipefunc.resources` module, containing the `Resources` class."""
+
 from __future__ import annotations
 
 import inspect

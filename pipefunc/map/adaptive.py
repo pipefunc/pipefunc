@@ -79,7 +79,7 @@ def create_learners(
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        Whether to clean up the ``run_folder```.
+        Whether to clean up the ``run_folder``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -332,7 +332,7 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        Whether to clean up the ``run_folder```.
+        Whether to clean up the ``run_folder``.
 
     Returns
     -------
