@@ -3,6 +3,7 @@
 from pipefunc import lazy, map, sweep
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, pipefunc
 from pipefunc._pipeline import Pipeline
+from pipefunc._resources import Resources
 from pipefunc._version import __version__
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "NestedPipeFunc",
     "lazy",
     "map",
+    "Resources",
     "sweep",
 ]
