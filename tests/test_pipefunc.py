@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, Resources, pipefunc
+from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.resources import Resources
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
 if TYPE_CHECKING:

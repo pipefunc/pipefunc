@@ -1,6 +1,6 @@
 import pytest
 
-from pipefunc._resources import Resources
+from pipefunc.resources import Resources
 
 
 def test_valid_resources_initialization():
