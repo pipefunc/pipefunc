@@ -352,6 +352,7 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
+
         defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
         kwargs.update(defaults)
         kwargs.update(self._bound)
