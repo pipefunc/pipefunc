@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -22,10 +23,10 @@ class AdaptiveSchedulerDetails(NamedTuple):
     learners: list[SequenceLearner]
     fnames: list[Path]
     dependencies: dict[int, list[int]]
-    nodes: tuple[int, ...]
-    cores_per_node: tuple[int, ...]
-    extra_scheduler: tuple[list[str], ...]
-    partition: tuple[str, ...]
+    nodes: tuple[int, ...] | None
+    cores_per_node: tuple[int, ...] | None
+    extra_scheduler: tuple[list[str], ...] | None
+    partition: tuple[str, ...] | None
 
 
 def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
@@ -46,10 +47,7 @@ def slurm_run_setup(
     run_folder = Path(run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
-    cores_per_node: list[int] = []
-    num_nodes: list[int] = []
-    extra_scheduler: list[list[str]] = []
-    partition: list[str] = []
+    resources: dict[str, list[Any]] = defaultdict(list)
     dependencies: dict[int, list[int]] = {}
     for learners_lists in learners_dict.data.values():
         for learner_list in learners_lists:
@@ -67,13 +65,13 @@ def slurm_run_setup(
                     raise ValueError(msg)
 
                 if (v := tracker.get(r, "num_cpus")) is not None:
-                    cores_per_node.append(v)
+                    resources["cores_per_node"].append(v)
                 if (v := tracker.get(r, "num_cpus_per_node")) is not None:
-                    cores_per_node.append(v)
+                    resources["cores_per_node"].append(v)
                 if (v := tracker.get(r, "num_nodes")) is not None:
-                    num_nodes.append(v)
+                    resources["nodes"].append(v)
                 if (v := tracker.get(r, "partition")) is not None:
-                    partition.append(v)
+                    resources["partition"].append(v)
 
                 _extra_scheduler = []
                 if (v := tracker.get(r, "memory")) is not None:
@@ -85,17 +83,22 @@ def slurm_run_setup(
                 if (v := tracker.get(r, "extra_args")) is not None:
                     for key, value in v.items():
                         _extra_scheduler.append(f"--{key}={value}")
-
+                resources["extra_scheduler"].append(_extra_scheduler)
             prev_indices = indices
+
     return AdaptiveSchedulerDetails(
         learners=learners,
         fnames=fnames,
         dependencies=dependencies,
-        nodes=tuple(num_nodes),
-        cores_per_node=tuple(cores_per_node),
-        extra_scheduler=tuple(extra_scheduler),
-        partition=tuple(partition),
+        nodes=_maybe_get(resources, "nodes"),
+        cores_per_node=_maybe_get(resources, "cores_per_node"),
+        extra_scheduler=_maybe_get(resources, "extra_scheduler"),
+        partition=_maybe_get(resources, "partition"),
     )
+
+
+def _maybe_get(resources: dict[str, list[Any]], key: str) -> tuple | None:
+    return tuple(resources[key]) if key in resources else None
 
 
 @dataclass
