@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import pickle
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -431,10 +430,10 @@ def test_tuple_outputs(tmp_path: Path):
 
     assert dict(pipeline.graph.nodes) == {
         f_c: {},
-        "a": {"default_value": inspect._empty},
-        "b": {"default_value": inspect._empty},
+        "a": {},
+        "b": {},
         f_d: {},
-        "x": {"default_value": 1},
+        "x": {},
         f_e: {},
         f_i: {},
     }

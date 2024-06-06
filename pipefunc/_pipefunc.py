@@ -513,6 +513,7 @@ def pipefunc(
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
     defaults: dict[str, Any] | None = None,
+    bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
@@ -535,6 +536,10 @@ def pipefunc(
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
+    bound
+        Bind arguments to the function. These are arguments that are fixed. Even when
+        providing different values, the bound values will be used. Must be in terms of
+        the renamed argument names.
     profile
         Flag indicating whether the decorated function should be profiled.
     debug
@@ -598,6 +603,7 @@ def pipefunc(
             output_picker=output_picker,
             renames=renames,
             defaults=defaults,
+            bound=bound,
             profile=profile,
             debug=debug,
             cache=cache,
