@@ -292,13 +292,13 @@ class Pipeline:
                 if arg in self.output_to_func:  # is function output
                     if arg in f.bound:
                         bound = _Bound(arg, f.output_name, f.bound[arg])
-                        g.add_edge(bound, f, arg=arg)
+                        g.add_edge(bound, f)
                     else:
                         edge = (self.output_to_func[arg], f)
                         if edge not in g.edges:
                             g.add_edge(*edge, arg=arg)
                         else:
-                            # tuple output of function, and the edge already exists
+                            # edge already exists because of multiple outputs
                             assert isinstance(edge[0].output_name, tuple)
                             current = g.edges[edge]["arg"]
                             g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
@@ -402,7 +402,8 @@ class Pipeline:
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
         result_from_cache = False
-        kwargs = dict(self.defaults, **kwargs)  # must include defaults to get cache_key
+        kwargs = dict(self.defaults, **kwargs)  # must include defaults+bound to get cache_key
+        kwargs.update(func.bound)
         if use_cache:
             assert cache is not None
             cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
@@ -650,7 +651,9 @@ class Pipeline:
     def defaults(self) -> dict[str, Any]:
         defaults = {}
         for func in self.functions:
-            defaults.update(func.defaults)
+            for arg, value in func.defaults.items():
+                if arg not in func.bound:
+                    defaults[arg] = value
         return defaults
 
     def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
@@ -1246,6 +1249,8 @@ def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
     arg_defaults = defaultdict(set)
     for f in functions:
         for arg, default_value in f.defaults.items():
+            if arg in f.bound:
+                continue
             arg_defaults[arg].add(default_value)
             if len(arg_defaults[arg]) > 1:
                 msg = (

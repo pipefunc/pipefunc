@@ -1196,3 +1196,36 @@ def test_map_with_partial(tmp_path: Path) -> None:
     r = pipeline.map(inputs, tmp_path, output_names={"y"})
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
+
+
+def test_bound():
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c, x=1):  # noqa: ARG001
+        return b * c
+
+    @pipefunc(output_name="e", bound={"x": 2})
+    def f_e(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f_c, f_d, f_e], debug=True)
+    assert pipeline(a=1, b=2) == pipeline.map({"a": 1, "b": 2}, None)["e"].output == 36
+
+
+def test_bound_2():
+    @pipefunc(output_name="d", bound={"x": 3})
+    def f(b, c, x=1):  # noqa: ARG001
+        return b * c
+
+    @pipefunc(output_name="e", bound={"x": 2})
+    def g(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"c": 2, "b": 3}
+    r1 = pipeline("e", **inputs)
+    r2 = pipeline.map(inputs, None)
+    assert r1 == r2["e"].output == 24

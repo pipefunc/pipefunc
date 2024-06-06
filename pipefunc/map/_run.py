@@ -287,6 +287,8 @@ def _func_kwargs(
 ) -> dict[str, Any]:
     return {
         p: _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
+        if p not in func.bound
+        else func.bound[p]
         for p in func.parameters
     }
 
