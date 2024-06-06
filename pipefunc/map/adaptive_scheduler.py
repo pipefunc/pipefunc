@@ -143,7 +143,10 @@ class _Tracker:
             self.do_raise(key)
 
     def is_missing(self, key: str) -> None:
-        if self.default_resources is not None and getattr(self.default_resources, key) is not None:
+        if (
+            self.default_resources is not None and getattr(self.default_resources, key) is not None
+        ):  # pragma: no cover
+            # Never happens because we strictly call `get` with combined defaults+resources
             return
         self.missing.add(key)
         if key in self.defined:

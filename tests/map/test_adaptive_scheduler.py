@@ -123,3 +123,49 @@ def test_missing_resources(tmp_path: Path) -> None:
         match="Either all `PipeFunc`s must have resources or `default_resources` must be provided.",
     ):
         learners_dict.to_slurm_run(tmp_path)
+
+
+def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", resources=Resources(num_cpus=2), mapspec="a[i] -> x[i]")
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+
+    inputs = {"a": list(range(10))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+
+    default_resources = Resources(num_cpus=4)
+    info = slurm_run_setup(learners_dict, tmp_path, default_resources)
+    assert len(info.learners) == 2
+    assert len(info.fnames) == 2
+    assert info.dependencies == {0: [], 1: [0]}
+    assert info.nodes is None
+    assert info.cores_per_node == (2, 4)
+    assert info.extra_scheduler is None
+    assert info.partition is None
+
+
+def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", resources=Resources(partition="partition-1"), mapspec="a[i] -> x[i]")
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+
+    inputs = {"a": list(range(10))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+
+    with pytest.raises(
+        ValueError,
+        match="At least one `PipeFunc` provides `partition`.",
+    ):
+        slurm_run_setup(learners_dict, tmp_path, Resources(num_nodes=1))
