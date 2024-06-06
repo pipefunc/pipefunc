@@ -27,8 +27,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
     inputs = {"a": list(range(10))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
-    info = slurm_run_setup(
-        learners_dict,
+    info = learners_dict.to_slurm_run(
         tmp_path,
         Resources(
             num_cpus_per_node=2,

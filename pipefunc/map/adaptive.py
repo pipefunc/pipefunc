@@ -115,11 +115,27 @@ def create_learners(
 ) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
-    Creates a learner for each function node in the graph. All learners
-    in the values of the dictionary are fully independent of each
-    other and can be executed in parallel. The lists of lists of learners
-    need to be executed in order. All the learners in the inner list are
-    independent of each other and can be executed in parallel.
+    Creates learner(s) for each function node in the pipeline graph. The number of learners
+    created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
+
+    - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
+      is created for each function node.
+    - If `split_independent_axes` is `True`, multiple learners are created for each function
+      node, corresponding to different combinations of the independent axes in the pipeline.
+
+    Returns a dictionary where the keys represent specific combinations of indices for the
+    independent axes, and the values are lists of lists of learners:
+
+    - The outer lists represent different stages or generations of the pipeline, where the
+      learners in each stage depend on the outputs of the learners in the previous stage.
+    - The inner lists contain learners that can be executed independently within each stage.
+
+    When `split_independent_axes` is `True`, each key in the dictionary corresponds to a
+    different combination of indices for the independent axes, allowing for parallel
+    execution across different subsets of the input data.
+
+    If `fixed_indices` is `None` and `split_independent_axes` is `False`, the only key in
+    the dictionary is `None`, indicating that all indices are being processed together.
 
     Parameters
     ----------
@@ -145,10 +161,15 @@ def create_learners(
         Whether to split the independent axes into separate learners. Do not use
         in conjunction with ``fixed_indices``.
 
+    See Also
+    --------
+    LearnersDict.to_slurm_run
+        Convert the learners to variables that can be passed to `adaptive_scheduler.RunManager`.
+
     Returns
     -------
         A dictionary where the keys are the fixed indices, e.g., ``(("i", 0), ("j", 0))``,
-        and the values are lists of lists of learner. The learners
+        and the values are lists of lists of learners. The learners
         in the inner list can be executed in parallel, but the outer lists need
         to be executed in order. If ``fixed_indices`` is ``None`` and
         ``split_independent_axes`` is ``False``, then the only key is ``None``.

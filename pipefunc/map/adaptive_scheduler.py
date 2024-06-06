@@ -31,7 +31,16 @@ class AdaptiveSchedulerDetails(NamedTuple):
     exclusive: bool = False
 
     def kwargs(self) -> dict[str, Any]:
-        """Get keyword arguments for `adaptive_scheduler.slurm_run`."""
+        """Get keyword arguments for `adaptive_scheduler.slurm_run`.
+
+        Examples
+        --------
+        >>> learners = pipefunc.map.adaptive.create_learners(...)
+        >>> info = learners.to_slurm_run(...)
+        >>> kwargs = info.kwargs()
+        >>> adaptive_scheduler.slurm_run(**kwargs)
+
+        """
         dct = self._asdict()
         return {k: v for k, v in dct.items() if v is not None}
 
