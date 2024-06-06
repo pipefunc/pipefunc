@@ -87,11 +87,18 @@ class LearnersDict(LearnersDictType):
         self,
         run_folder: str | Path,
         default_resources: dict | Resources | None,
+        *,
+        ignore_resources: bool = False,
     ) -> AdaptiveSchedulerDetails:
         """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
-        return slurm_run_setup(self, run_folder, default_resources)
+        return slurm_run_setup(
+            self,
+            run_folder,
+            default_resources,
+            ignore_resources=ignore_resources,
+        )
 
 
 def create_learners(

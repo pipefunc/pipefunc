@@ -37,6 +37,8 @@ def slurm_run_setup(
     learners_dict: LearnersDict,
     run_folder: str | Path,
     default_resources: dict | Resources | None,
+    *,
+    ignore_resources: bool = False,
 ) -> AdaptiveSchedulerDetails:
     """Set up the arguments for `adaptive_scheduler.slurm_run`."""
     default_resources = _maybe_resources(default_resources)
@@ -80,7 +82,9 @@ def slurm_run_setup(
                     _extra_scheduler.append(f"--gres=gpu:{v}")
                 if (v := tracker.get(r, "wall_time")) is not None:
                     _extra_scheduler.append(f"--time={v}")
-                extra_scheduler.append(_extra_scheduler)
+                if (v := tracker.get(r, "extra_args")) is not None:
+                    for key, value in v.items():
+                        _extra_scheduler.append(f"--{key}={value}")
 
             prev_indices = indices
     return AdaptiveSchedulerDetails(
