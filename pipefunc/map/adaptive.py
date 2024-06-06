@@ -86,7 +86,7 @@ class LearnersDict(LearnersDictType):
     def to_slurm_run(
         self,
         run_folder: str | Path,
-        default_resources: dict | Resources | None,
+        default_resources: dict | Resources | None = None,
         *,
         ignore_resources: bool = False,
     ) -> AdaptiveSchedulerDetails:

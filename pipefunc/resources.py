@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -261,3 +261,20 @@ class Resources:
                     max_data["extra_args"][key] = value
 
         return Resources(**max_data)
+
+    def dict(self) -> dict[str, Any]:
+        """Return the Resources instance as a dictionary.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the Resources instance.
+
+        """
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+    def with_defaults(self, default_resources: Resources | None) -> Resources:
+        """Combine the Resources instance with default resources."""
+        if default_resources is None:
+            return self
+        return Resources(**dict(default_resources.dict(), **self.dict()))

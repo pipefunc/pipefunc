@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._pipefunc import PipeFunc, _maybe_resources
 from pipefunc._utils import at_least_tuple
+from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from adaptive import SequenceLearner
@@ -43,7 +44,7 @@ def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
 def slurm_run_setup(
     learners_dict: LearnersDict,
     run_folder: str | Path,
-    default_resources: dict | Resources | None,
+    default_resources: dict | Resources | None = None,
     *,
     ignore_resources: bool = False,
 ) -> AdaptiveSchedulerDetails:
@@ -67,7 +68,12 @@ def slurm_run_setup(
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 if not ignore_resources:
                     _update_resources(learner.pipefunc.resources, tracker, resources_dict)
+                elif ignore_resources and default_resources is not None:
+                    _update_resources(default_resources, tracker, resources_dict)
             prev_indices = indices
+
+    if not any(resources_dict["extra_scheduler"]):  # all are empty
+        del resources_dict["extra_scheduler"]
 
     return AdaptiveSchedulerDetails(
         learners=learners,
@@ -84,16 +90,22 @@ def _maybe_get(resources: dict[str, list[Any]], key: str) -> tuple | None:
     return tuple(resources[key]) if key in resources else None
 
 
-def _update_resources(
+def _update_resources(  # noqa: PLR0912
     resources: Resources | None,
     tracker: _Tracker,
     resources_dict: dict[str, list[Any]],
 ) -> None:
-    r = resources or tracker.default_resources
-    if r is None:
+    if resources is None and tracker.default_resources is None:
         msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
         raise ValueError(msg)
 
+    if resources is None:
+        r = tracker.default_resources
+    elif tracker.default_resources is None:
+        r = resources
+    else:
+        r = resources.with_defaults(tracker.default_resources)
+    assert r is not None
     if (v := tracker.get(r, "num_cpus")) is not None:
         resources_dict["cores_per_node"].append(v)
     if (v := tracker.get(r, "num_cpus_per_node")) is not None:
@@ -103,15 +115,16 @@ def _update_resources(
     if (v := tracker.get(r, "partition")) is not None:
         resources_dict["partition"].append(v)
 
+    # There is no requirement for these to be defined for all `PipeFunc`s.
     _extra_scheduler = []
-    if (v := tracker.get(r, "memory")) is not None:
-        _extra_scheduler.append(f"--mem={v}")
-    if (v := tracker.get(r, "num_gpus")) is not None:
-        _extra_scheduler.append(f"--gres=gpu:{v}")
-    if (v := tracker.get(r, "wall_time")) is not None:
-        _extra_scheduler.append(f"--time={v}")
-    if (v := tracker.get(r, "extra_args")) is not None:
-        for key, value in v.items():
+    if r.memory:
+        _extra_scheduler.append(f"--mem={r.memory}")
+    if r.num_gpus:
+        _extra_scheduler.append(f"--gres=gpu:{r.num_gpus}")
+    if r.wall_time:
+        _extra_scheduler.append(f"--time={r.wall_time}")
+    if r.extra_args:
+        for key, value in r.extra_args.items():
             _extra_scheduler.append(f"--{key}={value}")
     resources_dict["extra_scheduler"].append(_extra_scheduler)
 
