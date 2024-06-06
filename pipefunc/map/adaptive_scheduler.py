@@ -28,6 +28,10 @@ class AdaptiveSchedulerDetails(NamedTuple):
     extra_scheduler: tuple[list[str], ...] | None
     partition: tuple[str, ...] | None
 
+    def kwargs(self):
+        dct = self._asdict()
+        return {k: v for k, v in dct.items() if v is not None}
+
 
 def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
     output_name = "-".join(at_least_tuple(func.output_name))
