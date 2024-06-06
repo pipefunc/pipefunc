@@ -28,7 +28,8 @@ class AdaptiveSchedulerDetails(NamedTuple):
     extra_scheduler: tuple[list[str], ...] | None
     partition: tuple[str, ...] | None
 
-    def kwargs(self):
+    def kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for `adaptive_scheduler.slurm_run`."""
         dct = self._asdict()
         return {k: v for k, v in dct.items() if v is not None}
 
