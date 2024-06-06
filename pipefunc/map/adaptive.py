@@ -61,7 +61,7 @@ LearnersDictType: TypeAlias = UserDict[tuple[AxisIndex, ...] | None, list[list[L
 
 
 class LearnersDict(LearnersDictType):
-    """A dictionary of adaptive learners for a pipeline."""
+    """A dictionary of adaptive learners for a pipeline as returned by `create_learners`."""
 
     def __init__(self, learners_dict: LearnersDictType | None = None) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
