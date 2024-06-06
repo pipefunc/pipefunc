@@ -311,7 +311,6 @@ class Pipeline:
                         g.add_edge(arg, f, arg=arg)
                     else:
                         bound = _Bound(arg, f.output_name, bound_value)
-                        g.add_node(bound)
                         g.add_edge(bound, f)
         return g
 
@@ -700,7 +699,8 @@ class Pipeline:
         generations = list(nx.topological_generations(self.graph))
         assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return Generations([x for x in generations[0] if isinstance(x, str)], generations[1:])
+        root_args = [x for x in generations[0] if isinstance(x, str)]
+        return Generations(root_args, generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
