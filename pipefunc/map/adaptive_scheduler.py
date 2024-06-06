@@ -47,11 +47,11 @@ def slurm_run_setup(
     run_folder = Path(run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
-    resources: dict[str, list[Any]] = defaultdict(list)
+    resources_dict: dict[str, list[Any]] = defaultdict(list)
     dependencies: dict[int, list[int]] = {}
     for learners_lists in learners_dict.data.values():
+        prev_indices: list[int] = []
         for learner_list in learners_lists:
-            prev_indices: list[int] = []
             indices: list[int] = []
             for learner in learner_list:
                 i = len(learners)
@@ -59,46 +59,55 @@ def slurm_run_setup(
                 dependencies[i] = prev_indices
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
-                r = learner.pipefunc.resources or default_resources
-                if r is None:
-                    msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
-                    raise ValueError(msg)
-
-                if (v := tracker.get(r, "num_cpus")) is not None:
-                    resources["cores_per_node"].append(v)
-                if (v := tracker.get(r, "num_cpus_per_node")) is not None:
-                    resources["cores_per_node"].append(v)
-                if (v := tracker.get(r, "num_nodes")) is not None:
-                    resources["nodes"].append(v)
-                if (v := tracker.get(r, "partition")) is not None:
-                    resources["partition"].append(v)
-
-                _extra_scheduler = []
-                if (v := tracker.get(r, "memory")) is not None:
-                    _extra_scheduler.append(f"--mem={v}")
-                if (v := tracker.get(r, "num_gpus")) is not None:
-                    _extra_scheduler.append(f"--gres=gpu:{v}")
-                if (v := tracker.get(r, "wall_time")) is not None:
-                    _extra_scheduler.append(f"--time={v}")
-                if (v := tracker.get(r, "extra_args")) is not None:
-                    for key, value in v.items():
-                        _extra_scheduler.append(f"--{key}={value}")
-                resources["extra_scheduler"].append(_extra_scheduler)
+                if not ignore_resources:
+                    _update_resources(learner.pipefunc.resources, tracker, resources_dict)
             prev_indices = indices
 
     return AdaptiveSchedulerDetails(
         learners=learners,
         fnames=fnames,
         dependencies=dependencies,
-        nodes=_maybe_get(resources, "nodes"),
-        cores_per_node=_maybe_get(resources, "cores_per_node"),
-        extra_scheduler=_maybe_get(resources, "extra_scheduler"),
-        partition=_maybe_get(resources, "partition"),
+        nodes=_maybe_get(resources_dict, "nodes"),
+        cores_per_node=_maybe_get(resources_dict, "cores_per_node"),
+        extra_scheduler=_maybe_get(resources_dict, "extra_scheduler"),
+        partition=_maybe_get(resources_dict, "partition"),
     )
 
 
 def _maybe_get(resources: dict[str, list[Any]], key: str) -> tuple | None:
     return tuple(resources[key]) if key in resources else None
+
+
+def _update_resources(
+    resources: Resources | None,
+    tracker: _Tracker,
+    resources_dict: dict[str, list[Any]],
+) -> None:
+    r = resources or tracker.default_resources
+    if r is None:
+        msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
+        raise ValueError(msg)
+
+    if (v := tracker.get(r, "num_cpus")) is not None:
+        resources_dict["cores_per_node"].append(v)
+    if (v := tracker.get(r, "num_cpus_per_node")) is not None:
+        resources_dict["cores_per_node"].append(v)
+    if (v := tracker.get(r, "num_nodes")) is not None:
+        resources_dict["nodes"].append(v)
+    if (v := tracker.get(r, "partition")) is not None:
+        resources_dict["partition"].append(v)
+
+    _extra_scheduler = []
+    if (v := tracker.get(r, "memory")) is not None:
+        _extra_scheduler.append(f"--mem={v}")
+    if (v := tracker.get(r, "num_gpus")) is not None:
+        _extra_scheduler.append(f"--gres=gpu:{v}")
+    if (v := tracker.get(r, "wall_time")) is not None:
+        _extra_scheduler.append(f"--time={v}")
+    if (v := tracker.get(r, "extra_args")) is not None:
+        for key, value in v.items():
+            _extra_scheduler.append(f"--{key}={value}")
+    resources_dict["extra_scheduler"].append(_extra_scheduler)
 
 
 @dataclass
