@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._pipefunc import PipeFunc, _maybe_resources
 from pipefunc._utils import at_least_tuple
@@ -64,50 +64,22 @@ def slurm_run_setup(
                     msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
                     raise ValueError(msg)
 
-                if r.num_cpus:
-                    tracker.is_defined("num_cpus")
-                    cores_per_node.append(r.num_cpus)
-                else:
-                    tracker.is_missing("num_cpus")
-                if r.num_cpus_per_node:
-                    tracker.is_defined("num_cpus_per_node")
-                    cores_per_node.append(r.num_cpus_per_node)
-                else:
-                    tracker.is_missing("num_cpus_per_node")
-
-                if r.num_nodes:
-                    tracker.is_defined("num_nodes")
-                    num_nodes.append(r.num_nodes)
-                else:
-                    tracker.is_missing("num_nodes")
-
-                if r.partition:
-                    tracker.is_defined("partition")
-                    partition.append(r.partition)
-                else:
-                    tracker.is_missing("partition")
+                if (v := tracker.get(r, "num_cpus")) is not None:
+                    cores_per_node.append(v)
+                if (v := tracker.get(r, "num_cpus_per_node")) is not None:
+                    cores_per_node.append(v)
+                if (v := tracker.get(r, "num_nodes")) is not None:
+                    num_nodes.append(v)
+                if (v := tracker.get(r, "partition")) is not None:
+                    partition.append(v)
 
                 _extra_scheduler = []
-                if r.memory:
-                    tracker.is_defined("memory")
-                    _extra_scheduler.append(f"--mem={r.memory}")
-                else:
-                    tracker.is_missing("memory")
-                if r.num_gpus:
-                    tracker.is_defined("num_gpus")
-                    _extra_scheduler.append(f"--gres=gpu:{r.num_gpus}")
-                else:
-                    tracker.is_missing("num_gpus")
-                if r.wall_time:
-                    tracker.is_defined("wall_time")
-                    _extra_scheduler.append(f"--time={r.wall_time}")
-                else:
-                    tracker.is_missing("wall_time")
-                if r.queue:
-                    tracker.is_defined("queue")
-                    _extra_scheduler.append(f"--partition={r.queue}")
-                else:
-                    tracker.is_missing("queue")
+                if (v := tracker.get(r, "memory")) is not None:
+                    _extra_scheduler.append(f"--mem={v}")
+                if (v := tracker.get(r, "num_gpus")) is not None:
+                    _extra_scheduler.append(f"--gres=gpu:{v}")
+                if (v := tracker.get(r, "wall_time")) is not None:
+                    _extra_scheduler.append(f"--time={v}")
                 extra_scheduler.append(_extra_scheduler)
 
             prev_indices = indices
@@ -124,6 +96,8 @@ def slurm_run_setup(
 
 @dataclass
 class _Tracker:
+    """Ensures that iff a resource is defined for one `PipeFunc`, it is defined for all of them."""
+
     default_resources: Resources | None
     defined: set[str] = field(default_factory=set)
     missing: set[str] = field(default_factory=set)
@@ -139,6 +113,15 @@ class _Tracker:
         self.missing.add(key)
         if key in self.defined:
             self.do_raise(key)
+
+    def get(self, resources: Resources, key: str) -> Any | None:
+        value = getattr(resources, key)
+        if value is not None:
+            self.is_defined(key)
+            return value
+        else:  # noqa: RET505
+            self.is_missing(key)
+            return None
 
     def do_raise(self, key: str) -> None:
         msg = (
