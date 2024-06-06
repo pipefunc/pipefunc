@@ -35,7 +35,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
 
         Examples
         --------
-        >>> learners = pipefunc.map.adaptive.create_learners(...)
+        >>> learners = pipefunc.map.adaptive.create_learners(pipeline, ...)
         >>> info = learners.to_slurm_run(...)
         >>> kwargs = info.kwargs()
         >>> adaptive_scheduler.slurm_run(**kwargs)
