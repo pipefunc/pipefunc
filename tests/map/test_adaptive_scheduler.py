@@ -148,6 +148,9 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     assert info.cores_per_node == (2, 4)
     assert info.extra_scheduler is None
     assert info.partition is None
+    kwargs = info.kwargs()
+    assert "partition" not in kwargs
+    assert "cores_per_node" in kwargs
 
 
 def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:

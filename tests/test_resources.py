@@ -223,3 +223,14 @@ def test_num_cpus_per_node():
     r = Resources(num_cpus_per_node=1, num_nodes=1)
     assert r.num_cpus_per_node == 1
     assert r.to_slurm_options() == "--nodes=1 --cpus-per-node=1"
+
+
+def test_combine_with_defaults():
+    r = Resources(num_cpus_per_node=1, num_nodes=1)
+    defaults = Resources(partition="partition-1", num_nodes=2)
+    combined = r.with_defaults(defaults)
+    assert combined.num_cpus_per_node == 1
+    assert combined.num_nodes == 1
+    assert combined.partition == "partition-1"
+    combined = r.with_defaults(None)
+    assert combined is r
