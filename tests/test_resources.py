@@ -9,14 +9,12 @@ def test_valid_resources_initialization():
         num_gpus=1,
         memory="16GB",
         wall_time="2:00:00",
-        queue="high",
         partition="gpu",
     )
     assert res.num_cpus == 4
     assert res.num_gpus == 1
     assert res.memory == "16GB"
     assert res.wall_time == "2:00:00"
-    assert res.queue == "high"
     assert res.partition == "gpu"
 
 
@@ -58,7 +56,6 @@ def test_from_dict():
         "num_gpus": 1,
         "memory": "16GB",
         "wall_time": "2:00:00",
-        "queue": "high",
         "partition": "gpu",
     }
     res = Resources.from_dict(data)
@@ -66,7 +63,6 @@ def test_from_dict():
     assert res.num_gpus == 1
     assert res.memory == "16GB"
     assert res.wall_time == "2:00:00"
-    assert res.queue == "high"
     assert res.partition == "gpu"
 
 
@@ -83,8 +79,8 @@ def test_to_slurm_options():
 
 def test_update():
     res = Resources(num_cpus=4, memory="16GB", wall_time="2:00:00")
-    res = res.update(queue="high", num_gpus=2)
-    assert res.queue == "high"
+    res = res.update(partition="high", num_gpus=2)
+    assert res.partition == "high"
     assert res.num_gpus == 2
     assert (
         res.to_slurm_options()
@@ -118,7 +114,6 @@ def test_combine_max_none_values():
     assert combined_res.num_gpus == 1
     assert combined_res.memory == "16GB"
     assert combined_res.wall_time == "2:00:00"
-    assert combined_res.queue is None
     assert combined_res.partition is None
 
 
@@ -133,7 +128,7 @@ def test_combine_max_extra_args():
 
 def test_combine_max_multiple_resources():
     res1 = Resources(num_cpus=4, memory="16GB", wall_time="2:00:00")
-    res2 = Resources(num_cpus=2, memory="32GB", wall_time="4:00:00", queue="high")
+    res2 = Resources(num_cpus=2, memory="32GB", wall_time="4:00:00")
     res3 = Resources(num_gpus=1, memory="8GB", wall_time="1:00:00", partition="gpu")
 
     combined_res = Resources.combine_max([res1, res2, res3])
@@ -142,7 +137,6 @@ def test_combine_max_multiple_resources():
         num_gpus=1,
         memory="32GB",
         wall_time="4:00:00",
-        queue="high",
         partition="gpu",
     )
 
@@ -229,3 +223,14 @@ def test_num_cpus_per_node():
     r = Resources(num_cpus_per_node=1, num_nodes=1)
     assert r.num_cpus_per_node == 1
     assert r.to_slurm_options() == "--nodes=1 --cpus-per-node=1"
+
+
+def test_combine_with_defaults():
+    r = Resources(num_cpus_per_node=1, num_nodes=1)
+    defaults = Resources(partition="partition-1", num_nodes=2)
+    combined = r.with_defaults(defaults)
+    assert combined.num_cpus_per_node == 1
+    assert combined.num_nodes == 1
+    assert combined.partition == "partition-1"
+    combined = r.with_defaults(None)
+    assert combined is r

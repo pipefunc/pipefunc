@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -26,8 +26,6 @@ class Resources:
         The memory required for the job. Must be a valid string (e.g., ``'2GB'``, ``'500MB'``).
     wall_time
         The wall time required for the job. Must be a valid string (e.g., ``'2:00:00'``, ``'48:00:00'``).
-    queue
-        The queue to submit the job to.
     partition
         The partition to submit the job to.
     extra_args
@@ -61,7 +59,6 @@ class Resources:
     num_cpus_per_node: int | None = None
     memory: str | None = None
     wall_time: str | None = None
-    queue: str | None = None
     partition: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
 
@@ -173,8 +170,6 @@ class Resources:
             options.append(f"--mem={self.memory}")
         if self.wall_time:
             options.append(f"--time={self.wall_time}")
-        if self.queue:
-            options.append(f"--partition={self.queue}")
         if self.partition:
             options.append(f"--partition={self.partition}")
         for key, value in self.extra_args.items():
@@ -226,7 +221,6 @@ class Resources:
             "num_gpus": None,
             "memory": None,
             "wall_time": None,
-            "queue": None,
             "partition": None,
             "extra_args": {},
         }
@@ -259,8 +253,6 @@ class Resources:
                     if max_data["wall_time"] is None
                     else max(max_data["wall_time"], resources.wall_time)
                 )
-            if resources.queue is not None:
-                max_data["queue"] = resources.queue
             if resources.partition is not None:
                 max_data["partition"] = resources.partition
 
@@ -269,3 +261,20 @@ class Resources:
                     max_data["extra_args"][key] = value
 
         return Resources(**max_data)
+
+    def dict(self) -> dict[str, Any]:
+        """Return the Resources instance as a dictionary.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the Resources instance.
+
+        """
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+    def with_defaults(self, default_resources: Resources | None) -> Resources:
+        """Combine the Resources instance with default resources."""
+        if default_resources is None:
+            return self
+        return Resources(**dict(default_resources.dict(), **self.dict()))

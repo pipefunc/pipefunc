@@ -9,7 +9,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map._run_info import RunInfo
-from pipefunc.map.adaptive import create_learners, create_learners_from_sweep, flatten_learners
+from pipefunc.map.adaptive import create_learners, create_learners_from_sweep
 from pipefunc.sweep import Sweep
 
 if TYPE_CHECKING:
@@ -33,15 +33,15 @@ def test_basic(tmp_path: Path) -> None:
     pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
 
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         return_output=True,
     )
-    flat_learners = flatten_learners(learners_dicts)
+    learners.simple_run()
+    flat_learners = learners.flatten()
     assert len(flat_learners) == 2
-    adaptive.runner.simple(flat_learners["z"][0])
     assert flat_learners["z"][0].data == {
         0: (2,),
         1: (3,),
@@ -79,14 +79,14 @@ def test_simple_from_step(tmp_path: Path) -> None:
         ],
     )
     inputs = {"n": 4}
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         internal_shapes={"x": 4},  # 4 should become (4,)
         return_output=True,
     )
-    flat_learners = flatten_learners(learners_dicts)
+    flat_learners = learners.flatten()
     assert len(flat_learners) == 3
     assert sum(len(learners) for learners in flat_learners.values()) == 3
     adaptive.runner.simple(flat_learners["x"][0])
@@ -118,31 +118,31 @@ def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> No
     inputs = {"x": [1, 2], "y": [3, 4]}
 
     # First run, should create the files
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         return_output=return_output,
         cleanup=True,
     )
-    flat_learners = flatten_learners(learners_dicts)
-    for learners in flat_learners.values():
-        for learner in learners:
+    flat_learners = learners.flatten()
+    for learner_list in flat_learners.values():
+        for learner in learner_list:
             adaptive.runner.simple(learner)
     assert counters["add"] == 4
     assert counters["take_sum"] == 1
 
     # Second run, should load the files (not run the functions again)
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         return_output=return_output,
         cleanup=False,
     )
-    flat_learners = flatten_learners(learners_dicts)
-    for learners in flat_learners.values():
-        for learner in learners:
+    flat_learners = learners.flatten()
+    for learner_list in flat_learners.values():
+        for learner in learner_list:
             adaptive.runner.simple(learner)
     assert counters["add"] == 4
     assert counters["take_sum"] == 1
@@ -220,14 +220,14 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
     pipeline = Pipeline([add])
 
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         return_output=True,
         fixed_indices={"i": 0},
     )
-    flat_learners = flatten_learners(learners_dicts)
+    flat_learners = learners.flatten()
     assert len(flat_learners) == 1
     adaptive.runner.simple(flat_learners["z"][0])
     assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
@@ -259,14 +259,14 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     pipeline = Pipeline([add])
 
     inputs = {"x": [1, 2, 3], "y": np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])}
-    learners_dicts = create_learners(
+    learners = create_learners(
         pipeline,
         inputs,
         run_folder=tmp_path,
         return_output=True,
         split_independent_axes=True,
     )
-    flat_learners = flatten_learners(learners_dicts)
+    flat_learners = learners.flatten()
     assert len(flat_learners) == 1
     assert len(flat_learners["z"]) == 12
     for learner in flat_learners["z"][:-3]:
@@ -308,7 +308,7 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
         return_output=True,
         split_independent_axes=True,
     )
-    flat_learners = flatten_learners(learners)
+    flat_learners = learners.flatten()
     for learners_list in flat_learners.values():
         for learner in learners_list:
             adaptive.runner.simple(learner)
