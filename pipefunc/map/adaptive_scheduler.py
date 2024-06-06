@@ -27,6 +27,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
     cores_per_node: tuple[int, ...] | None
     extra_scheduler: tuple[list[str], ...] | None
     partition: tuple[str, ...] | None
+    exclusive: bool = False
 
     def kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for `adaptive_scheduler.slurm_run`."""
