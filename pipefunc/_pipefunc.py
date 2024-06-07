@@ -193,7 +193,7 @@ class PipeFunc(Generic[T]):
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
                 defaults[new_name] = self._defaults[new_name]
-            elif v.default is not inspect.Parameter.empty:
+            elif v.default is not inspect.Parameter.empty and new_name not in self._bound:
                 defaults[new_name] = v.default
         return defaults
 
