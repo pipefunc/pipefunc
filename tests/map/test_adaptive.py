@@ -341,14 +341,23 @@ def test_internal_shapes(tmp_path: Path) -> None:
 
     inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
     internal_shapes = {"r": 5}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+    )
     learners = create_learners(
         pipeline,
         inputs,
-        tmp_path,
-        internal_shapes=internal_shapes,
+        tmp_path / "learners",
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
         return_output=True,
         split_independent_axes=True,
     )
     assert results
     assert learners
+    learners.simple_run()
+    r_map = load_outputs("r", run_folder=tmp_path)
+    r_adap = load_outputs("r", run_folder=tmp_path / "learners")
+    assert r_map.tolist() == r_adap.tolist()

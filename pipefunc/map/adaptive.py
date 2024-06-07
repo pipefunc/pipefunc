@@ -25,7 +25,7 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -260,7 +260,7 @@ def _sequence(
         return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
-    assert len(fixed_mask) == prod(shape)
+    assert len(fixed_mask) == prod(_external_shape(shape, mask))
     return np.flatnonzero(fixed_mask)
 
 

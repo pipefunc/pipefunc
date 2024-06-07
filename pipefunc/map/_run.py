@@ -492,10 +492,7 @@ def _mask_fixed_axes(
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
-    # TODO: first make a failing test! for
-    # IndexError: too many indices for array: array is 2-dimensional, but 3 were indexed
-    # external_key = _select_by_mask(shape_mask, shape, key)
-    external_key = key
+    external_key = _external_shape(key, shape_mask)  # type: ignore[arg-type]
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[external_key] = True
