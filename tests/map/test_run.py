@@ -1218,24 +1218,6 @@ def test_bound():
     assert pipeline.defaults == {"x": 1}  # "c" is bound, so it's not in the defaults
 
 
-def test_defaults_with_bound_exception():
-    with pytest.raises(
-        ValueError,
-        match="The following parameters are both defaults and bound: `{'x'}`. This is not allowed.",
-    ):
-
-        @pipefunc(output_name="e", bound={"x": 2}, defaults={"x": 3})
-        def f(c, d, x=1):
-            return c * d * x
-
-    # The function itself is allowed to have defaults
-    @pipefunc(output_name="e", bound={"x": 2})
-    def g(c, d, x=1):
-        return c * d * x
-
-    assert g.defaults == {}
-
-
 def test_bound_2():
     @pipefunc(output_name="d", bound={"x": 3})
     def f(b, c, x=1):  # noqa: ARG001
@@ -1305,6 +1287,24 @@ def test_bound_5():
     assert r["d"].output == ("b", "c_bound", 1)
     assert pipeline("c", a="a", b="b") == ("a", "b")
     assert pipeline("d", b="b") == ("b", "c_bound", 1)
+
+
+def test_defaults_with_bound_exception():
+    with pytest.raises(
+        ValueError,
+        match="The following parameters are both defaults and bound: `{'x'}`. This is not allowed.",
+    ):
+
+        @pipefunc(output_name="e", bound={"x": 2}, defaults={"x": 3})
+        def f(c, d, x=1):
+            return c * d * x
+
+    # The function itself is allowed to have defaults
+    @pipefunc(output_name="e", bound={"x": 2})
+    def g(c, d, x=1):
+        return c * d * x
+
+    assert g.defaults == {}
 
 
 def test_internal_shapes(tmp_path: Path) -> None:
