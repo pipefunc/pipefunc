@@ -1328,3 +1328,20 @@ def test_internal_shapes(tmp_path: Path) -> None:
         parallel=False,
     )
     assert results["r"].output.shape == (2, 4, 5)
+
+
+def test_bound_with_mapspec() -> None:
+    def f(a, b):
+        return a, b
+
+    pipeline = Pipeline(
+        [
+            PipeFunc(f, "x", bound={"b": None}),
+            PipeFunc(f, "y"),
+        ],
+    )
+
+    pipeline.add_mapspec_axis("b", axis="i")
+
+    assert pipeline.functions[0].mapspec is None
+    assert str(pipeline.functions[1].mapspec) == "b[i] -> y[i]"

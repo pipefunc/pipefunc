@@ -1439,7 +1439,7 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
     for f in functions:
-        if p not in f.parameters:
+        if p not in f.parameters or p in f.bound:
             continue
         if f.mapspec is None:
             axes = _axes_from_dims(p, dims, axis)
