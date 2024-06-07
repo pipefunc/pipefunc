@@ -188,8 +188,19 @@ def visualize(  # noqa: PLR0912, PLR0915
     plt.show()
 
 
-def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
-    """Visualize the pipeline as a directed graph using HoloViews."""
+def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | None:
+    """Visualize the pipeline as a directed graph using HoloViews.
+
+    Parameters
+    ----------
+    graph
+        The directed graph representing the pipeline.
+    show
+        Whether to show the plot. Uses `bokeh.plotting.show(holoviews.render(plot))`.
+        If ``False`` the `holoviews.Graph` object is returned.
+
+    """
+    import bokeh.plotting
     import holoviews as hv
     import numpy as np
 
@@ -234,8 +245,12 @@ def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    return graph * labels.opts(
+    plot = graph * labels.opts(
         text_font_size="8pt",
         text_color="black",
         bgcolor="white",
     )
+    if show:
+        bokeh.plotting.show(hv.render(plot))
+        return None
+    return plot
