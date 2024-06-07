@@ -1275,7 +1275,7 @@ def test_bound_5():
         return a, b
 
     @pipefunc(output_name="d", bound={"c": "c_bound"})
-    def g(b, c, x=1):  # "c" is the output of f
+    def g(b, c, x=1):
         return b, c, x
 
     pipeline = Pipeline([f, g], debug=True)
