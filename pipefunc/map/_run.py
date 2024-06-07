@@ -110,6 +110,7 @@ def run(
     outputs: dict[str, Result] = OrderedDict()
     store = run_info.init_store()
     _check_parallel(parallel, store)
+
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
