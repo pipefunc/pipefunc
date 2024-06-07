@@ -73,6 +73,11 @@ file = "README.md"
 [tool.versioningit]
 default-version = "0.0.0"
 
+[tool.versioningit.vcs]
+method = "git"
+match = ["v*"]
+default-tag = "0.0.0"
+
 [tool.versioningit.onbuild]
 build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
