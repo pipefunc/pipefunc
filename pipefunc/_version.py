@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 # Is set during `onbuild` if normally `pip install pipefunc` is used
-__version__: str = None  # type: ignore[assignment]
+__version__ = ""
 
-if __version__ is None:
+if not __version__:
     try:
         import versioningit
     except ImportError:  # pragma: no cover
