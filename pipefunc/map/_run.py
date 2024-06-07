@@ -386,6 +386,7 @@ def _set_output(
     external_shape = _external_shape(shape, shape_mask)
     internal_shape = _internal_shape(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
+    assert np.shape(output) == internal_shape
     for internal_index in _iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,

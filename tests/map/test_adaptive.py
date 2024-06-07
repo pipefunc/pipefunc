@@ -335,17 +335,18 @@ def test_internal_shapes(tmp_path: Path) -> None:
 
     @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
     def g(y, z) -> int:  # noqa: ARG001
-        return 1
+        return z
 
     pipeline = Pipeline([f, g])
 
     inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
-    internal_shapes = {"z": 5}
+    internal_shapes = {"r": 5}
     results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
     learners = create_learners(
         pipeline,
         inputs,
         tmp_path,
+        internal_shapes=internal_shapes,
         return_output=True,
         split_independent_axes=True,
     )

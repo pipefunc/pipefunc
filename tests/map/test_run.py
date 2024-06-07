@@ -1268,3 +1268,21 @@ def test_add_double_axis(tmp_path: Path) -> None:
     internal_shapes = {"z": 5}
     results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
     assert results["r"].output == 1
+
+
+def test_internal_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
+    def g(y, z) -> int:
+        assert isinstance(y, np.int_)
+        return z
+
+    pipeline = Pipeline([f, g])
+
+    inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
+    internal_shapes = {"r": (5,)}
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
+    assert results["r"].output.shape == (2, 4, 5)
