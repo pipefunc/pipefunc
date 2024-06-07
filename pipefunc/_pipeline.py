@@ -369,8 +369,12 @@ class Pipeline:
         # Used in _run
         func_args = {}
         for arg in func.parameters:
-            if arg in kwargs:
+            if arg in func.bound:
+                value = func.bound[arg]
+            elif arg in kwargs:
                 value = kwargs[arg]
+            elif arg in func.defaults:
+                value = func.defaults[arg]
             else:
                 value = self._run(
                     output_name=arg,
@@ -401,11 +405,13 @@ class Pipeline:
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
         result_from_cache = False
-        # We're not adding 'bound' to kwargs here because downstream functions use kwargs
-        kwargs = dict(func.defaults, **kwargs)
         if use_cache:
             assert cache is not None
-            cache_key = _compute_cache_key(func.output_name, dict(kwargs, **func.bound), root_args)
+            cache_key = _compute_cache_key(
+                func.output_name,
+                func.defaults | kwargs | func.bound,
+                root_args,
+            )
             return_now, result_from_cache = _get_result_from_cache(
                 func,
                 cache,
@@ -426,7 +432,7 @@ class Pipeline:
             return all_results[output_name]
 
         start_time = time.perf_counter()
-        r = _execute_func(func, dict(func_args, **func.bound), self.lazy)
+        r = _execute_func(func, func_args, self.lazy)
         if use_cache and cache_key is not None:
             assert cache is not None
             _update_cache(cache, cache_key, r, start_time)
