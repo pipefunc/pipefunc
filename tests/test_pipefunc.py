@@ -1149,3 +1149,13 @@ def test_nested_pipefunc_with_resources() -> None:
     assert isinstance(nf3.resources, Resources)
     assert nf3.resources.num_cpus == 3
     assert nf3.resources.memory == "3GB"
+
+
+def test_missing_kw():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(ValueError, match="Missing value for argument `b` in `f(...) → c."):
+        pipeline("c", a=1)
