@@ -282,6 +282,7 @@ def _execute_iteration_in_single(
         return output
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
@@ -329,6 +330,7 @@ def _execute_iteration_in_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,

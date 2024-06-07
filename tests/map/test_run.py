@@ -515,13 +515,13 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "z": (4,)}
     sum_result = load_outputs("sum", run_folder=tmp_path)
-    assert sum_result == 10
+    assert sum_result == 1 + 2 + 3 + 4
     sum_result = load_outputs("z", run_folder=tmp_path)
     assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
 
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    assert results["sum"].output == 14
+    assert results["sum"].output == 2 + 3 + 4 + 5
     load_xarray_dataset(run_folder=tmp_path)
 
 
@@ -1213,7 +1213,8 @@ def test_bound():
 
     pipeline = Pipeline([f_c, f_d, f_e], debug=True)
     r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False)
-    assert pipeline(a=1, b=2) == r_map["e"].output == 36
+    assert pipeline(a=1, b=2) == 36
+    assert r_map["e"].output == 36
 
 
 def test_bound_2():
