@@ -292,8 +292,8 @@ class Pipeline:
             assert f.parameters is not None
             for arg in f.parameters:
                 if arg in self.output_to_func:  # is function output
-                    if arg in f.bound:
-                        bound = _Bound(arg, f.output_name, f.bound[arg])
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name, f._bound[arg])
                         g.add_edge(bound, f)
                     else:
                         edge = (self.output_to_func[arg], f)
@@ -305,7 +305,7 @@ class Pipeline:
                             current = g.edges[edge]["arg"]
                             g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
                 else:
-                    bound_value = f.bound.get(arg, _empty)
+                    bound_value = f._bound.get(arg, _empty)
                     if bound_value is _empty:
                         if arg not in g:
                             # Add the node only if it doesn't exist
@@ -371,8 +371,8 @@ class Pipeline:
         # Used in _run
         func_args = {}
         for arg in func.parameters:
-            if arg in func.bound:
-                value = func.bound[arg]
+            if arg in func._bound:
+                value = func._bound[arg]
             elif arg in kwargs:
                 value = kwargs[arg]
             elif arg in self.output_to_func:
@@ -414,7 +414,7 @@ class Pipeline:
             assert cache is not None
             cache_key = _compute_cache_key(
                 func.output_name,
-                func.defaults | kwargs | func.bound,
+                func.defaults | kwargs | func._bound,
                 root_args,
             )
             return_now, result_from_cache = _get_result_from_cache(
@@ -662,7 +662,7 @@ class Pipeline:
         defaults = {}
         for func in self.functions:
             for arg, value in func.defaults.items():
-                if arg not in func.bound and arg not in self.output_to_func:
+                if arg not in func._bound and arg not in self.output_to_func:
                     defaults[arg] = value
         return defaults
 
@@ -1263,7 +1263,7 @@ def _check_consistent_defaults(
     arg_defaults = defaultdict(set)
     for f in functions:
         for arg, default_value in f.defaults.items():
-            if arg in f.bound or arg in output_to_func:
+            if arg in f._bound or arg in output_to_func:
                 continue
             arg_defaults[arg].add(default_value)
             if len(arg_defaults[arg]) > 1:
@@ -1439,7 +1439,7 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
     for f in functions:
-        if p not in f.parameters:
+        if p not in f.parameters or p in f._bound:
             continue
         if f.mapspec is None:
             axes = _axes_from_dims(p, dims, axis)
