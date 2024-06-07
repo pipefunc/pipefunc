@@ -1269,6 +1269,24 @@ def test_bound_4():
     assert pipeline("y", **inputs) == ("a_g", "a")
 
 
+def test_bound_5():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a, b
+
+    @pipefunc(output_name="d", bound={"c": "c_bound"})
+    def g(b, c, x=1):  # "c" is the output of f
+        return b, c, x
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"a": "a", "b": "b"}
+    r = pipeline.map(inputs, None, parallel=False)
+    assert r["c"].output == ("a", "b")
+    assert r["d"].output == ("b", "c_bound", 1)
+    assert pipeline("c", a="a", b="b") == ("a", "b")
+    assert pipeline("d", b="b") == ("b", "c_bound", 1)
+
+
 def test_add_double_axis(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
     def f(x):
