@@ -1158,7 +1158,7 @@ def test_map_without_mapspec(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": 1}
-    results = pipeline.map(inputs, tmp_path)
+    results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results["y"].output == 1
 
 
@@ -1173,18 +1173,18 @@ def test_map_with_partial(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, tmp_path)
+    results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["z"].output == 6
 
     # Run via subpipeline and map with partial inputs
     partial = pipeline.subpipeline({"y"})
     inputs1 = {"y": results["y"].output}
-    r = partial.map(inputs1, tmp_path)
+    r = partial.map(inputs1, tmp_path, parallel=False)
     assert len(r) == 1
     assert r["z"].output == 6
 
-    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True)
+    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True, parallel=False)
     assert len(r) == 1
     assert r["z"].output == 6
 
@@ -1193,7 +1193,7 @@ def test_map_with_partial(tmp_path: Path) -> None:
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
-    r = pipeline.map(inputs, tmp_path, output_names={"y"})
+    r = pipeline.map(inputs, tmp_path, output_names={"y"}, parallel=False)
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
@@ -1212,7 +1212,8 @@ def test_bound():
         return c * d * x
 
     pipeline = Pipeline([f_c, f_d, f_e], debug=True)
-    assert pipeline(a=1, b=2) == pipeline.map({"a": 1, "b": 2}, None)["e"].output == 36
+    r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False)
+    assert pipeline(a=1, b=2) == r_map["e"].output == 36
 
 
 def test_bound_2():
@@ -1227,7 +1228,7 @@ def test_bound_2():
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": 2, "b": 3}
     r1 = pipeline("e", **inputs)
-    r2 = pipeline.map(inputs, None)
+    r2 = pipeline.map(inputs, None, parallel=False)
     assert r1 == r2["e"].output == 24
 
 
@@ -1242,7 +1243,7 @@ def test_bound_3():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": "c", "b": "b"}
-    r = pipeline.map(inputs, None)
+    r = pipeline.map(inputs, None, parallel=False)
     d = ("b", "c", "x_f")
     assert r["d"].output == d
     assert r["e"].output == ("c_fixed", d, "x_g")
@@ -1256,7 +1257,7 @@ def test_add_double_axis(tmp_path: Path) -> None:
         return x
 
     @pipefunc(output_name="r", mapspec="... -> r[k]")
-    def g(y, z):
+    def g(y, z):  # noqa: ARG001
         return 1
 
     pipeline = Pipeline([f, g])
@@ -1266,7 +1267,12 @@ def test_add_double_axis(tmp_path: Path) -> None:
 
     inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
     internal_shapes = {"z": 5}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+    )
     assert results["r"].output == 1
 
 
@@ -1284,5 +1290,10 @@ def test_internal_shapes(tmp_path: Path) -> None:
 
     inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
     internal_shapes = {"r": (5,)}
-    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+    )
     assert results["r"].output.shape == (2, 4, 5)
