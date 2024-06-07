@@ -373,9 +373,7 @@ class Pipeline:
                 value = func.bound[arg]
             elif arg in kwargs:
                 value = kwargs[arg]
-            elif arg in func.defaults:
-                value = func.defaults[arg]
-            else:
+            elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
                     kwargs=kwargs,
@@ -383,6 +381,11 @@ class Pipeline:
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
+            elif arg in func.defaults:
+                value = func.defaults[arg]
+            else:
+                msg = f"Missing value for argument `{arg}` in `{func}`."
+                raise ValueError(msg)
             func_args[arg] = value
             used_parameters.add(arg)
         return func_args

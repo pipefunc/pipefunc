@@ -1204,7 +1204,7 @@ def test_bound():
         return a + b
 
     @pipefunc(output_name="d")
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c=5, x=1):  # noqa: ARG001
         return b * c
 
     @pipefunc(output_name="e", bound={"x": 2})
