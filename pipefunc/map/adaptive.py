@@ -187,7 +187,13 @@ def create_learners(
     run_info.dump(run_folder)
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict()
-    iterator = _maybe_iterate_axes(pipeline, inputs, fixed_indices, split_independent_axes)  # type: ignore[assignment]
+    iterator = _maybe_iterate_axes(
+        pipeline,
+        inputs,
+        fixed_indices,
+        split_independent_axes,
+        internal_shapes,
+    )
     for fixed_indices in iterator:
         key = _key(fixed_indices) if fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
@@ -462,6 +468,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> Generator[dict[str, Any] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
@@ -473,7 +480,7 @@ def _maybe_iterate_axes(
         return
     independent_axes = _identify_cross_product_axes(pipeline)
     axes = pipeline.mapspec_axes
-    shapes = map_shapes(pipeline, inputs).shapes
+    shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
