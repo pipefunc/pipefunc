@@ -66,7 +66,7 @@ class RunInfo:
     run_folder: Path
     mapspecs_as_strings: list[str]
     storage: str
-    pipefunc_version: str = __version__
+    pipefunc_version: str = __version__  # type: ignore[arg-type]
 
     @classmethod
     def create(
