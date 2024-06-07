@@ -353,9 +353,7 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs.update(defaults)
-        kwargs.update(self._bound)
+        kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
