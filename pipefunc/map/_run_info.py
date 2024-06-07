@@ -130,7 +130,7 @@ class RunInfo:
         path = self.path(run_folder)
         data = asdict(self)
         data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
-        data["all_output_names"] = list(data["all_output_names"])
+        data["all_output_names"] = sorted(data["all_output_names"])
         data["shapes"] = {",".join(at_least_tuple(k)): v for k, v in data["shapes"].items()}
         data["shape_masks"] = {
             ",".join(at_least_tuple(k)): v for k, v in data["shape_masks"].items()

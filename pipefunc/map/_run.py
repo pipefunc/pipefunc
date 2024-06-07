@@ -677,8 +677,7 @@ def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> Non
     `pipeline.unique_leaf_node` is used.
     """
     root_args = set(pipeline.topological_generations.root_args)
-    from_defaults = {p for p in pipeline.defaults if p not in pipeline.output_to_func}
-    inputs_with_defaults = set(inputs) | from_defaults
+    inputs_with_defaults = set(inputs) | set(pipeline.defaults)
     if missing := root_args - set(inputs_with_defaults):
         missing_args = ", ".join(missing)
         msg = f"Missing inputs: `{missing_args}`."
