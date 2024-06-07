@@ -326,3 +326,38 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
         (("j", 2),),
         (("j", 3),),
     ]
+
+
+def test_internal_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
+    def g(y, z) -> int:  # noqa: ARG001
+        return z
+
+    pipeline = Pipeline([f, g])
+
+    inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
+    internal_shapes = {"r": 5}
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+    )
+    learners = create_learners(
+        pipeline,
+        inputs,
+        tmp_path / "learners",
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        return_output=True,
+        split_independent_axes=True,
+    )
+    assert results
+    assert learners
+    learners.simple_run()
+    r_map = load_outputs("r", run_folder=tmp_path)
+    r_adap = load_outputs("r", run_folder=tmp_path / "learners")
+    assert r_map.tolist() == r_adap.tolist()

@@ -25,7 +25,7 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -260,7 +260,7 @@ def _sequence(
         return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
-    assert len(fixed_mask) == prod(shape)
+    assert len(fixed_mask) == prod(_external_shape(shape, mask))
     return np.flatnonzero(fixed_mask)
 
 
@@ -282,6 +282,7 @@ def _execute_iteration_in_single(
         return output
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
@@ -329,6 +330,7 @@ def _execute_iteration_in_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
@@ -468,7 +470,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
 ) -> Generator[dict[str, Any] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import inspect
 import pickle
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -431,10 +431,10 @@ def test_tuple_outputs(tmp_path: Path):
 
     assert dict(pipeline.graph.nodes) == {
         f_c: {},
-        "a": {"default_value": inspect._empty},
-        "b": {"default_value": inspect._empty},
+        "a": {},
+        "b": {},
         f_d: {},
-        "x": {"default_value": 1},
+        "x": {},
         f_e: {},
         f_i: {},
     }
@@ -1150,3 +1150,16 @@ def test_nested_pipefunc_with_resources() -> None:
     assert isinstance(nf3.resources, Resources)
     assert nf3.resources.num_cpus == 3
     assert nf3.resources.memory == "3GB"
+
+
+def test_missing_kw():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Missing value for argument `b` in `f(...) → c`."),
+    ):
+        pipeline("c", a=1)

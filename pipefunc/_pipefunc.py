@@ -193,7 +193,7 @@ class PipeFunc(Generic[T]):
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
                 defaults[new_name] = self._defaults[new_name]
-            elif v.default is not inspect.Parameter.empty:
+            elif v.default is not inspect.Parameter.empty and new_name not in self._bound:
                 defaults[new_name] = v.default
         return defaults
 
@@ -309,6 +309,13 @@ class PipeFunc(Generic[T]):
             _validate_identifier(key, name)
 
     def _validate_names(self) -> None:
+        if common := set(self._defaults) & set(self._bound):
+            msg = (
+                f"The following parameters are both defaults and bound: `{common}`."
+                " This is not allowed."
+            )
+            raise ValueError(msg)
+
         self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
@@ -352,9 +359,8 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
-        defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs.update(defaults)
-        kwargs.update(self._bound)
+
+        kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
@@ -513,6 +519,7 @@ def pipefunc(
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
     defaults: dict[str, Any] | None = None,
+    bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
@@ -535,6 +542,10 @@ def pipefunc(
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
+    bound
+        Bind arguments to the function. These are arguments that are fixed. Even when
+        providing different values, the bound values will be used. Must be in terms of
+        the renamed argument names.
     profile
         Flag indicating whether the decorated function should be profiled.
     debug
@@ -598,6 +609,7 @@ def pipefunc(
             output_picker=output_picker,
             renames=renames,
             defaults=defaults,
+            bound=bound,
             profile=profile,
             debug=debug,
             cache=cache,

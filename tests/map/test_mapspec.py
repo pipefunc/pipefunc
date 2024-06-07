@@ -270,7 +270,7 @@ def test_array_shape():
     assert array_shape(arr) == (2,)
 
     # Test with unsupported type
-    with pytest.raises(TypeError, match="No array shape defined for type"):
+    with pytest.raises(TypeError, match="No array shape defined for"):
         array_shape(42)
 
 

@@ -17,6 +17,7 @@ import inspect
 import time
 import warnings
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import networkx as nx
@@ -56,6 +57,8 @@ if TYPE_CHECKING:
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
+
+_empty = inspect.Parameter.empty
 
 
 class Pipeline:
@@ -266,9 +269,10 @@ class Pipeline:
                     for name in node.output_name:
                         mapping[name] = node
                 mapping[node.output_name] = node
-            else:
-                assert isinstance(node, str)
+            elif isinstance(node, str):
                 mapping[node] = node
+            else:
+                assert isinstance(node, _Bound)
         return mapping
 
     @functools.cached_property
@@ -281,27 +285,35 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        _check_consistent_defaults(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
             assert f.parameters is not None
             for arg in f.parameters:
                 if arg in self.output_to_func:  # is function output
-                    edge = (self.output_to_func[arg], f)
-                    if edge not in g.edges:
-                        g.add_edge(*edge, arg=arg)
+                    if arg in f.bound:
+                        bound = _Bound(arg, f.output_name, f.bound[arg])
+                        g.add_edge(bound, f)
                     else:
-                        # tuple output of function, and the edge already exists
-                        assert isinstance(edge[0].output_name, tuple)
-                        current = g.edges[edge]["arg"]
-                        g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
-
+                        edge = (self.output_to_func[arg], f)
+                        if edge not in g.edges:
+                            g.add_edge(*edge, arg=arg)
+                        else:
+                            # edge already exists because of multiple outputs
+                            assert isinstance(edge[0].output_name, tuple)
+                            current = g.edges[edge]["arg"]
+                            g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
                 else:
-                    if arg not in g:  # Add the node only if it doesn't exist
-                        default_value = f.defaults.get(arg, inspect.Parameter.empty)
-                        g.add_node(arg, default_value=default_value)
-                    g.add_edge(arg, f, arg=arg)
+                    bound_value = f.bound.get(arg, _empty)
+                    if bound_value is _empty:
+                        if arg not in g:
+                            # Add the node only if it doesn't exist
+                            g.add_node(arg)
+                        g.add_edge(arg, f, arg=arg)
+                    else:
+                        bound = _Bound(arg, f.output_name, bound_value)
+                        g.add_edge(bound, f)
         return g
 
     def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
@@ -346,7 +358,7 @@ class Pipeline:
         """
         if __output_name__ is None:
             __output_name__ = self.unique_leaf_node.output_name
-        return self.func(__output_name__)(**kwargs)
+        return self.run(__output_name__, kwargs=kwargs)
 
     def _get_func_args(
         self,
@@ -359,9 +371,11 @@ class Pipeline:
         # Used in _run
         func_args = {}
         for arg in func.parameters:
-            if arg in kwargs:
+            if arg in func.bound:
+                value = func.bound[arg]
+            elif arg in kwargs:
                 value = kwargs[arg]
-            else:
+            elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
                     kwargs=kwargs,
@@ -369,6 +383,11 @@ class Pipeline:
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
+            elif arg in func.defaults:
+                value = func.defaults[arg]
+            else:
+                msg = f"Missing value for argument `{arg}` in `{func}`."
+                raise ValueError(msg)
             func_args[arg] = value
             used_parameters.add(arg)
         return func_args
@@ -391,10 +410,13 @@ class Pipeline:
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
         result_from_cache = False
-        kwargs = dict(self.defaults, **kwargs)  # must include defaults to get cache_key
         if use_cache:
             assert cache is not None
-            cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
+            cache_key = _compute_cache_key(
+                func.output_name,
+                func.defaults | kwargs | func.bound,
+                root_args,
+            )
             return_now, result_from_cache = _get_result_from_cache(
                 func,
                 cache,
@@ -639,7 +661,9 @@ class Pipeline:
     def defaults(self) -> dict[str, Any]:
         defaults = {}
         for func in self.functions:
-            defaults.update(func.defaults)
+            for arg, value in func.defaults.items():
+                if arg not in func.bound and arg not in self.output_to_func:
+                    defaults[arg] = value
         return defaults
 
     def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
@@ -684,9 +708,10 @@ class Pipeline:
         the functions in topological order.
         """
         generations = list(nx.topological_generations(self.graph))
-        assert all(isinstance(x, str) for x in generations[0])
+        assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return Generations(generations[0], generations[1:])
+        root_args = [x for x in generations[0] if isinstance(x, str)]
+        return Generations(root_args, generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
@@ -1042,6 +1067,13 @@ class Generations(NamedTuple):
     function_lists: list[list[PipeFunc]]
 
 
+@dataclass(frozen=True, eq=True)
+class _Bound:
+    name: str
+    output_name: _OUTPUT_TYPE
+    value: Any
+
+
 class _PipelineAsFunc:
     """Wrapper class for a pipeline function.
 
@@ -1223,11 +1255,16 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
+def _check_consistent_defaults(
+    functions: list[PipeFunc],
+    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = defaultdict(set)
     for f in functions:
         for arg, default_value in f.defaults.items():
+            if arg in f.bound or arg in output_to_func:
+                continue
             arg_defaults[arg].add(default_value)
             if len(arg_defaults[arg]) > 1:
                 msg = (
@@ -1383,7 +1420,7 @@ def _compute_arg_mapping(
     replaced: list[PipeFunc | str],
     arg_set: set[tuple[str, ...]],
 ) -> None:
-    preds = [n for n in graph.predecessors(node) if n not in replaced]
+    preds = [n for n in graph.predecessors(node) if n not in replaced and not isinstance(n, _Bound)]
     deps = _unique(args + preds)
     deps_names = _names(deps)
     if deps_names in arg_set:

@@ -119,6 +119,7 @@ def run(
                 run_folder=run_folder,
                 store=store,
                 outputs=outputs,
+                all_output_names=run_info.all_output_names,
                 fixed_indices=fixed_indices,
                 executor=ex,
             )
@@ -279,16 +280,27 @@ def _load_parameter(
 
 def _func_kwargs(
     func: PipeFunc,
+    all_output_names: set[str],
     input_paths: dict[str, Path],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
     run_folder: Path,
 ) -> dict[str, Any]:
-    return {
-        p: _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
-        for p in func.parameters
-    }
+    kwargs = {}
+    for p in func.parameters:
+        if p in func.bound:
+            kwargs[p] = func.bound[p]
+        elif p in input_paths or p in all_output_names:
+            kwargs[p] = _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
+        elif p in func.defaults and p not in all_output_names:
+            kwargs[p] = func.defaults[p]
+        else:  # pragma: no cover
+            # In principle it should not be possible to reach this point because of
+            # the checks in `run` and `_validate_complete_inputs`.
+            msg = f"Parameter `{p}` not found in inputs, outputs, bound or defaults."
+            raise ValueError(msg)
+    return kwargs
 
 
 def _select_kwargs(
@@ -384,6 +396,7 @@ def _set_output(
     external_shape = _external_shape(shape, shape_mask)
     internal_shape = _internal_shape(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
+    assert np.shape(output) == internal_shape
     for internal_index in _iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -489,9 +502,10 @@ def _mask_fixed_axes(
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
+    external_key = _external_shape(key, shape_mask)  # type: ignore[arg-type]
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
-    select[key] = True
+    select[external_key] = True
     return select.flat
 
 
@@ -567,6 +581,7 @@ def _run_and_process_generation(
     run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
+    all_output_names: set[str],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
@@ -576,6 +591,7 @@ def _run_and_process_generation(
     for func in generation:
         kwargs = _func_kwargs(
             func,
+            all_output_names,
             run_info.input_paths,
             run_info.shapes,
             run_info.shape_masks,

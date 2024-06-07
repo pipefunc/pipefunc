@@ -515,13 +515,13 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "z": (4,)}
     sum_result = load_outputs("sum", run_folder=tmp_path)
-    assert sum_result == 10
+    assert sum_result == 1 + 2 + 3 + 4
     sum_result = load_outputs("z", run_folder=tmp_path)
     assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
 
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    assert results["sum"].output == 14
+    assert results["sum"].output == 2 + 3 + 4 + 5
     load_xarray_dataset(run_folder=tmp_path)
 
 
@@ -1158,7 +1158,7 @@ def test_map_without_mapspec(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": 1}
-    results = pipeline.map(inputs, tmp_path)
+    results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results["y"].output == 1
 
 
@@ -1173,18 +1173,18 @@ def test_map_with_partial(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, tmp_path)
+    results = pipeline.map(inputs, tmp_path, parallel=False)
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["z"].output == 6
 
     # Run via subpipeline and map with partial inputs
     partial = pipeline.subpipeline({"y"})
     inputs1 = {"y": results["y"].output}
-    r = partial.map(inputs1, tmp_path)
+    r = partial.map(inputs1, tmp_path, parallel=False)
     assert len(r) == 1
     assert r["z"].output == 6
 
-    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True)
+    r = pipeline.map(inputs1, tmp_path, auto_subpipeline=True, parallel=False)
     assert len(r) == 1
     assert r["z"].output == 6
 
@@ -1193,6 +1193,138 @@ def test_map_with_partial(tmp_path: Path) -> None:
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
-    r = pipeline.map(inputs, tmp_path, output_names={"y"})
+    r = pipeline.map(inputs, tmp_path, output_names={"y"}, parallel=False)
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
+
+
+def test_bound():
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c=5, x=1):  # noqa: ARG001
+        return b * c
+
+    @pipefunc(output_name="e", bound={"x": 2})
+    def f_e(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f_c, f_d, f_e], debug=True)
+    r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False)
+    assert pipeline(a=1, b=2) == 36
+    assert r_map["e"].output == 36
+    assert pipeline.defaults == {"x": 1}  # "c" is bound, so it's not in the defaults
+
+
+def test_bound_2():
+    @pipefunc(output_name="d", bound={"x": 3})
+    def f(b, c, x=1):  # noqa: ARG001
+        return b * c
+
+    @pipefunc(output_name="e", bound={"x": 2})
+    def g(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"c": 2, "b": 3}
+    r1 = pipeline("e", **inputs)
+    r2 = pipeline.map(inputs, None, parallel=False)
+    assert r1 == r2["e"].output == 24
+
+
+def test_bound_3():
+    @pipefunc(output_name="d", bound={"x": "x_f"})
+    def f(b, c, x=1):
+        return (b, c, x)
+
+    @pipefunc(output_name="e", bound={"x": "x_g", "c": "c_fixed"})
+    def g(c, d, x=1):
+        return (c, d, x)
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"c": "c", "b": "b"}
+    r = pipeline.map(inputs, None, parallel=False)
+    d = ("b", "c", "x_f")
+    assert r["d"].output == d
+    assert r["e"].output == ("c_fixed", d, "x_g")
+    assert pipeline("d", **inputs) == d
+    assert pipeline("e", **inputs) == ("c_fixed", d, "x_g")
+
+
+def test_bound_4():
+    @pipefunc(output_name="x")
+    def f(a):
+        return a
+
+    @pipefunc(output_name="y", bound={"a": "a_g"})
+    def g(a, x):
+        return (a, x)
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"a": "a"}
+    r = pipeline.map(inputs, None, parallel=False)
+    assert r["x"].output == "a"
+    assert r["y"].output == ("a_g", "a")
+    assert pipeline("x", a="a") == "a"
+    assert pipeline("y", **inputs) == ("a_g", "a")
+
+
+def test_bound_5():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a, b
+
+    @pipefunc(output_name="d", bound={"c": "c_bound"})
+    def g(b, c, x=1):
+        return b, c, x
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"a": "a", "b": "b"}
+    r = pipeline.map(inputs, None, parallel=False)
+    assert r["c"].output == ("a", "b")
+    assert r["d"].output == ("b", "c_bound", 1)
+    assert pipeline("c", a="a", b="b") == ("a", "b")
+    assert pipeline("d", b="b") == ("b", "c_bound", 1)
+
+
+def test_defaults_with_bound_exception():
+    with pytest.raises(
+        ValueError,
+        match="The following parameters are both defaults and bound: `{'x'}`. This is not allowed.",
+    ):
+
+        @pipefunc(output_name="e", bound={"x": 2}, defaults={"x": 3})
+        def f(c, d, x=1):
+            return c * d * x
+
+    # The function itself is allowed to have defaults
+    @pipefunc(output_name="e", bound={"x": 2})
+    def g(c, d, x=1):
+        return c * d * x
+
+    assert g.defaults == {}
+
+
+def test_internal_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
+    def g(y, z) -> int:
+        assert isinstance(y, np.int_)
+        return z
+
+    pipeline = Pipeline([f, g])
+
+    inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
+    internal_shapes = {"r": (5,)}
+    results = pipeline.map(
+        inputs,
+        tmp_path,
+        internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+    )
+    assert results["r"].output.shape == (2, 4, 5)
