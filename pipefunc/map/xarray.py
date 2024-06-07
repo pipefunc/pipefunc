@@ -83,5 +83,5 @@ def load_xarray_dataset(
     }
     all_coords = {coord for data in data_arrays.values() for coord in data.coords}
     # Remove the DataArrays that are already appear in other DataArrays' coords
-    data_arrays = [v for k, v in data_arrays.items() if k not in all_coords]
-    return xr.merge(data_arrays, compat="override")
+    to_merge = [v for k, v in data_arrays.items() if k not in all_coords]
+    return xr.merge(to_merge, compat="override")
