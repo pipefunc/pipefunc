@@ -309,6 +309,13 @@ class PipeFunc(Generic[T]):
             _validate_identifier(key, name)
 
     def _validate_names(self) -> None:
+        if common := set(self._defaults) & set(self._bound):
+            msg = (
+                f"The following parameters are both defaults and bound: `{common}`."
+                " This is not allowed."
+            )
+            raise ValueError(msg)
+
         self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
