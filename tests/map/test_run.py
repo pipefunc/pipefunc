@@ -1229,3 +1229,22 @@ def test_bound_2():
     r1 = pipeline("e", **inputs)
     r2 = pipeline.map(inputs, None)
     assert r1 == r2["e"].output == 24
+
+
+def test_bound_3():
+    @pipefunc(output_name="d", bound={"x": "x_f"})
+    def f(b, c, x=1):
+        return (b, c, x)
+
+    @pipefunc(output_name="e", bound={"x": "x_g", "c": "c_fixed"})
+    def g(c, d, x=1):
+        return (c, d, x)
+
+    pipeline = Pipeline([f, g], debug=True)
+    inputs = {"c": "c", "b": "b"}
+    r = pipeline.map(inputs, None)
+    d = ("b", "c", "x_f")
+    assert r["d"].output == d
+    assert r["e"].output == ("c_fixed", d, "x_g")
+    assert pipeline("d", **inputs) == d
+    assert pipeline("e", **inputs) == ("c_fixed", d, "x_g")
