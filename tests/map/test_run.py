@@ -1248,3 +1248,23 @@ def test_bound_3():
     assert r["e"].output == ("c_fixed", d, "x_g")
     assert pipeline("d", **inputs) == d
     assert pipeline("e", **inputs) == ("c_fixed", d, "x_g")
+
+
+def test_add_double_axis(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="... -> r[k]")
+    def g(y, z):
+        return 1
+
+    pipeline = Pipeline([f, g])
+    pipeline.add_mapspec_axis("y", axis="i")
+    pipeline.add_mapspec_axis("y", axis="j")
+    assert pipeline.mapspecs_as_strings == ["... -> y[i, j]", "y[i, j] -> r[k, i, j]"]
+
+    inputs = {"x": np.array([[0, 1, 2, 3], [0, 1, 2, 3]]), "z": np.arange(5)}
+    internal_shapes = {"z": 5}
+    results = pipeline.map(inputs, tmp_path, internal_shapes, parallel=False)
+    assert results["r"].output == 1

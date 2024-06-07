@@ -468,7 +468,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
 ) -> Generator[dict[str, Any] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
