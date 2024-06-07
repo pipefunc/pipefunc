@@ -73,13 +73,23 @@ file = "README.md"
 [tool.versioningit]
 default-version = "0.0.0"
 
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
+[tool.versioningit.vcs]
+method = "git"
+match = ["v*"]
+default-tag = "0.0.0"
 
 [tool.setuptools.cmdclass]
 sdist = "versioningit.cmdclass.sdist"
 build_py = "versioningit.cmdclass.build_py"
+
+[tool.versioningit.format]
+dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
+distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
+distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
+
+[tool.versioningit.onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
 
 [tool.setuptools.packages.find]
 include = ["pipefunc.*", "pipefunc"]
