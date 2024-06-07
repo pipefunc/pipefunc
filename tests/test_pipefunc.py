@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -1157,5 +1158,8 @@ def test_missing_kw():
         return a + b
 
     pipeline = Pipeline([f])
-    with pytest.raises(ValueError, match="Missing value for argument `b` in `f(...) → c."):
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Missing value for argument `b` in `f(...) → c`."),
+    ):
         pipeline("c", a=1)
