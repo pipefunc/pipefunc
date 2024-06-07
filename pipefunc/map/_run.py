@@ -295,7 +295,9 @@ def _func_kwargs(
             kwargs[p] = _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
         elif p in func.defaults and p not in all_output_names:
             kwargs[p] = func.defaults[p]
-        else:
+        else:  # pragma: no cover
+            # In principle it should not be possible to reach this point because of
+            # the checks in `run` and `_validate_complete_inputs`.
             msg = f"Parameter `{p}` not found in inputs, outputs, bound or defaults."
             raise ValueError(msg)
     return kwargs
