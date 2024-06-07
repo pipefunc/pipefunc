@@ -271,6 +271,8 @@ class Pipeline:
                 mapping[node.output_name] = node
             elif isinstance(node, str):
                 mapping[node] = node
+            else:
+                assert isinstance(node, _Bound)
         return mapping
 
     @functools.cached_property
@@ -283,7 +285,7 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        _check_consistent_defaults(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
@@ -1253,12 +1255,15 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
+def _check_consistent_defaults(
+    functions: list[PipeFunc],
+    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = defaultdict(set)
     for f in functions:
         for arg, default_value in f.defaults.items():
-            if arg in f.bound:
+            if arg in f.bound or arg in output_to_func:
                 continue
             arg_defaults[arg].add(default_value)
             if len(arg_defaults[arg]) > 1:

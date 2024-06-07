@@ -290,7 +290,7 @@ def _func_kwargs(
     for p in func.parameters:
         if p in func.bound:
             kwargs[p] = func.bound[p]
-        elif p in input_paths or p in shapes or p in store:
+        elif p in input_paths or p in all_output_names:
             kwargs[p] = _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
         elif p in func.defaults and p not in all_output_names:
             kwargs[p] = func.defaults[p]
