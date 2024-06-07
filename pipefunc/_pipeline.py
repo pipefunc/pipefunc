@@ -356,7 +356,7 @@ class Pipeline:
         """
         if __output_name__ is None:
             __output_name__ = self.unique_leaf_node.output_name
-        return self.func(__output_name__)(**kwargs)
+        return self.run(__output_name__, kwargs=kwargs)
 
     def _get_func_args(
         self,
