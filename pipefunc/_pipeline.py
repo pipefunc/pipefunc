@@ -662,7 +662,7 @@ class Pipeline:
         defaults = {}
         for func in self.functions:
             for arg, value in func.defaults.items():
-                if arg not in func.bound:
+                if arg not in func.bound and arg not in self.output_to_func:
                     defaults[arg] = value
         return defaults
 

@@ -1215,6 +1215,7 @@ def test_bound():
     r_map = pipeline.map({"a": 1, "b": 2}, None, parallel=False)
     assert pipeline(a=1, b=2) == 36
     assert r_map["e"].output == 36
+    assert pipeline.defaults == {"x": 1}  # "c" is bound, so it's not in the defaults
 
 
 def test_bound_2():
