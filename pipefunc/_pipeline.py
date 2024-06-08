@@ -801,9 +801,17 @@ class Pipeline:
             func_node_colors=func_node_colors,
         )
 
-    def visualize_holoviews(self) -> hv.Graph:
-        """Visualize the pipeline as a directed graph using HoloViews."""
-        return visualize_holoviews(self.graph)
+    def visualize_holoviews(self, *, show: bool = False) -> hv.Graph | None:
+        """Visualize the pipeline as a directed graph using HoloViews.
+
+        Parameters
+        ----------
+        show
+            Whether to show the plot. Uses `bokeh.plotting.show(holoviews.render(plot))`.
+            If ``False`` the `holoviews.Graph` object is returned.
+
+        """
+        return visualize_holoviews(self.graph, show=show)
 
     def resources_report(self) -> None:
         """Display the resource usage report for each function in the pipeline."""
