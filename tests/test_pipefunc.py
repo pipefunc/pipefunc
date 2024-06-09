@@ -1183,3 +1183,8 @@ def test_join_pipelines() -> None:
     assert pipeline("f", a=1, b=2) == 3
     assert pipeline("g", a=1, b=2) == 2
     assert pipeline.debug
+
+    pipeline = pipeline1 | PipeFunc(g, "g")
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
