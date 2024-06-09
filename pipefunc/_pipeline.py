@@ -916,7 +916,7 @@ class Pipeline:
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
     def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
-        """Join multiple pipelines into a single pipeline.
+        """Join multiple pipelines into a single new pipeline.
 
         Parameters
         ----------
