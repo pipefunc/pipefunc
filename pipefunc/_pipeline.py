@@ -893,16 +893,38 @@ class Pipeline:
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
-    def copy(self) -> Pipeline:
+    def copy(self, **update: Any) -> Pipeline:
         """Return a copy of the pipeline."""
-        return Pipeline(
-            [f.copy() for f in self.functions],  # type: ignore[arg-type]
-            lazy=self.lazy,
-            debug=self._debug,
-            profile=self._profile,
-            cache_type=self._cache_type,
-            cache_kwargs=self._cache_kwargs,
-        )
+        kwargs = {
+            "functions": [f.copy() for f in self.functions],
+            "lazy": self.lazy,
+            "debug": self._debug,
+            "profile": self._profile,
+            "cache_type": self._cache_type,
+            "cache_kwargs": self._cache_kwargs,
+        }
+        kwargs.update(update)
+        return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    def join(self, *pipelines: Pipeline) -> Pipeline:
+        """Join multiple pipelines into a single pipeline.
+
+        Parameters
+        ----------
+        pipelines
+            The pipelines to join.
+
+        Returns
+        -------
+            A new pipeline containing all functions from the original pipelines.
+
+        """
+        functions = [f for p in [self, *pipelines] for f in p.functions]
+        return self.copy(functions=functions)
+
+    def __or__(self, other: Pipeline) -> Pipeline:
+        """Combine two pipelines using the ``|`` operator."""
+        return self.join(other)
 
     def _connected_components(self) -> list[set[PipeFunc | str]]:
         """Return the connected components of the pipeline graph."""
