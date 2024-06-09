@@ -894,7 +894,15 @@ class Pipeline:
         return pipeline_str
 
     def copy(self, **update: Any) -> Pipeline:
-        """Return a copy of the pipeline."""
+        """Return a copy of the pipeline.
+
+        Parameters
+        ----------
+        update
+            Keyword arguments passed to the `Pipeline` constructor instead of the
+            original values.
+
+        """
         kwargs = {
             "lazy": self.lazy,
             "debug": self._debug,
