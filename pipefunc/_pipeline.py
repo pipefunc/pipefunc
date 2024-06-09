@@ -906,23 +906,33 @@ class Pipeline:
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
-    def join(self, *pipelines: Pipeline) -> Pipeline:
+    def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
         """Join multiple pipelines into a single pipeline.
 
         Parameters
         ----------
         pipelines
-            The pipelines to join.
+            The pipelines to join. Can also be individual `PipeFunc` instances.
 
         Returns
         -------
             A new pipeline containing all functions from the original pipelines.
 
         """
-        functions = [f for p in [self, *pipelines] for f in p.functions]
+        functions = []
+        for pipeline in [self, *pipelines]:
+            if isinstance(pipeline, Pipeline):
+                for f in pipeline.functions:
+                    functions.append(f.copy())  # noqa: PERF401
+            elif isinstance(pipeline, PipeFunc):
+                functions.append(pipeline.copy())
+            else:
+                msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
+                raise TypeError(msg)
+
         return self.copy(functions=functions)
 
-    def __or__(self, other: Pipeline) -> Pipeline:
+    def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
         """Combine two pipelines using the ``|`` operator."""
         return self.join(other)
 
