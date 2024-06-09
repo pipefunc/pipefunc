@@ -1188,3 +1188,9 @@ def test_join_pipelines() -> None:
     assert pipeline("f", a=1, b=2) == 3
     assert pipeline("g", a=1, b=2) == 2
     assert pipeline.debug
+
+    with pytest.raises(
+        TypeError,
+        match="Only `Pipeline` or `PipeFunc` instances can be joined",
+    ):
+        pipeline1 | g  # type: ignore[operator]
