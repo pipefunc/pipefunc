@@ -215,17 +215,21 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
     node_indices = range(len(graph.nodes))
     node_types = []
     node_labels = []
+    mapspecs = []
     for node in graph.nodes:
         if isinstance(node, str):
             node_types.append("str")
             node_labels.append(node)
+            mapspecs.append(None)
         elif isinstance(node, PipeFunc):
             node_types.append("func")
             node_labels.append(str(node))
+            mapspecs.append(node.mapspec)
         else:
             assert isinstance(node, _Bound)
             node_types.append("bound")
             node_labels.append(node.name)
+            mapspecs.append(None)
 
     # Create a dictionary for quick lookup of indices
     node_index_dict = {node: index for index, node in enumerate(graph.nodes)}
@@ -237,8 +241,8 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
 
     # Create Nodes and Graph
     nodes = hv.Nodes(
-        (x, y, node_indices, node_labels, node_types),
-        vdims=["label", "type"],
+        (x, y, node_indices, node_labels, node_types, mapspecs),
+        vdims=["label", "type", "mapspec"],
     )
     graph = hv.Graph((edges, nodes))
 
