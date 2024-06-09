@@ -1163,3 +1163,34 @@ def test_missing_kw():
         match=re.escape("Missing value for argument `b` in `f(...) → c`."),
     ):
         pipeline("c", a=1)
+
+
+def test_join_pipelines() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(a, b):
+        return a * b
+
+    pipeline1 = Pipeline([PipeFunc(f, "f")], debug=True)
+    pipeline2 = Pipeline([PipeFunc(g, "g")], debug=False)
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    pipeline = pipeline1 | pipeline2
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    pipeline = pipeline1 | PipeFunc(g, "g")
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    with pytest.raises(
+        TypeError,
+        match="Only `Pipeline` or `PipeFunc` instances can be joined",
+    ):
+        pipeline1 | g  # type: ignore[operator]

@@ -893,16 +893,57 @@ class Pipeline:
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
-    def copy(self) -> Pipeline:
-        """Return a copy of the pipeline."""
-        return Pipeline(
-            [f.copy() for f in self.functions],  # type: ignore[arg-type]
-            lazy=self.lazy,
-            debug=self._debug,
-            profile=self._profile,
-            cache_type=self._cache_type,
-            cache_kwargs=self._cache_kwargs,
-        )
+    def copy(self, **update: Any) -> Pipeline:
+        """Return a copy of the pipeline.
+
+        Parameters
+        ----------
+        update
+            Keyword arguments passed to the `Pipeline` constructor instead of the
+            original values.
+
+        """
+        kwargs = {
+            "lazy": self.lazy,
+            "debug": self._debug,
+            "profile": self._profile,
+            "cache_type": self._cache_type,
+            "cache_kwargs": self._cache_kwargs,
+        }
+        if "functions" not in update:
+            kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
+        kwargs.update(update)
+        return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
+        """Join multiple pipelines into a single new pipeline.
+
+        Parameters
+        ----------
+        pipelines
+            The pipelines to join. Can also be individual `PipeFunc` instances.
+
+        Returns
+        -------
+            A new pipeline containing all functions from the original pipelines.
+
+        """
+        functions = []
+        for pipeline in [self, *pipelines]:
+            if isinstance(pipeline, Pipeline):
+                for f in pipeline.functions:
+                    functions.append(f.copy())  # noqa: PERF401
+            elif isinstance(pipeline, PipeFunc):
+                functions.append(pipeline.copy())
+            else:
+                msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
+                raise TypeError(msg)
+
+        return self.copy(functions=functions)
+
+    def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
+        """Combine two pipelines using the ``|`` operator."""
+        return self.join(other)
 
     def _connected_components(self) -> list[set[PipeFunc | str]]:
         """Return the connected components of the pipeline graph."""
