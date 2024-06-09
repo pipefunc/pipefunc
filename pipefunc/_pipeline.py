@@ -896,13 +896,14 @@ class Pipeline:
     def copy(self, **update: Any) -> Pipeline:
         """Return a copy of the pipeline."""
         kwargs = {
-            "functions": [f.copy() for f in self.functions],
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
         }
+        if "functions" not in update:
+            kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
