@@ -191,7 +191,9 @@ class Pipeline:
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
             f._validate_mapspec()
-
+        if not isinstance(f, PipeFunc):
+            msg = f"`f` must be a PipeFunc, got {type(f)}"
+            raise TypeError(msg)
         self.functions.append(f)
 
         if self.profile is not None:
@@ -738,6 +740,9 @@ class Pipeline:
         the functions in topological order.
         """
         generations = list(nx.topological_generations(self.graph))
+        if not generations:
+            return _Generations([], [])
+
         assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         root_args = [x for x in generations[0] if isinstance(x, str)]
