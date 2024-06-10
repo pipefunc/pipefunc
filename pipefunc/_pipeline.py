@@ -23,7 +23,7 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._perf import resources_report
-from pipefunc._pipefunc import PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -949,6 +949,33 @@ class Pipeline:
             kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    def nest_funcs(
+        self,
+        output_names: set[_OUTPUT_TYPE],
+        new_output_name: _OUTPUT_TYPE | None = None,
+    ) -> NestedPipeFunc:
+        """Replaces a set of output names with a single nested function inplace.
+
+        Parameters
+        ----------
+        output_names
+            The output names to nest in a `NestedPipeFunc`.
+        new_output_name
+            The identifier for the output of the wrapped function. If ``None``, it is automatically
+            constructed from all the output names of the `PipeFunc` instances.
+
+        Returns
+        -------
+            The newly added `NestedPipeFunc` instance.
+
+        """
+        funcs = {self.output_to_func[output_name] for output_name in output_names}
+        for f in funcs:
+            self.drop(f=f)
+        nested_func = NestedPipeFunc(list(funcs), output_name=new_output_name)
+        self.add(nested_func)
+        return nested_func
 
     def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
         """Join multiple pipelines into a single new pipeline.

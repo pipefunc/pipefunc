@@ -221,13 +221,15 @@ def test_combining_mapspecs() -> None:
     def charge(electrostatics):
         return electrostatics
 
+    expected = "V_left[i], V_right[j], materials[a, b], mesh[a, b, c] -> charge[i, j, a, b, c]"
     nf = NestedPipeFunc([electrostatics, charge], output_name="charge")
-    assert (
-        str(nf.mapspec)
-        == "V_left[i], V_right[j], materials[a, b], mesh[a, b, c] -> charge[i, j, a, b, c]"
-    )
+    assert str(nf.mapspec) == expected
     nf = NestedPipeFunc([electrostatics, charge])
     assert (
         str(nf.mapspec)
         == "V_left[i], V_right[j], materials[a, b], mesh[a, b, c] -> charge[i, j, a, b, c], electrostatics[i, j, a, b, c]"
     )
+
+    pipeline = Pipeline([electrostatics, charge])
+    pipeline.nest_funcs({"electrostatics", "charge"}, new_output_name="charge")
+    assert pipeline.mapspecs_as_strings == [expected]
