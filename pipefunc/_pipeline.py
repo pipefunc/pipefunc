@@ -178,7 +178,7 @@ class Pipeline:
             maps to the output.
 
         """
-        if not isinstance(f, PipeFunc):
+        if not isinstance(f, PipeFunc) and callable(f):
             f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
@@ -191,7 +191,9 @@ class Pipeline:
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
             f._validate_mapspec()
-
+        if not isinstance(f, PipeFunc):
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
         self.functions.append(f)
 
         if self.profile is not None:
@@ -738,6 +740,9 @@ class Pipeline:
         the functions in topological order.
         """
         generations = list(nx.topological_generations(self.graph))
+        if not generations:
+            return Generations([], [])
+
         assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         root_args = [x for x in generations[0] if isinstance(x, str)]
