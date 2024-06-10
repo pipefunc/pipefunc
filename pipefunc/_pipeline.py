@@ -178,7 +178,7 @@ class Pipeline:
             maps to the output.
 
         """
-        if not isinstance(f, PipeFunc):
+        if not isinstance(f, PipeFunc) and callable(f):
             f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
@@ -192,7 +192,7 @@ class Pipeline:
             f.mapspec = mapspec
             f._validate_mapspec()
         if not isinstance(f, PipeFunc):
-            msg = f"`f` must be a PipeFunc, got {type(f)}"
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
         self.functions.append(f)
 

@@ -1232,3 +1232,8 @@ def test_join_pipelines() -> None:
 def test_empty_pipeline() -> None:
     pipeline = Pipeline([])
     assert pipeline.output_to_func == {}
+    assert pipeline.topological_generations.root_args == []
+    assert pipeline.topological_generations.function_lists == []
+
+    with pytest.raises(TypeError, match="must be a `PipeFunc` or callable"):
+        pipeline.add(1)  # type: ignore[arg-type]
