@@ -16,7 +16,6 @@ import functools
 import inspect
 import time
 import warnings
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
@@ -1353,25 +1352,14 @@ def _check_consistent_defaults(
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
-    arg_defaults = defaultdict(set)
-    defaults_counter: dict[str, int] = defaultdict(int)
+    arg_defaults = {}
     for f in functions:
         for arg, default_value in f.defaults.items():
             if arg in f._bound or arg in output_to_func:
                 continue
-            defaults_counter[arg] += 1
-            if not _is_hashable(default_value):
-                if defaults_counter[arg] > 1:
-                    msg = (
-                        f"⚠️ Default value for argument '{arg}' is present in multiple functions"
-                        f" and is used {defaults_counter[arg]} times. Its value"
-                        " is not hashable. Pipefunc therefore cannot guarantee that the"
-                        " default value is consistent across functions!"
-                    )
-                    warnings.warn(msg, UserWarning, stacklevel=2)
-                continue
-            arg_defaults[arg].add(default_value)
-            if len(arg_defaults[arg]) > 1:
+            if arg not in arg_defaults:
+                arg_defaults[arg] = default_value
+            elif default_value != arg_defaults[arg]:
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"
