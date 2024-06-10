@@ -1227,3 +1227,8 @@ def test_join_pipelines() -> None:
         match="Only `Pipeline` or `PipeFunc` instances can be joined",
     ):
         pipeline1 | g  # type: ignore[operator]
+
+
+def test_empty_pipeline() -> None:
+    pipeline = Pipeline([])
+    assert pipeline.output_to_func == {}
