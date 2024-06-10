@@ -111,6 +111,7 @@ class Pipeline:
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache

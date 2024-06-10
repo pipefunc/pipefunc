@@ -1237,3 +1237,20 @@ def test_empty_pipeline() -> None:
 
     with pytest.raises(TypeError, match="must be a `PipeFunc` or callable"):
         pipeline.add(1)  # type: ignore[arg-type]
+
+
+def test_unhashable_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": []})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", defaults={"b": {}})
+    def g(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert pipeline.defaults == {"b": []}
+
+    # The problem should occur when using the default twice
+    with pytest.warns(UserWarning, match="Default value for argument"):
+        Pipeline([f, g])
