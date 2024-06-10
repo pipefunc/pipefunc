@@ -1252,5 +1252,5 @@ def test_unhashable_defaults() -> None:
     assert pipeline.defaults == {"b": []}
 
     # The problem should occur when using the default twice
-    with pytest.warns(UserWarning, match="Default value for argument"):
+    with pytest.raises(ValueError, match="Inconsistent default"):
         Pipeline([f, g])
