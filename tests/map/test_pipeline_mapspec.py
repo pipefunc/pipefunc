@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pipefunc import PipeFunc, Pipeline, pipefunc
+from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 
 
 def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
@@ -204,3 +204,30 @@ def test_multiple_outputs_order() -> None:
         match="does not match the output_names in the MapSpec",
     ):
         Pipeline([func])
+
+
+def test_combining_mapspecs() -> None:
+    @pipefunc(
+        output_name="electrostatics",
+        mapspec="'V_left[i], V_right[j], mesh[a, b, c], materials[a, b] -> electrostatics[i, j, a, b, c]'",
+    )
+    def electrostatics(V_left, V_right, mesh, materials):  # noqa: N803, ARG001
+        return 1
+
+    @pipefunc(
+        output_name="charge",
+        mapspec="'electrostatics[i, j, a, b, c] -> charge[i, j, a, b, c]'",
+    )
+    def charge(electrostatics):
+        return electrostatics
+
+    nf = NestedPipeFunc([electrostatics, charge], output_name="charge")
+    assert (
+        str(nf.mapspec)
+        == "V_left[i], V_right[j], materials[a, b], mesh[a, b, c] -> charge[i, j, a, b, c]"
+    )
+    nf = NestedPipeFunc([electrostatics, charge])
+    assert (
+        str(nf.mapspec)
+        == "V_left[i], V_right[j], materials[a, b], mesh[a, b, c] -> charge[i, j, a, b, c], electrostatics[i, j, a, b, c]"
+    )
