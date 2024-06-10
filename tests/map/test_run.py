@@ -782,6 +782,8 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
         parallel=False,
     )
     assert results["c"].output.shape == (2, 2)
+    assert results["c"].store is not None
+    assert isinstance(results["c"].store.parallelizable, bool)
     assert results["c"].output.tolist() == [[2, 0], [3, -1]]
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     load_xarray_dataset(run_folder=tmp_path)
