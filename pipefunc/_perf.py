@@ -159,7 +159,7 @@ class ResourceProfiler:
 
 
 def resources_report(profiling_stats: dict[str, ProfilingStats]) -> None:
-    """Display the resource usage report for each function in `profiling_stats`."""
+    """Display the resource usage report for each function in ``profiling_stats``."""
     headers = [
         "Function",
         "Avg CPU Usage (%)",

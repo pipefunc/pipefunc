@@ -329,7 +329,7 @@ def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
     raise TypeError(msg)
 
 
-def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
+def array_shape(x: npt.NDArray | list, key: str = "?") -> tuple[int, ...]:
     """Return the shape of 'x'.
 
     Parameters
@@ -337,6 +337,8 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
     x
         The input for which to determine the shape. If 'x' has a 'shape' attribute, it is returned;
         otherwise, the length of 'x' is returned if 'x' is a list.
+    key
+        The key for which to determine the shape. Only used in error messages.
 
     Raises
     ------
@@ -352,12 +354,12 @@ def array_shape(x: npt.NDArray | list) -> tuple[int, ...]:
         return tuple(map(int, x.shape))
     if isinstance(x, list):
         return (len(x),)
-    msg = f"No array shape defined for type {type(x)}"
+    msg = f"No array shape defined for `{key}` of type {type(x)}"
     raise TypeError(msg)
 
 
 def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
-    kwarg_shapes = {k: array_shape(v) for k, v in inputs.items()}
+    kwarg_shapes = {k: array_shape(v, k) for k, v in inputs.items()}
     kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
     map_shape, _ = mapspec.shape(kwarg_shapes)
     map_size = np.prod(map_shape)

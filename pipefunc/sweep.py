@@ -537,7 +537,7 @@ def get_precalculation_order(
 
     The order is determined by the topological dependencies of the functions
     and the count of their executions in the context of a parameter sweep.
-    Only functions that are executed multiple times (as specified by `min_executions`)
+    Only functions that are executed multiple times (as specified by ``min_executions``)
     are included in the precalculation order.
 
     Parameters

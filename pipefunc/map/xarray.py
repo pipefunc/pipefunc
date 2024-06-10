@@ -57,7 +57,7 @@ def load_xarray(
             array = pd.MultiIndex.from_arrays(arrays, names=names)
         coords[name] = (axes, array)
 
-    return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name])
+    return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
 
 def load_xarray_dataset(
@@ -71,7 +71,7 @@ def load_xarray_dataset(
     """Load the xarray dataset."""
     if not output_names:
         output_names = [name for ms in mapspecs for name in ms.output_names]
-    data_vars = {
+    data_arrays = {
         name: load_xarray(
             name,
             mapspecs,
@@ -81,4 +81,7 @@ def load_xarray_dataset(
         )
         for name in output_names
     }
-    return xr.Dataset(data_vars)
+    all_coords = {coord for data in data_arrays.values() for coord in data.coords}
+    # Remove the DataArrays that are already appear in other DataArrays' coords
+    to_merge = [v for k, v in data_arrays.items() if k not in all_coords]
+    return xr.merge(to_merge, compat="override")

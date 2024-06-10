@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
     from pipefunc._pipefunc import PipeFunc
 
+_empty = inspect.Parameter.empty
+
 
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
     try:
@@ -52,14 +54,21 @@ def visualize(  # noqa: PLR0912, PLR0915
     """
     import matplotlib.pyplot as plt
 
+    from pipefunc._pipefunc import PipeFunc
+    from pipefunc._pipeline import _Bound
+
     pos = _get_graph_layout(graph)
     arg_nodes = []
     func_nodes = []
+    bound_nodes = []
     for node in graph.nodes:
         if isinstance(node, str):
             arg_nodes.append(node)
-        else:  # is PipeFunc
+        elif isinstance(node, PipeFunc):
             func_nodes.append(node)
+        else:
+            assert isinstance(node, _Bound)
+            bound_nodes.append(node)
 
     plt.figure(figsize=figsize)
     nx.draw_networkx_nodes(
@@ -78,6 +87,14 @@ def visualize(  # noqa: PLR0912, PLR0915
         node_color=func_node_colors or "skyblue",
         node_shape="o",
     )
+    nx.draw_networkx_nodes(
+        graph,
+        pos,
+        nodelist=bound_nodes,
+        node_size=4000,
+        node_color="red",
+        node_shape="h",
+    )
 
     nx.draw_networkx_labels(
         graph,
@@ -91,6 +108,7 @@ def visualize(  # noqa: PLR0912, PLR0915
         if not func.mapspec:
             return s
         for spec in func.mapspec.outputs:
+            # changes e.g., "func(...) -> y" to "func(...) -> y[i]"
             s = re.sub(rf"\b{spec.name}\b", str(spec), s)
         return s
 
@@ -101,26 +119,35 @@ def visualize(  # noqa: PLR0912, PLR0915
         font_size=12,
     )
 
+    nx.draw_networkx_labels(
+        graph,
+        pos,
+        {node: node.name for node in bound_nodes},
+        font_size=12,
+    )
+
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
     # Add edge labels with function outputs
     outputs = {}
     inputs = {}
+    bound = {}
     outputs_mapspec = {}
     inputs_mapspec = {}
 
     for edge, attrs in graph.edges.items():
         a, b = edge
         if isinstance(a, str):
-            default_value = graph.nodes[a]["default_value"]
+            assert not isinstance(b, str)  # `b` is PipeFunc
+            default_value = b.defaults.get(a, _empty)
             if b.mapspec and a in b.mapspec.input_names:
                 spec = next(i for i in b.mapspec.inputs if i.name == a)
                 inputs_mapspec[edge] = str(spec)
-            elif default_value is not inspect.Parameter.empty:
+            elif default_value is not _empty:
                 inputs[edge] = f"{a}={default_value}"
             else:
                 inputs[edge] = a
-        else:  # is PipeFunc
+        elif isinstance(a, PipeFunc):
             output_str = []
             with_mapspec = False
             for name in at_least_tuple(attrs["arg"]):
@@ -134,12 +161,17 @@ def visualize(  # noqa: PLR0912, PLR0915
                 outputs_mapspec[edge] = ", ".join(output_str)
             else:
                 outputs[edge] = ", ".join(output_str)
+        else:
+            assert isinstance(a, _Bound)
+            bound_value = a.value
+            bound[edge] = f"{a.name}={bound_value}"
 
     for labels, color in [
         (outputs, "skyblue"),
         (outputs_mapspec, "blue"),
         (inputs, "lightgreen"),
         (inputs_mapspec, "green"),
+        (bound, "red"),
     ]:
         nx.draw_networkx_edge_labels(
             graph,
@@ -156,8 +188,19 @@ def visualize(  # noqa: PLR0912, PLR0915
     plt.show()
 
 
-def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
-    """Visualize the pipeline as a directed graph using HoloViews."""
+def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | None:
+    """Visualize the pipeline as a directed graph using HoloViews.
+
+    Parameters
+    ----------
+    graph
+        The directed graph representing the pipeline.
+    show
+        Whether to show the plot. Uses `bokeh.plotting.show(holoviews.render(plot))`.
+        If ``False`` the `holoviews.Graph` object is returned.
+
+    """
+    import bokeh.plotting
     import holoviews as hv
     import numpy as np
 
@@ -202,8 +245,12 @@ def visualize_holoviews(graph: nx.DiGraph) -> hv.Graph:
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    return graph * labels.opts(
+    plot = graph * labels.opts(
         text_font_size="8pt",
         text_color="black",
         bgcolor="white",
     )
+    if show:
+        bokeh.plotting.show(hv.render(plot))
+        return None
+    return plot
