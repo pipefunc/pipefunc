@@ -1272,3 +1272,33 @@ def test_unhashable_defaults() -> None:
     # The problem should occur when using the default twice
     with pytest.raises(ValueError, match="Inconsistent default"):
         Pipeline([f, g])
+
+
+def test_update_renames_pipeline() -> None:
+    @pipefunc(output_name="c", renames={"a": "a1"})
+    def f(a, b):
+        return a, b
+
+    pipeline = Pipeline([f])
+    assert pipeline("c", a1="a1", b="b") == ("a1", "b")
+
+    pipeline.update_renames({"a1": "a2"}, update_from="current")
+    assert pipeline("c", a2="a2", b="b") == ("a2", "b")
+
+    pipeline.update_renames({"a2": "a3"}, update_from="current")
+    assert pipeline("c", a3="a3", b="b") == ("a3", "b")
+
+    pipeline.update_renames({"b": "b1"}, update_from="current")
+    assert pipeline("c", a3="a3", b1="b1") == ("a3", "b1")
+
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `a3`. These are not settable renames",
+    ):
+        pipeline.update_renames({"a3": "a4"}, update_from="original")
+
+    pipeline.update_renames({"a": "a5"}, update_from="original")
+    assert pipeline("c", a5="a5", b1="b1") == ("a5", "b1")
+
+    pipeline.update_renames({"a": "a6"}, update_from="original", overwrite=True)
+    assert pipeline("c", a6="a6", b="b") == ("a6", "b")

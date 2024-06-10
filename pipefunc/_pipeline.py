@@ -630,7 +630,7 @@ class Pipeline:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
-        depend on the updated defaults and updates their defaults as well.
+        that the defaults can be applied to.
 
         If `overwrite` is `False`, the new defaults will be added to the existing
         defaults. If `overwrite` is `True`, the existing defaults will be replaced
@@ -654,6 +654,47 @@ class Pipeline:
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
+            raise ValueError(msg)
+
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"] = "current",
+        overwrite: bool = False,
+    ) -> None:
+        """Update the renames for the pipeline.
+
+        Automatically traverses the pipeline graph to find all functions that
+        the renames can be applied to.
+
+        Parameters
+        ----------
+        renames
+            A dictionary mapping old parameter names to new parameter names.
+        update_from
+            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
+            or from the original parameter names (`PipeFunc.original_parameters`).
+        overwrite
+            Whether to overwrite the existing renames. If ``False``, the new
+            renames will be added to the existing renames.
+
+        """
+        unused = set(renames.keys())
+        for f in self.functions:
+            if update_from == "original":
+                update = {k: v for k, v in renames.items() if k in f.original_parameters}
+                unused -= set(update.keys())
+            else:
+                assert update_from == "current"
+                update = {
+                    f._inverse_renames.get(k, k): v for k, v in renames.items() if k in f.parameters
+                }
+                unused -= set(renames) & set(f.parameters)
+            f.update_renames(update, overwrite=overwrite)
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
 
     @functools.cached_property
