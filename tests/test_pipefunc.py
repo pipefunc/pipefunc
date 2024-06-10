@@ -856,6 +856,39 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a4=88, b=1) == 89
 
 
+def test_update_pipeline_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
+    def f(a=42, b=69):
+        return a + b
+
+    pipeline = Pipeline([f])
+    fp = pipeline.functions[0]
+
+    # Test initial parameters and defaults
+    assert fp.parameters == ("a1", "b")
+    assert fp.defaults == {"a1": 42, "b": 1}
+
+    # Update defaults
+    pipeline.update_defaults({"b": 2})
+    assert fp.defaults == {"a1": 42, "b": 2}
+
+    # Call function with updated defaults
+    assert pipeline(a1=3) == 5
+
+    # Overwrite defaults
+    pipeline.update_defaults({"a1": 1, "b": 3}, overwrite=True)
+    assert fp.defaults == {"a1": 1, "b": 3}
+    assert fp.parameters == ("a1", "b")
+
+    # Call function with new defaults
+    assert fp(a1=2) == 5
+    assert fp() == 4
+    assert fp(a1=2, b=3) == 5
+
+    with pytest.raises(ValueError, match="Unused keyword arguments"):
+        pipeline.update_defaults({"does_not_exist": 1})
+
+
 def test_validate_update_defaults_and_renames_and_bound() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):
