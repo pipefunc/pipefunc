@@ -624,6 +624,36 @@ class Pipeline:
         """
         return _traverse_graph(name, "successors", self.graph, self.node_mapping)
 
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Automatically traverses the pipeline graph to find all functions that
+        depend on the updated defaults and updates their defaults as well.
+
+        If `overwrite` is `False`, the new defaults will be added to the existing
+        defaults. If `overwrite` is `True`, the existing defaults will be replaced
+        with the new defaults.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If ``False``, the new
+            defaults will be added to the existing defaults.
+
+        """
+        unused = set(defaults.keys())
+        for f in self.functions:
+            update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
+            unused -= set(update.keys())
+            if overwrite or update:
+                f.update_defaults(update, overwrite=overwrite)
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
+            raise ValueError(msg)
+
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
