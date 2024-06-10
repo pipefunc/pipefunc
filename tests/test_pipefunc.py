@@ -1185,6 +1185,24 @@ def test_nested_pipefunc_with_resources() -> None:
     assert nf3.resources.memory == "3GB"
 
 
+def test_nest_all() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c + 1
+
+    pipeline = Pipeline([f, g])
+    assert pipeline("d", a=1, b=2) == 4
+    nested = pipeline.nest_funcs("*")
+    assert nested.output_name == ("c", "d")
+    assert nested(a=1, b=2) == (3, 4)
+    assert pipeline("d", a=1, b=2) == 4
+    assert len(pipeline.functions) == 1
+
+
 def test_missing_kw():
     @pipefunc(output_name="c")
     def f(a, b):
