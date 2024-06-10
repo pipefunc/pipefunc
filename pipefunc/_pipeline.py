@@ -111,6 +111,7 @@ class Pipeline:
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache
@@ -1339,22 +1340,42 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
+def _is_hashable(value: Any) -> bool:
+    try:
+        hash(value)
+    except TypeError:
+        return False
+    return True
+
+
 def _check_consistent_defaults(
     functions: list[PipeFunc],
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = defaultdict(set)
+    defaults_counter: dict[str, int] = defaultdict(int)
     for f in functions:
         for arg, default_value in f.defaults.items():
             if arg in f._bound or arg in output_to_func:
+                continue
+            defaults_counter[arg] += 1
+            if not _is_hashable(default_value):
+                if defaults_counter[arg] > 1:
+                    msg = (
+                        f"⚠️ Default value for argument '{arg}' is present in multiple functions"
+                        f" and is used {defaults_counter[arg]} times. Its value"
+                        " is not hashable. Pipefunc therefore cannot guarantee that the"
+                        " default value is consistent across functions!"
+                    )
+                    warnings.warn(msg, UserWarning, stacklevel=2)
                 continue
             arg_defaults[arg].add(default_value)
             if len(arg_defaults[arg]) > 1:
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function.",
+                    " the same default value or are set only for one function."
                 )
                 raise ValueError(msg)
 
