@@ -233,3 +233,4 @@ def test_combining_mapspecs() -> None:
     pipeline = Pipeline([electrostatics, charge])
     pipeline.nest_funcs({"electrostatics", "charge"}, new_output_name="charge")
     assert pipeline.mapspecs_as_strings == [expected]
+    assert len(pipeline.functions) == 1
