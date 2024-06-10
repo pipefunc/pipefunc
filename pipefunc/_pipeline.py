@@ -656,17 +656,25 @@ class Pipeline:
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
             raise ValueError(msg)
 
-    def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"],
+        overwrite: bool = False,
+    ) -> None:
         """Update the renames for the pipeline.
 
         Automatically traverses the pipeline graph to find all functions that
-        the renames can be applied to. Note that renames must be in terms of the
-        original parameter names, as defined in the function signature.
+        the renames can be applied to.
 
         Parameters
         ----------
         renames
             A dictionary mapping old parameter names to new parameter names.
+        update_from
+            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
+            or from the original parameter names (`PipeFunc.original_parameters`).
         overwrite
             Whether to overwrite the existing renames. If ``False``, the new
             renames will be added to the existing renames.
@@ -674,8 +682,15 @@ class Pipeline:
         """
         unused = set(renames.keys())
         for f in self.functions:
-            update = {k: v for k, v in renames.items() if k in f.original_parameters}
-            unused -= set(update.keys())
+            if update_from == "original":
+                update = {k: v for k, v in renames.items() if k in f.original_parameters}
+                unused -= set(update.keys())
+            else:
+                assert update_from == "current"
+                update = {
+                    f._inverse_renames.get(k, k): v for k, v in renames.items() if k in f.parameters
+                }
+                unused -= set(renames) & set(f.parameters)
             f.update_renames(update, overwrite=overwrite)
         if unused:
             unused_str = ", ".join(sorted(unused))
