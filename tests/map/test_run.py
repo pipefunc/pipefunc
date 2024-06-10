@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -1347,3 +1348,17 @@ def test_bound_with_mapspec() -> None:
 
     assert pipeline.functions[0].mapspec is None
     assert str(pipeline.functions[1].mapspec) == "b[i] -> y[i]"
+
+
+def test_map_func_exception():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):  # noqa: ARG001
+        msg = "Error"
+        raise ValueError(msg)
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Error occurred while executing function `f(x=1)`"),
+    ):
+        pipeline.map({"x": [1, 2, 3]}, None, parallel=False)

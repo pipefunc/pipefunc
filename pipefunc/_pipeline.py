@@ -1480,7 +1480,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         return func(**func_args)
     except Exception as e:
         handle_error(e, func, func_args)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _compute_cache_key(
