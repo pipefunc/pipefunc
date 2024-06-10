@@ -660,7 +660,7 @@ class Pipeline:
         self,
         renames: dict[str, str],
         *,
-        update_from: Literal["current", "original"],
+        update_from: Literal["current", "original"] = "current",
         overwrite: bool = False,
     ) -> None:
         """Update the renames for the pipeline.
