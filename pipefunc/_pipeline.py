@@ -16,7 +16,6 @@ import functools
 import inspect
 import time
 import warnings
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
@@ -111,6 +110,7 @@ class Pipeline:
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache
@@ -178,7 +178,7 @@ class Pipeline:
             maps to the output.
 
         """
-        if not isinstance(f, PipeFunc):
+        if not isinstance(f, PipeFunc) and callable(f):
             f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
@@ -192,7 +192,7 @@ class Pipeline:
             f.mapspec = mapspec
             f._validate_mapspec()
         if not isinstance(f, PipeFunc):
-            msg = f"`f` must be a PipeFunc, got {type(f)}"
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
         self.functions.append(f)
 
@@ -741,7 +741,7 @@ class Pipeline:
         """
         generations = list(nx.topological_generations(self.graph))
         if not generations:
-            return _Generations([], [])
+            return Generations([], [])
 
         assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
@@ -1339,22 +1339,31 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
+def _is_hashable(value: Any) -> bool:
+    try:
+        hash(value)
+    except TypeError:
+        return False
+    return True
+
+
 def _check_consistent_defaults(
     functions: list[PipeFunc],
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
-    arg_defaults = defaultdict(set)
+    arg_defaults = {}
     for f in functions:
         for arg, default_value in f.defaults.items():
             if arg in f._bound or arg in output_to_func:
                 continue
-            arg_defaults[arg].add(default_value)
-            if len(arg_defaults[arg]) > 1:
+            if arg not in arg_defaults:
+                arg_defaults[arg] = default_value
+            elif default_value != arg_defaults[arg]:
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function.",
+                    " the same default value or are set only for one function."
                 )
                 raise ValueError(msg)
 

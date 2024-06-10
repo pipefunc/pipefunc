@@ -1227,3 +1227,30 @@ def test_join_pipelines() -> None:
         match="Only `Pipeline` or `PipeFunc` instances can be joined",
     ):
         pipeline1 | g  # type: ignore[operator]
+
+
+def test_empty_pipeline() -> None:
+    pipeline = Pipeline([])
+    assert pipeline.output_to_func == {}
+    assert pipeline.topological_generations.root_args == []
+    assert pipeline.topological_generations.function_lists == []
+
+    with pytest.raises(TypeError, match="must be a `PipeFunc` or callable"):
+        pipeline.add(1)  # type: ignore[arg-type]
+
+
+def test_unhashable_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": []})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", defaults={"b": {}})
+    def g(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert pipeline.defaults == {"b": []}
+
+    # The problem should occur when using the default twice
+    with pytest.raises(ValueError, match="Inconsistent default"):
+        Pipeline([f, g])
