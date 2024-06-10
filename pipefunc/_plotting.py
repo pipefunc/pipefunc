@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import re
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc
 
 _empty = inspect.Parameter.empty
+MAX_LABEL_LENGTH = 20
 
 
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
@@ -30,6 +31,13 @@ def _get_graph_layout(graph: nx.DiGraph) -> dict:
             stacklevel=2,
         )
         return nx.spring_layout(graph)
+
+
+def _trim(s: Any, max_len: int = MAX_LABEL_LENGTH) -> str:
+    s = str(s)
+    if len(s) > max_len:
+        return s[: max_len - 3] + "..."
+    return s
 
 
 def visualize(  # noqa: PLR0912, PLR0915
@@ -144,7 +152,7 @@ def visualize(  # noqa: PLR0912, PLR0915
                 spec = next(i for i in b.mapspec.inputs if i.name == a)
                 inputs_mapspec[edge] = str(spec)
             elif default_value is not _empty:
-                inputs[edge] = f"{a}={default_value}"
+                inputs[edge] = f"{a}={_trim(default_value)}"
             else:
                 inputs[edge] = a
         elif isinstance(a, PipeFunc):
