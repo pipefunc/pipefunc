@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc._cache import LRUCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.resources import Resources
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
@@ -597,19 +598,25 @@ def test_drop_from_pipeline():
     assert len(pipeline.functions) == 3
     assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
 
+    pipeline.replace(f3, f4)
+    assert len(pipeline.functions) == 3
+    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f3}
+
     with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
         pipeline.drop()
 
 
 def test_used_variable():
-    @pipefunc(output_name="c")
+    @pipefunc(output_name="c", cache=True)
     def f1(a, b):
         return a + b
 
-    pipeline = Pipeline([f1], cache_type="lru")
-    pipeline("c", a=1, b=2)
+    pipeline = Pipeline([f1])  # automatically sets cache_type="lru" because of cache=True
+    assert isinstance(pipeline.cache, LRUCache)
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
+
+    pipeline("c", a=1, b=2)
 
     # Test regression with cache:
     def f(a):
