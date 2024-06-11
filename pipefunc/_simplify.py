@@ -69,22 +69,24 @@ def simplified_pipeline(
     all_inputs = {p for f in funcs for p in f.parameters}
     nested_funcs = [[base, *combine] for base, combine in sorted_nodes.items()]
     for i, to_combine in enumerate(nested_funcs):
-        # Get all outputs for functions to combine
-        current_outputs = [n for f in to_combine for n in at_least_tuple(f.output_name)]
-        # Get inputs to all functions except the current one
-        other_inputs = {
-            p for j, fs in enumerate(nested_funcs) if j != i for f in fs for p in f.parameters
-        } | all_inputs
-        outputs_for_others = set(current_outputs) & other_inputs
-        base = to_combine[0]
-        output_name = _output_name({*at_least_tuple(base.output_name), *outputs_for_others})
+        output_name = _output_name(i, nested_funcs, all_inputs)
         nested = NestedPipeFunc(to_combine, output_name=output_name)
         funcs.append(nested)
     return Pipeline(funcs)  # type: ignore[arg-type]
 
 
-def _output_name(names: set[str]) -> _OUTPUT_TYPE:
-    output_names = tuple(sorted(names))
+def _output_name(i: int, nested_funcs: list[list[PipeFunc]], all_inputs: set[str]) -> _OUTPUT_TYPE:
+    to_combine = nested_funcs[i]
+    # Get all outputs for functions to combine
+    current_outputs = {n for f in to_combine for n in at_least_tuple(f.output_name)}
+    # Get inputs to all functions except the current one
+    other_inputs = {
+        p for j, fs in enumerate(nested_funcs) if j != i for f in fs for p in f.parameters
+    } | all_inputs
+    outputs_for_others = current_outputs & other_inputs
+    base = to_combine[0]
+    output_name_set = {*at_least_tuple(base.output_name), *outputs_for_others}
+    output_names = tuple(sorted(output_name_set))
     return output_names[0] if len(output_names) == 1 else output_names
 
 
