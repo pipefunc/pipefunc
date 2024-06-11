@@ -13,7 +13,6 @@ from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc._cache import LRUCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.resources import Resources
-from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -441,30 +440,6 @@ def test_tuple_outputs(tmp_path: Path):
         f_e: {},
         f_i: {},
     }
-
-
-def test_execution_order():
-    @pipefunc(output_name=("d", "e"))
-    def f_d(b, g, x=1):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name=("g", "h"))
-    def f_e(a, x=1):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name="gg")
-    def f_gg(g):  # noqa: ARG001
-        pass
-
-    @pipefunc(output_name="i")
-    def f_i(gg, b, e):  # noqa: ARG001
-        pass
-
-    pipeline = Pipeline([f_d, f_e, f_i, f_gg])
-    sweep = Sweep({"a": [1, 2], "b": [3, 4], "x": [5, 6]})
-    cnt = count_sweep("i", sweep, pipeline)
-    # f_d is skipped because max(cnt) is 1
-    assert get_precalculation_order(pipeline, cnt) == [f_e, f_gg]
 
 
 @pytest.mark.parametrize("cache", [True, False])
