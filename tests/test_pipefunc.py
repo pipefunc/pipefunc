@@ -1329,3 +1329,30 @@ def test_set_debug_and_profile():
     pipeline.profile = True
     assert f.debug
     assert f.profile
+
+
+def test_simple_cache():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.raises(ValueError, match="Invalid cache type"):
+        Pipeline([f], cache_type="not_exist")
+    pipeline = Pipeline([f], cache_type="simple")
+    assert pipeline("c", a=1, b=2) == (1, 2)
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
+    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
+    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
+
+
+def test_hybrid_cache_lazy_warning():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.warns(UserWarning, match="Hybrid cache uses function evaluation"):
+        Pipeline([f], cache_type="hybrid", lazy=True)
