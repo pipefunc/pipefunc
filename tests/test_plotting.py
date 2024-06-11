@@ -70,6 +70,6 @@ def test_plot_with_mapspec(tmp_path: Path):
 
     pipeline = Pipeline([f, g])
     filename = tmp_path / "pipeline.png"
-    pipeline.visualize(filename=filename)
+    pipeline.visualize(filename=filename, color_combinable=True)
     assert filename.exists()
     pipeline.visualize_holoviews()
