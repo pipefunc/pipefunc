@@ -10,7 +10,6 @@ import itertools
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -356,32 +355,6 @@ def array_shape(x: npt.NDArray | list, key: str = "?") -> tuple[int, ...]:
         return (len(x),)
     msg = f"No array shape defined for `{key}` of type {type(x)}"
     raise TypeError(msg)
-
-
-def expected_mask(mapspec: MapSpec, inputs: dict[str, Any]) -> npt.NDArray[np.bool_]:
-    kwarg_shapes = {k: array_shape(v, k) for k, v in inputs.items()}
-    kwarg_masks = {k: array_mask(v) for k, v in inputs.items()}
-    map_shape, _ = mapspec.shape(kwarg_shapes)
-    map_size = np.prod(map_shape)
-
-    def is_masked(i: int) -> bool:
-        return any(kwarg_masks[k][v] for k, v in mapspec.input_keys(map_shape, i).items())
-
-    return np.array([is_masked(x) for x in range(map_size)]).reshape(map_shape)
-
-
-def num_tasks_from_mask(mask: npt.NDArray[np.bool_]) -> int:
-    """Return the number of tasks that will be executed given a mask."""
-    return np.sum(~mask)  # type: ignore[return-value]
-
-
-def num_tasks(kwargs: dict[str, Any], mapspec: str | MapSpec) -> int:
-    """Return the number of tasks."""
-    if isinstance(mapspec, str):
-        mapspec = MapSpec.from_string(mapspec)
-    mapped_kwargs = {k: v for k, v in kwargs.items() if k in mapspec.input_names}
-    mask = expected_mask(mapspec, mapped_kwargs)
-    return num_tasks_from_mask(mask)
 
 
 def validate_consistent_axes(mapspecs: list[MapSpec]) -> None:

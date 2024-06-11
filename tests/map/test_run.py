@@ -73,6 +73,7 @@ def test_simple(storage, tmp_path: Path) -> None:
         pipeline.split_disconnected()
     assert results["y"].store is not None
     assert isinstance(results["y"].store.parallelizable, bool)
+    assert results["y"].store.has_index(0)
 
 
 def test_simple_2_dim_array(tmp_path: Path) -> None:
@@ -534,29 +535,34 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
         counters["f"] += 1
         return x + y
 
-    @pipefunc(output_name="sum")
+    @pipefunc(output_name="sum_")
     def g(z: np.ndarray) -> int:
         counters["g"] += 1
         return sum(z)
 
-    pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
+    @pipefunc(output_name=("r1", "r2"))
+    def h(sum_: np.ndarray) -> tuple[int, int]:
+        return int(-sum_), int(sum_)  # make to int for mypy
+
+    pipeline = Pipeline([(f, "x[i] -> z[i]"), g, h])
     inputs = {"x": [1, 2, 3]}
 
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
-    assert results["sum"].output == 9
-    assert results["sum"].output_name == "sum"
+    assert results["sum_"].output == 9
+    assert results["r1"].output == -9
+    assert results["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
     results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
-    assert results2["sum"].output == 9
-    assert results2["sum"].output_name == "sum"
+    assert results2["sum_"].output == 9
+    assert results2["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
     results3 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
-    assert results3["sum"].output == 9
-    assert results3["sum"].output_name == "sum"
+    assert results3["sum_"].output == 9
+    assert results3["sum_"].output_name == "sum_"
     assert counters["f"] == 6
     assert counters["g"] == 2
     load_xarray_dataset(run_folder=tmp_path)
@@ -1351,14 +1357,21 @@ def test_bound_with_mapspec() -> None:
 
 
 def test_map_func_exception():
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    @pipefunc(output_name="y")
     def f(x):  # noqa: ARG001
         msg = "Error"
         raise ValueError(msg)
+
+    pipeline = Pipeline([(f, "x[i] -> y[i]")])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Error occurred while executing function `f(x=1)`"),
+    ):
+        pipeline.map({"x": [1, 2, 3]}, None, parallel=False)
 
     pipeline = Pipeline([f])
     with pytest.raises(
         ValueError,
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
-        pipeline.map({"x": [1, 2, 3]}, None, parallel=False)
+        pipeline.map({"x": 1}, None, parallel=False)
