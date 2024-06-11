@@ -217,7 +217,7 @@ class Pipeline:
 
         """
         if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or `output_name` should be provided."
+            msg = "Either `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
@@ -1412,14 +1412,6 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _is_hashable(value: Any) -> bool:
-    try:
-        hash(value)
-    except TypeError:
-        return False
-    return True
-
-
 def _check_consistent_defaults(
     functions: list[PipeFunc],
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
@@ -1480,7 +1472,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         return func(**func_args)
     except Exception as e:
         handle_error(e, func, func_args)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _compute_cache_key(

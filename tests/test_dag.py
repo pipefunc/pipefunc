@@ -155,3 +155,15 @@ def test_running_dag_pipeline():
         "f2": [({"b": 2, "c": 3, "x": 1}, 6)],
         "f3": [({"c": 3, "d": 6, "x": 1}, 18)],
     }
+
+
+def test_evaluate_lazy_set():
+    def func1(x):
+        return x + 1
+
+    def func2(z):
+        return sum(z)
+
+    lazy_func1 = _LazyFunction(func1, args=(1,))
+    lazy_func2 = _LazyFunction(func2, args=({lazy_func1, lazy_func1},))
+    assert lazy_func2.evaluate() == 2

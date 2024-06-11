@@ -102,11 +102,16 @@ class FileArray(StorageBase):
         """Yield all the filenames that constitute the data in this array."""
         return (self._key_to_file(x) for x in _iterate_shape_indices(self.shape))
 
-    def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
+    def _slice_indices(
+        self,
+        key: tuple[int | slice, ...],
+        *,
+        for_dump: bool = False,
+    ) -> list[range]:
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0
-        normalized_key = self._normalize_key(key)
+        normalized_key = self._normalize_key(key, for_dump=for_dump)
         for k, m in zip(normalized_key, self.shape_mask):
             shape = self.shape if m else self.internal_shape
             index = shape_index if m else internal_shape_index
@@ -253,7 +258,7 @@ class FileArray(StorageBase):
             dump(value, self._key_to_file(key))  # type: ignore[arg-type]
             return
 
-        for index in itertools.product(*self._slice_indices(key)):
+        for index in itertools.product(*self._slice_indices(key, for_dump=True)):
             file = self._key_to_file(index)
             dump(value, file)
 

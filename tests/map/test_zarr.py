@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import zarr
 
-from pipefunc.map.zarr import ZarrFileArray, _select_by_mask
+from pipefunc.map.zarr import CloudPickleCodec, ZarrFileArray, _select_by_mask
 
 
 def test_zarr_array_init():
@@ -33,6 +33,9 @@ def test_zarr_array_getitem():
     assert arr[1, 2] == {"b": 2}
     assert arr[0, 1] is np.ma.masked
     assert arr[0:1, 0] == {"a": 1}
+    assert arr.has_index(0)
+    assert not arr.has_index(3)
+    assert arr.parallelizable
 
 
 def test_zarr_array_to_array():
@@ -265,3 +268,18 @@ def test_zarr_array_set_and_get_slice_with_internal_shape():
     data2 = np.ones(internal_shape)
     arr.dump((1, slice(1, 2)), data2)
     assert np.array_equal(arr[1, 1], data2)
+
+
+def test_cloudpickle_codec():
+    codec = CloudPickleCodec()
+    data = {"a": 1, "b": 2}
+    encoded = codec.encode(data)
+    decoded = codec.decode(encoded)
+    assert data == decoded
+
+    data = np.array(["foo", "bar", "baz"], dtype="object")
+    encoded_data = codec.encode(data)
+    out = np.empty(data.shape, dtype=data.dtype)
+    decoded_data = codec.decode(encoded_data, out=out)
+    assert decoded_data is out
+    assert np.array_equal(decoded_data, data)

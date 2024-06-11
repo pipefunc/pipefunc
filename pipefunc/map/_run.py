@@ -342,7 +342,8 @@ def _run_iteration(
         return func(**selected)
     except Exception as e:
         handle_error(e, func, selected)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _run_iteration_and_process(
@@ -554,7 +555,8 @@ def _submit_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> 
         return func(**kwargs)
     except Exception as e:
         handle_error(e, func, kwargs)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _maybe_load_file_array(x: Any) -> Any:

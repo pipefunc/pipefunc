@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias, Union
 
 import networkx as nx
 
+from pipefunc._pipefunc import PipeFunc
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
@@ -14,7 +15,6 @@ if TYPE_CHECKING:
 
     import networkx as nx
 
-    from pipefunc._pipefunc import PipeFunc
     from pipefunc._pipeline import Pipeline
 
 
@@ -112,7 +112,7 @@ def _identify_combinable_nodes(
         funcs = set()
         i = 0
         for node in graph.predecessors(head):
-            if isinstance(node, (tuple, str)):  # node is root_arg
+            if not isinstance(node, PipeFunc):
                 continue
             if node.mapspec is not None:
                 msg = "`PipeFunc`s with `mapspec` cannot be simplified currently."

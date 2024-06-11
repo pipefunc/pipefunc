@@ -24,7 +24,7 @@ MAX_LABEL_LENGTH = 20
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
     try:
         return graphviz_layout(graph, prog="dot")
-    except ImportError:
+    except ImportError:  # pragma: no cover
         warnings.warn(
             "Graphviz is not installed. Using spring layout instead.",
             ImportWarning,
@@ -258,7 +258,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         text_color="black",
         bgcolor="white",
     )
-    if show:
+    if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None
     return plot

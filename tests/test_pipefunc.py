@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc._cache import LRUCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.resources import Resources
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
@@ -70,6 +71,8 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested(a=2, b=3) == (5, 15)
     pipeline = Pipeline([f_nested, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
+
+    assert str(pipeline).startswith("Pipeline:")
 
 
 def test_pipeline_and_all_arg_combinations_lazy() -> None:
@@ -597,16 +600,25 @@ def test_drop_from_pipeline():
     assert len(pipeline.functions) == 3
     assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
 
+    pipeline.replace(f3, f4)
+    assert len(pipeline.functions) == 3
+    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f3}
+
+    with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
+        pipeline.drop()
+
 
 def test_used_variable():
-    @pipefunc(output_name="c")
+    @pipefunc(output_name="c", cache=True)
     def f1(a, b):
         return a + b
 
-    pipeline = Pipeline([f1], cache_type="lru")
-    pipeline("c", a=1, b=2)
+    pipeline = Pipeline([f1])  # automatically sets cache_type="lru" because of cache=True
+    assert isinstance(pipeline.cache, LRUCache)
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
+
+    pipeline("c", a=1, b=2)
 
     # Test regression with cache:
     def f(a):
@@ -990,6 +1002,7 @@ def test_subpipeline():
 
     partial = pipeline.subpipeline(output_names=["h"])
     assert partial.topological_generations.root_args == ["a", "b"]
+    assert partial.root_nodes == ["a", "b"]
 
     partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
     assert partial.topological_generations.root_args == ["c"]
@@ -1302,3 +1315,59 @@ def test_update_renames_pipeline() -> None:
 
     pipeline.update_renames({"a": "a6"}, update_from="original", overwrite=True)
     assert pipeline("c", a6="a6", b="b") == ("a6", "b")
+
+
+def test_set_debug_and_profile():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert not f.debug
+    assert not f.profile
+    pipeline.debug = True
+    pipeline.profile = True
+    assert f.debug
+    assert f.profile
+
+
+def test_simple_cache():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.raises(ValueError, match="Invalid cache type"):
+        Pipeline([f], cache_type="not_exist")
+    pipeline = Pipeline([f], cache_type="simple")
+    assert pipeline("c", a=1, b=2) == (1, 2)
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
+    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
+    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
+
+
+def test_hybrid_cache_lazy_warning():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.warns(UserWarning, match="Hybrid cache uses function evaluation"):
+        Pipeline([f], cache_type="hybrid", lazy=True)
+
+
+def test_cache_non_root_args():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(c, b):
+        return c + b
+
+    pipeline = Pipeline([f, g], cache_type="simple")
+    # Won't populate cache because `c` is not a root argument
+    assert pipeline("d", c=1, b=2) == 3
+    assert pipeline.cache.cache == {}

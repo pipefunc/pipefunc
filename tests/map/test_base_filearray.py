@@ -489,6 +489,18 @@ def test_list_or_arrays(array_type) -> None:
     assert r.dtype == object
     assert isinstance(r[0], list)
     assert np.array_equal(r[0], value)
+    assert arr.has_index(0)
+
+
+def test_with_internal_shape_list(array_type) -> None:
+    shape = (1, 1)
+    internal_shape = (2,)
+    mask = (True, True, False)
+    arr = array_type(shape=shape, internal_shape=internal_shape, shape_mask=mask)
+    value = [1, 2]
+    arr.dump((0, slice(None)), value)
+    assert arr[0, 0, 0] == 1
+    assert arr[0, 0, 1] == 2
 
 
 def test_compare_equal(tmp_path: Path) -> None:
