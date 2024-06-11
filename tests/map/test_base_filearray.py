@@ -489,6 +489,7 @@ def test_list_or_arrays(array_type) -> None:
     assert r.dtype == object
     assert isinstance(r[0], list)
     assert np.array_equal(r[0], value)
+    assert arr.has_index(0)
 
 
 def test_with_internal_shape_list(array_type) -> None:
