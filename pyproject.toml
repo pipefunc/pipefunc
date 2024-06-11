@@ -113,7 +113,7 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = ["pipefunc/_plotting.py"]
+omit = []
 
 [tool.ruff]
 line-length = 100
