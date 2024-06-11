@@ -1313,7 +1313,13 @@ def test_update_renames_pipeline() -> None:
         ValueError,
         match="Unused keyword arguments: `a3`. These are not settable renames",
     ):
-        pipeline.update_renames({"a3": "a4"}, update_from="original")
+        pipeline.update_renames({"a3": "foo"}, update_from="original")
+
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `a`. These are not settable renames",
+    ):
+        pipeline.update_renames({"a": "foo"}, update_from="current")
 
     pipeline.update_renames({"a": "a5"}, update_from="original")
     assert pipeline("c", a5="a5", b1="b1") == ("a5", "b1")
