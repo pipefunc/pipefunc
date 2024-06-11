@@ -1412,14 +1412,6 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _is_hashable(value: Any) -> bool:
-    try:
-        hash(value)
-    except TypeError:
-        return False
-    return True
-
-
 def _check_consistent_defaults(
     functions: list[PipeFunc],
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],

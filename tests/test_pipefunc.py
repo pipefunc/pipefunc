@@ -72,6 +72,8 @@ def test_pipeline_and_all_arg_combinations() -> None:
     pipeline = Pipeline([f_nested, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
 
+    assert str(pipeline).startswith("Pipeline:")
+
 
 def test_pipeline_and_all_arg_combinations_lazy() -> None:
     @pipefunc(output_name="c")
@@ -1000,6 +1002,7 @@ def test_subpipeline():
 
     partial = pipeline.subpipeline(output_names=["h"])
     assert partial.topological_generations.root_args == ["a", "b"]
+    assert partial.root_nodes == ["a", "b"]
 
     partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
     assert partial.topological_generations.root_args == ["c"]
