@@ -691,7 +691,7 @@ class Pipeline:
                     f._inverse_renames.get(k, k): v for k, v in renames.items() if k in f.parameters
                 }
                 unused -= set(renames) & set(f.parameters)
-            f.update_renames(update, overwrite=overwrite)
+            f.update_renames(update, overwrite=overwrite, update_from="original")
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
