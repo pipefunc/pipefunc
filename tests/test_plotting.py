@@ -56,7 +56,7 @@ def test_plot_with_defaults_and_bound():
         return b, c, x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize()
+    pipeline.visualize(color_combinable=True)
 
 
 def test_plot_with_mapspec(tmp_path: Path):
@@ -70,6 +70,6 @@ def test_plot_with_mapspec(tmp_path: Path):
 
     pipeline = Pipeline([f, g])
     filename = tmp_path / "pipeline.png"
-    pipeline.visualize(filename=filename, color_combinable=True)
+    pipeline.visualize(filename=filename)
     assert filename.exists()
     pipeline.visualize_holoviews()
