@@ -14,7 +14,7 @@ import functools
 import inspect
 import os
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
 import cloudpickle
 
@@ -232,22 +232,40 @@ class PipeFunc(Generic[T]):
             self._defaults = dict(self._defaults, **defaults)
         clear_cached_properties(self, PipeFunc)
 
-    def update_renames(self, renames: dict[str, str], *, overwrite: bool = False) -> None:
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"] = "current",
+        overwrite: bool = False,
+    ) -> None:
         """Update renames to function arguments for the wrapped function.
-
-        Note that renames *must* be in terms of the original argument names.
 
         Parameters
         ----------
         renames
             A dictionary of renames for the function arguments.
+        update_from
+            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
+            or from the original parameter names (`PipeFunc.original_parameters`).
         overwrite
             Whether to overwrite the existing renames. If ``False``, the new
             renames will be added to the existing renames.
 
         """
-        self._validate_update(renames, "renames", self.original_parameters)  # type: ignore[arg-type]
-        old_inverse = self._inverse_renames
+        assert update_from in ("current", "original")
+        self._validate_update(
+            renames,
+            "renames",
+            self.parameters if update_from == "current" else self.original_parameters.keys(),  # type: ignore[arg-type]
+        )
+        if update_from == "current":
+            renames = {
+                self._inverse_renames.get(k, k): v
+                for k, v in renames.items()
+                if k in self.parameters
+            }
+        old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
         if overwrite:
             self._renames = renames.copy()

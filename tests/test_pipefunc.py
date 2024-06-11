@@ -840,7 +840,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a1=2, b=3) == 5
 
     # Update renames
-    f.update_renames({"a": "a2"})
+    f.update_renames({"a": "a2"}, update_from="original")
     assert f.renames == {"a": "a2"}
     assert f.parameters == ("a2", "b")
 
@@ -849,7 +849,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(b=0) == 1
 
     # Overwrite renames
-    f.update_renames({"a": "a3"}, overwrite=True)
+    f.update_renames({"a": "a3"}, overwrite=True, update_from="original")
     assert f.parameters == ("a3", "b")
 
     # Call function with new renames
@@ -862,10 +862,15 @@ def test_update_defaults_and_renames_and_bound() -> None:
     f.update_bound({"a3": "yolo", "b": "swag"})
     assert f(a3=88, b=1) == "yoloswag"
     assert f.bound == {"a3": "yolo", "b": "swag"}
-    f.update_renames({"a": "a4"})
+    f.update_renames({"a": "a4"}, update_from="original")
     assert f.bound == {"a4": "yolo", "b": "swag"}
     f.update_bound({}, overwrite=True)
     assert f(a4=88, b=1) == 89
+
+    f.update_renames({"a4": "a5"}, update_from="current")
+    assert f(a5=88, b=1) == 89
+    f.update_renames({"b": "b1"}, update_from="current")
+    assert f.renames == {"a": "a5", "b": "b1"}
 
 
 def test_update_pipeline_defaults() -> None:
@@ -909,7 +914,7 @@ def test_validate_update_defaults_and_renames_and_bound() -> None:
     with pytest.raises(ValueError, match="The allowed arguments are"):
         f.update_defaults({"does_not_exist": 1})
     with pytest.raises(ValueError, match="The allowed arguments are"):
-        f.update_renames({"does_not_exist": "1"})
+        f.update_renames({"does_not_exist": "1"}, update_from="original")
     with pytest.raises(ValueError, match="The allowed arguments are"):
         f.update_bound({"does_not_exist": 1})
 
@@ -933,9 +938,9 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
 
     # Update defaults and renames within pipeline
     f.update_defaults({"b": 3})
-    f.update_renames({"a": "a2"})
+    f.update_renames({"a": "a2"}, update_from="original")
     g.update_defaults({"c": 4})
-    g.update_renames({"d": "d2"})
+    g.update_renames({"d": "d2"}, update_from="original")
 
     # Test updated pipeline parameters and defaults
     assert f.parameters == ("a2", "b")
@@ -1130,7 +1135,7 @@ def test_nested_func_renames_defaults_and_bound() -> None:
     )
 
     assert nf.renames == {}
-    nf.update_renames({"a": "a1", "b": "b1"})
+    nf.update_renames({"a": "a1", "b": "b1"}, update_from="original")
     assert nf.renames == {"a": "a1", "b": "b1"}
     assert nf(a1=1, b1=2) == 3
     assert nf(a1=1) == 100
@@ -1308,7 +1313,13 @@ def test_update_renames_pipeline() -> None:
         ValueError,
         match="Unused keyword arguments: `a3`. These are not settable renames",
     ):
-        pipeline.update_renames({"a3": "a4"}, update_from="original")
+        pipeline.update_renames({"a3": "foo"}, update_from="original")
+
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `a`. These are not settable renames",
+    ):
+        pipeline.update_renames({"a": "foo"}, update_from="current")
 
     pipeline.update_renames({"a": "a5"}, update_from="original")
     assert pipeline("c", a5="a5", b1="b1") == ("a5", "b1")
