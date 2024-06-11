@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._simplify import _combine_nodes, _get_signature, _identify_combinable_nodes
+from pipefunc._simplify import _combine_nodes, _identify_combinable_nodes
 
 
 def test_identify_combinable_nodes():
@@ -26,16 +26,8 @@ def test_identify_combinable_nodes():
         pass
 
     pipeline = Pipeline([f_d, f_e, f_i, f_gg])
-    combinable_nodes = _identify_combinable_nodes(
-        pipeline.output_to_func["i"],
-        pipeline.graph,
-        pipeline.all_root_args,
-        conservatively_combine=True,
-    )
-    assert combinable_nodes == {f_gg: {f_e}}
-    sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
-    assert sig_in == {f_gg: {"a", "x"}}
-    assert sig_out == {f_gg: {"gg", "h", "g"}}
+
+    # `conservatively_combine=False`
     combinable_nodes = _identify_combinable_nodes(
         pipeline.output_to_func["i"],
         pipeline.graph,
@@ -43,9 +35,27 @@ def test_identify_combinable_nodes():
         conservatively_combine=False,
     )
     assert combinable_nodes == {f_gg: {f_e}, f_i: {f_d}}
-    sig_in, sig_out = _get_signature(combinable_nodes, pipeline.graph)
-    assert sig_in == {f_gg: {"a", "x"}, f_i: {"g", "b", "gg", "x"}}
-    assert sig_out == {f_gg: {"gg", "h", "g"}, f_i: {"d", "i"}}
+    simple = pipeline.simplified_pipeline(conservatively_combine=False)
+    assert len(simple.functions) == 2
+    assert repr(simple.functions[0]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_gg), PipeFunc(f_e)])"
+    assert repr(simple.functions[1]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_i), PipeFunc(f_d)])"
+    assert simple.functions[0].output_name == "gg"
+    assert simple.functions[1].output_name == "i"
+
+    # `conservatively_combine=True`
+    combinable_nodes = _identify_combinable_nodes(
+        pipeline.output_to_func["i"],
+        pipeline.graph,
+        pipeline.all_root_args,
+        conservatively_combine=True,
+    )
+    assert combinable_nodes == {f_gg: {f_e}}
+    simple = pipeline.simplified_pipeline(conservatively_combine=True)
+    assert len(simple.functions) == 3
+    assert repr(simple.functions[0]) == "PipeFunc(f_d)"
+    assert repr(simple.functions[1]) == "PipeFunc(f_i)"
+    assert repr(simple.functions[2]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_gg), PipeFunc(f_e)])"
+    assert simple.functions[2].output_name == "gg"
 
 
 def test_conservatively_combine():
@@ -76,16 +86,11 @@ def test_conservatively_combine():
     assert combinable_nodes_true == {}
 
     # Test simplified_pipeline with conservatively_combine=True
-    simplified_pipeline_true = pipeline.simplified_pipeline(
-        "z",
-        conservatively_combine=True,
-    )
-    simplified_functions_true = simplified_pipeline_true.functions
-    assert len(simplified_functions_true) == 3
-    function_names_true = [f.__name__ for f in simplified_functions_true]
-    assert "f1" in function_names_true
-    assert "f2" in function_names_true
-    assert "f3" in function_names_true
+    with pytest.raises(ValueError, match="No combinable nodes found"):
+        _simplified_pipeline_true = pipeline.simplified_pipeline(
+            "z",
+            conservatively_combine=True,
+        )
 
     # Test with conservatively_combine=False
     combinable_nodes_false = _identify_combinable_nodes(
@@ -105,19 +110,18 @@ def test_conservatively_combine():
     assert len(simplified_functions_false) == 2
     function_names_false = [f.__name__ for f in simplified_functions_false]
     assert "f1" in function_names_false
-    assert "combined_f3" in function_names_false
+    assert "NestedPipeFunc_z" in function_names_false
 
     # Check that the combined function has the expected input and output arguments
-    combined_f3 = next(f for f in simplified_functions_false if f.__name__ == "combined_f3")
+    combined_f3 = next(f for f in simplified_functions_false if f.__name__ == "NestedPipeFunc_z")
     assert combined_f3.parameters == ("b", "x")
     assert combined_f3.output_name == "z"
 
     # Check that the simplified pipeline produces the same output as the original pipeline
     input_data = {"a": 2, "b": 3}
     original_output = pipeline("z", **input_data)
-    simplified_output_true = simplified_pipeline_true("z", **input_data)
     simplified_output_false = simplified_pipeline_false("z", **input_data)
-    assert original_output == simplified_output_true == simplified_output_false
+    assert original_output == simplified_output_false
 
     assert pipeline._func_node_colors() == ["C1", "C0", "C0"]
 
@@ -156,10 +160,6 @@ def test_identify_combinable_nodes2():
     simplified_combinable_nodes = _combine_nodes(combinable_nodes)
     assert simplified_combinable_nodes == expected
 
-    sig_in, sig_out = _get_signature(simplified_combinable_nodes, pipeline.graph)
-    assert sig_in == {m["f6"]: {"a", "b", "c", "d"}}
-    assert sig_out == {m["f6"]: {"f6"}}
-
     # Test simplified_pipeline
     simplified_pipeline = pipeline.simplified_pipeline()
     assert (
@@ -175,11 +175,11 @@ def test_identify_combinable_nodes2():
     # Check that the simplified pipeline has the expected function names
     function_names = [f.__name__ for f in simplified_functions]
     assert "f2" in function_names
-    assert "combined_f6" in function_names
+    assert "NestedPipeFunc_f6" in function_names
     assert "f7" in function_names
 
     # Check that the combined function has the expected input and output arguments
-    combined_f6 = next(f for f in simplified_functions if f.__name__ == "combined_f6")
+    combined_f6 = next(f for f in simplified_functions if f.__name__ == "NestedPipeFunc_f6")
     assert combined_f6.parameters == ("a", "b", "c", "d")
     assert combined_f6.output_name == "f6"
 
