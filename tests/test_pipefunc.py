@@ -1371,3 +1371,21 @@ def test_cache_non_root_args():
     # Won't populate cache because `c` is not a root argument
     assert pipeline("d", c=1, b=2) == 3
     assert pipeline.cache.cache == {}
+
+
+def test_axis_in_root_args():
+    # Test reaches the `output_name in visited` condition
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
+    def g(a, c):
+        return a + c
+
+    @pipefunc(output_name="e", mapspec="c[i], d[i] -> e[i]")
+    def h(c, d):
+        return c + d
+
+    pipeline = Pipeline([f, g, h])
+    assert pipeline.independent_axes_in_mapspecs("e") == {"i"}
