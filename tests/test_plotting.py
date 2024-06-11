@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import matplotlib.pyplot as plt
 import pytest
 
 from pipefunc import Pipeline, pipefunc
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
@@ -48,8 +52,23 @@ def test_plot_with_defaults_and_bound():
         return a, b, x
 
     @pipefunc("d")
-    def g(b, c, x=1):
+    def g(b, c, x="1" * 100):  # x is a long string that should be trimmed
         return b, c, x
 
     pipeline = Pipeline([f, g])
     pipeline.visualize()
+
+
+def test_plot_with_mapspec(tmp_path: Path):
+    @pipefunc("c", mapspec="a[i] -> c[i]")
+    def f(a, b, x):
+        return a, b, x
+
+    @pipefunc("d")
+    def g(b, c, x):
+        return b, c, x
+
+    pipeline = Pipeline([f, g])
+    filename = tmp_path / "pipeline.png"
+    pipeline.visualize(filename=filename)
+    assert filename.exists()
