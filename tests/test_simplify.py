@@ -39,7 +39,7 @@ def test_identify_combinable_nodes():
     assert len(simple.functions) == 2
     assert repr(simple.functions[0]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_gg), PipeFunc(f_e)])"
     assert repr(simple.functions[1]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_i), PipeFunc(f_d)])"
-    assert simple.functions[0].output_name == "gg"
+    assert simple.functions[0].output_name == ("g", "gg")
     assert simple.functions[1].output_name == "i"
 
     # `conservatively_combine=True`
@@ -55,7 +55,8 @@ def test_identify_combinable_nodes():
     assert repr(simple.functions[0]) == "PipeFunc(f_d)"
     assert repr(simple.functions[1]) == "PipeFunc(f_i)"
     assert repr(simple.functions[2]) == "NestedPipeFunc(pipefuncs=[PipeFunc(f_gg), PipeFunc(f_e)])"
-    assert simple.functions[2].output_name == "gg"
+    assert simple.functions[1].output_name == "i"
+    assert simple.functions[2].output_name == ("g", "gg")
 
 
 def test_conservatively_combine():
