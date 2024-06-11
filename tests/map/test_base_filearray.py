@@ -497,7 +497,7 @@ def test_with_internal_shape_list(array_type) -> None:
     mask = (True, True, False)
     arr = array_type(shape=shape, internal_shape=internal_shape, shape_mask=mask)
     value = [1, 2]
-    arr.dump((0, 0), value)
+    arr.dump((0, slice(None)), value)
     assert arr[0, 0, 0] == 1
     assert arr[0, 0, 1] == 2
 
