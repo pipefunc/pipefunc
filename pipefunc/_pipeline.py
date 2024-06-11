@@ -682,16 +682,14 @@ class Pipeline:
         """
         unused = set(renames.keys())
         for f in self.functions:
+            parameters = f.parameters if update_from == "current" else f.original_parameters
+            update = {k: v for k, v in renames.items() if k in parameters}
             if update_from == "original":
-                update = {k: v for k, v in renames.items() if k in f.original_parameters}
                 unused -= set(update.keys())
             else:
                 assert update_from == "current"
-                update = {
-                    f._inverse_renames.get(k, k): v for k, v in renames.items() if k in f.parameters
-                }
-                unused -= set(renames) & set(f.parameters)
-            f.update_renames(update, overwrite=overwrite, update_from="original")
+                unused -= set(update) & set(f.parameters)
+            f.update_renames(update, overwrite=overwrite, update_from=update_from)
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
