@@ -73,3 +73,17 @@ def test_plot_with_mapspec(tmp_path: Path):
     pipeline.visualize(filename=filename)
     assert filename.exists()
     pipeline.visualize_holoviews()
+
+
+def test_plot_nested_func():
+    @pipefunc("c", bound={"x": 2})
+    def f(a, b, x):
+        return a, b, x
+
+    @pipefunc("d")
+    def g(b, c, x="1" * 100):  # x is a long string that should be trimmed
+        return b, c, x
+
+    pipeline = Pipeline([f, g])
+    pipeline.nest_funcs("*")
+    pipeline.visualize()
