@@ -599,6 +599,7 @@ def _run_and_process_generation(
             run_info.shape_masks,
             store,
             run_folder,
+            lazy,
         )
         if func.mapspec and func.mapspec.inputs:
             args = _prepare_submit_map_spec(
