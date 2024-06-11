@@ -1,14 +1,15 @@
-"""Provides functions to create adaptive learners for a pipeline."""
+"""Provides `adaptive` integration for `pipefunc`."""
 
 from __future__ import annotations
 
 import functools
+from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner
+from adaptive import SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -24,7 +25,7 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo, map_shapes
+from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -34,10 +35,70 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
+    from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
+    from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+
+
+class LearnerPipeFunc(NamedTuple):
+    """A tuple with `~adaptive.SequenceLearner` and `~pipefunc.PipeFunc`."""
+
+    learner: SequenceLearner
+    pipefunc: PipeFunc
+
+
+class AxisIndex(NamedTuple):
+    """A named tuple to store the axis and index for a fixed axis."""
+
+    axis: str
+    idx: int | slice  # not called `index` to avoid shadowing the built-in
+
+
+LearnersDictType: TypeAlias = UserDict[tuple[AxisIndex, ...] | None, list[list[LearnerPipeFunc]]]
+
+
+class LearnersDict(LearnersDictType):
+    """A dictionary of adaptive learners for a pipeline as returned by `create_learners`."""
+
+    def __init__(self, learners_dict: LearnersDictType | None = None) -> None:
+        """Create a dictionary of adaptive learners for a pipeline."""
+        super().__init__(learners_dict or {})
+
+    def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
+        """Flatten the learners into a dictionary with the output names as keys."""
+        flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
+        for learners_lists in self.data.values():
+            for learners in learners_lists:
+                for learner_with_pipefunc in learners:
+                    output_name = learner_with_pipefunc.pipefunc.output_name
+                    flat_learners.setdefault(output_name, []).append(learner_with_pipefunc.learner)
+        return flat_learners
+
+    def simple_run(self) -> None:
+        """Run all the learners in the dictionary in order using `adaptive.runner.simple`."""
+        for learner_list in self.flatten().values():
+            for learner in learner_list:
+                runner.simple(learner)
+
+    def to_slurm_run(
+        self,
+        run_folder: str | Path,
+        default_resources: dict | Resources | None = None,
+        *,
+        ignore_resources: bool = False,
+    ) -> AdaptiveSchedulerDetails:
+        """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
+        from pipefunc.map.adaptive_scheduler import slurm_run_setup
+
+        return slurm_run_setup(
+            self,
+            run_folder,
+            default_resources,
+            ignore_resources=ignore_resources,
+        )
 
 
 def create_learners(
@@ -51,17 +112,30 @@ def create_learners(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     split_independent_axes: bool = False,
-) -> dict[
-    tuple[tuple[str, int | slice], ...] | None,
-    list[dict[_OUTPUT_TYPE, SequenceLearner]],
-]:
+) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
-    Creates a learner for each function node in the graph. All learners
-    in the values of the outer dictionaries are fully independent of each
-    other and can be executed in parallel. The lists of dictionaries of learners
-    need to be executed in order. All the learners in the same dictionary are
-    independent of each other and can be executed in parallel.
+    Creates learner(s) for each function node in the pipeline graph. The number of learners
+    created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
+
+    - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
+      is created for each function node.
+    - If `split_independent_axes` is `True`, multiple learners are created for each function
+      node, corresponding to different combinations of the independent axes in the pipeline.
+
+    Returns a dictionary where the keys represent specific combinations of indices for the
+    independent axes, and the values are lists of lists of learners:
+
+    - The outer lists represent different stages or generations of the pipeline, where the
+      learners in each stage depend on the outputs of the learners in the previous stage.
+    - The inner lists contain learners that can be executed independently within each stage.
+
+    When `split_independent_axes` is `True`, each key in the dictionary corresponds to a
+    different combination of indices for the independent axes, allowing for parallel
+    execution across different subsets of the input data.
+
+    If `fixed_indices` is `None` and `split_independent_axes` is `False`, the only key in
+    the dictionary is `None`, indicating that all indices are being processed together.
 
     Parameters
     ----------
@@ -79,7 +153,7 @@ def create_learners(
     return_output
         Whether to return the output of the function in the learner.
     cleanup
-        Whether to clean up the ``run_folder```.
+        Whether to clean up the ``run_folder``.
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
@@ -87,12 +161,17 @@ def create_learners(
         Whether to split the independent axes into separate learners. Do not use
         in conjunction with ``fixed_indices``.
 
+    See Also
+    --------
+    LearnersDict.to_slurm_run
+        Convert the learners to variables that can be passed to `adaptive_scheduler.RunManager`.
+
     Returns
     -------
         A dictionary where the keys are the fixed indices, e.g., ``(("i", 0), ("j", 0))``,
-        and the values are lists of dictionaries where the keys are the output names of the
-        functions and the values are the corresponding adaptive learners. As noted
-        above, the learners have to be executed in order. If ``fixed_indices`` is ``None`` and
+        and the values are lists of lists of learners. The learners
+        in the inner list can be executed in parallel, but the outer lists need
+        to be executed in order. If ``fixed_indices`` is ``None`` and
         ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
@@ -107,17 +186,20 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: dict[
-        tuple[tuple[str, int | slice], ...] | None,
-        list[dict[_OUTPUT_TYPE, SequenceLearner]],
-    ] = {}
-    iterator = _maybe_iterate_axes(pipeline, inputs, fixed_indices, split_independent_axes)  # type: ignore[assignment]
+    learners: LearnersDict = LearnersDict()
+    iterator = _maybe_iterate_axes(
+        pipeline,
+        inputs,
+        fixed_indices,
+        split_independent_axes,
+        internal_shapes,
+    )
     for fixed_indices in iterator:
-        key = tuple(sorted(fixed_indices.items())) if fixed_indices else None
+        key = _key(fixed_indices) if fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
-            _learners = {}
+            _learners = []
             for func in gen:
-                _learners[func.output_name] = _learner(
+                learner = _learner(
                     func=func,
                     run_info=run_info,
                     run_folder=run_folder,
@@ -125,6 +207,7 @@ def create_learners(
                     fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
                 )
+                _learners.append(LearnerPipeFunc(learner, func))
             learners.setdefault(key, []).append(_learners)
     return learners
 
@@ -163,6 +246,10 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
+def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+    return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
+
+
 def _sequence(
     fixed_indices: dict[str, int | slice] | None,
     mapspec: MapSpec,
@@ -173,23 +260,8 @@ def _sequence(
         return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
-    assert len(fixed_mask) == prod(shape)
+    assert len(fixed_mask) == prod(_external_shape(shape, mask))
     return np.flatnonzero(fixed_mask)
-
-
-def flatten_learners(
-    learners_dicts: dict[
-        tuple[tuple[str, int | slice], ...] | None,
-        list[dict[_OUTPUT_TYPE, SequenceLearner]],
-    ],
-) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
-    """Flatten the list of dictionaries of learners into a single dictionary."""
-    flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
-    for learners in learners_dicts.values():
-        for learner_dict in learners:
-            for output_name, learner in learner_dict.items():
-                flat_learners.setdefault(output_name, []).append(learner)
-    return flat_learners
 
 
 def _execute_iteration_in_single(
@@ -210,6 +282,7 @@ def _execute_iteration_in_single(
         return output
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
@@ -257,6 +330,7 @@ def _execute_iteration_in_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(
         func,
+        run_info.all_output_names,
         run_info.input_paths,
         run_info.shapes,
         run_info.shape_masks,
@@ -332,7 +406,7 @@ def create_learners_from_sweep(
     parallel
         Whether to run the map in parallel.
     cleanup
-        Whether to clean up the ``run_folder```.
+        Whether to clean up the ``run_folder``.
 
     Returns
     -------
@@ -396,6 +470,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
 ) -> Generator[dict[str, Any] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
@@ -407,7 +482,7 @@ def _maybe_iterate_axes(
         return
     independent_axes = _identify_cross_product_axes(pipeline)
     axes = pipeline.mapspec_axes
-    shapes = map_shapes(pipeline, inputs).shapes
+    shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices

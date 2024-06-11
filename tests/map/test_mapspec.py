@@ -12,7 +12,6 @@ from pipefunc.map._mapspec import (
     _parse_indexed_arrays,
     array_mask,
     array_shape,
-    expected_mask,
     shape_to_strides,
     trace_dependencies,
     validate_consistent_axes,
@@ -203,45 +202,6 @@ def test_parse_indexed_arrays():
     )
 
 
-def test_expected_mask():
-    mapspec = MapSpec.from_string("a[i], b[i, j] -> c[i, j]")
-
-    # Test with numpy arrays
-    inputs = {
-        "a": np.array([1, 2, 3]),
-        "b": np.array([[4, 5], [6, 7], [8, 9]]),
-    }
-    expected = np.array([[False, False], [False, False], [False, False]])
-    assert np.array_equal(expected_mask(mapspec, inputs), expected)
-
-    # Test with masked arrays
-    inputs = {
-        "a": np.ma.MaskedArray([1, 2, 3], mask=[False, True, False]),
-        "b": np.ma.MaskedArray(
-            [[4, 5], [6, 7], [8, 9]],
-            mask=[[False, False], [True, True], [False, False]],
-        ),
-    }
-    expected = np.array([[False, False], [True, True], [False, False]])
-    assert np.array_equal(expected_mask(mapspec, inputs), expected)
-
-    # Test with lists
-    mapspec = MapSpec.from_string("a[i], b[j] -> c[i, j]")
-    inputs = {
-        "a": [0, 1, 2, 3],
-        "b": [4, 5, 6],
-    }
-    expected = np.array(
-        [
-            [False, False, False],
-            [False, False, False],
-            [False, False, False],
-            [False, False, False],
-        ],
-    )
-    assert np.array_equal(expected_mask(mapspec, inputs), expected)
-
-
 def test_array_mask():
     # Test with masked array
     arr = np.ma.MaskedArray([1, 2, 3], mask=[False, True, False])
@@ -270,7 +230,7 @@ def test_array_shape():
     assert array_shape(arr) == (2,)
 
     # Test with unsupported type
-    with pytest.raises(TypeError, match="No array shape defined for type"):
+    with pytest.raises(TypeError, match="No array shape defined for"):
         array_shape(42)
 
 
@@ -314,7 +274,7 @@ def test_validate_consistent_axes():
     )
 
 
-def test_larger_output_then_input():
+def test_larger_output_then_input():  # noqa: PLR0915
     mapspec = MapSpec.from_string("... -> b[j]")
     assert str(mapspec) == "... -> b[j]"
     assert mapspec.input_names == ()
@@ -379,6 +339,9 @@ def test_larger_output_then_input():
     shape, mask = mapspec.shape(input_shapes, internal_shapes={"c": (5, 6)})
     assert mask == (True, True, False, False)
     assert shape == (3, 4, 5, 6)
+
+    with pytest.raises(TypeError, match="Internal shape for 'c' must be a tuple of integers."):
+        mapspec.shape(input_shapes, internal_shapes={"c": ("a",)})
 
 
 def test_shape_exceptions():

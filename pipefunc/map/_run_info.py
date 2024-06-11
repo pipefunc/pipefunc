@@ -37,7 +37,7 @@ def map_shapes(
     input_parameters = set(pipeline.topological_generations.root_args)
 
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
-        p: array_shape(inputs[p]) for p in input_parameters if p in mapspec_names
+        p: array_shape(inputs[p], p) for p in input_parameters if p in mapspec_names
     }
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
@@ -60,6 +60,7 @@ def map_shapes(
 @dataclass(frozen=True, eq=True)
 class RunInfo:
     input_paths: dict[str, Path]
+    all_output_names: set[str]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
@@ -85,10 +86,13 @@ class RunInfo:
         else:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
-        input_paths = _dump_inputs(inputs, pipeline.defaults, run_folder)
+        input_paths = _dump_inputs(inputs, run_folder)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes or {})
         return cls(
             input_paths=input_paths,
+            all_output_names={
+                name for f in pipeline.functions for name in at_least_tuple(f.output_name)
+            },
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
@@ -126,6 +130,7 @@ class RunInfo:
         path = self.path(run_folder)
         data = asdict(self)
         data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
+        data["all_output_names"] = sorted(data["all_output_names"])
         data["shapes"] = {",".join(at_least_tuple(k)): v for k, v in data["shapes"].items()}
         data["shape_masks"] = {
             ",".join(at_least_tuple(k)): v for k, v in data["shape_masks"].items()
@@ -148,6 +153,7 @@ class RunInfo:
             }
         data["run_folder"] = Path(data["run_folder"])
         data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
+        data["all_output_names"] = set(data["all_output_names"])
         return cls(**data)
 
     @staticmethod
@@ -184,7 +190,7 @@ def _compare_to_previous_run_info(
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    equal_inputs = equal_dicts(dict(pipeline.defaults, **inputs), old.inputs, verbose=True)
+    equal_inputs = equal_dicts(inputs, old.inputs, verbose=True)
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
@@ -212,14 +218,12 @@ def _maybe_tuple(x: str) -> tuple[str, ...] | str:
 
 def _dump_inputs(
     inputs: dict[str, Any],
-    defaults: dict[str, Any],
     run_folder: Path,
 ) -> dict[str, Path]:
     folder = run_folder / "inputs"
     folder.mkdir(parents=True, exist_ok=True)
     paths = {}
-    to_dump = dict(defaults, **inputs)
-    for k, v in to_dump.items():
+    for k, v in inputs.items():
         path = folder / f"{k}.cloudpickle"
         dump(v, path)
         paths[k] = path

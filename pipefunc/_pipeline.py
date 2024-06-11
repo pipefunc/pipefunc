@@ -16,14 +16,14 @@ import functools
 import inspect
 import time
 import warnings
-from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._perf import resources_report
-from pipefunc._pipefunc import PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -56,6 +56,8 @@ if TYPE_CHECKING:
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
+
+_empty = inspect.Parameter.empty
 
 
 class Pipeline:
@@ -108,6 +110,7 @@ class Pipeline:
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         self._validate_mapspec()
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
         # Internal Pipeline cache
@@ -175,7 +178,7 @@ class Pipeline:
             maps to the output.
 
         """
-        if not isinstance(f, PipeFunc):
+        if not isinstance(f, PipeFunc) and callable(f):
             f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
         elif mapspec is not None:
             msg = (
@@ -188,7 +191,9 @@ class Pipeline:
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
             f._validate_mapspec()
-
+        if not isinstance(f, PipeFunc):
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
         self.functions.append(f)
 
         if self.profile is not None:
@@ -212,7 +217,7 @@ class Pipeline:
 
         """
         if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or `output_name` should be provided."
+            msg = "Either `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
@@ -266,9 +271,10 @@ class Pipeline:
                     for name in node.output_name:
                         mapping[name] = node
                 mapping[node.output_name] = node
-            else:
-                assert isinstance(node, str)
+            elif isinstance(node, str):
                 mapping[node] = node
+            else:
+                assert isinstance(node, _Bound)
         return mapping
 
     @functools.cached_property
@@ -281,27 +287,35 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        _check_consistent_defaults(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
             assert f.parameters is not None
             for arg in f.parameters:
                 if arg in self.output_to_func:  # is function output
-                    edge = (self.output_to_func[arg], f)
-                    if edge not in g.edges:
-                        g.add_edge(*edge, arg=arg)
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name, f._bound[arg])
+                        g.add_edge(bound, f)
                     else:
-                        # tuple output of function, and the edge already exists
-                        assert isinstance(edge[0].output_name, tuple)
-                        current = g.edges[edge]["arg"]
-                        g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
-
+                        edge = (self.output_to_func[arg], f)
+                        if edge not in g.edges:
+                            g.add_edge(*edge, arg=arg)
+                        else:
+                            # edge already exists because of multiple outputs
+                            assert isinstance(edge[0].output_name, tuple)
+                            current = g.edges[edge]["arg"]
+                            g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
                 else:
-                    if arg not in g:  # Add the node only if it doesn't exist
-                        default_value = f.defaults.get(arg, inspect.Parameter.empty)
-                        g.add_node(arg, default_value=default_value)
-                    g.add_edge(arg, f, arg=arg)
+                    bound_value = f._bound.get(arg, _empty)
+                    if bound_value is _empty:
+                        if arg not in g:
+                            # Add the node only if it doesn't exist
+                            g.add_node(arg)
+                        g.add_edge(arg, f, arg=arg)
+                    else:
+                        bound = _Bound(arg, f.output_name, bound_value)
+                        g.add_edge(bound, f)
         return g
 
     def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
@@ -346,7 +360,7 @@ class Pipeline:
         """
         if __output_name__ is None:
             __output_name__ = self.unique_leaf_node.output_name
-        return self.func(__output_name__)(**kwargs)
+        return self.run(__output_name__, kwargs=kwargs)
 
     def _get_func_args(
         self,
@@ -359,9 +373,11 @@ class Pipeline:
         # Used in _run
         func_args = {}
         for arg in func.parameters:
-            if arg in kwargs:
+            if arg in func._bound:
+                value = func._bound[arg]
+            elif arg in kwargs:
                 value = kwargs[arg]
-            else:
+            elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
                     kwargs=kwargs,
@@ -369,6 +385,11 @@ class Pipeline:
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
+            elif arg in func.defaults:
+                value = func.defaults[arg]
+            else:
+                msg = f"Missing value for argument `{arg}` in `{func}`."
+                raise ValueError(msg)
             func_args[arg] = value
             used_parameters.add(arg)
         return func_args
@@ -391,10 +412,13 @@ class Pipeline:
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
         result_from_cache = False
-        kwargs = dict(self.defaults, **kwargs)  # must include defaults to get cache_key
         if use_cache:
             assert cache is not None
-            cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
+            cache_key = _compute_cache_key(
+                func.output_name,
+                func.defaults | kwargs | func._bound,
+                root_args,
+            )
             return_now, result_from_cache = _get_result_from_cache(
                 func,
                 cache,
@@ -602,6 +626,77 @@ class Pipeline:
         """
         return _traverse_graph(name, "successors", self.graph, self.node_mapping)
 
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Automatically traverses the pipeline graph to find all functions that
+        that the defaults can be applied to.
+
+        If `overwrite` is `False`, the new defaults will be added to the existing
+        defaults. If `overwrite` is `True`, the existing defaults will be replaced
+        with the new defaults.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If ``False``, the new
+            defaults will be added to the existing defaults.
+
+        """
+        unused = set(defaults.keys())
+        for f in self.functions:
+            update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
+            unused -= set(update.keys())
+            if overwrite or update:
+                f.update_defaults(update, overwrite=overwrite)
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
+            raise ValueError(msg)
+
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"] = "current",
+        overwrite: bool = False,
+    ) -> None:
+        """Update the renames for the pipeline.
+
+        Automatically traverses the pipeline graph to find all functions that
+        the renames can be applied to.
+
+        Parameters
+        ----------
+        renames
+            A dictionary mapping old parameter names to new parameter names.
+        update_from
+            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
+            or from the original parameter names (`PipeFunc.original_parameters`).
+        overwrite
+            Whether to overwrite the existing renames. If ``False``, the new
+            renames will be added to the existing renames.
+
+        """
+        unused = set(renames.keys())
+        for f in self.functions:
+            if update_from == "original":
+                update = {k: v for k, v in renames.items() if k in f.original_parameters}
+                unused -= set(update.keys())
+            else:
+                assert update_from == "current"
+                update = {
+                    f._inverse_renames.get(k, k): v for k, v in renames.items() if k in f.parameters
+                }
+                unused -= set(renames) & set(f.parameters)
+            f.update_renames(update, overwrite=overwrite)
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
+            raise ValueError(msg)
+
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
@@ -639,7 +734,9 @@ class Pipeline:
     def defaults(self) -> dict[str, Any]:
         defaults = {}
         for func in self.functions:
-            defaults.update(func.defaults)
+            for arg, value in func.defaults.items():
+                if arg not in func._bound and arg not in self.output_to_func:
+                    defaults[arg] = value
         return defaults
 
     def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
@@ -684,9 +781,13 @@ class Pipeline:
         the functions in topological order.
         """
         generations = list(nx.topological_generations(self.graph))
-        assert all(isinstance(x, str) for x in generations[0])
+        if not generations:
+            return Generations([], [])
+
+        assert all(isinstance(x, str | _Bound) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return Generations(generations[0], generations[1:])
+        root_args = [x for x in generations[0] if isinstance(x, str)]
+        return Generations(root_args, generations[1:])
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
@@ -776,9 +877,17 @@ class Pipeline:
             func_node_colors=func_node_colors,
         )
 
-    def visualize_holoviews(self) -> hv.Graph:
-        """Visualize the pipeline as a directed graph using HoloViews."""
-        return visualize_holoviews(self.graph)
+    def visualize_holoviews(self, *, show: bool = False) -> hv.Graph | None:
+        """Visualize the pipeline as a directed graph using HoloViews.
+
+        Parameters
+        ----------
+        show
+            Whether to show the plot. Uses `bokeh.plotting.show(holoviews.render(plot))`.
+            If ``False`` the `holoviews.Graph` object is returned.
+
+        """
+        return visualize_holoviews(self.graph, show=show)
 
     def resources_report(self) -> None:
         """Display the resource usage report for each function in the pipeline."""
@@ -859,16 +968,89 @@ class Pipeline:
                 pipeline_str += f"    Possible input arguments: {input_args}\n"
         return pipeline_str
 
-    def copy(self) -> Pipeline:
-        """Return a copy of the pipeline."""
-        return Pipeline(
-            [f.copy() for f in self.functions],  # type: ignore[arg-type]
-            lazy=self.lazy,
-            debug=self._debug,
-            profile=self._profile,
-            cache_type=self._cache_type,
-            cache_kwargs=self._cache_kwargs,
-        )
+    def copy(self, **update: Any) -> Pipeline:
+        """Return a copy of the pipeline.
+
+        Parameters
+        ----------
+        update
+            Keyword arguments passed to the `Pipeline` constructor instead of the
+            original values.
+
+        """
+        kwargs = {
+            "lazy": self.lazy,
+            "debug": self._debug,
+            "profile": self._profile,
+            "cache_type": self._cache_type,
+            "cache_kwargs": self._cache_kwargs,
+        }
+        if "functions" not in update:
+            kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
+        kwargs.update(update)
+        return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    def nest_funcs(
+        self,
+        output_names: set[_OUTPUT_TYPE] | Literal["*"],
+        new_output_name: _OUTPUT_TYPE | None = None,
+    ) -> NestedPipeFunc:
+        """Replaces a set of output names with a single nested function inplace.
+
+        Parameters
+        ----------
+        output_names
+            The output names to nest in a `NestedPipeFunc`. Can also be ``"*"`` to nest all functions
+            in the pipeline into a single `NestedPipeFunc`.
+        new_output_name
+            The identifier for the output of the wrapped function. If ``None``, it is automatically
+            constructed from all the output names of the `PipeFunc` instances.
+
+        Returns
+        -------
+            The newly added `NestedPipeFunc` instance.
+
+        """
+        if output_names == "*":
+            funcs = self.functions.copy()
+        else:
+            funcs = [self.output_to_func[output_name] for output_name in output_names]
+
+        for f in funcs:
+            self.drop(f=f)
+        nested_func = NestedPipeFunc(funcs, output_name=new_output_name)
+        self.add(nested_func)
+        return nested_func
+
+    def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
+        """Join multiple pipelines into a single new pipeline.
+
+        Parameters
+        ----------
+        pipelines
+            The pipelines to join. Can also be individual `PipeFunc` instances.
+
+        Returns
+        -------
+            A new pipeline containing all functions from the original pipelines.
+
+        """
+        functions = []
+        for pipeline in [self, *pipelines]:
+            if isinstance(pipeline, Pipeline):
+                for f in pipeline.functions:
+                    functions.append(f.copy())  # noqa: PERF401
+            elif isinstance(pipeline, PipeFunc):
+                functions.append(pipeline.copy())
+            else:
+                msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
+                raise TypeError(msg)
+
+        return self.copy(functions=functions)
+
+    def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
+        """Combine two pipelines using the ``|`` operator."""
+        return self.join(other)
 
     def _connected_components(self) -> list[set[PipeFunc | str]]:
         """Return the connected components of the pipeline graph."""
@@ -1039,6 +1221,13 @@ class Pipeline:
 class Generations(NamedTuple):
     root_args: list[str]
     function_lists: list[list[PipeFunc]]
+
+
+@dataclass(frozen=True, eq=True)
+class _Bound:
+    name: str
+    output_name: _OUTPUT_TYPE
+    value: Any
 
 
 class _PipelineAsFunc:
@@ -1222,17 +1411,23 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
+def _check_consistent_defaults(
+    functions: list[PipeFunc],
+    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+) -> None:
     """Check that the default values for shared arguments are consistent."""
-    arg_defaults = defaultdict(set)
+    arg_defaults = {}
     for f in functions:
         for arg, default_value in f.defaults.items():
-            arg_defaults[arg].add(default_value)
-            if len(arg_defaults[arg]) > 1:
+            if arg in f._bound or arg in output_to_func:
+                continue
+            if arg not in arg_defaults:
+                arg_defaults[arg] = default_value
+            elif default_value != arg_defaults[arg]:
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function.",
+                    " the same default value or are set only for one function."
                 )
                 raise ValueError(msg)
 
@@ -1276,7 +1471,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         return func(**func_args)
     except Exception as e:
         handle_error(e, func, func_args)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _compute_cache_key(
@@ -1382,7 +1578,7 @@ def _compute_arg_mapping(
     replaced: list[PipeFunc | str],
     arg_set: set[tuple[str, ...]],
 ) -> None:
-    preds = [n for n in graph.predecessors(node) if n not in replaced]
+    preds = [n for n in graph.predecessors(node) if n not in replaced and not isinstance(n, _Bound)]
     deps = _unique(args + preds)
     deps_names = _names(deps)
     if deps_names in arg_set:
@@ -1401,7 +1597,7 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
     for f in functions:
-        if p not in f.parameters:
+        if p not in f.parameters or p in f._bound:
             continue
         if f.mapspec is None:
             axes = _axes_from_dims(p, dims, axis)

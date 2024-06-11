@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import inspect
 import pickle
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc._cache import LRUCache
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.resources import Resources
 from pipefunc.sweep import Sweep, count_sweep, get_precalculation_order
 
 if TYPE_CHECKING:
@@ -69,6 +71,8 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested(a=2, b=3) == (5, 15)
     pipeline = Pipeline([f_nested, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
+
+    assert str(pipeline).startswith("Pipeline:")
 
 
 def test_pipeline_and_all_arg_combinations_lazy() -> None:
@@ -430,10 +434,10 @@ def test_tuple_outputs(tmp_path: Path):
 
     assert dict(pipeline.graph.nodes) == {
         f_c: {},
-        "a": {"default_value": inspect._empty},
-        "b": {"default_value": inspect._empty},
+        "a": {},
+        "b": {},
         f_d: {},
-        "x": {"default_value": 1},
+        "x": {},
         f_e: {},
         f_i: {},
     }
@@ -596,16 +600,25 @@ def test_drop_from_pipeline():
     assert len(pipeline.functions) == 3
     assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
 
+    pipeline.replace(f3, f4)
+    assert len(pipeline.functions) == 3
+    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f3}
+
+    with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
+        pipeline.drop()
+
 
 def test_used_variable():
-    @pipefunc(output_name="c")
+    @pipefunc(output_name="c", cache=True)
     def f1(a, b):
         return a + b
 
-    pipeline = Pipeline([f1], cache_type="lru")
-    pipeline("c", a=1, b=2)
+    pipeline = Pipeline([f1])  # automatically sets cache_type="lru" because of cache=True
+    assert isinstance(pipeline.cache, LRUCache)
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
+
+    pipeline("c", a=1, b=2)
 
     # Test regression with cache:
     def f(a):
@@ -855,6 +868,39 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a4=88, b=1) == 89
 
 
+def test_update_pipeline_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
+    def f(a=42, b=69):
+        return a + b
+
+    pipeline = Pipeline([f])
+    fp = pipeline.functions[0]
+
+    # Test initial parameters and defaults
+    assert fp.parameters == ("a1", "b")
+    assert fp.defaults == {"a1": 42, "b": 1}
+
+    # Update defaults
+    pipeline.update_defaults({"b": 2})
+    assert fp.defaults == {"a1": 42, "b": 2}
+
+    # Call function with updated defaults
+    assert pipeline(a1=3) == 5
+
+    # Overwrite defaults
+    pipeline.update_defaults({"a1": 1, "b": 3}, overwrite=True)
+    assert fp.defaults == {"a1": 1, "b": 3}
+    assert fp.parameters == ("a1", "b")
+
+    # Call function with new defaults
+    assert fp(a1=2) == 5
+    assert fp() == 4
+    assert fp(a1=2, b=3) == 5
+
+    with pytest.raises(ValueError, match="Unused keyword arguments"):
+        pipeline.update_defaults({"does_not_exist": 1})
+
+
 def test_validate_update_defaults_and_renames_and_bound() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):
@@ -956,6 +1002,7 @@ def test_subpipeline():
 
     partial = pipeline.subpipeline(output_names=["h"])
     assert partial.topological_generations.root_args == ["a", "b"]
+    assert partial.root_nodes == ["a", "b"]
 
     partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
     assert partial.topological_generations.root_args == ["c"]
@@ -1091,3 +1138,254 @@ def test_nested_func_renames_defaults_and_bound() -> None:
     assert nf() == 4
     nf.update_bound({"a1": "a", "b1": "b"})
     assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now
+
+
+def test_nested_pipefunc_with_resources() -> None:
+    def f(a, b=99):
+        return a + b
+
+    def g(f):
+        return f
+
+    # Test the resources are combined correctly
+    nf = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+        ],
+        output_name="g",
+    )
+    assert isinstance(nf.resources, Resources)
+    assert nf.resources.num_cpus == 2
+    assert nf.resources.memory == "2GB"
+
+    # Test that the resources specified in NestedPipeFunc are used
+    nf2 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+        ],
+        output_name="g",
+        resources={"memory": "3GB", "num_cpus": 3},
+    )
+    assert isinstance(nf2.resources, Resources)
+    assert nf2.resources.num_cpus == 3
+    assert nf2.resources.memory == "3GB"
+
+    # Test that the resources specified in PipeFunc are used, with the other None
+    nf3 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources=None),
+        ],
+        output_name="g",
+    )
+    assert isinstance(nf3.resources, Resources)
+    assert nf3.resources.num_cpus == 2
+    assert nf3.resources.memory == "1GB"
+
+    # Test that Resources instance in NestedPipeFunc is used
+    nf3 = NestedPipeFunc(
+        [
+            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(g, "g", resources=None),
+        ],
+        output_name="g",
+        resources=Resources(num_cpus=3, memory="3GB"),
+    )
+    assert isinstance(nf3.resources, Resources)
+    assert nf3.resources.num_cpus == 3
+    assert nf3.resources.memory == "3GB"
+
+
+def test_nest_all() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c + 1
+
+    pipeline = Pipeline([f, g])
+    assert pipeline("d", a=1, b=2) == 4
+    nested = pipeline.nest_funcs("*")
+    assert nested.output_name == ("c", "d")
+    assert nested(a=1, b=2) == (3, 4)
+    assert pipeline("d", a=1, b=2) == 4
+    assert len(pipeline.functions) == 1
+
+
+def test_missing_kw():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Missing value for argument `b` in `f(...) → c`."),
+    ):
+        pipeline("c", a=1)
+
+
+def test_join_pipelines() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(a, b):
+        return a * b
+
+    pipeline1 = Pipeline([PipeFunc(f, "f")], debug=True)
+    pipeline2 = Pipeline([PipeFunc(g, "g")], debug=False)
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    pipeline = pipeline1 | pipeline2
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    pipeline = pipeline1 | PipeFunc(g, "g")
+    assert pipeline("f", a=1, b=2) == 3
+    assert pipeline("g", a=1, b=2) == 2
+    assert pipeline.debug
+
+    with pytest.raises(
+        TypeError,
+        match="Only `Pipeline` or `PipeFunc` instances can be joined",
+    ):
+        pipeline1 | g  # type: ignore[operator]
+
+
+def test_empty_pipeline() -> None:
+    pipeline = Pipeline([])
+    assert pipeline.output_to_func == {}
+    assert pipeline.topological_generations.root_args == []
+    assert pipeline.topological_generations.function_lists == []
+
+    with pytest.raises(TypeError, match="must be a `PipeFunc` or callable"):
+        pipeline.add(1)  # type: ignore[arg-type]
+
+
+def test_unhashable_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": []})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", defaults={"b": {}})
+    def g(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert pipeline.defaults == {"b": []}
+
+    # The problem should occur when using the default twice
+    with pytest.raises(ValueError, match="Inconsistent default"):
+        Pipeline([f, g])
+
+
+def test_update_renames_pipeline() -> None:
+    @pipefunc(output_name="c", renames={"a": "a1"})
+    def f(a, b):
+        return a, b
+
+    pipeline = Pipeline([f])
+    assert pipeline("c", a1="a1", b="b") == ("a1", "b")
+
+    pipeline.update_renames({"a1": "a2"}, update_from="current")
+    assert pipeline("c", a2="a2", b="b") == ("a2", "b")
+
+    pipeline.update_renames({"a2": "a3"}, update_from="current")
+    assert pipeline("c", a3="a3", b="b") == ("a3", "b")
+
+    pipeline.update_renames({"b": "b1"}, update_from="current")
+    assert pipeline("c", a3="a3", b1="b1") == ("a3", "b1")
+
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `a3`. These are not settable renames",
+    ):
+        pipeline.update_renames({"a3": "a4"}, update_from="original")
+
+    pipeline.update_renames({"a": "a5"}, update_from="original")
+    assert pipeline("c", a5="a5", b1="b1") == ("a5", "b1")
+
+    pipeline.update_renames({"a": "a6"}, update_from="original", overwrite=True)
+    assert pipeline("c", a6="a6", b="b") == ("a6", "b")
+
+
+def test_set_debug_and_profile():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert not f.debug
+    assert not f.profile
+    pipeline.debug = True
+    pipeline.profile = True
+    assert f.debug
+    assert f.profile
+
+
+def test_simple_cache():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.raises(ValueError, match="Invalid cache type"):
+        Pipeline([f], cache_type="not_exist")
+    pipeline = Pipeline([f], cache_type="simple")
+    assert pipeline("c", a=1, b=2) == (1, 2)
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
+    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
+    pipeline.cache.clear()
+    assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
+    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
+
+
+def test_hybrid_cache_lazy_warning():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a, b
+
+    with pytest.warns(UserWarning, match="Hybrid cache uses function evaluation"):
+        Pipeline([f], cache_type="hybrid", lazy=True)
+
+
+def test_cache_non_root_args():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(c, b):
+        return c + b
+
+    pipeline = Pipeline([f, g], cache_type="simple")
+    # Won't populate cache because `c` is not a root argument
+    assert pipeline("d", c=1, b=2) == 3
+    assert pipeline.cache.cache == {}
+
+
+def test_axis_in_root_args():
+    # Test reaches the `output_name in visited` condition
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
+    def g(a, c):
+        return a + c
+
+    @pipefunc(output_name="e", mapspec="c[i], d[i] -> e[i]")
+    def h(c, d):
+        return c + d
+
+    pipeline = Pipeline([f, g, h])
+    assert pipeline.independent_axes_in_mapspecs("e") == {"i"}

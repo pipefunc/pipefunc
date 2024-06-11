@@ -22,6 +22,7 @@ from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -67,6 +68,13 @@ class PipeFunc(Generic[T]):
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    resources
+        A dictionary or `Resources` instance containing the resources required
+        for the function. This can be used to specify the number of CPUs, GPUs,
+        memory, wall time, queue, partition, and any extra job scheduler
+        arguments. This is *not* used by the `pipefunc` directly but can be
+        used by job schedulers to manage the resources required for the
+        function.
 
     Returns
     -------
@@ -103,6 +111,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
         mapspec: str | MapSpec | None = None,
+        resources: dict | Resources | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
@@ -116,6 +125,7 @@ class PipeFunc(Generic[T]):
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
+        self.resources = _maybe_resources(resources)
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
         self._validate_mapspec()
@@ -183,7 +193,7 @@ class PipeFunc(Generic[T]):
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
                 defaults[new_name] = self._defaults[new_name]
-            elif v.default is not inspect.Parameter.empty:
+            elif v.default is not inspect.Parameter.empty and new_name not in self._bound:
                 defaults[new_name] = v.default
         return defaults
 
@@ -261,7 +271,7 @@ class PipeFunc(Generic[T]):
 
         clear_cached_properties(self, PipeFunc)
 
-    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = True) -> None:
+    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update the bound arguments for the function that are fixed.
 
         Parameters
@@ -299,6 +309,13 @@ class PipeFunc(Generic[T]):
             _validate_identifier(key, name)
 
     def _validate_names(self) -> None:
+        if common := set(self._defaults) & set(self._bound):
+            msg = (
+                f"The following parameters are both defaults and bound: `{common}`."
+                " This is not allowed."
+            )
+            raise ValueError(msg)
+
         self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
@@ -324,6 +341,7 @@ class PipeFunc(Generic[T]):
             cache=self.cache,
             save_function=self.save_function,
             mapspec=self.mapspec,
+            resources=self.resources,
         )
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -341,9 +359,8 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
-        defaults = {k: v for k, v in self.defaults.items() if k not in kwargs}
-        kwargs.update(defaults)
-        kwargs.update(self._bound)
+
+        kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
@@ -502,11 +519,13 @@ def pipefunc(
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
     defaults: dict[str, Any] | None = None,
+    bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
+    resources: dict | Resources | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -523,6 +542,10 @@ def pipefunc(
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
+    bound
+        Bind arguments to the function. These are arguments that are fixed. Even when
+        providing different values, the bound values will be used. Must be in terms of
+        the renamed argument names.
     profile
         Flag indicating whether the decorated function should be profiled.
     debug
@@ -536,6 +559,13 @@ def pipefunc(
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    resources
+        A dictionary or `Resources` instance containing the resources required
+        for the function. This can be used to specify the number of CPUs, GPUs,
+        memory, wall time, queue, partition, and any extra job scheduler
+        arguments. This is *not* used by the `pipefunc` directly but can be
+        used by job schedulers to manage the resources required for the
+        function.
 
     Returns
     -------
@@ -579,11 +609,13 @@ def pipefunc(
             output_picker=output_picker,
             renames=renames,
             defaults=defaults,
+            bound=bound,
             profile=profile,
             debug=debug,
             cache=cache,
             save_function=save_function,
             mapspec=mapspec,
+            resources=resources,
         )
 
     return decorator
@@ -603,6 +635,9 @@ class NestedPipeFunc(PipeFunc):
         `~pipefunc.map.MapSpec` for the joint function. If ``None``, the mapspec is inferred
         from the individual `PipeFunc` instances. None of the `MapsSpec` instances should
         have a reduction and all should use identical axes.
+    resources
+        Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
+        from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
 
     Attributes
     ----------
@@ -625,6 +660,7 @@ class NestedPipeFunc(PipeFunc):
         *,
         output_name: _OUTPUT_TYPE | None = None,
         mapspec: str | MapSpec | None = None,
+        resources: dict | Resources | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -644,6 +680,7 @@ class NestedPipeFunc(PipeFunc):
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
         self._bound: dict[str, Any] = {}
+        self.resources = _maybe_max_resources(resources, self.pipefuncs)
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipefuncs:
@@ -663,8 +700,8 @@ class NestedPipeFunc(PipeFunc):
         _validate_combinable_mapspecs(mapspecs)
         axes = mapspec_axes(mapspecs)  # type: ignore[arg-type]
         return MapSpec(
-            tuple(ArraySpec(n, axes[n]) for n in self.parameters),
-            tuple(ArraySpec(n, axes[n]) for n in at_least_tuple(self.output_name)),
+            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
+            tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
         )
 
     @functools.cached_property
@@ -693,6 +730,30 @@ class NestedPipeFunc(PipeFunc):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pipefuncs={self.pipefuncs})"
+
+
+def _maybe_max_resources(
+    resources: dict | Resources | None,
+    pipefuncs: list[PipeFunc],
+) -> Resources | None:
+    if isinstance(resources, Resources):
+        return resources
+    if resources is not None:
+        return Resources.from_dict(resources)
+    resources_list = [f.resources for f in pipefuncs if f.resources is not None]
+    if len(resources_list) == 1:
+        return resources_list[0]
+    if not resources_list:
+        return None
+    return Resources.combine_max(resources_list)
+
+
+def _maybe_resources(resources: dict | Resources | None) -> Resources | None:
+    if resources is None:
+        return None
+    if isinstance(resources, Resources):
+        return resources
+    return Resources.from_dict(resources)
 
 
 class _NestedFuncWrapper:

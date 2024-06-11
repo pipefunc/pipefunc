@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from pipefunc import Pipeline, pipefunc
 from pipefunc._simplify import _combine_nodes, _get_signature, _identify_combinable_nodes
 
@@ -186,3 +188,20 @@ def test_identify_combinable_nodes2():
     original_output = pipeline("f7", **input_data)
     simplified_output = simplified_pipeline("f7", **input_data)
     assert original_output == simplified_output
+
+
+def test_exception_simplify_mapspec():
+    @pipefunc(output_name="x", mapspec="a[i] -> x[i]")
+    def f1(a):
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x):
+        return x
+
+    pipeline = Pipeline([f1, f2])
+    with pytest.raises(
+        NotImplementedError,
+        match="PipeFunc`s with `mapspec` cannot be simplified currently",
+    ):
+        pipeline.simplified_pipeline()
