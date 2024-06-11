@@ -1356,3 +1356,18 @@ def test_hybrid_cache_lazy_warning():
 
     with pytest.warns(UserWarning, match="Hybrid cache uses function evaluation"):
         Pipeline([f], cache_type="hybrid", lazy=True)
+
+
+def test_cache_non_root_args():
+    @pipefunc(output_name="c", cache=True)
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(c, b):
+        return c + b
+
+    pipeline = Pipeline([f, g], cache_type="simple")
+    # Won't populate cache because `c` is not a root argument
+    assert pipeline("d", c=1, b=2) == 3
+    assert pipeline.cache.cache == {}
