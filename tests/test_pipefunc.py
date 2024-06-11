@@ -597,6 +597,9 @@ def test_drop_from_pipeline():
     assert len(pipeline.functions) == 3
     assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
 
+    with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
+        pipeline.drop()
+
 
 def test_used_variable():
     @pipefunc(output_name="c")
@@ -1302,3 +1305,17 @@ def test_update_renames_pipeline() -> None:
 
     pipeline.update_renames({"a": "a6"}, update_from="original", overwrite=True)
     assert pipeline("c", a6="a6", b="b") == ("a6", "b")
+
+
+def test_set_debug_and_profile():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    assert not f.debug
+    assert not f.profile
+    pipeline.debug = True
+    pipeline.profile = True
+    assert f.debug
+    assert f.profile

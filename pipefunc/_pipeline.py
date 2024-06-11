@@ -217,7 +217,7 @@ class Pipeline:
 
         """
         if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or `output_name` should be provided."
+            msg = "Either `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
             self.functions.remove(f)
