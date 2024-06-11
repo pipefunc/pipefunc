@@ -1052,7 +1052,7 @@ def test_nested_func() -> None:
     assert nf(a=1, b=2) == 3
 
     # Check all exceptions
-    with pytest.raises(ValueError, match="The provided `output_name` should"):
+    with pytest.raises(ValueError, match="The provided `output_name='not_exist'` should"):
         nf = NestedPipeFunc(
             [PipeFunc(f, "f"), PipeFunc(g, "g")],
             output_name="not_exist",

@@ -801,7 +801,7 @@ def _validate_output_name(output_name: _OUTPUT_TYPE | None, all_outputs: tuple[s
     if output_name is None:
         return
     if not all(x in all_outputs for x in at_least_tuple(output_name)):
-        msg = f"The provided `output_name` should be a subset of the combined output names: {all_outputs}."
+        msg = f"The provided `{output_name=}` should be a subset of the combined output names: {all_outputs}."
         raise ValueError(msg)
 
 
