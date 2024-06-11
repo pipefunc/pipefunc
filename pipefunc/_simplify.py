@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from collections import OrderedDict
 from typing import TYPE_CHECKING, TypeAlias, Union
 
@@ -9,12 +8,75 @@ import networkx as nx
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     import networkx as nx
 
     from pipefunc._pipeline import Pipeline
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+
+
+def simplified_pipeline(
+    functions: list[PipeFunc],
+    graph: nx.DiGraph,
+    all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
+    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
+    output_name: _OUTPUT_TYPE,
+    *,
+    conservatively_combine: bool = False,
+) -> Pipeline:
+    """Simplify pipeline with combined function nodes.
+
+    Generate a simplified version of the pipeline where combinable function
+    nodes have been merged into single function nodes.
+
+    This method identifies combinable nodes in the pipeline's execution
+    graph (i.e., functions that share the same root arguments) and merges
+    them into single `NestedPipeFunc` nodes. This results in a simplified pipeline
+    where each key function only depends on nodes that cannot be further
+    combined.
+
+    Returns
+    -------
+        The simplified version of the pipeline.
+
+    """
+    from pipefunc import PipeFunc, Pipeline
+
+    func = node_mapping[output_name]
+    assert isinstance(func, PipeFunc)
+    combinable_nodes = _identify_combinable_nodes(
+        func,
+        graph,
+        all_root_args,
+        conservatively_combine=conservatively_combine,
+    )
+    if not combinable_nodes:
+        msg = "No combinable nodes found, the pipeline cannot be simplified."
+        raise ValueError(msg)
+
+    # Simplify the combinable_nodes dictionary by replacing any nodes that
+    # can be combined with their own dependencies, so that each key in the
+    # dictionary only depends on nodes that cannot be further combined.
+    combinable_nodes = _combine_nodes(combinable_nodes)
+    # Sort to ensure deterministic output
+    sorted_nodes = {k: _sort(combinable_nodes[k]) for k in _sort(combinable_nodes.keys())}
+    to_combine_flat = _flatten_dict(sorted_nodes)
+    simple = Pipeline([f for f in functions if f not in to_combine_flat])
+    for base, combine in sorted_nodes.items():
+        nested = NestedPipeFunc([base, *combine], output_name=base.output_name)
+        simple.add(nested)
+    return simple
+
+
+def _sort(funcs: Iterable[PipeFunc]) -> list[PipeFunc]:
+    return sorted(funcs, key=lambda f: f.output_name)
+
+
+def _flatten_dict(d: dict[PipeFunc, list[PipeFunc]]) -> list[PipeFunc]:
+    return [v for k, lst in d.items() for v in [k, *lst]]
 
 
 def _identify_combinable_nodes(
@@ -172,80 +234,3 @@ def _func_node_colors(
             func_node_colors.append(f"C{color_index}")
             color_index += 1
     return func_node_colors
-
-
-def simplified_pipeline(
-    functions: list[PipeFunc],
-    graph: nx.DiGraph,
-    all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
-    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
-    output_name: _OUTPUT_TYPE,
-    *,
-    conservatively_combine: bool = False,
-) -> Pipeline:
-    """Simplify pipeline with combined function nodes.
-
-    Generate a simplified version of the pipeline where combinable function
-    nodes have been merged into single function nodes.
-
-    This method identifies combinable nodes in the pipeline's execution
-    graph (i.e., functions that share the same root arguments) and merges
-    them into single function nodes. This results in a simplified pipeline
-    where each key function only depends on nodes that cannot be further
-    combined.
-
-    Returns
-    -------
-        The simplified version of the pipeline.
-
-    Notes
-    -----
-    The pipeline simplification process works in the following way:
-
-    1.  Identify combinable function nodes in the execution graph by
-        checking if they share the same root arguments.
-    2.  Simplify the dictionary of combinable nodes by replacing any nodes
-        that can be combined with their dependencies.
-    3.  Generate the set of nodes to be skipped (those that will be merged).
-    4.  Get the input and output signatures for the combined nodes.
-    5.  Create new pipeline functions for the combined nodes, and add them
-        to the list of new functions.
-    6.  Add the remaining (non-combinable) functions to the list of new
-        functions.
-    7.  Generate a new pipeline with the new functions.
-
-    This process can significantly simplify complex pipelines, making them
-    easier to understand and potentially improving performance by simplifying
-    function calls.
-
-    """
-    from pipefunc import PipeFunc, Pipeline
-
-    func = node_mapping[output_name]
-    assert isinstance(func, PipeFunc)
-    combinable_nodes = _identify_combinable_nodes(
-        func,
-        graph,
-        all_root_args,
-        conservatively_combine=conservatively_combine,
-    )
-    if not combinable_nodes:
-        warnings.warn(
-            "No combinable nodes found, the pipeline cannot be simplified.",
-            UserWarning,
-            stacklevel=2,
-        )
-    # Simplify the combinable_nodes dictionary by replacing any nodes that
-    # can be combined with their own dependencies, so that each key in the
-    # dictionary only depends on nodes that cannot be further combined.
-    combinable_nodes = _combine_nodes(combinable_nodes)
-
-    to_combine_flat = list(combinable_nodes.keys())
-    for v in combinable_nodes.values():
-        to_combine_flat.extend(v)
-
-    simple = Pipeline([f for f in functions if f not in to_combine_flat])
-    for base, combine in combinable_nodes.items():
-        nested = NestedPipeFunc([base, *combine], output_name=base.output_name)
-        simple.add(nested)
-    return simple

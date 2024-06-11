@@ -1389,3 +1389,19 @@ def test_axis_in_root_args():
 
     pipeline = Pipeline([f, g, h])
     assert pipeline.independent_axes_in_mapspecs("e") == {"i"}
+
+
+def test_nesting_funcs_with_bound():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", bound={"b": "b2"})
+    def g(c, b):
+        return c + b
+
+    pipeline = Pipeline([f, g])
+    assert pipeline("d", a="a", b="b") == "abb2"
+    pipeline.nest_funcs(["c", "d"], "d")
+    assert pipeline("d", a="a", b="b") == "abb2"
+    assert len(pipeline.functions) == 1
