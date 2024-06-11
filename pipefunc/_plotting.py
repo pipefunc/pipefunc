@@ -258,7 +258,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         text_color="black",
         bgcolor="white",
     )
-    if show:
+    if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None
     return plot

@@ -64,7 +64,7 @@ def test_plot_with_mapspec(tmp_path: Path):
     def f(a, b, x):
         return a, b, x
 
-    @pipefunc("d")
+    @pipefunc("d", mapspec="b[i], c[i] -> d[i]")
     def g(b, c, x):
         return b, c, x
 
@@ -72,3 +72,4 @@ def test_plot_with_mapspec(tmp_path: Path):
     filename = tmp_path / "pipeline.png"
     pipeline.visualize(filename=filename)
     assert filename.exists()
+    pipeline.visualize_holoviews()
