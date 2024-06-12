@@ -18,9 +18,9 @@ kernelspec:
 You can provide defaults in
 
 - The original function definition (the normal way)
-- The `pipefunc` decorator `@pipefunc(..., defaults={...})` (see {class}`pipefunc.pipefunc`)
-- Update the defaults of a `PipeFunc` object (a wrapped function) via `PipeFunc.update_defaults({...})` (see {class}`pipefunc.PipeFunc.update_defaults`)
-- Update the defaults of an entire pipeline via `Pipeline.update_defaults({...})` (see {class}`pipefunc.Pipeline.update_defaults`)
+- The `pipefunc` decorator `@`{class}`pipefunc.pipefunc``(..., defaults={...})`
+- Update the defaults of a `PipeFunc` object (a wrapped function) via {class}`pipefunc.PipeFunc.update_defaults``({...})`
+- Update the defaults of an entire pipeline via {class}`pipefunc.Pipeline.update_defaults``({...})`
 
 Some examples in code:
 
@@ -94,8 +94,8 @@ Instead of using defaults, you can bind parameters to a fixed value using the `b
 
 See:
 
-- The `pipefunc` decorator `@pipefunc(..., bound={...})` (see {class}`pipefunc.pipefunc`)
-- Update the bound arguments of a `PipeFunc` object (a wrapped function) via `PipeFunc.update_bound({...})` (see {class}`pipefunc.PipeFunc.update_bound`)
+- The `pipefunc` decorator `@`{class}`pipefunc.pipefunc``(..., bound={...})`
+- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}`pipefunc.PipeFunc.update_bound``({...})`
 
 ```{code-cell} ipython3
 @pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
