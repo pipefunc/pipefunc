@@ -278,7 +278,12 @@ These methods are used to execute the pipeline but have different use cases:
 - `pipeline.map(inputs, ...)` is used to execute the pipeline in parallel. It supports map-reduce operations and is optimized for parallel execution. Internally, it puts all intermediate results in a {class}`~pipefunc.map.StorageBase` (there are implementations for storing on disk or in memory).
 
 ```{note}
-When calling the pipeline as a function, like `pipeline("output_name", **kwargs)`, it is equivalent to calling `pipeline.run("output_name", **kwargs)`.
+Internally, the `pipeline.run` method is called when using the pipeline as a function, the following are equivalent:
+
+- `pipeline.run(output_name, kwargs)`
+- `pipeline(output_name, **kwargs)`
+- `f = pipeline.func(output_name)` and then `f(**kwargs)`
+
 ```
 
 Here is a table summarizing the differences between `pipeline.run` and `pipeline.map`:
