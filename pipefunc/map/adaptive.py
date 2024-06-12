@@ -97,7 +97,7 @@ class LearnersDict(LearnersDictType):
         ignore_resources: bool = False,
         returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
     ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
-        """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`.
+        """Helper for `adaptive_scheduler.slurm_run` which returns a `adaptive_scheduler.RunManager`.
 
         Parameters
         ----------
