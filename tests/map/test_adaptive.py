@@ -9,7 +9,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map._run_info import RunInfo
-from pipefunc.map.adaptive import create_learners, create_learners_from_sweep
+from pipefunc.map.adaptive import LearnersDict, create_learners, create_learners_from_sweep
 from pipefunc.sweep import Sweep
 
 if TYPE_CHECKING:
@@ -361,3 +361,9 @@ def test_internal_shapes(tmp_path: Path) -> None:
     r_map = load_outputs("r", run_folder=tmp_path)
     r_adap = load_outputs("r", run_folder=tmp_path / "learners")
     assert r_map.tolist() == r_adap.tolist()
+
+
+def test_learners_dict_no_run_folder():
+    learners_dict = LearnersDict()
+    with pytest.raises(ValueError, match="`run_folder` must be provided"):
+        learners_dict.to_slurm_run()
