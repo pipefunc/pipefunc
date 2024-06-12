@@ -113,6 +113,9 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert "extra_scheduler" not in info
     assert info["cores_per_node"] == (8, 8)
 
+    with pytest.raises(ValueError, match="Invalid value for `returns`: not_exists"):
+        learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
+
 
 def test_missing_resources(tmp_path: Path) -> None:
     @pipefunc(output_name="x", mapspec="a[i] -> x[i]")
