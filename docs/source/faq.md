@@ -270,6 +270,7 @@ Handling multiple outputs allows for more modular and reusable functions in your
 It's particularly useful when a function computes multiple related values that might be used independently by different downstream functions.
 This way, you can avoid recomputing the same values multiple times and can mix and match the outputs as needed.
 
+(run-vs-map)=
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
 These methods are used to execute the pipeline but have different use cases:
