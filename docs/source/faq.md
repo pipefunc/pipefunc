@@ -195,7 +195,62 @@ Proper use of renames can make your pipelines more readable and maintainable by 
 
 ## How to handle multiple outputs?
 
-Some function
+Functions in a pipeline can return multiple outputs.
+By default, `pipefunc` assumes that a function returns a single output or a tuple of outputs. For any other return type, you need to specify an `output_picker` function.
+
+Here are a few ways to handle multiple outputs:
+
+1. Return a tuple of outputs and specify the `output_name` as a tuple of strings:
+
+   ```python
+   @pipefunc(output_name=("mean", "std"))
+   def mean_and_std(data):
+       return np.mean(data), np.std(data)
+   ```
+
+   This will automatically unpack the tuple and assign each output to the corresponding name in `output_name`.
+
+2. Return a dictionary, custom object, or any other type and specify the `output_name` as a tuple of strings along with an `output_picker` function:
+
+   ```python
+
+   def output_picker(dct, output_name):
+       return dct[output_name]
+
+   @pipefunc(output_name=("mean", "std"), output_picker=output_picker)
+   def mean_and_std(data):
+       return {"mean": np.mean(data), "std": np.std(data)}
+   ```
+
+   The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument. It should return the output corresponding to the given name.
+
+   Another example with a custom object and an explicit `output_picker` function:
+
+   ```python
+   from dataclasses import dataclass
+
+   @dataclass
+   class MeanStd:
+       mean: float
+       std: float
+
+   def pick_mean_std(obj, output_name):
+       return getattr(obj, output_name)
+
+   @pipefunc(output_name=("mean", "std"), output_picker=pick_mean_std)
+   def mean_and_std(data):
+       return MeanStd(np.mean(data), np.std(data))
+   ```
+
+   Here, the `pick_mean_std` function is defined to extract the `mean` and `std` attributes from the returned `MeanStd` object.
+
+Some key things to note:
+
+- If there are multiple outputs, all must be explicitly named in `output_name`, even if some outputs are not used by subsequent functions.
+- You can use `pipeline.visualize()` to see how the multiple outputs are connected in the pipeline graph.
+
+Handling multiple outputs allows for more modular and reusable functions in your pipelines.
+It's particularly useful when a function computes multiple related values that might be used independently by different downstream functions.
 
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
