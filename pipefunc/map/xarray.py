@@ -11,6 +11,7 @@ import xarray as xr
 
 from pipefunc.map import MapSpec, load_outputs
 from pipefunc.map._mapspec import mapspec_axes, trace_dependencies
+from pipefunc.map._run_info import RunInfo
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -70,7 +71,10 @@ def load_xarray_dataset(
 ) -> xr.Dataset:
     """Load the xarray dataset."""
     if not output_names:
-        output_names = [name for ms in mapspecs for name in ms.output_names]
+        run_info = RunInfo.load(run_folder)
+        output_names = sorted(run_info.all_output_names)
+    mapspec_output_names = [n for ms in mapspecs for n in ms.output_names if n in output_names]
+    single_output_names = [n for n in output_names if n not in mapspec_output_names]
     data_arrays = {
         name: load_xarray(
             name,
@@ -79,9 +83,13 @@ def load_xarray_dataset(
             run_folder=run_folder,
             load_intermediate=load_intermediate,
         )
-        for name in output_names
+        for name in mapspec_output_names
     }
     all_coords = {coord for data in data_arrays.values() for coord in data.coords}
     # Remove the DataArrays that are already appear in other DataArrays' coords
     to_merge = [v for k, v in data_arrays.items() if k not in all_coords]
-    return xr.merge(to_merge, compat="override")
+    ds = xr.merge(to_merge, compat="override")
+    for name in single_output_names:
+        array = load_outputs(name, run_folder=run_folder)
+        ds[name] = array
+    return ds
