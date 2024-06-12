@@ -261,6 +261,19 @@ class MapSpec:
             tuple(x.add_axes(*axis) for x in self.outputs),
         )
 
+    def rename(self, renames: dict[str, str]) -> MapSpec:
+        """Return a new renamed MapSpec if any of the names are in 'renames'."""
+        if not any(name in renames for name in self.input_names + self.output_names):
+            return self
+
+        def _rename(spec: ArraySpec) -> ArraySpec:
+            return ArraySpec(renames.get(spec.name, spec.name), spec.axes)
+
+        return MapSpec(
+            tuple(map(_rename, self.inputs)),
+            tuple(map(_rename, self.outputs)),
+        )
+
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
     # Could use np.unravel_index

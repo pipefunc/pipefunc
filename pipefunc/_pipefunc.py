@@ -199,6 +199,7 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def _inverse_renames(self) -> dict[str, str]:
+        """Renames from current name to original name."""
         return {v: k for k, v in self._renames.items()}
 
     @functools.cached_property
@@ -259,12 +260,15 @@ class PipeFunc(Generic[T]):
             "renames",
             self.parameters if update_from == "current" else self.original_parameters.keys(),  # type: ignore[arg-type]
         )
+
         if update_from == "current":
+            # Convert to `renames` in terms of original names
             renames = {
                 self._inverse_renames.get(k, k): v
                 for k, v in renames.items()
                 if k in self.parameters
             }
+        old_renames = self._renames.copy()
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
         if overwrite:
@@ -286,6 +290,11 @@ class PipeFunc(Generic[T]):
             new_name = self._renames.get(name, name)
             new_bound[new_name] = value
         self._bound = new_bound
+
+        if self.mapspec is not None:
+            self.mapspec = self.mapspec.rename(
+                {old_renames.get(k, k): v for k, v in self._renames.items()},
+            )
 
         clear_cached_properties(self, PipeFunc)
 
