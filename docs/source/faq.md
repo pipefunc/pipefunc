@@ -73,7 +73,7 @@ See:
 def f(a, x):
     return a * x
 
-f(a=1, x=999)  # x is fixed to 2, so this returns 2
+f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```
 
 We can update the bound arguments with
@@ -86,6 +86,7 @@ or remove them with
 
 ```{code-cell} ipython3
 f.update_bound({}, overwrite=True)
+f(a=1, x=999)  # no longer fixed, so this returns 999
 ```
 
 ## How to handle multiple outputs?
