@@ -42,12 +42,13 @@ Whether you're working with data processing, scientific computations, machine le
 2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
 3. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
 4. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
-5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to improve computational efficiency, trading off visibility into intermediate steps.
+5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to run multiple functions in a single step.
 6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-7. 🔄 **Parallel Execution and Caching**: Run functions in parallel and cache results to avoid redundant computations.
+7. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
 8. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 9. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
-10. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel (adaptive) sweeps.
+10. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
+11. 🤓 **Nerd stats**: >400 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
 
 ## :test_tube: How does it work?
 

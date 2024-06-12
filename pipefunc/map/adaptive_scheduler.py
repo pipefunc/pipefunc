@@ -12,6 +12,7 @@ from pipefunc._utils import at_least_tuple
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
+    import adaptive_scheduler
     from adaptive import SequenceLearner
 
     from pipefunc.map.adaptive import LearnersDict
@@ -43,6 +44,12 @@ class AdaptiveSchedulerDetails(NamedTuple):
         """
         dct = self._asdict()
         return {k: v for k, v in dct.items() if v is not None}
+
+    def run_manager(self) -> adaptive_scheduler.RunManager:  # pragma: no cover
+        """Get a `RunManager` for the adaptive scheduler."""
+        import adaptive_scheduler
+
+        return adaptive_scheduler.RunManager(**self.kwargs())
 
 
 def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:

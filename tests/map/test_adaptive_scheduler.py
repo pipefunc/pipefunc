@@ -6,7 +6,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
-from pipefunc.map.adaptive_scheduler import slurm_run_setup
+from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, slurm_run_setup
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -36,7 +36,9 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
             num_gpus=1,
             wall_time="1:00:00",
         ),
+        returns="namedtuple",
     )
+    assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     assert info.dependencies == {0: [], 1: [0]}
@@ -77,10 +79,11 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     with pytest.raises(ValueError, match="At least one `PipeFunc` provides `num_cpus`"):
-        learners_dict.to_slurm_run(tmp_path, None)
+        learners_dict.to_slurm_run(tmp_path, None, returns="namedtuple")
 
     # Test including defaults
-    info = learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8})
+    info = learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, returns="namedtuple")
+    assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     assert len(info.learners[0].sequence) == 4
@@ -92,16 +95,26 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert info.cores_per_node == (8, 2)
 
     # Test ignoring resources
-    info = learners_dict.to_slurm_run(tmp_path, None, ignore_resources=True)
+    info = learners_dict.to_slurm_run(tmp_path, None, ignore_resources=True, returns="namedtuple")
+    assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert info.extra_scheduler is None
     assert info.cores_per_node is None
 
-    # Test ignoring resources with default
-    info = learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, ignore_resources=True)
-    assert len(info.learners) == 2
-    assert info.extra_scheduler is None
-    assert info.cores_per_node == (8, 8)
+    # Test ignoring resources with default (now using "kwargs")
+    info = learners_dict.to_slurm_run(
+        tmp_path,
+        {"num_cpus": 8},
+        ignore_resources=True,
+        returns="kwargs",
+    )
+    assert isinstance(info, dict)
+    assert len(info["learners"]) == 2
+    assert "extra_scheduler" not in info
+    assert info["cores_per_node"] == (8, 8)
+
+    with pytest.raises(ValueError, match="Invalid value for `returns`: not_exists"):
+        learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
 
 
 def test_missing_resources(tmp_path: Path) -> None:
@@ -140,6 +153,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
 
     default_resources = Resources(num_cpus=4)
     info = slurm_run_setup(learners_dict, tmp_path, default_resources)
+    assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     assert info.dependencies == {0: [], 1: [0]}
