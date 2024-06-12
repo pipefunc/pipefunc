@@ -39,6 +39,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "myst_nb",
+    "sphinx_togglebutton",
 ]
 
 templates_path = ["_templates"]
@@ -73,7 +74,11 @@ autodoc_member_order = "bysource"
 nb_execution_mode = "cache"
 nb_execution_timeout = 180
 nb_execution_raise_on_error = True
-myst_heading_anchors = 3
+myst_heading_anchors = 4
+myst_enable_extensions = [
+    "html_admonition",
+    "colon_fence",
+]
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
