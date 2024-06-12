@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import re
+import threading
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True, eq=True)
@@ -278,3 +283,24 @@ class Resources:
         if default_resources is None:
             return self
         return Resources(**dict(default_resources.dict(), **self.dict()))
+
+
+_local_storage = threading.local()
+
+
+def get_resources() -> Resources | None:
+    """Get the resources for the current context."""
+    return getattr(_local_storage, "resources", None)
+
+
+@contextlib.contextmanager
+def _set_resources(resources: Resources | None) -> Generator[None, None, None]:
+    """Set the resources for the current context."""
+    if resources is None:
+        yield
+        return
+    _local_storage.resources = resources
+    try:
+        yield
+    finally:
+        _local_storage.resources = None

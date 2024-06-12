@@ -22,7 +22,7 @@ from pipefunc._perf import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
-from pipefunc.resources import Resources
+from pipefunc.resources import Resources, _set_resources
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -384,7 +384,8 @@ class PipeFunc(Generic[T]):
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
-            result = self.func(*args, **kwargs)
+            with _set_resources(self.resources):
+                result = self.func(*args, **kwargs)
 
         if self.debug:
             func_str = format_function_call(self.func.__name__, (), kwargs)
