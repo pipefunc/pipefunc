@@ -34,7 +34,7 @@ def f(a, x):
 
 This function `f` has a default value for `x` set to 2.
 
-:::{admonition} We can do the same by constructing a <code>PipeFunc</code> object directly
+:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
 :class: note, dropdown
 
    ```python
@@ -105,7 +105,7 @@ def f(a, x):
 f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```
 
-:::{admonition} We can do the same by constructing a <code>PipeFunc</code> object directly
+:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
 :class: note, dropdown
 
    ```python
