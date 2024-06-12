@@ -196,7 +196,12 @@ Proper use of renames can make your pipelines more readable and maintainable by 
 ## How to handle multiple outputs?
 
 Functions in a pipeline can return multiple outputs.
-By default, `pipefunc` assumes that a function returns a single output or a tuple of outputs. For any other return type, you need to specify an `output_picker` function.
+
+By default, `pipefunc` assumes that a function returns a single output or a tuple of outputs.
+For any other return type, you need to specify an `output_picker` function.
+
+If `output_picker` is not specified, `pipefunc` assumes that the function returns a single output or a tuple of outputs.
+In this case, the `output_name` should be a single string or a tuple of strings with the same length as the returned tuple.
 
 Here are a few ways to handle multiple outputs:
 
@@ -213,7 +218,6 @@ Here are a few ways to handle multiple outputs:
 2. Return a dictionary, custom object, or any other type and specify the `output_name` as a tuple of strings along with an `output_picker` function:
 
    ```python
-
    def output_picker(dct, output_name):
        return dct[output_name]
 
@@ -244,6 +248,19 @@ Here are a few ways to handle multiple outputs:
 
    Here, the `pick_mean_std` function is defined to extract the `mean` and `std` attributes from the returned `MeanStd` object.
 
+Note that the `output_picker` function is called once for each output name specified in `output_name`.
+This allows you to handle cases where the returned object has a different structure than the desired output names.
+
+When a function has multiple outputs, subsequent functions in the pipeline can access any of those outputs by name:
+
+```python
+@pipefunc(output_name="normalized")
+def normalize(data, mean, std):
+    return (data - mean) / std
+```
+
+This function takes `mean` and `std` as separate inputs, which will be automatically wired from the outputs of `mean_and_std`.
+
 Some key things to note:
 
 - If there are multiple outputs, all must be explicitly named in `output_name`, even if some outputs are not used by subsequent functions.
@@ -251,6 +268,7 @@ Some key things to note:
 
 Handling multiple outputs allows for more modular and reusable functions in your pipelines.
 It's particularly useful when a function computes multiple related values that might be used independently by different downstream functions.
+This way, you can avoid recomputing the same values multiple times and can mix and match the outputs as needed.
 
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
