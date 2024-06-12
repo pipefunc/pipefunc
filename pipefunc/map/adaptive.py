@@ -97,7 +97,29 @@ class LearnersDict(LearnersDictType):
         ignore_resources: bool = False,
         returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
     ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
-        """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
+        """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`.
+
+        Parameters
+        ----------
+        run_folder
+            The folder to store the run information.
+        default_resources
+            The default resources to use for the run. Only needed if not all `PipeFunc`s have
+            resources.
+        ignore_resources
+            Whether to ignore the resources of the `PipeFunc`s and use the `default_resources`
+            for all of them.
+        returns
+            What to return. Can be one of "run_manager", "kwargs", or "namedtuple".
+            If "run_manager", returns a `adaptive_scheduler.RunManager`.
+            If "kwargs", returns a dictionary that can be passed to `adaptive_scheduler.slurm_run`.
+            If "namedtuple", returns an `AdaptiveSchedulerDetails`.
+
+        Returns
+        -------
+            The output depends on the value of `returns`.
+
+        """
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
         if run_folder is None:
