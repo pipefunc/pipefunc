@@ -76,6 +76,20 @@ def f(a, x):
 f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```
 
+:::{admonition} We can do the same by constructing a <code>PipeFunc</code> object directly
+:class: note, dropdown
+
+   ```python
+   from pipefunc import PipeFunc
+
+   def multiply(a, x):
+      return a * x
+
+   multiply_func = PipeFunc(multiply, output_name="y", bound={"x": 2})
+   ```
+
+:::
+
 We can update the bound arguments with
 
 ```{code-cell} ipython3
@@ -88,6 +102,60 @@ or remove them with
 f.update_bound({}, overwrite=True)
 f(a=1, x=999)  # no longer fixed, so this returns 999
 ```
+
+## How to rename inputs and outputs?
+
+The `renames` attribute in `@`{class}`~pipefunc.pipefunc` and {class}`~pipefunc.PipeFunc` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline. This can be particularly useful when:
+
+- The same function is used multiple times in a pipeline
+- You want to provide more meaningful names to the outputs
+- You need to avoid name collisions between functions
+
+There are a few ways to specify renames:
+
+1. Via the `@pipefunc` decorator:
+
+   ```python
+   @pipefunc(output_name="y", renames={"a": "x", "b": "y"})
+   def multiply(a, b):
+       return a * b
+   ```
+
+   This renames the `a` input to `x` and the `b` input to `y`.
+
+2. By creating a `PipeFunc` object directly and specifying the `renames` attribute:
+
+   ```python
+   def add(a, b):
+       return a + b
+
+   add_func = PipeFunc(add, output_name="sum", renames={"a": "x", "b": "y"})
+   ```
+
+3. By updating the renames of an existing `PipeFunc` object:
+
+   ```python
+   add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
+   ```
+
+   This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
+
+4. By updating the renames of an entire pipeline:
+
+   ```python
+   pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="current")
+   ```
+
+When specifying renames, you can choose to update from the original argument names (`update_from="original"`) or from the current renamed arguments (`update_from="current"`).
+
+Some key things to note:
+
+- Renaming inputs does not change the actual parameter names in the function definition, it just changes how the pipeline passes arguments between functions.
+- Renaming allows using the same function multiple times in a pipeline with different input/output names each time.
+- Renames are applied in the order they are defined when a function is used multiple times in a pipeline.
+- You can use `pipeline.visualize()` to see a graph of the pipeline with the renamed arguments.
+
+Proper use of renames can make your pipelines more readable and maintainable by providing clear, context-specific names for the data flowing between functions.
 
 ## How to handle multiple outputs?
 
