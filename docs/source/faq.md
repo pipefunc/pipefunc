@@ -30,8 +30,27 @@ from pipefunc import pipefunc, Pipeline
 @pipefunc(output_name="y", defaults={"x": 2})
 def f(a, x):
     return a * x
+```
 
-# update the defaults of the function afterwards
+This function `f` has a default value for `x` set to 2.
+
+:::{admonition} We can do the same by constructing a <code>PipeFunc</code> object directly
+:class: note, dropdown
+
+   ```python
+   from pipefunc import PipeFunc
+
+   def f(a, x):
+       return a * x
+
+   f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
+   ```
+
+:::
+
+We can also update the defaults of the function afterwards:
+
+```{code-cell} ipython3
 f.update_defaults({"x": 3})
 ```
 
@@ -46,11 +65,21 @@ def g(y, b=1):
 
 pipeline = Pipeline([f, g])
 pipeline.update_defaults({"a": 1, "b": 3, "x": 1})  # override `b=2` default
-print(pipeline.defaults)  # all parameters now have defaults
-print(pipeline())  # no arguments required now
 ```
 
-To undo the defaults, you can use
+We can check the defaults of the pipeline:
+
+```{code-cell} ipython3
+pipeline.defaults  # all parameters now have defaults
+```
+
+Now, when we call the pipeline, we don't need to provide any arguments:
+
+```{code-cell} ipython3
+pipeline()
+```
+
+To undo the defaults, you can use `overwrite=True`:
 
 ```{code-cell} ipython3
 g.update_defaults({}, overwrite=True)
@@ -71,7 +100,7 @@ See:
 ```{code-cell} ipython3
 @pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
 def f(a, x):
-    return a * x
+    return a + x
 
 f(a=1, x=999)  # x is ignored and replaced by the bound value
 ```
@@ -82,13 +111,20 @@ f(a=1, x=999)  # x is ignored and replaced by the bound value
    ```python
    from pipefunc import PipeFunc
 
-   def multiply(a, x):
-      return a * x
+   def f(a, x):
+      return a + x
 
-   multiply_func = PipeFunc(multiply, output_name="y", bound={"x": 2})
+   f_func = PipeFunc(f, output_name="y", bound={"x": 2})
    ```
 
 :::
+
+Bound arguments show as red hexagons in the pipeline visualization.
+
+```{code-cell} ipython3
+pipeline = Pipeline([f])
+pipeline.visualize()
+```
 
 We can update the bound arguments with
 
@@ -100,7 +136,7 @@ or remove them with
 
 ```{code-cell} ipython3
 f.update_bound({}, overwrite=True)
-f(a=1, x=999)  # no longer fixed, so this returns 999
+f(a=1, x=999)  # no longer fixed
 ```
 
 ## How to rename inputs and outputs?
@@ -159,7 +195,7 @@ Proper use of renames can make your pipelines more readable and maintainable by 
 
 ## How to handle multiple outputs?
 
-...
+Some function
 
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
