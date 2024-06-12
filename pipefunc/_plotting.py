@@ -40,7 +40,7 @@ def _trim(s: Any, max_len: int = MAX_LABEL_LENGTH) -> str:
     return s
 
 
-def visualize(  # noqa: PLR0912, PLR0915
+def visualize(  # noqa: PLR0912, PLR0915, C901
     graph: nx.DiGraph,
     figsize: tuple[int, int] = (10, 10),
     filename: str | Path | None = None,
@@ -62,16 +62,19 @@ def visualize(  # noqa: PLR0912, PLR0915
     """
     import matplotlib.pyplot as plt
 
-    from pipefunc._pipefunc import PipeFunc
+    from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
     from pipefunc._pipeline import _Bound
 
     pos = _get_graph_layout(graph)
     arg_nodes = []
     func_nodes = []
+    nested_func_nodes = []
     bound_nodes = []
     for node in graph.nodes:
         if isinstance(node, str):
             arg_nodes.append(node)
+        elif isinstance(node, NestedPipeFunc):
+            nested_func_nodes.append(node)
         elif isinstance(node, PipeFunc):
             func_nodes.append(node)
         else:
@@ -79,37 +82,22 @@ def visualize(  # noqa: PLR0912, PLR0915
             bound_nodes.append(node)
 
     plt.figure(figsize=figsize)
-    nx.draw_networkx_nodes(
-        graph,
-        pos,
-        nodelist=arg_nodes,
-        node_size=4000,
-        node_color="lightgreen",
-        node_shape="s",
-    )
-    nx.draw_networkx_nodes(
-        graph,
-        pos,
-        nodelist=func_nodes,
-        node_size=4000,
-        node_color=func_node_colors or "skyblue",
-        node_shape="o",
-    )
-    nx.draw_networkx_nodes(
-        graph,
-        pos,
-        nodelist=bound_nodes,
-        node_size=4000,
-        node_color="red",
-        node_shape="h",
-    )
 
-    nx.draw_networkx_labels(
-        graph,
-        pos,
-        {node: node for node in arg_nodes},
-        font_size=12,
-    )
+    for nodes, color, shape, edgecolor in [
+        (arg_nodes, "lightgreen", "s", None),
+        (func_nodes, func_node_colors or "skyblue", "o", None),
+        (nested_func_nodes, func_node_colors or "skyblue", "o", "red"),
+        (bound_nodes, "red", "h", None),
+    ]:
+        nx.draw_networkx_nodes(
+            graph,
+            pos,
+            nodelist=nodes,
+            node_size=4000,
+            node_color=color,
+            node_shape=shape,
+            edgecolors=edgecolor,
+        )
 
     def func_with_mapspec(func: PipeFunc) -> str:
         s = str(func)
@@ -120,19 +108,17 @@ def visualize(  # noqa: PLR0912, PLR0915
             s = re.sub(rf"\b{spec.name}\b", str(spec), s)
         return s
 
-    nx.draw_networkx_labels(
-        graph,
-        pos,
-        {node: func_with_mapspec(node) for node in func_nodes},
-        font_size=12,
-    )
-
-    nx.draw_networkx_labels(
-        graph,
-        pos,
+    for labels in [
+        {node: node for node in arg_nodes},
+        {node: func_with_mapspec(node) for node in (*func_nodes, *nested_func_nodes)},
         {node: node.name for node in bound_nodes},
-        font_size=12,
-    )
+    ]:
+        nx.draw_networkx_labels(
+            graph,
+            pos,
+            labels,
+            font_size=12,
+        )
 
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
