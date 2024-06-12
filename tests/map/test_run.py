@@ -63,6 +63,7 @@ def test_simple(storage, tmp_path: Path) -> None:
     assert all(dimensions[k] == len(v) for k, v in axes.items())
     ds = load_xarray_dataset(run_folder=tmp_path)
     assert ds["y"].data.tolist() == [0, 2, 4, 6]
+    assert ds["sum"] == 12
 
     run_info = RunInfo.load(tmp_path)
     run_info.dump(tmp_path)
