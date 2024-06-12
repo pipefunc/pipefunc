@@ -45,7 +45,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
         dct = self._asdict()
         return {k: v for k, v in dct.items() if v is not None}
 
-    def run_manager(self) -> adaptive_scheduler.RunManager:
+    def run_manager(self) -> adaptive_scheduler.RunManager:  # pragma: no cover
         """Get a `RunManager` for the adaptive scheduler."""
         import adaptive_scheduler
 
