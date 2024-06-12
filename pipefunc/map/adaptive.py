@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import numpy as np
 from adaptive import SequenceLearner, runner
@@ -31,6 +31,7 @@ from pipefunc.map._storage_base import _iterate_shape_indices
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    import adaptive_scheduler
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
@@ -63,9 +64,14 @@ LearnersDictType: TypeAlias = UserDict[tuple[AxisIndex, ...] | None, list[list[L
 class LearnersDict(LearnersDictType):
     """A dictionary of adaptive learners for a pipeline as returned by `create_learners`."""
 
-    def __init__(self, learners_dict: LearnersDictType | None = None) -> None:
+    def __init__(
+        self,
+        learners_dict: LearnersDictType | None = None,
+        run_folder: str | Path | None = None,
+    ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
+        self.run_folder = run_folder
 
     def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
         """Flatten the learners into a dictionary with the output names as keys."""
@@ -85,20 +91,35 @@ class LearnersDict(LearnersDictType):
 
     def to_slurm_run(
         self,
-        run_folder: str | Path,
+        run_folder: str | Path | None = None,
         default_resources: dict | Resources | None = None,
         *,
         ignore_resources: bool = False,
-    ) -> AdaptiveSchedulerDetails:
+        returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
+    ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
         """Uses `adaptive_scheduler.slurm_run` to create a `adaptive_scheduler.RunManager`."""
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
-        return slurm_run_setup(
+        if run_folder is None:
+            if self.run_folder is None:
+                msg = "The `run_folder` must be provided."
+                raise ValueError(msg)
+            run_folder = self.run_folder
+
+        details: AdaptiveSchedulerDetails = slurm_run_setup(
             self,
             run_folder,
             default_resources,
             ignore_resources=ignore_resources,
         )
+        if returns == "namedtuple":
+            return details
+        if returns == "run_manager":  # pragma: no cover
+            return details.run_manager()
+        if returns == "kwargs":
+            return details.kwargs()
+        msg = f"Invalid value for `returns`: {returns}"
+        raise ValueError(msg)
 
 
 def create_learners(
@@ -186,7 +207,7 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: LearnersDict = LearnersDict()
+    learners: LearnersDict = LearnersDict(run_folder=run_folder)
     iterator = _maybe_iterate_axes(
         pipeline,
         inputs,
