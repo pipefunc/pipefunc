@@ -115,7 +115,7 @@ class PipeFunc(Generic[T]):
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
-        self.output_name: _OUTPUT_TYPE = output_name
+        self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
         self.save_function = save_function
@@ -133,7 +133,7 @@ class PipeFunc(Generic[T]):
 
     @property
     def renames(self) -> dict[str, str]:
-        """Return the renames for the function arguments.
+        """Return the renames for the function arguments and output name.
 
         See Also
         --------
@@ -156,6 +156,17 @@ class PipeFunc(Generic[T]):
         """
         # Is a property to prevent users mutating `bound` directly
         return self._bound
+
+    @functools.cached_property
+    def output_name(self) -> _OUTPUT_TYPE:
+        """Return the output name(s) of the wrapped function.
+
+        Returns
+        -------
+            The output name(s) of the wrapped function.
+
+        """
+        return _rename_output_name(self._output_name, self._renames)
 
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
@@ -240,32 +251,45 @@ class PipeFunc(Generic[T]):
         update_from: Literal["current", "original"] = "current",
         overwrite: bool = False,
     ) -> None:
-        """Update renames to function arguments for the wrapped function.
+        """Update renames to function arguments and ``output_name`` for the wrapped function.
+
+        When renaming the ``output_name`` and if it is a tuple of strings, the
+        renames must be provided as individual strings in the tuple.
 
         Parameters
         ----------
         renames
-            A dictionary of renames for the function arguments.
+            A dictionary of renames for the function arguments or ``output_name``.
         update_from
-            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
-            or from the original parameter names (`PipeFunc.original_parameters`).
+            Whether to update the renames from the ``"current"`` parameter names
+            (`PipeFunc.parameters`) or from the ``"original"`` parameter names as
+            in the function signature (`PipeFunc.original_parameters`). If also updating
+            the ``output_name``, original means the name that was provided to the
+            `PipeFunc` instance.
         overwrite
             Whether to overwrite the existing renames. If ``False``, the new
             renames will be added to the existing renames.
 
         """
         assert update_from in ("current", "original")
+        assert all(isinstance(k, str) for k in renames.keys())  # noqa: SIM118
+        assert all(isinstance(v, str) for v in renames.values())
+        allowed_parameters = tuple(
+            self.parameters + at_least_tuple(self.output_name)
+            if update_from == "current"
+            else tuple(self.original_parameters) + at_least_tuple(self._output_name),
+        )
         self._validate_update(
             renames,
             "renames",
-            self.parameters if update_from == "current" else self.original_parameters.keys(),  # type: ignore[arg-type]
+            allowed_parameters,  # type: ignore[arg-type]
         )
         if update_from == "current":
             # Convert to `renames` in terms of original names
             renames = {
                 self._inverse_renames.get(k, k): v
                 for k, v in renames.items()
-                if k in self.parameters
+                if k in allowed_parameters
             }
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
@@ -274,7 +298,7 @@ class PipeFunc(Generic[T]):
         else:
             self._renames = dict(self._renames, **renames)
 
-        # Update defaults with new renames
+        # Update `defaults`
         new_defaults = {}
         for name, value in self._defaults.items():
             if original_name := old_inverse.get(name):
@@ -282,13 +306,14 @@ class PipeFunc(Generic[T]):
             new_defaults[name] = value
         self._defaults = new_defaults
 
-        # Update bound with new renames
+        # Update `bound`
         new_bound = {}
         for name, value in bound_original.items():
             new_name = self._renames.get(name, name)
             new_bound[new_name] = value
         self._bound = new_bound
 
+        # Update `mapspec`
         if self.mapspec is not None:
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
@@ -338,23 +363,26 @@ class PipeFunc(Generic[T]):
                 " This is not allowed."
             )
             raise ValueError(msg)
-
-        self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
-        self._validate_update(self._defaults, "defaults", self.parameters)
-        self._validate_update(self._bound, "bound", self.parameters)
-        if not isinstance(self.output_name, str | tuple):
+        if not isinstance(self._output_name, str | tuple):
             msg = (
                 f"The output name should be a string or a tuple of strings,"
-                f" not {type(self.output_name)}."
+                f" not {type(self._output_name)}."
             )
             raise TypeError(msg)
+        self._validate_update(
+            self._renames,
+            "renames",
+            tuple(self.original_parameters) + at_least_tuple(self._output_name),  # type: ignore[arg-type]
+        )
+        self._validate_update(self._defaults, "defaults", self.parameters)
+        self._validate_update(self._bound, "bound", self.parameters)
         for name in at_least_tuple(self.output_name):
             _validate_identifier("output_name", name)
 
     def copy(self) -> PipeFunc:
         return PipeFunc(
             self.func,
-            self.output_name,
+            self._output_name,
             output_picker=self._output_picker,
             renames=self._renames,
             defaults=self._defaults,
@@ -680,8 +708,9 @@ class NestedPipeFunc(PipeFunc):
     def __init__(
         self,
         pipefuncs: Sequence[PipeFunc],
-        *,
         output_name: _OUTPUT_TYPE | None = None,
+        *,
+        renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
     ) -> None:
@@ -692,13 +721,13 @@ class NestedPipeFunc(PipeFunc):
         self.pipeline = Pipeline(self.pipefuncs)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
-        self.output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipefuncs)
         self.save_function = None
         self._output_picker = None
         self._profile = False
-        self._renames: dict[str, str] = {}
+        self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = {
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
@@ -714,7 +743,12 @@ class NestedPipeFunc(PipeFunc):
     def copy(self) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
         # the child mapspecs to None in the __init__
-        return NestedPipeFunc(self.pipefuncs, output_name=self.output_name, mapspec=self.mapspec)
+        return NestedPipeFunc(
+            self.pipefuncs,
+            output_name=self._output_name,
+            renames=self._renames,
+            mapspec=self.mapspec,
+        )
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipefuncs]
@@ -860,3 +894,12 @@ def _default_output_picker(
 
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _rename_output_name(
+    original_output_name: _OUTPUT_TYPE,
+    renames: dict[str, str],
+) -> _OUTPUT_TYPE:
+    if isinstance(original_output_name, str):
+        return renames.get(original_output_name, original_output_name)
+    return tuple(renames.get(name, name) for name in original_output_name)

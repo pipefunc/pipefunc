@@ -79,6 +79,7 @@ myst_enable_extensions = [
     "html_admonition",
     "colon_fence",
 ]
+html_theme_options = {"show_toc_level": 2}
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
@@ -119,6 +120,7 @@ shutil.copy(nb, nb_docs_folder)
 
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
+
 
 def setup(app) -> None:
     pass

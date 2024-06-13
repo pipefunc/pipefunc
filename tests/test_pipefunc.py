@@ -68,7 +68,17 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.parameters == ("a", "b", "x")
     assert f_nested.defaults == {"x": 1}
     assert f_nested(a=2, b=3) == (5, 15)
-    pipeline = Pipeline([f_nested, f3])
+    assert f_nested.renames == {}
+    f_nested.update_renames({"a": "a1", "b": "b1"})
+    assert f_nested.renames == {"a": "a1", "b": "b1"}
+    f_nested.update_renames({"a": "a2", "b": "b2"}, overwrite=True, update_from="original")
+    assert f_nested.renames == {"a": "a2", "b": "b2"}
+    assert f_nested.parameters == ("a2", "b2", "x")
+    f_nested_copy = f_nested.copy()
+    assert f_nested_copy.renames == f_nested.renames
+    assert f_nested_copy(a2=2, b2=3) == (5, 15)
+    f_nested_copy.update_renames({}, overwrite=True)
+    pipeline = Pipeline([f_nested_copy, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
 
     assert str(pipeline).startswith("Pipeline:")
@@ -876,6 +886,42 @@ def test_update_renames_with_mapspec() -> None:
     assert str(f.mapspec) == "a5[i], b1[j] -> c[i, j]"
     f.update_renames({}, overwrite=True)
     assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
+
+    # Test updating output_name
+    f.update_renames({"c": "c1"}, update_from="original")
+    assert str(f.mapspec) == "a[i], b[j] -> c1[i, j]"
+    assert f.output_name == "c1"
+    f.update_renames({"c1": "c2"}, update_from="current")
+    assert str(f.mapspec) == "a[i], b[j] -> c2[i, j]"
+    assert f.output_name == "c2"
+    f.update_renames({"c": "c3"}, update_from="original")
+    assert str(f.mapspec) == "a[i], b[j] -> c3[i, j]"
+    assert f.output_name == "c3"
+    f.update_renames({}, overwrite=True)
+    assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
+    assert f.output_name == "c"
+
+
+def test_renaming_output_name() -> None:
+    @pipefunc(output_name=("c", "d"), renames={"a": "a1"})
+    def f(a, b):
+        return a + b, 1
+
+    pipeline = Pipeline([f])
+    f.update_renames({"c": "c1"}, update_from="current")
+    assert f.output_name == ("c1", "d")
+    pipeline.update_renames({"c1": "c2"}, update_from="current")
+    assert f.output_name == ("c2", "d")
+    pipeline.update_renames({"d": "d1"}, overwrite=True, update_from="current")
+    assert f.output_name == ("c", "d1")
+    pipeline.update_renames({"c": "c1"}, overwrite=True, update_from="original")
+    assert f.output_name == ("c1", "d")
+    f2 = f.copy()
+    assert f2.output_name == ("c1", "d")
+    f2.update_renames({"c1": "c2"}, update_from="current")
+    assert f2.output_name == ("c2", "d")
+    f2.update_renames({}, overwrite=True)
+    assert f2.output_name == ("c", "d")
 
 
 def test_update_pipeline_defaults() -> None:
