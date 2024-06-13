@@ -115,8 +115,6 @@ class PipeFunc(Generic[T]):
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
-        self.output_name: _OUTPUT_TYPE = output_name
-        # copy of original output_name, used in renaming when `update_from="original"`
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
@@ -158,6 +156,17 @@ class PipeFunc(Generic[T]):
         """
         # Is a property to prevent users mutating `bound` directly
         return self._bound
+
+    @functools.cached_property
+    def output_name(self) -> _OUTPUT_TYPE:
+        """Return the output name(s) of the wrapped function.
+
+        Returns
+        -------
+            The output name(s) of the wrapped function.
+
+        """
+        return _rename_output_name(self._output_name, self._renames)
 
     @functools.cached_property
     def parameters(self) -> tuple[str, ...]:
@@ -308,9 +317,6 @@ class PipeFunc(Generic[T]):
         if self.mapspec is not None:
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
-        # Update `output_name`
-        self.output_name = _rename_output_name(self._output_name, self._renames)
-
         clear_cached_properties(self, PipeFunc)
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
@@ -357,7 +363,12 @@ class PipeFunc(Generic[T]):
                 " This is not allowed."
             )
             raise ValueError(msg)
-
+        if not isinstance(self._output_name, str | tuple):
+            msg = (
+                f"The output name should be a string or a tuple of strings,"
+                f" not {type(self._output_name)}."
+            )
+            raise TypeError(msg)
         self._validate_update(
             self._renames,
             "renames",
@@ -365,19 +376,13 @@ class PipeFunc(Generic[T]):
         )
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
-        if not isinstance(self.output_name, str | tuple):
-            msg = (
-                f"The output name should be a string or a tuple of strings,"
-                f" not {type(self.output_name)}."
-            )
-            raise TypeError(msg)
         for name in at_least_tuple(self.output_name):
             _validate_identifier("output_name", name)
 
     def copy(self) -> PipeFunc:
-        f = PipeFunc(
+        return PipeFunc(
             self.func,
-            self.output_name,
+            self._output_name,
             output_picker=self._output_picker,
             renames=self._renames,
             defaults=self._defaults,
@@ -389,8 +394,6 @@ class PipeFunc(Generic[T]):
             mapspec=self.mapspec,
             resources=self.resources,
         )
-        f._output_name = self._output_name
-        return f
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -717,7 +720,7 @@ class NestedPipeFunc(PipeFunc):
         self.pipeline = Pipeline(self.pipefuncs)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
-        self.output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipefuncs)
         self.save_function = None
@@ -814,7 +817,6 @@ class _NestedFuncWrapper:
     def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
         self.func: Callable[..., dict[str, Any]] = func
         self.output_name: _OUTPUT_TYPE = output_name
-        self._output_name: _OUTPUT_TYPE = output_name  # copy of original output_name
         self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
