@@ -188,13 +188,13 @@ When specifying renames, you can choose to update from the original argument nam
 :class: note, dropdown
 
    ```python
-   @pipefunc(output_name=("i", "j"), renames={"a": "x", "b": "y"})
+   @pipefunc(output_name=("i", "j"))
    def f(a, b):
        return a, b
 
    # renames must be in terms of individual output strings
-   add_func.update_renames({"i": "ii", "j": "jj"}, update_from="current")
-   assert add_func.output_name == ("ii", "jj")
+   add_func.update_renames({"i": "ii"}, update_from="current")
+   assert add_func.output_name == ("ii", "j")
    ```
 :::
 
