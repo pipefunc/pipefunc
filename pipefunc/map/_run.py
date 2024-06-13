@@ -38,7 +38,7 @@ _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    run_folder: str | Path | None,
+    run_folder: str | Path | None = None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
@@ -137,6 +137,7 @@ class Result(NamedTuple):
     output_name: str
     output: Any
     store: StorageBase | None
+    run_folder: Path
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -653,6 +654,7 @@ def _process_task(
             output_name=output_name,
             output=_output,
             store=store.get(output_name),
+            run_folder=run_folder,
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }

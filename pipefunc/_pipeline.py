@@ -506,7 +506,7 @@ class Pipeline:
     def map(
         self,
         inputs: dict[str, Any],
-        run_folder: str | Path | None,
+        run_folder: str | Path | None = None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
