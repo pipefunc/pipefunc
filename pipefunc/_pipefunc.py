@@ -133,7 +133,7 @@ class PipeFunc(Generic[T]):
 
     @property
     def renames(self) -> dict[str, str]:
-        """Return the renames for the function arguments.
+        """Return the renames for the function arguments and output name.
 
         See Also
         --------
@@ -251,7 +251,7 @@ class PipeFunc(Generic[T]):
         update_from: Literal["current", "original"] = "current",
         overwrite: bool = False,
     ) -> None:
-        """Update renames to function arguments for the wrapped function.
+        """Update renames to function arguments and ``output_name`` for the wrapped function.
 
         When renaming the ``output_name`` and if it is a tuple of strings, the
         renames must be provided as individual strings in the tuple.

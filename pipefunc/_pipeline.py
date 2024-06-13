@@ -671,7 +671,7 @@ class Pipeline:
         Parameters
         ----------
         renames
-            A dictionary mapping old parameter names to new parameter names.
+            A dictionary mapping old parameter names to new parameter and output names.
         update_from
             Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
             or from the original parameter names (`PipeFunc.original_parameters`).
