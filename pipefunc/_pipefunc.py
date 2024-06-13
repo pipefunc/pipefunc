@@ -577,6 +577,7 @@ def pipefunc(
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | None = None,
+    namespace: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -617,6 +618,23 @@ def pipefunc(
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
+    namespace
+        If provided, the parameter names of the function will be prefixed with the specified namespace
+        followed by a dot ('.'), creating a separate scope for the function's parameters within the pipeline.
+        This allows multiple functions in a pipeline to have parameters with the same name without conflict.
+
+        When a `Pipeline` contains `PipeFunc` instances with different namespaces, the parameters should be
+        provided as nested dictionaries, where the top-level keys correspond to the namespaces and the
+        nested keys represent the parameter names within each namespace.
+
+        For example, if a `Pipeline` contains `PipeFunc` instances with namespaces "foo" and "bar", the
+        parameters can be provided as: ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
+
+        The `namespace` feature allows for clearer organization and disambiguation of parameters in complex
+        pipelines, ensuring that each function's parameters are encapsulated within its own namespace.
+
+        Note: The `namespace` only affects the parameter names within the context of the `PipeFunc` and
+        `Pipeline`. The original function definition and its parameter names remain unchanged.
 
     Returns
     -------

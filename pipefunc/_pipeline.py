@@ -67,6 +67,11 @@ class Pipeline:
     ----------
     functions
         A list of functions that form the pipeline.
+    namespace
+        If provided, the parameter names of the functions are
+        prefixed with the namespace. This means a function with
+        a parameter named `x` in the namespace `foo` will take
+        the parameter name `foo.x`.
     lazy
         Flag indicating whether the pipeline should be lazy.
     debug
@@ -86,6 +91,7 @@ class Pipeline:
         self,
         functions: list[PipeFunc | tuple[PipeFunc, str | MapSpec]],
         *,
+        namespace: str | None = None,
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
