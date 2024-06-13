@@ -358,7 +358,11 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        self._validate_update(self._renames, "renames", self.original_parameters)  # type: ignore[arg-type]
+        self._validate_update(
+            self._renames,
+            "renames",
+            tuple(self.original_parameters) + at_least_tuple(self._output_name),  # type: ignore[arg-type]
+        )
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
         if not isinstance(self.output_name, str | tuple):
@@ -371,7 +375,7 @@ class PipeFunc(Generic[T]):
             _validate_identifier("output_name", name)
 
     def copy(self) -> PipeFunc:
-        return PipeFunc(
+        f = PipeFunc(
             self.func,
             self.output_name,
             output_picker=self._output_picker,
@@ -385,6 +389,8 @@ class PipeFunc(Generic[T]):
             mapspec=self.mapspec,
             resources=self.resources,
         )
+        f._output_name = self._output_name
+        return f
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.

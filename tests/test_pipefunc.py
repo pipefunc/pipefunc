@@ -892,6 +892,28 @@ def test_update_renames_with_mapspec() -> None:
     assert f.output_name == "c"
 
 
+def test_renaming_output_name() -> None:
+    @pipefunc(output_name=("c", "d"), renames={"a": "a1"})
+    def f(a, b):
+        return a + b, 1
+
+    pipeline = Pipeline([f])
+    f.update_renames({"c": "c1"}, update_from="current")
+    assert f.output_name == ("c1", "d")
+    pipeline.update_renames({"c1": "c2"}, update_from="current")
+    assert f.output_name == ("c2", "d")
+    pipeline.update_renames({"d": "d1"}, overwrite=True, update_from="current")
+    assert f.output_name == ("c", "d1")
+    pipeline.update_renames({"c": "c1"}, overwrite=True, update_from="original")
+    assert f.output_name == ("c1", "d")
+    f2 = f.copy()
+    assert f2.output_name == ("c1", "d")
+    f2.update_renames({"c1": "c2"}, update_from="current")
+    assert f2.output_name == ("c2", "d")
+    f2.update_renames({}, overwrite=True)
+    assert f2.output_name == ("c", "d")
+
+
 def test_update_pipeline_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
     def f(a=42, b=69):
