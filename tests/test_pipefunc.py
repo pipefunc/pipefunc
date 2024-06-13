@@ -847,6 +847,36 @@ def test_update_defaults_and_renames_and_bound() -> None:
     f.update_renames({"b": "b1"}, update_from="current")
     assert f.renames == {"a": "a5", "b": "b1"}
 
+    f.update_renames({}, overwrite=True)
+    assert f.parameters == ("a", "b")
+    assert f.renames == {}
+
+
+def test_update_renames_with_mapspec() -> None:
+    @pipefunc(output_name="c", renames={"a": "a1"}, mapspec="a1[i], b[j] -> c[i, j]")
+    def f(a=42, b=69):
+        return a + b
+
+    # Test initial parameters and defaults
+    assert f.parameters == ("a1", "b")
+    assert str(f.mapspec) == "a1[i], b[j] -> c[i, j]"
+
+    f.update_renames({"a": "a2"}, update_from="original")
+    assert f.renames == {"a": "a2"}
+    assert f.parameters == ("a2", "b")
+    assert str(f.mapspec) == "a2[i], b[j] -> c[i, j]"
+    f.update_renames({"a": "a3"}, overwrite=True, update_from="original")
+    assert f.parameters == ("a3", "b")
+    assert str(f.mapspec) == "a3[i], b[j] -> c[i, j]"
+    f.update_renames({"a": "a4"}, update_from="original")
+    assert str(f.mapspec) == "a4[i], b[j] -> c[i, j]"
+    f.update_renames({"a4": "a5"}, update_from="current")
+    assert str(f.mapspec) == "a5[i], b[j] -> c[i, j]"
+    f.update_renames({"b": "b1"}, update_from="current")
+    assert str(f.mapspec) == "a5[i], b1[j] -> c[i, j]"
+    f.update_renames({}, overwrite=True)
+    assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
+
 
 def test_update_pipeline_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})
