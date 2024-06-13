@@ -260,7 +260,6 @@ class PipeFunc(Generic[T]):
             "renames",
             self.parameters if update_from == "current" else self.original_parameters.keys(),  # type: ignore[arg-type]
         )
-
         if update_from == "current":
             # Convert to `renames` in terms of original names
             renames = {
@@ -268,7 +267,6 @@ class PipeFunc(Generic[T]):
                 for k, v in renames.items()
                 if k in self.parameters
             }
-        old_renames = self._renames.copy()
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
         if overwrite:
@@ -292,9 +290,7 @@ class PipeFunc(Generic[T]):
         self._bound = new_bound
 
         if self.mapspec is not None:
-            self.mapspec = self.mapspec.rename(
-                {old_renames.get(k, k): v for k, v in self._renames.items()},
-            )
+            self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
         clear_cached_properties(self, PipeFunc)
 
