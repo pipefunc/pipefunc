@@ -978,7 +978,7 @@ def test_storage_options():
         ValueError,
         match="Parallel execution is not supported with `zarr_memory` storage",
     ):
-        pipeline.map(inputs, None, storage="zarr_memory", parallel=True)
+        pipeline.map(inputs, storage="zarr_memory", parallel=True)
 
 
 def test_custom_executor():
@@ -1017,7 +1017,7 @@ def test_independent_axes_2():
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
     internal_shapes = {"y": (3,)}
-    r = pipeline.map(inputs, None, internal_shapes=internal_shapes, parallel=False)
+    r = pipeline.map(inputs, internal_shapes=internal_shapes, parallel=False)
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
     assert pipeline.independent_axes_in_mapspecs("r") == set()
@@ -1152,7 +1152,7 @@ def test_missing_inputs():
     pipeline = Pipeline([f])
     inputs = {}
     with pytest.raises(ValueError, match="Missing inputs"):
-        pipeline.map(inputs, None, parallel=False)
+        pipeline.map(inputs, parallel=False)
 
     with pytest.raises(
         ValueError,
@@ -1240,7 +1240,7 @@ def test_bound_2():
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": 2, "b": 3}
     r1 = pipeline("e", **inputs)
-    r2 = pipeline.map(inputs, None, parallel=False)
+    r2 = pipeline.map(inputs, parallel=False)
     assert r1 == r2["e"].output == 24
 
 
@@ -1255,7 +1255,7 @@ def test_bound_3():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": "c", "b": "b"}
-    r = pipeline.map(inputs, None, parallel=False)
+    r = pipeline.map(inputs, parallel=False)
     d = ("b", "c", "x_f")
     assert r["d"].output == d
     assert r["e"].output == ("c_fixed", d, "x_g")
@@ -1274,7 +1274,7 @@ def test_bound_4():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a"}
-    r = pipeline.map(inputs, None, parallel=False)
+    r = pipeline.map(inputs, parallel=False)
     assert r["x"].output == "a"
     assert r["y"].output == ("a_g", "a")
     assert pipeline("x", a="a") == "a"
@@ -1292,7 +1292,7 @@ def test_bound_5():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a", "b": "b"}
-    r = pipeline.map(inputs, None, parallel=False)
+    r = pipeline.map(inputs, parallel=False)
     assert r["c"].output == ("a", "b")
     assert r["d"].output == ("b", "c_bound", 1)
     assert pipeline("c", a="a", b="b") == ("a", "b")
