@@ -68,7 +68,17 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.parameters == ("a", "b", "x")
     assert f_nested.defaults == {"x": 1}
     assert f_nested(a=2, b=3) == (5, 15)
-    pipeline = Pipeline([f_nested, f3])
+    assert f_nested.renames == {}
+    f_nested.update_renames({"a": "a1", "b": "b1"})
+    assert f_nested.renames == {"a": "a1", "b": "b1"}
+    f_nested.update_renames({"a": "a2", "b": "b2"}, overwrite=True, update_from="original")
+    assert f_nested.renames == {"a": "a2", "b": "b2"}
+    assert f_nested.parameters == ("a2", "b2", "x")
+    f_nested_copy = f_nested.copy()
+    assert f_nested_copy.renames == f_nested.renames
+    assert f_nested_copy(a2=2, b2=3) == (5, 15)
+    f_nested_copy.update_renames({}, overwrite=True)
+    pipeline = Pipeline([f_nested_copy, f3])
     assert pipeline("e", a=2, b=3, x=1) == 75
 
     assert str(pipeline).startswith("Pipeline:")

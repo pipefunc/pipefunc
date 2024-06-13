@@ -708,8 +708,9 @@ class NestedPipeFunc(PipeFunc):
     def __init__(
         self,
         pipefuncs: Sequence[PipeFunc],
-        *,
         output_name: _OUTPUT_TYPE | None = None,
+        *,
+        renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
     ) -> None:
@@ -726,7 +727,7 @@ class NestedPipeFunc(PipeFunc):
         self.save_function = None
         self._output_picker = None
         self._profile = False
-        self._renames: dict[str, str] = {}
+        self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = {
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
@@ -742,7 +743,12 @@ class NestedPipeFunc(PipeFunc):
     def copy(self) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
         # the child mapspecs to None in the __init__
-        return NestedPipeFunc(self.pipefuncs, output_name=self.output_name, mapspec=self.mapspec)
+        return NestedPipeFunc(
+            self.pipefuncs,
+            output_name=self._output_name,
+            renames=self._renames,
+            mapspec=self.mapspec,
+        )
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipefuncs]
