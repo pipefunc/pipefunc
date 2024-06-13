@@ -877,6 +877,20 @@ def test_update_renames_with_mapspec() -> None:
     f.update_renames({}, overwrite=True)
     assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
 
+    # Test updating output_name
+    f.update_renames({"c": "c1"}, update_from="original")
+    assert str(f.mapspec) == "a[i], b[j] -> c1[i, j]"
+    assert f.output_name == "c1"
+    f.update_renames({"c1": "c2"}, update_from="current")
+    assert str(f.mapspec) == "a[i], b[j] -> c2[i, j]"
+    assert f.output_name == "c2"
+    f.update_renames({"c": "c3"}, update_from="original")
+    assert str(f.mapspec) == "a[i], b[j] -> c3[i, j]"
+    assert f.output_name == "c3"
+    f.update_renames({}, overwrite=True)
+    assert str(f.mapspec) == "a[i], b[j] -> c[i, j]"
+    assert f.output_name == "c"
+
 
 def test_update_pipeline_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 1}, renames={"a": "a1"})

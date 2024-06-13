@@ -280,7 +280,7 @@ class PipeFunc(Generic[T]):
             renames = {
                 self._inverse_renames.get(k, k): v
                 for k, v in renames.items()
-                if k in self.parameters
+                if k in allowed_parameters
             }
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
@@ -289,7 +289,7 @@ class PipeFunc(Generic[T]):
         else:
             self._renames = dict(self._renames, **renames)
 
-        # Update defaults with new renames
+        # Update `defaults`
         new_defaults = {}
         for name, value in self._defaults.items():
             if original_name := old_inverse.get(name):
@@ -297,15 +297,19 @@ class PipeFunc(Generic[T]):
             new_defaults[name] = value
         self._defaults = new_defaults
 
-        # Update bound with new renames
+        # Update `bound`
         new_bound = {}
         for name, value in bound_original.items():
             new_name = self._renames.get(name, name)
             new_bound[new_name] = value
         self._bound = new_bound
 
+        # Update `mapspec`
         if self.mapspec is not None:
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
+
+        # Update `output_name`
+        self.output_name = _rename_output_name(self._output_name, self._renames)
 
         clear_cached_properties(self, PipeFunc)
 
@@ -804,6 +808,7 @@ class _NestedFuncWrapper:
     def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
         self.func: Callable[..., dict[str, Any]] = func
         self.output_name: _OUTPUT_TYPE = output_name
+        self._output_name: _OUTPUT_TYPE = output_name  # copy of original output_name
         self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -875,3 +880,12 @@ def _default_output_picker(
 
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _rename_output_name(
+    original_output_name: _OUTPUT_TYPE,
+    renames: dict[str, str],
+) -> _OUTPUT_TYPE:
+    if isinstance(original_output_name, str):
+        return renames.get(original_output_name, original_output_name)
+    return tuple(renames.get(name, name) for name in original_output_name)
