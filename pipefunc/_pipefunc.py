@@ -244,6 +244,9 @@ class PipeFunc(Generic[T]):
     ) -> None:
         """Update renames to function arguments for the wrapped function.
 
+        When renaming the ``output_name`` and if it is a tuple of strings, the
+        renames must be provided as individual strings in the tuple.
+
         Parameters
         ----------
         renames
@@ -260,6 +263,8 @@ class PipeFunc(Generic[T]):
 
         """
         assert update_from in ("current", "original")
+        assert all(isinstance(k, str) for k in renames.keys())  # noqa: SIM118
+        assert all(isinstance(v, str) for v in renames.values())
         allowed_parameters = tuple(
             self.parameters + at_least_tuple(self.output_name)
             if update_from == "current"
