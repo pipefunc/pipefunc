@@ -152,7 +152,7 @@ There are a few ways to specify renames:
 1. Via the `@pipefunc` decorator:
 
    ```python
-   @pipefunc(output_name="y", renames={"a": "x", "b": "y"})
+   @pipefunc(output_name="prod", renames={"a": "x", "b": "y"})
    def multiply(a, b):
        return a * b
    ```
@@ -183,6 +183,21 @@ There are a few ways to specify renames:
    ```
 
 When specifying renames, you can choose to update from the original argument names (`update_from="original"`) or from the current renamed arguments (`update_from="current"`).
+
+:::{admonition} We can also update the <code>output_name</code>
+:class: note, dropdown
+
+   ```python
+   @pipefunc(output_name=("i", "j"), renames={"a": "x", "b": "y"})
+   def f(a, b):
+       return a, b
+
+   # renames must be in terms of individual output strings
+   add_func.update_renames({"i": "ii", "j": "jj"}, update_from="current")
+   assert add_func.output_name == ("ii", "jj")
+   ```
+:::
+
 
 Some key things to note:
 
