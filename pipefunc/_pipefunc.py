@@ -116,6 +116,8 @@ class PipeFunc(Generic[T]):
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
         self.output_name: _OUTPUT_TYPE = output_name
+        # copy of original output_name, used in renaming when `update_from="original"`
+        self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
         self.save_function = save_function
@@ -245,20 +247,28 @@ class PipeFunc(Generic[T]):
         Parameters
         ----------
         renames
-            A dictionary of renames for the function arguments.
+            A dictionary of renames for the function arguments or ``output_name``.
         update_from
-            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
-            or from the original parameter names (`PipeFunc.original_parameters`).
+            Whether to update the renames from the ``"current"`` parameter names
+            (`PipeFunc.parameters`) or from the ``"original"`` parameter names as
+            in the function signature (`PipeFunc.original_parameters`). If also updating
+            the ``output_name``, original means the name that was provided to the
+            `PipeFunc` instance.
         overwrite
             Whether to overwrite the existing renames. If ``False``, the new
             renames will be added to the existing renames.
 
         """
         assert update_from in ("current", "original")
+        allowed_parameters = tuple(
+            self.parameters + at_least_tuple(self.output_name)
+            if update_from == "current"
+            else tuple(self.original_parameters) + at_least_tuple(self._output_name),
+        )
         self._validate_update(
             renames,
             "renames",
-            self.parameters if update_from == "current" else self.original_parameters.keys(),  # type: ignore[arg-type]
+            allowed_parameters,  # type: ignore[arg-type]
         )
         if update_from == "current":
             # Convert to `renames` in terms of original names

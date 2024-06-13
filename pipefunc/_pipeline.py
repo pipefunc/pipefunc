@@ -682,7 +682,11 @@ class Pipeline:
         """
         unused = set(renames.keys())
         for f in self.functions:
-            parameters = f.parameters if update_from == "current" else f.original_parameters
+            parameters = tuple(
+                f.parameters + at_least_tuple(f.output_name)
+                if update_from == "current"
+                else tuple(f.original_parameters) + at_least_tuple(f._output_name),
+            )
             update = {k: v for k, v in renames.items() if k in parameters}
             unused -= set(update.keys())
             f.update_renames(update, overwrite=overwrite, update_from=update_from)
