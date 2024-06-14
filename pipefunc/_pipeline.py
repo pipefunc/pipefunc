@@ -67,11 +67,6 @@ class Pipeline:
     ----------
     functions
         A list of functions that form the pipeline.
-    namespace
-        If provided, the parameter names of the functions are
-        prefixed with the namespace. This means a function with
-        a parameter named `x` in the namespace `foo` will take
-        the parameter name `foo.x`.
     lazy
         Flag indicating whether the pipeline should be lazy.
     debug
