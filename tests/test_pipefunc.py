@@ -1495,3 +1495,25 @@ def test_pipeline_scope():
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="for functions that have scopes"):
         pipeline(**{"x.b": 1, "x": {"a": 1}})
+
+
+def test_pipeline_scope_partial():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c
+
+    pipeline = Pipeline([f, g])
+    scope = "x"
+    pipeline.set_scope(scope, inputs="*", outputs={"c"})
+    assert f.output_name == "x.c"
+    assert f.parameters == ("x.a", "x.b")
+    assert g.parameters == ("x.c",)
+    assert g.output_name == "d"
+    assert pipeline("d", x={"a": 1, "b": 1}) == 2
+    assert pipeline(x={"a": 1, "b": 1}) == 2
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(**{"x.a": 1, "x.b": 1}) == 2

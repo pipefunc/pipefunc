@@ -23,7 +23,7 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._perf import resources_report
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _prepend_name_with_scope
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -498,12 +498,12 @@ class Pipeline:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
 
-        all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
-        used_parameters: set[str | None] = set()
-
         flat_scope_kwargs = kwargs
         for f in self.functions:
             flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+
+        all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        used_parameters: set[str | None] = set()
 
         self._run(
             output_name=output_name,
@@ -751,26 +751,19 @@ class Pipeline:
         >>> pipeline.set_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
 
         """
-        if exclude is None:
-            exclude = set()
+        all_inputs = set(self.topological_generations.root_args)
 
-        if inputs == "*":
-            inputs = set(self.topological_generations.root_args)
-        elif inputs is None:
-            inputs = set()
-        else:
-            inputs = set(inputs)  # Ensure it is a set
-
-        if outputs == "*":
-            outputs = set(self.all_output_names)
-        elif outputs is None:
-            outputs = set()
-        else:
-            outputs = set(outputs)  # Ensure it is a set
-
-        all_parameters = (inputs | outputs) - exclude
-        renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
-        self.update_renames(renames, update_from="current")
+        for f in self.functions:
+            f_inputs = (
+                set(inputs) & set(f.parameters) & all_inputs if isinstance(inputs, set) else inputs
+            )
+            f_outputs = (
+                set(outputs) & set(at_least_tuple(f.output_name))
+                if isinstance(outputs, set)
+                else outputs
+            )
+            f.set_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        self._init_internal_cache()
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:

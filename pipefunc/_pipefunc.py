@@ -144,7 +144,7 @@ class PipeFunc(Generic[T]):
         self._validate_mapspec()
         self._validate_names()
         if scope is not None:
-            self.set_scope(scope)
+            self.set_scope(scope, inputs="*", outputs="*")
 
     @property
     def renames(self) -> dict[str, str]:
