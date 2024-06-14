@@ -46,7 +46,15 @@ class ArraySpec:
     axes: tuple[str | None, ...]
 
     def __post_init__(self) -> None:
-        if not self.name.isidentifier():
+        if "." in self.name:
+            scope, name = self.name.split(".")
+            if not (scope.isidentifier() and name.isidentifier()):
+                msg = (
+                    f"Array name '{self.name}' is not a valid Python identifier."
+                    " Both the scope and parameter name must be valid identifiers."
+                )
+                raise ValueError(msg)
+        elif not self.name.isidentifier():
             msg = f"Array name '{self.name}' is not a valid Python identifier"
             raise ValueError(msg)
         for i in self.axes:

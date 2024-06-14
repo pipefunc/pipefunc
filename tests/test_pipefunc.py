@@ -1470,13 +1470,12 @@ def test_nesting_funcs_with_bound():
 
 
 def test_pipefunc_scope():
-    @pipefunc(output_name="c")
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
     def f(a, b):
         return a + b
 
     scope = "x"
     f.set_scope(scope, "*")
-
     assert f(x={"a": 1, "b": 1}) == 2
     assert f(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="for functions that have scopes"):
