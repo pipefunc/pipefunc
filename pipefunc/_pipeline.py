@@ -370,7 +370,8 @@ class Pipeline:
     def _get_func_args(
         self,
         func: PipeFunc,
-        kwargs: dict[str, Any],  # Includes defaults
+        kwargs: dict[str, Any],
+        flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
@@ -380,12 +381,13 @@ class Pipeline:
         for arg in func.parameters:
             if arg in func._bound:
                 value = func._bound[arg]
-            elif arg in kwargs:
-                value = kwargs[arg]
+            elif arg in flat_scope_kwargs:
+                value = flat_scope_kwargs[arg]
             elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
                     kwargs=kwargs,
+                    flat_scope_kwargs=flat_scope_kwargs,
                     all_results=all_results,
                     full_output=full_output,
                     used_parameters=used_parameters,
@@ -403,7 +405,8 @@ class Pipeline:
         self,
         *,
         output_name: _OUTPUT_TYPE,
-        kwargs: Any,
+        kwargs: dict[str, Any],
+        flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,
         used_parameters: set[str | None],
@@ -412,7 +415,6 @@ class Pipeline:
             return all_results[output_name]
         func = self.output_to_func[output_name]
         assert func.parameters is not None
-
         cache = self._current_cache()
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
@@ -421,7 +423,7 @@ class Pipeline:
             assert cache is not None
             cache_key = _compute_cache_key(
                 func.output_name,
-                func.defaults | kwargs | func._bound,
+                func.defaults | flat_scope_kwargs | func._bound,
                 root_args,
             )
             return_now, result_from_cache = _get_result_from_cache(
@@ -437,7 +439,14 @@ class Pipeline:
             if return_now:
                 return all_results[output_name]
 
-        func_args = self._get_func_args(func, kwargs, all_results, full_output, used_parameters)
+        func_args = self._get_func_args(
+            func,
+            kwargs,
+            flat_scope_kwargs,
+            all_results,
+            full_output,
+            used_parameters,
+        )
 
         if result_from_cache:
             assert full_output
@@ -492,16 +501,23 @@ class Pipeline:
         all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
 
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+
         self._run(
             output_name=output_name,
             kwargs=kwargs,
+            flat_scope_kwargs=flat_scope_kwargs,
             all_results=all_results,
             full_output=full_output,
             used_parameters=used_parameters,
         )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (unused := kwargs.keys() - set(used_parameters)):
+        if None not in used_parameters and (
+            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        ):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
