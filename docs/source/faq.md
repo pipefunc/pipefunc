@@ -340,41 +340,45 @@ Here are a few ways to use parameter scopes:
        return a * b
 
    g_func = PipeFunc(g, output_name="z")
+   print(g_func.parameters)  # Output: ('a', 'b')
+   print(g_func.output_name)  # Output: 'z'
+
    g_func.update_scope("bar", inputs={"a"}, outputs="*")
+   print(g_func.parameters)  # Output: ('bar.a', 'b')
+   print(g_func.output_name)  # Output: 'bar.z'
    ```
 
-   This updates the scope of input `a` and outputs of `g_func` to "bar". The parameter names become `bar.a` and `b` (same), and the output name becomes `bar.z`.
+   This updates the scope of input `a` and outputs of `g_func` to "bar". The parameter names become `bar.a` and `b`, and the output name becomes `bar.z`.
 
 3. Update the scope of an entire `Pipeline`:
 
    ```python
    pipeline = Pipeline([f, g_func])
-   pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+   pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})  # all outputs except foo.y, so only bar.z, which is now baz.z
    ```
 
-   This updates the scope of all inputs and outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope. The parameter are now `foo.a`, `foo.b`, `bar.a`, `bar.b`, and only the output name `bar.z` becomes `baz.z`.
+   This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope. The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
 
-When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation:
+When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
 
 ```python
-pipeline(foo=dict(a=1, b=2), bar=dict(a=3, b=4))
+pipeline(foo=dict(a=1, b=2), bar=dict(a=3), b=4)
 # or
-pipeline(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})
+pipeline(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4})
 ```
-
-Both ways are equivalent, but you cannot mix the two styles in a single call.
 
 Some key things to note:
 
-- Setting a scope prefixes all parameter and output names with `{scope}.`, e.g. `x` becomes `foo.x` if the scope is "foo".
+- Setting a scope prefixes parameter and output names with `{scope}.`, e.g. `x` becomes `foo.x` if the scope is "foo".
 - You can selectively include or exclude certain inputs/outputs when updating the scope using the `inputs`, `outputs` and `exclude` arguments.
-- Updating the scope of a pipeline updates the scopes of all its functions, propagating the changes.
+- Updating the scope of a pipeline updates the scopes of its functions, propagating the changes.
+- Applying a scope to a parameter that is already in a scope will *replace* the existing scope with the new one.
 - Using scopes makes it possible to use the same parameter names in different contexts without conflicts.
 - Scopes are purely a naming mechanism and do not affect the actual function execution.
 
 Parameter scopes are a convenient way to organize complex pipelines and make them more readable by grouping related parameters together. They also help avoid naming conflicts and make it easier to reason about the data flow between functions.
 
-This additional example that illustrates how `update_scope` is essentially applying renames under the hood:
+To illustrate how `update_scope` works under the hood, consider this example:
 
 ```python
 @pipefunc(output_name="y")
@@ -400,9 +404,7 @@ This is equivalent to applying the following renames:
 pipeline.update_renames({"a": "my_scope.a", "b": "my_scope.b", "y": "my_scope.y", "c": "my_scope.c", "z": "my_scope.z"})
 ```
 
-After applying the scope, the parameter names and output names of the functions in the pipeline are prefixed with `my_scope.`.
-
-We can confirm this by inspecting the `PipeFunc` objects:
+After applying the scope, the parameter names and output names of the functions in the pipeline are prefixed with `my_scope.`. We can confirm this by inspecting the `PipeFunc` objects:
 
 ```python
 print(f.parameters)  # Output: ('my_scope.a', 'my_scope.b')
@@ -411,10 +413,6 @@ print(g.parameters)  # Output: ('my_scope.y', 'my_scope.c')
 print(g.output_name)  # Output: 'my_scope.z'
 ```
 
-So, `update_scope` is really just a convenience method that automatically generates the appropriate renames based on the provided scope and applies them to the `PipeFunc` or `Pipeline`.
-
-Internally, it calls `update_renames` with the generated renames. This abstraction makes it easier to manage parameter and output names in complex pipelines without having to manually specify all the renames.
+So, `update_scope` is really just a convenience method that automatically generates the appropriate renames based on the provided scope and applies them to the `PipeFunc` or `Pipeline`. Internally, it calls `update_renames` with the generated renames, making it easier to manage parameter and output names in complex pipelines.
 
 It's worth noting that while `update_scope` affects the external names (i.e., how the parameters and outputs are referred to in the pipeline), it doesn't change the actual parameter names in the original function definitions. The mapping between the original names and the scoped names is handled by the `PipeFunc` wrapper.
-
-Understanding that `update_scope` is essentially applying renames can help clarify how it works and how it relates to other features like `update_renames`. It also highlights the flexibility of the `PipeFunc` and `Pipeline` abstractions, which allow you to manipulate the input/output names without modifying the underlying functions.
