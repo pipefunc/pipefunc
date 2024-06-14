@@ -78,11 +78,11 @@ class PipeFunc(Generic[T]):
         function.
     scope
         If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot ('.'), creating a
-        separate scope for the function's parameters. This
-        allows multiple functions in a pipeline to have parameters with the same
-        name without conflict. To be selective about which parameters and
-        outputs to include in the scope, use the `PipeFunc.update_scope` method.
+        be prefixed with the specified scope followed by a dot ('.'), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
 
         When providing parameter values for functions that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
@@ -490,6 +490,7 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
+
         kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
@@ -750,11 +751,11 @@ def pipefunc(
         function.
     scope
         If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot ('.'), creating a
-        separate scope for the function's parameters. This
-        allows multiple functions in a pipeline to have parameters with the same
-        name without conflict. To be selective about which parameters and
-        outputs to include in the scope, use the `PipeFunc.update_scope` method.
+        be prefixed with the specified scope followed by a dot ('.'), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
 
         When providing parameter values for functions that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
