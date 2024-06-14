@@ -657,6 +657,7 @@ class Pipeline:
             unused -= set(update.keys())
             if overwrite or update:
                 f.update_defaults(update, overwrite=overwrite)
+        self._init_internal_cache()
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
@@ -696,6 +697,7 @@ class Pipeline:
             update = {k: v for k, v in renames.items() if k in parameters}
             unused -= set(update.keys())
             f.update_renames(update, overwrite=overwrite, update_from=update_from)
+        self._init_internal_cache()
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
