@@ -95,7 +95,6 @@ class Pipeline:
         debug: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
-        namespace: str | None = None,
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
@@ -702,6 +701,61 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
+
+    def set_scope(
+        self,
+        scope: str,
+        inputs: set[str] | Literal["*"] | None = None,
+        outputs: set[str] | Literal["*"] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Set the scope for the pipeline by adding a prefix to the input and output names.
+
+        This method updates the names of the specified inputs and outputs by adding the provided
+        scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
+        If an input or output name already starts with the scope prefix, it remains unchanged.
+
+        Parameters
+        ----------
+        scope
+            The scope to set for the pipeline.
+        inputs
+            Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
+        outputs
+            Specific output names to include, or "*" to include all outputs. If None, no outputs are included.
+        exclude
+            Names to exclude from the scope. This can include both inputs and outputs. Can be used with `inputs`
+            or `outputs` being "*" to exclude specific names.
+
+        Examples
+        --------
+        >>> pipeline.set_scope("my_scope", inputs="*")
+        >>> pipeline.set_scope("my_scope", outputs={"output1", "output2"})
+        >>> pipeline.set_scope("my_scope", exclude={"input3", "output3"})
+        >>> pipeline.set_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+
+        """
+        if exclude is None:
+            exclude = set()
+
+        # Determine final sets of inputs and outputs
+        if inputs == "*":
+            inputs = set(self.topological_generations.root_args)
+        elif inputs is None:
+            inputs = set()
+        inputs = inputs - exclude
+
+        if outputs == "*":
+            outputs = set(self.all_output_names)
+        elif outputs is None:
+            outputs = set()
+        outputs = outputs - exclude
+
+        def add_scope(name: str) -> str:
+            return name if name.startswith(f"{scope}.") else f"{scope}.{name}"
+
+        renames = {name: add_scope(name) for name in inputs | outputs}
+        self.update_renames(renames, update_from="current")
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
