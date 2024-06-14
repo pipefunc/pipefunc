@@ -800,6 +800,10 @@ class Pipeline:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations.function_lists for f in gen]
 
+    @functools.cached_property
+    def all_output_names(self) -> set[str]:
+        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
+
     def _autogen_mapspec_axes(self) -> set[PipeFunc]:
         """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
         root_args = self.topological_generations.root_args
