@@ -1557,3 +1557,20 @@ def test_set_pipefunc_scope_on_init():
     assert f.unscoped_parameters == ("a", "b")
     assert f.parameters == ("a", "b")
     assert f(a=1, b=1) == 2
+
+
+def test_scope_and_parameter_identical():
+    @pipefunc(output_name="c", scope="foo")
+    def f(x):
+        return x
+
+    pipeline1 = Pipeline([f])
+
+    @pipefunc(output_name="c", scope="bar")
+    def g(foo):
+        return foo
+
+    pipeline2 = Pipeline([g])
+
+    with pytest.raises(ValueError, match="The provided `scope='foo'` cannot be identical"):
+        pipeline1 | pipeline2
