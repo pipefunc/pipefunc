@@ -226,6 +226,10 @@ class _MockPipeline:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
 
+    @functools.cached_property
+    def all_output_names(self) -> set[str]:
+        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
+
     @property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
