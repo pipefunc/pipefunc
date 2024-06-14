@@ -92,8 +92,8 @@ class Pipeline:
         ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
         a `Pipeline` instance with scope "foo" and "bar", the parameters
         can be provided as:
-        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))`` or
-        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
     """
 
@@ -737,7 +737,7 @@ class Pipeline:
         """Update the scope for the pipeline by adding (or removing) a prefix to the input and output names.
 
         This method updates the names of the specified inputs and outputs by adding the provided
-        scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
+        scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
         If an input or output name already starts with the scope prefix, it remains unchanged.
         If their is an existing scope, it is replaced with the new scope.
 
@@ -745,6 +745,14 @@ class Pipeline:
         which are outputs of other functions are considered to be outputs.
 
         Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
         Parameters
         ----------
