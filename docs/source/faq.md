@@ -354,7 +354,8 @@ Here are a few ways to use parameter scopes:
 
    ```python
    pipeline = Pipeline([f, g_func])
-   pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})  # all outputs except foo.y, so only bar.z, which is now baz.z
+   # all outputs except foo.y, so only bar.z, which becomes baz.z
+   pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
    ```
 
    This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope. The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
