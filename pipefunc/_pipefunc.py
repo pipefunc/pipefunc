@@ -339,12 +339,12 @@ class PipeFunc(Generic[T]):
 
     def update_scope(
         self,
-        scope: str,
+        scope: str | None,
         inputs: set[str] | Literal["*"] | None = None,
         outputs: set[str] | Literal["*"] | None = None,
         exclude: set[str] | None = None,
     ) -> None:
-        """Set the scope for the `PipeFunc` by adding a prefix to the input and output names.
+        """Update the scope for the `PipeFunc` by adding (or removing) a prefix to the input and output names.
 
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
@@ -356,7 +356,7 @@ class PipeFunc(Generic[T]):
         Parameters
         ----------
         scope
-            The scope to set for the inputs and outputs.
+            The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
         inputs
             Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
         outputs
@@ -370,6 +370,7 @@ class PipeFunc(Generic[T]):
         >>> f.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
         >>> f.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
         >>> f.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
+        >>> f.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
         if scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name):
@@ -1056,7 +1057,11 @@ def _rename_output_name(
     return tuple(renames.get(name, name) for name in original_output_name)
 
 
-def _prepend_name_with_scope(name: str, scope: str) -> str:
+def _prepend_name_with_scope(name: str, scope: str | None) -> str:
+    if scope is None:
+        if "." in name:
+            return name.split(".")[1]
+        return name
     if name.startswith(f"{scope}."):
         return name
     if "." in name:

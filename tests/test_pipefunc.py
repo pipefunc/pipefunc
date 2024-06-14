@@ -1517,3 +1517,21 @@ def test_pipeline_scope_partial():
     assert pipeline(x={"a": 1, "b": 1}) == 2
     assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
+
+
+def test_set_pipeline_scope_on_init():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f], scope="x")
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(x={"a": 1, "b": 1}) == 2
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
+    with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
+        pipeline.update_scope("a", "*")
+    pipeline.update_scope("foo", outputs="*")
+    assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
+    pipeline.update_scope(None, "*")
+    assert pipeline("foo.c", a=1, b=1) == 2

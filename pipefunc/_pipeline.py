@@ -131,7 +131,7 @@ class Pipeline:
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         if scope is not None:
-            self.update_scope(scope)
+            self.update_scope(scope, "*", "*")
         self._validate_mapspec()
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
@@ -738,12 +738,12 @@ class Pipeline:
 
     def update_scope(
         self,
-        scope: str,
+        scope: str | None,
         inputs: set[str] | Literal["*"] | None = None,
         outputs: set[str] | Literal["*"] | None = None,
         exclude: set[str] | None = None,
     ) -> None:
-        """Set the scope for the pipeline by adding a prefix to the input and output names.
+        """Update the scope for the pipeline by adding (or removing) a prefix to the input and output names.
 
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
@@ -758,20 +758,23 @@ class Pipeline:
         Parameters
         ----------
         scope
-            The scope to set for the inputs and outputs.
+            The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
         inputs
-            Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
+            Specific input names to include, or ``"*"`` to include all inputs.
+            If ``None``, no inputs are included.
         outputs
-            Specific output names to include, or "*" to include all outputs. If None, no outputs are included.
+            Specific output names to include, or ``"*"`` to include all outputs.
+            If ``None``, no outputs are included.
         exclude
-            Names to exclude from the scope. This can include both inputs and outputs. Can be used with `inputs`
-            or `outputs` being "*" to exclude specific names.
+            Names to exclude from the scope. Both inputs and outputs can be excluded.
+            Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
 
         Examples
         --------
         >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
         >>> pipeline.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
         >>> pipeline.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
+        >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
         all_inputs = set(self.topological_generations.root_args)
