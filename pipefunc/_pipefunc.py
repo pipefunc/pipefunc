@@ -851,6 +851,10 @@ class _NestedFuncWrapper:
 
 
 def _validate_identifier(name: str, value: Any) -> None:
+    if "." in value:
+        for part in value.split("."):
+            _validate_identifier(name, part)
+        return
     if not value.isidentifier():
         msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."
         raise ValueError(msg)

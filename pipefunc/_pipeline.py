@@ -83,7 +83,7 @@ class Pipeline:
     cache_type
         The type of cache to use.
     cache_kwargs
-        Keyword arguments passed to
+        Keyword arguments passed to the cache constructor.
 
     """
 
@@ -91,11 +91,11 @@ class Pipeline:
         self,
         functions: list[PipeFunc | tuple[PipeFunc, str | MapSpec]],
         *,
-        namespace: str | None = None,
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
+        namespace: str | None = None,
         cache_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
