@@ -1606,4 +1606,5 @@ def test_scope_with_mapspec():
     assert str(f.mapspec) == "foo.a[i] -> foo.c[i]"
     pipeline = Pipeline([f])
     assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
-    pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})
+    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})
+    assert results["foo.c"].output.tolist() == [1, 2, 3]

@@ -305,7 +305,7 @@ def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
             "Please check your syntax and try again."
         )
         raise ValueError(msg)
-    array_pattern = r"(\w+?)\[(.+?)\]"
+    array_pattern = r"(\w+(?:\.\w+)?\w*)\[(.+?)\]"
     return tuple(
         ArraySpec(name, _parse_index_string(indices))
         for name, indices in re.findall(array_pattern, expr)

@@ -494,6 +494,16 @@ def test_trace_dependencies():
 
 
 def test_mapspec_from_string_with_scope() -> None:
-    spec = MapSpec.from_string("foo.a[i] -> foo.c[i]")
-    assert spec.input_names == ("foo.a",)
-    assert spec.output_names == ("foo.c",)
+    # Valid cases
+    valid_cases = [
+        ("foo.a[i] -> foo.c[i]", ("foo.a",), ("foo.c",)),
+        ("a[i, j] -> b[i, j]", ("a",), ("b",)),
+        ("foo.bar[i] -> baz.qux[i]", ("foo.bar",), ("baz.qux",)),
+        ("x[i] -> y[i]", ("x",), ("y",)),
+        ("simple_name[index1] -> another_name[index1]", ("simple_name",), ("another_name",)),
+    ]
+
+    for expr, expected_inputs, expected_outputs in valid_cases:
+        spec = MapSpec.from_string(expr)
+        assert spec.input_names == expected_inputs, f"Failed on input: {expr}"
+        assert spec.output_names == expected_outputs, f"Failed on output: {expr}"
