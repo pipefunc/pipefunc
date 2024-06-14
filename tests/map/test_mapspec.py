@@ -491,3 +491,9 @@ def test_trace_dependencies():
         "y": {"n": ("j",)},
         "sum": {"n": ("j",)},
     }
+
+
+def test_mapspec_from_string_with_scope() -> None:
+    spec = MapSpec.from_string("foo.a[i] -> foo.c[i]")
+    assert spec.input_names == ("foo.a",)
+    assert spec.output_names == ("foo.c",)

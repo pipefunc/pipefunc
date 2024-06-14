@@ -92,6 +92,7 @@ def run(
         and an exception is raised if any are missing.
 
     """
+    inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     _validate_complete_inputs(pipeline, inputs)

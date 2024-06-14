@@ -1595,3 +1595,15 @@ def test_scope_and_parameter_identical():
 
     with pytest.raises(ValueError, match="`bar` are used as both parameter and scope"):
         pipeline1 | pipeline2
+
+
+def test_scope_with_mapspec():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a, b):
+        return a + b
+
+    f.update_scope("foo", {"a"}, {"c"})
+    assert str(f.mapspec) == "foo.a[i] -> foo.c[i]"
+    pipeline = Pipeline([f])
+    assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
+    pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})

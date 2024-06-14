@@ -508,9 +508,7 @@ class Pipeline:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
 
-        flat_scope_kwargs = kwargs
-        for f in self.functions:
-            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
@@ -790,6 +788,12 @@ class Pipeline:
             )
             f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
         self._init_internal_cache()
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        return flat_scope_kwargs
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
