@@ -536,12 +536,16 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def parameter_scopes(self) -> set[str]:
-        """Return the scopes of the function parameters."""
+        """Return the scopes of the function parameters.
+
+        These are constructed from the parameter names that contain a dot.
+        So if the parameter is ``foo.bar``, the scope is ``foo``.
+        """
         return {k.split(".", 1)[0] for k in self.parameters if "." in k}
 
     @functools.cached_property
     def unscoped_parameters(self) -> tuple[str, ...]:
-        """Return the parameters without the scope."""
+        """Return the parameters with the scope stripped off."""
         return tuple(name.split(".", 1)[-1] for name in self.parameters)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
