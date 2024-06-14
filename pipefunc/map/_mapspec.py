@@ -47,7 +47,7 @@ class ArraySpec:
 
     def __post_init__(self) -> None:
         if "." in self.name:
-            scope, name = self.name.split(".")
+            scope, name = self.name.split(".", 1)
             if not (scope.isidentifier() and name.isidentifier()):
                 msg = (
                     f"Array name '{self.name}' is not a valid Python identifier."

@@ -1532,6 +1532,24 @@ def test_set_pipeline_scope_on_init():
     with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
         pipeline.update_scope("a", "*")
     pipeline.update_scope("foo", outputs="*")
+    pipeline.update_scope("foo", outputs="*")  # twice should be fine
     assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
+    pipeline.update_scope(None, {"x.b"})
+    assert pipeline("foo.c", x={"a": 1}, b=1) == 2
     pipeline.update_scope(None, "*")
     assert pipeline("foo.c", a=1, b=1) == 2
+
+    with pytest.raises(ValueError, match="The `renames` should contain"):
+        pipeline.update_renames({"a": "qq#.a"})
+
+
+def test_set_pipefunc_scope_on_init():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="x")
+    def f(a, b):
+        return a + b
+
+    assert f.unscoped_parameters == ("a", "b")
+    assert f.parameter_scopes == {"x"}
+    assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
+    assert str(f.mapspec) == "x.a[i] -> x.c[i]"
+    assert f(x={"a": 1, "b": 1}) == 2

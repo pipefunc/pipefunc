@@ -373,7 +373,9 @@ class PipeFunc(Generic[T]):
         >>> f.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
-        if scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name):
+        if scope is not None and (
+            scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name)
+        ):
             msg = f"The provided `{scope=}` cannot be identical to the function input parameters or output name."
             raise ValueError(msg)
 
@@ -395,6 +397,7 @@ class PipeFunc(Generic[T]):
             outputs = set(outputs)  # Ensure it is a set
 
         all_parameters = (inputs | outputs) - exclude
+        assert all_parameters, "No parameters to update the scope for."
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
@@ -432,8 +435,10 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        for key in update:
-            _validate_identifier(key, name)
+        for key, value in update.items():
+            _validate_identifier(name, key)
+            if name == "renames":
+                _validate_identifier(name, value)
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -525,12 +530,12 @@ class PipeFunc(Generic[T]):
     @functools.cached_property
     def parameter_scopes(self) -> set[str]:
         """Return the scopes of the function parameters."""
-        return {k.split(".")[0] for k in self.parameters if "." in k}
+        return {k.split(".", 1)[0] for k in self.parameters if "." in k}
 
     @functools.cached_property
     def unscoped_parameters(self) -> tuple[str, ...]:
         """Return the parameters without the scope."""
-        return tuple(name.split(".")[-1] for name in self.parameters)
+        return tuple(name.split(".", 1)[-1] for name in self.parameters)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Flatten the scopes of the function parameters.
@@ -981,7 +986,7 @@ class _NestedFuncWrapper:
 
 def _validate_identifier(name: str, value: Any) -> None:
     if "." in value:
-        scope, value = value.split(".")
+        scope, value = value.split(".", 1)
         _validate_identifier(name, scope)
         _validate_identifier(name, value)
         return
@@ -1059,9 +1064,7 @@ def _rename_output_name(
 
 def _prepend_name_with_scope(name: str, scope: str | None) -> str:
     if scope is None:
-        if "." in name:
-            return name.split(".")[1]
-        return name
+        return name.split(".", 1)[1] if "." in name else name
     if name.startswith(f"{scope}."):
         return name
     if "." in name:
