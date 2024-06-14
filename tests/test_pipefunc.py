@@ -1553,3 +1553,7 @@ def test_set_pipefunc_scope_on_init():
     assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
     assert str(f.mapspec) == "x.a[i] -> x.c[i]"
     assert f(x={"a": 1, "b": 1}) == 2
+    f.update_scope(None, "*", "*")
+    assert f.unscoped_parameters == ("a", "b")
+    assert f.parameters == ("a", "b")
+    assert f(a=1, b=1) == 2

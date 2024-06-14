@@ -36,6 +36,13 @@ def test_arrayspec_init():
     with pytest.raises(ValueError, match="is not a valid Python identifier"):
         ArraySpec("a", ("i", "123"))
 
+    with pytest.raises(ValueError, match="is not a valid Python identifier"):
+        ArraySpec("a#.a", ("i", "i"))
+
+    spec = ArraySpec("foo.x", ("i",))
+    assert spec.name == "foo.x"
+    assert spec.axes == ("i",)
+
 
 def test_arrayspec_str():
     spec = ArraySpec("a", ("i", None, "j"))
