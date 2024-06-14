@@ -146,10 +146,10 @@ class PipeFunc(Generic[T]):
         self.resources = _maybe_resources(resources)
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
-        self._validate_mapspec()
-        self._validate_names()
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
+        self._validate_mapspec()
+        self._validate_names()
 
     @property
     def renames(self) -> dict[str, str]:
@@ -294,12 +294,6 @@ class PipeFunc(Generic[T]):
         assert update_from in ("current", "original")
         assert all(isinstance(k, str) for k in renames.keys())  # noqa: SIM118
         assert all(isinstance(v, str) for v in renames.values())
-        if overlap := self.parameter_scopes & set(self.unscoped_parameters):
-            # TODO: check this before setting a rename
-            msg = (
-                f"A scope cannot have the same name as a parameter. Problem with scopes: {overlap}."
-            )
-            raise ValueError(msg)
         allowed_parameters = tuple(
             self.parameters + at_least_tuple(self.output_name)
             if update_from == "current"
@@ -352,17 +346,19 @@ class PipeFunc(Generic[T]):
         outputs: set[str] | Literal["*"] | None = None,
         exclude: set[str] | None = None,
     ) -> None:
-        """Set the scope for the pipeline by adding a prefix to the input and output names.
+        """Set the scope for the `PipeFunc` by adding a prefix to the input and output names.
 
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
         If an input or output name already starts with the scope prefix, it remains unchanged.
         If their is an existing scope, it is replaced with the new scope.
 
+        Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
+
         Parameters
         ----------
         scope
-            The scope to set for the pipeline.
+            The scope to set for the inputs and outputs.
         inputs
             Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
         outputs
@@ -373,12 +369,15 @@ class PipeFunc(Generic[T]):
 
         Examples
         --------
-        >>> pipeline.update_scope("my_scope", inputs="*")
-        >>> pipeline.update_scope("my_scope", outputs={"output1", "output2"})
-        >>> pipeline.update_scope("my_scope", exclude={"input3", "output3"})
-        >>> pipeline.update_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+        >>> f.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
+        >>> f.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
+        >>> f.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
 
         """
+        if scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name):
+            msg = f"The provided `{scope=}` cannot be identical to the function input parameters or output name."
+            raise ValueError(msg)
+
         if exclude is None:
             exclude = set()
 

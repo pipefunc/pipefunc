@@ -734,14 +734,15 @@ class Pipeline:
         If an input or output name already starts with the scope prefix, it remains unchanged.
         If their is an existing scope, it is replaced with the new scope.
 
-        ``inputs`` are the root arguments required to compute the outputs. This means that the inputs to
-        functions that are output by other functions are not included in the inputs, and considered
-        outputs.
+        ``inputs`` are the root arguments of the pipeline. Inputs to functions
+        which are outputs of other functions are considered to be outputs.
+
+        Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
 
         Parameters
         ----------
         scope
-            The scope to set for the pipeline.
+            The scope to set for the inputs and outputs.
         inputs
             Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
         outputs
@@ -752,10 +753,9 @@ class Pipeline:
 
         Examples
         --------
-        >>> pipeline.update_scope("my_scope", inputs="*")
-        >>> pipeline.update_scope("my_scope", outputs={"output1", "output2"})
-        >>> pipeline.update_scope("my_scope", exclude={"input3", "output3"})
-        >>> pipeline.update_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
+        >>> pipeline.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
 
         """
         all_inputs = set(self.topological_generations.root_args)
