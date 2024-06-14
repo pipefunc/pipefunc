@@ -1559,18 +1559,39 @@ def test_set_pipefunc_scope_on_init():
     assert f(a=1, b=1) == 2
 
 
-def test_scope_and_parameter_identical():
-    @pipefunc(output_name="c", scope="foo")
+def test_duplicate_output_name():
+    @pipefunc(output_name="c")
     def f(x):
         return x
 
     pipeline1 = Pipeline([f])
 
-    @pipefunc(output_name="c", scope="bar")
+    @pipefunc(output_name="c")
     def g(foo):
         return foo
 
     pipeline2 = Pipeline([g])
 
-    with pytest.raises(ValueError, match="The provided `scope='foo'` cannot be identical"):
+    with pytest.raises(ValueError, match="The provided `output_name='c'` cannot be identical"):
+        pipeline1 | pipeline2
+
+
+def test_scope_and_parameter_identical():
+    @pipefunc(output_name="c")
+    def f(x, bar):
+        return x + bar
+
+    f.update_scope("foo", {"x"}, {"c"})
+    assert f.parameters == ("foo.x", "bar")
+    assert f.renames == {"x": "foo.x", "c": "foo.c"}
+
+    pipeline1 = Pipeline([f])
+
+    @pipefunc(output_name="d", scope="bar")
+    def g(foo):
+        return foo
+
+    pipeline2 = Pipeline([g])
+
+    with pytest.raises(ValueError, match="`bar` are used as both parameter and scope"):
         pipeline1 | pipeline2

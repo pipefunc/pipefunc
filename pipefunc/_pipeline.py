@@ -128,6 +128,7 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
         self._validate_mapspec()
+        _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
@@ -383,7 +384,6 @@ class Pipeline:
     def _get_func_args(
         self,
         func: PipeFunc,
-        kwargs: dict[str, Any],
         flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
@@ -399,7 +399,6 @@ class Pipeline:
             elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
-                    kwargs=kwargs,
                     flat_scope_kwargs=flat_scope_kwargs,
                     all_results=all_results,
                     full_output=full_output,
@@ -418,7 +417,6 @@ class Pipeline:
         self,
         *,
         output_name: _OUTPUT_TYPE,
-        kwargs: dict[str, Any],
         flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,
@@ -454,7 +452,6 @@ class Pipeline:
 
         func_args = self._get_func_args(
             func,
-            kwargs,
             flat_scope_kwargs,
             all_results,
             full_output,
@@ -520,7 +517,6 @@ class Pipeline:
 
         self._run(
             output_name=output_name,
-            kwargs=kwargs,
             flat_scope_kwargs=flat_scope_kwargs,
             all_results=all_results,
             full_output=full_output,
@@ -772,6 +768,7 @@ class Pipeline:
         >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
+        _validate_scopes(self.functions, scope)
         all_inputs = set(self.topological_generations.root_args)
 
         for f in self.functions:
@@ -1819,3 +1816,14 @@ def _find_nodes_between(
         reachable_to_outputs.update(nx.ancestors(graph, output_node))
     reachable_to_outputs.update(output_nodes)
     return reachable_from_inputs & reachable_to_outputs
+
+
+def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
+    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
+    if new_scope is not None:
+        all_scopes.add(new_scope)
+    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
+    if overlap := all_scopes & all_parameters:
+        overlap_str = ", ".join(overlap)
+        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
+        raise ValueError(msg)
