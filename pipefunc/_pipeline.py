@@ -84,6 +84,8 @@ class Pipeline:
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
+    scope
+        The scope to set for the pipeline. If provided, the input and output
 
     """
 
@@ -718,7 +720,7 @@ class Pipeline:
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
 
-    def set_scope(
+    def update_scope(
         self,
         scope: str,
         inputs: set[str] | Literal["*"] | None = None,
@@ -730,6 +732,11 @@ class Pipeline:
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
         If an input or output name already starts with the scope prefix, it remains unchanged.
+        If their is an existing scope, it is replaced with the new scope.
+
+        ``inputs`` are the root arguments required to compute the outputs. This means that the inputs to
+        functions that are output by other functions are not included in the inputs, and considered
+        outputs.
 
         Parameters
         ----------
@@ -745,10 +752,10 @@ class Pipeline:
 
         Examples
         --------
-        >>> pipeline.set_scope("my_scope", inputs="*")
-        >>> pipeline.set_scope("my_scope", outputs={"output1", "output2"})
-        >>> pipeline.set_scope("my_scope", exclude={"input3", "output3"})
-        >>> pipeline.set_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+        >>> pipeline.update_scope("my_scope", inputs="*")
+        >>> pipeline.update_scope("my_scope", outputs={"output1", "output2"})
+        >>> pipeline.update_scope("my_scope", exclude={"input3", "output3"})
+        >>> pipeline.update_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
 
         """
         all_inputs = set(self.topological_generations.root_args)
@@ -762,7 +769,7 @@ class Pipeline:
                 if isinstance(outputs, set)
                 else outputs
             )
-            f.set_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+            f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
         self._init_internal_cache()
 
     @functools.cached_property

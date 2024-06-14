@@ -144,7 +144,7 @@ class PipeFunc(Generic[T]):
         self._validate_mapspec()
         self._validate_names()
         if scope is not None:
-            self.set_scope(scope, inputs="*", outputs="*")
+            self.update_scope(scope, inputs="*", outputs="*")
 
     @property
     def renames(self) -> dict[str, str]:
@@ -340,7 +340,7 @@ class PipeFunc(Generic[T]):
 
         clear_cached_properties(self, PipeFunc)
 
-    def set_scope(
+    def update_scope(
         self,
         scope: str,
         inputs: set[str] | Literal["*"] | None = None,
@@ -352,6 +352,7 @@ class PipeFunc(Generic[T]):
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
         If an input or output name already starts with the scope prefix, it remains unchanged.
+        If their is an existing scope, it is replaced with the new scope.
 
         Parameters
         ----------
@@ -367,10 +368,10 @@ class PipeFunc(Generic[T]):
 
         Examples
         --------
-        >>> pipeline.set_scope("my_scope", inputs="*")
-        >>> pipeline.set_scope("my_scope", outputs={"output1", "output2"})
-        >>> pipeline.set_scope("my_scope", exclude={"input3", "output3"})
-        >>> pipeline.set_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+        >>> pipeline.update_scope("my_scope", inputs="*")
+        >>> pipeline.update_scope("my_scope", outputs={"output1", "output2"})
+        >>> pipeline.update_scope("my_scope", exclude={"input3", "output3"})
+        >>> pipeline.update_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
 
         """
         if exclude is None:
@@ -973,8 +974,9 @@ class _NestedFuncWrapper:
 
 def _validate_identifier(name: str, value: Any) -> None:
     if "." in value:
-        for part in value.split("."):
-            _validate_identifier(name, part)
+        scope, value = value.split(".")
+        _validate_identifier(name, scope)
+        _validate_identifier(name, value)
         return
     if not value.isidentifier():
         msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."

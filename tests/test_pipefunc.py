@@ -1475,7 +1475,7 @@ def test_pipefunc_scope():
         return a + b
 
     scope = "x"
-    f.set_scope(scope, "*")
+    f.update_scope(scope, "*")
     assert f(x={"a": 1, "b": 1}) == 2
     assert f(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="for functions that have scopes"):
@@ -1489,7 +1489,7 @@ def test_pipeline_scope():
 
     pipeline = Pipeline([f])
     scope = "x"
-    pipeline.set_scope(scope, "*")
+    pipeline.update_scope(scope, "*")
 
     assert pipeline(x={"a": 1, "b": 1}) == 2
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
@@ -1508,7 +1508,7 @@ def test_pipeline_scope_partial():
 
     pipeline = Pipeline([f, g])
     scope = "x"
-    pipeline.set_scope(scope, inputs="*", outputs={"c"})
+    pipeline.update_scope(scope, inputs="*", outputs={"c"})
     assert f.output_name == "x.c"
     assert f.parameters == ("x.a", "x.b")
     assert g.parameters == ("x.c",)
