@@ -742,11 +742,15 @@ class Pipeline:
             inputs = set(self.topological_generations.root_args)
         elif inputs is None:
             inputs = set()
+        else:
+            inputs = set(inputs)  # Ensure it is a set
 
         if outputs == "*":
             outputs = set(self.all_output_names)
         elif outputs is None:
             outputs = set()
+        else:
+            outputs = set(outputs)  # Ensure it is a set
 
         all_parameters = (inputs | outputs) - exclude
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}

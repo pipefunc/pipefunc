@@ -380,11 +380,15 @@ class PipeFunc(Generic[T]):
             inputs = set(self.parameters)
         elif inputs is None:
             inputs = set()
+        else:
+            inputs = set(inputs)  # Ensure it is a set
 
         if outputs == "*":
             outputs = set(at_least_tuple(self.output_name))
         elif outputs is None:
             outputs = set()
+        else:
+            outputs = set(outputs)  # Ensure it is a set
 
         all_parameters = (inputs | outputs) - exclude
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
