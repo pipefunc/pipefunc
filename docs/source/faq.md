@@ -359,6 +359,7 @@ Here are a few ways to use parameter scopes:
    ```
 
    This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope. The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
+   Noting that if a parameter is already in a scope, it will be replaced by the new scope.
 
 When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
 
