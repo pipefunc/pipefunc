@@ -78,7 +78,7 @@ class PipeFunc(Generic[T]):
         function.
     scope
         If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot ('.'), e.g., parameter
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
         ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
         pipeline to have parameters with the same name without conflict. To be selective
         about which parameters and outputs to include in the scope, use the
@@ -750,7 +750,7 @@ def pipefunc(
         function.
     scope
         If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot ('.'), e.g., parameter
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
         ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
         pipeline to have parameters with the same name without conflict. To be selective
         about which parameters and outputs to include in the scope, use the

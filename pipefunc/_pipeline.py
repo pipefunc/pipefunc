@@ -86,7 +86,7 @@ class Pipeline:
         Keyword arguments passed to the cache constructor.
     scope
         If provided, *all* parameter names and output names of the pipeline functions will
-        be prefixed with the specified scope followed by a dot ('.'), e.g., parameter
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
         ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
         pipeline to have parameters with the same name without conflict. To be selective
         about which parameters and outputs to include in the scope, use the
