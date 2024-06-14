@@ -85,7 +85,20 @@ class Pipeline:
     cache_kwargs
         Keyword arguments passed to the cache constructor.
     scope
-        The scope to set for the pipeline. If provided, the input and output
+        If provided, *all* parameter names and output names of the pipeline functions will
+        be prefixed with the specified scope followed by a dot ('.'), creating a
+        separate scope for the function's parameters within the pipeline. This
+        allows multiple functions in a pipeline to have parameters with the same
+        name without conflict. To be selective about which parameters and
+        outputs to include in the scope, use the `PipeFunc.update_scope` method.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        f'{scope}.{name}' notation. Mixing the two is not allowed. For example,
+        a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
 
     """
 

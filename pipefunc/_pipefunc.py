@@ -79,7 +79,7 @@ class PipeFunc(Generic[T]):
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot ('.'), creating a
-        separate scope for the function's parameters within the pipeline. This
+        separate scope for the function's parameters. This
         allows multiple functions in a pipeline to have parameters with the same
         name without conflict. To be selective about which parameters and
         outputs to include in the scope, use the `PipeFunc.update_scope` method.
@@ -88,9 +88,8 @@ class PipeFunc(Generic[T]):
         be provided either as a dictionary for the scope, or by using the
         f'{scope}.{name}' notation. Mixing the two is not allowed. For example,
         a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
-        can be provided as: ``func(output_name, foo=dict(a=1, b=2),
-        bar=dict(x=3, y=4))`` or ``func(output_name, **{"foo.a": 1, "foo.b": 2,
-        "bar.x": 3, "bar.y": 4})``
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
 
     Returns
     -------
