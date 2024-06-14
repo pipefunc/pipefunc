@@ -13,6 +13,7 @@ import datetime
 import functools
 import inspect
 import os
+import warnings
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
@@ -385,11 +386,8 @@ class PipeFunc(Generic[T]):
         elif outputs is None:
             outputs = set()
 
-        def add_scope(name: str) -> str:
-            return name if name.startswith(f"{scope}.") else f"{scope}.{name}"
-
         all_parameters = (inputs | outputs) - exclude
-        renames = {name: add_scope(name) for name in all_parameters}
+        renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
@@ -1040,3 +1038,15 @@ def _rename_output_name(
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
     return tuple(renames.get(name, name) for name in original_output_name)
+
+
+def _prepend_name_with_scope(name: str, scope: str) -> str:
+    if name.startswith(f"{scope}."):
+        return name
+    if "." in name:
+        old_scope, name = name.split(".", 1)
+        warnings.warn(
+            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
+            stacklevel=3,
+        )
+    return f"{scope}.{name}"

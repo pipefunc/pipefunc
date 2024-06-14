@@ -23,7 +23,7 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._perf import resources_report
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _prepend_name_with_scope
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -748,11 +748,8 @@ class Pipeline:
         elif outputs is None:
             outputs = set()
 
-        def add_scope(name: str) -> str:
-            return name if name.startswith(f"{scope}.") else f"{scope}.{name}"
-
         all_parameters = (inputs | outputs) - exclude
-        renames = {name: add_scope(name) for name in all_parameters}
+        renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
     @functools.cached_property
