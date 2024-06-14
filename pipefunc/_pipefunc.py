@@ -77,20 +77,25 @@ class PipeFunc(Generic[T]):
         used by job schedulers to manage the resources required for the
         function.
     scope
-        If provided, the parameter names of the function will be prefixed with the specified scope
-        followed by a dot ('.'), creating a separate scope for the function's parameters within the pipeline.
-        This allows multiple functions in a pipeline to have parameters with the same name without conflict.
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot ('.'), creating a
+        separate scope for the function's parameters within the pipeline. This
+        allows multiple functions in a pipeline to have parameters with the same
+        name without conflict. To be selective about which parameters and
+        outputs to include in the scope, use the `PipeFunc.update_scope` method.
 
-        When a `Pipeline` contains `PipeFunc` instances with different namespaces, the parameters should be
-        provided as nested dictionaries, where the top-level keys correspond to the namespaces and the
-        nested keys represent the parameter names within each scope.
-
-        For example, if a `Pipeline` contains `PipeFunc` instances with namespaces "foo" and "bar", the
-        parameters can be provided as: ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        f'{scope}.{name}' notation. Mixing the two is not allowed. For example,
+        a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
+        can be provided as: ``func(output_name, foo=dict(a=1, b=2),
+        bar=dict(x=3, y=4))`` or ``func(output_name, **{"foo.a": 1, "foo.b": 2,
+        "bar.x": 3, "bar.y": 4})``
 
     Returns
     -------
-        The identifier for the output of the wrapped function.
+        A `PipeFunc` instance that wraps the original function with the specified
+        return identifier.
 
     Examples
     --------
@@ -746,20 +751,24 @@ def pipefunc(
         used by job schedulers to manage the resources required for the
         function.
     scope
-        If provided, the parameter names of the function will be prefixed with the specified scope
-        followed by a dot ('.'), creating a separate scope for the function's parameters within the pipeline.
-        This allows multiple functions in a pipeline to have parameters with the same name without conflict.
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot ('.'), creating a
+        separate scope for the function's parameters within the pipeline. This
+        allows multiple functions in a pipeline to have parameters with the same
+        name without conflict. To be selective about which parameters and
+        outputs to include in the scope, use the `PipeFunc.update_scope` method.
 
-        When a `Pipeline` contains `PipeFunc` instances with different namespaces, the parameters should be
-        provided as nested dictionaries, where the top-level keys correspond to the namespaces and the
-        nested keys represent the parameter names within each scope.
-
-        For example, if a `Pipeline` contains `PipeFunc` instances with namespaces "foo" and "bar", the
-        parameters can be provided as: ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        f'{scope}.{name}' notation. Mixing the two is not allowed. For example,
+        a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
+        can be provided as: ``func(output_name, foo=dict(a=1, b=2),
+        bar=dict(x=3, y=4))`` or ``func(output_name, **{"foo.a": 1, "foo.b": 2,
+        "bar.x": 3, "bar.y": 4})``
 
     Returns
     -------
-        A decorator function that takes the original function and ``output_name`` and
+        A wrapped function that takes the original function and ``output_name`` and
         creates a `PipeFunc` instance with the specified return identifier.
 
     See Also
