@@ -548,7 +548,11 @@ class PipeFunc(Generic[T]):
         if not self.parameter_scopes:
             return kwargs
 
-        if any("." in k for k in kwargs) and self.parameter_scopes & kwargs.keys():
+        requires_flattening = self.parameter_scopes & kwargs.keys()
+        if not requires_flattening:
+            return kwargs
+
+        if any("." in k for k in kwargs):
             msg = (
                 "Providing parameters for functions that have scopes is allowed either by"
                 " providing a dictionary for the scope, or by using f'{scope}.{name}' notation."
