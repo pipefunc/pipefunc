@@ -75,6 +75,17 @@ class PipeFunc(Generic[T]):
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
+    scope
+        If provided, the parameter names of the function will be prefixed with the specified scope
+        followed by a dot ('.'), creating a separate scope for the function's parameters within the pipeline.
+        This allows multiple functions in a pipeline to have parameters with the same name without conflict.
+
+        When a `Pipeline` contains `PipeFunc` instances with different namespaces, the parameters should be
+        provided as nested dictionaries, where the top-level keys correspond to the namespaces and the
+        nested keys represent the parameter names within each scope.
+
+        For example, if a `Pipeline` contains `PipeFunc` instances with namespaces "foo" and "bar", the
+        parameters can be provided as: ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
 
     Returns
     -------
@@ -112,6 +123,7 @@ class PipeFunc(Generic[T]):
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
@@ -130,6 +142,8 @@ class PipeFunc(Generic[T]):
         self.set_profiling(enable=profile)
         self._validate_mapspec()
         self._validate_names()
+        if scope is not None:
+            self.set_scope(scope)
 
     @property
     def renames(self) -> dict[str, str]:
@@ -274,6 +288,12 @@ class PipeFunc(Generic[T]):
         assert update_from in ("current", "original")
         assert all(isinstance(k, str) for k in renames.keys())  # noqa: SIM118
         assert all(isinstance(v, str) for v in renames.values())
+        if overlap := self.parameter_scopes & set(self.unscoped_parameters):
+            # TODO: check this before setting a rename
+            msg = (
+                f"A scope cannot have the same name as a parameter. Problem with scopes: {overlap}."
+            )
+            raise ValueError(msg)
         allowed_parameters = tuple(
             self.parameters + at_least_tuple(self.output_name)
             if update_from == "current"
@@ -318,6 +338,59 @@ class PipeFunc(Generic[T]):
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
         clear_cached_properties(self, PipeFunc)
+
+    def set_scope(
+        self,
+        scope: str,
+        inputs: set[str] | Literal["*"] | None = None,
+        outputs: set[str] | Literal["*"] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Set the scope for the pipeline by adding a prefix to the input and output names.
+
+        This method updates the names of the specified inputs and outputs by adding the provided
+        scope as a prefix. The scope is added to the names using the format "{scope}.{name}".
+        If an input or output name already starts with the scope prefix, it remains unchanged.
+
+        Parameters
+        ----------
+        scope
+            The scope to set for the pipeline.
+        inputs
+            Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
+        outputs
+            Specific output names to include, or "*" to include all outputs. If None, no outputs are included.
+        exclude
+            Names to exclude from the scope. This can include both inputs and outputs. Can be used with `inputs`
+            or `outputs` being "*" to exclude specific names.
+
+        Examples
+        --------
+        >>> pipeline.set_scope("my_scope", inputs="*")
+        >>> pipeline.set_scope("my_scope", outputs={"output1", "output2"})
+        >>> pipeline.set_scope("my_scope", exclude={"input3", "output3"})
+        >>> pipeline.set_scope("my_scope", inputs={"input1", "input2"}, outputs={"output1"})
+
+        """
+        if exclude is None:
+            exclude = set()
+
+        if inputs == "*":
+            inputs = set(self.parameters)
+        elif inputs is None:
+            inputs = set()
+
+        if outputs == "*":
+            outputs = set(at_least_tuple(self.output_name))
+        elif outputs is None:
+            outputs = set()
+
+        def add_scope(name: str) -> str:
+            return name if name.startswith(f"{scope}.") else f"{scope}.{name}"
+
+        all_parameters = (inputs | outputs) - exclude
+        renames = {name: add_scope(name) for name in all_parameters}
+        self.update_renames(renames, update_from="current")
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update the bound arguments for the function that are fixed.
@@ -403,6 +476,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
                 f"Unexpected keyword arguments: `{extra}`."
@@ -410,7 +484,6 @@ class PipeFunc(Generic[T]):
                 f" The provided arguments are: `{kwargs}`."
             )
             raise ValueError(msg)
-
         kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
@@ -441,6 +514,53 @@ class PipeFunc(Generic[T]):
     def profile(self, enable: bool) -> None:
         """Enable or disable profiling for the wrapped function."""
         self.set_profiling(enable=enable)
+
+    @functools.cached_property
+    def parameter_scopes(self) -> set[str]:
+        """Return the scopes of the function parameters."""
+        return {k.split(".")[0] for k in self.parameters if "." in k}
+
+    @functools.cached_property
+    def unscoped_parameters(self) -> tuple[str, ...]:
+        """Return the parameters without the scope."""
+        return tuple(name.split(".")[-1] for name in self.parameters)
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Flatten the scopes of the function parameters.
+
+        Flattens `{scope: {name: value}}` to `{f"{scope}.{name}": value}`.
+
+        Raises
+        ------
+        ValueError
+            If the function call mixes scoped parameters provided as nested dictionaries
+            and using the dot notation.
+
+        Examples
+        --------
+        >>> f_c(x={"a": 1, "b": 1})  # Allowed
+        >>> f_c(**{"x.a": 1, "x.b": 1})  # Allowed
+        >>> f_c(x=dict(a=1), **{"x.b": 1})  # Raises ValueError
+
+        """
+        if not self.parameter_scopes:
+            return kwargs
+
+        if any("." in k for k in kwargs) and self.parameter_scopes & kwargs.keys():
+            msg = (
+                "Providing parameters for functions that have scopes is allowed either by"
+                " providing a dictionary for the scope, or by using f'{scope}.{name}' notation."
+                " Mixing the two is not allowed."
+            )
+            raise ValueError(msg)
+
+        new_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.parameter_scopes:
+                new_kwargs.update({f"{k}.{name}": value for name, value in v.items()})
+            else:
+                new_kwargs[k] = v
+        return new_kwargs
 
     def set_profiling(self, *, enable: bool = True) -> None:
         """Enable or disable profiling for the wrapped function."""
@@ -577,7 +697,7 @@ def pipefunc(
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | None = None,
-    namespace: str | None = None,
+    scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -618,23 +738,17 @@ def pipefunc(
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
-    namespace
-        If provided, the parameter names of the function will be prefixed with the specified namespace
+    scope
+        If provided, the parameter names of the function will be prefixed with the specified scope
         followed by a dot ('.'), creating a separate scope for the function's parameters within the pipeline.
         This allows multiple functions in a pipeline to have parameters with the same name without conflict.
 
         When a `Pipeline` contains `PipeFunc` instances with different namespaces, the parameters should be
         provided as nested dictionaries, where the top-level keys correspond to the namespaces and the
-        nested keys represent the parameter names within each namespace.
+        nested keys represent the parameter names within each scope.
 
         For example, if a `Pipeline` contains `PipeFunc` instances with namespaces "foo" and "bar", the
         parameters can be provided as: ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
-
-        The `namespace` feature allows for clearer organization and disambiguation of parameters in complex
-        pipelines, ensuring that each function's parameters are encapsulated within its own namespace.
-
-        Note: The `namespace` only affects the parameter names within the context of the `PipeFunc` and
-        `Pipeline`. The original function definition and its parameter names remain unchanged.
 
     Returns
     -------
@@ -685,6 +799,7 @@ def pipefunc(
             save_function=save_function,
             mapspec=mapspec,
             resources=resources,
+            scope=scope,
         )
 
     return decorator

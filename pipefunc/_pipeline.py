@@ -738,23 +738,21 @@ class Pipeline:
         if exclude is None:
             exclude = set()
 
-        # Determine final sets of inputs and outputs
         if inputs == "*":
             inputs = set(self.topological_generations.root_args)
         elif inputs is None:
             inputs = set()
-        inputs = inputs - exclude
 
         if outputs == "*":
             outputs = set(self.all_output_names)
         elif outputs is None:
             outputs = set()
-        outputs = outputs - exclude
 
         def add_scope(name: str) -> str:
             return name if name.startswith(f"{scope}.") else f"{scope}.{name}"
 
-        renames = {name: add_scope(name) for name in inputs | outputs}
+        all_parameters = (inputs | outputs) - exclude
+        renames = {name: add_scope(name) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
     @functools.cached_property
