@@ -93,8 +93,7 @@ class PipeFunc(Generic[T]):
 
     Returns
     -------
-        A `PipeFunc` instance that wraps the original function with the specified
-        return identifier.
+        A `PipeFunc` instance that wraps the original function with the specified return identifier.
 
     Examples
     --------
