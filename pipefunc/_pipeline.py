@@ -95,7 +95,7 @@ class Pipeline:
         When providing parameter values for pipelines that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
         ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
-        a `Pipeline` instances with namespaces "foo" and "bar", the parameters
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
         can be provided as:
         ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(x=3, y=4))`` or
         ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
@@ -111,6 +111,7 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
+        scope: str | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -129,6 +130,8 @@ class Pipeline:
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        if scope is not None:
+            self.update_scope(scope)
         self._validate_mapspec()
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 

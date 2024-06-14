@@ -87,7 +87,7 @@ class PipeFunc(Generic[T]):
         When providing parameter values for functions that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
         ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
-        a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
 
@@ -759,7 +759,7 @@ def pipefunc(
         When providing parameter values for functions that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
         ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
-        a `PipeFunc` instances with namespaces "foo" and "bar", the parameters
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(x=3, y=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.x": 3, "bar.y": 4})``
 
