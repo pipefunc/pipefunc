@@ -31,6 +31,7 @@ def test_basic(tmp_path: Path) -> None:
         return np.prod(z)
 
     pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
+    pipeline.update_scope("foo", outputs={"z"})
 
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
     learners = create_learners(
