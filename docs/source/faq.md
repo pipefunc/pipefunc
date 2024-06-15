@@ -331,7 +331,8 @@ Here are a few ways to use parameter scopes:
        return a + b
    ```
 
-   This sets the scope "foo" for all parameters and the output name of the function `f`. The actual parameter names become `foo.a` and `foo.b`, and the output name becomes `foo.y`.
+   This sets the scope "foo" for all parameters and the output name of the function `f`.
+   The actual parameter names become `foo.a` and `foo.b`, and the output name becomes `foo.y`.
 
 2. Update the scope of an existing `PipeFunc`:
 
@@ -348,7 +349,8 @@ Here are a few ways to use parameter scopes:
    print(g_func.output_name)  # Output: 'bar.z'
    ```
 
-   This updates the scope of input `a` and outputs of `g_func` to "bar". The parameter names become `bar.a` and `b`, and the output name becomes `bar.z`.
+   This updates the scope of input `a` and outputs of `g_func` to "bar".
+   The parameter names become `bar.a` and `b`, and the output name becomes `bar.z`.
 
 3. Update the scope of an entire `Pipeline`:
 
@@ -358,7 +360,8 @@ Here are a few ways to use parameter scopes:
    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
    ```
 
-   This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope. The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
+   This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope.
+   The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
    Noting that if a parameter is already in a scope, it will be replaced by the new scope.
 
 When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
@@ -371,7 +374,7 @@ pipeline(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4})
 
 Some key things to note:
 
-- Setting a scope prefixes parameter and output names with `{scope}.`, e.g. `x` becomes `foo.x` if the scope is "foo".
+- Setting a scope prefixes parameter and output names with `{scope}.`, e.g., `x` becomes `foo.x` if the scope is "foo".
 - You can selectively include or exclude certain inputs/outputs when updating the scope using the `inputs`, `outputs` and `exclude` arguments.
 - Updating the scope of a pipeline updates the scopes of its functions, propagating the changes.
 - Applying a scope to a parameter that is already in a scope will *replace* the existing scope with the new one.
