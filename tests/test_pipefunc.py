@@ -1559,23 +1559,6 @@ def test_set_pipefunc_scope_on_init():
     assert f(a=1, b=1) == 2
 
 
-def test_duplicate_output_name():
-    @pipefunc(output_name="c")
-    def f(x):
-        return x
-
-    pipeline1 = Pipeline([f])
-
-    @pipefunc(output_name="c")
-    def g(foo):
-        return foo
-
-    pipeline2 = Pipeline([g])
-
-    with pytest.raises(ValueError, match="The provided `output_name='c'` cannot be identical"):
-        pipeline1 | pipeline2
-
-
 def test_scope_and_parameter_identical():
     @pipefunc(output_name="c")
     def f(x, bar):

@@ -241,6 +241,12 @@ class _MockPipeline:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
 
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        return flat_scope_kwargs
+
 
 def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
