@@ -191,18 +191,12 @@ class Pipeline:
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
             f._validate_mapspec()
+        elif not isinstance(f, PipeFunc):
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
         else:
-            if not isinstance(f, PipeFunc):
-                msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
-                raise TypeError(msg)
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
-        if not isinstance(f, PipeFunc):
-            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
-            raise TypeError(msg)
-        if not isinstance(f, PipeFunc):
-            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
-            raise TypeError(msg)
         if not isinstance(f, PipeFunc):
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
