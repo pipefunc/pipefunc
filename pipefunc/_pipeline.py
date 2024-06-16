@@ -197,9 +197,6 @@ class Pipeline:
         else:
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
-        if not isinstance(f, PipeFunc):
-            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
-            raise TypeError(msg)
         self.functions.append(f)
 
         if self.profile is not None:
