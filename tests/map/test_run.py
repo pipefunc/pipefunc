@@ -642,9 +642,9 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
 
     # Adding another axis to "one"
     pipeline.add_mapspec_axis("a", axis="k")
-    assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
-    assert str(two.mapspec) == "one[:, :, k] -> two[k]"
-    assert str(three.mapspec) == "two[k] -> three[k]"
+    assert str(pipeline["one"].mapspec) == "a[i, k], b[j] -> one[i, j, k]"
+    assert str(pipeline["two"].mapspec) == "one[:, :, k] -> two[k]"
+    assert str(pipeline["three"].mapspec) == "two[k] -> three[k]"
 
     # Run the pipeline
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": 1}
@@ -657,9 +657,9 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
 
     # Adding another axis to "d"
     pipeline.add_mapspec_axis("d", axis="l")
-    assert str(one.mapspec) == "a[i, k], b[j] -> one[i, j, k]"
-    assert str(two.mapspec) == "one[:, :, k], d[l] -> two[k, l]"
-    assert str(three.mapspec) == "two[k, l], d[l] -> three[k, l]"
+    assert str(pipeline["one"].mapspec) == "a[i, k], b[j] -> one[i, j, k]"
+    assert str(pipeline["two"].mapspec) == "one[:, :, k], d[l] -> two[k, l]"
+    assert str(pipeline["three"].mapspec) == "two[k, l], d[l] -> three[k, l]"
 
     # Run the pipeline
     inputs = {"a": np.ones((2, 3)), "b": [1, 1], "d": [1, 1]}
@@ -692,9 +692,9 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     pipeline = Pipeline([generate_ints, add, take_sum])
 
     pipeline.add_mapspec_axis("z", axis="k")
-    assert str(generate_ints.mapspec) == "... -> x[i]"
-    assert str(add.mapspec) == "x[i], z[k] -> y[i, k]"
-    assert str(take_sum.mapspec) == "y[:, k] -> sum[k]"
+    assert str(pipeline["x"].mapspec) == "... -> x[i]"
+    assert str(pipeline["y"].mapspec) == "x[i], z[k] -> y[i, k]"
+    assert str(pipeline["sum"].mapspec) == "y[:, k] -> sum[k]"
 
     inputs = {"n": 4, "z": [1, 2]}
     internal_shapes = {"x": 4}
@@ -841,10 +841,10 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
     # Add an axis `j` to `x`
     pipeline_map = Pipeline(
         [
-            (generate_ints, "n[j] -> x[i, j]"),
-            (double_it, "x[i, j] -> y[i, j]"),
-            side_chain,
-            (take_sum, "y[:, j] -> sum[j]"),
+            (pipeline["x"], "n[j] -> x[i, j]"),
+            (pipeline["y"], "x[i, j] -> y[i, j]"),
+            pipeline["side"],
+            (pipeline["sum"], "y[:, j] -> sum[j]"),
         ],
     )
     inputs_map = {"n": [4], "z": 1}

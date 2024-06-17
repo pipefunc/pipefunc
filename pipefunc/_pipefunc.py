@@ -717,13 +717,12 @@ class NestedPipeFunc(PipeFunc):
         from pipefunc import Pipeline
 
         _validate_pipefuncs(pipefuncs)
-        self.pipefuncs: list[PipeFunc] = [f.copy() for f in pipefuncs]
-        self.pipeline = Pipeline(self.pipefuncs)  # type: ignore[arg-type]
+        self.pipeline = Pipeline(pipefuncs)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
-        self.cache = any(f.cache for f in self.pipefuncs)
+        self.cache = any(f.cache for f in self.pipeline.functions)
         self.save_function = None
         self._output_picker = None
         self._profile = False
@@ -732,10 +731,10 @@ class NestedPipeFunc(PipeFunc):
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
         self._bound: dict[str, Any] = {}
-        self.resources = _maybe_max_resources(resources, self.pipefuncs)
+        self.resources = _maybe_max_resources(resources, self.pipeline.functions)
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
-        for f in self.pipefuncs:
+        for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
         self._validate_mapspec()
         self._validate_names()
@@ -744,14 +743,14 @@ class NestedPipeFunc(PipeFunc):
         # Pass the mapspec to the new instance because we set
         # the child mapspecs to None in the __init__
         return NestedPipeFunc(
-            self.pipefuncs,
+            self.pipeline.functions,
             output_name=self._output_name,
             renames=self._renames,
             mapspec=self.mapspec,
         )
 
     def _combine_mapspecs(self) -> MapSpec | None:
-        mapspecs = [f.mapspec for f in self.pipefuncs]
+        mapspecs = [f.mapspec for f in self.pipeline.functions]
         if all(m is None for m in mapspecs):
             return None
         _validate_combinable_mapspecs(mapspecs)
@@ -769,14 +768,14 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
         outputs: set[str] = set()
-        for f in self.pipefuncs:
+        for f in self.pipeline.functions:
             outputs.update(at_least_tuple(f.output_name))
         return tuple(sorted(outputs))
 
     @functools.cached_property
     def _all_inputs(self) -> tuple[str, ...]:
         inputs: set[str] = set()
-        for f in self.pipefuncs:
+        for f in self.pipeline.functions:
             inputs.update(f.parameters)
         return tuple(sorted(inputs))
 
@@ -786,7 +785,7 @@ class NestedPipeFunc(PipeFunc):
         return _NestedFuncWrapper(func.call_full_output, self.output_name)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(pipefuncs={self.pipefuncs})"
+        return f"{self.__class__.__name__}(pipefuncs={self.pipeline.functions})"
 
 
 def _maybe_max_resources(

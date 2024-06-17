@@ -23,9 +23,9 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
     pipeline.add_mapspec_axis("b", axis="i")
     pipeline.add_mapspec_axis("x", axis="j")
 
-    assert str(f_c.mapspec) == "a[i], b[i] -> c[i]"
-    assert str(f_d.mapspec) == "c[i], b[i], x[j] -> d[i, j]"
-    assert str(f_e.mapspec) == "d[i, j], c[i], x[j] -> e[i, j]"
+    assert str(pipeline["c"].mapspec) == "a[i], b[i] -> c[i]"
+    assert str(pipeline["d"].mapspec) == "c[i], b[i], x[j] -> d[i, j]"
+    assert str(pipeline["e"].mapspec) == "d[i, j], c[i], x[j] -> e[i, j]"
 
     assert pipeline.mapspecs_as_strings == [
         "a[i], b[i] -> c[i]",
@@ -64,9 +64,9 @@ def test_adding_axes_to_mapspec_less_pipeline() -> None:
     pipeline.add_mapspec_axis("b", axis="j")
     pipeline.add_mapspec_axis("x", axis="k")
 
-    assert str(f_c.mapspec) == "a[i], b[j] -> c[i, j]"
-    assert str(f_d.mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
-    assert str(f_e.mapspec) == "d[i, j, k], c[i, j], x[k] -> e[i, j, k]"
+    assert str(pipeline["c"].mapspec) == "a[i], b[j] -> c[i, j]"
+    assert str(pipeline["d"].mapspec) == "c[i, j], b[j], x[k] -> d[i, j, k]"
+    assert str(pipeline["e"].mapspec) == "d[i, j, k], c[i, j], x[k] -> e[i, j, k]"
 
     assert pipeline.mapspecs_as_strings == [
         "a[i], b[j] -> c[i, j]",
@@ -85,7 +85,7 @@ def test_add_mapspec_axis_multiple_axes() -> None:
     pipeline.add_mapspec_axis("a", axis="k")
     pipeline.add_mapspec_axis("b", axis="l")
 
-    assert str(func.mapspec) == "a[i, k], b[j, l] -> result[i, j, k, l]"
+    assert str(pipeline["result"].mapspec) == "a[i, k], b[j, l] -> result[i, j, k, l]"
 
 
 def test_add_mapspec_axis_parameter_in_output() -> None:
@@ -97,7 +97,7 @@ def test_add_mapspec_axis_parameter_in_output() -> None:
 
     pipeline.add_mapspec_axis("a", axis="k")
 
-    assert str(func.mapspec) == "a[i, j, k] -> result[i, j, k]"
+    assert str(pipeline["result"].mapspec) == "a[i, j, k] -> result[i, j, k]"
 
 
 def test_consistent_indices() -> None:
@@ -189,9 +189,9 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
 
     pipeline.add_mapspec_axis("a", axis="l")
 
-    assert str(func1.mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
-    assert str(func2.mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
-    assert str(func3.mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
+    assert str(pipeline["out1"].mapspec) == "a[i, l], b[j] -> out1[i, j, l], out2[i, j, l]"
+    assert str(pipeline["out3"].mapspec) == "out1[i, j, l], c[k] -> out3[i, j, k, l]"
+    assert str(pipeline["out4"].mapspec) == "out3[:, :, :, l], out2[:, :, l] -> out4[l]"
 
 
 def test_multiple_outputs_order() -> None:
