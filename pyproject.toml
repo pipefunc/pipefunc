@@ -52,6 +52,7 @@ docs = [
     "pytest-xdist",
     "versioningit",
     "sphinx-togglebutton",
+    "sphinx-copybutton",
 ]
 all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
 dev = [  # all + dev deps
