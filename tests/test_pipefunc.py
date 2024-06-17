@@ -567,12 +567,12 @@ def test_drop_from_pipeline():
         return c * d * x
 
     pipeline = Pipeline([f1, f2, f3])
-    assert "d" in pipeline.output_to_func
+    assert "d" in pipeline
     pipeline.drop(output_name="d")
-    assert "d" not in pipeline.output_to_func
+    assert "d" not in pipeline
 
     pipeline = Pipeline([f1, f2, f3])
-    assert "d" in pipeline.output_to_func
+    assert "d" in pipeline
     pipeline.drop(f=pipeline["d"])
 
     pipeline = Pipeline([f1, f2, f3])
@@ -1465,3 +1465,16 @@ def test_nesting_funcs_with_bound():
     pipeline.nest_funcs(["c", "d"], "d")
     assert pipeline("d", a="a", b="b") == "abb2"
     assert len(pipeline.functions) == 1
+
+
+def test_accessing_copied_pipefunc():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("you can access that function via `pipeline['c']`"),
+    ):
+        pipeline.drop(f=f)

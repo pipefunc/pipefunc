@@ -29,7 +29,7 @@ def test_identify_combinable_nodes():
 
     # `conservatively_combine=False`
     combinable_nodes = _identify_combinable_nodes(
-        pipeline.output_to_func["i"],
+        pipeline["i"],
         pipeline.graph,
         pipeline.all_root_args,
         conservatively_combine=False,
@@ -44,7 +44,7 @@ def test_identify_combinable_nodes():
 
     # `conservatively_combine=True`
     combinable_nodes = _identify_combinable_nodes(
-        pipeline.output_to_func["i"],
+        pipeline["i"],
         pipeline.graph,
         pipeline.all_root_args,
         conservatively_combine=True,
@@ -79,7 +79,7 @@ def test_conservatively_combine():
 
     # Test with conservatively_combine=True
     combinable_nodes_true = _identify_combinable_nodes(
-        pipeline.output_to_func["z"],
+        pipeline["z"],
         pipeline.graph,
         pipeline.all_root_args,
         conservatively_combine=True,
@@ -95,7 +95,7 @@ def test_conservatively_combine():
 
     # Test with conservatively_combine=False
     combinable_nodes_false = _identify_combinable_nodes(
-        pipeline.output_to_func["z"],
+        pipeline["z"],
         pipeline.graph,
         pipeline.all_root_args,
         conservatively_combine=False,
@@ -150,11 +150,11 @@ def test_identify_combinable_nodes2():
         return a + f2 + f6
 
     pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7])
-    m = pipeline.output_to_func
+    m = pipeline
 
     expected = {m["f6"]: {m["f1"], m["f3"], m["f4"], m["f5"]}}
     combinable_nodes = _identify_combinable_nodes(
-        pipeline.output_to_func["f7"],
+        pipeline["f7"],
         pipeline.graph,
         pipeline.all_root_args,
     )

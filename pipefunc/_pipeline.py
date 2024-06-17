@@ -79,8 +79,6 @@ class Pipeline:
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
-    copy_funcs
-        Whether to copy the functions before adding them to the pipeline.
 
     """
 
@@ -93,7 +91,6 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
-        copy_funcs: bool = True,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -105,7 +102,7 @@ class Pipeline:
                 f, mapspec = f  # noqa: PLW2901
             else:
                 mapspec = None
-            self.add(f, mapspec=mapspec, copy=copy_funcs)
+            self.add(f, mapspec=mapspec, copy=True)
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
@@ -170,6 +167,7 @@ class Pipeline:
         self,
         f: PipeFunc | Callable,
         mapspec: str | MapSpec | None = None,
+        *,
         copy: bool = True,
     ) -> PipeFunc:
         """Add a function to the pipeline.
@@ -233,6 +231,17 @@ class Pipeline:
             msg = "Either `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
+            if f not in self.functions:
+                msg = (
+                    f"The function `{f}` is not in the pipeline."
+                    " Remember that the `PipeFunc` instances are copied on `Pipeline` initialization."
+                )
+                if f.output_name in self.output_to_func:
+                    msg += (
+                        f" However, the function with the same output name `{f.output_name!r}` exists in the"
+                        f" pipeline, you can access that function via `pipeline[{f.output_name!r}]`."
+                    )
+                raise ValueError(msg)
             self.functions.remove(f)
         elif output_name is not None:
             f = self.output_to_func[output_name]
