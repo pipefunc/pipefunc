@@ -481,6 +481,7 @@ class Pipeline:
             return all_results[output_name]
         func = self.output_to_func[output_name]
         assert func.parameters is not None
+
         cache = self._current_cache()
         use_cache = (func.cache and cache is not None) or task_graph() is not None
         root_args = self.root_args(output_name)
@@ -813,6 +814,7 @@ class Pipeline:
             The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
         inputs
             Specific input names to include, or ``"*"`` to include all inputs.
+            The inputs are *only* the root arguments of the pipeline.
             If ``None``, no inputs are included.
         outputs
             Specific output names to include, or ``"*"`` to include all outputs.
