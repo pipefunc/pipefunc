@@ -399,6 +399,7 @@ def test_tuple_outputs(tmp_path: Path):
         cache_type="lru",
         lazy=True,
         cache_kwargs={"shared": False},
+        copy_funcs=False,
     )
     f = pipeline.func("i")
     r = f.call_full_output(a=1, b=2, x=3)["i"].evaluate()
@@ -566,16 +567,16 @@ def test_drop_from_pipeline():
     def f3(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f1, f2, f3])
+    pipeline = Pipeline([f1, f2, f3], copy_funcs=False)
     assert "d" in pipeline.output_to_func
     pipeline.drop(output_name="d")
     assert "d" not in pipeline.output_to_func
 
-    pipeline = Pipeline([f1, f2, f3])
+    pipeline = Pipeline([f1, f2, f3], copy_funcs=False)
     assert "d" in pipeline.output_to_func
     pipeline.drop(f=f2)
 
-    pipeline = Pipeline([f1, f2, f3])
+    pipeline = Pipeline([f1, f2, f3], copy_funcs=False)
 
     @pipefunc(output_name="e")
     def f4(c, d, x=1):
@@ -907,7 +908,7 @@ def test_renaming_output_name() -> None:
     def f(a, b):
         return a + b, 1
 
-    pipeline = Pipeline([f])
+    pipeline = Pipeline([f], copy_funcs=False)
     f.update_renames({"c": "c1"}, update_from="current")
     assert f.output_name == ("c1", "d")
     pipeline.update_renames({"c1": "c2"}, update_from="current")
@@ -979,7 +980,7 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     def g(c=999, d=666):
         return c * d
 
-    pipeline = Pipeline([f, g])
+    pipeline = Pipeline([f, g], copy_funcs=False)
 
     # Test initial pipeline parameters and defaults
     assert f.parameters == ("a1", "b")
@@ -1384,7 +1385,7 @@ def test_set_debug_and_profile():
     def f(a, b):
         return a + b
 
-    pipeline = Pipeline([f])
+    pipeline = Pipeline([f], copy_funcs=False)
     assert not f.debug
     assert not f.profile
     pipeline.debug = True

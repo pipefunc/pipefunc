@@ -718,7 +718,7 @@ class NestedPipeFunc(PipeFunc):
 
         _validate_pipefuncs(pipefuncs)
         self.pipefuncs: list[PipeFunc] = [f.copy() for f in pipefuncs]
-        self.pipeline = Pipeline(self.pipefuncs)  # type: ignore[arg-type]
+        self.pipeline = Pipeline(self.pipefuncs, copy_funcs=False)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs

@@ -631,7 +631,7 @@ def test_add_mapspec_axis(tmp_path: Path) -> None:
     def three(two, d):
         return two / d
 
-    pipeline = Pipeline([one, two, three])
+    pipeline = Pipeline([one, two, three], copy_funcs=False)
     inputs = {"a": np.ones((2,)), "b": [1, 1], "d": 1}
     expected = {"b": (2,), "a": (2,), "one": (2, 2)}
     shapes, masks = map_shapes(pipeline, inputs)
@@ -689,7 +689,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
     def take_sum(y: list[int]) -> int:
         return sum(y)
 
-    pipeline = Pipeline([generate_ints, add, take_sum])
+    pipeline = Pipeline([generate_ints, add, take_sum], copy_funcs=False)
 
     pipeline.add_mapspec_axis("z", axis="k")
     assert str(generate_ints.mapspec) == "... -> x[i]"
@@ -821,6 +821,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
             side_chain,
             take_sum,
         ],
+        copy_funcs=False,
     )
 
     inputs = {"n": 4, "z": 1}

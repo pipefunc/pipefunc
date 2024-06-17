@@ -18,7 +18,7 @@ def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
     def f_e(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline = Pipeline([f_c, f_d, f_e], copy_funcs=False)
     pipeline.add_mapspec_axis("a", axis="i")
     pipeline.add_mapspec_axis("b", axis="i")
     pipeline.add_mapspec_axis("x", axis="j")
@@ -59,7 +59,7 @@ def test_adding_axes_to_mapspec_less_pipeline() -> None:
     def f_e(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline = Pipeline([f_c, f_d, f_e], copy_funcs=False)
     pipeline.add_mapspec_axis("a", axis="i")
     pipeline.add_mapspec_axis("b", axis="j")
     pipeline.add_mapspec_axis("x", axis="k")
@@ -80,7 +80,7 @@ def test_add_mapspec_axis_multiple_axes() -> None:
     def func(a, b):
         return a + b
 
-    pipeline = Pipeline([func])
+    pipeline = Pipeline([func], copy_funcs=False)
 
     pipeline.add_mapspec_axis("a", axis="k")
     pipeline.add_mapspec_axis("b", axis="l")
@@ -93,7 +93,7 @@ def test_add_mapspec_axis_parameter_in_output() -> None:
     def func(a):
         return a
 
-    pipeline = Pipeline([func])
+    pipeline = Pipeline([func], copy_funcs=False)
 
     pipeline.add_mapspec_axis("a", axis="k")
 
@@ -185,7 +185,7 @@ def test_add_mapspec_axis_complex_pipeline() -> None:
     def func3(out2, out3):
         return out2 + out3
 
-    pipeline = Pipeline([func1, func2, func3])
+    pipeline = Pipeline([func1, func2, func3], copy_funcs=False)
 
     pipeline.add_mapspec_axis("a", axis="l")
 

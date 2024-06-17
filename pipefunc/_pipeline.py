@@ -78,7 +78,9 @@ class Pipeline:
     cache_type
         The type of cache to use.
     cache_kwargs
-        Keyword arguments passed to
+        Keyword arguments passed to the cache constructor.
+    copy_funcs
+        Whether to copy the functions before adding them to the pipeline.
 
     """
 
@@ -91,6 +93,7 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
+        copy_funcs: bool = True,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -102,7 +105,7 @@ class Pipeline:
                 f, mapspec = f  # noqa: PLW2901
             else:
                 mapspec = None
-            self.add(f, mapspec=mapspec)
+            self.add(f, mapspec=mapspec, copy=copy_funcs)
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
@@ -163,7 +166,9 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
+    def add(
+        self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None, copy: bool = True
+    ) -> PipeFunc:
         """Add a function to the pipeline.
 
         Parameters
@@ -176,6 +181,8 @@ class Pipeline:
             This is a specification for mapping that dictates how input values should
             be merged together. If ``None``, the default behavior is that the input directly
             maps to the output.
+        copy
+            Whether to copy the function before adding it to the pipeline.
 
         """
         if not isinstance(f, PipeFunc) and callable(f):
@@ -194,7 +201,7 @@ class Pipeline:
         elif not isinstance(f, PipeFunc):
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
-        else:
+        elif copy:
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
         self.functions.append(f)

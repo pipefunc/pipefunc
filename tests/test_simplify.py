@@ -25,7 +25,7 @@ def test_identify_combinable_nodes():
     def f_i(gg, b, e):  # noqa: ARG001
         pass
 
-    pipeline = Pipeline([f_d, f_e, f_i, f_gg])
+    pipeline = Pipeline([f_d, f_e, f_i, f_gg], copy_funcs=False)
 
     # `conservatively_combine=False`
     combinable_nodes = _identify_combinable_nodes(
@@ -72,7 +72,7 @@ def test_conservatively_combine():
     def f3(b, x, y):
         return x * y * b
 
-    pipeline = Pipeline([f1, f2, f3])
+    pipeline = Pipeline([f1, f2, f3], copy_funcs=False)
 
     root_args = pipeline.all_root_args
     assert root_args == {"x": ("a",), "y": ("a", "b"), "z": ("a", "b")}
