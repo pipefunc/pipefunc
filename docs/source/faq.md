@@ -405,6 +405,7 @@ def g(y, c):
     return y * c
 
 pipeline = Pipeline([f, g])
+pipeline2 = pipeline.copy()
 ```
 
 Now, let's update the scope of the pipeline using `update_scope`:
@@ -416,17 +417,36 @@ pipeline.update_scope("my_scope", inputs="*", outputs="*")
 This is equivalent to applying the following renames:
 
 ```{code-cell} ipython3
-pipeline.update_renames({"a": "my_scope.a", "b": "my_scope.b", "y": "my_scope.y", "c": "my_scope.c", "z": "my_scope.z"})
+pipeline2.update_renames({"a": "my_scope.a", "b": "my_scope.b", "y": "my_scope.y", "c": "my_scope.c", "z": "my_scope.z"})
 ```
 
 After applying the scope, the parameter names and output names of the functions in the pipeline are prefixed with `my_scope.`.
 We can confirm this by inspecting the `PipeFunc` objects:
 
+:::{admonition} Get the <code>PipeFunc</code> objects using <code>pipeline[output_name]</code>
+:class: note, dropdown
+
+   The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified. Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
+
+:::
+
 ```{code-cell} ipython3
+f = pipeline["my_scope.y"]
 print(f.parameters)  # Output: ('my_scope.a', 'my_scope.b')
 print(f.output_name)  # Output: 'my_scope.y'
+g = pipeline["my_scope.z"]
 print(g.parameters)  # Output: ('my_scope.y', 'my_scope.c')
 print(g.output_name)  # Output: 'my_scope.z'
+```
+
+or see the `renames` attribute:
+
+```{code-cell} ipython3
+for f in pipeline.functions:
+    print(f.__name__, f.renames)
+
+for f in pipeline2.functions:
+    print(f.__name__, f.renames)
 ```
 
 So, `update_scope` is really just a convenience method that automatically generates the appropriate renames based on the provided scope and applies them to the `PipeFunc` or `Pipeline`.
@@ -434,7 +454,3 @@ Internally, it calls `update_renames` with the generated renames, making it easi
 
 It's worth noting that while `update_scope` affects the external names (i.e., how the parameters and outputs are referred to in the pipeline), it doesn't change the actual parameter names in the original function definitions.
 The mapping between the original names and the scoped names is handled by the `PipeFunc` wrapper.
-
-```{code-cell} ipython3
-
-```
