@@ -834,16 +834,28 @@ class Pipeline:
         _validate_scopes(self.functions, scope)
         all_inputs = set(self.topological_generations.root_args)
         all_outputs = self.all_output_names
+        if inputs == "*":
+            inputs = all_inputs
+        if outputs == "*":
+            outputs = all_outputs
+        if exclude is None:
+            exclude = set()
 
         for f in self.functions:
+            parameters = set(f.parameters)
             f_inputs = (
-                set(inputs) & set(f.parameters) & all_inputs if isinstance(inputs, set) else inputs
+                (set(inputs) & parameters & all_inputs) - exclude
+                if isinstance(inputs, set)
+                else inputs
             )
-            all_names = set(at_least_tuple(f.output_name)) | set(f.parameters)
+            all_names = set(at_least_tuple(f.output_name)) | parameters
             f_outputs = (
-                set(outputs) & all_names & all_outputs if isinstance(outputs, set) else outputs
+                (set(outputs) & all_names & all_outputs) - exclude
+                if isinstance(outputs, set)
+                else outputs
             )
-            f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+            if f_inputs or f_outputs:
+                f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
         self._init_internal_cache()
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:

@@ -1635,3 +1635,26 @@ def test_update_scope_output_only():
     assert pipeline["foo.z"].output_name == "foo.z"
     assert pipeline["prod"].parameters == ("foo.z",)
     assert pipeline["prod"].output_name == "prod"
+
+
+def test_update_scope_from_faq():
+    @pipefunc(output_name="y", scope="foo")
+    def f(a, b):
+        return a + b
+
+    assert f.renames == {"a": "foo.a", "b": "foo.b", "y": "foo.y"}
+
+    def g(a, b):
+        return a * b
+
+    g_func = PipeFunc(g, output_name="z")
+    assert g_func.parameters == ("a", "b")
+    assert g_func.output_name == "z"
+    g_func.update_scope("bar", inputs={"a"}, outputs="*")
+    assert g_func.parameters == ("bar.a", "b")
+    assert g_func.output_name == "bar.z"
+    assert g_func.renames == {"a": "bar.a", "z": "bar.z"}
+
+    pipeline = Pipeline([f, g_func])
+    # all outputs except foo.y, so only bar.z, which becomes baz.z
+    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})

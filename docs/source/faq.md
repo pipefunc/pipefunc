@@ -151,55 +151,55 @@ There are a few ways to specify renames:
 
 1. Via the `@pipefunc` decorator:
 
-   ```{code-cell} ipython3
-   @pipefunc(output_name="prod", renames={"a": "x", "b": "y"})
-   def multiply(a, b):
-       return a * b
-   ```
+```{code-cell} ipython3
+@pipefunc(output_name="prod", renames={"a": "x", "b": "y"})
+def multiply(a, b):
+    return a * b
+```
 
    This renames the `a` input to `x` and the `b` input to `y`.
 
 2. By creating a `PipeFunc` object directly and specifying the `renames` attribute:
 
-   ```{code-cell} ipython3
-   from pipefunc import PipeFunc
+```{code-cell} ipython3
+from pipefunc import PipeFunc
 
-   def add(a, b):
-       return a + b
+def add(a, b):
+    return a + b
 
-   add_func = PipeFunc(add, output_name="sum", renames={"a": "x", "b": "y"})
-   ```
+add_func = PipeFunc(add, output_name="sum", renames={"a": "x", "b": "y"})
+```
 
 3. By updating the renames of an existing `PipeFunc` object:
 
-   ```{code-cell} ipython3
-   add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
-   ```
+```{code-cell} ipython3
+add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
+```
 
    This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
 
 
 4. By updating the renames of an entire pipeline:
 
-   ```{code-cell} ipython3
-   pipeline = Pipeline([add_func])
-   pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="original")
-   ```
+```{code-cell} ipython3
+pipeline = Pipeline([add_func])
+pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="original")
+```
 
 When specifying renames, you can choose to update from the original argument names (`update_from="original"`) or from the current renamed arguments (`update_from="current"`).
 
 :::{admonition} We can also update the <code>output_name</code>
 :class: note, dropdown
 
-   ```{code-cell} ipython3
-   @pipefunc(output_name=("i", "j"))
-   def f(a, b):
-       return a, b
+```{code-cell} ipython3
+@pipefunc(output_name=("i", "j"))
+def f(a, b):
+    return a, b
 
-   # renames must be in terms of individual output strings
-   f.update_renames({"i": "ii"}, update_from="current")
-   assert f.output_name == ("ii", "j")
-   ```
+# renames must be in terms of individual output strings
+f.update_renames({"i": "ii"}, update_from="current")
+assert f.output_name == ("ii", "j")
+```
 
 :::
 
@@ -227,44 +227,44 @@ Here are a few ways to handle multiple outputs:
 
 1. Return a tuple of outputs and specify the `output_name` as a tuple of strings:
 
-   ```{code-cell} ipython3
-   @pipefunc(output_name=("mean", "std"))
-   def mean_and_std(data):
-       return np.mean(data), np.std(data)
-   ```
+```{code-cell} ipython3
+@pipefunc(output_name=("mean", "std"))
+def mean_and_std(data):
+    return np.mean(data), np.std(data)
+```
 
    This will automatically unpack the tuple and assign each output to the corresponding name in `output_name`.
 
 2. Return a dictionary, custom object, or any other type and specify the `output_name` as a tuple of strings along with an `output_picker` function:
 
-   ```{code-cell} ipython3
-   def output_picker(dct, output_name):
-       return dct[output_name]
+```{code-cell} ipython3
+def output_picker(dct, output_name):
+    return dct[output_name]
 
-   @pipefunc(output_name=("mean", "std"), output_picker=output_picker)
-   def mean_and_std(data):
-       return {"mean": np.mean(data), "std": np.std(data)}
-   ```
+@pipefunc(output_name=("mean", "std"), output_picker=output_picker)
+def mean_and_std(data):
+    return {"mean": np.mean(data), "std": np.std(data)}
+```
 
    The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument. It should return the output corresponding to the given name.
 
    Another example with a custom object and an explicit `output_picker` function:
 
-   ```{code-cell} ipython3
-   from dataclasses import dataclass
+```{code-cell} ipython3
+from dataclasses import dataclass
 
-   @dataclass
-   class MeanStd:
-       mean: float
-       std: float
+@dataclass
+class MeanStd:
+    mean: float
+    std: float
 
-   def pick_mean_std(obj, output_name):
-       return getattr(obj, output_name)
+def pick_mean_std(obj, output_name):
+    return getattr(obj, output_name)
 
-   @pipefunc(output_name=("mean", "std"), output_picker=pick_mean_std)
-   def mean_and_std(data):
-       return MeanStd(np.mean(data), np.std(data))
-   ```
+@pipefunc(output_name=("mean", "std"), output_picker=pick_mean_std)
+def mean_and_std(data):
+    return MeanStd(np.mean(data), np.std(data))
+```
 
    Here, the `pick_mean_std` function is defined to extract the `mean` and `std` attributes from the returned `MeanStd` object.
 
@@ -330,40 +330,44 @@ Here are a few ways to use parameter scopes:
 
 1. Set the scope when defining a `PipeFunc`:
 
-   ```{code-cell} ipython3
-   @pipefunc(output_name="y", scope="foo")
-   def f(a, b):
-       return a + b
-   ```
+```{code-cell} ipython3
+@pipefunc(output_name="y", scope="foo")
+def f(a, b):
+    return a + b
+
+print(f.renames)  # Output: {'a': 'foo.a', 'b': 'foo.b', 'y': 'foo.y'}
+```
 
    This sets the scope "foo" for all parameters and the output name of the function `f`.
    The actual parameter names become `foo.a` and `foo.b`, and the output name becomes `foo.y`.
 
 2. Update the scope of an existing `PipeFunc`:
 
-   ```{code-cell} ipython3
-   def g(a, b):
-       return a * b
+```{code-cell} ipython3
+from pipefunc import PipeFunc
 
-   g_func = PipeFunc(g, output_name="z")
-   print(g_func.parameters)  # Output: ('a', 'b')
-   print(g_func.output_name)  # Output: 'z'
+def g(a, b, y):
+    return a * b + y
 
-   g_func.update_scope("bar", inputs={"a"}, outputs="*")
-   print(g_func.parameters)  # Output: ('bar.a', 'b')
-   print(g_func.output_name)  # Output: 'bar.z'
-   ```
+g_func = PipeFunc(g, output_name="z", renames={"y": "foo.y"})
+print(g_func.parameters)  # Output: ('a', 'b', 'foo.y')
+print(g_func.output_name)  # Output: 'z'
 
-   This updates the scope of input `a` and outputs of `g_func` to "bar".
-   The parameter names become `bar.a` and `b`, and the output name becomes `bar.z`.
+g_func.update_scope("bar", inputs={"a"}, outputs="*")
+print(g_func.parameters)  # Output: ('bar.a', 'b', 'foo.y')
+print(g_func.output_name)  # Output: 'bar.z'
+```
+
+   This updates the scope of the outputs of `g_func` to "bar".
+   The parameter names become `bar.a`, `b`, and `foo.y`, and the output name becomes `bar.z`.
 
 3. Update the scope of an entire `Pipeline`:
 
-   ```{code-cell} ipython3
-   pipeline = Pipeline([f, g_func])
-   # all outputs except foo.y, so only bar.z, which becomes baz.z
-   pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
-   ```
+```{code-cell} ipython3
+pipeline = Pipeline([f, g_func])
+# all outputs except foo.y, so only bar.z, which becomes baz.z
+pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+```
 
    This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope.
    The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
@@ -430,3 +434,7 @@ Internally, it calls `update_renames` with the generated renames, making it easi
 
 It's worth noting that while `update_scope` affects the external names (i.e., how the parameters and outputs are referred to in the pipeline), it doesn't change the actual parameter names in the original function definitions.
 The mapping between the original names and the scoped names is handled by the `PipeFunc` wrapper.
+
+```{code-cell} ipython3
+
+```
