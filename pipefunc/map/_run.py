@@ -92,6 +92,7 @@ def run(
         and an exception is raised if any are missing.
 
     """
+    inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     _validate_complete_inputs(pipeline, inputs)
@@ -226,6 +227,10 @@ class _MockPipeline:
         """Return the MapSpecs for all functions in the pipeline as strings."""
         return [str(ms) for ms in self.mapspecs()]
 
+    @functools.cached_property
+    def all_output_names(self) -> set[str]:
+        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
+
     @property
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
@@ -235,6 +240,12 @@ class _MockPipeline:
     def mapspec_dimensions(self) -> dict[str, int]:
         """Return the number of dimensions for each array parameter in the pipeline."""
         return mapspec_dimensions(self.mapspecs())
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        return flat_scope_kwargs
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:

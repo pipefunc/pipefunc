@@ -90,9 +90,7 @@ class RunInfo:
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes or {})
         return cls(
             input_paths=input_paths,
-            all_output_names={
-                name for f in pipeline.functions for name in at_least_tuple(f.output_name)
-            },
+            all_output_names=pipeline.all_output_names,
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,

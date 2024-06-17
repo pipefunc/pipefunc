@@ -80,6 +80,21 @@ class Pipeline:
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
+    scope
+        If provided, *all* parameter names and output names of the pipeline functions will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `Pipeline.update_scope` method.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
     """
 
@@ -92,6 +107,7 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
+        scope: str | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -110,7 +126,10 @@ class Pipeline:
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        if scope is not None:
+            self.update_scope(scope, "*", "*")
         self._validate_mapspec()
+        _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     def _init_internal_cache(self) -> None:
@@ -300,6 +319,10 @@ class Pipeline:
             The mapping from output names to functions.
 
         """
+        if output_name not in self.output_to_func:
+            available = list(self.output_to_func.keys())
+            msg = f"No function with output name `{output_name!r}` in the pipeline, only `{available}`."
+            raise KeyError(msg)
         return self.output_to_func[output_name]
 
     def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
@@ -416,7 +439,7 @@ class Pipeline:
     def _get_func_args(
         self,
         func: PipeFunc,
-        kwargs: dict[str, Any],  # Includes defaults
+        flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
@@ -426,12 +449,12 @@ class Pipeline:
         for arg in func.parameters:
             if arg in func._bound:
                 value = func._bound[arg]
-            elif arg in kwargs:
-                value = kwargs[arg]
+            elif arg in flat_scope_kwargs:
+                value = flat_scope_kwargs[arg]
             elif arg in self.output_to_func:
                 value = self._run(
                     output_name=arg,
-                    kwargs=kwargs,
+                    flat_scope_kwargs=flat_scope_kwargs,
                     all_results=all_results,
                     full_output=full_output,
                     used_parameters=used_parameters,
@@ -449,7 +472,7 @@ class Pipeline:
         self,
         *,
         output_name: _OUTPUT_TYPE,
-        kwargs: Any,
+        flat_scope_kwargs: dict[str, Any],
         all_results: dict[_OUTPUT_TYPE, Any],
         full_output: bool,
         used_parameters: set[str | None],
@@ -467,7 +490,7 @@ class Pipeline:
             assert cache is not None
             cache_key = _compute_cache_key(
                 func.output_name,
-                func.defaults | kwargs | func._bound,
+                func.defaults | flat_scope_kwargs | func._bound,
                 root_args,
             )
             return_now, result_from_cache = _get_result_from_cache(
@@ -483,7 +506,13 @@ class Pipeline:
             if return_now:
                 return all_results[output_name]
 
-        func_args = self._get_func_args(func, kwargs, all_results, full_output, used_parameters)
+        func_args = self._get_func_args(
+            func,
+            flat_scope_kwargs,
+            all_results,
+            full_output,
+            used_parameters,
+        )
 
         if result_from_cache:
             assert full_output
@@ -535,19 +564,23 @@ class Pipeline:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
 
-        all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
+        flat_scope_kwargs = self._flatten_scopes(kwargs)
+
+        all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
 
         self._run(
             output_name=output_name,
-            kwargs=kwargs,
+            flat_scope_kwargs=flat_scope_kwargs,
             all_results=all_results,
             full_output=full_output,
             used_parameters=used_parameters,
         )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (unused := kwargs.keys() - set(used_parameters)):
+        if None not in used_parameters and (
+            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        ):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
@@ -748,6 +781,89 @@ class Pipeline:
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
 
+    def update_scope(
+        self,
+        scope: str | None,
+        inputs: set[str] | Literal["*"] | None = None,
+        outputs: set[str] | Literal["*"] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Update the scope for the pipeline by adding (or removing) a prefix to the input and output names.
+
+        This method updates the names of the specified inputs and outputs by adding the provided
+        scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
+        If an input or output name already starts with the scope prefix, it remains unchanged.
+        If their is an existing scope, it is replaced with the new scope.
+
+        ``inputs`` are the root arguments of the pipeline. Inputs to functions
+        which are outputs of other functions are considered to be outputs.
+
+        Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+
+        Parameters
+        ----------
+        scope
+            The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
+        inputs
+            Specific input names to include, or ``"*"`` to include all inputs.
+            The inputs are *only* the root arguments of the pipeline.
+            If ``None``, no inputs are included.
+        outputs
+            Specific output names to include, or ``"*"`` to include all outputs.
+            If ``None``, no outputs are included.
+        exclude
+            Names to exclude from the scope. Both inputs and outputs can be excluded.
+            Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
+
+        Examples
+        --------
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
+        >>> pipeline.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
+        >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
+
+        """
+        _validate_scopes(self.functions, scope)
+        all_inputs = set(self.topological_generations.root_args)
+        all_outputs = self.all_output_names
+        if inputs == "*":
+            inputs = all_inputs
+        if outputs == "*":
+            outputs = all_outputs
+        if exclude is None:
+            exclude = set()
+
+        for f in self.functions:
+            parameters = set(f.parameters)
+            f_inputs = (
+                (set(inputs) & parameters & all_inputs) - exclude
+                if isinstance(inputs, set)
+                else inputs
+            )
+            all_names = set(at_least_tuple(f.output_name)) | parameters
+            f_outputs = (
+                (set(outputs) & all_names & all_outputs) - exclude
+                if isinstance(outputs, set)
+                else outputs
+            )
+            if f_inputs or f_outputs:
+                f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        self._init_internal_cache()
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        return flat_scope_kwargs
+
     @functools.cached_property
     def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
@@ -844,6 +960,10 @@ class Pipeline:
     def sorted_functions(self) -> list[PipeFunc]:
         """Return the functions in the pipeline in topological order."""
         return [f for gen in self.topological_generations.function_lists for f in gen]
+
+    @functools.cached_property
+    def all_output_names(self) -> set[str]:
+        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
 
     def _autogen_mapspec_axes(self) -> set[PipeFunc]:
         """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
@@ -1777,3 +1897,14 @@ def _find_nodes_between(
         reachable_to_outputs.update(nx.ancestors(graph, output_node))
     reachable_to_outputs.update(output_nodes)
     return reachable_from_inputs & reachable_to_outputs
+
+
+def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
+    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
+    if new_scope is not None:
+        all_scopes.add(new_scope)
+    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
+    if overlap := all_scopes & all_parameters:
+        overlap_str = ", ".join(overlap)
+        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
+        raise ValueError(msg)

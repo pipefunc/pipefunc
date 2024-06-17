@@ -13,6 +13,7 @@ import datetime
 import functools
 import inspect
 import os
+import warnings
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
@@ -75,10 +76,24 @@ class PipeFunc(Generic[T]):
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
+    scope
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
+
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
     Returns
     -------
-        The identifier for the output of the wrapped function.
+        A `PipeFunc` instance that wraps the original function with the specified return identifier.
 
     Examples
     --------
@@ -112,6 +127,7 @@ class PipeFunc(Generic[T]):
         save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self.func: Callable[..., Any] = func
@@ -128,6 +144,8 @@ class PipeFunc(Generic[T]):
         self.resources = _maybe_resources(resources)
         self.profiling_stats: ProfilingStats | None
         self.set_profiling(enable=profile)
+        if scope is not None:
+            self.update_scope(scope, inputs="*", outputs="*")
         self._validate_mapspec()
         self._validate_names()
 
@@ -319,6 +337,77 @@ class PipeFunc(Generic[T]):
 
         clear_cached_properties(self, PipeFunc)
 
+    def update_scope(
+        self,
+        scope: str | None,
+        inputs: set[str] | Literal["*"] | None = None,
+        outputs: set[str] | Literal["*"] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Update the scope for the `PipeFunc` by adding (or removing) a prefix to the input and output names.
+
+        This method updates the names of the specified inputs and outputs by adding the provided
+        scope as a prefix. The scope is added to the names using the format `f"{scope}.{name}"`.
+        If an input or output name already starts with the scope prefix, it remains unchanged.
+        If their is an existing scope, it is replaced with the new scope.
+
+        Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
+
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+
+        Parameters
+        ----------
+        scope
+            The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
+        inputs
+            Specific input names to include, or "*" to include all inputs. If None, no inputs are included.
+        outputs
+            Specific output names to include, or "*" to include all outputs. If None, no outputs are included.
+        exclude
+            Names to exclude from the scope. This can include both inputs and outputs. Can be used with `inputs`
+            or `outputs` being "*" to exclude specific names.
+
+        Examples
+        --------
+        >>> f.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
+        >>> f.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
+        >>> f.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
+        >>> f.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
+
+        """
+        if scope is not None and (
+            scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name)
+        ):
+            msg = f"The provided `{scope=}` cannot be identical to the function input parameters or output name."
+            raise ValueError(msg)
+
+        if exclude is None:
+            exclude = set()
+
+        if inputs == "*":
+            inputs = set(self.parameters)
+        elif inputs is None:
+            inputs = set()
+        else:
+            inputs = set(inputs)  # Ensure it is a set
+
+        if outputs == "*":
+            outputs = set(at_least_tuple(self.output_name))
+        elif outputs is None:
+            outputs = set()
+        else:
+            outputs = set(outputs)  # Ensure it is a set
+
+        all_parameters = (inputs | outputs) - exclude
+        assert all_parameters
+        renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
+        self.update_renames(renames, update_from="current")
+
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update the bound arguments for the function that are fixed.
 
@@ -353,8 +442,10 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        for key in update:
-            _validate_identifier(key, name)
+        for key, value in update.items():
+            _validate_identifier(name, key)
+            if name == "renames":
+                _validate_identifier(name, value)
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -403,6 +494,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
                 f"Unexpected keyword arguments: `{extra}`."
@@ -441,6 +533,47 @@ class PipeFunc(Generic[T]):
     def profile(self, enable: bool) -> None:
         """Enable or disable profiling for the wrapped function."""
         self.set_profiling(enable=enable)
+
+    @functools.cached_property
+    def parameter_scopes(self) -> set[str]:
+        """Return the scopes of the function parameters.
+
+        These are constructed from the parameter names that contain a dot.
+        So if the parameter is ``foo.bar``, the scope is ``foo``.
+        """
+        return {k.split(".", 1)[0] for k in self.parameters if "." in k}
+
+    @functools.cached_property
+    def unscoped_parameters(self) -> tuple[str, ...]:
+        """Return the parameters with the scope stripped off."""
+        return tuple(name.split(".", 1)[-1] for name in self.parameters)
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Flatten the scopes of the function parameters.
+
+        Flattens `{scope: {name: value}}` to `{f"{scope}.{name}": value}`.
+
+        Examples
+        --------
+        >>> f_c(x={"a": 1, "b": 1})
+        >>> f_c(**{"x.a": 1, "x.b": 1})
+        >>> f_c(x=dict(a=1), **{"x.b": 1})
+
+        """
+        if not self.parameter_scopes:
+            return kwargs
+
+        requires_flattening = self.parameter_scopes & kwargs.keys()
+        if not requires_flattening:
+            return kwargs
+
+        new_kwargs = {}
+        for k, v in kwargs.items():
+            if k in self.parameter_scopes:
+                new_kwargs.update({f"{k}.{name}": value for name, value in v.items()})
+            else:
+                new_kwargs[k] = v
+        return new_kwargs
 
     def set_profiling(self, *, enable: bool = True) -> None:
         """Enable or disable profiling for the wrapped function."""
@@ -577,6 +710,7 @@ def pipefunc(
     save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | None = None,
+    scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -617,10 +751,24 @@ def pipefunc(
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
+    scope
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
+
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
     Returns
     -------
-        A decorator function that takes the original function and ``output_name`` and
+        A wrapped function that takes the original function and ``output_name`` and
         creates a `PipeFunc` instance with the specified return identifier.
 
     See Also
@@ -667,6 +815,7 @@ def pipefunc(
             save_function=save_function,
             mapspec=mapspec,
             resources=resources,
+            scope=scope,
         )
 
     return decorator
@@ -832,6 +981,11 @@ class _NestedFuncWrapper:
 
 
 def _validate_identifier(name: str, value: Any) -> None:
+    if "." in value:
+        scope, value = value.split(".", 1)
+        _validate_identifier(name, scope)
+        _validate_identifier(name, value)
+        return
     if not value.isidentifier():
         msg = f"The `{name}` should contain/be valid Python identifier(s), not `{value}`."
         raise ValueError(msg)
@@ -902,3 +1056,17 @@ def _rename_output_name(
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
     return tuple(renames.get(name, name) for name in original_output_name)
+
+
+def _prepend_name_with_scope(name: str, scope: str | None) -> str:
+    if scope is None:
+        return name.split(".", 1)[1] if "." in name else name
+    if name.startswith(f"{scope}."):
+        return name
+    if "." in name:
+        old_scope, name = name.split(".", 1)
+        warnings.warn(
+            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
+            stacklevel=3,
+        )
+    return f"{scope}.{name}"

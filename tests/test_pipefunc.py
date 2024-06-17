@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -1467,6 +1468,128 @@ def test_nesting_funcs_with_bound():
     assert len(pipeline.functions) == 1
 
 
+def test_pipefunc_scope():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a, b):
+        return a + b
+
+    scope = "x"
+    f.update_scope(scope, "*")
+    assert f(x={"a": 1, "b": 1}) == 2
+    assert f(**{"x.a": 1, "x.b": 1}) == 2
+    assert f(**{"x.b": 1, "x": {"a": 1}}) == 2
+
+
+def test_pipeline_scope():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    scope = "x"
+    pipeline.update_scope(scope, "*")
+
+    assert pipeline(x={"a": 1, "b": 1}) == 2
+    assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
+    assert pipeline(**{"x.b": 1, "x": {"a": 1}}) == 2
+
+
+def test_pipeline_scope_partial():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c
+
+    pipeline = Pipeline([f, g])
+    scope = "x"
+    pipeline.update_scope(scope, inputs="*", outputs={"c"})
+    assert pipeline["x.c"].output_name == "x.c"
+    assert pipeline["x.c"].parameters == ("x.a", "x.b")
+    assert pipeline["d"].parameters == ("x.c",)
+    assert pipeline["d"].output_name == "d"
+    assert pipeline("d", x={"a": 1, "b": 1}) == 2
+    assert pipeline(x={"a": 1, "b": 1}) == 2
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
+
+
+def test_set_pipeline_scope_on_init():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f], scope="x")
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(x={"a": 1, "b": 1}) == 2
+    assert pipeline("x.c", x={"a": 1, "b": 1}) == 2
+    assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
+    with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
+        pipeline.update_scope("a", "*")
+    pipeline.update_scope("foo", outputs="*")
+    pipeline.update_scope("foo", outputs="*")  # twice should be fine
+    assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
+    pipeline.update_scope(None, {"x.b"})
+    assert pipeline("foo.c", x={"a": 1}, b=1) == 2
+    pipeline.update_scope(None, "*")
+    assert pipeline("foo.c", a=1, b=1) == 2
+
+    with pytest.raises(ValueError, match="The `renames` should contain"):
+        pipeline.update_renames({"a": "qq#.a"})
+
+
+def test_set_pipefunc_scope_on_init():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="x")
+    def f(a, b):
+        return a + b
+
+    assert f.unscoped_parameters == ("a", "b")
+    assert f.parameter_scopes == {"x"}
+    assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
+    assert str(f.mapspec) == "x.a[i] -> x.c[i]"
+    assert f(x={"a": 1, "b": 1}) == 2
+    f.update_scope(None, "*", "*")
+    assert f.unscoped_parameters == ("a", "b")
+    assert f.parameters == ("a", "b")
+    assert f(a=1, b=1) == 2
+
+
+def test_scope_and_parameter_identical():
+    @pipefunc(output_name="c")
+    def f(x, bar):
+        return x + bar
+
+    f.update_scope("foo", {"x"}, {"c"})
+    assert f.parameters == ("foo.x", "bar")
+    assert f.renames == {"x": "foo.x", "c": "foo.c"}
+
+    pipeline1 = Pipeline([f])
+
+    @pipefunc(output_name="d", scope="bar")
+    def g(foo):
+        return foo
+
+    pipeline2 = Pipeline([g])
+
+    with pytest.raises(ValueError, match="`bar` are used as both parameter and scope"):
+        pipeline1 | pipeline2
+
+
+def test_scope_with_mapspec():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a, b):
+        return a + b
+
+    f.update_scope("foo", {"a"}, {"c"})
+    assert str(f.mapspec) == "foo.a[i] -> foo.c[i]"
+    pipeline = Pipeline([f])
+    assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
+    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})
+    assert results["foo.c"].output.tolist() == [1, 2, 3]
+
+
 def test_accessing_copied_pipefunc():
     @pipefunc(output_name="c")
     def f(a, b):
@@ -1478,3 +1601,63 @@ def test_accessing_copied_pipefunc():
         match=re.escape("you can access that function via `pipeline['c']`"),
     ):
         pipeline.drop(f=f)
+
+
+def test_pipeline_getitem_exception():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        KeyError,
+        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
+    ):
+        pipeline["d"]
+
+
+def test_update_scope_output_only():
+    @pipefunc(output_name="z")
+    def add(x: int, y: int) -> int:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x + y
+
+    @pipefunc(output_name="prod")
+    def take_sum(z: np.ndarray) -> int:
+        return np.prod(z)
+
+    pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
+    pipeline.update_scope("foo", outputs={"z"})
+    assert pipeline["foo.z"].parameters == ("x", "y")
+    assert pipeline["foo.z"].output_name == "foo.z"
+    assert pipeline["prod"].parameters == ("foo.z",)
+    assert pipeline["prod"].output_name == "prod"
+
+
+def test_update_scope_from_faq():
+    @pipefunc(output_name="y", scope="foo")
+    def f(a, b):
+        return a + b
+
+    assert f.renames == {"a": "foo.a", "b": "foo.b", "y": "foo.y"}
+
+    def g(a, b, y):
+        return a * b + y
+
+    g_func = PipeFunc(g, output_name="z", renames={"y": "foo.y"})
+    assert g_func.parameters == ("a", "b", "foo.y")
+    assert g_func.output_name == "z"
+
+    g_func.update_scope("bar", inputs={"a"}, outputs="*")
+    assert g_func.parameters == ("bar.a", "b", "foo.y")
+    assert g_func.output_name == "bar.z"
+
+    pipeline = Pipeline([f, g_func])
+    # all outputs except foo.y, so only bar.z, which becomes baz.z
+    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+    kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
+    assert pipeline(**kwargs) == 15
+    results = pipeline.map(inputs=kwargs)
+    assert results["baz.z"].output == 15
+    assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
