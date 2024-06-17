@@ -269,6 +269,19 @@ class Pipeline:
 
     @functools.cached_property
     def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+        """Return a mapping from output names to functions.
+
+        The mapping includes functions with multiple outputs both as individual
+        outputs and as tuples of outputs. For example, if a function has the
+        output name ``("a", "b")``, the mapping will include both ``"a"``,
+        ``"b"``, and ``("a", "b")`` as keys.
+
+        See Also
+        --------
+        __getitem__
+            Shortcut for accessing the function corresponding to a specific output name.
+
+        """
         output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
         for f in self.functions:
             output_to_func[f.output_name] = f
@@ -278,7 +291,14 @@ class Pipeline:
         return output_to_func
 
     def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
-        """Return the function corresponding to a specific output name."""
+        """Return the function corresponding to a specific output name.
+
+        See Also
+        --------
+        output_to_func
+            The mapping from output names to functions.
+
+        """
         return self.output_to_func[output_name]
 
     def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
