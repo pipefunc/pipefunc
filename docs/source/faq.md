@@ -330,7 +330,7 @@ Here are a few ways to use parameter scopes:
 
 1. Set the scope when defining a `PipeFunc`:
 
-   ```python
+   ```{code-cell} ipython3
    @pipefunc(output_name="y", scope="foo")
    def f(a, b):
        return a + b
@@ -341,7 +341,7 @@ Here are a few ways to use parameter scopes:
 
 2. Update the scope of an existing `PipeFunc`:
 
-   ```python
+   ```{code-cell} ipython3
    def g(a, b):
        return a * b
 
@@ -359,7 +359,7 @@ Here are a few ways to use parameter scopes:
 
 3. Update the scope of an entire `Pipeline`:
 
-   ```python
+   ```{code-cell} ipython3
    pipeline = Pipeline([f, g_func])
    # all outputs except foo.y, so only bar.z, which becomes baz.z
    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
@@ -371,7 +371,7 @@ Here are a few ways to use parameter scopes:
 
 When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
 
-```python
+```{code-cell} ipython3
 pipeline(foo=dict(a=1, b=2), bar=dict(a=3), b=4)
 # or
 pipeline(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4})
@@ -391,7 +391,7 @@ They also help avoid naming conflicts and make it easier to reason about the dat
 
 To illustrate how `update_scope` works under the hood, consider this example:
 
-```python
+```{code-cell} ipython3
 @pipefunc(output_name="y")
 def f(a, b):
     return a + b
@@ -405,20 +405,20 @@ pipeline = Pipeline([f, g])
 
 Now, let's update the scope of the pipeline using `update_scope`:
 
-```python
+```{code-cell} ipython3
 pipeline.update_scope("my_scope", inputs="*", outputs="*")
 ```
 
 This is equivalent to applying the following renames:
 
-```python
+```{code-cell} ipython3
 pipeline.update_renames({"a": "my_scope.a", "b": "my_scope.b", "y": "my_scope.y", "c": "my_scope.c", "z": "my_scope.z"})
 ```
 
 After applying the scope, the parameter names and output names of the functions in the pipeline are prefixed with `my_scope.`.
 We can confirm this by inspecting the `PipeFunc` objects:
 
-```python
+```{code-cell} ipython3
 print(f.parameters)  # Output: ('my_scope.a', 'my_scope.b')
 print(f.output_name)  # Output: 'my_scope.y'
 print(g.parameters)  # Output: ('my_scope.y', 'my_scope.c')
