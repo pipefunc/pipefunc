@@ -157,7 +157,7 @@ def multiply(a, b):
     return a * b
 ```
 
-   This renames the `a` input to `x` and the `b` input to `y`.
+This renames the `a` input to `x` and the `b` input to `y`.
 
 2. By creating a `PipeFunc` object directly and specifying the `renames` attribute:
 
@@ -176,7 +176,7 @@ add_func = PipeFunc(add, output_name="sum", renames={"a": "x", "b": "y"})
 add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
 ```
 
-   This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
+This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
 
 
 4. By updating the renames of an entire pipeline:
@@ -233,7 +233,7 @@ def mean_and_std(data):
     return np.mean(data), np.std(data)
 ```
 
-   This will automatically unpack the tuple and assign each output to the corresponding name in `output_name`.
+This will automatically unpack the tuple and assign each output to the corresponding name in `output_name`.
 
 2. Return a dictionary, custom object, or any other type and specify the `output_name` as a tuple of strings along with an `output_picker` function:
 
@@ -246,9 +246,9 @@ def mean_and_std(data):
     return {"mean": np.mean(data), "std": np.std(data)}
 ```
 
-   The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument. It should return the output corresponding to the given name.
+The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument. It should return the output corresponding to the given name.
 
-   Another example with a custom object and an explicit `output_picker` function:
+Another example with a custom object and an explicit `output_picker` function:
 
 ```{code-cell} ipython3
 from dataclasses import dataclass
@@ -266,7 +266,7 @@ def mean_and_std(data):
     return MeanStd(np.mean(data), np.std(data))
 ```
 
-   Here, the `pick_mean_std` function is defined to extract the `mean` and `std` attributes from the returned `MeanStd` object.
+Here, the `pick_mean_std` function is defined to extract the `mean` and `std` attributes from the returned `MeanStd` object.
 
 Note that the `output_picker` function is called once for each output name specified in `output_name`.
 This allows you to handle cases where the returned object has a different structure than the desired output names.
@@ -358,8 +358,8 @@ print(g_func.parameters)  # Output: ('bar.a', 'b', 'foo.y')
 print(g_func.output_name)  # Output: 'bar.z'
 ```
 
-   This updates the scope of the outputs of `g_func` to "bar".
-   The parameter names become `bar.a`, `b`, and `foo.y`, and the output name becomes `bar.z`.
+This updates the scope of the outputs of `g_func` to "bar".
+The parameter names become `bar.a`, `b`, and `foo.y`, and the output name becomes `bar.z`.
 
 3. Update the scope of an entire `Pipeline`:
 
@@ -369,9 +369,9 @@ pipeline = Pipeline([f, g_func])
 pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
 ```
 
-   This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope.
-   The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
-   Noting that if a parameter is already in a scope, it will be replaced by the new scope.
+This updates the scope of all outputs of the pipeline to "baz", except for the output `foo.y` which keeps its existing scope.
+The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
+Noting that if a parameter is already in a scope, it will be replaced by the new scope.
 
 When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
 
