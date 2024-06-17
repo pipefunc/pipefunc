@@ -90,7 +90,7 @@ class Pipeline:
 
         When providing parameter values for pipelines that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
-        ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
+        ``f'{scope}.{name}'`` notation. For example,
         a `Pipeline` instance with scope "foo" and "bar", the parameters
         can be provided as:
         ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
@@ -802,7 +802,7 @@ class Pipeline:
 
         When providing parameter values for pipelines that have scopes, they can
         be provided either as a dictionary for the scope, or by using the
-        ``f'{scope}.{name}'`` notation. Mixing the two is not allowed. For example,
+        ``f'{scope}.{name}'`` notation. For example,
         a `Pipeline` instance with scope "foo" and "bar", the parameters
         can be provided as:
         ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or

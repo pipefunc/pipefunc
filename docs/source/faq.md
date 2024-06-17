@@ -373,7 +373,7 @@ This updates the scope of all outputs of the pipeline to "baz", except for the o
 The parameters are now `foo.a`, `foo.b`, `bar.a`, `b`, and the output names are `foo.y` and `baz.z`.
 Noting that if a parameter is already in a scope, it will be replaced by the new scope.
 
-When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation, but you cannot mix the two styles in a single call:
+When providing parameter values for functions or pipelines with scopes, you can either use a nested dictionary structure or the dot notation:
 
 ```{code-cell} ipython3
 pipeline(foo=dict(a=1, b=2), bar=dict(a=3), b=4)
