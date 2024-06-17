@@ -1507,10 +1507,10 @@ def test_pipeline_scope_partial():
     pipeline = Pipeline([f, g])
     scope = "x"
     pipeline.update_scope(scope, inputs="*", outputs={"c"})
-    assert f.output_name == "x.c"
-    assert f.parameters == ("x.a", "x.b")
-    assert g.parameters == ("x.c",)
-    assert g.output_name == "d"
+    assert pipeline["x.c"].output_name == "x.c"
+    assert pipeline["x.c"].parameters == ("x.a", "x.b")
+    assert pipeline["d"].parameters == ("x.c",)
+    assert pipeline["d"].output_name == "d"
     assert pipeline("d", x={"a": 1, "b": 1}) == 2
     assert pipeline(x={"a": 1, "b": 1}) == 2
     assert pipeline("x.c", x={"a": 1, "b": 1}) == 2

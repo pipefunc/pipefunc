@@ -319,6 +319,12 @@ class Pipeline:
             The mapping from output names to functions.
 
         """
+        if output_name not in self.output_to_func:
+            available: str = ", ".join(map(str, self.output_to_func.keys()))
+            msg = (
+                f"No function with output name `{output_name}` in the pipeline, only {available!r}."
+            )
+            raise KeyError(msg)
         return self.output_to_func[output_name]
 
     def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
