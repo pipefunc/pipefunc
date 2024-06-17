@@ -555,9 +555,9 @@ class PipeFunc(Generic[T]):
 
         Examples
         --------
-        >>> f_c(x={"a": 1, "b": 1})  # Allowed
-        >>> f_c(**{"x.a": 1, "x.b": 1})  # Allowed
-        >>> f_c(x=dict(a=1), **{"x.b": 1})  # Raises ValueError
+        >>> f_c(x={"a": 1, "b": 1})
+        >>> f_c(**{"x.a": 1, "x.b": 1})
+        >>> f_c(x=dict(a=1), **{"x.b": 1})
 
         """
         if not self.parameter_scopes:
