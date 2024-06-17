@@ -831,15 +831,15 @@ class Pipeline:
         """
         _validate_scopes(self.functions, scope)
         all_inputs = set(self.topological_generations.root_args)
+        all_outputs = self.all_output_names
 
         for f in self.functions:
             f_inputs = (
                 set(inputs) & set(f.parameters) & all_inputs if isinstance(inputs, set) else inputs
             )
+            all_names = set(at_least_tuple(f.output_name)) | set(f.parameters)
             f_outputs = (
-                set(outputs) & (set(at_least_tuple(f.output_name)) | set(f.parameters))
-                if isinstance(outputs, set)
-                else outputs
+                set(outputs) & all_names & all_outputs if isinstance(outputs, set) else outputs
             )
             f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
         self._init_internal_cache()
