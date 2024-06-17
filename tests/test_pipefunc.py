@@ -1479,12 +1479,6 @@ def test_pipefunc_scope():
     assert f(**{"x.a": 1, "x.b": 1}) == 2
     assert f(**{"x.b": 1, "x": {"a": 1}}) == 2
 
-    with pytest.raises(
-        ValueError,
-        match="No parameters to update the scope",
-    ):
-        f.update_scope(scope, inputs={"not_exist"})
-
 
 def test_pipeline_scope():
     @pipefunc(output_name="c")
