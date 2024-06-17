@@ -1644,17 +1644,22 @@ def test_update_scope_from_faq():
 
     assert f.renames == {"a": "foo.a", "b": "foo.b", "y": "foo.y"}
 
-    def g(a, b):
-        return a * b
+    def g(a, b, y):
+        return a * b + y
 
-    g_func = PipeFunc(g, output_name="z")
-    assert g_func.parameters == ("a", "b")
+    g_func = PipeFunc(g, output_name="z", renames={"y": "foo.y"})
+    assert g_func.parameters == ("a", "b", "foo.y")
     assert g_func.output_name == "z"
+
     g_func.update_scope("bar", inputs={"a"}, outputs="*")
-    assert g_func.parameters == ("bar.a", "b")
+    assert g_func.parameters == ("bar.a", "b", "foo.y")
     assert g_func.output_name == "bar.z"
-    assert g_func.renames == {"a": "bar.a", "z": "bar.z"}
 
     pipeline = Pipeline([f, g_func])
     # all outputs except foo.y, so only bar.z, which becomes baz.z
     pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+    kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
+    assert pipeline(**kwargs) == 15
+    results = pipeline.map(inputs=kwargs)
+    assert results["baz.z"].output == 15
+    assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
