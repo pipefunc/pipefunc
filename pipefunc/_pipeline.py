@@ -66,7 +66,8 @@ class Pipeline:
     Parameters
     ----------
     functions
-        A list of functions that form the pipeline.
+        A list of functions that form the pipeline. Note that the functions
+        are copied when added to the pipeline using `PipeFunc.copy`.
     lazy
         Flag indicating whether the pipeline should be lazy.
     debug
@@ -118,7 +119,7 @@ class Pipeline:
                 f, mapspec = f  # noqa: PLW2901
             else:
                 mapspec = None
-            self.add(f, mapspec=mapspec)
+            self.add(f, mapspec=mapspec, copy=True)
         self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
@@ -182,7 +183,13 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
+    def add(
+        self,
+        f: PipeFunc | Callable,
+        mapspec: str | MapSpec | None = None,
+        *,
+        copy: bool = True,
+    ) -> PipeFunc:
         """Add a function to the pipeline.
 
         Parameters
@@ -195,6 +202,8 @@ class Pipeline:
             This is a specification for mapping that dictates how input values should
             be merged together. If ``None``, the default behavior is that the input directly
             maps to the output.
+        copy
+            Whether to copy the function before adding it to the pipeline.
 
         """
         if not isinstance(f, PipeFunc) and callable(f):
@@ -210,9 +219,12 @@ class Pipeline:
                 mapspec = MapSpec.from_string(mapspec)
             f.mapspec = mapspec
             f._validate_mapspec()
-        if not isinstance(f, PipeFunc):
+        elif not isinstance(f, PipeFunc):
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
+        elif copy:
+            f: PipeFunc = f.copy()  # type: ignore[no-redef]
+
         self.functions.append(f)
 
         if self.profile is not None:
@@ -239,6 +251,17 @@ class Pipeline:
             msg = "Either `f` or `output_name` should be provided."
             raise ValueError(msg)
         if f is not None:
+            if f not in self.functions:
+                msg = (
+                    f"The function `{f}` is not in the pipeline."
+                    " Remember that the `PipeFunc` instances are copied on `Pipeline` initialization."
+                )
+                if f.output_name in self.output_to_func:
+                    msg += (
+                        f" However, the function with the same output name `{f.output_name!r}` exists in the"
+                        f" pipeline, you can access that function via `pipeline[{f.output_name!r}]`."
+                    )
+                raise ValueError(msg)
             self.functions.remove(f)
         elif output_name is not None:
             f = self.output_to_func[output_name]
@@ -266,6 +289,19 @@ class Pipeline:
 
     @functools.cached_property
     def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+        """Return a mapping from output names to functions.
+
+        The mapping includes functions with multiple outputs both as individual
+        outputs and as tuples of outputs. For example, if a function has the
+        output name ``("a", "b")``, the mapping will include both ``"a"``,
+        ``"b"``, and ``("a", "b")`` as keys.
+
+        See Also
+        --------
+        __getitem__
+            Shortcut for accessing the function corresponding to a specific output name.
+
+        """
         output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
         for f in self.functions:
             output_to_func[f.output_name] = f
@@ -273,6 +309,21 @@ class Pipeline:
                 for name in f.output_name:
                     output_to_func[name] = f
         return output_to_func
+
+    def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
+        """Return the function corresponding to a specific output name.
+
+        See Also
+        --------
+        output_to_func
+            The mapping from output names to functions.
+
+        """
+        return self.output_to_func[output_name]
+
+    def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
+        """Check if the pipeline contains a function with a specific output name."""
+        return output_name in self.output_to_func
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:

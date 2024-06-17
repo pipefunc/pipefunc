@@ -382,10 +382,10 @@ def test_tuple_outputs(tmp_path: Path):
         cache=cache,
         save_function=save_function,
     )
-    def f_e(c, e, x=1):  # noqa: ARG001
+    def f_g(c, e, x=1):  # noqa: ARG001
         from types import SimpleNamespace
 
-        print(f"Called f_e with c={c} and e={e}")
+        print(f"Called f_g with c={c} and e={e}")
         return SimpleNamespace(g=c + e, h=c - e)
 
     @pipefunc(output_name="i", cache=cache)
@@ -393,7 +393,7 @@ def test_tuple_outputs(tmp_path: Path):
         return h + g
 
     pipeline = Pipeline(
-        [f_c, f_d, f_e, f_i],
+        [f_c, f_d, f_g, f_i],
         debug=True,
         profile=True,
         cache_type="lru",
@@ -429,26 +429,26 @@ def test_tuple_outputs(tmp_path: Path):
     assert r.h == 2
 
     edges = {
-        (f_c, f_d): {"arg": "c"},
-        (f_c, f_e): {"arg": "c"},
-        ("a", f_c): {"arg": "a"},
-        ("b", f_c): {"arg": "b"},
-        ("b", f_d): {"arg": "b"},
-        (f_d, f_e): {"arg": "e"},
-        ("x", f_d): {"arg": "x"},
-        ("x", f_e): {"arg": "x"},
-        (f_e, f_i): {"arg": ("h", "g")},
+        (pipeline["c"], pipeline["d"]): {"arg": "c"},
+        (pipeline["c"], pipeline["g"]): {"arg": "c"},
+        ("a", pipeline["c"]): {"arg": "a"},
+        ("b", pipeline["c"]): {"arg": "b"},
+        ("b", pipeline["d"]): {"arg": "b"},
+        (pipeline["d"], pipeline["g"]): {"arg": "e"},
+        ("x", pipeline["d"]): {"arg": "x"},
+        ("x", pipeline["g"]): {"arg": "x"},
+        (pipeline["g"], pipeline["i"]): {"arg": ("h", "g")},
     }
     assert edges == dict(pipeline.graph.edges)
 
     assert dict(pipeline.graph.nodes) == {
-        f_c: {},
+        pipeline["c"]: {},
         "a": {},
         "b": {},
-        f_d: {},
+        pipeline["d"]: {},
         "x": {},
-        f_e: {},
-        f_i: {},
+        pipeline["g"]: {},
+        pipeline["i"]: {},
     }
 
 
@@ -567,13 +567,13 @@ def test_drop_from_pipeline():
         return c * d * x
 
     pipeline = Pipeline([f1, f2, f3])
-    assert "d" in pipeline.output_to_func
+    assert "d" in pipeline
     pipeline.drop(output_name="d")
-    assert "d" not in pipeline.output_to_func
+    assert "d" not in pipeline
 
     pipeline = Pipeline([f1, f2, f3])
-    assert "d" in pipeline.output_to_func
-    pipeline.drop(f=f2)
+    assert "d" in pipeline
+    pipeline.drop(f=pipeline["d"])
 
     pipeline = Pipeline([f1, f2, f3])
 
@@ -583,11 +583,11 @@ def test_drop_from_pipeline():
 
     pipeline.replace(f4)
     assert len(pipeline.functions) == 3
-    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f4}
+    assert pipeline["e"].__name__ == "f4"
 
-    pipeline.replace(f3, f4)
+    pipeline.replace(f3, pipeline["e"])
     assert len(pipeline.functions) == 3
-    assert pipeline.output_to_func == {"c": f1, "d": f2, "e": f3}
+    assert pipeline["e"].__name__ == "f3"
 
     with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
         pipeline.drop()
@@ -907,16 +907,15 @@ def test_renaming_output_name() -> None:
     def f(a, b):
         return a + b, 1
 
-    pipeline = Pipeline([f])
     f.update_renames({"c": "c1"}, update_from="current")
     assert f.output_name == ("c1", "d")
+    pipeline = Pipeline([f])
     pipeline.update_renames({"c1": "c2"}, update_from="current")
-    assert f.output_name == ("c2", "d")
     pipeline.update_renames({"d": "d1"}, overwrite=True, update_from="current")
-    assert f.output_name == ("c", "d1")
+    assert pipeline["c"].output_name == ("c", "d1")
     pipeline.update_renames({"c": "c1"}, overwrite=True, update_from="original")
-    assert f.output_name == ("c1", "d")
-    f2 = f.copy()
+    assert pipeline["c1"].output_name == ("c1", "d")
+    f2 = pipeline["c1"].copy()
     assert f2.output_name == ("c1", "d")
     f2.update_renames({"c1": "c2"}, update_from="current")
     assert f2.output_name == ("c2", "d")
@@ -979,8 +978,6 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     def g(c=999, d=666):
         return c * d
 
-    pipeline = Pipeline([f, g])
-
     # Test initial pipeline parameters and defaults
     assert f.parameters == ("a1", "b")
     assert f.defaults == {"a1": 42, "b": 1}
@@ -1000,6 +997,7 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     assert g.defaults == {"c": 4, "d2": 666}
 
     # Call functions within pipeline with updated defaults and renames
+    pipeline = Pipeline([f, g])
     assert pipeline("x", a2=3) == 6
     assert pipeline("y", c=2, d2=3) == 6
     assert pipeline("y") == 4 * 666
@@ -1389,8 +1387,8 @@ def test_set_debug_and_profile():
     assert not f.profile
     pipeline.debug = True
     pipeline.profile = True
-    assert f.debug
-    assert f.profile
+    assert pipeline["c"].debug
+    assert pipeline["c"].profile
 
 
 def test_simple_cache():
@@ -1591,3 +1589,16 @@ def test_scope_with_mapspec():
     assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
     results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1})
     assert results["foo.c"].output.tolist() == [1, 2, 3]
+
+
+def test_accessing_copied_pipefunc():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("you can access that function via `pipeline['c']`"),
+    ):
+        pipeline.drop(f=f)
