@@ -404,9 +404,7 @@ class PipeFunc(Generic[T]):
             outputs = set(outputs)  # Ensure it is a set
 
         all_parameters = (inputs | outputs) - exclude
-        if not all_parameters:
-            msg = f"No parameters to update the scope for, {outputs=}, {inputs=}, {exclude=}."
-            raise ValueError(msg)
+        assert all_parameters
         renames = {name: _prepend_name_with_scope(name, scope) for name in all_parameters}
         self.update_renames(renames, update_from="current")
 
