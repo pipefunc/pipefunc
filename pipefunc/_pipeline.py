@@ -167,7 +167,10 @@ class Pipeline:
                 f.debug = value
 
     def add(
-        self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None, copy: bool = True
+        self,
+        f: PipeFunc | Callable,
+        mapspec: str | MapSpec | None = None,
+        copy: bool = True,
     ) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -264,6 +267,14 @@ class Pipeline:
                 for name in f.output_name:
                     output_to_func[name] = f
         return output_to_func
+
+    def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
+        """Return the function corresponding to a specific output name."""
+        return self.output_to_func[output_name]
+
+    def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
+        """Check if the pipeline contains a function with a specific output name."""
+        return output_name in self.output_to_func
 
     @functools.cached_property
     def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
