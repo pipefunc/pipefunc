@@ -320,8 +320,8 @@ class Pipeline:
 
         """
         if output_name not in self.output_to_func:
-            available: str = ", ".join(map(str, self.output_to_func.keys()))
-            msg = f"No function with output name `{output_name!r}` in the pipeline, only `{available!r}`."
+            available = list(self.output_to_func.keys())
+            msg = f"No function with output name `{output_name!r}` in the pipeline, only `{available}`."
             raise KeyError(msg)
         return self.output_to_func[output_name]
 
@@ -837,7 +837,7 @@ class Pipeline:
                 set(inputs) & set(f.parameters) & all_inputs if isinstance(inputs, set) else inputs
             )
             f_outputs = (
-                set(outputs) & set(at_least_tuple(f.output_name))
+                set(outputs) & (set(at_least_tuple(f.output_name)) | set(f.parameters))
                 if isinstance(outputs, set)
                 else outputs
             )

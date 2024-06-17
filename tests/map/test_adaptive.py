@@ -43,7 +43,7 @@ def test_basic(tmp_path: Path) -> None:
     learners.simple_run()
     flat_learners = learners.flatten()
     assert len(flat_learners) == 2
-    assert flat_learners["z"][0].data == {
+    assert flat_learners["foo.z"][0].data == {
         0: (2,),
         1: (3,),
         2: (4,),

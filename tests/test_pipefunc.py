@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -1612,6 +1613,25 @@ def test_pipeline_getitem_exception():
     pipeline = Pipeline([f])
     with pytest.raises(
         KeyError,
-        match=re.escape("No function with output name `'d'` in the pipeline, only `'c'`"),
+        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
     ):
         pipeline["d"]
+
+
+def test_update_scope_output_only():
+    @pipefunc(output_name="z")
+    def add(x: int, y: int) -> int:
+        assert isinstance(x, int)
+        assert isinstance(y, int)
+        return x + y
+
+    @pipefunc(output_name="prod")
+    def take_sum(z: np.ndarray) -> int:
+        return np.prod(z)
+
+    pipeline = Pipeline([(add, "x[i], y[j] -> z[i, j]"), take_sum])
+    pipeline.update_scope("foo", outputs={"z"})
+    assert pipeline["foo.z"].parameters == ("x", "y")
+    assert pipeline["foo.z"].output_name == "foo.z"
+    assert pipeline["prod"].parameters == ("foo.z",)
+    assert pipeline["prod"].output_name == "prod"
