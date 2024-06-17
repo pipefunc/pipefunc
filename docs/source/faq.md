@@ -4,9 +4,9 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.14.5
+    jupytext_version: 1.16.2
 kernelspec:
-  display_name: adaptive
+  display_name: Python 3 (ipykernel)
   language: python
   name: python3
 ---
@@ -151,7 +151,7 @@ There are a few ways to specify renames:
 
 1. Via the `@pipefunc` decorator:
 
-   ```python
+   ```{code-cell} ipython3
    @pipefunc(output_name="prod", renames={"a": "x", "b": "y"})
    def multiply(a, b):
        return a * b
@@ -161,7 +161,9 @@ There are a few ways to specify renames:
 
 2. By creating a `PipeFunc` object directly and specifying the `renames` attribute:
 
-   ```python
+   ```{code-cell} ipython3
+   from pipefunc import PipeFunc
+
    def add(a, b):
        return a + b
 
@@ -170,16 +172,18 @@ There are a few ways to specify renames:
 
 3. By updating the renames of an existing `PipeFunc` object:
 
-   ```python
+   ```{code-cell} ipython3
    add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
    ```
 
    This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
 
+
 4. By updating the renames of an entire pipeline:
 
-   ```python
-   pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="current")
+   ```{code-cell} ipython3
+   pipeline = Pipeline([add_func])
+   pipeline.update_renames({"a": "aa", "b": "bb"}, update_from="original")
    ```
 
 When specifying renames, you can choose to update from the original argument names (`update_from="original"`) or from the current renamed arguments (`update_from="current"`).
@@ -187,15 +191,16 @@ When specifying renames, you can choose to update from the original argument nam
 :::{admonition} We can also update the <code>output_name</code>
 :class: note, dropdown
 
-   ```python
+   ```{code-cell} ipython3
    @pipefunc(output_name=("i", "j"))
    def f(a, b):
        return a, b
 
    # renames must be in terms of individual output strings
-   add_func.update_renames({"i": "ii"}, update_from="current")
-   assert add_func.output_name == ("ii", "j")
+   f.update_renames({"i": "ii"}, update_from="current")
+   assert f.output_name == ("ii", "j")
    ```
+
 :::
 
 
@@ -222,7 +227,7 @@ Here are a few ways to handle multiple outputs:
 
 1. Return a tuple of outputs and specify the `output_name` as a tuple of strings:
 
-   ```python
+   ```{code-cell} ipython3
    @pipefunc(output_name=("mean", "std"))
    def mean_and_std(data):
        return np.mean(data), np.std(data)
@@ -232,7 +237,7 @@ Here are a few ways to handle multiple outputs:
 
 2. Return a dictionary, custom object, or any other type and specify the `output_name` as a tuple of strings along with an `output_picker` function:
 
-   ```python
+   ```{code-cell} ipython3
    def output_picker(dct, output_name):
        return dct[output_name]
 
@@ -245,7 +250,7 @@ Here are a few ways to handle multiple outputs:
 
    Another example with a custom object and an explicit `output_picker` function:
 
-   ```python
+   ```{code-cell} ipython3
    from dataclasses import dataclass
 
    @dataclass
@@ -268,7 +273,7 @@ This allows you to handle cases where the returned object has a different struct
 
 When a function has multiple outputs, subsequent functions in the pipeline can access any of those outputs by name:
 
-```python
+```{code-cell} ipython3
 @pipefunc(output_name="normalized")
 def normalize(data, mean, std):
     return (data - mean) / std

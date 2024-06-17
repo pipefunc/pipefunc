@@ -66,7 +66,8 @@ class Pipeline:
     Parameters
     ----------
     functions
-        A list of functions that form the pipeline.
+        A list of functions that form the pipeline. Note that the functions
+        are copied when added to the pipeline using `PipeFunc.copy`.
     lazy
         Flag indicating whether the pipeline should be lazy.
     debug
