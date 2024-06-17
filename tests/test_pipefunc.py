@@ -1602,3 +1602,16 @@ def test_accessing_copied_pipefunc():
         match=re.escape("you can access that function via `pipeline['c']`"),
     ):
         pipeline.drop(f=f)
+
+
+def test_pipeline_getitem_exception():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        KeyError,
+        match=re.escape("No function with output name `'d'` in the pipeline, only `'c'`"),
+    ):
+        pipeline["d"]

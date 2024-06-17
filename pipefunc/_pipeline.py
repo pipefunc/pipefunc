@@ -321,9 +321,7 @@ class Pipeline:
         """
         if output_name not in self.output_to_func:
             available: str = ", ".join(map(str, self.output_to_func.keys()))
-            msg = (
-                f"No function with output name `{output_name}` in the pipeline, only {available!r}."
-            )
+            msg = f"No function with output name `{output_name!r}` in the pipeline, only `{available!r}`."
             raise KeyError(msg)
         return self.output_to_func[output_name]
 
