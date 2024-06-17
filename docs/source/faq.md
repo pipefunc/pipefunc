@@ -338,8 +338,8 @@ def f(a, b):
 print(f.renames)  # Output: {'a': 'foo.a', 'b': 'foo.b', 'y': 'foo.y'}
 ```
 
-   This sets the scope "foo" for all parameters and the output name of the function `f`.
-   The actual parameter names become `foo.a` and `foo.b`, and the output name becomes `foo.y`.
+This sets the scope "foo" for all parameters and the output name of the function `f`.
+The actual parameter names become `foo.a` and `foo.b`, and the output name becomes `foo.y`.
 
 2. Update the scope of an existing `PipeFunc`:
 
