@@ -264,7 +264,7 @@ class PipeFunc(Generic[T]):
             self._defaults = defaults.copy()
         else:
             self._defaults = dict(self._defaults, **defaults)
-        self._clear_cached_properties()
+        self._clear_internal_cache()
 
     def update_renames(
         self,
@@ -339,7 +339,7 @@ class PipeFunc(Generic[T]):
         if self.mapspec is not None:
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
-        self._clear_cached_properties()
+        self._clear_internal_cache()
 
     def update_scope(
         self,
@@ -430,9 +430,9 @@ class PipeFunc(Generic[T]):
         else:
             self._bound = dict(self._bound, **bound)
 
-        self._clear_cached_properties()
+        self._clear_internal_cache()
 
-    def _clear_cached_properties(self) -> None:
+    def _clear_internal_cache(self) -> None:
         clear_cached_properties(self, PipeFunc)
         for pipeline in self._pipelines:
             pipeline._clear_internal_cache()
