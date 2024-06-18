@@ -225,7 +225,7 @@ def test_profiling():
     p("d", a=1, b=2)
     p.resources_report()
     for f in p.functions:
-        f.set_profiling(enable=False)
+        f.profile = False
     with pytest.raises(ValueError, match="Profiling is not enabled"):
         p.resources_report()
 

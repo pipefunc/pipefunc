@@ -203,7 +203,7 @@ class Pipeline:
         f._pipelines.add(self)
 
         if self.profile is not None:
-            f.set_profiling(enable=self.profile)
+            f.profile = self.profile
 
         if self.debug is not None:
             f.debug = self.debug

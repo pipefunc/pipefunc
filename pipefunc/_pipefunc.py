@@ -141,13 +141,12 @@ class PipeFunc(Generic[T]):
         self.save_function = save_function
         self.mapspec = _maybe_mapspec(mapspec)
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
-        self._profile = profile
+        self.profile = profile
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
         self.resources = _maybe_resources(resources)
         self.profiling_stats: ProfilingStats | None
-        self.set_profiling(enable=profile)
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
         self._validate_mapspec()
@@ -540,7 +539,11 @@ class PipeFunc(Generic[T]):
     @profile.setter
     def profile(self, enable: bool) -> None:
         """Enable or disable profiling for the wrapped function."""
-        self.set_profiling(enable=enable)
+        self._profile = enable
+        if enable:
+            self.profiling_stats = ProfilingStats()
+        else:
+            self.profiling_stats = None
 
     @functools.cached_property
     def parameter_scopes(self) -> set[str]:
@@ -582,14 +585,6 @@ class PipeFunc(Generic[T]):
             else:
                 new_kwargs[k] = v
         return new_kwargs
-
-    def set_profiling(self, *, enable: bool = True) -> None:
-        """Enable or disable profiling for the wrapped function."""
-        self._profile = enable
-        if enable:
-            self.profiling_stats = ProfilingStats()
-        else:
-            self.profiling_stats = None
 
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
