@@ -384,7 +384,7 @@ class PipeFunc(Generic[T]):
 
         """
         if scope is not None and (
-            scope in self._unscoped_parameters or scope in at_least_tuple(self.output_name)
+            scope in self.unscoped_parameters or scope in at_least_tuple(self.output_name)
         ):
             msg = f"The provided `{scope=}` cannot be identical to the function input parameters or output name."
             raise ValueError(msg)
@@ -555,7 +555,7 @@ class PipeFunc(Generic[T]):
         return {k.split(".", 1)[0] for k in self.parameters if "." in k}
 
     @functools.cached_property
-    def _unscoped_parameters(self) -> tuple[str, ...]:
+    def unscoped_parameters(self) -> tuple[str, ...]:
         """Return the parameters with the scope stripped off."""
         return tuple(name.split(".", 1)[-1] for name in self.parameters)
 
