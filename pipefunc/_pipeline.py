@@ -29,7 +29,6 @@ from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, si
 from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
-    generate_filename_from_dict,
     handle_error,
 )
 from pipefunc.exceptions import UnusedParametersError
@@ -512,7 +511,6 @@ class Pipeline:
             assert cache is not None
             _update_cache(cache, cache_key, r, start_time)
         _update_all_results(func, r, output_name, all_results, self.lazy)
-        _save_results(func, r, output_name, all_results, root_args, self.lazy)
         return all_results[output_name]
 
     def run(
@@ -1690,28 +1688,6 @@ def _compute_cache_key(
         cache_key_items.append((k, key))
 
     return output_name, tuple(cache_key_items)
-
-
-def _save_results(
-    func: PipeFunc,
-    r: Any,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
-    root_args: tuple[str, ...],
-    lazy: bool,  # noqa: FBT001
-) -> None:
-    # Used in _run
-    if func.save_function is None:
-        return
-    to_save = {k: all_results[k] for k in root_args}
-    filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-    filename = func.__name__ / filename
-    to_save[output_name] = all_results[output_name]  # type: ignore[index]
-    if lazy:
-        lazy_save = _LazyFunction(func.save_function, args=(filename, to_save), add_to_graph=False)
-        r.add_delayed_callback(lazy_save)
-    else:
-        func.save_function(filename, to_save)  # type: ignore[arg-type]
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:

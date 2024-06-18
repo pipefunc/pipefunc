@@ -24,7 +24,6 @@ class _LazyFunction:
         "kwargs",
         "_result",
         "_evaluated",
-        "_delayed_callbacks",
         "_id",
     ]
 
@@ -35,8 +34,6 @@ class _LazyFunction:
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
-        *,
-        add_to_graph: bool = True,
     ) -> None:
         self.func = func
         self.args = args
@@ -44,12 +41,11 @@ class _LazyFunction:
 
         self._result = None
         self._evaluated = False
-        self._delayed_callbacks: list[_LazyFunction] = []
 
         self._id = _LazyFunction._counter
         _LazyFunction._counter += 1
 
-        if add_to_graph and _TASK_GRAPH is not None:
+        if _TASK_GRAPH is not None:
             _TASK_GRAPH.graph.add_node(self._id, lazy_func=self)
             _TASK_GRAPH.mapping[self._id] = self
 
@@ -68,10 +64,6 @@ class _LazyFunction:
                 for arg in kwargs.values():
                     add_edge(arg)
 
-    def add_delayed_callback(self, cb: _LazyFunction) -> None:
-        """Add a delayed callback to the lazy function."""
-        self._delayed_callbacks.append(cb)
-
     def evaluate(self) -> Any:
         """Evaluate the lazy function and return the result."""
         if self._evaluated:
@@ -81,9 +73,6 @@ class _LazyFunction:
         result = self.func(*args, **kwargs)
         self._result = result
         self._evaluated = True
-        for cb in self._delayed_callbacks:
-            cb._result = result
-            evaluate_lazy(cb)
         return result
 
     def __repr__(self) -> str:

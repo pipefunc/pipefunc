@@ -350,7 +350,7 @@ def test_complex_pipeline():
     assert r.evaluate() == 52
 
 
-def test_tuple_outputs(tmp_path: Path):
+def test_tuple_outputs():
     cache = True
 
     @pipefunc(
@@ -363,26 +363,11 @@ def test_tuple_outputs(tmp_path: Path):
     def f_c(a, b):
         return {"c": a + b, "_throw": 1}
 
-    def save_function(fname, result):
-        p = tmp_path / fname
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("wb") as f:
-            pickle.dump(result, f)
-
-    @pipefunc(
-        output_name=("d", "e"),
-        cache=cache,
-        save_function=save_function,
-    )
+    @pipefunc(output_name=("d", "e"), cache=cache)
     def f_d(b, c, x=1):  # noqa: ARG001
         return b * c, 1
 
-    @pipefunc(
-        output_name=("g", "h"),
-        output_picker=getattr,
-        cache=cache,
-        save_function=save_function,
-    )
+    @pipefunc(output_name=("g", "h"), output_picker=getattr, cache=cache)
     def f_g(c, e, x=1):  # noqa: ARG001
         from types import SimpleNamespace
 
@@ -457,21 +442,15 @@ def test_tuple_outputs(tmp_path: Path):
 def test_full_output(cache, tmp_path: Path):
     from pipefunc import Pipeline
 
-    def save_function(fname, result):
-        p = tmp_path / fname
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("wb") as f:
-            pickle.dump(result, f)
-
-    @pipefunc(output_name="f1", save_function=save_function)
+    @pipefunc(output_name="f1")
     def f1(a, b):
         return a + b
 
-    @pipefunc(output_name=("f2i", "f2j"), save_function=save_function)
+    @pipefunc(output_name=("f2i", "f2j"))
     def f2(f1):
         return 2 * f1, 1
 
-    @pipefunc(output_name="f3", save_function=save_function)
+    @pipefunc(output_name="f3")
     def f3(a, f2i):
         return a + f2i
 
