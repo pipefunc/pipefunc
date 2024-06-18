@@ -989,7 +989,7 @@ class Pipeline:
         self._autogen_mapspec_axes()
         for p in parameter:
             _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
-        self._clear_internal_cache()  # reset cache because mapspecs have changed
+        self._clear_internal_cache()
 
     def _func_node_colors(
         self,
