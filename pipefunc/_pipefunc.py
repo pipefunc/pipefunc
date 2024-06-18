@@ -14,6 +14,7 @@ import functools
 import inspect
 import os
 import warnings
+import weakref
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
@@ -27,6 +28,8 @@ from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pipefunc import Pipeline
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -130,6 +133,7 @@ class PipeFunc(Generic[T]):
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
+        self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
@@ -260,7 +264,7 @@ class PipeFunc(Generic[T]):
             self._defaults = defaults.copy()
         else:
             self._defaults = dict(self._defaults, **defaults)
-        clear_cached_properties(self, PipeFunc)
+        self._clear_internal_cache()
 
     def update_renames(
         self,
@@ -335,7 +339,7 @@ class PipeFunc(Generic[T]):
         if self.mapspec is not None:
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
-        clear_cached_properties(self, PipeFunc)
+        self._clear_internal_cache()
 
     def update_scope(
         self,
@@ -425,8 +429,12 @@ class PipeFunc(Generic[T]):
             self._bound = bound.copy()
         else:
             self._bound = dict(self._bound, **bound)
+        self._clear_internal_cache()
 
+    def _clear_internal_cache(self) -> None:
         clear_cached_properties(self, PipeFunc)
+        for pipeline in self._pipelines:
+            pipeline._clear_internal_cache()
 
     def _validate_update(
         self,
@@ -647,7 +655,7 @@ class PipeFunc(Generic[T]):
             A dictionary containing the picklable state of the object.
 
         """
-        state = {k: v for k, v in self.__dict__.items() if k != "func"}
+        state = {k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines")}
         state["func"] = cloudpickle.dumps(self.func)
         return state
 
@@ -664,6 +672,7 @@ class PipeFunc(Generic[T]):
 
         """
         self.__dict__.update(state)
+        self._pipelines = weakref.WeakSet()
         self.func = cloudpickle.loads(self.func)
 
     def _validate_mapspec(self) -> None:
@@ -865,6 +874,7 @@ class NestedPipeFunc(PipeFunc):
     ) -> None:
         from pipefunc import Pipeline
 
+        self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         _validate_pipefuncs(pipefuncs)
         self.pipeline = Pipeline(pipefuncs)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)

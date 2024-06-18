@@ -16,7 +16,7 @@ import functools
 import inspect
 import time
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import networkx as nx
@@ -114,13 +114,13 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
+        self._internal_cache = _PipelineInternalCache()
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
             else:
                 mapspec = None
             self.add(f, mapspec=mapspec, copy=True)
-        self._init_internal_cache()
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
         if cache_type is None and any(f.cache for f in self.functions):
@@ -132,11 +132,8 @@ class Pipeline:
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
-    def _init_internal_cache(self) -> None:
-        # Internal Pipeline cache
-        self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
-        self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
-        self._func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = {}
+    def _clear_internal_cache(self) -> None:
+        self._internal_cache.clear()
         clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
@@ -226,6 +223,7 @@ class Pipeline:
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
         self.functions.append(f)
+        f._pipelines.add(self)
 
         if self.profile is not None:
             f.set_profiling(enable=self.profile)
@@ -233,7 +231,7 @@ class Pipeline:
         if self.debug is not None:
             f.debug = self.debug
 
-        self._init_internal_cache()  # reset cache
+        self._clear_internal_cache()  # reset cache
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
@@ -266,7 +264,7 @@ class Pipeline:
         elif output_name is not None:
             f = self.output_to_func[output_name]
             self.drop(f=f)
-        self._init_internal_cache()
+        self._clear_internal_cache()
 
     def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
         """Replace a function in the pipeline with another function.
@@ -285,7 +283,7 @@ class Pipeline:
         else:
             self.drop(f=old)
         self.add(new)
-        self._init_internal_cache()
+        self._clear_internal_cache()
 
     @functools.cached_property
     def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
@@ -405,12 +403,12 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
-        if f := self._func.get(output_name):
+        if f := self._internal_cache.func.get(output_name):
             return f
         root_args = self.root_args(output_name)
         assert isinstance(root_args, tuple)
         f = _PipelineAsFunc(self, output_name, root_args=root_args)
-        self._func[output_name] = f
+        self._internal_cache.func[output_name] = f
         return f
 
     def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
@@ -671,23 +669,23 @@ class Pipeline:
             The tuples are sorted in lexicographical order.
 
         """
-        if r := self._arg_combinations.get(output_name):
+        if r := self._internal_cache.arg_combinations.get(output_name):
             return r
         head = self.node_mapping[output_name]
         arg_set: set[tuple[str, ...]] = set()
         _compute_arg_mapping(self.graph, head, head, [], [], arg_set)  # type: ignore[arg-type]
-        self._arg_combinations[output_name] = arg_set
+        self._internal_cache.arg_combinations[output_name] = arg_set
         return arg_set
 
     def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
         """Return the root arguments required to compute a specific output."""
-        if r := self._root_args.get(output_name):
+        if r := self._internal_cache.root_args.get(output_name):
             return r
         arg_combos = self.arg_combinations(output_name)
         root_args = next(
             args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
         )
-        self._root_args[output_name] = root_args
+        self._internal_cache.root_args[output_name] = root_args
         return root_args
 
     def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
@@ -735,7 +733,7 @@ class Pipeline:
             unused -= set(update.keys())
             if overwrite or update:
                 f.update_defaults(update, overwrite=overwrite)
-        self._init_internal_cache()
+        self._clear_internal_cache()
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
@@ -775,7 +773,7 @@ class Pipeline:
             update = {k: v for k, v in renames.items() if k in parameters}
             unused -= set(update.keys())
             f.update_renames(update, overwrite=overwrite, update_from=update_from)
-        self._init_internal_cache()
+        self._clear_internal_cache()
         if unused:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
@@ -856,7 +854,7 @@ class Pipeline:
             )
             if f_inputs or f_outputs:
                 f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
-        self._init_internal_cache()
+        self._clear_internal_cache()
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
@@ -991,7 +989,7 @@ class Pipeline:
         self._autogen_mapspec_axes()
         for p in parameter:
             _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
-        self._init_internal_cache()  # reset cache because mapspecs have changed
+        self._clear_internal_cache()
 
     def _func_node_colors(
         self,
@@ -1908,3 +1906,15 @@ def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) ->
         overlap_str = ", ".join(overlap)
         msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
         raise ValueError(msg)
+
+
+@dataclass
+class _PipelineInternalCache:
+    arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
+    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+
+    def clear(self) -> None:
+        self.arg_combinations.clear()
+        self.root_args.clear()
+        self.func.clear()
