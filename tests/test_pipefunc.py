@@ -363,18 +363,11 @@ def test_tuple_outputs():
     def f_c(a, b):
         return {"c": a + b, "_throw": 1}
 
-    @pipefunc(
-        output_name=("d", "e"),
-        cache=cache,
-    )
+    @pipefunc(output_name=("d", "e"), cache=cache)
     def f_d(b, c, x=1):  # noqa: ARG001
         return b * c, 1
 
-    @pipefunc(
-        output_name=("g", "h"),
-        output_picker=getattr,
-        cache=cache,
-    )
+    @pipefunc(output_name=("g", "h"), output_picker=getattr, cache=cache)
     def f_g(c, e, x=1):  # noqa: ARG001
         from types import SimpleNamespace
 
