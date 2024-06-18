@@ -226,6 +226,7 @@ class Pipeline:
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
         self.functions.append(f)
+        f._pipelines.add(self)
 
         if self.profile is not None:
             f.set_profiling(enable=self.profile)
