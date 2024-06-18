@@ -6,7 +6,6 @@ import tempfile
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
 
@@ -17,7 +16,6 @@ from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
-    mapspec_dimensions,
     validate_consistent_axes,
 )
 from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
@@ -29,7 +27,6 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline import Generations
 
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
@@ -191,61 +188,6 @@ def load_xarray_dataset(
         output_names=output_name,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
-
-
-@dataclass(frozen=True)
-class _MockPipeline:
-    """An object that contains all information required to run a pipeline.
-
-    Ensures that we're not pickling the entire pipeline object when not needed.
-    """
-
-    defaults: dict[str, Any]
-    mapspec_names: set[str]
-    topological_generations: Generations
-
-    @classmethod
-    def from_pipeline(cls: type[_MockPipeline], pipeline: Pipeline) -> _MockPipeline:  # noqa: PYI019
-        return cls(
-            defaults=pipeline.defaults,
-            mapspec_names=pipeline.mapspec_names,
-            topological_generations=pipeline.topological_generations,
-        )
-
-    @property
-    def functions(self) -> list[PipeFunc]:
-        # Return all functions in topological order
-        return [f for gen in self.topological_generations[1] for f in gen]
-
-    def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:  # noqa: ARG002
-        """Return the MapSpecs for all functions in the pipeline."""
-        functions = self.functions  # topologically ordered
-        return [f.mapspec for f in functions if f.mapspec]
-
-    @functools.cached_property
-    def mapspecs_as_strings(self) -> list[str]:
-        """Return the MapSpecs for all functions in the pipeline as strings."""
-        return [str(ms) for ms in self.mapspecs()]
-
-    @functools.cached_property
-    def all_output_names(self) -> set[str]:
-        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
-
-    @property
-    def sorted_functions(self) -> list[PipeFunc]:
-        """Return the functions in the pipeline in topological order."""
-        return self.functions
-
-    @functools.cached_property
-    def mapspec_dimensions(self) -> dict[str, int]:
-        """Return the number of dimensions for each array parameter in the pipeline."""
-        return mapspec_dimensions(self.mapspecs())
-
-    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        flat_scope_kwargs = kwargs
-        for f in self.functions:
-            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
-        return flat_scope_kwargs
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:
