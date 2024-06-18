@@ -429,7 +429,6 @@ class PipeFunc(Generic[T]):
             self._bound = bound.copy()
         else:
             self._bound = dict(self._bound, **bound)
-
         self._clear_internal_cache()
 
     def _clear_internal_cache(self) -> None:
