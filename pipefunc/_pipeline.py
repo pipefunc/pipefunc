@@ -114,7 +114,6 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
-        self._internal_cache = _PipelineInternalCache()
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -132,8 +131,11 @@ class Pipeline:
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
+    @functools.cached_property
+    def _internal_cache(self) -> _PipelineInternalCache:
+        return _PipelineInternalCache()
+
     def _clear_internal_cache(self) -> None:
-        self._internal_cache.clear()
         clear_cached_properties(self)
 
     def _validate_mapspec(self) -> None:
@@ -1913,8 +1915,3 @@ class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
-
-    def clear(self) -> None:
-        self.arg_combinations.clear()
-        self.root_args.clear()
-        self.func.clear()
