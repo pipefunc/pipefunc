@@ -17,7 +17,6 @@ from pipefunc.map._run import (
     _func_kwargs,
     _mask_fixed_axes,
     _maybe_load_single_output,
-    _MockPipeline,
     _process_task,
     _reduced_axes,
     _run_iteration_and_process,
@@ -390,11 +389,10 @@ def _execute_iteration_in_map_spec(
 class _MapWrapper:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 
-    Uses a `_MockPipeline` that contains all the required information to run the pipeline but is
-    cheaper to serialize and pass around.
+    Copies the Pipeline and removes the cache to avoid issues with the parallel execution.
     """
 
-    mock_pipeline: _MockPipeline
+    mock_pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
     internal_shapes: dict[str, int | tuple[int, ...]] | None
@@ -460,11 +458,12 @@ def create_learners_from_sweep(
     run_folder = Path(run_folder)
     learners = []
     folders = []
+    pipeline = pipeline.copy(cache_type=None, cache_kwargs=None)
+    pipeline._clear_internal_cache()
     max_digits = len(str(len(sweep) - 1))
     for i, inputs in enumerate(sweep):
         sweep_run = run_folder / f"sweep_{str(i).zfill(max_digits)}"
-        mock_pipeline = _MockPipeline.from_pipeline(pipeline)
-        f = _MapWrapper(mock_pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup)
+        f = _MapWrapper(pipeline, inputs, sweep_run, internal_shapes, parallel, cleanup)
         learner = SequenceLearner(f, sequence=[None])
         learners.append(learner)
         folders.append(sweep_run)

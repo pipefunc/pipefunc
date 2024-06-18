@@ -114,7 +114,6 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
-        self._internal_cache = _PipelineInternalCache()
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -131,28 +130,6 @@ class Pipeline:
         self._validate_mapspec()
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
-
-    def _clear_internal_cache(self) -> None:
-        self._internal_cache.clear()
-        clear_cached_properties(self)
-
-    def _validate_mapspec(self) -> None:
-        """Validate the MapSpecs for all functions in the pipeline."""
-        for f in self.functions:
-            if f.mapspec and at_least_tuple(f.output_name) != f.mapspec.output_names:
-                msg = (
-                    f"The output_name of the function `{f}` does not match the output_names"
-                    f" in the MapSpec: `{f.output_name}` != `{f.mapspec.output_names}`."
-                )
-                raise ValueError(msg)
-        validate_consistent_axes(self.mapspecs(ordered=False))
-        self._autogen_mapspec_axes()
-
-    def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
-        """Return the cache used by the pipeline."""
-        if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
-            return tg.cache
-        return self.cache
 
     @property
     def profile(self) -> bool | None:
@@ -411,6 +388,13 @@ class Pipeline:
         self._internal_cache.func[output_name] = f
         return f
 
+    @functools.cached_property
+    def _internal_cache(self) -> _PipelineInternalCache:
+        return _PipelineInternalCache()
+
+    def _clear_internal_cache(self) -> None:
+        clear_cached_properties(self)
+
     def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
@@ -465,6 +449,12 @@ class Pipeline:
             func_args[arg] = value
             used_parameters.add(arg)
         return func_args
+
+    def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
+        """Return the cache used by the pipeline."""
+        if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
+            return tg.cache
+        return self.cache
 
     def _run(
         self,
@@ -708,6 +698,15 @@ class Pipeline:
         """
         return _traverse_graph(name, "successors", self.graph, self.node_mapping)
 
+    @functools.cached_property
+    def defaults(self) -> dict[str, Any]:
+        defaults = {}
+        for func in self.functions:
+            for arg, value in func.defaults.items():
+                if arg not in func._bound and arg not in self.output_to_func:
+                    defaults[arg] = value
+        return defaults
+
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
 
@@ -895,15 +894,6 @@ class Pipeline:
             for name in mapspec.input_names + mapspec.output_names
         }
 
-    @functools.cached_property
-    def defaults(self) -> dict[str, Any]:
-        defaults = {}
-        for func in self.functions:
-            for arg, value in func.defaults.items():
-                if arg not in func._bound and arg not in self.output_to_func:
-                    defaults[arg] = value
-        return defaults
-
     def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
         """Return the MapSpecs for all functions in the pipeline."""
         functions = self.sorted_functions if ordered else self.functions
@@ -923,6 +913,18 @@ class Pipeline:
     def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
+
+    def _validate_mapspec(self) -> None:
+        """Validate the MapSpecs for all functions in the pipeline."""
+        for f in self.functions:
+            if f.mapspec and at_least_tuple(f.output_name) != f.mapspec.output_names:
+                msg = (
+                    f"The output_name of the function `{f}` does not match the output_names"
+                    f" in the MapSpec: `{f.output_name}` != `{f.mapspec.output_names}`."
+                )
+                raise ValueError(msg)
+        validate_consistent_axes(self.mapspecs(ordered=False))
+        self._autogen_mapspec_axes()
 
     @functools.cached_property
     def unique_leaf_node(self) -> PipeFunc:
@@ -1913,8 +1915,3 @@ class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
-
-    def clear(self) -> None:
-        self.arg_combinations.clear()
-        self.root_args.clear()
-        self.func.clear()
