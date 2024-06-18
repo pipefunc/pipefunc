@@ -27,8 +27,6 @@ from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pipefunc import Pipeline
 
 
@@ -65,9 +63,6 @@ class PipeFunc(Generic[T]):
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
-    save_function
-        A function that takes the filename and a dict containing the inputs and output.
-        If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
@@ -127,7 +122,6 @@ class PipeFunc(Generic[T]):
         profile: bool = False,
         debug: bool = False,
         cache: bool = False,
-        save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
         scope: str | None = None,
@@ -138,7 +132,6 @@ class PipeFunc(Generic[T]):
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
-        self.save_function = save_function
         self.mapspec = _maybe_mapspec(mapspec)
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
@@ -300,11 +293,7 @@ class PipeFunc(Generic[T]):
             if update_from == "current"
             else tuple(self.original_parameters) + at_least_tuple(self._output_name),
         )
-        self._validate_update(
-            renames,
-            "renames",
-            allowed_parameters,  # type: ignore[arg-type]
-        )
+        self._validate_update(renames, "renames", allowed_parameters)
         if update_from == "current":
             # Convert to `renames` in terms of original names
             renames = {
@@ -488,7 +477,6 @@ class PipeFunc(Generic[T]):
             profile=self._profile,
             debug=self.debug,
             cache=self.cache,
-            save_function=self.save_function,
             mapspec=self.mapspec,
             resources=self.resources,
         )
@@ -711,7 +699,6 @@ def pipefunc(
     profile: bool = False,
     debug: bool = False,
     cache: bool = False,
-    save_function: Callable[[str | Path, dict[str, Any]], None] | None = None,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | None = None,
     scope: str | None = None,
@@ -741,9 +728,6 @@ def pipefunc(
         Flag indicating whether debug information should be printed.
     cache
         Flag indicating whether the decorated function should be cached.
-    save_function
-        A function that takes the filename and a dict containing the inputs and output.
-        If provided, the result will be saved.
     mapspec
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
@@ -816,7 +800,6 @@ def pipefunc(
             profile=profile,
             debug=debug,
             cache=cache,
-            save_function=save_function,
             mapspec=mapspec,
             resources=resources,
             scope=scope,
@@ -877,7 +860,6 @@ class NestedPipeFunc(PipeFunc):
         self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
-        self.save_function = None
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}

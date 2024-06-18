@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import hashlib
-import json
 import math
 import operator
 import sys
@@ -21,21 +19,6 @@ if TYPE_CHECKING:
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
     """Convert x to a tuple if it is not already a tuple."""
     return x if isinstance(x, tuple) else (x,)
-
-
-def generate_filename_from_dict(obj: dict[str, Any], suffix: str = ".pickle") -> Path:
-    """Generate a filename from a dictionary."""
-    assert all(isinstance(k, str) for k in obj)
-    keys = "_".join(obj.keys())
-    # Convert the dictionary to a sorted string
-    obj_string = json.dumps(obj, sort_keys=True)
-    obj_bytes = obj_string.encode()  # Convert the string to bytes
-
-    sha256_hash = hashlib.sha256()
-    sha256_hash.update(obj_bytes)
-    # Convert the hash to a hexadecimal string for the filename
-    str_hash = sha256_hash.hexdigest()
-    return Path(f"{keys}__{str_hash}{suffix}")
 
 
 def load(path: Path, *, cache: bool = False) -> Any:
