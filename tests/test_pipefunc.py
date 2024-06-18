@@ -225,7 +225,7 @@ def test_profiling():
     p("d", a=1, b=2)
     p.resources_report()
     for f in p.functions:
-        f.set_profiling(enable=False)
+        f.profile = False
     with pytest.raises(ValueError, match="Profiling is not enabled"):
         p.resources_report()
 
@@ -1545,13 +1545,13 @@ def test_set_pipefunc_scope_on_init():
     def f(a, b):
         return a + b
 
-    assert f.unscoped_parameters == ("a", "b")
+    assert f._unscoped_parameters == ("a", "b")
     assert f.parameter_scopes == {"x"}
     assert f.renames == {"a": "x.a", "b": "x.b", "c": "x.c"}
     assert str(f.mapspec) == "x.a[i] -> x.c[i]"
     assert f(x={"a": 1, "b": 1}) == 2
     f.update_scope(None, "*", "*")
-    assert f.unscoped_parameters == ("a", "b")
+    assert f._unscoped_parameters == ("a", "b")
     assert f.parameters == ("a", "b")
     assert f(a=1, b=1) == 2
 
