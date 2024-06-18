@@ -435,7 +435,7 @@ class PipeFunc(Generic[T]):
     def _clear_cached_properties(self) -> None:
         clear_cached_properties(self, PipeFunc)
         for pipeline in self._pipelines:
-            pipeline._init_internal_cache()
+            pipeline._clear_internal_cache()
 
     def _validate_update(
         self,
