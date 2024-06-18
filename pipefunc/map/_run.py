@@ -193,7 +193,7 @@ def load_xarray_dataset(
     )
 
 
-@dataclass
+@dataclass(frozen=True)
 class _MockPipeline:
     """An object that contains all information required to run a pipeline.
 

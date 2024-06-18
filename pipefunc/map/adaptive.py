@@ -386,7 +386,7 @@ def _execute_iteration_in_map_spec(
     return outputs if return_output else None
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _MapWrapper:
     """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
 

@@ -1392,7 +1392,7 @@ class Generations(NamedTuple):
     function_lists: list[list[PipeFunc]]
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, slots=True, eq=True)
 class _Bound:
     name: str
     output_name: _OUTPUT_TYPE
@@ -1908,7 +1908,7 @@ def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) ->
         raise ValueError(msg)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
