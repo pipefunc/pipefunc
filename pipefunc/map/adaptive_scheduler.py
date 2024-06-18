@@ -145,7 +145,7 @@ def _update_resources(  # noqa: PLR0912
     resources_dict["extra_scheduler"].append(_extra_scheduler)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _Tracker:
     """Ensures that iff a resource is defined for one `PipeFunc`, it is defined for all of them."""
 

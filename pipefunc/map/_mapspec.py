@@ -38,7 +38,7 @@ def shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(strides)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ArraySpec:
     """Specification for a named array, with some axes indexed by named indices."""
 

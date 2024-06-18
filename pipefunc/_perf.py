@@ -17,15 +17,14 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 
+@dataclass
 class ResourceStats:
     """A class for storing execution statistics for a function."""
 
-    def __init__(self) -> None:
-        """Initialize the execution statistics."""
-        self.num_executions = 0
-        self.average = 0.0
-        self.variance = 0.0
-        self.max = 0.0
+    num_executions: int = 0
+    average: float = 0.0
+    variance: float = 0.0
+    max: float = 0.0
 
     def update(self, execution_time: float) -> None:
         """Update the execution statistics with a new execution time.
@@ -61,7 +60,7 @@ class ResourceStats:
         return f"ResourceStats(num_executions={self.num_executions}, average={self.average:.4e}, max={self.max:.4e}, std={self.std:.4e})"
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ProfilingStats:
     """A class for storing execution statistics."""
 
