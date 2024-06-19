@@ -20,7 +20,7 @@ from pipefunc.map._run import (
     _process_task,
     _reduced_axes,
     _run_iteration_and_process,
-    _submit_single,
+    _submit_func,
     _validate_fixed_indices,
     run,
 )
@@ -280,7 +280,6 @@ def _learner(
             _execute_iteration_in_single,
             func=func,
             run_info=run_info,
-            run_folder=run_folder,
             store=store,
             return_output=return_output,
         )
@@ -310,7 +309,6 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
@@ -319,26 +317,15 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    output, exists = _maybe_load_single_output(func, run_folder, return_output=return_output)
+    output, exists = _maybe_load_single_output(
+        func,
+        run_info.run_folder,
+        return_output=return_output,
+    )
     if exists:
         return output
-    kwargs = _func_kwargs(
-        func,
-        run_info.all_output_names,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        store,
-        run_folder,
-    )
-    task = _submit_single(func, kwargs, run_folder)
-    result = _process_task(
-        func,
-        task,
-        run_folder,
-        store,
-        kwargs,
-    )
+    kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
+    result = _process_task(func, kwargs_task, run_info.run_folder, store)
     if not return_output:
         return None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))

@@ -546,8 +546,7 @@ def _run_and_process_generation(
     for func in generation:
         tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor)
     for func in generation:
-        kwargs, task = tasks[func]
-        _outputs = _process_task(func, task, run_info.run_folder, store, kwargs, executor)
+        _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
         outputs.update(_outputs)
 
 
@@ -585,12 +584,12 @@ def _submit_func(
 
 def _process_task(
     func: PipeFunc,
-    task: Any,
+    kwargs_task: _KwargsTask,
     run_folder: Path,
     store: dict[str, StorageBase],
-    kwargs: dict[str, Any],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
+    kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         outputs_list = list(r)
@@ -604,7 +603,7 @@ def _process_task(
 
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
-        r = task.result() if executor else task
+        r = task.result() if executor else task  # type: ignore[union-attr]
         output = _dump_output(func, r, run_folder)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
