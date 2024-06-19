@@ -127,10 +127,8 @@ class RunInfo:
         data = asdict(self)
         data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
         data["all_output_names"] = sorted(data["all_output_names"])
-        data["shapes"] = {",".join(at_least_tuple(k)): v for k, v in data["shapes"].items()}
-        data["shape_masks"] = {
-            ",".join(at_least_tuple(k)): v for k, v in data["shape_masks"].items()
-        }
+        for key in ["shapes", "shape_masks"]:
+            data[key] = {",".join(at_least_tuple(k)): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
         with path.open("w") as f:
             json.dump(data, f, indent=4)
@@ -140,16 +138,16 @@ class RunInfo:
         path = cls.path(run_folder)
         with path.open() as f:
             data = json.load(f)
-        data["shapes"] = {_maybe_tuple(k): tuple(v) for k, v in data["shapes"].items()}
-        data["shape_masks"] = {_maybe_tuple(k): tuple(v) for k, v in data["shape_masks"].items()}
+        data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
+        data["all_output_names"] = set(data["all_output_names"])
+        for key in ["shapes", "shape_masks"]:
+            data[key] = {_maybe_tuple(k): tuple(v) for k, v in data[key].items()}
         if data["internal_shapes"] is not None:
             data["internal_shapes"] = {
                 k: tuple(v) if isinstance(v, list) else v
                 for k, v in data["internal_shapes"].items()
             }
         data["run_folder"] = Path(data["run_folder"])
-        data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
-        data["all_output_names"] = set(data["all_output_names"])
         return cls(**data)
 
     @staticmethod

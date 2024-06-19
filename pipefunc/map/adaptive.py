@@ -339,13 +339,9 @@ def _execute_iteration_in_map_spec(
 ) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
-    Performs a single iteration of the code in `_execute_map_spec`, however,
-    it does not keep and return the output. This is meant to be used in the
-    parallel execution of the map spec.
-
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays = [store[o] for o in at_least_tuple(func.output_name)]
+    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
