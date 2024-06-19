@@ -141,14 +141,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     outputs = [
-        _load_parameter(
-            output_name,
-            run_info.input_paths,
-            run_info.shapes,
-            run_info.shape_masks,
-            run_info.init_store(),
-            run_folder,
-        )
+        _load_parameter(output_name, run_info, run_info.init_store())
         for output_name in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
@@ -215,18 +208,11 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
     return load(path)
 
 
-def _load_parameter(
-    parameter: str,
-    input_paths: dict[str, Path],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    store: dict[str, StorageBase],
-    run_folder: Path,
-) -> Any:
-    if parameter in input_paths:
-        return _load_input(parameter, input_paths)
-    if parameter not in shapes or not any(shape_masks[parameter]):
-        return _load_output(parameter, run_folder)
+def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageBase]) -> Any:
+    if parameter in run_info.input_paths:
+        return _load_input(parameter, run_info.input_paths)
+    if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
+        return _load_output(parameter, run_info.run_folder)
     return store[parameter]
 
 
@@ -240,14 +226,7 @@ def _func_kwargs(
         if p in func._bound:
             kwargs[p] = func._bound[p]
         elif p in run_info.input_paths or p in run_info.all_output_names:
-            kwargs[p] = _load_parameter(
-                p,
-                run_info.input_paths,
-                run_info.shapes,
-                run_info.shape_masks,
-                store,
-                run_info.run_folder,
-            )
+            kwargs[p] = _load_parameter(p, run_info, store)
         elif p in func.defaults and p not in run_info.all_output_names:
             kwargs[p] = func.defaults[p]
         else:  # pragma: no cover
