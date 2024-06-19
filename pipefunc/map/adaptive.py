@@ -244,7 +244,6 @@ def create_learners(
                 learner = _learner(
                     func=func,
                     run_info=run_info,
-                    run_folder=run_folder,
                     store=store,
                     fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
@@ -257,7 +256,6 @@ def create_learners(
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
     *,
@@ -268,7 +266,6 @@ def _learner(
             _execute_iteration_in_map_spec,
             func=func,
             run_info=run_info,
-            run_folder=run_folder,
             store=store,
             return_output=return_output,
         )
@@ -336,7 +333,6 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
@@ -357,15 +353,7 @@ def _execute_iteration_in_map_spec(
         return tuple(arr.get_from_index(index) for arr in file_arrays)
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
-    kwargs = _func_kwargs(
-        func,
-        run_info.all_output_names,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        store,
-        run_folder,
-    )
+    kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
