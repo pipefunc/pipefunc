@@ -114,10 +114,8 @@ def run(
             _run_and_process_generation(
                 generation=gen,
                 run_info=run_info,
-                run_folder=run_folder,
                 store=store,
                 outputs=outputs,
-                all_output_names=run_info.all_output_names,
                 fixed_indices=fixed_indices,
                 executor=ex,
             )
@@ -531,47 +529,62 @@ def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     return Path(run_folder)
 
 
+class _KwargsTask(NamedTuple):
+    kwargs: dict[str, Any]
+    task: tuple[Any, _MapSpecArgs] | Any
+
+
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
-    all_output_names: set[str],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
-    tasks: dict[PipeFunc, Any] = {}
+    tasks: dict[PipeFunc, _KwargsTask] = {}
 
     # First submit all calls
     for func in generation:
-        kwargs = _func_kwargs(
-            func,
-            all_output_names,
-            run_info.input_paths,
-            run_info.shapes,
-            run_info.shape_masks,
-            store,
-            run_folder,
-        )
-        if func.mapspec and func.mapspec.inputs:
-            args = _prepare_submit_map_spec(
-                func,
-                kwargs,
-                run_info.shapes,
-                run_info.shape_masks,
-                store,
-                fixed_indices,
-            )
-            r = _maybe_parallel_map(args.process_index, args.missing, executor)
-            tasks[func] = r, args
-        else:
-            tasks[func] = _maybe_submit(_submit_single, executor, func, kwargs, run_folder)
+        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor)
 
     # Then process the results
     for func in generation:
-        _outputs = _process_task(func, tasks[func], run_folder, store, kwargs, executor)
+        t = tasks[func]
+        _outputs = _process_task(func, t.task, run_info.run_folder, store, t.kwargs, executor)
         outputs.update(_outputs)
+
+
+def _submit_func(
+    func: PipeFunc,
+    run_info: RunInfo,
+    store: dict[str, StorageBase],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor | None,
+) -> _KwargsTask:
+    kwargs = _func_kwargs(
+        func,
+        run_info.all_output_names,
+        run_info.input_paths,
+        run_info.shapes,
+        run_info.shape_masks,
+        store,
+        run_info.run_folder,
+    )
+    if func.mapspec and func.mapspec.inputs:
+        args = _prepare_submit_map_spec(
+            func,
+            kwargs,
+            run_info.shapes,
+            run_info.shape_masks,
+            store,
+            fixed_indices,
+        )
+        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        task = r, args
+    else:
+        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder)
+    return _KwargsTask(kwargs, task)
 
 
 def _process_task(
