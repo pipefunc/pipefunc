@@ -114,10 +114,8 @@ def run(
             _run_and_process_generation(
                 generation=gen,
                 run_info=run_info,
-                run_folder=run_folder,
                 store=store,
                 outputs=outputs,
-                all_output_names=run_info.all_output_names,
                 fixed_indices=fixed_indices,
                 executor=ex,
             )
@@ -143,14 +141,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     outputs = [
-        _load_parameter(
-            output_name,
-            run_info.input_paths,
-            run_info.shapes,
-            run_info.shape_masks,
-            run_info.init_store(),
-            run_folder,
-        )
+        _load_parameter(output_name, run_info, run_info.init_store())
         for output_name in output_names
     ]
     outputs = [_maybe_load_file_array(o) for o in outputs]
@@ -217,37 +208,26 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
     return load(path)
 
 
-def _load_parameter(
-    parameter: str,
-    input_paths: dict[str, Path],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    store: dict[str, StorageBase],
-    run_folder: Path,
-) -> Any:
-    if parameter in input_paths:
-        return _load_input(parameter, input_paths)
-    if parameter not in shapes or not any(shape_masks[parameter]):
-        return _load_output(parameter, run_folder)
+def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageBase]) -> Any:
+    if parameter in run_info.input_paths:
+        return _load_input(parameter, run_info.input_paths)
+    if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
+        return _load_output(parameter, run_info.run_folder)
     return store[parameter]
 
 
 def _func_kwargs(
     func: PipeFunc,
-    all_output_names: set[str],
-    input_paths: dict[str, Path],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    run_info: RunInfo,
     store: dict[str, StorageBase],
-    run_folder: Path,
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
             kwargs[p] = func._bound[p]
-        elif p in input_paths or p in all_output_names:
-            kwargs[p] = _load_parameter(p, input_paths, shapes, shape_masks, store, run_folder)
-        elif p in func.defaults and p not in all_output_names:
+        elif p in run_info.input_paths or p in run_info.all_output_names:
+            kwargs[p] = _load_parameter(p, run_info, store)
+        elif p in func.defaults and p not in run_info.all_output_names:
             kwargs[p] = func.defaults[p]
         else:  # pragma: no cover
             # In principle it should not be possible to reach this point because of
@@ -531,57 +511,59 @@ def _ensure_run_folder(run_folder: str | Path | None) -> Path:
     return Path(run_folder)
 
 
+class _KwargsTask(NamedTuple):
+    kwargs: dict[str, Any]
+    task: tuple[Any, _MapSpecArgs] | Any
+
+
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     outputs: dict[str, Result],
-    all_output_names: set[str],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
 ) -> None:
-    tasks: dict[PipeFunc, Any] = {}
-
-    # First submit all calls
+    tasks: dict[PipeFunc, _KwargsTask] = {}
     for func in generation:
-        kwargs = _func_kwargs(
+        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor)
+    for func in generation:
+        _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
+        outputs.update(_outputs)
+
+
+def _submit_func(
+    func: PipeFunc,
+    run_info: RunInfo,
+    store: dict[str, StorageBase],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor | None,
+) -> _KwargsTask:
+    kwargs = _func_kwargs(func, run_info, store)
+    if func.mapspec and func.mapspec.inputs:
+        args = _prepare_submit_map_spec(
             func,
-            all_output_names,
-            run_info.input_paths,
+            kwargs,
             run_info.shapes,
             run_info.shape_masks,
             store,
-            run_folder,
+            fixed_indices,
         )
-        if func.mapspec and func.mapspec.inputs:
-            args = _prepare_submit_map_spec(
-                func,
-                kwargs,
-                run_info.shapes,
-                run_info.shape_masks,
-                store,
-                fixed_indices,
-            )
-            r = _maybe_parallel_map(args.process_index, args.missing, executor)
-            tasks[func] = r, args
-        else:
-            tasks[func] = _maybe_submit(_submit_single, executor, func, kwargs, run_folder)
-
-    # Then process the results
-    for func in generation:
-        _outputs = _process_task(func, tasks[func], run_folder, store, kwargs, executor)
-        outputs.update(_outputs)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        task = r, args
+    else:
+        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder)
+    return _KwargsTask(kwargs, task)
 
 
 def _process_task(
     func: PipeFunc,
-    task: Any,
+    kwargs_task: _KwargsTask,
     run_folder: Path,
     store: dict[str, StorageBase],
-    kwargs: dict[str, Any],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
+    kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         outputs_list = list(r)
@@ -595,7 +577,7 @@ def _process_task(
 
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
-        r = task.result() if executor else task
+        r = task.result() if executor else task  # type: ignore[union-attr]
         output = _dump_output(func, r, run_folder)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec

@@ -20,7 +20,7 @@ from pipefunc.map._run import (
     _process_task,
     _reduced_axes,
     _run_iteration_and_process,
-    _submit_single,
+    _submit_func,
     _validate_fixed_indices,
     run,
 )
@@ -244,7 +244,6 @@ def create_learners(
                 learner = _learner(
                     func=func,
                     run_info=run_info,
-                    run_folder=run_folder,
                     store=store,
                     fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
@@ -257,7 +256,6 @@ def create_learners(
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
     *,
@@ -268,7 +266,6 @@ def _learner(
             _execute_iteration_in_map_spec,
             func=func,
             run_info=run_info,
-            run_folder=run_folder,
             store=store,
             return_output=return_output,
         )
@@ -280,7 +277,6 @@ def _learner(
             _execute_iteration_in_single,
             func=func,
             run_info=run_info,
-            run_folder=run_folder,
             store=store,
             return_output=return_output,
         )
@@ -310,7 +306,6 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
@@ -319,26 +314,15 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    output, exists = _maybe_load_single_output(func, run_folder, return_output=return_output)
+    output, exists = _maybe_load_single_output(
+        func,
+        run_info.run_folder,
+        return_output=return_output,
+    )
     if exists:
         return output
-    kwargs = _func_kwargs(
-        func,
-        run_info.all_output_names,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        store,
-        run_folder,
-    )
-    task = _submit_single(func, kwargs, run_folder)
-    result = _process_task(
-        func,
-        task,
-        run_folder,
-        store,
-        kwargs,
-    )
+    kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
+    result = _process_task(func, kwargs_task, run_info.run_folder, store)
     if not return_output:
         return None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
@@ -349,20 +333,15 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    run_folder: Path,
     store: dict[str, StorageBase],
     *,
     return_output: bool = False,
 ) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
-    Performs a single iteration of the code in `_execute_map_spec`, however,
-    it does not keep and return the output. This is meant to be used in the
-    parallel execution of the map spec.
-
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays = [store[o] for o in at_least_tuple(func.output_name)]
+    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -370,15 +349,7 @@ def _execute_iteration_in_map_spec(
         return tuple(arr.get_from_index(index) for arr in file_arrays)
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
-    kwargs = _func_kwargs(
-        func,
-        run_info.all_output_names,
-        run_info.input_paths,
-        run_info.shapes,
-        run_info.shape_masks,
-        store,
-        run_folder,
-    )
+    kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
