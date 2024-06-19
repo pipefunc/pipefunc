@@ -543,15 +543,11 @@ def _run_and_process_generation(
     executor: Executor | None,
 ) -> None:
     tasks: dict[PipeFunc, _KwargsTask] = {}
-
-    # First submit all calls
     for func in generation:
         tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor)
-
-    # Then process the results
     for func in generation:
-        t = tasks[func]
-        _outputs = _process_task(func, t.task, run_info.run_folder, store, t.kwargs, executor)
+        kwargs, task = tasks[func]
+        _outputs = _process_task(func, task, run_info.run_folder, store, kwargs, executor)
         outputs.update(_outputs)
 
 
