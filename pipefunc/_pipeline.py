@@ -1224,7 +1224,7 @@ class Pipeline:
                 msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
                 raise TypeError(msg)
 
-        return self.copy(functions=functions)
+        return self.copy(functions=functions, default_resources=None)
 
     def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
         """Combine two pipelines using the ``|`` operator."""
