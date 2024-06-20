@@ -1640,3 +1640,30 @@ def test_update_scope_from_faq():
     results = pipeline.map(inputs=kwargs)
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
+
+
+def test_default_resources_from_pipeline():
+    @pipefunc(output_name="c", resources={"memory": "1GB", "num_cpus": 2})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c
+
+    pipeline1 = Pipeline([f, g], default_resources={"memory": "2GB", "num_cpus": 1})
+
+    @pipefunc(output_name="e")
+    def h(d):
+        return d
+
+    pipeline2 = Pipeline([h], default_resources={"memory": "3GB", "num_cpus": 3})
+
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline.default_resources is None
+    assert pipeline["c"].resources.num_cpus == 2
+    assert pipeline["c"].resources.memory == "1GB"
+    assert pipeline["d"].resources.num_cpus == 1
+    assert pipeline["d"].resources.memory == "2GB"
+    assert pipeline["e"].resources.num_cpus == 3
+    assert pipeline["e"].resources.memory == "3GB"
