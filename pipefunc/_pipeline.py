@@ -1201,6 +1201,10 @@ class Pipeline:
     def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
         """Join multiple pipelines into a single new pipeline.
 
+        The new pipeline has no `default_resources` set, instead, each function has a
+        `Resources` attribute that is the union of the `resources` attributes the
+        `default_resources` of the original pipelines.
+
         Parameters
         ----------
         pipelines
