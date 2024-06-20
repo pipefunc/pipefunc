@@ -21,7 +21,12 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Uni
 import cloudpickle
 
 from pipefunc._profile import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
+from pipefunc._utils import (
+    assert_complete_kwargs,
+    at_least_tuple,
+    clear_cached_properties,
+    format_function_call,
+)
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.resources import Resources
@@ -481,6 +486,7 @@ class PipeFunc(Generic[T]):
             "mapspec": self.mapspec,
             "resources": self.resources,
         }
+        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type]
 

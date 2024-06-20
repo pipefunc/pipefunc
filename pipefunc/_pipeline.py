@@ -27,6 +27,7 @@ from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
+    assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
     handle_error,
@@ -1160,9 +1161,11 @@ class Pipeline:
             "profile": self._profile,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
+            "default_resources": self.default_resources,
         }
         if "functions" not in update:
             kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
+        assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
