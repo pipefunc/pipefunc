@@ -138,7 +138,7 @@ class PipeFunc(Generic[T]):
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
-        self.resources = _maybe_resources(resources)
+        self.resources = Resources.maybe_from_dict(resources)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -938,14 +938,6 @@ def _maybe_max_resources(
     if not resources_list:
         return None
     return Resources.combine_max(resources_list)
-
-
-def _maybe_resources(resources: dict | Resources | None) -> Resources | None:
-    if resources is None:
-        return None
-    if isinstance(resources, Resources):
-        return resources
-    return Resources.from_dict(resources)
 
 
 class _NestedFuncWrapper:

@@ -123,6 +123,15 @@ class Resources:
             raise TypeError(msg) from e
 
     @staticmethod
+    def maybe_from_dict(resources: dict[str, Any] | Resources | None) -> Resources | None:
+        """Create a Resources instance from a dictionary, if not already an instance."""
+        if resources is None:
+            return None
+        if isinstance(resources, Resources):
+            return resources
+        return Resources.from_dict(resources)
+
+    @staticmethod
     def _is_valid_memory(memory: str) -> bool:
         if not isinstance(memory, str):
             return False

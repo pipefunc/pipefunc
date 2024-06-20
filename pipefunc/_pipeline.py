@@ -41,6 +41,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import run
+from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -94,6 +95,10 @@ class Pipeline:
         can be provided as:
         ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
         ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    default_resources
+        Default resources to use for the pipeline functions. If ``None``,
+        the resources are not set. Either a dict or a `pipefunc.resources.Resources`
+        instance can be provided.
 
     """
 
@@ -107,6 +112,7 @@ class Pipeline:
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
         scope: str | None = None,
+        default_resources: dict[str, Any] | Resources | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -121,6 +127,7 @@ class Pipeline:
             self.add(f, mapspec=mapspec, copy=True)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
+        self.default_resources = Resources.maybe_from_dict(default_resources)
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
