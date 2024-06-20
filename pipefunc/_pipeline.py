@@ -1238,6 +1238,12 @@ class Pipeline:
         join
             The method that is called when using the ``|`` operator.
 
+        Examples
+        --------
+        >>> pipeline1 = Pipeline([f1, f2])
+        >>> pipeline2 = Pipeline([f3, f4])
+        >>> combined_pipeline = pipeline1 | pipeline2
+
         """
         return self.join(other)
 
