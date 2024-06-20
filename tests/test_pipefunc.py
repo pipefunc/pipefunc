@@ -1659,7 +1659,13 @@ def test_default_resources_from_pipeline():
 
     pipeline2 = Pipeline([h], default_resources={"memory": "3GB", "num_cpus": 3})
 
-    pipeline = pipeline1.join(pipeline2)
+    @pipefunc(output_name="f", resources={"memory": "4GB", "num_cpus": 4})
+    def i(e):
+        return e
+
+    pipeline3 = Pipeline([i])
+
+    pipeline = pipeline1 | pipeline2 | pipeline3
     assert pipeline.default_resources is None
     assert pipeline["c"].resources.num_cpus == 2
     assert pipeline["c"].resources.memory == "1GB"
@@ -1667,3 +1673,4 @@ def test_default_resources_from_pipeline():
     assert pipeline["d"].resources.memory == "2GB"
     assert pipeline["e"].resources.num_cpus == 3
     assert pipeline["e"].resources.memory == "3GB"
+    assert pipeline["f"].resources.num_cpus == 4
