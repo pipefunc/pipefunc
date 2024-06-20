@@ -1231,7 +1231,14 @@ class Pipeline:
         return self.copy(functions=functions, default_resources=None)
 
     def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
-        """Combine two pipelines using the ``|`` operator."""
+        """Combine two pipelines using the ``|`` operator.
+
+        See Also
+        --------
+        join
+            The method that is called when using the ``|`` operator.
+
+        """
         return self.join(other)
 
     def _connected_components(self) -> list[set[PipeFunc | str]]:
