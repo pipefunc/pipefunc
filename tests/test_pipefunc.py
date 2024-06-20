@@ -223,11 +223,11 @@ def test_profiling():
 
     p = Pipeline([f, g], debug=True, profile=True)
     p("d", a=1, b=2)
-    p.resources_report()
+    p.print_profiling_stats()
     for f in p.functions:
         f.profile = False
     with pytest.raises(ValueError, match="Profiling is not enabled"):
-        p.resources_report()
+        p.print_profiling_stats()
 
 
 def test_pipe_func_and_execution():

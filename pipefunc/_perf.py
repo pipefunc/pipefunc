@@ -157,8 +157,8 @@ class ResourceProfiler:
             self.stop_event.wait(self.interval)
 
 
-def resources_report(profiling_stats: dict[str, ProfilingStats]) -> None:
-    """Display the resource usage report for each function in ``profiling_stats``."""
+def print_profiling_stats(profiling_stats: dict[str, ProfilingStats]) -> None:
+    """Print the resource usage report for each function in ``profiling_stats``."""
     headers = [
         "Function",
         "Avg CPU Usage (%)",

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._perf import resources_report
+from pipefunc._perf import print_profiling_stats
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
@@ -127,7 +127,7 @@ class Pipeline:
             self.add(f, mapspec=mapspec, copy=True)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
-        self.default_resources = Resources.maybe_from_dict(default_resources)
+        self._default_resources = Resources.maybe_from_dict(default_resources)
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
@@ -1065,12 +1065,12 @@ class Pipeline:
         """
         return visualize_holoviews(self.graph, show=show)
 
-    def resources_report(self) -> None:
+    def print_profiling_stats(self) -> None:
         """Display the resource usage report for each function in the pipeline."""
         if not self.profiling_stats:
             msg = "Profiling is not enabled."
             raise ValueError(msg)
-        resources_report(self.profiling_stats)
+        print_profiling_stats(self.profiling_stats)
 
     def simplified_pipeline(
         self,
