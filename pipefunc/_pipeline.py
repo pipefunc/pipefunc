@@ -1212,6 +1212,7 @@ class Pipeline:
 
         """
         functions = []
+        # TODO: make the function inherit the `default_resources` from the pipeline
         for pipeline in [self, *pipelines]:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
