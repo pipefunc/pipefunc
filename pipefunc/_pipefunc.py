@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Uni
 
 import cloudpickle
 
-from pipefunc._perf import ProfilingStats, ResourceProfiler
+from pipefunc._profile import ProfilingStats, ResourceProfiler
 from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes

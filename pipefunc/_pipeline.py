@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._perf import print_profiling_stats
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
+from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
     at_least_tuple,
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 
     import holoviews as hv
 
-    from pipefunc._perf import ProfilingStats
+    from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
 
 
