@@ -1212,11 +1212,12 @@ class Pipeline:
 
         """
         functions = []
-        # TODO: make the function inherit the `default_resources` from the pipeline
         for pipeline in [self, *pipelines]:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
-                    functions.append(f.copy())  # noqa: PERF401
+                    resources = _maybe_with_defaults(f.resources, self._default_resources)
+                    f_new = f.copy(resources=resources)
+                    functions.append(f_new)
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())
             else:
@@ -1899,3 +1900,16 @@ class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+
+
+def _maybe_with_defaults(
+    resources: Resources | None,
+    default_resources: Resources | None,
+) -> Resources | None:
+    if resources is None and default_resources is None:
+        return None
+    if resources is None:
+        return default_resources
+    if default_resources is None:
+        return resources
+    return resources.with_defaults(default_resources)
