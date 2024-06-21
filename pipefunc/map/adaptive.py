@@ -240,16 +240,15 @@ def create_learners(
         key = _key(fixed_indices) if fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
             _learners = []
-            for f in gen:
-                f_new = f.copy()
+            for func in gen:
                 learner = _learner(
-                    func=f_new,
+                    func=func,
                     run_info=run_info,
                     store=store,
                     fixed_indices=fixed_indices,  # might be None
                     return_output=return_output,
                 )
-                _learners.append(LearnerPipeFunc(learner, f_new))
+                _learners.append(LearnerPipeFunc(learner, func))
             learners.setdefault(key, []).append(_learners)
     return learners
 
