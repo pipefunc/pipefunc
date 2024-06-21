@@ -1691,3 +1691,20 @@ def test_resources_variable():
 
     with pytest.raises(ValueError, match="Unused keyword arguments: `resources`"):
         pipeline(a=1, b=2, resources={"num_gpus": 4})
+
+
+def test_resources_variable_nested_func():
+    @pipefunc(output_name="c", resources_variable="resources", resources={"num_gpus": 8})
+    def f_c(a, b, resources):  # noqa: ARG001
+        return resources.num_gpus
+
+    @pipefunc(output_name="d")
+    def f_d(c):
+        return c
+
+    nf = NestedPipeFunc([f_c, f_d], output_name="d")
+    assert nf.resources.num_gpus == 8
+    assert nf(a=1, b=2) == 8
+
+    pipeline = Pipeline([nf])
+    assert pipeline(a=1, b=2) == 8
