@@ -80,6 +80,11 @@ class PipeFunc(Generic[T]):
         used by job schedulers to manage the resources required for the
         function. Alternatively, provide a callable that receives a dict with the
         input values and returns a `Resources` instance.
+    pass_resources_as
+        If provided, the resources will be passed as the specified argument name to the function.
+        For example, if ``pass_resources_as="resources"``, the resources will be passed as
+        ``resources=resources`` to the function. This can be useful when the function behaves
+        differently based on the resources provided.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -130,6 +135,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+        pass_resources_as: str | None = None,
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -146,6 +152,7 @@ class PipeFunc(Generic[T]):
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
         self.resources = Resources.maybe_from_dict(resources)
+        self.pass_resources_as = pass_resources_as
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -697,6 +704,7 @@ def pipefunc(
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+    pass_resources_as: str | None = None,
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -736,6 +744,11 @@ def pipefunc(
         used by job schedulers to manage the resources required for the
         function. Alternatively, provide a callable that receives a dict with the
         input values and returns a `Resources` instance.
+    pass_resources_as
+        If provided, the resources will be passed as the specified argument name to the function.
+        For example, if ``pass_resources_as="resources"``, the resources will be passed as
+        ``resources=resources`` to the function. This can be useful when the function behaves
+        differently based on the resources provided.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -799,6 +812,7 @@ def pipefunc(
             cache=cache,
             mapspec=mapspec,
             resources=resources,
+            pass_resources_as=pass_resources_as,
             scope=scope,
         )
 
@@ -846,6 +860,7 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+        pass_resources_as: str | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -865,6 +880,7 @@ class NestedPipeFunc(PipeFunc):
         }
         self._bound: dict[str, Any] = {}
         self.resources = _maybe_max_resources(resources, self.pipeline.functions)
+        self.pass_resources_as = pass_resources_as
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
