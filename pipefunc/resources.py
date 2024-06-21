@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True, eq=True)
@@ -123,11 +123,13 @@ class Resources:
             raise TypeError(msg) from e
 
     @staticmethod
-    def maybe_from_dict(resources: dict[str, Any] | Resources | None) -> Resources | None:
+    def maybe_from_dict(
+        resources: dict[str, Any] | Resources | Callable[[dict[str, Any]], Resources] | None,
+    ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
-        if isinstance(resources, Resources):
+        if isinstance(resources, Resources) or callable(resources):
             return resources
         return Resources.from_dict(resources)
 
@@ -282,7 +284,10 @@ class Resources:
         """
         return {k: v for k, v in asdict(self).items() if v is not None}
 
-    def with_defaults(self, default_resources: Resources | None) -> Resources:
+    def with_defaults(
+        self,
+        default_resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+    ) -> Resources | Callable[[dict[str, Any]], Resources]:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
             return self
@@ -290,9 +295,9 @@ class Resources:
 
     @staticmethod
     def maybe_with_defaults(
-        resources: Resources | None,
+        resources: Resources | None | Callable[[dict[str, Any]], Resources],
         default_resources: Resources | None,
-    ) -> Resources | None:
+    ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Combine the Resources instance with default resources, if provided."""
         if resources is None and default_resources is None:
             return None

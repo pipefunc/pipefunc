@@ -78,7 +78,8 @@ class PipeFunc(Generic[T]):
         memory, wall time, queue, partition, and any extra job scheduler
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
-        function.
+        function. Alternatively, provide a callable that receives a dict with the
+        input values and returns a `Resources` instance.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -128,7 +129,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        resources: dict | Resources | None = None,
+        resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -695,7 +696,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    resources: dict | Resources | None = None,
+    resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -733,7 +734,8 @@ def pipefunc(
         memory, wall time, queue, partition, and any extra job scheduler
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
-        function.
+        function. Alternatively, provide a callable that receives a dict with the
+        input values and returns a `Resources` instance.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -843,7 +845,7 @@ class NestedPipeFunc(PipeFunc):
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
-        resources: dict | Resources | None = None,
+        resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -927,13 +929,14 @@ class NestedPipeFunc(PipeFunc):
 
 
 def _maybe_max_resources(
-    resources: dict | Resources | None,
+    resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None,
     pipefuncs: list[PipeFunc],
-) -> Resources | None:
-    if isinstance(resources, Resources):
+) -> Resources | Callable[[dict[str, Any]], Resources] | None:
+    if isinstance(resources, Resources) or callable(resources):
         return resources
-    if resources is not None:
+    if isinstance(resources, dict):
         return Resources.from_dict(resources)
+    # TODO: make delayed resources calculation
     resources_list = [f.resources for f in pipefuncs if f.resources is not None]
     if len(resources_list) == 1:
         return resources_list[0]
