@@ -120,7 +120,7 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
-        self._default_resources = Resources.maybe_from_dict(default_resources)
+        self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -1197,8 +1197,8 @@ class Pipeline:
         """Join multiple pipelines into a single new pipeline.
 
         The new pipeline has no `default_resources` set, instead, each function has a
-        `Resources` attribute that is the union of the `resources` attributes the
-        `default_resources` of the original pipelines.
+        `Resources` attribute that is created via
+        ``Resources.maybe_with_defaults(f.resources, pipeline.default_resources)``.
 
         Parameters
         ----------

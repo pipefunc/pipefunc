@@ -123,7 +123,9 @@ class Resources:
             raise TypeError(msg) from e
 
     @staticmethod
-    def maybe_from_dict(resources: dict[str, Any] | Resources | None) -> Resources | None:
+    def maybe_from_dict(
+        resources: dict[str, Any] | Resources | None,
+    ) -> Resources | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
@@ -271,18 +273,10 @@ class Resources:
 
         return Resources(**max_data)
 
-    def dict(self) -> dict[str, Any]:
-        """Return the Resources instance as a dictionary.
-
-        Returns
-        -------
-        dict
-            A dictionary representation of the Resources instance.
-
-        """
-        return {k: v for k, v in asdict(self).items() if v is not None}
-
-    def with_defaults(self, default_resources: Resources | None) -> Resources:
+    def with_defaults(
+        self,
+        default_resources: Resources | None,
+    ) -> Resources:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
             return self
@@ -301,3 +295,14 @@ class Resources:
         if default_resources is None:
             return resources
         return resources.with_defaults(default_resources)
+
+    def dict(self) -> dict[str, Any]:
+        """Return the Resources instance as a dictionary.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the Resources instance.
+
+        """
+        return {k: v for k, v in asdict(self).items() if v is not None}
