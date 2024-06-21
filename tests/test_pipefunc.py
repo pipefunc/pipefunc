@@ -1688,3 +1688,6 @@ def test_resources_variable():
 
     with pytest.raises(ValueError, match="Unexpected keyword arguments: `{'resources'}`"):
         f_c(a=1, b=2, resources={"num_gpus": 4})
+
+    with pytest.raises(ValueError, match="Unused keyword arguments: `resources`"):
+        pipeline(a=1, b=2, resources={"num_gpus": 4})
