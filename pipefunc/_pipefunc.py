@@ -617,7 +617,7 @@ class PipeFunc(Generic[T]):
 
         """
         outputs = ", ".join(at_least_tuple(self.output_name))
-        return f"{self.func.__name__}(...) → {outputs}"
+        return f"{self.__name__}(...) → {outputs}"
 
     def __repr__(self) -> str:
         """Return a string representation of the PipeFunc instance.
@@ -627,7 +627,7 @@ class PipeFunc(Generic[T]):
             A string representation of the PipeFunc instance.
 
         """
-        return f"PipeFunc({self.func.__name__})"
+        return f"PipeFunc({self.__name__})"
 
     def __getstate__(self) -> dict:
         """Prepare the state of the current object for pickling.
