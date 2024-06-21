@@ -128,7 +128,7 @@ class Pipeline:
             self.add(f, mapspec=mapspec)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
-        self.default_resources = Resources.maybe_from_dict(default_resources)
+        self.default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)

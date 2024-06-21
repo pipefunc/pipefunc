@@ -936,12 +936,22 @@ def _maybe_max_resources(
         return resources
     if isinstance(resources, dict):
         return Resources.from_dict(resources)
-    # TODO: make delayed resources calculation
     resources_list = [f.resources for f in pipefuncs if f.resources is not None]
     if len(resources_list) == 1:
         return resources_list[0]
     if not resources_list:
         return None
+    if any(callable(r) for r in resources_list):
+        return functools.partial(_delayed_resources_combine_max, _resources_list=resources_list)
+    return Resources.combine_max(resources_list)  # type: ignore[arg-type]
+
+
+def _delayed_resources_combine_max(
+    kwargs: dict[str, Any],
+    *,
+    _resources_list: list[Resources | Callable[[dict[str, Any]], Resources]],
+) -> Resources:
+    resources_list = [r(kwargs) if callable(r) else r for r in _resources_list]
     return Resources.combine_max(resources_list)
 
 

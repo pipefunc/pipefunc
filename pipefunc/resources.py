@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
@@ -273,21 +274,10 @@ class Resources:
 
         return Resources(**max_data)
 
-    def dict(self) -> dict[str, Any]:
-        """Return the Resources instance as a dictionary.
-
-        Returns
-        -------
-        dict
-            A dictionary representation of the Resources instance.
-
-        """
-        return {k: v for k, v in asdict(self).items() if v is not None}
-
     def with_defaults(
         self,
-        default_resources: Resources | Callable[[dict[str, Any]], Resources] | None,
-    ) -> Resources | Callable[[dict[str, Any]], Resources]:
+        default_resources: Resources | None,
+    ) -> Resources:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
             return self
@@ -305,4 +295,31 @@ class Resources:
             return default_resources
         if default_resources is None:
             return resources
+        if callable(resources):
+            return functools.partial(
+                _delayed_resources_with_defaults,
+                _resources=resources,
+                _default_resources=default_resources,
+            )
         return resources.with_defaults(default_resources)
+
+    def dict(self) -> dict[str, Any]:
+        """Return the Resources instance as a dictionary.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the Resources instance.
+
+        """
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+def _delayed_resources_with_defaults(
+    kwargs: dict[str, Any],
+    *,
+    _resources: Callable[[dict[str, Any]], Resources],
+    _default_resources: Resources,
+) -> Resources:
+    resources = _resources(kwargs)
+    return resources.with_defaults(_default_resources)
