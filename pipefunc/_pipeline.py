@@ -120,6 +120,7 @@ class Pipeline:
         self.lazy = lazy
         self._debug = debug
         self._profile = profile
+        self._default_resources = Resources.maybe_from_dict(default_resources)
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -128,7 +129,6 @@ class Pipeline:
             self.add(f, mapspec=mapspec)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
-        self.default_resources = Resources.maybe_from_dict(default_resources)
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
@@ -198,6 +198,7 @@ class Pipeline:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
+        f._default_resources = self._default_resources
         self.functions.append(f)
         f._pipelines.add(self)
 
@@ -1154,7 +1155,7 @@ class Pipeline:
             "profile": self._profile,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
-            "default_resources": self.default_resources,
+            "default_resources": self._default_resources,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
@@ -1213,11 +1214,8 @@ class Pipeline:
         for pipeline in [self, *pipelines]:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
-                    resources = Resources.maybe_with_defaults(
-                        f.resources,
-                        pipeline.default_resources,
-                    )
-                    f_new = f.copy(resources=resources)
+                    f_new = f.copy(resources=f.resources)
+                    f_new._default_resources = None
                     functions.append(f_new)
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())
