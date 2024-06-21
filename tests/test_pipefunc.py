@@ -1674,3 +1674,17 @@ def test_default_resources_from_pipeline():
     assert pipeline["e"].resources.num_cpus == 3
     assert pipeline["e"].resources.memory == "3GB"
     assert pipeline["f"].resources.num_cpus == 4
+
+
+def test_resources_variable():
+    @pipefunc(output_name="c", resources_variable="resources", resources={"num_gpus": 8})
+    def f_c(a, b, resources):  # noqa: ARG001
+        return resources.num_gpus
+
+    assert f_c(a=1, b=2) == 8
+
+    pipeline = Pipeline([f_c])
+    assert pipeline(a=1, b=2) == 8
+
+    with pytest.raises(ValueError, match="Unexpected keyword arguments: `{'resources'}`"):
+        f_c(a=1, b=2, resources={"num_gpus": 4})
