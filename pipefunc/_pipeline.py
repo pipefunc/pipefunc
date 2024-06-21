@@ -1148,6 +1148,7 @@ class Pipeline:
 
         """
         kwargs = {
+            "functions": self.functions,
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
@@ -1155,10 +1156,8 @@ class Pipeline:
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self.default_resources,
         }
-        if "functions" not in update:
-            kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
-        kwargs.update(update)
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
+        kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
     def nest_funcs(
