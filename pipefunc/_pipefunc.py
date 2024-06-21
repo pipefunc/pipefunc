@@ -79,9 +79,10 @@ class PipeFunc(Generic[T]):
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
-    pass_resources_as
+    resources_variable
         If provided, the resources will be passed as the specified argument name to the function.
-        For example, if ``pass_resources_as="resources"``, the resources will be passed as
+        This requires that the function has a parameter with the same name. For example,
+        if ``resources_variable="resources"``, the resources will be passed as
         ``resources=resources`` to the function. This can be useful when the function behaves
         differently based on the resources provided.
     scope
@@ -134,7 +135,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
-        pass_resources_as: str | None = None,
+        resources_variable: str | None = None,
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -152,7 +153,7 @@ class PipeFunc(Generic[T]):
         self._bound: dict[str, Any] = bound or {}
         self._resources = Resources.maybe_from_dict(resources)
         self._default_resources: Resources | None = None  # not settable by user
-        self.pass_resources_as = pass_resources_as
+        self.resources_variable = resources_variable
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -210,7 +211,10 @@ class PipeFunc(Generic[T]):
             respective `inspect.Parameter` objects.
 
         """
-        return dict(inspect.signature(self.func).parameters)
+        parameters = dict(inspect.signature(self.func).parameters)
+        if self.resources_variable is not None:
+            del parameters[self.resources_variable]
+        return parameters
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
@@ -499,6 +503,7 @@ class PipeFunc(Generic[T]):
             "cache": self.cache,
             "mapspec": self.mapspec,
             "resources": self._resources,
+            "resources_variable": self.resources_variable,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -529,6 +534,8 @@ class PipeFunc(Generic[T]):
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
+            if self.resources_variable:
+                kwargs[self.resources_variable] = self.resources
             result = self.func(*args, **kwargs)
 
         if self.debug:
@@ -711,7 +718,7 @@ def pipefunc(
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     resources: dict | Resources | None = None,
-    pass_resources_as: str | None = None,
+    resources_variable: str | None = None,
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -750,9 +757,10 @@ def pipefunc(
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
         function.
-    pass_resources_as
+    resources_variable
         If provided, the resources will be passed as the specified argument name to the function.
-        For example, if ``pass_resources_as="resources"``, the resources will be passed as
+        This requires that the function has a parameter with the same name. For example,
+        if ``resources_variable="resources"``, the resources will be passed as
         ``resources=resources`` to the function. This can be useful when the function behaves
         differently based on the resources provided.
     scope
@@ -818,7 +826,7 @@ def pipefunc(
             cache=cache,
             mapspec=mapspec,
             resources=resources,
-            pass_resources_as=pass_resources_as,
+            resources_variable=resources_variable,
             scope=scope,
         )
 
@@ -866,7 +874,7 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
-        pass_resources_as: str | None = None,
+        resources_variable: str | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -887,7 +895,7 @@ class NestedPipeFunc(PipeFunc):
         self._bound: dict[str, Any] = {}
         self._resources = _maybe_max_resources(resources, self.pipeline.functions)
         self._default_resources = None  # not settable by user
-        self.pass_resources_as = pass_resources_as
+        self.resources_variable = resources_variable
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:

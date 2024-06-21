@@ -63,7 +63,7 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
     import matplotlib.pyplot as plt
 
     from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
-    from pipefunc._pipeline import _Bound
+    from pipefunc._pipeline import _Bound, _Resources
 
     pos = _get_graph_layout(graph)
     arg_nodes = []
@@ -77,9 +77,13 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
             nested_func_nodes.append(node)
         elif isinstance(node, PipeFunc):
             func_nodes.append(node)
-        else:
-            assert isinstance(node, _Bound)
+        elif isinstance(node, _Bound):
             bound_nodes.append(node)
+        elif isinstance(node, _Resources):
+            pass
+        else:
+            msg = f"Unknown node type: {type(node)}"
+            raise TypeError(msg)
 
     plt.figure(figsize=figsize)
 
@@ -155,10 +159,11 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
                 outputs_mapspec[edge] = ", ".join(output_str)
             else:
                 outputs[edge] = ", ".join(output_str)
-        else:
-            assert isinstance(a, _Bound)
+        elif isinstance(a, _Bound):
             bound_value = a.value
             bound[edge] = f"{a.name}={bound_value}"
+        else:
+            assert isinstance(a, _Resources)
 
     for labels, color in [
         (outputs, "skyblue"),

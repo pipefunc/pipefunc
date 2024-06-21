@@ -323,7 +323,7 @@ class Pipeline:
             elif isinstance(node, str):
                 mapping[node] = node
             else:
-                assert isinstance(node, _Bound)
+                assert isinstance(node, _Bound | _Resources)
         return mapping
 
     @functools.cached_property
@@ -357,14 +357,16 @@ class Pipeline:
                             g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
                 else:
                     bound_value = f._bound.get(arg, _empty)
-                    if bound_value is _empty:
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name, bound_value)
+                        g.add_edge(bound, f)
+                    elif arg == f.resources_variable:
+                        g.add_edge(_Resources(arg), f)
+                    else:
                         if arg not in g:
                             # Add the node only if it doesn't exist
                             g.add_node(arg)
                         g.add_edge(arg, f, arg=arg)
-                    else:
-                        bound = _Bound(arg, f.output_name, bound_value)
-                        g.add_edge(bound, f)
         return g
 
     def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
@@ -950,7 +952,7 @@ class Pipeline:
         if not generations:
             return Generations([], [])
 
-        assert all(isinstance(x, str | _Bound) for x in generations[0])
+        assert all(isinstance(x, str | _Bound | _Resources) for x in generations[0])
         assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
         root_args = [x for x in generations[0] if isinstance(x, str)]
         return Generations(root_args, generations[1:])
@@ -1420,6 +1422,11 @@ class _Bound:
     value: Any
 
 
+@dataclass(frozen=True, slots=True, eq=True)
+class _Resources:
+    name: str
+
+
 class _PipelineAsFunc:
     """Wrapper class for a pipeline function.
 
@@ -1746,7 +1753,11 @@ def _compute_arg_mapping(
     replaced: list[PipeFunc | str],
     arg_set: set[tuple[str, ...]],
 ) -> None:
-    preds = [n for n in graph.predecessors(node) if n not in replaced and not isinstance(n, _Bound)]
+    preds = [
+        n
+        for n in graph.predecessors(node)
+        if n not in replaced and not isinstance(n, _Bound | _Resources)
+    ]
     deps = _unique(args + preds)
     deps_names = _names(deps)
     if deps_names in arg_set:
