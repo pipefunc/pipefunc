@@ -23,7 +23,6 @@ import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
-from pipefunc._plotting import visualize, visualize_holoviews
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -355,10 +354,9 @@ class Pipeline:
                             assert isinstance(edge[0].output_name, tuple)
                             current = g.edges[edge]["arg"]
                             g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
-                else:
-                    bound_value = f._bound.get(arg, _empty)
+                else:  # noqa: PLR5501
                     if arg in f._bound:
-                        bound = _Bound(arg, f.output_name, bound_value)
+                        bound = _Bound(arg, f.output_name, f._bound[arg])
                         g.add_edge(bound, f)
                     else:
                         if arg not in g:
@@ -1035,6 +1033,8 @@ class Pipeline:
             Argument as passed to `Pipeline.simply_pipeline`.
 
         """
+        from pipefunc._plotting import visualize
+
         if color_combinable:
             func_node_colors = self._func_node_colors(
                 conservatively_combine=conservatively_combine,
@@ -1059,6 +1059,8 @@ class Pipeline:
             If ``False`` the `holoviews.Graph` object is returned.
 
         """
+        from pipefunc._plotting import visualize_holoviews
+
         return visualize_holoviews(self.graph, show=show)
 
     def print_profiling_stats(self) -> None:
