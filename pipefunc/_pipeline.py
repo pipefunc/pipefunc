@@ -1222,12 +1222,7 @@ class Pipeline:
         for pipeline in [self, *pipelines]:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
-                    resources = Resources.maybe_with_defaults(
-                        f.resources,
-                        pipeline.default_resources,
-                    )
-                    f_new = f.copy(resources=resources)
-                    functions.append(f_new)
+                    functions.append(f.copy())  # noqa: PERF401
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())
             else:
