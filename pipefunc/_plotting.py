@@ -61,8 +61,8 @@ class _Nodes:
             self.bound.append(node)
         elif isinstance(node, _Resources):
             self.resources.append(node)
-        else:
-            msg = f"Unknown node type: {type(node)}"
+        else:  # pragma: no cover
+            msg = "Should not happen. Please report this as a bug."
             raise TypeError(msg)
 
 
