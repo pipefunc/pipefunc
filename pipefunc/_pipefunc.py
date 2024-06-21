@@ -145,7 +145,7 @@ class PipeFunc(Generic[T]):
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
         self._resources = Resources.maybe_from_dict(resources)
-        self._default_resources = None  # not settable by user
+        self._default_resources: Resources | None = None  # not settable by user
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")

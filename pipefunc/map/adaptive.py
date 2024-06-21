@@ -26,7 +26,6 @@ from pipefunc.map._run import (
 )
 from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
-from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.map._storage_base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
+    from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
 
@@ -241,8 +241,7 @@ def create_learners(
         for gen in pipeline.topological_generations.function_lists:
             _learners = []
             for f in gen:
-                resources = Resources.maybe_with_defaults(f.resources, pipeline.default_resources)
-                f_new = f.copy(resources=resources)
+                f_new = f.copy()
                 learner = _learner(
                     func=f_new,
                     run_info=run_info,
