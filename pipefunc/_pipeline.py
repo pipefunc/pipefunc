@@ -360,13 +360,13 @@ class Pipeline:
                     if arg in f._bound:
                         bound = _Bound(arg, f.output_name, bound_value)
                         g.add_edge(bound, f)
-                    elif arg == f.resources_variable:
-                        g.add_edge(_Resources(arg), f)
                     else:
                         if arg not in g:
                             # Add the node only if it doesn't exist
                             g.add_node(arg)
                         g.add_edge(arg, f, arg=arg)
+            if f.resources_variable is not None:
+                g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
     def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
@@ -1425,6 +1425,7 @@ class _Bound:
 @dataclass(frozen=True, slots=True, eq=True)
 class _Resources:
     name: str
+    output_name: _OUTPUT_TYPE
 
 
 class _PipelineAsFunc:

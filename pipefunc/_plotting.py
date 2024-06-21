@@ -70,6 +70,7 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
     func_nodes = []
     nested_func_nodes = []
     bound_nodes = []
+    resources_nodes = []
     for node in graph.nodes:
         if isinstance(node, str):
             arg_nodes.append(node)
@@ -80,7 +81,7 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
         elif isinstance(node, _Bound):
             bound_nodes.append(node)
         elif isinstance(node, _Resources):
-            pass
+            resources_nodes.append(node)
         else:
             msg = f"Unknown node type: {type(node)}"
             raise TypeError(msg)
@@ -92,6 +93,7 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
         (func_nodes, func_node_colors or "skyblue", "o", None),
         (nested_func_nodes, func_node_colors or "skyblue", "o", "red"),
         (bound_nodes, "red", "h", None),
+        (resources_nodes, "C1", "p", None),
     ]:
         nx.draw_networkx_nodes(
             graph,
@@ -116,6 +118,7 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
         {node: node for node in arg_nodes},
         {node: func_with_mapspec(node) for node in (*func_nodes, *nested_func_nodes)},
         {node: node.name for node in bound_nodes},
+        {node: node.name for node in resources_nodes},
     ]:
         nx.draw_networkx_labels(
             graph,
