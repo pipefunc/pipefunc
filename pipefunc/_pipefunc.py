@@ -151,7 +151,8 @@ class PipeFunc(Generic[T]):
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
-        self.resources = Resources.maybe_from_dict(resources)
+        self._resources = Resources.maybe_from_dict(resources)
+        self._default_resources: Resources | None = None  # not settable by user
         self.pass_resources_as = pass_resources_as
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
@@ -252,6 +253,11 @@ class PipeFunc(Generic[T]):
         if self._output_picker is None and isinstance(self.output_name, tuple):
             return functools.partial(_default_output_picker, output_name=self.output_name)
         return self._output_picker
+
+    @property
+    def resources(self) -> Resources | Callable[[dict[str, Any]], Resources] | None:
+        """Return the resources required for the function, if provided."""
+        return Resources.maybe_with_defaults(self._resources, self._default_resources)
 
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
@@ -493,11 +499,13 @@ class PipeFunc(Generic[T]):
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
-            "resources": self.resources,
+            "resources": self._resources,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
-        return PipeFunc(**kwargs)  # type: ignore[arg-type]
+        f = PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
+        f._default_resources = self._default_resources
+        return f
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -879,7 +887,8 @@ class NestedPipeFunc(PipeFunc):
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
         self._bound: dict[str, Any] = {}
-        self.resources = _maybe_max_resources(resources, self.pipeline.functions)
+        self._resources = _maybe_max_resources(resources, self.pipeline.functions)
+        self._default_resources = None  # not settable by user
         self.pass_resources_as = pass_resources_as
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
@@ -896,7 +905,7 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "renames": self._renames,
             "mapspec": self.mapspec,
-            "resources": self.resources,
+            "resources": self._resources,
         }
         kwargs.update(update)
         return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]

@@ -1666,7 +1666,7 @@ def test_default_resources_from_pipeline():
     pipeline3 = Pipeline([i])
 
     pipeline = pipeline1 | pipeline2 | pipeline3
-    assert pipeline.default_resources is None
+    assert pipeline._default_resources is None
     assert pipeline["c"].resources.num_cpus == 2
     assert pipeline["c"].resources.memory == "1GB"
     assert pipeline["d"].resources.num_cpus == 1
