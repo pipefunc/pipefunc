@@ -137,6 +137,25 @@ def test_missing_resources(tmp_path: Path) -> None:
         learners_dict.to_slurm_run(tmp_path)
 
 
+def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", mapspec="a[i] -> x[i]")
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: int) -> int:
+        return x
+
+    pipeline1 = Pipeline([f1], default_resources=Resources(num_cpus=2))
+    pipeline2 = Pipeline([f2])
+    pipeline = pipeline1 | pipeline2
+    inputs = {"a": list(range(4))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    kw = learners_dict.to_slurm_run(tmp_path, default_resources=Resources(num_cpus=4))
+    assert isinstance(kw, dict)
+    assert kw["cores_per_node"] == (2, 4)
+
+
 def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     @pipefunc(output_name="x", resources=Resources(num_cpus=2), mapspec="a[i] -> x[i]")
     def f1(a: int) -> int:
