@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from pipefunc._pipefunc import PipeFunc, _maybe_resources
 from pipefunc._utils import at_least_tuple
 from pipefunc.resources import Resources
 
@@ -15,8 +14,8 @@ if TYPE_CHECKING:
     import adaptive_scheduler
     from adaptive import SequenceLearner
 
+    from pipefunc._pipefunc import PipeFunc
     from pipefunc.map.adaptive import LearnersDict
-    from pipefunc.resources import Resources
 
 
 class AdaptiveSchedulerDetails(NamedTuple):
@@ -65,7 +64,7 @@ def slurm_run_setup(
     ignore_resources: bool = False,
 ) -> AdaptiveSchedulerDetails:
     """Set up the arguments for `adaptive_scheduler.slurm_run`."""
-    default_resources = _maybe_resources(default_resources)
+    default_resources = Resources.maybe_from_dict(default_resources)
     tracker = _Tracker(default_resources)
     run_folder = Path(run_folder)
     learners: list[SequenceLearner] = []

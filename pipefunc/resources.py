@@ -123,6 +123,15 @@ class Resources:
             raise TypeError(msg) from e
 
     @staticmethod
+    def maybe_from_dict(resources: dict[str, Any] | Resources | None) -> Resources | None:
+        """Create a Resources instance from a dictionary, if not already an instance and not None."""
+        if resources is None:
+            return None
+        if isinstance(resources, Resources):
+            return resources
+        return Resources.from_dict(resources)
+
+    @staticmethod
     def _is_valid_memory(memory: str) -> bool:
         if not isinstance(memory, str):
             return False
@@ -278,3 +287,17 @@ class Resources:
         if default_resources is None:
             return self
         return Resources(**dict(default_resources.dict(), **self.dict()))
+
+    @staticmethod
+    def maybe_with_defaults(
+        resources: Resources | None,
+        default_resources: Resources | None,
+    ) -> Resources | None:
+        """Combine the Resources instance with default resources, if provided."""
+        if resources is None and default_resources is None:
+            return None
+        if resources is None:
+            return default_resources
+        if default_resources is None:
+            return resources
+        return resources.with_defaults(default_resources)

@@ -99,7 +99,7 @@ all_args = pipeline.all_arg_combinations
 print(all_args)
 
 # Show resource reporting (only works if profile=True)
-pipeline.resources_report()
+pipeline.print_profiling_stats()
 ```
 
 This example demonstrates defining a pipeline with `f_c`, `f_d`, `f_e` functions, accessing and executing these functions using the pipeline, visualizing the pipeline graph, getting all possible argument mappings, and reporting on the resource usage.

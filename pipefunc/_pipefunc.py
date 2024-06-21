@@ -20,8 +20,13 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Uni
 
 import cloudpickle
 
-from pipefunc._perf import ProfilingStats, ResourceProfiler
-from pipefunc._utils import at_least_tuple, clear_cached_properties, format_function_call
+from pipefunc._profile import ProfilingStats, ResourceProfiler
+from pipefunc._utils import (
+    assert_complete_kwargs,
+    at_least_tuple,
+    clear_cached_properties,
+    format_function_call,
+)
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.resources import Resources
@@ -138,7 +143,7 @@ class PipeFunc(Generic[T]):
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
-        self.resources = _maybe_resources(resources)
+        self.resources = Resources.maybe_from_dict(resources)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -466,20 +471,24 @@ class PipeFunc(Generic[T]):
         for name in at_least_tuple(self.output_name):
             _validate_identifier("output_name", name)
 
-    def copy(self) -> PipeFunc:
-        return PipeFunc(
-            self.func,
-            self._output_name,
-            output_picker=self._output_picker,
-            renames=self._renames,
-            defaults=self._defaults,
-            bound=self._bound,
-            profile=self._profile,
-            debug=self.debug,
-            cache=self.cache,
-            mapspec=self.mapspec,
-            resources=self.resources,
-        )
+    def copy(self, **update: Any) -> PipeFunc:
+        """Create a copy of the `PipeFunc` instance, optionally updating the attributes."""
+        kwargs = {
+            "func": self.func,
+            "output_name": self._output_name,
+            "output_picker": self._output_picker,
+            "renames": self._renames,
+            "defaults": self._defaults,
+            "bound": self._bound,
+            "profile": self._profile,
+            "debug": self.debug,
+            "cache": self.cache,
+            "mapspec": self.mapspec,
+            "resources": self.resources,
+        }
+        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
+        kwargs.update(update)
+        return PipeFunc(**kwargs)  # type: ignore[arg-type]
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -875,15 +884,18 @@ class NestedPipeFunc(PipeFunc):
         self._validate_mapspec()
         self._validate_names()
 
-    def copy(self) -> NestedPipeFunc:
+    def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
         # the child mapspecs to None in the __init__
-        return NestedPipeFunc(
-            self.pipeline.functions,
-            output_name=self._output_name,
-            renames=self._renames,
-            mapspec=self.mapspec,
-        )
+        kwargs = {
+            "pipefuncs": self.pipeline.functions,
+            "output_name": self._output_name,
+            "renames": self._renames,
+            "mapspec": self.mapspec,
+            "resources": self.resources,
+        }
+        kwargs.update(update)
+        return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
@@ -938,14 +950,6 @@ def _maybe_max_resources(
     if not resources_list:
         return None
     return Resources.combine_max(resources_list)
-
-
-def _maybe_resources(resources: dict | Resources | None) -> Resources | None:
-    if resources is None:
-        return None
-    if isinstance(resources, Resources):
-        return resources
-    return Resources.from_dict(resources)
 
 
 class _NestedFuncWrapper:

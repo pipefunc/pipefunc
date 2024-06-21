@@ -22,11 +22,12 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._perf import resources_report
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._plotting import visualize, visualize_holoviews
+from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
+    assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
     handle_error,
@@ -41,6 +42,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import run
+from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -49,7 +51,7 @@ if TYPE_CHECKING:
 
     import holoviews as hv
 
-    from pipefunc._perf import ProfilingStats
+    from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
 
 
@@ -94,6 +96,10 @@ class Pipeline:
         can be provided as:
         ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
         ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    default_resources
+        Default resources to use for the pipeline functions. If ``None``,
+        the resources are not set. Either a dict or a `pipefunc.resources.Resources`
+        instance can be provided.
 
     """
 
@@ -107,6 +113,7 @@ class Pipeline:
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
         scope: str | None = None,
+        default_resources: dict[str, Any] | Resources | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -121,6 +128,7 @@ class Pipeline:
             self.add(f, mapspec=mapspec, copy=True)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
+        self.default_resources = Resources.maybe_from_dict(default_resources)
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
@@ -1058,12 +1066,12 @@ class Pipeline:
         """
         return visualize_holoviews(self.graph, show=show)
 
-    def resources_report(self) -> None:
+    def print_profiling_stats(self) -> None:
         """Display the resource usage report for each function in the pipeline."""
         if not self.profiling_stats:
             msg = "Profiling is not enabled."
             raise ValueError(msg)
-        resources_report(self.profiling_stats)
+        print_profiling_stats(self.profiling_stats)
 
     def simplified_pipeline(
         self,
@@ -1153,10 +1161,12 @@ class Pipeline:
             "profile": self._profile,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
+            "default_resources": self.default_resources,
         }
         if "functions" not in update:
             kwargs["functions"] = [f.copy() for f in self.functions]  # type: ignore[assignment]
         kwargs.update(update)
+        assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         return Pipeline(**kwargs)  # type: ignore[arg-type]
 
     def nest_funcs(
@@ -1194,6 +1204,10 @@ class Pipeline:
     def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
         """Join multiple pipelines into a single new pipeline.
 
+        The new pipeline has no `default_resources` set, instead, each function has a
+        `Resources` attribute that is the union of the `resources` attributes the
+        `default_resources` of the original pipelines.
+
         Parameters
         ----------
         pipelines
@@ -1208,17 +1222,35 @@ class Pipeline:
         for pipeline in [self, *pipelines]:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
-                    functions.append(f.copy())  # noqa: PERF401
+                    resources = Resources.maybe_with_defaults(
+                        f.resources,
+                        pipeline.default_resources,
+                    )
+                    f_new = f.copy(resources=resources)
+                    functions.append(f_new)
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())
             else:
                 msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
                 raise TypeError(msg)
 
-        return self.copy(functions=functions)
+        return self.copy(functions=functions, default_resources=None)
 
     def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
-        """Combine two pipelines using the ``|`` operator."""
+        """Combine two pipelines using the ``|`` operator.
+
+        See Also
+        --------
+        join
+            The method that is called when using the ``|`` operator.
+
+        Examples
+        --------
+        >>> pipeline1 = Pipeline([f1, f2])
+        >>> pipeline2 = Pipeline([f3, f4])
+        >>> combined_pipeline = pipeline1 | pipeline2
+
+        """
         return self.join(other)
 
     def _connected_components(self) -> list[set[PipeFunc | str]]:
