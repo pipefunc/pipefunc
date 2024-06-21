@@ -124,7 +124,7 @@ class Resources:
 
     @staticmethod
     def maybe_from_dict(resources: dict[str, Any] | Resources | None) -> Resources | None:
-        """Create a Resources instance from a dictionary, if not already an instance."""
+        """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
         if isinstance(resources, Resources):
