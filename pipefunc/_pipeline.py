@@ -126,7 +126,7 @@ class Pipeline:
                 f, mapspec = f  # noqa: PLW2901
             else:
                 mapspec = None
-            self.add(f, mapspec=mapspec, copy=True)
+            self.add(f, mapspec=mapspec)
         self._cache_type = cache_type
         self._cache_kwargs = cache_kwargs
         if cache_type is None and any(f.cache for f in self.functions):
@@ -168,10 +168,10 @@ class Pipeline:
         self,
         f: PipeFunc | Callable,
         mapspec: str | MapSpec | None = None,
-        *,
-        copy: bool = True,
     ) -> PipeFunc:
         """Add a function to the pipeline.
+
+        Always creates a copy of the `PipeFunc` instance to avoid side effects.
 
         Parameters
         ----------
@@ -183,28 +183,20 @@ class Pipeline:
             This is a specification for mapping that dictates how input values should
             be merged together. If ``None``, the default behavior is that the input directly
             maps to the output.
-        copy
-            Whether to copy the function before adding it to the pipeline.
 
         """
-        if not isinstance(f, PipeFunc) and callable(f):
-            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
-        elif mapspec is not None:
-            msg = (
-                "Initializing the `Pipeline` using tuples of `PipeFunc`s and `MapSpec`s"
-                " will create a copy of the `PipeFunc`."
-            )
-            warnings.warn(msg, UserWarning, stacklevel=3)
+        if isinstance(f, PipeFunc):
             f: PipeFunc = f.copy()  # type: ignore[no-redef]
-            if isinstance(mapspec, str):
-                mapspec = MapSpec.from_string(mapspec)
-            f.mapspec = mapspec
-            f._validate_mapspec()
-        elif not isinstance(f, PipeFunc):
+            if mapspec is not None:
+                if isinstance(mapspec, str):
+                    mapspec = MapSpec.from_string(mapspec)
+                f.mapspec = mapspec
+                f._validate_mapspec()
+        elif callable(f):
+            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
+        else:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
-        elif copy:
-            f: PipeFunc = f.copy()  # type: ignore[no-redef]
 
         f._default_resources = self._default_resources
         self.functions.append(f)
