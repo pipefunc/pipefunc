@@ -1708,3 +1708,11 @@ def test_resources_variable_nested_func():
 
     pipeline = Pipeline([nf])
     assert pipeline(a=1, b=2) == 8
+
+
+def test_incorrect_resources_variable():
+    with pytest.raises(ValueError, match="The parameter 'missing' is not present in the function."):
+
+        @pipefunc(output_name="c", resources_variable="missing")
+        def f_c(a):
+            return a
