@@ -134,6 +134,7 @@ class PipeFunc(Generic[T]):
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
+        self.__name__ = func.__name__
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
@@ -516,7 +517,7 @@ class PipeFunc(Generic[T]):
             result = self.func(*args, **kwargs)
 
         if self.debug:
-            func_str = format_function_call(self.func.__name__, (), kwargs)
+            func_str = format_function_call(self.__name__, (), kwargs)
             now = datetime.datetime.now()  # noqa: DTZ005
             msg = (
                 f"{now} - Function returning '{self.output_name}' was invoked"
@@ -598,21 +599,6 @@ class PipeFunc(Generic[T]):
         if self.profiling_stats is not None:
             return ResourceProfiler(os.getpid(), self.profiling_stats)
         return contextlib.nullcontext()
-
-    def __getattr__(self, name: str) -> Any:
-        """Get attributes of the wrapped function.
-
-        Parameters
-        ----------
-        name
-            The name of the attribute to get.
-
-        Returns
-        -------
-            The value of the attribute.
-
-        """
-        return getattr(self.func, name)
 
     def __str__(self) -> str:
         """Return a string representation of the PipeFunc instance.
@@ -931,6 +917,10 @@ class NestedPipeFunc(PipeFunc):
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
         func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
         return _NestedFuncWrapper(func.call_full_output, self.output_name)
+
+    @functools.cached_property
+    def __name__(self) -> str:  # type: ignore[override]
+        return self.func.__name__
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pipefuncs={self.pipeline.functions})"
