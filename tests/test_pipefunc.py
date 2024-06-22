@@ -1709,6 +1709,10 @@ def test_resources_variable_nested_func():
     pipeline = Pipeline([nf])
     assert pipeline(a=1, b=2) == 8
 
+    # TODO: fix this
+    nf_with_resources = NestedPipeFunc([f_c, f_d], output_name="d", resources_variable="resources")
+    assert nf_with_resources.resources.num_gpus == 8
+
 
 def test_incorrect_resources_variable():
     with pytest.raises(ValueError, match="The parameter 'missing' is not present in the function."):
