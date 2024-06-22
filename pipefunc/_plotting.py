@@ -3,11 +3,14 @@ from __future__ import annotations
 import inspect
 import re
 import warnings
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._pipeline import _Bound, _Resources
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
@@ -15,7 +18,6 @@ if TYPE_CHECKING:
 
     import holoviews as hv
 
-    from pipefunc._pipefunc import PipeFunc
 
 _empty = inspect.Parameter.empty
 MAX_LABEL_LENGTH = 20
@@ -40,7 +42,31 @@ def _trim(s: Any, max_len: int = MAX_LABEL_LENGTH) -> str:
     return s
 
 
-def visualize(  # noqa: PLR0912, PLR0915, C901
+@dataclass
+class _Nodes:
+    arg: list[str] = field(default_factory=list)
+    func: list[PipeFunc] = field(default_factory=list)
+    nested_func: list[NestedPipeFunc] = field(default_factory=list)
+    bound: list[_Bound] = field(default_factory=list)
+    resources: list[_Resources] = field(default_factory=list)
+
+    def append(self, node: Any) -> None:
+        if isinstance(node, str):
+            self.arg.append(node)
+        elif isinstance(node, NestedPipeFunc):
+            self.nested_func.append(node)
+        elif isinstance(node, PipeFunc):
+            self.func.append(node)
+        elif isinstance(node, _Bound):
+            self.bound.append(node)
+        elif isinstance(node, _Resources):
+            self.resources.append(node)
+        else:  # pragma: no cover
+            msg = "Should not happen. Please report this as a bug."
+            raise TypeError(msg)
+
+
+def visualize(  # noqa: PLR0912, PLR0915
     graph: nx.DiGraph,
     figsize: tuple[int, int] = (10, 10),
     filename: str | Path | None = None,
@@ -62,37 +88,24 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
     """
     import matplotlib.pyplot as plt
 
-    from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
-    from pipefunc._pipeline import _Bound
-
     pos = _get_graph_layout(graph)
-    arg_nodes = []
-    func_nodes = []
-    nested_func_nodes = []
-    bound_nodes = []
+    nodes = _Nodes()
     for node in graph.nodes:
-        if isinstance(node, str):
-            arg_nodes.append(node)
-        elif isinstance(node, NestedPipeFunc):
-            nested_func_nodes.append(node)
-        elif isinstance(node, PipeFunc):
-            func_nodes.append(node)
-        else:
-            assert isinstance(node, _Bound)
-            bound_nodes.append(node)
+        nodes.append(node)
 
     plt.figure(figsize=figsize)
 
-    for nodes, color, shape, edgecolor in [
-        (arg_nodes, "lightgreen", "s", None),
-        (func_nodes, func_node_colors or "skyblue", "o", None),
-        (nested_func_nodes, func_node_colors or "skyblue", "o", "red"),
-        (bound_nodes, "red", "h", None),
+    for _nodes, color, shape, edgecolor in [
+        (nodes.arg, "lightgreen", "s", None),
+        (nodes.func, func_node_colors or "skyblue", "o", None),
+        (nodes.nested_func, func_node_colors or "skyblue", "o", "red"),
+        (nodes.bound, "red", "h", None),
+        (nodes.resources, "C1", "p", None),
     ]:
         nx.draw_networkx_nodes(
             graph,
             pos,
-            nodelist=nodes,
+            nodelist=_nodes,
             node_size=4000,
             node_color=color,
             node_shape=shape,
@@ -109,9 +122,9 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
         return s
 
     for labels in [
-        {node: node for node in arg_nodes},
-        {node: func_with_mapspec(node) for node in (*func_nodes, *nested_func_nodes)},
-        {node: node.name for node in bound_nodes},
+        {node: node for node in nodes.arg},
+        {node: func_with_mapspec(node) for node in nodes.func + nodes.nested_func},
+        {node: node.name for node in nodes.bound + nodes.resources},
     ]:
         nx.draw_networkx_labels(
             graph,
@@ -155,10 +168,11 @@ def visualize(  # noqa: PLR0912, PLR0915, C901
                 outputs_mapspec[edge] = ", ".join(output_str)
             else:
                 outputs[edge] = ", ".join(output_str)
-        else:
-            assert isinstance(a, _Bound)
+        elif isinstance(a, _Bound):
             bound_value = a.value
             bound[edge] = f"{a.name}={bound_value}"
+        else:
+            assert isinstance(a, _Resources)
 
     for labels, color in [
         (outputs, "skyblue"),
