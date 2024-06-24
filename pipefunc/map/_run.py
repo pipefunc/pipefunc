@@ -227,8 +227,8 @@ def _func_kwargs(
             kwargs[p] = func._bound[p]
         elif p in run_info.input_paths or p in run_info.all_output_names:
             kwargs[p] = _load_parameter(p, run_info, store)
-        elif p in func.defaults and p not in run_info.all_output_names:
-            kwargs[p] = func.defaults[p]
+        elif p in run_info.defaults and p not in run_info.all_output_names:
+            kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
             # In principle it should not be possible to reach this point because of
             # the checks in `run` and `_validate_complete_inputs`.
