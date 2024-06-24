@@ -1025,7 +1025,7 @@ def test_subpipeline() -> None:
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
     with pytest.raises(ValueError, match="Cannot construct a partial pipeline"):
-        partial = pipeline.subpipeline(inputs=["a"])  # type: ignore[arg-type]
+        pipeline.subpipeline(inputs=["a"])  # type: ignore[arg-type]
 
     @pipefunc(output_name="h")
     def h(c):
