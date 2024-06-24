@@ -203,6 +203,16 @@ def _compare_to_previous_run_info(
     if not equal_inputs:
         msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
+    equal_defaults = equal_dicts(pipeline.defaults, old.defaults)
+    if equal_defaults is None:
+        print(
+            "Could not compare new `defaults` to `defaults` from previous run."
+            " Proceeding *without* `cleanup`, hoping for the best.",
+        )
+        return
+    if not equal_defaults:
+        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
