@@ -1685,16 +1685,17 @@ def test_default_resources_from_pipeline() -> None:
 
 
 def test_sharing_defaults() -> None:
-    @pipefunc(output_name="c", defaults={"b": 1})
+    @pipefunc(output_name="c", defaults={"b": 1}, cache=True)
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="d")
+    @pipefunc(output_name="d", cache=True)
     def g(b, c):
         return b + c
 
-    pipeline = Pipeline([f, g])
+    pipeline = Pipeline([f, g], cache_type="simple")
     assert pipeline("d", a=1) == 3
-    assert pipeline("d", a=1, b=2) == 5
+    assert pipeline.cache is not None
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
     assert pipeline.map(inputs={"a": 1})["d"].output == 3
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
