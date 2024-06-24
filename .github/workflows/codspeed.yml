@@ -27,7 +27,7 @@ jobs:
       - name: Install pipefunc
         shell: bash -l {0}
         run: |
-          pip install -e ".[test,all]" pytest-codspeed
+          pip install -e ".[test,all]"
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v2

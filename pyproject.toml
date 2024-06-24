@@ -38,6 +38,7 @@ test = [
     "xarray",
     "zarr",
     "versioningit",
+    "pytest-codspeed",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
