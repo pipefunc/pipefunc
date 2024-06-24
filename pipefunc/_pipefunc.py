@@ -772,6 +772,8 @@ def pipefunc(
         If provided, the resources will be passed as the specified argument name to the function.
         This requires that the function has a parameter with the same name. For example,
         if ``resources_variable="resources"``, the resources will be passed as
+        ``resources=resources`` to the function. This can be useful when the function behaves
+        differently based on the resources provided.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
