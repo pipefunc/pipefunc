@@ -480,6 +480,15 @@ class PipeFunc(Generic[T]):
                 f" not {type(self._output_name)}."
             )
             raise TypeError(msg)
+        if self.resources_variable is not None:
+            try:
+                self.original_parameters  # noqa: B018
+            except KeyError as e:
+                msg = (
+                    f"The `resources_variable={self.resources_variable!r}`"
+                    " should be a parameter of the function."
+                )
+                raise KeyError(msg) from e
         self._validate_update(
             self._renames,
             "renames",
