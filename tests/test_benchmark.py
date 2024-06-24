@@ -61,4 +61,6 @@ def test_map(pipeline_mapspec) -> None:
             "i": 1,
             "j": 1,
         },
+        parallel=False,
+        storage="dict",
     )
