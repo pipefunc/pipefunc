@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  benchmark:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
