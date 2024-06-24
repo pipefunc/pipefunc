@@ -49,18 +49,7 @@ def test_map_sequential_with_dict_storage(pipeline_mapspec) -> None:
     b = list(range(10))
 
     pipeline_mapspec.map(
-        inputs={
-            "a": a,
-            "b": b,
-            "c": 1,
-            "d": 1,
-            "e": 1,
-            "f": 1,
-            "g": 1,
-            "h": 1,
-            "i": 1,
-            "j": 1,
-        },
+        inputs={"a": a, "b": b},
         parallel=False,
         storage="dict",
     )
