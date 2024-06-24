@@ -38,6 +38,7 @@ test = [
     "xarray",
     "zarr",
     "versioningit",
+    "pytest-codspeed",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
@@ -61,7 +62,7 @@ dev = [  # all + dev deps
     "ruff",
     "mypy",
     "versioningit",
-    "pipefunc[all,test,docs,dev]",
+    "pipefunc[all,test,docs]",
 ]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"

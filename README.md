@@ -8,6 +8,7 @@
 [![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
+[![CodSpeed Badge](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/pipefunc/pipefunc)
 [![Documentation](https://readthedocs.org/projects/pipefunc/badge/?version=latest)](https://pipefunc.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://img.shields.io/conda/dn/conda-forge/pipefunc.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![GitHub](https://img.shields.io/github/stars/pipefunc/pipefunc.svg?style=social)](https://github.com/pipefunc/pipefunc/stargazers)
