@@ -1670,10 +1670,10 @@ def test_default_resources_from_pipeline() -> None:
 
     pipeline = pipeline1 | pipeline2 | pipeline3
     assert pipeline._default_resources is None
-    assert pipeline["c"].resources is not None
-    assert pipeline["d"].resources is not None
-    assert pipeline["e"].resources is not None
-    assert pipeline["f"].resources is not None
+    assert isinstance(pipeline["c"].resources, Resources)
+    assert isinstance(pipeline["d"].resources, Resources)
+    assert isinstance(pipeline["e"].resources, Resources)
+    assert isinstance(pipeline["f"].resources, Resources)
 
     assert pipeline["c"].resources.num_cpus == 2
     assert pipeline["c"].resources.memory == "1GB"
@@ -1723,7 +1723,10 @@ def test_resources_variable_nested_func():
 
 
 def test_incorrect_resources_variable():
-    with pytest.raises(ValueError, match="The parameter 'missing' is not present in the function."):
+    with pytest.raises(
+        ValueError,
+        match="The `resources_variable='missing'` should be a parameter of the function.",
+    ):
 
         @pipefunc(output_name="c", resources_variable="missing")
         def f_c(a):
