@@ -58,6 +58,7 @@ def map_shapes(
 @dataclass(frozen=True, eq=True)
 class RunInfo:
     input_paths: dict[str, Path]
+    defaults_path: Path
     all_output_names: set[str]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
@@ -85,9 +86,11 @@ class RunInfo:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, run_folder)
+        defaults_path = _dump_defaults(pipeline.defaults, run_folder)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes or {})
         return cls(
             input_paths=input_paths,
+            defaults_path=defaults_path,
             all_output_names=pipeline.all_output_names,
             shapes=shapes,
             internal_shapes=internal_shapes,
@@ -119,6 +122,10 @@ class RunInfo:
         return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
 
     @functools.cached_property
+    def defaults(self) -> Any:
+        return load(self.defaults_path, cache=False)
+
+    @functools.cached_property
     def mapspecs(self) -> list[MapSpec]:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
@@ -130,6 +137,7 @@ class RunInfo:
         for key in ["shapes", "shape_masks"]:
             data[key] = {",".join(at_least_tuple(k)): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
+        data["defaults_path"] = str(data["defaults_path"])
         with path.open("w") as f:
             json.dump(data, f, indent=4)
 
@@ -148,6 +156,7 @@ class RunInfo:
                 for k, v in data["internal_shapes"].items()
             }
         data["run_folder"] = Path(data["run_folder"])
+        data["defaults_path"] = Path(data["defaults_path"])
         return cls(**data)
 
     @staticmethod
@@ -194,6 +203,16 @@ def _compare_to_previous_run_info(
     if not equal_inputs:
         msg = f"Inputs `{inputs=}` / `{old.inputs=}` do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
+    equal_defaults = equal_dicts(pipeline.defaults, old.defaults)
+    if equal_defaults is None:
+        print(
+            "Could not compare new `defaults` to `defaults` from previous run."
+            " Proceeding *without* `cleanup`, hoping for the best.",
+        )
+        return
+    if not equal_defaults:
+        msg = f"Defaults `{pipeline.defaults=}` / `{old.defaults=}` do not match previous run, cannot use `cleanup=False`."
+        raise ValueError(msg)
 
 
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
@@ -222,6 +241,14 @@ def _dump_inputs(
         dump(v, path)
         paths[k] = path
     return paths
+
+
+def _dump_defaults(defaults: dict[str, Any], run_folder: Path) -> Path:
+    folder = run_folder / "defaults"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "defaults.cloudpickle"
+    dump(defaults, path)
+    return path
 
 
 def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:

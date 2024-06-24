@@ -441,8 +441,8 @@ class Pipeline:
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
-            elif arg in func.defaults:
-                value = func.defaults[arg]
+            elif arg in self.defaults:
+                value = self.defaults[arg]
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
                 raise ValueError(msg)
@@ -478,7 +478,7 @@ class Pipeline:
             assert cache is not None
             cache_key = _compute_cache_key(
                 func.output_name,
-                func.defaults | flat_scope_kwargs | func._bound,
+                self._func_defaults(func) | flat_scope_kwargs | func._bound,
                 root_args,
             )
             return_now, result_from_cache = _get_result_from_cache(
@@ -704,6 +704,21 @@ class Pipeline:
             for arg, value in func.defaults.items():
                 if arg not in func._bound and arg not in self.output_to_func:
                     defaults[arg] = value
+        return defaults
+
+    def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
+        """Retrieve defaults for a function, including those set by other functions."""
+        if r := self._internal_cache.func_defaults.get(func.output_name):
+            return r
+        defaults = func.defaults.copy()
+        for arg in func.parameters:
+            if arg in self.defaults:
+                pipeline_default = self.defaults[arg]
+                if arg in defaults:
+                    assert defaults[arg] == pipeline_default
+                    continue
+                defaults[arg] = self.defaults[arg]
+        self._internal_cache.func_defaults[func.output_name] = defaults
         return defaults
 
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
@@ -1926,3 +1941,4 @@ class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)

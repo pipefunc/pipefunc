@@ -202,7 +202,7 @@ def test_different_defaults() -> None:
         Pipeline([f, g])
 
 
-def test_output_name_in_kwargs():
+def test_output_name_in_kwargs() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -212,7 +212,7 @@ def test_output_name_in_kwargs():
         assert p("a", a=1)
 
 
-def test_profiling():
+def test_profiling() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -230,7 +230,7 @@ def test_profiling():
         p.print_profiling_stats()
 
 
-def test_pipe_func_and_execution():
+def test_pipe_func_and_execution() -> None:
     def func1(a, b=2):
         return a + b
 
@@ -273,7 +273,7 @@ def test_pipe_func_and_execution():
     assert pipeline("out3", y3=9, z3=3) == 6
 
 
-def test_pipe_func_profile():
+def test_pipe_func_profile() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -286,7 +286,7 @@ def test_pipe_func_profile():
     assert pipe_func.profiling_stats is None
 
 
-def test_pipe_func_str():
+def test_pipe_func_str() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -295,7 +295,7 @@ def test_pipe_func_str():
     assert str(pipe_func) == "f1(...) → c"
 
 
-def test_pipe_func_getstate_setstate():
+def test_pipe_func_getstate_setstate() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -322,7 +322,7 @@ def test_pipe_func_getstate_setstate():
     )  # the functions behave the same
 
 
-def test_complex_pipeline():
+def test_complex_pipeline() -> None:
     def f1(a, b, c, d):
         return a + b + c + d
 
@@ -344,13 +344,13 @@ def test_complex_pipeline():
     def f7(a, f2, f6):
         return a + f2 + f6
 
-    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7], lazy=True)
+    pipeline = Pipeline([f1, f2, f3, f4, f5, f6, f7], lazy=True)  # type: ignore[list-item]
 
     r = pipeline("f7", a=1, b=2, c=3, d=4, e=5)
     assert r.evaluate() == 52
 
 
-def test_tuple_outputs():
+def test_tuple_outputs() -> None:
     cache = True
 
     @pipefunc(
@@ -477,7 +477,7 @@ def test_full_output(cache, tmp_path: Path):
         assert len(list(cache_dir.glob("*.pkl"))) == 3
 
 
-def test_lazy_pipeline():
+def test_lazy_pipeline() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -507,7 +507,7 @@ def test_function(arg1: str, arg2: str) -> str:
 pipeline = Pipeline([test_function])
 
 
-def test_function_pickling():
+def test_function_pickling() -> None:
     # Get the _PipelineAsFunc instance from the pipeline
     func = pipeline.func("test_function")
 
@@ -533,7 +533,7 @@ def test_function_pickling():
     }
 
 
-def test_drop_from_pipeline():
+def test_drop_from_pipeline() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -573,7 +573,7 @@ def test_drop_from_pipeline():
         pipeline.drop()
 
 
-def test_used_variable():
+def test_used_variable() -> None:
     @pipefunc(output_name="c", cache=True)
     def f1(a, b):
         return a + b
@@ -590,12 +590,12 @@ def test_used_variable():
         return a
 
     pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)], cache_type="lru")
-    f = pipeline.func("c")
-    assert f(a=1) == 1
-    assert f(a=1) == 1  # should not raise an error
+    ff = pipeline.func("c")
+    assert ff(a=1) == 1
+    assert ff(a=1) == 1  # should not raise an error
 
 
-def test_handle_error():
+def test_handle_error() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):  # noqa: ARG001
         msg = "Test error"
@@ -606,13 +606,13 @@ def test_handle_error():
         pipeline("c", a=1, b=2)
     except ValueError as e:
         msg = "Error occurred while executing function `f1(a=1, b=2)`"
-        assert msg in str(e) or msg in str(e.__notes__)  # noqa: PT017
+        assert msg in str(e) or msg in str(e.__notes__)  # type: ignore[attr-defined]  # noqa: PT017
         # NOTE: with pytest.raises match="..." does not work
         # with add_note for some reason on my Mac, however,
         # on CI it works fine (Linux)...
 
 
-def test_full_output_cache():
+def test_full_output_cache() -> None:
     ran_f1 = False
     ran_f2 = False
 
@@ -637,6 +637,7 @@ def test_full_output_cache():
     r = f.call_full_output(a=1, b=2, x=3)
     expected = {"a": 1, "b": 2, "c": 3, "d": 18, "x": 3}
     assert r == expected
+    assert pipeline.cache is not None
     assert len(pipeline.cache) == 2
     r = f.call_full_output(a=1, b=2, x=3)
     assert r == expected
@@ -644,7 +645,7 @@ def test_full_output_cache():
     assert r == 18
 
 
-def test_output_picker_single_output():
+def test_output_picker_single_output() -> None:
     @pipefunc(output_name=("y",), output_picker=dict.__getitem__)
     def f(a, b):
         return {"y": a + b, "_throw": 1}
@@ -662,19 +663,19 @@ class DataClass:
     a: int
 
 
-def test_pickle_pipefunc():
+def test_pickle_pipefunc() -> None:
     func = PipeFunc(f, output_name="c")
     p = pickle.dumps(func)
     func2 = pickle.loads(p)  # noqa: S301
     assert func(1, 2) == func2(1, 2)
 
-    func = PipeFunc(DataClass, output_name="c")
+    func = PipeFunc(DataClass, output_name="c")  # type: ignore[arg-type]
     p = pickle.dumps(func)
     func2 = pickle.loads(p)  # noqa: S301
     assert func(a=1) == func2(a=1)
 
 
-def test_independent_axes_in_mapspecs_with_disconnected_chains():
+def test_independent_axes_in_mapspecs_with_disconnected_chains() -> None:
     @pipefunc(output_name=("c", "d"), mapspec="a[i] -> c[i], d[i]")
     def f(a: int, b: int):
         return a + b, 1
@@ -994,17 +995,17 @@ def test_invalid_output_name_identifier(output_name):
         def f(): ...
 
 
-def test_invalid_output_name():
+def test_invalid_output_name() -> None:
     with pytest.raises(
         TypeError,
         match="The output name should be a string or a tuple of strings",
     ):
 
-        @pipefunc(output_name=["a"])
+        @pipefunc(output_name=["a"])  # type: ignore[arg-type]
         def f(): ...
 
 
-def test_subpipeline():
+def test_subpipeline() -> None:
     @pipefunc(output_name=("c", "d"))
     def f(a: int, b: int):
         return a + b, 1
@@ -1014,31 +1015,31 @@ def test_subpipeline():
         return x + y
 
     pipeline = Pipeline([f, g])
-    partial = pipeline.subpipeline(inputs=["a", "b"])
+    partial = pipeline.subpipeline(inputs=["a", "b"])  # type: ignore[arg-type]
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
-    partial = pipeline.subpipeline(inputs=["a", "b", "x", "y"])
+    partial = pipeline.subpipeline(inputs=["a", "b", "x", "y"])  # type: ignore[arg-type]
     assert [f.output_name for f in partial.functions] == [("c", "d"), "z"]
 
-    partial = pipeline.subpipeline(output_names=[("c", "d")])
+    partial = pipeline.subpipeline(output_names=[("c", "d")])  # type: ignore[arg-type]
     assert [f.output_name for f in partial.functions] == [("c", "d")]
 
     with pytest.raises(ValueError, match="Cannot construct a partial pipeline"):
-        partial = pipeline.subpipeline(inputs=["a"])
+        pipeline.subpipeline(inputs=["a"])  # type: ignore[arg-type]
 
     @pipefunc(output_name="h")
     def h(c):
         return c
 
     pipeline = Pipeline([f, g, h])
-    partial = pipeline.subpipeline(inputs=["a", "b"])
+    partial = pipeline.subpipeline(inputs=["a", "b"])  # type: ignore[arg-type]
     assert [f.output_name for f in partial.functions] == [("c", "d"), "h"]
 
-    partial = pipeline.subpipeline(output_names=["h"])
+    partial = pipeline.subpipeline(output_names=["h"])  # type: ignore[arg-type]
     assert partial.topological_generations.root_args == ["a", "b"]
     assert partial.root_nodes == ["a", "b"]
 
-    partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])
+    partial = pipeline.subpipeline(output_names=["h"], inputs=["c"])  # type: ignore[arg-type]
     assert partial.topological_generations.root_args == ["c"]
     assert [f.output_name for f in partial.functions] == ["h"]
 
@@ -1250,7 +1251,7 @@ def test_nest_all() -> None:
     assert len(pipeline.functions) == 1
 
 
-def test_missing_kw():
+def test_missing_kw() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1357,7 +1358,7 @@ def test_update_renames_pipeline() -> None:
     assert pipeline("c", a6="a6", b="b") == ("a6", "b")
 
 
-def test_set_debug_and_profile():
+def test_set_debug_and_profile() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1371,15 +1372,16 @@ def test_set_debug_and_profile():
     assert pipeline["c"].profile
 
 
-def test_simple_cache():
+def test_simple_cache() -> None:
     @pipefunc(output_name="c", cache=True)
     def f(a, b):
         return a, b
 
     with pytest.raises(ValueError, match="Invalid cache type"):
-        Pipeline([f], cache_type="not_exist")
+        Pipeline([f], cache_type="not_exist")  # type: ignore[arg-type]
     pipeline = Pipeline([f], cache_type="simple")
     assert pipeline("c", a=1, b=2) == (1, 2)
+    assert pipeline.cache is not None
     assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
@@ -1389,7 +1391,7 @@ def test_simple_cache():
     assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
 
 
-def test_hybrid_cache_lazy_warning():
+def test_hybrid_cache_lazy_warning() -> None:
     @pipefunc(output_name="c", cache=True)
     def f(a, b):
         return a, b
@@ -1398,7 +1400,7 @@ def test_hybrid_cache_lazy_warning():
         Pipeline([f], cache_type="hybrid", lazy=True)
 
 
-def test_cache_non_root_args():
+def test_cache_non_root_args() -> None:
     @pipefunc(output_name="c", cache=True)
     def f(a, b):
         return a + b
@@ -1410,10 +1412,11 @@ def test_cache_non_root_args():
     pipeline = Pipeline([f, g], cache_type="simple")
     # Won't populate cache because `c` is not a root argument
     assert pipeline("d", c=1, b=2) == 3
+    assert pipeline.cache is not None
     assert pipeline.cache.cache == {}
 
 
-def test_axis_in_root_args():
+def test_axis_in_root_args() -> None:
     # Test reaches the `output_name in visited` condition
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
     def f(a, b):
@@ -1431,7 +1434,7 @@ def test_axis_in_root_args():
     assert pipeline.independent_axes_in_mapspecs("e") == {"i"}
 
 
-def test_nesting_funcs_with_bound():
+def test_nesting_funcs_with_bound() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1442,12 +1445,12 @@ def test_nesting_funcs_with_bound():
 
     pipeline = Pipeline([f, g])
     assert pipeline("d", a="a", b="b") == "abb2"
-    pipeline.nest_funcs(["c", "d"], "d")
+    pipeline.nest_funcs(["c", "d"], "d")  # type: ignore[arg-type]
     assert pipeline("d", a="a", b="b") == "abb2"
     assert len(pipeline.functions) == 1
 
 
-def test_pipefunc_scope():
+def test_pipefunc_scope() -> None:
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
     def f(a, b):
         return a + b
@@ -1459,7 +1462,7 @@ def test_pipefunc_scope():
     assert f(**{"x.b": 1, "x": {"a": 1}}) == 2
 
 
-def test_pipeline_scope():
+def test_pipeline_scope() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1473,7 +1476,7 @@ def test_pipeline_scope():
     assert pipeline(**{"x.b": 1, "x": {"a": 1}}) == 2
 
 
-def test_pipeline_scope_partial():
+def test_pipeline_scope_partial() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1495,7 +1498,7 @@ def test_pipeline_scope_partial():
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
 
 
-def test_set_pipeline_scope_on_init():
+def test_set_pipeline_scope_on_init() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1519,7 +1522,7 @@ def test_set_pipeline_scope_on_init():
         pipeline.update_renames({"a": "qq#.a"})
 
 
-def test_set_pipefunc_scope_on_init():
+def test_set_pipefunc_scope_on_init() -> None:
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="x")
     def f(a, b):
         return a + b
@@ -1535,7 +1538,7 @@ def test_set_pipefunc_scope_on_init():
     assert f(a=1, b=1) == 2
 
 
-def test_scope_and_parameter_identical():
+def test_scope_and_parameter_identical() -> None:
     @pipefunc(output_name="c")
     def f(x, bar):
         return x + bar
@@ -1556,7 +1559,7 @@ def test_scope_and_parameter_identical():
         pipeline1 | pipeline2
 
 
-def test_scope_with_mapspec():
+def test_scope_with_mapspec() -> None:
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
     def f(a, b):
         return a + b
@@ -1569,7 +1572,7 @@ def test_scope_with_mapspec():
     assert results["foo.c"].output.tolist() == [1, 2, 3]
 
 
-def test_accessing_copied_pipefunc():
+def test_accessing_copied_pipefunc() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1582,7 +1585,7 @@ def test_accessing_copied_pipefunc():
         pipeline.drop(f=f)
 
 
-def test_pipeline_getitem_exception():
+def test_pipeline_getitem_exception() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -1595,7 +1598,7 @@ def test_pipeline_getitem_exception():
         pipeline["d"]
 
 
-def test_update_scope_output_only():
+def test_update_scope_output_only() -> None:
     @pipefunc(output_name="z")
     def add(x: int, y: int) -> int:
         assert isinstance(x, int)
@@ -1614,7 +1617,7 @@ def test_update_scope_output_only():
     assert pipeline["prod"].output_name == "prod"
 
 
-def test_update_scope_from_faq():
+def test_update_scope_from_faq() -> None:
     @pipefunc(output_name="y", scope="foo")
     def f(a, b):
         return a + b
@@ -1642,7 +1645,7 @@ def test_update_scope_from_faq():
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
 
 
-def test_default_resources_from_pipeline():
+def test_default_resources_from_pipeline() -> None:
     @pipefunc(output_name="c", resources={"memory": "1GB", "num_cpus": 2})
     def f(a, b):
         return a + b
@@ -1667,6 +1670,11 @@ def test_default_resources_from_pipeline():
 
     pipeline = pipeline1 | pipeline2 | pipeline3
     assert pipeline._default_resources is None
+    assert pipeline["c"].resources is not None
+    assert pipeline["d"].resources is not None
+    assert pipeline["e"].resources is not None
+    assert pipeline["f"].resources is not None
+
     assert pipeline["c"].resources.num_cpus == 2
     assert pipeline["c"].resources.memory == "1GB"
     assert pipeline["d"].resources.num_cpus == 1
@@ -1720,3 +1728,20 @@ def test_incorrect_resources_variable():
         @pipefunc(output_name="c", resources_variable="missing")
         def f_c(a):
             return a
+
+
+def test_sharing_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 1}, cache=True)
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(b, c):
+        return b + c
+
+    pipeline = Pipeline([f, g], cache_type="simple")
+    assert pipeline("d", a=1) == 3
+    assert pipeline.cache is not None
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
+    assert pipeline.map(inputs={"a": 1})["d"].output == 3
+    assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
