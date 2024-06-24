@@ -13,10 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+    env:
+      python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Update Python version in environment.yml
+        run: |
+          sed -i 's/- python/- python=${{ env.python-version }}/g' environment.yml
+          echo "Updated environment.yml content:"
+          cat environment.yml
 
       - name: Install Conda environment with micromamba
         uses: mamba-org/setup-micromamba@v1
