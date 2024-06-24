@@ -4,7 +4,7 @@ from pipefunc import Pipeline, pipefunc
 
 
 @pytest.fixture()
-def pipeline():
+def pipeline() -> Pipeline:
     @pipefunc(output_name="out1", defaults={"c": 1, "d": 1, "e": 1})
     def f1(a, b, c, d, e):
         return a + b + c + d + e
@@ -29,10 +29,18 @@ def pipeline():
 
 
 @pytest.fixture()
-def pipeline_mapspec(pipeline):
+def pipeline_mapspec(pipeline: Pipeline) -> Pipeline:
     pipeline = pipeline.copy()
     pipeline.add_mapspec_axis("a", axis="i")
     pipeline.add_mapspec_axis("b", axis="j")
+    return pipeline
+
+
+@pytest.fixture()
+def pipeline_with_cache(pipeline: Pipeline) -> Pipeline:
+    pipeline = pipeline.copy(cache_type="simple")
+    for func in pipeline.functions:
+        func.cache = True
     return pipeline
 
 
@@ -44,23 +52,19 @@ def test_calling_pipeline_directly(pipeline: Pipeline) -> None:
 
 
 @pytest.mark.benchmark()
-def test_map_sequential_with_dict_storage(pipeline_mapspec) -> None:
+def test_calling_pipeline_directly_with_cache(pipeline_with_cache: Pipeline) -> None:
+    for a in range(10):
+        for b in range(10):
+            pipeline_with_cache(a=a, b=b)
+
+
+@pytest.mark.benchmark()
+def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
     a = list(range(10))
     b = list(range(10))
 
     pipeline_mapspec.map(
-        inputs={
-            "a": a,
-            "b": b,
-            "c": 1,
-            "d": 1,
-            "e": 1,
-            "f": 1,
-            "g": 1,
-            "h": 1,
-            "i": 1,
-            "j": 1,
-        },
+        inputs={"a": a, "b": b},
         parallel=False,
         storage="dict",
     )
