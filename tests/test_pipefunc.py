@@ -1741,3 +1741,22 @@ def test_sharing_defaults() -> None:
     assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
     assert pipeline.map(inputs={"a": 1})["d"].output == 3
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
+
+
+def test_resources_variable_in_nested_func():
+    @pipefunc(
+        output_name="c",
+        resources=lambda a, b: Resources(num_gpus=a + b),
+        resources_variable="resources",
+    )
+    def f_c(a, b, resources):
+        return resources(a, b)
+
+    @pipefunc(output_name="d")
+    def f_d(c):
+        return c
+
+    nf = NestedPipeFunc([f_c, f_d], output_name="d")
+    r = nf(a=1, b=2)
+    assert isinstance(r, Resources)
+    assert r.num_gpus == 3
