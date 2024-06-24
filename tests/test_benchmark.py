@@ -44,7 +44,7 @@ def test_calling_pipeline_directly(pipeline: Pipeline) -> None:
 
 
 @pytest.mark.benchmark()
-def test_map(pipeline_mapspec) -> None:
+def test_map_sequential_with_dict_storage(pipeline_mapspec) -> None:
     a = list(range(10))
     b = list(range(10))
 
