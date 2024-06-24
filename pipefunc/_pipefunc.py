@@ -874,7 +874,6 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
-        resources_variable: str | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -895,7 +894,7 @@ class NestedPipeFunc(PipeFunc):
         self._bound: dict[str, Any] = {}
         self._resources = _maybe_max_resources(resources, self.pipeline.functions)
         self._default_resources = None  # not settable by user
-        self.resources_variable = resources_variable
+        self.resources_variable = None  # not settable by user for NestedPipeFunc
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
