@@ -33,3 +33,4 @@ dependencies:
   - xarray
   - zarr
   - versioningit
+  - pytest-codspeed

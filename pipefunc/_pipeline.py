@@ -441,8 +441,8 @@ class Pipeline:
                     full_output=full_output,
                     used_parameters=used_parameters,
                 )
-            elif arg in func.defaults:
-                value = func.defaults[arg]
+            elif arg in self.defaults:
+                value = self.defaults[arg]
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
                 raise ValueError(msg)
