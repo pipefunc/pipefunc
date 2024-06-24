@@ -33,4 +33,6 @@ jobs:
         uses: CodSpeedHQ/action@v2
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          run: pytest tests/test_benchmark.py --codspeed
+          run: |
+            micromamba activate pipefunc
+            pytest tests/test_benchmark.py --codspeed
