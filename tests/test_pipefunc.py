@@ -1761,7 +1761,7 @@ def test_resources_variable_in_nested_func():
 
     @pipefunc(
         output_name="e",
-        resources=lambda kwargs: Resources(num_gpus=kwargs["d"]),
+        resources=lambda kwargs: kwargs["d"],  # 'd' is the resources of f_c
         resources_variable="resources",
     )
     def f_e(d, resources):
