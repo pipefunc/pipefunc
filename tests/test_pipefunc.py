@@ -1763,3 +1763,28 @@ def test_resources_variable_in_nested_func():
     r = nf(a=1, b=2)
     assert isinstance(r, Resources)
     assert r.num_gpus == 3
+
+
+def test_resources_func_with_variable() -> None:
+    def resources_with_cpu(kwargs) -> Resources:
+        num_cpus = kwargs["a"] + kwargs["b"]
+        return Resources(num_cpus=num_cpus)
+
+    @pipefunc(
+        output_name="i",
+        resources=resources_with_cpu,
+        resources_variable="resources",
+    )
+    def j(a, b, resources):
+        assert isinstance(resources, Resources)
+        assert resources.num_cpus == a + b
+        return a * b
+
+    result = j(a=2, b=3)
+    assert result == 6
+
+    pipeline = Pipeline([j])
+    result = pipeline(a=2, b=3)
+    assert result == 6
+    result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False)
+    assert result["i"].output == 6

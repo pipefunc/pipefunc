@@ -545,7 +545,9 @@ class PipeFunc(Generic[T]):
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
             if self.resources_variable:
-                kwargs[self.resources_variable] = self.resources
+                kwargs[self.resources_variable] = (
+                    self.resources(kwargs) if callable(self.resources) else self.resources
+                )
             result = self.func(*args, **kwargs)
 
         if self.debug:
