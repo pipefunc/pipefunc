@@ -458,9 +458,9 @@ The mapping between the original names and the scoped names is handled by the `P
 ## How to inspect the `Resources` inside a `PipeFunc`?
 
 ```{note}
-A execution environment that supports resource management is required to run this example.
+Using `resouces` requires an execution environment that supports resource management.
 Currently, only the Adaptive Scheduler execution environment supports resource management.
-In all cases, you can set and inspect the `Resources` object, but the actual resource management will depend on the execution environment.
+In all cases, you can set and inspect the `Resources` object, but whether these resources are actually used depends on the execution environment.
 ```
 
 When the `resources_variable` argument is provided, you can access the `resources` object inside the function to inspect the `Resources` associated with the `PipeFunc`.
