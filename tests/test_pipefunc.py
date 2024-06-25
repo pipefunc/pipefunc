@@ -1755,14 +1755,24 @@ def test_resources_variable_in_nested_func():
     def f_c(a, b, resources):  # noqa: ARG001
         return resources
 
-    @pipefunc(output_name="d")
+    @pipefunc(output_name="d", resources=lambda kwargs: Resources(num_gpus=kwargs["c"]))
     def f_d(c):
         return c
 
-    nf = NestedPipeFunc([f_c, f_d], output_name="d")
+    @pipefunc(
+        output_name="e",
+        resources=lambda kwargs: Resources(num_gpus=kwargs["d"]),
+        resources_variable="resources",
+    )
+    def f_e(d, resources):
+        assert isinstance(resources, Resources)
+        return d
+
+    nf = NestedPipeFunc([f_c, f_d, f_e], output_name="e")
     r = nf(a=1, b=2)
     assert isinstance(r, Resources)
     assert r.num_gpus == 3
+    assert callable(nf.resources)
 
 
 def test_resources_func_with_variable() -> None:
