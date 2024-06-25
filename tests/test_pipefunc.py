@@ -1749,11 +1749,11 @@ def test_sharing_defaults() -> None:
 def test_resources_variable_in_nested_func():
     @pipefunc(
         output_name="c",
-        resources=lambda a, b: Resources(num_gpus=a + b),
+        resources=lambda kwargs: Resources(num_gpus=kwargs["a"] + kwargs["b"]),
         resources_variable="resources",
     )
-    def f_c(a, b, resources):
-        return resources(a, b)
+    def f_c(a, b, resources):  # noqa: ARG001
+        return resources
 
     @pipefunc(output_name="d")
     def f_d(c):
