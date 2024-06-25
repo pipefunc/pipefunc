@@ -141,7 +141,8 @@ f(a=1, x=999)  # no longer fixed
 
 ## How to rename inputs and outputs?
 
-The `renames` attribute in `@`{class}`~pipefunc.pipefunc` and {class}`~pipefunc.PipeFunc` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline. This can be particularly useful when:
+The `renames` attribute in `@`{class}`~pipefunc.pipefunc` and {class}`~pipefunc.PipeFunc` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline.
+This can be particularly useful when:
 
 - The same function is used multiple times in a pipeline
 - You want to provide more meaningful names to the outputs
@@ -246,7 +247,8 @@ def mean_and_std(data):
     return {"mean": np.mean(data), "std": np.std(data)}
 ```
 
-The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument. It should return the output corresponding to the given name.
+The `output_picker` function takes the returned object as the first argument and the `output_name` as the second argument.
+It should return the output corresponding to the given name.
 
 Another example with a custom object and an explicit `output_picker` function:
 
@@ -426,7 +428,8 @@ We can confirm this by inspecting the `PipeFunc` objects:
 :::{admonition} Get the <code>PipeFunc</code> objects using <code>pipeline[output_name]</code>
 :class: note, dropdown
 
-   The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified. Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
+   The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified.
+   Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
 
 :::
 
@@ -470,7 +473,11 @@ Here's an example:
 ```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
-@pipefunc(output_name="c", resources={"memory": "1GB", "num_cpus": 2}, resources_variable="resources")
+@pipefunc(
+    output_name="c",
+    resources={"memory": "1GB", "num_cpus": 2},
+    resources_variable="resources",
+)
 def f(a, b, resources):
     print(f"Inside the function `f`, resources.memory: {resources.memory}")
     print(f"Inside the function `f`, resources.num_cpus: {resources.num_cpus}")
@@ -480,7 +487,8 @@ result = f(a=1, b=1)
 print(f"Result: {result}")
 ```
 
-In this example, the `resources` argument is passed to the function `f` via the `resources_variable` parameter. Inside the function, you can access the attributes of the `Resources` instance using `resources.memory` and `resources.num_cpus`.
+In this example, the `resources` argument is passed to the function `f` via the `resources_variable` parameter.
+Inside the function, you can access the attributes of the `Resources` instance using `resources.memory` and `resources.num_cpus`.
 
 As you can see, the function `f` has access to the `resources` object and can inspect its attributes directly.
 
@@ -514,7 +522,7 @@ This becomes a powerful feature when combined with the `resources_variable` argu
 See the next example for how to use it in combination with `resources_variable`.
 ```
 
-Here's an example without using `resources_variable`:
+Here's an example that uses a function to determine the resources for a `PipeFunc`:
 
 ```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
@@ -547,7 +555,6 @@ You can also set the `Resources` dynamically in a `Pipeline`:
 pipeline = Pipeline([f])
 result = pipeline(x=2, y=3)
 print(f"Pipeline result: {result}")
-print(f"Pipeline resources: {pipeline["out1"].resources({"x": 2, "y": 3})}")
 ```
 
 Now, let's see an example that uses both a `resources` callable and the `resources_variable` argument:
@@ -570,7 +577,8 @@ result = g(out1=2, z=3)
 print(f"Result: {result}")
 ```
 
-In this case, `g.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `num_cpus` set to the sum of `out1` and `z`. The resulting `Resources` instance is then passed to the function `g` via the `resources` parameter.
+In this case, `g.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `num_cpus` set to the sum of `out1` and `z`
+The resulting `Resources` instance is then passed to the function `g` via the `resources` parameter.
 
 The `resources` callable dynamically creates a `Resources` instance based on the input arguments, and the function `g` can access the `num_cpus` attribute of the `resources` object inside the function.
 
@@ -582,4 +590,5 @@ result = pipeline(x=2, y=3, z=1)
 print(f"Result: {result}")
 ```
 
-By using a callable for `resources`, you can dynamically determine the resources based on the input arguments. Additionally, by using the `resources_variable` argument, you can pass the dynamically created `Resources` instance directly to the function, allowing it to access and utilize the resource information as needed.
+By using a callable for `resources`, you can dynamically determine the resources based on the input arguments.
+Additionally, by using the `resources_variable` argument, you can pass the dynamically created `Resources` instance directly to the function, allowing it to access and utilize the resource information as needed.
