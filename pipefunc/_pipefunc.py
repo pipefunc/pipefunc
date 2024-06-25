@@ -84,7 +84,7 @@ class PipeFunc(Generic[T]):
         This requires that the function has a parameter with the same name. For example,
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
-        parallelization and needs to know the resources available.
+        parallelization.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -771,7 +771,7 @@ def pipefunc(
         This requires that the function has a parameter with the same name. For example,
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
-        parallelization and needs to know the resources available.
+        parallelization.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
