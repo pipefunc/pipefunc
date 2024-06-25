@@ -1746,7 +1746,7 @@ def test_sharing_defaults() -> None:
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
 
 
-def nested_func_with_variables() -> NestedPipeFunc:
+def test_resources_variable_with_callable_resources() -> None:
     @pipefunc(
         output_name="c",
         resources=lambda kwargs: Resources(num_gpus=kwargs["a"] + kwargs["b"]),
@@ -1755,8 +1755,9 @@ def nested_func_with_variables() -> NestedPipeFunc:
     def f_c(a, b, resources):  # noqa: ARG001
         return resources
 
-    @pipefunc(output_name="d", resources=lambda kwargs: Resources(num_gpus=kwargs["c"]))
+    @pipefunc(output_name="d", resources=lambda kwargs: kwargs["c"])  # 'c' is the resources of f_c
     def f_d(c):
+        assert isinstance(c, Resources)
         return c
 
     @pipefunc(
@@ -1766,29 +1767,66 @@ def nested_func_with_variables() -> NestedPipeFunc:
     )
     def f_e(d, resources):
         assert isinstance(resources, Resources)
-        return d
+        assert isinstance(d, Resources)
+        assert resources == d
+        return resources
 
-    return NestedPipeFunc([f_c, f_d, f_e], output_name="e")
-
-
-def test_resources_variable_in_nested_func() -> None:
-    nf = nested_func_with_variables()
-    r = nf(a=1, b=2)
+    pipeline = Pipeline([f_c, f_d, f_e])
+    r = pipeline(a=1, b=2)
     assert isinstance(r, Resources)
     assert r.num_gpus == 3
-    assert callable(nf.resources)
-    pipeline = Pipeline([nf])
-    assert callable(pipeline["e"].resources)
-    r = pipeline(a=1, b=2)
-    assert r.num_gpus == 3
+
+    with pytest.raises(
+        ValueError,
+        match="A `NestedPipeFunc` cannot have nested functions with callable `resources`.",
+    ):
+        NestedPipeFunc([f_c, f_d, f_e], output_name="e")
+
+
+def test_delayed_resources_in_nested_func() -> None:
+    @pipefunc("c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc("d")
+    def g(c):
+        return c
+
+    nf = NestedPipeFunc([f, g], resources={"num_gpus": 3})
+    assert isinstance(nf.resources, Resources)
+    assert nf.resources.num_gpus == 3
+    with pytest.raises(TypeError, match="`NestedPipeFunc` cannot have callable `resources`."):
+        NestedPipeFunc(
+            [f, g],
+            resources=lambda kwargs: Resources(num_gpus=kwargs["c"]),  # type: ignore[arg-type]
+        )
 
 
 def test_resources_variable_in_nested_func_with_defaults() -> None:
-    nf = nested_func_with_variables()
-    pipeline = Pipeline([nf], default_resources={"memory": "4GB"})
-    assert pipeline["e"]._default_resources is not None
-    assert callable(pipeline["e"].resources)
+    def resources_func(kwargs) -> Resources:  # noqa: ARG001
+        msg = "Should not be called"
+        raise ValueError(msg)
+
+    @pipefunc("c", resources=resources_func)
+    def f(a, b):
+        return a + b
+
+    @pipefunc("d", resources_variable="resources", resources=resources_func)
+    def g(c, resources):  # noqa: ARG001
+        assert isinstance(resources, Resources)
+        return resources
+
+    nf = NestedPipeFunc([f, g], output_name="d", resources={"num_gpus": 3})
+    pipeline = Pipeline([nf], default_resources={"memory": "4GB", "num_gpus": 1})
+
+    # The pipeline adds the default resources to the nested function
+    assert nf._default_resources is None
+    assert pipeline["d"]._default_resources is not None
+
+    assert isinstance(pipeline["d"].resources, Resources)
+    assert pipeline["d"].resources == Resources(num_gpus=3, memory="4GB")
     r = pipeline(a=1, b=2)
+    assert isinstance(r, Resources)
     assert r.num_gpus == 3
     assert r.memory == "4GB"
 
