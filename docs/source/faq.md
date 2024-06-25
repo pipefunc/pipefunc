@@ -506,6 +506,7 @@ By using the `resources_variable` argument, you can pass the `Resources` instanc
 ## How to set the `Resources` dynamically, based on the input arguments?
 
 You can set the `Resources` for a `PipeFunc` dynamically based on the input arguments by providing a callable to the `resources` argument.
+This ensures lazy evaluation of the resources, allowing you to determine the resources at runtime based on the input arguments.
 The callable should take a dictionary of input arguments and return a `Resources` instance.
 
 ```{note}
