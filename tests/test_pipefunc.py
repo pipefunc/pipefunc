@@ -1773,6 +1773,10 @@ def test_resources_variable_in_nested_func():
     assert isinstance(r, Resources)
     assert r.num_gpus == 3
     assert callable(nf.resources)
+    pipeline = Pipeline([nf], default_resources={"memory": "4GB"})
+    r = pipeline(a=1, b=2)
+    assert r.num_gpus == 3
+    assert r.memory == "4GB"
 
 
 def test_resources_func_with_variable() -> None:
@@ -1798,3 +1802,27 @@ def test_resources_func_with_variable() -> None:
     assert result == 6
     result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False)
     assert result["i"].output == 6
+
+
+def test_with_resource_func_with_defaults():
+    def resources_with_cpu(kwargs) -> Resources:
+        num_cpus = kwargs["a"] + kwargs["b"]
+        return Resources(num_cpus=num_cpus)
+
+    @pipefunc(
+        output_name="i",
+        resources=resources_with_cpu,
+        resources_variable="resources",
+    )
+    def j(a, b, resources):
+        assert isinstance(resources, Resources)
+        assert resources.num_cpus == a + b
+        return resources
+
+    pipeline = Pipeline([j], default_resources={"num_gpus": 5, "num_cpus": 1000})
+    result = pipeline(a=2, b=3)
+    assert result.num_cpus == 5
+    assert result.num_gpus == 5
+    result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False, storage="dict")
+    assert result["i"].output.num_cpus == 5
+    assert result["i"].output.num_gpus == 5
