@@ -1746,7 +1746,7 @@ def test_sharing_defaults() -> None:
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
 
 
-def test_resources_variable_in_nested_func():
+def nested_func_with_variables() -> NestedPipeFunc:
     @pipefunc(
         output_name="c",
         resources=lambda kwargs: Resources(num_gpus=kwargs["a"] + kwargs["b"]),
@@ -1768,12 +1768,26 @@ def test_resources_variable_in_nested_func():
         assert isinstance(resources, Resources)
         return d
 
-    nf = NestedPipeFunc([f_c, f_d, f_e], output_name="e")
+    return NestedPipeFunc([f_c, f_d, f_e], output_name="e")
+
+
+def test_resources_variable_in_nested_func() -> None:
+    nf = nested_func_with_variables()
     r = nf(a=1, b=2)
     assert isinstance(r, Resources)
     assert r.num_gpus == 3
     assert callable(nf.resources)
+    pipeline = Pipeline([nf])
+    assert callable(pipeline["e"].resources)
+    r = pipeline(a=1, b=2)
+    assert r.num_gpus == 3
+
+
+def test_resources_variable_in_nested_func_with_defaults() -> None:
+    nf = nested_func_with_variables()
     pipeline = Pipeline([nf], default_resources={"memory": "4GB"})
+    assert pipeline["e"]._default_resources is not None
+    assert callable(pipeline["e"].resources)
     r = pipeline(a=1, b=2)
     assert r.num_gpus == 3
     assert r.memory == "4GB"
