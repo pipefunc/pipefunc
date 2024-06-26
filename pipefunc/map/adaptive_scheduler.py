@@ -83,7 +83,10 @@ def slurm_run_setup(
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 if not ignore_resources:
-                    assert isinstance(learner.pipefunc.resources, Resources)
+                    assert (
+                        isinstance(learner.pipefunc.resources, Resources)
+                        or learner.pipefunc.resources is None
+                    )
                     _update_resources(learner.pipefunc.resources, tracker, resources_dict)
                 elif ignore_resources and default_resources is not None:
                     _update_resources(default_resources, tracker, resources_dict)
