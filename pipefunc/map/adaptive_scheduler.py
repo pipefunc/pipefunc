@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.resources import Resources
@@ -148,18 +148,24 @@ class _Tracker:
         )
         raise ValueError(msg)
 
-    def update_resources(self, resources: Resources | None) -> None:  # noqa: PLR0912
+    def update_resources(  # noqa: PLR0912
+        self,
+        resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+    ) -> None:
         if resources is None and self.default_resources is None:
             msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
             raise ValueError(msg)
-
+        r: Resources | Callable[[dict[str, Any]], Resources] | None
         if resources is None:
             r = self.default_resources
         elif self.default_resources is None:
             r = resources
+        elif callable(resources):
+            r = Resources.maybe_with_defaults(resources, self.default_resources)
+            # TODO: Create functions for cores_per_node, nodes, etc.
         else:
             r = resources.with_defaults(self.default_resources)
-        assert r is not None
+        assert isinstance(r, Resources)
         if (v := self.get(r, "num_cpus")) is not None:
             self.resources_dict["cores_per_node"].append(v)
         if (v := self.get(r, "num_cpus_per_node")) is not None:
