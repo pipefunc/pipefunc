@@ -532,4 +532,5 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
 
 
 def maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
+    """Return either a MapSpec or None, depending on the input."""
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
