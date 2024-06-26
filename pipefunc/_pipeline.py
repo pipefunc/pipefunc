@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -38,7 +38,6 @@ from pipefunc.map._mapspec import (
     MapSpec,
     mapspec_axes,
     mapspec_dimensions,
-    maybe_mapspec,
     validate_consistent_axes,
 )
 from pipefunc.map._run import run
@@ -190,7 +189,7 @@ class Pipeline:
             resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
             f: PipeFunc = f.copy(  # type: ignore[no-redef]
                 resources=resources,
-                mapspec=maybe_mapspec(mapspec) if mapspec is not None else f.mapspec,
+                mapspec=_maybe_mapspec(mapspec) if mapspec is not None else f.mapspec,
             )
         elif callable(f):
             f = PipeFunc(
