@@ -28,7 +28,7 @@ from pipefunc._utils import (
     format_function_call,
 )
 from pipefunc.lazy import evaluate_lazy
-from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes, maybe_mapspec
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -146,7 +146,7 @@ class PipeFunc(Generic[T]):
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
-        self.mapspec = _maybe_mapspec(mapspec)
+        self.mapspec = maybe_mapspec(mapspec)
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -902,7 +902,7 @@ class NestedPipeFunc(PipeFunc):
         self._bound: dict[str, Any] = {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
-        self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
+        self.mapspec = self._combine_mapspecs() if mapspec is None else maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
         self._validate_mapspec()
@@ -1080,10 +1080,6 @@ def _default_output_picker(
 ) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
-
-
-def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
-    return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
 
 
 def _rename_output_name(

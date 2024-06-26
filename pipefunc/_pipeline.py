@@ -38,6 +38,7 @@ from pipefunc.map._mapspec import (
     MapSpec,
     mapspec_axes,
     mapspec_dimensions,
+    maybe_mapspec,
     validate_consistent_axes,
 )
 from pipefunc.map._run import run
@@ -186,12 +187,10 @@ class Pipeline:
         """
         if isinstance(f, PipeFunc):
             resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
-            f: PipeFunc = f.copy(resources=resources)  # type: ignore[no-redef]
-            if mapspec is not None:
-                if isinstance(mapspec, str):
-                    mapspec = MapSpec.from_string(mapspec)
-                f.mapspec = mapspec
-                f._validate_mapspec()
+            f: PipeFunc = f.copy(  # type: ignore[no-redef]
+                resources=resources,
+                mapspec=maybe_mapspec(mapspec) if mapspec is not None else f.mapspec,
+            )
         elif callable(f):
             f = PipeFunc(
                 f,
