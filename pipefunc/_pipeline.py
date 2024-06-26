@@ -99,7 +99,8 @@ class Pipeline:
     default_resources
         Default resources to use for the pipeline functions. If ``None``,
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
-        instance can be provided.
+        instance can be provided. If provided, the resources in the `PipeFunc`
+        instances are updated with the default resources.
 
     """
 
