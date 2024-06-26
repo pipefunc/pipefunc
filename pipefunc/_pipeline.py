@@ -189,7 +189,7 @@ class Pipeline:
             resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
             f: PipeFunc = f.copy(  # type: ignore[no-redef]
                 resources=resources,
-                mapspec=_maybe_mapspec(mapspec) if mapspec is not None else f.mapspec,
+                mapspec=f.mapspec if mapspec is None else _maybe_mapspec(mapspec),
             )
         elif callable(f):
             f = PipeFunc(
