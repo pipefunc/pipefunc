@@ -529,8 +529,3 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
         for output_name, dct in reordered.items()
     }
-
-
-def maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
-    """Return either a MapSpec or None, depending on the input."""
-    return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
