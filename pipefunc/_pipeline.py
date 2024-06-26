@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 import networkx as nx
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -98,7 +98,8 @@ class Pipeline:
     default_resources
         Default resources to use for the pipeline functions. If ``None``,
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
-        instance can be provided.
+        instance can be provided. If provided, the resources in the `PipeFunc`
+        instances are updated with the default resources.
 
     """
 
@@ -185,19 +186,22 @@ class Pipeline:
 
         """
         if isinstance(f, PipeFunc):
-            f: PipeFunc = f.copy()  # type: ignore[no-redef]
-            if mapspec is not None:
-                if isinstance(mapspec, str):
-                    mapspec = MapSpec.from_string(mapspec)
-                f.mapspec = mapspec
-                f._validate_mapspec()
+            resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
+            f: PipeFunc = f.copy(  # type: ignore[no-redef]
+                resources=resources,
+                mapspec=f.mapspec if mapspec is None else _maybe_mapspec(mapspec),
+            )
         elif callable(f):
-            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
+            f = PipeFunc(
+                f,
+                output_name=f.__name__,
+                mapspec=mapspec,
+                resources=self._default_resources,
+            )
         else:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
-        f._default_resources = self._default_resources
         self.functions.append(f)
         f._pipelines.add(self)
 
@@ -1234,7 +1238,6 @@ class Pipeline:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
                     f_new = f.copy(resources=f.resources)
-                    f_new._default_resources = None
                     functions.append(f_new)
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())
