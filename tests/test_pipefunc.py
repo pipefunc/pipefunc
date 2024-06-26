@@ -1819,10 +1819,6 @@ def test_resources_variable_in_nested_func_with_defaults() -> None:
     nf = NestedPipeFunc([f, g], output_name="d", resources={"num_gpus": 3})
     pipeline = Pipeline([nf], default_resources={"memory": "4GB", "num_gpus": 1})
 
-    # The pipeline adds the default resources to the nested function
-    assert nf._default_resources is None
-    assert pipeline["d"]._default_resources is not None
-
     assert isinstance(pipeline["d"].resources, Resources)
     assert pipeline["d"].resources == Resources(num_gpus=3, memory="4GB")
     r = pipeline(a=1, b=2)

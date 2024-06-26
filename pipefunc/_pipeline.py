@@ -185,19 +185,24 @@ class Pipeline:
 
         """
         if isinstance(f, PipeFunc):
-            f: PipeFunc = f.copy()  # type: ignore[no-redef]
+            resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
+            f: PipeFunc = f.copy(resources=resources)  # type: ignore[no-redef]
             if mapspec is not None:
                 if isinstance(mapspec, str):
                     mapspec = MapSpec.from_string(mapspec)
                 f.mapspec = mapspec
                 f._validate_mapspec()
         elif callable(f):
-            f = PipeFunc(f, output_name=f.__name__, mapspec=mapspec)
+            f = PipeFunc(
+                f,
+                output_name=f.__name__,
+                mapspec=mapspec,
+                resources=self._default_resources,
+            )
         else:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
-        f._default_resources = self._default_resources
         self.functions.append(f)
         f._pipelines.add(self)
 
@@ -1234,7 +1239,6 @@ class Pipeline:
             if isinstance(pipeline, Pipeline):
                 for f in pipeline.functions:
                     f_new = f.copy(resources=f.resources)
-                    f_new._default_resources = None
                     functions.append(f_new)
             elif isinstance(pipeline, PipeFunc):
                 functions.append(pipeline.copy())

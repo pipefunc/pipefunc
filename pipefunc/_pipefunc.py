@@ -152,8 +152,7 @@ class PipeFunc(Generic[T]):
         self._renames: dict[str, str] = renames or {}
         self._defaults: dict[str, Any] = defaults or {}
         self._bound: dict[str, Any] = bound or {}
-        self._resources = Resources.maybe_from_dict(resources)
-        self._default_resources: Resources | None = None  # not settable by user
+        self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
@@ -257,11 +256,6 @@ class PipeFunc(Generic[T]):
         if self._output_picker is None and isinstance(self.output_name, tuple):
             return functools.partial(_default_output_picker, output_name=self.output_name)
         return self._output_picker
-
-    @property
-    def resources(self) -> Resources | Callable[[dict[str, Any]], Resources] | None:
-        """Return the resources required for the function, if provided."""
-        return Resources.maybe_with_defaults(self._resources, self._default_resources)
 
     def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
@@ -512,14 +506,12 @@ class PipeFunc(Generic[T]):
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
-            "resources": self._resources,
+            "resources": self.resources,
             "resources_variable": self.resources_variable,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
-        f = PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
-        f._default_resources = self._default_resources
-        return f
+        return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -893,8 +885,8 @@ class NestedPipeFunc(PipeFunc):
 
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         _validate_nested_pipefunc(pipefuncs, resources)
-        self._resources = _maybe_max_resources(resources, pipefuncs)
-        functions = [f.copy(resources=self._resources) for f in pipefuncs]
+        self.resources = _maybe_max_resources(resources, pipefuncs)
+        functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
@@ -908,7 +900,6 @@ class NestedPipeFunc(PipeFunc):
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
         self._bound: dict[str, Any] = {}
-        self.__default_resources: Resources | None = None  # not settable by user
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
@@ -916,16 +907,6 @@ class NestedPipeFunc(PipeFunc):
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
         self._validate_mapspec()
         self._validate_names()
-
-    @property
-    def _default_resources(self) -> Resources | None:
-        return self.__default_resources
-
-    @_default_resources.setter
-    def _default_resources(self, value: Resources | None) -> None:
-        self.__default_resources = value
-        for f in self.pipeline.functions:
-            f._default_resources = value
 
     def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
@@ -935,7 +916,7 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "renames": self._renames,
             "mapspec": self.mapspec,
-            "resources": self._resources,
+            "resources": self.resources,
         }
         kwargs.update(update)
         return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
