@@ -64,7 +64,8 @@ def slurm_run_setup(
     ignore_resources: bool = False,
 ) -> AdaptiveSchedulerDetails:
     """Set up the arguments for `adaptive_scheduler.slurm_run`."""
-    default_resources = Resources.maybe_from_dict(default_resources)
+    default_resources = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
+    assert isinstance(default_resources, Resources) or default_resources is None
     tracker = _Tracker(default_resources)
     run_folder = Path(run_folder)
     learners: list[SequenceLearner] = []
@@ -82,6 +83,10 @@ def slurm_run_setup(
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 if not ignore_resources:
+                    assert (
+                        isinstance(learner.pipefunc.resources, Resources)
+                        or learner.pipefunc.resources is None
+                    )
                     _update_resources(learner.pipefunc.resources, tracker, resources_dict)
                 elif ignore_resources and default_resources is not None:
                     _update_resources(default_resources, tracker, resources_dict)

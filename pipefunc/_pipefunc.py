@@ -78,7 +78,8 @@ class PipeFunc(Generic[T]):
         memory, wall time, queue, partition, and any extra job scheduler
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
-        function.
+        function. Alternatively, provide a callable that receives a dict with the
+        input values and returns a `Resources` instance.
     resources_variable
         If provided, the resources will be passed as the specified argument name to the function.
         This requires that the function has a parameter with the same name. For example,
@@ -134,7 +135,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        resources: dict | Resources | None = None,
+        resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
         resources_variable: str | None = None,
         scope: str | None = None,
     ) -> None:
@@ -258,7 +259,7 @@ class PipeFunc(Generic[T]):
         return self._output_picker
 
     @property
-    def resources(self) -> Resources | None:
+    def resources(self) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Return the resources required for the function, if provided."""
         return Resources.maybe_with_defaults(self._resources, self._default_resources)
 
@@ -544,7 +545,9 @@ class PipeFunc(Generic[T]):
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
             if self.resources_variable:
-                kwargs[self.resources_variable] = self.resources
+                kwargs[self.resources_variable] = (
+                    self.resources(kwargs) if callable(self.resources) else self.resources
+                )
             result = self.func(*args, **kwargs)
 
         if self.debug:
@@ -726,7 +729,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    resources: dict | Resources | None = None,
+    resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
     resources_variable: str | None = None,
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
@@ -765,7 +768,8 @@ def pipefunc(
         memory, wall time, queue, partition, and any extra job scheduler
         arguments. This is *not* used by the `pipefunc` directly but can be
         used by job schedulers to manage the resources required for the
-        function.
+        function. Alternatively, provide a callable that receives a dict with the
+        input values and returns a `Resources` instance.
     resources_variable
         If provided, the resources will be passed as the specified argument name to the function.
         This requires that the function has a parameter with the same name. For example,
@@ -859,6 +863,7 @@ class NestedPipeFunc(PipeFunc):
     resources
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
+        Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
 
     Attributes
     ----------
@@ -877,7 +882,7 @@ class NestedPipeFunc(PipeFunc):
 
     def __init__(
         self,
-        pipefuncs: Sequence[PipeFunc],
+        pipefuncs: list[PipeFunc],
         output_name: _OUTPUT_TYPE | None = None,
         *,
         renames: dict[str, str] | None = None,
@@ -887,8 +892,10 @@ class NestedPipeFunc(PipeFunc):
         from pipefunc import Pipeline
 
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
-        _validate_pipefuncs(pipefuncs)
-        self.pipeline = Pipeline(pipefuncs)  # type: ignore[arg-type]
+        _validate_nested_pipefunc(pipefuncs, resources)
+        self._resources = _maybe_max_resources(resources, pipefuncs)
+        functions = [f.copy(resources=self._resources) for f in pipefuncs]
+        self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
@@ -901,15 +908,24 @@ class NestedPipeFunc(PipeFunc):
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
         self._bound: dict[str, Any] = {}
-        self._resources = _maybe_max_resources(resources, self.pipeline.functions)
-        self._default_resources = None  # not settable by user
-        self.resources_variable = None  # not settable by user for NestedPipeFunc
+        self.__default_resources: Resources | None = None  # not settable by user
+        self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
         self._validate_mapspec()
         self._validate_names()
+
+    @property
+    def _default_resources(self) -> Resources | None:
+        return self.__default_resources
+
+    @_default_resources.setter
+    def _default_resources(self, value: Resources | None) -> None:
+        self.__default_resources = value
+        for f in self.pipeline.functions:
+            f._default_resources = value
 
     def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
@@ -971,16 +987,17 @@ def _maybe_max_resources(
     resources: dict | Resources | None,
     pipefuncs: list[PipeFunc],
 ) -> Resources | None:
-    if isinstance(resources, Resources):
+    if isinstance(resources, Resources) or callable(resources):
         return resources
     if isinstance(resources, dict):
         return Resources.from_dict(resources)
     resources_list = [f.resources for f in pipefuncs if f.resources is not None]
+    assert not any(callable(f.resources) for f in pipefuncs)
     if len(resources_list) == 1:
-        return resources_list[0]
+        return resources_list[0]  # type: ignore[return-value]
     if not resources_list:
         return None
-    return Resources.combine_max(resources_list)
+    return Resources.combine_max(resources_list)  # type: ignore[arg-type]
 
 
 class _NestedFuncWrapper:
@@ -1013,7 +1030,10 @@ def _validate_identifier(name: str, value: Any) -> None:
         raise ValueError(msg)
 
 
-def _validate_pipefuncs(pipefuncs: Sequence[PipeFunc]) -> None:
+def _validate_nested_pipefunc(
+    pipefuncs: Sequence[PipeFunc],
+    resources: dict | Resources | None,
+) -> None:
     if not all(isinstance(f, PipeFunc) for f in pipefuncs):
         msg = "All elements in `pipefuncs` should be instances of `PipeFunc`."
         raise TypeError(msg)
@@ -1021,6 +1041,20 @@ def _validate_pipefuncs(pipefuncs: Sequence[PipeFunc]) -> None:
     if len(pipefuncs) < 2:  # noqa: PLR2004
         msg = "The provided `pipefuncs` should have at least two `PipeFunc`s."
         raise ValueError(msg)
+
+    if resources is None and any(callable(f.resources) for f in pipefuncs):
+        msg = (
+            "A `NestedPipeFunc` cannot have nested functions with callable `resources`."
+            " Provide `NestedPipeFunc(..., resources=...)` instead."
+        )
+        raise ValueError(msg)
+
+    if callable(resources):
+        msg = (
+            "`NestedPipeFunc` cannot have callable `resources`."
+            " Provide a `Resources` instance instead or do not nest the `PipeFunc`s."
+        )
+        raise TypeError(msg)
 
 
 def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:

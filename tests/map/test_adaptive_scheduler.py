@@ -147,7 +147,7 @@ def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> Non
         return x
 
     pipeline1 = Pipeline([f1], default_resources=Resources(num_cpus=2))
-    assert pipeline1["x"].resources is not None
+    assert isinstance(pipeline1["x"].resources, Resources)
     assert pipeline1["x"].resources.num_cpus == 2
     pipeline2 = Pipeline([f2])
     pipeline = pipeline1 | pipeline2
