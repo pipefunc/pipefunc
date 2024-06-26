@@ -129,7 +129,13 @@ class _Tracker:
         if key in self.defined:
             self.do_raise(key)
 
-    def get(self, resources: Resources, key: str) -> Any | None:
+    def get(
+        self,
+        resources: Resources | Callable[[dict[str, Any]], Resources],
+        key: str,
+    ) -> Any | None:
+        if callable(resources):
+            ...
         value = getattr(resources, key)
         if value is not None:
             self.is_defined(key)
@@ -165,7 +171,7 @@ class _Tracker:
             # TODO: Create functions for cores_per_node, nodes, etc.
         else:
             r = resources.with_defaults(self.default_resources)
-        assert isinstance(r, Resources)
+        assert resources is not None
         if (v := self.get(r, "num_cpus")) is not None:
             self.resources_dict["cores_per_node"].append(v)
         if (v := self.get(r, "num_cpus_per_node")) is not None:
