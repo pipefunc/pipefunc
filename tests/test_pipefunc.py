@@ -1884,3 +1884,13 @@ def test_unhashable_bound() -> None:
     assert f(a=1) == (1, [])
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
+
+
+def test_mapping_over_bound() -> None:
+    @pipefunc(output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
+    assert r_map["out"].output.tolist() == [2, 4, 6]
