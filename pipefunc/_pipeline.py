@@ -343,7 +343,7 @@ class Pipeline:
             for arg in f.parameters:
                 if arg in self.output_to_func:  # is function output
                     if arg in f._bound:
-                        bound = _Bound(arg, f.output_name, f._bound[arg])
+                        bound = _Bound(arg, f.output_name)
                         g.add_edge(bound, f)
                     else:
                         edge = (self.output_to_func[arg], f)
@@ -356,7 +356,7 @@ class Pipeline:
                             g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
                 else:  # noqa: PLR5501
                     if arg in f._bound:
-                        bound = _Bound(arg, f.output_name, f._bound[arg])
+                        bound = _Bound(arg, f.output_name)
                         g.add_edge(bound, f)
                     else:
                         if arg not in g:
@@ -1436,7 +1436,6 @@ class Generations(NamedTuple):
 class _Bound:
     name: str
     output_name: _OUTPUT_TYPE
-    value: Any
 
 
 @dataclass(frozen=True, slots=True, eq=True)
