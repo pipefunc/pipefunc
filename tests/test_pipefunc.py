@@ -1878,3 +1878,13 @@ def test_with_resource_func_with_defaults():
     result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False, storage="dict")
     assert result["i"].output.num_cpus == 5
     assert result["i"].output.num_gpus == 5
+
+
+def test_unhashable_bound() -> None:
+    @pipefunc(output_name="c", bound={"b": []})
+    def f(a, b):
+        return a, b
+
+    assert f(a=1) == (1, [])
+    pipeline = Pipeline([f])
+    assert pipeline(a=1) == (1, [])

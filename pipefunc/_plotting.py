@@ -169,7 +169,7 @@ def visualize(  # noqa: PLR0912, PLR0915
             else:
                 outputs[edge] = ", ".join(output_str)
         elif isinstance(a, _Bound):
-            bound_value = a.value
+            bound_value = b._bound[a.name]
             bound[edge] = f"{a.name}={bound_value}"
         else:
             assert isinstance(a, _Resources)
