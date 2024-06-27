@@ -978,10 +978,40 @@ class Pipeline:
         if not generations:
             return Generations([], [])
 
-        assert all(isinstance(x, str | _Bound | _Resources) for x in generations[0])
-        assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        root_args = [x for x in generations[0] if isinstance(x, str)]
-        return Generations(root_args, generations[1:])
+        root_args = []
+        parameterless_funcs = []
+        function_lists = []
+        for i, generation in enumerate(generations):
+            if i == 0 or not function_lists[-1]:
+                function_lists.append([])
+            for x in generation:
+                if isinstance(x, str):
+                    assert i == 0
+                    root_args.append(x)
+                elif i == 0:
+                    if isinstance(x, PipeFunc):
+                        parameterless_funcs.append([x])
+                    elif not isinstance(x, _Bound | _Resources):
+                        msg = f"Unexpected type: {type(x)}"
+                        raise TypeError(msg)
+                else:
+                    function_lists[-1].append(x)
+
+        assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
+
+        def insert_at_index(f: PipeFunc, function_lists: list[list[PipeFunc]]) -> int | None:
+            for i, gen in enumerate(function_lists):
+                if any(set(f.output_name) & set(func.parameters) for func in gen):
+                    return max(i - 1, 1)
+            return None
+
+        for f in parameterless_funcs:
+            index = insert_at_index(f, function_lists)
+            if index is not None:
+                function_lists[index].append(f)
+            else:
+                function_lists.append([f])
+        return Generations(root_args, function_lists)
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:
