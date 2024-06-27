@@ -699,6 +699,15 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+        if bound_inputs := self._bound.keys() & mapspec_input_names:
+            msg = (
+                f"The bound arguments cannot be part of the MapSpec input names."
+                f" The violating bound arguments are: `{bound_inputs}`."
+                " Because bound arguments might have the same name in different"
+                " functions, they cannot be part of the MapSpec input names."
+            )
+            raise ValueError(msg)
+
         mapspec_output_names = set(self.mapspec.output_names)
         output_names = set(at_least_tuple(self.output_name))
         if mapspec_output_names != output_names:

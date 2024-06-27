@@ -134,9 +134,6 @@ class Pipeline:
         self.cache = _create_cache(cache_type, lazy, cache_kwargs)
         if scope is not None:
             self.update_scope(scope, "*", "*")
-        self._validate_mapspec()
-        _validate_scopes(self.functions)
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
 
     @property
     def profile(self) -> bool | None:
@@ -212,6 +209,9 @@ class Pipeline:
             f.debug = self.debug
 
         self._clear_internal_cache()  # reset cache
+        self._validate_mapspec()
+        _validate_scopes(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
