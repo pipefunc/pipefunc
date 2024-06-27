@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
 
 import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
@@ -502,23 +502,21 @@ def _maybe_iterate_axes(
 
 
 def _adaptive_wrapper(
+    _adaptive_value: float | tuple[float, ...],
     pipeline: Pipeline,
     inputs: dict[str, Any],
     adaptive_dimensions: tuple[str, ...],
     adaptive_output: str,
     run_folder_template: str,
     map_kwargs: dict[str, Any],
-) -> Callable[[float | tuple[float, ...]], float]:
-    def wrapper(_adaptive_value: float | tuple[float, ...]) -> float:
-        run_folder = run_folder_template.format(_adaptive_value)
-        values: tuple[float, ...] = at_least_tuple(_adaptive_value)
-        inputs_ = inputs.copy()
-        for dim, val in zip(adaptive_dimensions, values):
-            inputs_[dim] = val
-        results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
-        return results[adaptive_output].output
-
-    return wrapper
+) -> float:
+    run_folder = run_folder_template.format(_adaptive_value)
+    values: tuple[float, ...] = at_least_tuple(_adaptive_value)
+    inputs_ = inputs.copy()
+    for dim, val in zip(adaptive_dimensions, values):
+        inputs_[dim] = val
+    results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
+    return results[adaptive_output].output
 
 
 def to_adaptive_learner(
@@ -561,12 +559,13 @@ def to_adaptive_learner(
         msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
         raise ValueError(msg)
     dims, bounds = zip(*adaptive_dimensions.items())
-    function = _adaptive_wrapper(
-        pipeline,
-        inputs,
-        dims,
-        adaptive_output,
-        run_folder_template,
+    function = functools.partial(
+        _adaptive_wrapper,
+        pipeline=pipeline,
+        inputs=inputs,
+        adaptive_dimensions=dims,
+        adaptive_output=adaptive_output,
+        run_folder_template=run_folder_template,
         map_kwargs=map_kwargs or {},
     )
     if len(adaptive_dimensions) == 1:

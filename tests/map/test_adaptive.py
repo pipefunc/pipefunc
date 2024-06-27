@@ -9,7 +9,12 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
 from pipefunc.map._run_info import RunInfo
-from pipefunc.map.adaptive import LearnersDict, create_learners, create_learners_from_sweep
+from pipefunc.map.adaptive import (
+    LearnersDict,
+    create_learners,
+    create_learners_from_sweep,
+    to_adaptive_learner,
+)
 from pipefunc.sweep import Sweep
 
 if TYPE_CHECKING:
@@ -375,3 +380,48 @@ def test_learners_dict_no_run_folder():
 
     learners_dict = LearnersDict()
     learners_dict.to_slurm_run(run_folder="run_folder")
+
+
+@pytest.fixture()
+def pipeline() -> Pipeline:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int, c: int) -> int:
+        return 2 * x + c
+
+    @pipefunc(output_name="sum_")
+    def take_sum(y: list[int], d: int) -> float:
+        return sum(y) / d
+
+    return Pipeline([double_it, take_sum])
+
+
+def test_adaptive_wrapper_1d(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    learner1d = to_adaptive_learner(
+        pipeline,
+        inputs={"x": [0, 1, 2, 3], "d": 1},
+        adaptive_dimensions={"c": (0, 100)},
+        adaptive_output="sum_",
+        run_folder_template=run_folder_template,
+        map_kwargs={"parallel": False, "storage": "dict"},
+    )
+    adaptive.runner.simple(learner1d, npoints_goal=10)
+
+    assert learner1d.to_numpy().shape == (10, 2)
+    assert len(list(tmp_path.glob("*"))) == 10
+
+
+def test_adaptive_wrapper_2d(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    learner2d = to_adaptive_learner(
+        pipeline,
+        inputs={"x": [0, 1, 2, 3]},
+        adaptive_dimensions={"c": (0, 100), "d": (-1, 1)},
+        adaptive_output="sum_",
+        run_folder_template=run_folder_template,
+        map_kwargs={"parallel": False, "storage": "dict"},
+    )
+    adaptive.runner.simple(learner2d, npoints_goal=10)
+
+    assert learner2d.to_numpy().shape == (10, 3)
+    assert len(list(tmp_path.glob("*"))) == 10
