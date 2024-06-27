@@ -13,14 +13,14 @@ from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._storage_base import StorageBase, storage_registry
 
 if TYPE_CHECKING:
-    from pipefunc import Pipeline
+    from pipefunc._pipeline import Pipeline, _Bound
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
 
 class Shapes(NamedTuple):
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    shapes: dict[_OUTPUT_TYPE | _Bound, tuple[int, ...]]
+    masks: dict[_OUTPUT_TYPE | _Bound, tuple[bool, ...]]
 
 
 def map_shapes(
@@ -28,6 +28,7 @@ def map_shapes(
     inputs: dict[str, Any],
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
 ) -> Shapes:
+    from pipefunc._pipeline import _Bound
     if internal_shapes is None:
         internal_shapes = {}
     internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
