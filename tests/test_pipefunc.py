@@ -806,6 +806,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a1=2, b=3) == 5
 
     # Update renames
+    assert f.renames == {"a": "a1"}
     f.update_renames({"a": "a2"}, update_from="original")
     assert f.renames == {"a": "a2"}
     assert f.parameters == ("a2", "b")

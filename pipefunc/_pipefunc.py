@@ -321,6 +321,7 @@ class PipeFunc(Generic[T]):
             }
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
+        defaults_original = {old_inverse.get(k, k): v for k, v in self._defaults.items()}
         if overwrite:
             self._renames = renames.copy()
         else:
@@ -328,9 +329,8 @@ class PipeFunc(Generic[T]):
 
         # Update `defaults`
         new_defaults = {}
-        for name, value in self._defaults.items():
-            original_name = old_inverse.get(name, name)
-            name = self._renames.get(original_name, original_name)  # noqa: PLW2901
+        for name, value in defaults_original.items():
+            name = self._renames.get(name, name)  # noqa: PLW2901
             new_defaults[name] = value
         self._defaults = new_defaults
 
