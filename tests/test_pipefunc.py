@@ -806,6 +806,7 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert f(a1=2, b=3) == 5
 
     # Update renames
+    assert f.renames == {"a": "a1"}
     f.update_renames({"a": "a2"}, update_from="original")
     assert f.renames == {"a": "a2"}
     assert f.parameters == ("a2", "b")
@@ -825,6 +826,8 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert pipeline("c", a3=1) == 4
     assert pipeline("c", a3=2, b=3) == 5
 
+    assert f.defaults == {"a3": 1, "b": 3}  # need to reset defaults before updating bound
+    f.update_defaults({}, overwrite=True)
     f.update_bound({"a3": "yolo", "b": "swag"})
     assert f(a3=88, b=1) == "yoloswag"
     assert f.bound == {"a3": "yolo", "b": "swag"}
@@ -1156,21 +1159,21 @@ def test_nested_func_renames_defaults_and_bound() -> None:
         return f
 
     # Test renaming
-    nf = NestedPipeFunc(
-        [
-            PipeFunc(f, "f", mapspec="a[i], b[i] -> f[i]"),
-            PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
-        ],
-        output_name="g",
-    )
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], output_name="g")
 
     assert nf.renames == {}
+    assert nf.defaults == {"b": 99}
     nf.update_renames({"a": "a1", "b": "b1"}, update_from="original")
+    assert nf.defaults == {"b1": 99}
     assert nf.renames == {"a": "a1", "b": "b1"}
     assert nf(a1=1, b1=2) == 3
     assert nf(a1=1) == 100
     nf.update_defaults({"b1": 2, "a1": 2})
     assert nf() == 4
+    assert nf.renames == {"a": "a1", "b": "b1"}
+    assert nf.defaults == {"b1": 2, "a1": 2}
+    # Reset defaults to update bound
+    nf.update_defaults({}, overwrite=True)
     nf.update_bound({"a1": "a", "b1": "b"})
     assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now
 
@@ -1884,6 +1887,34 @@ def test_unhashable_bound() -> None:
     assert f(a=1) == (1, [])
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
+
+
+def test_mapping_over_bound() -> None:
+    def f(a, b):
+        return a + b
+
+    with pytest.raises(
+        ValueError,
+        match="The bound arguments cannot be part of the MapSpec input names",
+    ):
+        PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
+
+    pf = PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]")
+    with pytest.raises(
+        ValueError,
+        match="The bound arguments cannot be part of the MapSpec input names",
+    ):
+        pf.update_bound({"b": [1, 2, 3]})
+
+
+def test_mapping_over_default() -> None:
+    @pipefunc(output_name="out", mapspec="a[i], b[i] -> out[i]", defaults={"b": [1, 2, 3]})
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
+    assert r_map["out"].output.tolist() == [2, 4, 6]
 
 
 def test_calling_add_with_autogen_mapspec():

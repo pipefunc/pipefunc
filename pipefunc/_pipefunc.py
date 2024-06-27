@@ -157,8 +157,7 @@ class PipeFunc(Generic[T]):
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
-        self._validate_mapspec()
-        self._validate_names()
+        self._validate()
 
     @property
     def renames(self) -> dict[str, str]:
@@ -275,6 +274,7 @@ class PipeFunc(Generic[T]):
         else:
             self._defaults = dict(self._defaults, **defaults)
         self._clear_internal_cache()
+        self._validate()
 
     def update_renames(
         self,
@@ -321,6 +321,7 @@ class PipeFunc(Generic[T]):
             }
         old_inverse = self._inverse_renames.copy()
         bound_original = {old_inverse.get(k, k): v for k, v in self._bound.items()}
+        defaults_original = {old_inverse.get(k, k): v for k, v in self._defaults.items()}
         if overwrite:
             self._renames = renames.copy()
         else:
@@ -328,9 +329,8 @@ class PipeFunc(Generic[T]):
 
         # Update `defaults`
         new_defaults = {}
-        for name, value in self._defaults.items():
-            if original_name := old_inverse.get(name):
-                name = self._renames.get(original_name, original_name)  # noqa: PLW2901
+        for name, value in defaults_original.items():
+            name = self._renames.get(name, name)  # noqa: PLW2901
             new_defaults[name] = value
         self._defaults = new_defaults
 
@@ -346,6 +346,7 @@ class PipeFunc(Generic[T]):
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
         self._clear_internal_cache()
+        self._validate()
 
     def update_scope(
         self,
@@ -436,6 +437,7 @@ class PipeFunc(Generic[T]):
         else:
             self._bound = dict(self._bound, **bound)
         self._clear_internal_cache()
+        self._validate()
 
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self, PipeFunc)
@@ -460,6 +462,10 @@ class PipeFunc(Generic[T]):
             _validate_identifier(name, key)
             if name == "renames":
                 _validate_identifier(name, value)
+
+    def _validate(self) -> None:
+        self._validate_names()
+        self._validate_mapspec()
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -699,6 +705,17 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+        if bound_inputs := self._bound.keys() & mapspec_input_names:
+            msg = (
+                f"The bound arguments cannot be part of the MapSpec input names."
+                f" The violating bound arguments are: `{bound_inputs}`."
+                " Because bound arguments might have the same name in different"
+                " functions and the MapSpec input names are unique, the bound"
+                " arguments cannot be part of the MapSpec input names."
+            )
+            # This *can* be implemented but requires a lot of work
+            raise ValueError(msg)
+
         mapspec_output_names = set(self.mapspec.output_names)
         output_names = set(at_least_tuple(self.output_name))
         if mapspec_output_names != output_names:
@@ -905,8 +922,7 @@ class NestedPipeFunc(PipeFunc):
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
-        self._validate_mapspec()
-        self._validate_names()
+        self._validate()
 
     def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
@@ -935,7 +951,15 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def original_parameters(self) -> dict[str, Any]:
         parameters = set(self._all_inputs) - set(self._all_outputs)
-        return {k: inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY) for k in sorted(parameters)}
+        return {
+            k: inspect.Parameter(
+                k,
+                inspect.Parameter.KEYWORD_ONLY,
+                # TODO: Do we need defaults here?
+                # default=...,  # noqa: ERA001
+            )
+            for k in sorted(parameters)
+        }
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
