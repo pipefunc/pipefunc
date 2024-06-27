@@ -467,3 +467,11 @@ def test_adaptive_wrapper_invalid(tmp_path: Path, pipeline: Pipeline) -> None:
             adaptive_output="sum_",
             run_folder_template=run_folder_template,
         )
+    with pytest.raises(ValueError, match="Adaptive dimensions `{'x'}` cannot be in `MapSpec`s"):
+        to_adaptive_learner(
+            pipeline,
+            inputs={"e": 0},
+            adaptive_dimensions={"c": (-1, 1), "x": (0, 100)},
+            adaptive_output="sum_",
+            run_folder_template=run_folder_template,
+        )

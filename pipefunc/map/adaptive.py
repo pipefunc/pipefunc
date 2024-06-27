@@ -558,6 +558,9 @@ def to_adaptive_learner(
     if invalid := set(adaptive_dimensions) & set(inputs):
         msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
         raise ValueError(msg)
+    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
+        raise ValueError(msg)
     n = len(adaptive_dimensions)
     if n == 0:
         msg = "`adaptive_dimensions` must be a non-empty dict"
