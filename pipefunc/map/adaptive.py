@@ -6,10 +6,10 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner, runner
+from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -499,3 +499,81 @@ def _maybe_iterate_axes(
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
+
+
+def _adaptive_wrapper(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: tuple[str, ...],
+    adaptive_output: str,
+    run_folder_template: str,
+    map_kwargs: dict[str, Any],
+) -> Callable[[float | tuple[float, ...]], float]:
+    def wrapper(_adaptive_value: float | tuple[float, ...]) -> float:
+        run_folder = run_folder_template.format(_adaptive_value)
+        values: tuple[float, ...] = at_least_tuple(_adaptive_value)
+        inputs_ = inputs.copy()
+        for dim, val in zip(adaptive_dimensions, values):
+            inputs_[dim] = val
+        results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
+        return results[adaptive_output].output
+
+    return wrapper
+
+
+def to_adaptive_learner(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: dict[str, tuple[float, float]],
+    adaptive_output: str,
+    run_folder_template: str = "run_folder_{}",
+    map_kwargs: dict[str, Any] | None = None,
+) -> Learner1D | Learner2D | LearnerND:
+    """Create an adaptive learner in 1D, 2D, or ND from a pipeline.map.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to create the learner from.
+    inputs
+        The inputs to the pipeline, as passed to `pipeline.map`. Should not
+        contain the adaptive dimensions.
+    adaptive_dimensions
+        A dictionary mapping the adaptive dimensions to their bounds.
+        If the length of the dictionary is 1, a `adaptive.Learner1D` is created.
+        If the length is 2, a `adaptive.Learner2D` is created.
+        If the length is 3 or more, a `adaptive.LearnerND` is created.
+    adaptive_output
+        The output to adapt to.
+    run_folder_template
+        The template for the run folder.
+    map_kwargs
+        Additional keyword arguments to pass to `pipeline.map`. For example,
+        the `parallel` argument can be passed here.
+
+    Returns
+    -------
+        A `Learner1D`, `Learner2D`, or `LearnerND` object.
+
+    """
+    if invalid := set(adaptive_dimensions) & set(inputs):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
+        raise ValueError(msg)
+    dims, bounds = zip(*adaptive_dimensions.items())
+    function = _adaptive_wrapper(
+        pipeline,
+        inputs,
+        dims,
+        adaptive_output,
+        run_folder_template,
+        map_kwargs=map_kwargs or {},
+    )
+    if len(adaptive_dimensions) == 1:
+        return Learner1D(function, bounds[0])
+    if len(adaptive_dimensions) == 2:  # noqa: PLR2004
+        return Learner2D(function, bounds)
+    if len(adaptive_dimensions) >= 3:  # noqa: PLR2004
+        # Create LearnerND
+        return LearnerND(function, bounds)
+    msg = "Invalid number of adaptive dimensions"
+    raise ValueError(msg)
