@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
 
 import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
@@ -526,6 +526,7 @@ def to_adaptive_learner(
     adaptive_output: str,
     run_folder_template: str = "run_folder_{}",
     map_kwargs: dict[str, Any] | None = None,
+    loss_function: Callable[..., Any] | None = None,
 ) -> Learner1D | Learner2D | LearnerND:
     """Create an adaptive learner in 1D, 2D, or ND from a pipeline.map.
 
@@ -549,6 +550,12 @@ def to_adaptive_learner(
     map_kwargs
         Additional keyword arguments to pass to `pipeline.map`. For example,
         the `parallel` argument can be passed here.
+    loss_function
+        The loss function to use for the adaptive learner.
+        The ``loss_per_interval`` argument for `adaptive.Learner1D`,
+        the ``loss_per_triangle`` argument for `adaptive.Learner2D`, and
+        the ``loss_per_simplex`` argument for `adaptive.LearnerND`.
+        If not provided, the default loss function is used.
 
     Returns
     -------
@@ -576,7 +583,7 @@ def to_adaptive_learner(
         map_kwargs=map_kwargs or {},
     )
     if n == 1:
-        return Learner1D(function, bounds[0])
+        return Learner1D(function, bounds[0], loss_per_interval=loss_function)
     if n == 2:  # noqa: PLR2004
-        return Learner2D(function, bounds)
-    return LearnerND(function, bounds)
+        return Learner2D(function, bounds, loss_per_triangle=loss_function)
+    return LearnerND(function, bounds, loss_per_simplex=loss_function)
