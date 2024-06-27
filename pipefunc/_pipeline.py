@@ -209,9 +209,7 @@ class Pipeline:
             f.debug = self.debug
 
         self._clear_internal_cache()  # reset cache
-        self._validate_mapspec()
-        _validate_scopes(self.functions)
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        self._validate()
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
@@ -931,6 +929,12 @@ class Pipeline:
     def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
+
+    def _validate(self) -> None:
+        """Validate the pipeline."""
+        _validate_scopes(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        self._validate_mapspec()
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""

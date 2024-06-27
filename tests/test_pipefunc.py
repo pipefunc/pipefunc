@@ -1887,13 +1887,23 @@ def test_unhashable_bound() -> None:
 
 
 def test_mapping_over_bound() -> None:
-    @pipefunc(output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
     def f(a, b):
         return a + b
 
-    pipeline = Pipeline([f])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
-    assert r_map["out"].output.tolist() == [2, 4, 6]
+    PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
+
+    with pytest.raises(
+        ValueError,
+        match="The bound arguments cannot be part of the MapSpec input names",
+    ):
+        PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
+
+    pf = PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]")
+    with pytest.raises(
+        ValueError,
+        match="The bound arguments cannot be part of the MapSpec input names",
+    ):
+        pf.update_bound({"b": [1, 2, 3]})
 
 
 def test_mapping_over_default() -> None:

@@ -157,8 +157,7 @@ class PipeFunc(Generic[T]):
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
-        self._validate_mapspec()
-        self._validate_names()
+        self._validate()
 
     @property
     def renames(self) -> dict[str, str]:
@@ -275,6 +274,7 @@ class PipeFunc(Generic[T]):
         else:
             self._defaults = dict(self._defaults, **defaults)
         self._clear_internal_cache()
+        self._validate()
 
     def update_renames(
         self,
@@ -346,6 +346,7 @@ class PipeFunc(Generic[T]):
             self.mapspec = self.mapspec.rename(old_inverse).rename(self._renames)
 
         self._clear_internal_cache()
+        self._validate()
 
     def update_scope(
         self,
@@ -436,6 +437,7 @@ class PipeFunc(Generic[T]):
         else:
             self._bound = dict(self._bound, **bound)
         self._clear_internal_cache()
+        self._validate()
 
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self, PipeFunc)
@@ -460,6 +462,10 @@ class PipeFunc(Generic[T]):
             _validate_identifier(name, key)
             if name == "renames":
                 _validate_identifier(name, value)
+
+    def _validate(self) -> None:
+        self._validate_names()
+        self._validate_mapspec()
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -916,8 +922,7 @@ class NestedPipeFunc(PipeFunc):
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
-        self._validate_mapspec()
-        self._validate_names()
+        self._validate()
 
     def copy(self, **update: Any) -> NestedPipeFunc:
         # Pass the mapspec to the new instance because we set
