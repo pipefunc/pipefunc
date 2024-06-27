@@ -1884,3 +1884,28 @@ def test_unhashable_bound() -> None:
     assert f(a=1) == (1, [])
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
+
+
+def test_calling_add_with_autogen_mapspec():
+    def foo(vector):
+        return vector
+
+    def bar(inpt, factor):
+        return inpt * factor
+
+    pipeline = Pipeline([])
+    pipeline.add(PipeFunc(func=foo, output_name="foo_out"))
+    pipeline.add(
+        PipeFunc(
+            func=bar,
+            output_name="bar_out",
+            renames={"inpt": "foo_out"},
+            mapspec="foo_out[i], factor[i] -> bar_out[i]",
+        ),
+    )
+
+    results = pipeline.map(
+        inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
+        internal_shapes={"foo_out": (3,)},
+    )
+    assert results["bar_out"].output.tolist() == [1, 4, 9]
