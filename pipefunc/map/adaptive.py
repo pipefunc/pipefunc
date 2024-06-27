@@ -558,6 +558,10 @@ def to_adaptive_learner(
     if invalid := set(adaptive_dimensions) & set(inputs):
         msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
         raise ValueError(msg)
+    n = len(adaptive_dimensions)
+    if n == 0:
+        msg = "`adaptive_dimensions` must be a non-empty dict"
+        raise ValueError(msg)
     dims, bounds = zip(*adaptive_dimensions.items())
     function = functools.partial(
         _adaptive_wrapper,
@@ -568,12 +572,8 @@ def to_adaptive_learner(
         run_folder_template=run_folder_template,
         map_kwargs=map_kwargs or {},
     )
-    if len(adaptive_dimensions) == 1:
+    if n == 1:
         return Learner1D(function, bounds[0])
-    if len(adaptive_dimensions) == 2:  # noqa: PLR2004
+    if n == 2:  # noqa: PLR2004
         return Learner2D(function, bounds)
-    if len(adaptive_dimensions) >= 3:  # noqa: PLR2004
-        # Create LearnerND
-        return LearnerND(function, bounds)
-    msg = "Invalid number of adaptive dimensions"
-    raise ValueError(msg)
+    return LearnerND(function, bounds)

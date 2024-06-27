@@ -385,12 +385,12 @@ def test_learners_dict_no_run_folder():
 @pytest.fixture()
 def pipeline() -> Pipeline:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double_it(x: int, c: int) -> int:
+    def double_it(x: float, c: float) -> float:
         return 2 * x + c
 
     @pipefunc(output_name="sum_")
-    def take_sum(y: list[int], d: int) -> float:
-        return sum(y) / d
+    def take_sum(y: list[float], d: float, e: float) -> float:
+        return sum(y) / d + e
 
     return Pipeline([double_it, take_sum])
 
@@ -399,29 +399,71 @@ def test_adaptive_wrapper_1d(tmp_path: Path, pipeline: Pipeline) -> None:
     run_folder_template = f"{tmp_path}/run_folder_{{}}"
     learner1d = to_adaptive_learner(
         pipeline,
-        inputs={"x": [0, 1, 2, 3], "d": 1},
+        inputs={"x": [0, 1, 2, 3], "d": 1, "e": 0},
         adaptive_dimensions={"c": (0, 100)},
         adaptive_output="sum_",
         run_folder_template=run_folder_template,
         map_kwargs={"parallel": False, "storage": "dict"},
     )
-    adaptive.runner.simple(learner1d, npoints_goal=10)
+    assert isinstance(learner1d, adaptive.Learner1D)
+    npoints_goal = 5
+    adaptive.runner.simple(learner1d, npoints_goal=npoints_goal)
 
-    assert learner1d.to_numpy().shape == (10, 2)
-    assert len(list(tmp_path.glob("*"))) == 10
+    assert learner1d.to_numpy().shape == (npoints_goal, 2)
+    assert len(list(tmp_path.glob("*"))) == npoints_goal
 
 
 def test_adaptive_wrapper_2d(tmp_path: Path, pipeline: Pipeline) -> None:
     run_folder_template = f"{tmp_path}/run_folder_{{}}"
     learner2d = to_adaptive_learner(
         pipeline,
-        inputs={"x": [0, 1, 2, 3]},
+        inputs={"x": [0, 1, 2, 3], "e": 0},
         adaptive_dimensions={"c": (0, 100), "d": (-1, 1)},
         adaptive_output="sum_",
         run_folder_template=run_folder_template,
         map_kwargs={"parallel": False, "storage": "dict"},
     )
-    adaptive.runner.simple(learner2d, npoints_goal=10)
+    assert isinstance(learner2d, adaptive.Learner2D)
+    npoints_goal = 5
+    adaptive.runner.simple(learner2d, npoints_goal=npoints_goal)
 
-    assert learner2d.to_numpy().shape == (10, 3)
-    assert len(list(tmp_path.glob("*"))) == 10
+    assert learner2d.to_numpy().shape == (npoints_goal, 3)
+    assert len(list(tmp_path.glob("*"))) == npoints_goal
+
+
+def test_adaptive_wrapper_3d(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    learner3d = to_adaptive_learner(
+        pipeline,
+        inputs={"x": [0, 1, 2, 3]},
+        adaptive_dimensions={"c": (0, 100), "d": (-1, 1), "e": (-1, 1)},
+        adaptive_output="sum_",
+        run_folder_template=run_folder_template,
+        map_kwargs={"parallel": False, "storage": "dict"},
+    )
+    assert isinstance(learner3d, adaptive.LearnerND)
+    npoints_goal = 5
+    adaptive.runner.simple(learner3d, npoints_goal=npoints_goal)
+
+    assert learner3d.to_numpy().shape == (npoints_goal, 4)
+    assert len(list(tmp_path.glob("*"))) == npoints_goal
+
+
+def test_adaptive_wrapper_invalid(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    with pytest.raises(ValueError, match="`adaptive_dimensions` must be a non-empty dict"):
+        to_adaptive_learner(
+            pipeline,
+            inputs={"x": [0, 1, 2, 3]},
+            adaptive_dimensions={},
+            adaptive_output="sum_",
+            run_folder_template=run_folder_template,
+        )
+    with pytest.raises(ValueError, match="cannot be in inputs"):
+        to_adaptive_learner(
+            pipeline,
+            inputs={"x": [0, 1, 2, 3], "c": 0, "e": 0},
+            adaptive_dimensions={"c": (-1, 1)},
+            adaptive_output="sum_",
+            run_folder_template=run_folder_template,
+        )
