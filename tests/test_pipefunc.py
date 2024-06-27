@@ -1158,21 +1158,21 @@ def test_nested_func_renames_defaults_and_bound() -> None:
         return f
 
     # Test renaming
-    nf = NestedPipeFunc(
-        [
-            PipeFunc(f, "f", mapspec="a[i], b[i] -> f[i]"),
-            PipeFunc(g, "g", mapspec="f[i] -> g[i]"),
-        ],
-        output_name="g",
-    )
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], output_name="g")
 
     assert nf.renames == {}
+    assert nf.defaults == {"b": 99}
     nf.update_renames({"a": "a1", "b": "b1"}, update_from="original")
+    assert nf.defaults == {"b1": 99}
     assert nf.renames == {"a": "a1", "b": "b1"}
     assert nf(a1=1, b1=2) == 3
     assert nf(a1=1) == 100
     nf.update_defaults({"b1": 2, "a1": 2})
     assert nf() == 4
+    assert nf.renames == {"a": "a1", "b": "b1"}
+    assert nf.defaults == {"b1": 2, "a1": 2}
+    # Reset defaults to update bound
+    nf.update_defaults({}, overwrite=True)
     nf.update_bound({"a1": "a", "b1": "b"})
     assert nf(a1=3, b1=4) == "ab"  # will ignore the input values now
 
@@ -1891,8 +1891,6 @@ def test_unhashable_bound() -> None:
 def test_mapping_over_bound() -> None:
     def f(a, b):
         return a + b
-
-    PipeFunc(f, output_name="out", mapspec="a[i], b[i] -> out[i]", bound={"b": [1, 2, 3]})
 
     with pytest.raises(
         ValueError,

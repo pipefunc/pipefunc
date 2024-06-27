@@ -329,8 +329,8 @@ class PipeFunc(Generic[T]):
         # Update `defaults`
         new_defaults = {}
         for name, value in self._defaults.items():
-            if original_name := old_inverse.get(name):
-                name = self._renames.get(original_name, original_name)  # noqa: PLW2901
+            original_name = old_inverse.get(name, name)
+            name = self._renames.get(original_name, original_name)  # noqa: PLW2901
             new_defaults[name] = value
         self._defaults = new_defaults
 
@@ -951,7 +951,15 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def original_parameters(self) -> dict[str, Any]:
         parameters = set(self._all_inputs) - set(self._all_outputs)
-        return {k: inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY) for k in sorted(parameters)}
+        return {
+            k: inspect.Parameter(
+                k,
+                inspect.Parameter.KEYWORD_ONLY,
+                # TODO: Do we need defaults here?
+                # default=...,  # noqa: ERA001
+            )
+            for k in sorted(parameters)
+        }
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:

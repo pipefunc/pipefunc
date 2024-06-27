@@ -34,8 +34,11 @@ def map_shapes(
 
     input_parameters = set(pipeline.topological_generations.root_args)
 
+    inputs_with_defaults = pipeline.defaults | inputs
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
-        p: array_shape(inputs[p], p) for p in input_parameters if p in pipeline.mapspec_names
+        p: array_shape(inputs_with_defaults[p], p)
+        for p in input_parameters
+        if p in pipeline.mapspec_names
     }
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
