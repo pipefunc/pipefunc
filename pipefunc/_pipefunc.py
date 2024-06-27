@@ -704,8 +704,10 @@ class PipeFunc(Generic[T]):
                 f"The bound arguments cannot be part of the MapSpec input names."
                 f" The violating bound arguments are: `{bound_inputs}`."
                 " Because bound arguments might have the same name in different"
-                " functions, they cannot be part of the MapSpec input names."
+                " functions and the MapSpec input names are unique, the bound"
+                " arguments cannot be part of the MapSpec input names."
             )
+            # This *can* be implemented but requires a lot of work
             raise ValueError(msg)
 
         mapspec_output_names = set(self.mapspec.output_names)
