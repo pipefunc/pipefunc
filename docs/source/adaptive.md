@@ -190,7 +190,7 @@ learner2d = to_adaptive_learner(
 )
 ```
 
-Even though the we are doing a 2D sweep, we can still use the `adaptive.Runner` to also run "doubly" parallel, where multiple `pipeline.map` are run in parallel, in addition to the parallelization of the `pipeline.map` itself.
+Even though `pipeline.map` is already parallelized by default, we can still use the `adaptive.Runner` to also run "doubly" parallel, where multiple `pipeline.map` are run in parallel in addition to the parallelization of the `pipeline.map` itself.
 
 ```{code-cell} ipython3
 runner = adaptive.Runner(learner2d, npoints_goal=10)
