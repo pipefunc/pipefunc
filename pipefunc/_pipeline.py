@@ -982,8 +982,7 @@ class Pipeline:
         parameterless_funcs = []
         function_lists = []
         for i, generation in enumerate(generations):
-            if i == 0 or not function_lists[-1]:
-                function_lists.append([])
+            function_lists.append([])
             for x in generation:
                 if isinstance(x, str):
                     assert i == 0
@@ -997,6 +996,8 @@ class Pipeline:
                 else:
                     function_lists[-1].append(x)
 
+        # Remove empty lists
+        function_lists = [lst for lst in function_lists if lst]
         assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
 
         def insert_at_index(f: PipeFunc, function_lists: list[list[PipeFunc]]) -> int | None:
@@ -1010,7 +1011,8 @@ class Pipeline:
             if index is not None:
                 function_lists[index].append(f)
             else:
-                function_lists.append([f])
+                function_lists.insert(0, [f])
+
         return Generations(root_args, function_lists)
 
     @functools.cached_property
