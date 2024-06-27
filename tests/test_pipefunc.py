@@ -825,6 +825,8 @@ def test_update_defaults_and_renames_and_bound() -> None:
     assert pipeline("c", a3=1) == 4
     assert pipeline("c", a3=2, b=3) == 5
 
+    assert f.defaults == {"a3": 1, "b": 3}  # need to reset defaults before updating bound
+    f.update_defaults({}, overwrite=True)
     f.update_bound({"a3": "yolo", "b": "swag"})
     assert f(a3=88, b=1) == "yoloswag"
     assert f.bound == {"a3": "yolo", "b": "swag"}
