@@ -29,7 +29,7 @@ This will turn into a 2D adaptive sweep (with `adaptive.Learner2D`) over `a` and
 
 :::
 
-This poor man's version runs a `pipeline.map` for each iteration in the adaptive sweep, creating a new `run_folder` for each iteration.
+This poor man's version runs `pipeline.map` for each iteration in the adaptive sweep, creating a new `run_folder` for each iteration.
 
 ---
 
@@ -56,9 +56,14 @@ pipeline = Pipeline([double_it, take_sum])
 inputs = {"x": [0, 1, 2, 3], "c": 1, "d": 2}
 run_folder = "my_run_folder"
 results = pipeline.map(inputs, run_folder=run_folder)
+```
+
+```{code-cell} ipython3
 print(results["y"].output.tolist())
-assert results["y"].output.tolist() == [1, 3, 5, 7]
-assert results["sum_"].output == 8.0
+```
+
+```{code-cell} ipython3
+print(results["sum_"].output)
 ```
 
 This pipeline returns a single number, which is the sum of the inputs.
@@ -89,6 +94,14 @@ from pipefunc.map import load_xarray_dataset
 ds = load_xarray_dataset(run_folder=run_folder)
 ds.sum_.astype(float).plot(x="c", y="d")
 ```
+
+
+```{important}
+One major advantage of this gridded sweep is that the data is all structured nicely and the parallelism in all captured by the `pipeline.map` function.
+
+Currently, using `adaptive` as desribed below is a bit more cumbersome, however, there are plans to make this more seamless in the future.
+```
+
 
 ## Using `adaptive` for adaptive sweeps
 
