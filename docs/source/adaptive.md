@@ -197,6 +197,12 @@ runner = adaptive.Runner(learner2d, npoints_goal=10)
 runner.live_info()
 ```
 
+```{code-cell} ipython3
+:tags: [hide-cell]
+
+await runner.task  # This is not needed in a notebook environment!
+```
+
 We can now inspect the results of the `adaptive_output` in the learner
 
 ```{code-cell} ipython3
