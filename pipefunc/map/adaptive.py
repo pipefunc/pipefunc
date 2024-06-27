@@ -546,7 +546,8 @@ def to_adaptive_learner(
     adaptive_output
         The output to adapt to.
     run_folder_template
-        The template for the run folder.
+        The template for the run folder. Must contain a single `{}` which will
+        be replaced by the adaptive value. For example, ``"data/my_sweep_{}"``.
     map_kwargs
         Additional keyword arguments to pass to `pipeline.map`. For example,
         the `parallel` argument can be passed here.
