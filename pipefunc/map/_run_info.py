@@ -13,7 +13,7 @@ from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._storage_base import StorageBase, storage_registry
 
 if TYPE_CHECKING:
-    from pipefunc._pipeline import Pipeline
+    from pipefunc import Pipeline
 
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 
