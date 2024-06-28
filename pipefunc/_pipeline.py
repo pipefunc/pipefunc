@@ -1007,8 +1007,6 @@ class Pipeline:
             if generation_functions:
                 function_lists.append(generation_functions)
 
-        assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
-
         return Generations(root_args, function_lists)
 
     @functools.cached_property
