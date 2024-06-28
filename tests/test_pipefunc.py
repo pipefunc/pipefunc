@@ -1001,7 +1001,7 @@ def test_invalid_output_name_identifier(output_name):
 def test_invalid_output_name() -> None:
     with pytest.raises(
         TypeError,
-        match="The output name should be a string or a tuple of strings",
+        match="The `output_name` should be a string or a tuple of strings, not",
     ):
 
         @pipefunc(output_name=["a"])  # type: ignore[arg-type]
@@ -1974,3 +1974,11 @@ def test_parameterless_pipefunc() -> None:
     ]
     r = pipeline.map({})
     assert r["e"].output == 3
+
+
+def test_arg_and_output_name_identical_error():
+    with pytest.raises(
+        ValueError,
+        match="The `output_name` cannot be the same as any of the input parameter names",
+    ):
+        PipeFunc(lambda x: x, output_name="x")
