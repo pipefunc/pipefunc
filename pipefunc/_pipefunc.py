@@ -54,7 +54,13 @@ class PipeFunc(Generic[T]):
         and the ``output_name`` (str) as second argument, and returns the desired output.
         If ``None``, the output of the wrapped function is returned as is.
     renames
-        A dictionary mapping from original argument names to new argument names.
+        A dictionary for renaming function arguments and outputs. The keys are the
+        original names (as defined in the function signature or the ``output_name``),
+        and the values are the new names to be used. This allows you to change how
+        the function is called without modifying its internal logic. For example,
+        ``{"old_name": "new_name"}`` would allow the function to be called with
+        ``new_name`` instead of ``old_name``. If renaming the ``output_name``, include it
+        in this dictionary as well.
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
@@ -476,7 +482,7 @@ class PipeFunc(Generic[T]):
             raise ValueError(msg)
         if not isinstance(self._output_name, str | tuple):
             msg = (
-                f"The output name should be a string or a tuple of strings,"
+                f"The `output_name` should be a string or a tuple of strings,"
                 f" not {type(self._output_name)}."
             )
             raise TypeError(msg)
@@ -489,6 +495,12 @@ class PipeFunc(Generic[T]):
                     " should be a parameter of the function."
                 )
                 raise ValueError(msg) from e
+        if overlap := set(self.parameters) & set(at_least_tuple(self.output_name)):
+            msg = (
+                "The `output_name` cannot be the same as any of the input"
+                f" parameter names. The overlap is: {overlap}"
+            )
+            raise ValueError(msg)
         self._validate_update(
             self._renames,
             "renames",
@@ -753,7 +765,13 @@ def pipefunc(
         and the ``output_name`` (str) as second argument, and returns the desired output.
         If ``None``, the output of the wrapped function is returned as is.
     renames
-        A dictionary mapping from original argument names to new argument names.
+        A dictionary for renaming function arguments and outputs. The keys are the
+        original names (as defined in the function signature or the ``output_name``),
+        and the values are the new names to be used. This allows you to change how
+        the function is called without modifying its internal logic. For example,
+        ``{"old_name": "new_name"}`` would allow the function to be called with
+        ``new_name`` instead of ``old_name``. If renaming the ``output_name``, include it
+        in this dictionary as well.
     defaults
         Set defaults for parameters. Overwrites any current defaults. Must be in terms
         of the renamed argument names.
