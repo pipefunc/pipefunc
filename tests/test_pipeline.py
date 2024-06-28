@@ -4,18 +4,13 @@ from __future__ import annotations
 
 import pickle
 import re
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
-from pipefunc._cache import LRUCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.resources import Resources
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -311,10 +306,7 @@ def test_tuple_outputs() -> None:
     }
 
 
-@pytest.mark.parametrize("cache", [True, False])
-def test_full_output(cache, tmp_path: Path):
-    from pipefunc import Pipeline
-
+def test_full_output() -> None:
     @pipefunc(output_name="f1")
     def f1(a, b):
         return a + b
@@ -327,15 +319,7 @@ def test_full_output(cache, tmp_path: Path):
     def f3(a, f2i):
         return a + f2i
 
-    if cache:
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir(exist_ok=True)
-        cache_kwargs = {"cache_type": "disk", "cache_kwargs": {"cache_dir": cache_dir}}
-    else:
-        cache_kwargs = {}
-    pipeline = Pipeline([f1, f2, f3], **cache_kwargs)  # type: ignore[arg-type]
-    for f in pipeline.functions:
-        f.cache = cache
+    pipeline = Pipeline([f1, f2, f3])  # type: ignore[arg-type]
     pipeline("f3", a=1, b=2)
     func = pipeline.func("f3")
     assert func.call_full_output(a=1, b=2) == {
@@ -346,8 +330,6 @@ def test_full_output(cache, tmp_path: Path):
         "f2j": 1,
         "f3": 7,
     }
-    if cache:
-        assert len(list(cache_dir.glob("*.pkl"))) == 3
 
 
 @pipefunc(output_name="test_function")
@@ -425,25 +407,15 @@ def test_drop_from_pipeline() -> None:
 
 
 def test_used_variable() -> None:
-    @pipefunc(output_name="c", cache=True)
+    @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
 
-    pipeline = Pipeline([f1])  # automatically sets cache_type="lru" because of cache=True
-    assert isinstance(pipeline.cache, LRUCache)
+    pipeline = Pipeline([f1])
     with pytest.raises(UnusedParametersError, match="Unused keyword arguments"):
         pipeline("c", a=1, b=2, doesnotexist=3)
 
     pipeline("c", a=1, b=2)
-
-    # Test regression with cache:
-    def f(a):
-        return a
-
-    pipeline = Pipeline([PipeFunc(f, output_name="c", cache=True)], cache_type="lru")
-    ff = pipeline.func("c")
-    assert ff(a=1) == 1
-    assert ff(a=1) == 1  # should not raise an error
 
 
 def test_handle_error() -> None:
@@ -461,39 +433,6 @@ def test_handle_error() -> None:
         # NOTE: with pytest.raises match="..." does not work
         # with add_note for some reason on my Mac, however,
         # on CI it works fine (Linux)...
-
-
-def test_full_output_cache() -> None:
-    ran_f1 = False
-    ran_f2 = False
-
-    @pipefunc(output_name="c", cache=True)
-    def f1(a, b):
-        nonlocal ran_f1
-        if ran_f2:
-            raise RuntimeError
-        ran_f1 = True
-        return a + b
-
-    @pipefunc(output_name="d", cache=True)
-    def f2(b, c, x=1):
-        nonlocal ran_f2
-        if ran_f2:
-            raise RuntimeError
-        ran_f2 = True
-        return b * c * x
-
-    pipeline = Pipeline([f1, f2], cache_type="hybrid")
-    f = pipeline.func("d")
-    r = f.call_full_output(a=1, b=2, x=3)
-    expected = {"a": 1, "b": 2, "c": 3, "d": 18, "x": 3}
-    assert r == expected
-    assert pipeline.cache is not None
-    assert len(pipeline.cache) == 2
-    r = f.call_full_output(a=1, b=2, x=3)
-    assert r == expected
-    r = f(a=1, b=2, x=3)
-    assert r == 18
 
 
 def test_output_picker_single_output() -> None:
@@ -881,41 +820,6 @@ def test_set_debug_and_profile() -> None:
     assert pipeline["c"].profile
 
 
-def test_simple_cache() -> None:
-    @pipefunc(output_name="c", cache=True)
-    def f(a, b):
-        return a, b
-
-    with pytest.raises(ValueError, match="Invalid cache type"):
-        Pipeline([f], cache_type="not_exist")  # type: ignore[arg-type]
-    pipeline = Pipeline([f], cache_type="simple")
-    assert pipeline("c", a=1, b=2) == (1, 2)
-    assert pipeline.cache is not None
-    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
-    pipeline.cache.clear()
-    assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
-    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
-    pipeline.cache.clear()
-    assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
-    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
-
-
-def test_cache_non_root_args() -> None:
-    @pipefunc(output_name="c", cache=True)
-    def f(a, b):
-        return a + b
-
-    @pipefunc(output_name="d", cache=True)
-    def g(c, b):
-        return c + b
-
-    pipeline = Pipeline([f, g], cache_type="simple")
-    # Won't populate cache because `c` is not a root argument
-    assert pipeline("d", c=1, b=2) == 3
-    assert pipeline.cache is not None
-    assert pipeline.cache.cache == {}
-
-
 def test_axis_in_root_args() -> None:
     # Test reaches the `output_name in visited` condition
     @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
@@ -1188,23 +1092,6 @@ def test_resources_variable_nested_func():
 
     pipeline = Pipeline([nf])
     assert pipeline(a=1, b=2) == 8
-
-
-def test_sharing_defaults() -> None:
-    @pipefunc(output_name="c", defaults={"b": 1}, cache=True)
-    def f(a, b):
-        return a + b
-
-    @pipefunc(output_name="d", cache=True)
-    def g(b, c):
-        return b + c
-
-    pipeline = Pipeline([f, g], cache_type="simple")
-    assert pipeline("d", a=1) == 3
-    assert pipeline.cache is not None
-    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
-    assert pipeline.map(inputs={"a": 1})["d"].output == 3
-    assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
 
 
 def test_resources_variable_with_callable_resources() -> None:
