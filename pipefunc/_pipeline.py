@@ -969,19 +969,45 @@ class Pipeline:
     def topological_generations(self) -> Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
-        Simply calls `networkx.topological_generations` on the `pipeline.graph`. Then
-        groups the functions in the pipeline by generation. The first generation
-        contains the root arguments, while the subsequent generations contain
-        the functions in topological order.
+        This method uses `networkx.topological_generations` on the pipeline graph to group
+        functions by their dependency order. The result includes:
+        - Root arguments: Initial inputs to the pipeline.
+        - Function generations: Subsequent groups of functions in topological order.
+
+        Nullary functions (those without parameters) are handled specially to ensure
+        they're included in the generations rather than treated as root arguments.
         """
-        generations = list(nx.topological_generations(self.graph))
+        nullary_functions = [f for f in self.functions if not f.parameters]
+        if nullary_functions:
+            # Handle nullary functions by adding placeholder edges.
+            # This ensures they're included in the generations rather than as root arguments.
+            graph = self.graph.copy()
+            for i, f in enumerate(nullary_functions):
+                graph.add_edge(i, f)
+        else:
+            graph = self.graph
+
+        generations = list(nx.topological_generations(graph))
         if not generations:
             return Generations([], [])
 
-        assert all(isinstance(x, str | _Bound | _Resources) for x in generations[0])
-        assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        root_args = [x for x in generations[0] if isinstance(x, str)]
-        return Generations(root_args, generations[1:])
+        root_args: list[str] = []
+        function_lists: list[list[PipeFunc]] = []
+        for i, generation in enumerate(generations):
+            generation_functions: list[PipeFunc] = []
+            for x in generation:
+                if i == 0 and isinstance(x, str):
+                    root_args.append(x)
+                elif i == 0 and isinstance(x, _Bound | _Resources | int):
+                    # Skip special first-generation nodes that aren't root arguments
+                    pass
+                else:
+                    assert isinstance(x, PipeFunc)
+                    generation_functions.append(x)
+            if generation_functions:
+                function_lists.append(generation_functions)
+
+        return Generations(root_args, function_lists)
 
     @functools.cached_property
     def sorted_functions(self) -> list[PipeFunc]:

@@ -1940,3 +1940,37 @@ def test_calling_add_with_autogen_mapspec():
         internal_shapes={"foo_out": (3,)},
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
+
+
+def test_parameterless_pipefunc() -> None:
+    @pipefunc(output_name="c")
+    def f():
+        return 1
+
+    assert f() == 1
+
+    pipeline = Pipeline([f])
+    assert pipeline() == 1
+    assert pipeline.topological_generations.root_args == []
+    assert pipeline.topological_generations.function_lists == [[pipeline["c"]]]
+    r = pipeline.map({})
+    assert r["c"].output == 1
+
+    @pipefunc(output_name="d")
+    def g():
+        return 2
+
+    @pipefunc(output_name="e")
+    def h(c, d):
+        return c + d
+
+    pipeline = Pipeline([f, g, h])
+
+    assert pipeline() == 3
+    assert pipeline.topological_generations.root_args == []
+    assert pipeline.topological_generations.function_lists == [
+        [pipeline["c"], pipeline["d"]],
+        [pipeline["e"]],
+    ]
+    r = pipeline.map({})
+    assert r["e"].output == 3
