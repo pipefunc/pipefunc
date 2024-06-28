@@ -994,7 +994,7 @@ class Pipeline:
         root_args: list[str] = []
         function_lists: list[list[PipeFunc]] = []
         for i, generation in enumerate(generations):
-            function_lists.append([])
+            generation_functions: list[PipeFunc] = []
             for x in generation:
                 if i == 0 and isinstance(x, str):
                     root_args.append(x)
@@ -1003,10 +1003,10 @@ class Pipeline:
                     pass
                 else:
                     assert isinstance(x, PipeFunc)
-                    function_lists[-1].append(x)
+                    generation_functions.append(x)
+            if generation_functions:
+                function_lists.append(generation_functions)
 
-        # Remove any empty generations
-        function_lists = [lst for lst in function_lists if lst]
         assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
 
         return Generations(root_args, function_lists)
