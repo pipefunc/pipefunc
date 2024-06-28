@@ -969,16 +969,20 @@ class Pipeline:
     def topological_generations(self) -> Generations:
         """Return the functions in the pipeline grouped by topological generation.
 
-        Simply calls `networkx.topological_generations` on the `pipeline.graph`. Then
-        groups the functions in the pipeline by generation. The first generation
-        contains the root arguments, while the subsequent generations contain
-        the functions in topological order.
+        This method uses `networkx.topological_generations` on the pipeline graph to group
+        functions by their dependency order. The result includes:
+        - Root arguments: Initial inputs to the pipeline.
+        - Function generations: Subsequent groups of functions in topological order.
+
+        Nullary functions (those without parameters) are handled specially to ensure
+        they're included in the generations rather than treated as root arguments.
         """
-        parameterless_functions = [f for f in self.functions if not f.parameters]
-        graph = self.graph
-        if parameterless_functions:
+        nullary_functions = [f for f in self.functions if not f.parameters]
+        if nullary_functions:
+            # Handle nullary functions by adding placeholder edges.
+            # This ensures they're included in the generations rather than as root arguments.
             graph = self.graph.copy()
-            for i, f in enumerate(parameterless_functions):
+            for i, f in enumerate(nullary_functions):
                 graph.add_edge(i, f)
         else:
             graph = self.graph
@@ -995,12 +999,13 @@ class Pipeline:
                 if i == 0 and isinstance(x, str):
                     root_args.append(x)
                 elif i == 0 and isinstance(x, _Bound | _Resources | int):
+                    # Skip special first-generation nodes that aren't root arguments
                     pass
                 else:
                     assert isinstance(x, PipeFunc)
                     function_lists[-1].append(x)
 
-        # Remove empty lists
+        # Remove any empty generations
         function_lists = [lst for lst in function_lists if lst]
         assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
 
