@@ -948,32 +948,6 @@ def test_scope_with_mapspec() -> None:
     assert results["foo.c"].output.tolist() == [1, 2, 3]
 
 
-def test_accessing_copied_pipefunc() -> None:
-    @pipefunc(output_name="c")
-    def f(a, b):
-        return a + b
-
-    pipeline = Pipeline([f])
-    with pytest.raises(
-        ValueError,
-        match=re.escape("you can access that function via `pipeline['c']`"),
-    ):
-        pipeline.drop(f=f)
-
-
-def test_pipeline_getitem_exception() -> None:
-    @pipefunc(output_name="c")
-    def f(a, b):
-        return a + b
-
-    pipeline = Pipeline([f])
-    with pytest.raises(
-        KeyError,
-        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
-    ):
-        pipeline["d"]
-
-
 def test_update_scope_output_only() -> None:
     @pipefunc(output_name="z")
     def add(x: int, y: int) -> int:
@@ -1019,6 +993,32 @@ def test_update_scope_from_faq() -> None:
     results = pipeline.map(inputs=kwargs)
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
+
+
+def test_accessing_copied_pipefunc() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("you can access that function via `pipeline['c']`"),
+    ):
+        pipeline.drop(f=f)
+
+
+def test_pipeline_getitem_exception() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        KeyError,
+        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
+    ):
+        pipeline["d"]
 
 
 def test_default_resources_from_pipeline() -> None:
