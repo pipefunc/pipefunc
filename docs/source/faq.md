@@ -592,3 +592,10 @@ print(f"Result: {result}")
 
 By using a callable for `resources`, you can dynamically determine the resources based on the input arguments.
 Additionally, by using the `resources_variable` argument, you can pass the dynamically created `Resources` instance directly to the function, allowing it to access and utilize the resource information as needed.
+
+
+## How to use `adaptive` with `pipefunc`?
+
+There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive sweeps over parameter spaces.
+Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
+See [this tutorial](adaptive.md) for a detailed example of how to use `adaptive` with `pipefunc`.

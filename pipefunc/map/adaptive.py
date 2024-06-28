@@ -6,10 +6,10 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
 
 import numpy as np
-from adaptive import SequenceLearner, runner
+from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
@@ -499,3 +499,91 @@ def _maybe_iterate_axes(
     for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
+
+
+def _adaptive_wrapper(
+    _adaptive_value: float | tuple[float, ...],
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: tuple[str, ...],
+    adaptive_output: str,
+    run_folder_template: str,
+    map_kwargs: dict[str, Any],
+) -> float:
+    run_folder = run_folder_template.format(_adaptive_value)
+    values: tuple[float, ...] = at_least_tuple(_adaptive_value)
+    inputs_ = inputs.copy()
+    for dim, val in zip(adaptive_dimensions, values):
+        inputs_[dim] = val
+    results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
+    return results[adaptive_output].output
+
+
+def to_adaptive_learner(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: dict[str, tuple[float, float]],
+    adaptive_output: str,
+    run_folder_template: str = "run_folder_{}",
+    map_kwargs: dict[str, Any] | None = None,
+    loss_function: Callable[..., Any] | None = None,
+) -> Learner1D | Learner2D | LearnerND:
+    """Create an adaptive learner in 1D, 2D, or ND from a pipeline.map.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to create the learner from.
+    inputs
+        The inputs to the pipeline, as passed to `pipeline.map`. Should not
+        contain the adaptive dimensions.
+    adaptive_dimensions
+        A dictionary mapping the adaptive dimensions to their bounds.
+        If the length of the dictionary is 1, a `adaptive.Learner1D` is created.
+        If the length is 2, a `adaptive.Learner2D` is created.
+        If the length is 3 or more, a `adaptive.LearnerND` is created.
+    adaptive_output
+        The output to adapt to.
+    run_folder_template
+        The template for the run folder. Must contain a single `{}` which will
+        be replaced by the adaptive value. For example, ``"data/my_sweep_{}"``.
+    map_kwargs
+        Additional keyword arguments to pass to `pipeline.map`. For example,
+        the `parallel` argument can be passed here.
+    loss_function
+        The loss function to use for the adaptive learner.
+        The ``loss_per_interval`` argument for `adaptive.Learner1D`,
+        the ``loss_per_triangle`` argument for `adaptive.Learner2D`, and
+        the ``loss_per_simplex`` argument for `adaptive.LearnerND`.
+        If not provided, the default loss function is used.
+
+    Returns
+    -------
+        A `Learner1D`, `Learner2D`, or `LearnerND` object.
+
+    """
+    if invalid := set(adaptive_dimensions) & set(inputs):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
+        raise ValueError(msg)
+    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
+        raise ValueError(msg)
+    n = len(adaptive_dimensions)
+    if n == 0:
+        msg = "`adaptive_dimensions` must be a non-empty dict"
+        raise ValueError(msg)
+    dims, bounds = zip(*adaptive_dimensions.items())
+    function = functools.partial(
+        _adaptive_wrapper,
+        pipeline=pipeline,
+        inputs=inputs,
+        adaptive_dimensions=dims,
+        adaptive_output=adaptive_output,
+        run_folder_template=run_folder_template,
+        map_kwargs=map_kwargs or {},
+    )
+    if n == 1:
+        return Learner1D(function, bounds[0], loss_per_interval=loss_function)
+    if n == 2:  # noqa: PLR2004
+        return Learner2D(function, bounds, loss_per_triangle=loss_function)
+    return LearnerND(function, bounds, loss_per_simplex=loss_function)
