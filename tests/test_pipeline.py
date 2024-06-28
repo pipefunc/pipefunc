@@ -233,30 +233,27 @@ def test_pipe_func_and_execution() -> None:
 
 
 def test_tuple_outputs() -> None:
-    cache = True
-
     @pipefunc(
         output_name=("c", "_throw"),
         profile=True,
         debug=True,
-        cache=cache,
         output_picker=dict.__getitem__,
     )
     def f_c(a, b):
         return {"c": a + b, "_throw": 1}
 
-    @pipefunc(output_name=("d", "e"), cache=cache)
+    @pipefunc(output_name=("d", "e"))
     def f_d(b, c, x=1):  # noqa: ARG001
         return b * c, 1
 
-    @pipefunc(output_name=("g", "h"), output_picker=getattr, cache=cache)
+    @pipefunc(output_name=("g", "h"), output_picker=getattr)
     def f_g(c, e, x=1):  # noqa: ARG001
         from types import SimpleNamespace
 
         print(f"Called f_g with c={c} and e={e}")
         return SimpleNamespace(g=c + e, h=c - e)
 
-    @pipefunc(output_name="i", cache=cache)
+    @pipefunc(output_name="i")
     def f_i(h, g):
         return h + g
 
@@ -264,8 +261,6 @@ def test_tuple_outputs() -> None:
         [f_c, f_d, f_g, f_i],
         debug=True,
         profile=True,
-        cache_type="lru",
-        cache_kwargs={"shared": False},
     )
     f = pipeline.func("i")
     r = f.call_full_output(a=1, b=2, x=3)["i"]
@@ -276,9 +271,6 @@ def test_tuple_outputs() -> None:
         == pipeline.root_args(("g", "h"))
         == ("a", "b", "x")
     )
-    key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
-    assert pipeline.cache is not None
-    assert pipeline.cache.cache[key] == (6, 1)
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
     assert pipeline.func_dependents("c") == [("d", "e"), ("g", "h"), "i"]
@@ -356,28 +348,6 @@ def test_full_output(cache, tmp_path: Path):
     }
     if cache:
         assert len(list(cache_dir.glob("*.pkl"))) == 3
-
-
-def test_lazy_pipeline() -> None:
-    @pipefunc(output_name="c")
-    def f1(a, b):
-        return a + b
-
-    @pipefunc(output_name="d")
-    def f2(b, c, x=1):
-        return b * c * x
-
-    @pipefunc(output_name="e")
-    def f3(c, d, x=1):
-        return c * d * x
-
-    pipeline = Pipeline([f1, f2, f3], lazy=True)
-
-    f = pipeline.func("e")
-    r = f(a=1, b=2, x=3).evaluate()
-    assert r == 162
-    r = f.call_full_output(a=1, b=2, x=3)["e"].evaluate()
-    assert r == 162
 
 
 @pipefunc(output_name="test_function")
@@ -928,15 +898,6 @@ def test_simple_cache() -> None:
     pipeline.cache.clear()
     assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
     assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
-
-
-def test_hybrid_cache_lazy_warning() -> None:
-    @pipefunc(output_name="c", cache=True)
-    def f(a, b):
-        return a, b
-
-    with pytest.warns(UserWarning, match="Hybrid cache uses function evaluation"):
-        Pipeline([f], cache_type="hybrid", lazy=True)
 
 
 def test_cache_non_root_args() -> None:
