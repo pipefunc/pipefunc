@@ -1953,6 +1953,8 @@ def test_parameterless_pipefunc() -> None:
     assert pipeline() == 1
     assert pipeline.topological_generations.root_args == []
     assert pipeline.topological_generations.function_lists == [[pipeline["c"]]]
+    r = pipeline.map({})
+    assert r["c"].output == 1
 
     @pipefunc(output_name="d")
     def g():
@@ -1970,3 +1972,5 @@ def test_parameterless_pipefunc() -> None:
         [pipeline["c"], pipeline["d"]],
         [pipeline["e"]],
     ]
+    r = pipeline.map({})
+    assert r["e"].output == 3

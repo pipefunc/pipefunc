@@ -974,44 +974,35 @@ class Pipeline:
         contains the root arguments, while the subsequent generations contain
         the functions in topological order.
         """
-        generations = list(nx.topological_generations(self.graph))
+        parameterless_functions = [f for f in self.functions if not f.parameters]
+        graph = self.graph
+        if parameterless_functions:
+            graph = self.graph.copy()
+            for i, f in enumerate(parameterless_functions):
+                graph.add_edge(i, f)
+        else:
+            graph = self.graph
+
+        generations = list(nx.topological_generations(graph))
         if not generations:
             return Generations([], [])
 
-        root_args = []
-        parameterless_funcs = []
-        function_lists = []
+        root_args: list[str] = []
+        function_lists: list[list[PipeFunc]] = []
         for i, generation in enumerate(generations):
             function_lists.append([])
             for x in generation:
-                if isinstance(x, str):
-                    assert i == 0
+                if i == 0 and isinstance(x, str):
                     root_args.append(x)
-                elif i == 0:
-                    if isinstance(x, PipeFunc):
-                        parameterless_funcs.append([x])
-                    elif not isinstance(x, _Bound | _Resources):
-                        msg = f"Unexpected type: {type(x)}"
-                        raise TypeError(msg)
+                elif i == 0 and isinstance(x, _Bound | _Resources | int):
+                    pass
                 else:
+                    assert isinstance(x, PipeFunc)
                     function_lists[-1].append(x)
 
         # Remove empty lists
         function_lists = [lst for lst in function_lists if lst]
         assert all(isinstance(x, PipeFunc) for gen in function_lists for x in gen)
-
-        def insert_at_index(f: PipeFunc, function_lists: list[list[PipeFunc]]) -> int | None:
-            for i, gen in enumerate(function_lists):
-                if any(set(f.output_name) & set(func.parameters) for func in gen):
-                    return max(i - 1, 1)
-            return None
-
-        for f in parameterless_funcs:
-            index = insert_at_index(f, function_lists)
-            if index is not None:
-                function_lists[index].append(f)
-            else:
-                function_lists.insert(0, [f])
 
         return Generations(root_args, function_lists)
 
