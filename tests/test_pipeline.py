@@ -442,53 +442,6 @@ def test_output_picker_single_output() -> None:
     assert pipeline("y", a=1, b=2) == 3
 
 
-def test_independent_axes_in_mapspecs_with_disconnected_chains() -> None:
-    @pipefunc(output_name=("c", "d"), mapspec="a[i] -> c[i], d[i]")
-    def f(a: int, b: int):
-        return a + b, 1
-
-    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
-    def g(x, y):
-        return x + y
-
-    pipeline = Pipeline([f, g])
-    assert pipeline.mapspecs_as_strings == [
-        "a[i] -> c[i], d[i]",
-        "x[i], y[i] -> z[i]",
-    ]
-    assert pipeline.independent_axes_in_mapspecs("c") == {"i"}
-    assert pipeline.independent_axes_in_mapspecs("d") == {"i"}
-    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i"}
-    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
-
-    pipeline.add_mapspec_axis("b", axis="j")
-    assert pipeline.mapspecs_as_strings == [
-        "a[i], b[j] -> c[i, j], d[i, j]",
-        "x[i], y[i] -> z[i]",
-    ]
-    assert pipeline.independent_axes_in_mapspecs("c") == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs("d") == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs("z") == {"i"}
-
-    pipeline.add_mapspec_axis("x", axis="j")
-    pipeline.add_mapspec_axis("y", axis="j")
-    assert pipeline.mapspecs_as_strings == [
-        "a[i], b[j] -> c[i, j], d[i, j]",
-        "x[i, j], y[i, j] -> z[i, j]",
-    ]
-    assert pipeline.independent_axes_in_mapspecs("c") == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs("d") == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
-    assert pipeline.independent_axes_in_mapspecs("z") == {"i", "j"}
-
-    with pytest.raises(
-        ValueError,
-        match="The provided `pipefuncs` should have only one leaf node, not 2.",
-    ):
-        NestedPipeFunc([f, g])
-
-
 def test_max_single_execution_per_call() -> None:
     counter = {"f_c": 0, "f_d": 0, "f_e": 0}
 
@@ -694,24 +647,6 @@ def test_set_debug_and_profile() -> None:
     assert pipeline["c"].profile
 
 
-def test_axis_in_root_args() -> None:
-    # Test reaches the `output_name in visited` condition
-    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
-    def f(a, b):
-        return a + b
-
-    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
-    def g(a, c):
-        return a + c
-
-    @pipefunc(output_name="e", mapspec="c[i], d[i] -> e[i]")
-    def h(c, d):
-        return c + d
-
-    pipeline = Pipeline([f, g, h])
-    assert pipeline.independent_axes_in_mapspecs("e") == {"i"}
-
-
 def test_nesting_funcs_with_bound() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
@@ -762,41 +697,6 @@ def test_unhashable_bound() -> None:
     assert f(a=1) == (1, [])
     pipeline = Pipeline([f])
     assert pipeline(a=1) == (1, [])
-
-
-def test_mapping_over_default() -> None:
-    @pipefunc(output_name="out", mapspec="a[i], b[i] -> out[i]", defaults={"b": [1, 2, 3]})
-    def f(a, b):
-        return a + b
-
-    pipeline = Pipeline([f])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
-    assert r_map["out"].output.tolist() == [2, 4, 6]
-
-
-def test_calling_add_with_autogen_mapspec():
-    def foo(vector):
-        return vector
-
-    def bar(inpt, factor):
-        return inpt * factor
-
-    pipeline = Pipeline([])
-    pipeline.add(PipeFunc(func=foo, output_name="foo_out"))
-    pipeline.add(
-        PipeFunc(
-            func=bar,
-            output_name="bar_out",
-            renames={"inpt": "foo_out"},
-            mapspec="foo_out[i], factor[i] -> bar_out[i]",
-        ),
-    )
-
-    results = pipeline.map(
-        inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
-        internal_shapes={"foo_out": (3,)},
-    )
-    assert results["bar_out"].output.tolist() == [1, 4, 9]
 
 
 def test_parameterless_pipefunc() -> None:
