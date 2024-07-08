@@ -93,7 +93,9 @@ def slurm_run_setup(
                         or learner.pipefunc.resources is None
                     )
                     tracker.update_resources(
-                        learner.pipefunc.resources, learner.pipefunc, run_folder
+                        learner.pipefunc.resources,
+                        learner.pipefunc,
+                        run_folder,
                     )
                 elif ignore_resources and default_resources is not None:
                     tracker.update_resources(default_resources, learner.pipefunc, run_folder)
