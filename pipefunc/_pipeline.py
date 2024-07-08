@@ -703,12 +703,12 @@ class Pipeline:
 
     @functools.cached_property
     def defaults(self) -> dict[str, Any]:
-        defaults = {}
-        for func in self.functions:
-            for arg, value in func.defaults.items():
-                if arg not in func._bound and arg not in self.output_to_func:
-                    defaults[arg] = value
-        return defaults
+        return {
+            arg: value
+            for func in self.functions
+            for arg, value in func.defaults.items()
+            if arg not in func._bound and arg not in self.output_to_func
+        }
 
     def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
         """Retrieve defaults for a function, including those set by other functions."""
