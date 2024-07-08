@@ -441,7 +441,7 @@ def test_internal_shape_list(typ: type, array_type) -> None:
     arr = array_type(shape=(2,), internal_shape=(2,), shape_mask=(True, False))
     arr.dump((0,), typ([1, 2]))
     arr.dump((1,), typ([3, 4]))
-    if typ == list:
+    if typ is list:
         assert arr[0, :].tolist() == [1, 2]
         assert arr[1, :].tolist() == [3, 4]
     else:

@@ -236,8 +236,8 @@ def create_learners(
         split_independent_axes,
         internal_shapes,
     )
-    for fixed_indices in iterator:
-        key = _key(fixed_indices) if fixed_indices else None
+    for _fixed_indices in iterator:
+        key = _key(_fixed_indices) if _fixed_indices else None
         for gen in pipeline.topological_generations.function_lists:
             _learners = []
             for func in gen:
@@ -245,7 +245,7 @@ def create_learners(
                     func=func,
                     run_info=run_info,
                     store=store,
-                    fixed_indices=fixed_indices,  # might be None
+                    fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
                 _learners.append(LearnerPipeFunc(learner, func))
@@ -496,9 +496,9 @@ def _maybe_iterate_axes(
     independent_axes = _identify_cross_product_axes(pipeline)
     axes = pipeline.mapspec_axes
     shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
-    for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
-        _validate_fixed_indices(fixed_indices, inputs, pipeline)
-        yield fixed_indices
+    for _fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
+        _validate_fixed_indices(_fixed_indices, inputs, pipeline)
+        yield _fixed_indices
 
 
 def _adaptive_wrapper(
