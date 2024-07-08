@@ -83,7 +83,7 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     if sys.version_info <= (3, 11):  # pragma: no cover
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
-    raise
+    raise  # noqa: PLE0704
 
 
 def prod(iterable: Iterable[int]) -> int:
