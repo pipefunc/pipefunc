@@ -273,7 +273,7 @@ def _init_storage(
         mask = shape_masks[output_names[0]]
         arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
         for output_name, arr in zip(output_names, arrays):
-            store[output_name] = arr
+            store[output_name] = arr  # noqa: PERF403
     return store
 
 
