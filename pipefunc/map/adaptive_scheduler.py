@@ -20,10 +20,6 @@ if TYPE_CHECKING:
     from pipefunc.map.adaptive import LearnersDict
 
 
-class _UnknownBecauseDelayed:
-    """A singleton to represent unknown values because of delayed evaluation."""
-
-
 class AdaptiveSchedulerDetails(NamedTuple):
     """Details for the adaptive scheduler."""
 
@@ -90,7 +86,7 @@ def slurm_run_setup(
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 if not ignore_resources:
                     assert (
-                        isinstance(learner.pipefunc.resources, Resources)
+                        isinstance(learner.pipefunc.resources, Resources | Callable)
                         or learner.pipefunc.resources is None
                     )
                     tracker.update_resources(
@@ -104,6 +100,8 @@ def slurm_run_setup(
                         learner.pipefunc,
                         learners_dict.run_info,
                     )
+                else:
+                    tracker.update_resources(None, learner.pipefunc, learners_dict.run_info)
             prev_indices = indices
 
     if not any(tracker.resources_dict["extra_scheduler"]):  # all are empty
@@ -129,12 +127,12 @@ class _Tracker:
     missing: set[str] = field(default_factory=set)
     resources_dict: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
 
-    def is_defined(self, key: str) -> None:
+    def _is_defined(self, key: str) -> None:
         self.defined.add(key)
         if key in self.missing:
-            self.do_raise(key)
+            self._do_raise(key)
 
-    def is_missing(self, key: str) -> None:
+    def _is_missing(self, key: str) -> None:
         if (
             self.default_resources is not None and getattr(self.default_resources, key) is not None
         ):  # pragma: no cover
@@ -142,9 +140,9 @@ class _Tracker:
             return
         self.missing.add(key)
         if key in self.defined:
-            self.do_raise(key)
+            self._do_raise(key)
 
-    def get(
+    def _get(
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources],
         key: str,
@@ -165,16 +163,16 @@ class _Tracker:
 
         value = getattr(resources, key)
         if value is not None:
-            self.is_defined(key)
+            self._is_defined(key)
             return value
-        else:  # noqa: RET505
-            self.is_missing(key)
-            return None
+
+        self._is_missing(key)
+        return None
 
     def maybe_get(self, key: str) -> tuple | None:
         return tuple(self.resources_dict[key]) if key in self.resources_dict else None
 
-    def do_raise(self, key: str) -> None:
+    def _do_raise(self, key: str) -> None:
         msg = (
             f"At least one `PipeFunc` provides `{key}`."
             " It must either be defined for all `PipeFunc`s or in `default_resources`."
@@ -201,14 +199,14 @@ class _Tracker:
         else:
             r = resources.with_defaults(self.default_resources)
         assert r is not None
-        if (v := self.get(r, "num_cpus", func, run_info)) is not None:
-            self.resources_dict["cores_per_node"].append(v)
-        if (v := self.get(r, "num_cpus_per_node", func, run_info)) is not None:
-            self.resources_dict["cores_per_node"].append(v)
-        if (v := self.get(r, "num_nodes", func, run_info)) is not None:
-            self.resources_dict["nodes"].append(v)
-        if (v := self.get(r, "partition", func, run_info)) is not None:
-            self.resources_dict["partition"].append(v)
+        key_mapping = {
+            "num_cpus_per_node": "cores_per_node",
+            "num_nodes": "nodes",
+            "partition": "partition",
+        }
+        for key, adaptive_key in key_mapping.items():
+            if (v := self._get(r, key, func, run_info)) is not None:
+                self.resources_dict[adaptive_key].append(v)
 
         # There is no requirement for these to be defined for all `PipeFunc`s.
         self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))

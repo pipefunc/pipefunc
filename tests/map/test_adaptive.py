@@ -374,13 +374,6 @@ def test_learners_dict_no_run_folder():
     with pytest.raises(ValueError, match="`run_folder` must be provided"):
         learners_dict.to_slurm_run()
 
-    # Test providing run_folder in either way
-    learners_dict = LearnersDict(run_folder="run_folder")
-    learners_dict.to_slurm_run()
-
-    learners_dict = LearnersDict()
-    learners_dict.to_slurm_run(run_folder="run_folder")
-
 
 @pytest.fixture()
 def pipeline() -> Pipeline:

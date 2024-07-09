@@ -204,3 +204,56 @@ def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:
         match="At least one `PipeFunc` provides `partition`.",
     ):
         slurm_run_setup(learners_dict, Resources(num_nodes=1))
+
+
+def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda kw: Resources(num_cpus=kw["a"]),
+        resources_variable="resources",
+    )
+    def f1(a: int, resources: Resources):
+        return a, resources
+
+    pipeline = Pipeline([f1])
+    inputs = {"a": 1}
+    learners_dict = create_learners(
+        pipeline,
+        inputs,
+        tmp_path,
+        split_independent_axes=True,
+        return_output=True,
+    )
+    info = slurm_run_setup(learners_dict, Resources(num_cpus=2))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 1
+    learners_dict.simple_run()
+    learner_pipefunc = learners_dict[None][0][0]
+    assert learner_pipefunc.learner.data == {0: (1, Resources(num_cpus=1))}
+    assert len(info.cores_per_node) == 1
+    assert info.cores_per_node[0]() == 1
+
+    kw = info.kwargs()
+    assert len(kw["cores_per_node"]) == 1
+    assert kw["cores_per_node"][0]() == 1
+
+
+def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda kw: Resources(num_cpus=kw["a"]),
+        mapspec="a[i] -> x[i]",
+    )
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+    inputs = {"a": list(range(10))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict, Resources(num_cpus=2))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
