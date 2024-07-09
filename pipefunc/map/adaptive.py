@@ -66,12 +66,10 @@ class LearnersDict(LearnersDictType):
     def __init__(
         self,
         learners_dict: LearnersDictType | None = None,
-        run_folder: str | Path | None = None,
         run_info: RunInfo | None = None,
     ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
-        self.run_folder = run_folder
         self.run_info: RunInfo | None = run_info
 
     def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
@@ -120,8 +118,8 @@ class LearnersDict(LearnersDictType):
         """
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
-        if self.run_folder is None:
-            msg = "The `run_folder` must be provided. Set `learners_dict.run_folder`."
+        if self.run_info is None:
+            msg = "The `run_info  must be provided. Set `learners_dict.run_info`."
             raise ValueError(msg)
 
         details: AdaptiveSchedulerDetails = slurm_run_setup(
@@ -224,7 +222,7 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: LearnersDict = LearnersDict(run_folder=run_folder, run_info=run_info)
+    learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(
         pipeline,
         inputs,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -69,8 +70,8 @@ def slurm_run_setup(
     default_resources = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
     assert isinstance(default_resources, Resources) or default_resources is None
     tracker = _Tracker(default_resources)
-    assert learners_dict.run_folder is not None
-    run_folder = Path(learners_dict.run_folder)
+    assert learners_dict.run_info is not None
+    run_folder = Path(learners_dict.run_info.run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
     dependencies: dict[int, list[int]] = {}
@@ -150,14 +151,14 @@ class _Tracker:
         run_info: RunInfo,
     ) -> Any | Callable[[], Any] | None:
         if callable(resources):
-            if key == "cpus":
-                return _num_cpus(resources, func, run_info)
-            if key == "cpus_per_node":
-                return _num_cpus_per_node(resources, func, run_info)
-            if key == "nodes":
-                return _num_nodes(resources, func, run_info)
-            if key == "partition":
-                return _partition(resources, func, run_info)
+            if key in ("cpus", "cpus_per_node", "nodes", "partition"):
+                return functools.partial(
+                    _attribute_from_resources,
+                    key=key,
+                    resources=resources,
+                    func=func,
+                    run_info=run_info,
+                )
             msg = f"Unknown key: {key}"
             raise ValueError(msg)
 
@@ -195,10 +196,9 @@ class _Tracker:
             r = resources
         elif callable(resources):
             r = Resources.maybe_with_defaults(resources, self.default_resources)
-            # TODO: Create functions for cores_per_node, nodes, etc.
         else:
             r = resources.with_defaults(self.default_resources)
-        assert r is not None
+
         key_mapping = {
             "cpus_per_node": "cores_per_node",
             "nodes": "nodes",
@@ -212,52 +212,15 @@ class _Tracker:
         self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
 
-def _num_cpus(
+def _attribute_from_resources(
+    *,
+    key: str,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
-) -> Callable[[], int | None]:
-    def _fn() -> int | None:
-        kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).cpus
-
-    return _fn
-
-
-def _num_cpus_per_node(
-    resources: Callable[[dict[str, Any]], Resources],
-    func: PipeFunc,
-    run_info: RunInfo,
-) -> Callable[[], int | None]:
-    def _fn() -> int | None:
-        kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).cpus_per_node
-
-    return _fn
-
-
-def _num_nodes(
-    resources: Callable[[dict[str, Any]], Resources],
-    func: PipeFunc,
-    run_info: RunInfo,
-) -> Callable[[], int | None]:
-    def _fn() -> int | None:
-        kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).nodes
-
-    return _fn
-
-
-def _partition(
-    resources: Callable[[dict[str, Any]], Resources],
-    func: PipeFunc,
-    run_info: RunInfo,
-) -> Callable[[], str | None]:
-    def _fn() -> str | None:
-        kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).partition
-
-    return _fn
+) -> Any | None:
+    kwargs = _func_kwargs(func, run_info, run_info.init_store())
+    return getattr(resources(kwargs), key)
 
 
 def _extra_scheduler(

@@ -369,9 +369,9 @@ def test_internal_shapes(tmp_path: Path) -> None:
     assert r_map.tolist() == r_adap.tolist()
 
 
-def test_learners_dict_no_run_folder():
+def test_learners_dict_no_run_info():
     learners_dict = LearnersDict()
-    with pytest.raises(ValueError, match="`run_folder` must be provided"):
+    with pytest.raises(ValueError, match="`run_info` must be provided"):
         learners_dict.to_slurm_run()
 
 
