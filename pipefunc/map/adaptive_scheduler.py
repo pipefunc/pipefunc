@@ -26,10 +26,10 @@ class AdaptiveSchedulerDetails(NamedTuple):
     learners: list[SequenceLearner]
     fnames: list[Path]
     dependencies: dict[int, list[int]]
-    nodes: tuple[int, ...] | None
-    cores_per_node: tuple[int, ...] | None
-    extra_scheduler: tuple[list[str], ...] | None
-    partition: tuple[str, ...] | None
+    nodes: tuple[int | Callable[[], int], ...] | None
+    cores_per_node: tuple[int | Callable[[], int], ...] | None
+    extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
+    partition: tuple[str | Callable[[], str], ...] | None
     exclusive: bool = False
 
     def kwargs(self) -> dict[str, Any]:
@@ -150,11 +150,11 @@ class _Tracker:
         run_info: RunInfo,
     ) -> Any | Callable[[], Any] | None:
         if callable(resources):
-            if key == "num_cpus":
+            if key == "cpus":
                 return _num_cpus(resources, func, run_info)
-            if key == "num_cpus_per_node":
+            if key == "cpus_per_node":
                 return _num_cpus_per_node(resources, func, run_info)
-            if key == "num_nodes":
+            if key == "nodes":
                 return _num_nodes(resources, func, run_info)
             if key == "partition":
                 return _partition(resources, func, run_info)
@@ -200,8 +200,8 @@ class _Tracker:
             r = resources.with_defaults(self.default_resources)
         assert r is not None
         key_mapping = {
-            "num_cpus_per_node": "cores_per_node",
-            "num_nodes": "nodes",
+            "cpus_per_node": "cores_per_node",
+            "nodes": "nodes",
             "partition": "partition",
         }
         for key, adaptive_key in key_mapping.items():
@@ -219,7 +219,7 @@ def _num_cpus(
 ) -> Callable[[], int | None]:
     def _fn() -> int | None:
         kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).num_cpus
+        return resources(kwargs).cpus
 
     return _fn
 
@@ -231,7 +231,7 @@ def _num_cpus_per_node(
 ) -> Callable[[], int | None]:
     def _fn() -> int | None:
         kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).num_cpus_per_node
+        return resources(kwargs).cpus_per_node
 
     return _fn
 
@@ -243,7 +243,7 @@ def _num_nodes(
 ) -> Callable[[], int | None]:
     def _fn() -> int | None:
         kwargs = _func_kwargs(func, run_info, run_info.init_store())
-        return resources(kwargs).num_nodes
+        return resources(kwargs).nodes
 
     return _fn
 
@@ -275,10 +275,10 @@ def _extra_scheduler(
     extra_scheduler = []
     if resources.memory:
         extra_scheduler.append(f"--mem={resources.memory}")
-    if resources.num_gpus:
-        extra_scheduler.append(f"--gres=gpu:{resources.num_gpus}")
-    if resources.wall_time:
-        extra_scheduler.append(f"--time={resources.wall_time}")
+    if resources.gpus:
+        extra_scheduler.append(f"--gres=gpu:{resources.gpus}")
+    if resources.time:
+        extra_scheduler.append(f"--time={resources.time}")
     if resources.extra_args:
         for key, value in resources.extra_args.items():
             extra_scheduler.append(f"--{key}={value}")

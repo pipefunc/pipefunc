@@ -29,11 +29,11 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
 
     info = learners_dict.to_slurm_run(
         Resources(
-            num_cpus_per_node=2,
-            num_nodes=1,
+            cpus_per_node=2,
+            nodes=1,
             partition="partition-1",
-            num_gpus=1,
-            wall_time="1:00:00",
+            gpus=1,
+            time="1:00:00",
         ),
         returns="namedtuple",
     )
@@ -67,7 +67,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
 
     @pipefunc(
         output_name="y",
-        resources=Resources(num_cpus=2, memory="4GB", extra_args={"qos": "high"}),
+        resources=Resources(cpus=2, memory="4GB", extra_args={"qos": "high"}),
     )
     def f2(x: int) -> int:
         return x
@@ -77,11 +77,11 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     inputs = {"a": list(range(4))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
-    with pytest.raises(ValueError, match="At least one `PipeFunc` provides `num_cpus`"):
+    with pytest.raises(ValueError, match="At least one `PipeFunc` provides `cpus`"):
         learners_dict.to_slurm_run(None, returns="namedtuple")
 
     # Test including defaults
-    info = learners_dict.to_slurm_run({"num_cpus": 8}, returns="namedtuple")
+    info = learners_dict.to_slurm_run({"cpus": 8}, returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
@@ -102,7 +102,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
 
     # Test ignoring resources with default (now using "kwargs")
     info = learners_dict.to_slurm_run(
-        {"num_cpus": 8},
+        {"cpus": 8},
         ignore_resources=True,
         returns="kwargs",
     )
@@ -112,7 +112,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert info["cores_per_node"] == (8, 8)
 
     with pytest.raises(ValueError, match="Invalid value for `returns`: not_exists"):
-        learners_dict.to_slurm_run({"num_cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
+        learners_dict.to_slurm_run({"cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
 
 
 def test_missing_resources(tmp_path: Path) -> None:
@@ -144,20 +144,20 @@ def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> Non
     def f2(x: int) -> int:
         return x
 
-    pipeline1 = Pipeline([f1], default_resources=Resources(num_cpus=2))
+    pipeline1 = Pipeline([f1], default_resources=Resources(cpus=2))
     assert isinstance(pipeline1["x"].resources, Resources)
-    assert pipeline1["x"].resources.num_cpus == 2
+    assert pipeline1["x"].resources.cpus == 2
     pipeline2 = Pipeline([f2])
     pipeline = pipeline1 | pipeline2
     inputs = {"a": list(range(4))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
-    kw = learners_dict.to_slurm_run(default_resources=Resources(num_cpus=4))
+    kw = learners_dict.to_slurm_run(default_resources=Resources(cpus=4))
     assert isinstance(kw, dict)
     assert kw["cores_per_node"] == (2, 4)
 
 
 def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
-    @pipefunc(output_name="x", resources=Resources(num_cpus=2), mapspec="a[i] -> x[i]")
+    @pipefunc(output_name="x", resources=Resources(cpus=2), mapspec="a[i] -> x[i]")
     def f1(a: int) -> int:
         return a
 
@@ -170,7 +170,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     inputs = {"a": list(range(10))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
-    default_resources = Resources(num_cpus=4)
+    default_resources = Resources(cpus=4)
     info = slurm_run_setup(learners_dict, default_resources)
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
@@ -203,13 +203,13 @@ def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:
         ValueError,
         match="At least one `PipeFunc` provides `partition`.",
     ):
-        slurm_run_setup(learners_dict, Resources(num_nodes=1))
+        slurm_run_setup(learners_dict, Resources(nodes=1))
 
 
 def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
-        resources=lambda kw: Resources(num_cpus=kw["a"]),
+        resources=lambda kw: Resources(cpus=kw["a"]),
         resources_variable="resources",
     )
     def f1(a: int, resources: Resources):
@@ -224,13 +224,15 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
         split_independent_axes=True,
         return_output=True,
     )
-    info = slurm_run_setup(learners_dict, Resources(num_cpus=2))
+    info = slurm_run_setup(learners_dict, Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 1
     learners_dict.simple_run()
     learner_pipefunc = learners_dict[None][0][0]
-    assert learner_pipefunc.learner.data == {0: (1, Resources(num_cpus=1))}
+    assert learner_pipefunc.learner.data == {0: (1, Resources(cpus=1))}
+    assert info.cores_per_node is not None
     assert len(info.cores_per_node) == 1
+    assert callable(info.cores_per_node[0])
     assert info.cores_per_node[0]() == 1
 
     kw = info.kwargs()
@@ -241,7 +243,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
 def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
-        resources=lambda kw: Resources(num_cpus=kw["a"]),
+        resources=lambda kw: Resources(cpus=kw["a"]),
         mapspec="a[i] -> x[i]",
     )
     def f1(a: int) -> int:
@@ -254,6 +256,6 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
     inputs = {"a": list(range(10))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
-    info = slurm_run_setup(learners_dict, Resources(num_cpus=2))
+    info = slurm_run_setup(learners_dict, Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
