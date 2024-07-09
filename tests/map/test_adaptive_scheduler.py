@@ -28,7 +28,6 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     info = learners_dict.to_slurm_run(
-        tmp_path,
         Resources(
             num_cpus_per_node=2,
             num_nodes=1,
@@ -79,10 +78,10 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     with pytest.raises(ValueError, match="At least one `PipeFunc` provides `num_cpus`"):
-        learners_dict.to_slurm_run(tmp_path, None, returns="namedtuple")
+        learners_dict.to_slurm_run(None, returns="namedtuple")
 
     # Test including defaults
-    info = learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, returns="namedtuple")
+    info = learners_dict.to_slurm_run({"num_cpus": 8}, returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
@@ -95,7 +94,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert info.cores_per_node == (8, 2)
 
     # Test ignoring resources
-    info = learners_dict.to_slurm_run(tmp_path, None, ignore_resources=True, returns="namedtuple")
+    info = learners_dict.to_slurm_run(None, ignore_resources=True, returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert info.extra_scheduler is None
@@ -103,7 +102,6 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
 
     # Test ignoring resources with default (now using "kwargs")
     info = learners_dict.to_slurm_run(
-        tmp_path,
         {"num_cpus": 8},
         ignore_resources=True,
         returns="kwargs",
@@ -114,7 +112,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert info["cores_per_node"] == (8, 8)
 
     with pytest.raises(ValueError, match="Invalid value for `returns`: not_exists"):
-        learners_dict.to_slurm_run(tmp_path, {"num_cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
+        learners_dict.to_slurm_run({"num_cpus": 8}, returns="not_exists")  # type: ignore[arg-type]
 
 
 def test_missing_resources(tmp_path: Path) -> None:
@@ -134,7 +132,7 @@ def test_missing_resources(tmp_path: Path) -> None:
         ValueError,
         match="Either all `PipeFunc`s must have resources or `default_resources` must be provided.",
     ):
-        learners_dict.to_slurm_run(tmp_path)
+        learners_dict.to_slurm_run()
 
 
 def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> None:
@@ -153,7 +151,7 @@ def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> Non
     pipeline = pipeline1 | pipeline2
     inputs = {"a": list(range(4))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
-    kw = learners_dict.to_slurm_run(tmp_path, default_resources=Resources(num_cpus=4))
+    kw = learners_dict.to_slurm_run(default_resources=Resources(num_cpus=4))
     assert isinstance(kw, dict)
     assert kw["cores_per_node"] == (2, 4)
 
@@ -173,7 +171,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     default_resources = Resources(num_cpus=4)
-    info = slurm_run_setup(learners_dict, tmp_path, default_resources)
+    info = slurm_run_setup(learners_dict, default_resources)
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
@@ -205,4 +203,4 @@ def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:
         ValueError,
         match="At least one `PipeFunc` provides `partition`.",
     ):
-        slurm_run_setup(learners_dict, tmp_path, Resources(num_nodes=1))
+        slurm_run_setup(learners_dict, Resources(num_nodes=1))

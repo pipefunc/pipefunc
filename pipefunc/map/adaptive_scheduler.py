@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 
 from pipefunc._utils import at_least_tuple
+from pipefunc.map._run import _func_kwargs
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -15,7 +16,6 @@ if TYPE_CHECKING:
     from adaptive import SequenceLearner
 
     from pipefunc._pipefunc import PipeFunc
-    from pipefunc.map._run import _func_kwargs
     from pipefunc.map._run_info import RunInfo
     from pipefunc.map.adaptive import LearnersDict
 
@@ -64,16 +64,17 @@ def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
 
 def slurm_run_setup(
     learners_dict: LearnersDict,
-    run_folder: str | Path,
     default_resources: dict | Resources | None = None,
     *,
     ignore_resources: bool = False,
 ) -> AdaptiveSchedulerDetails:
     """Set up the arguments for `adaptive_scheduler.slurm_run`."""
+    assert learners_dict.run_info is not None
     default_resources = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
     assert isinstance(default_resources, Resources) or default_resources is None
     tracker = _Tracker(default_resources)
-    run_folder = Path(run_folder)
+    assert learners_dict.run_folder is not None
+    run_folder = Path(learners_dict.run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
     dependencies: dict[int, list[int]] = {}
@@ -95,10 +96,14 @@ def slurm_run_setup(
                     tracker.update_resources(
                         learner.pipefunc.resources,
                         learner.pipefunc,
-                        run_folder,
+                        learners_dict.run_info,
                     )
                 elif ignore_resources and default_resources is not None:
-                    tracker.update_resources(default_resources, learner.pipefunc, run_folder)
+                    tracker.update_resources(
+                        default_resources,
+                        learner.pipefunc,
+                        learners_dict.run_info,
+                    )
             prev_indices = indices
 
     if not any(tracker.resources_dict["extra_scheduler"]):  # all are empty
@@ -143,16 +148,18 @@ class _Tracker:
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources],
         key: str,
-    ) -> Any | _UnknownBecauseDelayed | None:
+        func: PipeFunc,
+        run_info: RunInfo,
+    ) -> Any | Callable[[], Any] | None:
         if callable(resources):
             if key == "num_cpus":
-                return _num_cpus(resources)
+                return _num_cpus(resources, func, run_info)
             if key == "num_cpus_per_node":
-                return _num_cpus_per_node(resources)
+                return _num_cpus_per_node(resources, func, run_info)
             if key == "num_nodes":
-                return _num_nodes(resources)
+                return _num_nodes(resources, func, run_info)
             if key == "partition":
-                return _partition(resources)
+                return _partition(resources, func, run_info)
             msg = f"Unknown key: {key}"
             raise ValueError(msg)
 
@@ -178,7 +185,7 @@ class _Tracker:
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
-        run_folder: Path,
+        run_info: RunInfo,
     ) -> None:
         if resources is None and self.default_resources is None:
             msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
@@ -193,27 +200,27 @@ class _Tracker:
             # TODO: Create functions for cores_per_node, nodes, etc.
         else:
             r = resources.with_defaults(self.default_resources)
-        assert resources is not None
-        if (v := self.get(r, "num_cpus", func, run_folder)) is not None:
+        assert r is not None
+        if (v := self.get(r, "num_cpus", func, run_info)) is not None:
             self.resources_dict["cores_per_node"].append(v)
-        if (v := self.get(r, "num_cpus_per_node", func, run_folder)) is not None:
+        if (v := self.get(r, "num_cpus_per_node", func, run_info)) is not None:
             self.resources_dict["cores_per_node"].append(v)
-        if (v := self.get(r, "num_nodes", func, run_folder)) is not None:
+        if (v := self.get(r, "num_nodes", func, run_info)) is not None:
             self.resources_dict["nodes"].append(v)
-        if (v := self.get(r, "partition", func, run_folder)) is not None:
+        if (v := self.get(r, "partition", func, run_info)) is not None:
             self.resources_dict["partition"].append(v)
 
         # There is no requirement for these to be defined for all `PipeFunc`s.
-        self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_folder))
+        self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
 
 def _num_cpus(
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
-) -> Callable[[], int]:
-    def _fn() -> int:
-        kwargs = _func_kwargs(func, run_info)
+) -> Callable[[], int | None]:
+    def _fn() -> int | None:
+        kwargs = _func_kwargs(func, run_info, run_info.init_store())
         return resources(kwargs).num_cpus
 
     return _fn
@@ -223,9 +230,9 @@ def _num_cpus_per_node(
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
-) -> Callable[[], int]:
-    def _fn() -> int:
-        kwargs = _func_kwargs(func, run_info)
+) -> Callable[[], int | None]:
+    def _fn() -> int | None:
+        kwargs = _func_kwargs(func, run_info, run_info.init_store())
         return resources(kwargs).num_cpus_per_node
 
     return _fn
@@ -235,9 +242,9 @@ def _num_nodes(
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
-) -> Callable[[], int]:
-    def _fn() -> int:
-        kwargs = _func_kwargs(func, run_info)
+) -> Callable[[], int | None]:
+    def _fn() -> int | None:
+        kwargs = _func_kwargs(func, run_info, run_info.init_store())
         return resources(kwargs).num_nodes
 
     return _fn
@@ -247,9 +254,9 @@ def _partition(
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
-) -> Callable[[], str]:
-    def _fn() -> str:
-        kwargs = _func_kwargs(func, run_info)
+) -> Callable[[], str | None]:
+    def _fn() -> str | None:
+        kwargs = _func_kwargs(func, run_info, run_info.init_store())
         return resources(kwargs).partition
 
     return _fn
@@ -263,18 +270,18 @@ def _extra_scheduler(
     if callable(resources):
 
         def _fn() -> list[str]:
-            kwargs = _func_kwargs(func, run_info)
-            return _extra_scheduler(resources(kwargs))
+            kwargs = _func_kwargs(func, run_info, run_info.init_store())
+            return _extra_scheduler(resources(kwargs), func, run_info)  # type: ignore[return-value]
 
         return _fn
-    _extra_scheduler = []
+    extra_scheduler = []
     if resources.memory:
-        _extra_scheduler.append(f"--mem={resources.memory}")
+        extra_scheduler.append(f"--mem={resources.memory}")
     if resources.num_gpus:
-        _extra_scheduler.append(f"--gres=gpu:{resources.num_gpus}")
+        extra_scheduler.append(f"--gres=gpu:{resources.num_gpus}")
     if resources.wall_time:
-        _extra_scheduler.append(f"--time={resources.wall_time}")
+        extra_scheduler.append(f"--time={resources.wall_time}")
     if resources.extra_args:
         for key, value in resources.extra_args.items():
-            _extra_scheduler.append(f"--{key}={value}")
-    return _extra_scheduler
+            extra_scheduler.append(f"--{key}={value}")
+    return extra_scheduler
