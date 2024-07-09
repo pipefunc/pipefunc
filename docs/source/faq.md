@@ -475,12 +475,12 @@ from pipefunc import pipefunc, Pipeline
 
 @pipefunc(
     output_name="c",
-    resources={"memory": "1GB", "num_cpus": 2},
+    resources={"memory": "1GB", "cpus": 2},
     resources_variable="resources",
 )
 def f(a, b, resources):
     print(f"Inside the function `f`, resources.memory: {resources.memory}")
-    print(f"Inside the function `f`, resources.num_cpus: {resources.num_cpus}")
+    print(f"Inside the function `f`, resources.cpus: {resources.cpus}")
     return a + b
 
 result = f(a=1, b=1)
@@ -488,16 +488,16 @@ print(f"Result: {result}")
 ```
 
 In this example, the `resources` argument is passed to the function `f` via the `resources_variable` parameter.
-Inside the function, you can access the attributes of the `Resources` instance using `resources.memory` and `resources.num_cpus`.
+Inside the function, you can access the attributes of the `Resources` instance using `resources.memory` and `resources.cpus`.
 
 As you can see, the function `f` has access to the `resources` object and can inspect its attributes directly.
 
 Similarly, when using a `Pipeline`, you can inspect the `Resources` inside the functions:
 
 ```{code-cell} ipython3
-@pipefunc(output_name="d", resources={"num_gpus": 4}, resources_variable="resources")
+@pipefunc(output_name="d", resources={"gpus": 4}, resources_variable="resources")
 def g(c, resources):
-    print(f"Inside the function `g`, resources.num_gpus: {resources.num_gpus}")
+    print(f"Inside the function `g`, resources.gpus: {resources.gpus}")
     return c * 2
 
 pipeline = Pipeline([f, g])
@@ -507,7 +507,7 @@ print(f"Pipeline result: {result}")
 
 In this case, the `Pipeline` consists of two functions, `f` and `g`, both of which have access to their respective `resources` objects.
 
-The function `f` can inspect `resources.memory` and `resources.num_cpus`, while the function `g` can inspect `resources.num_gpus`.
+The function `f` can inspect `resources.memory` and `resources.cpus`, while the function `g` can inspect `resources.gpus`.
 
 By using the `resources_variable` argument, you can pass the `Resources` instance directly to the functions, allowing them to inspect the resource information as needed.
 
@@ -529,9 +529,9 @@ from pipefunc import pipefunc, Pipeline
 from pipefunc.resources import Resources
 
 def resources_func(kwargs):
-    num_gpus = kwargs["x"] + kwargs["y"]
-    print(f"Inside the resources function, num_gpus: {num_gpus}")
-    return Resources(num_gpus=num_gpus)
+    gpus = kwargs["x"] + kwargs["y"]
+    print(f"Inside the resources function, gpus: {gpus}")
+    return Resources(gpus=gpus)
 
 @pipefunc(output_name="out1", resources=resources_func)
 def f(x, y):
@@ -541,7 +541,7 @@ result = f(x=2, y=3)
 print(f"Result: {result}")
 ```
 
-In this case, `f.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `num_gpus` set to the sum of `x` and `y`.
+In this case, `f.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `gpus` set to the sum of `x` and `y`.
 
 The `f.resources` callable is invoked with the dictionary of input arguments to determine the resources for that specific execution.
 
@@ -561,8 +561,8 @@ Now, let's see an example that uses both a `resources` callable and the `resourc
 
 ```{code-cell} ipython3
 def resources_with_cpu(kwargs):
-    num_cpus = kwargs["out1"] + kwargs["z"]
-    return Resources(num_cpus=num_cpus)
+    cpus = kwargs["out1"] + kwargs["z"]
+    return Resources(cpus=cpus)
 
 @pipefunc(
     output_name="out2",
@@ -570,17 +570,17 @@ def resources_with_cpu(kwargs):
     resources_variable="resources",
 )
 def g(out1, z, resources):
-    print(f"Inside the function `g`, resources.num_cpus: {resources.num_cpus}")
+    print(f"Inside the function `g`, resources.cpus: {resources.cpus}")
     return out1 * z
 
 result = g(out1=2, z=3)
 print(f"Result: {result}")
 ```
 
-In this case, `g.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `num_cpus` set to the sum of `out1` and `z`
+In this case, `g.resources` is a callable that takes a dictionary of input arguments and returns a `Resources` instance with `cpus` set to the sum of `out1` and `z`
 The resulting `Resources` instance is then passed to the function `g` via the `resources` parameter.
 
-The `resources` callable dynamically creates a `Resources` instance based on the input arguments, and the function `g` can access the `num_cpus` attribute of the `resources` object inside the function.
+The `resources` callable dynamically creates a `Resources` instance based on the input arguments, and the function `g` can access the `cpus` attribute of the `resources` object inside the function.
 
 Combining both functions into a pipeline
 

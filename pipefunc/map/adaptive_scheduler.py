@@ -126,11 +126,11 @@ def _update_resources(  # noqa: PLR0912
     else:
         r = resources.with_defaults(tracker.default_resources)
     assert r is not None
-    if (v := tracker.get(r, "num_cpus")) is not None:
+    if (v := tracker.get(r, "cpus")) is not None:
         resources_dict["cores_per_node"].append(v)
-    if (v := tracker.get(r, "num_cpus_per_node")) is not None:
+    if (v := tracker.get(r, "cpus_per_node")) is not None:
         resources_dict["cores_per_node"].append(v)
-    if (v := tracker.get(r, "num_nodes")) is not None:
+    if (v := tracker.get(r, "nodes")) is not None:
         resources_dict["nodes"].append(v)
     if (v := tracker.get(r, "partition")) is not None:
         resources_dict["partition"].append(v)
@@ -139,10 +139,10 @@ def _update_resources(  # noqa: PLR0912
     _extra_scheduler = []
     if r.memory:
         _extra_scheduler.append(f"--mem={r.memory}")
-    if r.num_gpus:
-        _extra_scheduler.append(f"--gres=gpu:{r.num_gpus}")
-    if r.wall_time:
-        _extra_scheduler.append(f"--time={r.wall_time}")
+    if r.gpus:
+        _extra_scheduler.append(f"--gres=gpu:{r.gpus}")
+    if r.time:
+        _extra_scheduler.append(f"--time={r.time}")
     if r.extra_args:
         for key, value in r.extra_args.items():
             _extra_scheduler.append(f"--{key}={value}")
