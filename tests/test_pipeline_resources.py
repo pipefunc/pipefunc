@@ -9,7 +9,7 @@ from pipefunc.resources import Resources
 
 
 def test_default_resources_from_pipeline() -> None:
-    @pipefunc(output_name="c", resources={"memory": "1GB", "num_cpus": 2})
+    @pipefunc(output_name="c", resources={"memory": "1GB", "cpus": 2})
     def f(a, b):
         return a + b
 
@@ -17,15 +17,15 @@ def test_default_resources_from_pipeline() -> None:
     def g(c):
         return c
 
-    pipeline1 = Pipeline([f, g], default_resources={"memory": "2GB", "num_cpus": 1})
+    pipeline1 = Pipeline([f, g], default_resources={"memory": "2GB", "cpus": 1})
 
     @pipefunc(output_name="e")
     def h(d):
         return d
 
-    pipeline2 = Pipeline([h], default_resources={"memory": "3GB", "num_cpus": 3})
+    pipeline2 = Pipeline([h], default_resources={"memory": "3GB", "cpus": 3})
 
-    @pipefunc(output_name="f", resources={"memory": "4GB", "num_cpus": 4})
+    @pipefunc(output_name="f", resources={"memory": "4GB", "cpus": 4})
     def i(e):
         return e
 
@@ -38,19 +38,19 @@ def test_default_resources_from_pipeline() -> None:
     assert isinstance(pipeline["e"].resources, Resources)
     assert isinstance(pipeline["f"].resources, Resources)
 
-    assert pipeline["c"].resources.num_cpus == 2
+    assert pipeline["c"].resources.cpus == 2
     assert pipeline["c"].resources.memory == "1GB"
-    assert pipeline["d"].resources.num_cpus == 1
+    assert pipeline["d"].resources.cpus == 1
     assert pipeline["d"].resources.memory == "2GB"
-    assert pipeline["e"].resources.num_cpus == 3
+    assert pipeline["e"].resources.cpus == 3
     assert pipeline["e"].resources.memory == "3GB"
-    assert pipeline["f"].resources.num_cpus == 4
+    assert pipeline["f"].resources.cpus == 4
 
 
 def test_resources_variable():
-    @pipefunc(output_name="c", resources_variable="resources", resources={"num_gpus": 8})
+    @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):  # noqa: ARG001
-        return resources.num_gpus
+        return resources.gpus
 
     assert f_c(a=1, b=2) == 8
 
@@ -58,23 +58,23 @@ def test_resources_variable():
     assert pipeline(a=1, b=2) == 8
 
     with pytest.raises(ValueError, match="Unexpected keyword arguments: `{'resources'}`"):
-        f_c(a=1, b=2, resources={"num_gpus": 4})
+        f_c(a=1, b=2, resources={"gpus": 4})
 
     with pytest.raises(ValueError, match="Unused keyword arguments: `resources`"):
-        pipeline(a=1, b=2, resources={"num_gpus": 4})
+        pipeline(a=1, b=2, resources={"gpus": 4})
 
 
 def test_resources_variable_nested_func():
-    @pipefunc(output_name="c", resources_variable="resources", resources={"num_gpus": 8})
+    @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):  # noqa: ARG001
-        return resources.num_gpus
+        return resources.gpus
 
     @pipefunc(output_name="d")
     def f_d(c):
         return c
 
     nf = NestedPipeFunc([f_c, f_d], output_name="d")
-    assert nf.resources.num_gpus == 8
+    assert nf.resources.gpus == 8
     assert nf(a=1, b=2) == 8
 
     pipeline = Pipeline([nf])
@@ -84,7 +84,7 @@ def test_resources_variable_nested_func():
 def test_resources_variable_with_callable_resources() -> None:
     @pipefunc(
         output_name="c",
-        resources=lambda kwargs: Resources(num_gpus=kwargs["a"] + kwargs["b"]),
+        resources=lambda kwargs: Resources(gpus=kwargs["a"] + kwargs["b"]),
         resources_variable="resources",
     )
     def f_c(a, b, resources):  # noqa: ARG001
@@ -109,7 +109,7 @@ def test_resources_variable_with_callable_resources() -> None:
     pipeline = Pipeline([f_c, f_d, f_e])
     r = pipeline(a=1, b=2)
     assert isinstance(r, Resources)
-    assert r.num_gpus == 3
+    assert r.gpus == 3
 
     with pytest.raises(
         ValueError,
@@ -132,21 +132,21 @@ def test_resources_variable_in_nested_func_with_defaults() -> None:
         assert isinstance(resources, Resources)
         return resources
 
-    nf = NestedPipeFunc([f, g], output_name="d", resources={"num_gpus": 3})
-    pipeline = Pipeline([nf], default_resources={"memory": "4GB", "num_gpus": 1})
+    nf = NestedPipeFunc([f, g], output_name="d", resources={"gpus": 3})
+    pipeline = Pipeline([nf], default_resources={"memory": "4GB", "gpus": 1})
 
     assert isinstance(pipeline["d"].resources, Resources)
-    assert pipeline["d"].resources == Resources(num_gpus=3, memory="4GB")
+    assert pipeline["d"].resources == Resources(gpus=3, memory="4GB")
     r = pipeline(a=1, b=2)
     assert isinstance(r, Resources)
-    assert r.num_gpus == 3
+    assert r.gpus == 3
     assert r.memory == "4GB"
 
 
 def test_resources_func_with_variable() -> None:
     def resources_with_cpu(kwargs) -> Resources:
-        num_cpus = kwargs["a"] + kwargs["b"]
-        return Resources(num_cpus=num_cpus)
+        cpus = kwargs["a"] + kwargs["b"]
+        return Resources(cpus=cpus)
 
     @pipefunc(
         output_name="i",
@@ -155,7 +155,7 @@ def test_resources_func_with_variable() -> None:
     )
     def j(a, b, resources):
         assert isinstance(resources, Resources)
-        assert resources.num_cpus == a + b
+        assert resources.cpus == a + b
         return a * b
 
     result = j(a=2, b=3)
@@ -170,8 +170,8 @@ def test_resources_func_with_variable() -> None:
 
 def test_with_resource_func_with_defaults():
     def resources_with_cpu(kwargs) -> Resources:
-        num_cpus = kwargs["a"] + kwargs["b"]
-        return Resources(num_cpus=num_cpus)
+        cpus = kwargs["a"] + kwargs["b"]
+        return Resources(cpus=cpus)
 
     @pipefunc(
         output_name="i",
@@ -180,13 +180,13 @@ def test_with_resource_func_with_defaults():
     )
     def j(a, b, resources):
         assert isinstance(resources, Resources)
-        assert resources.num_cpus == a + b
+        assert resources.cpus == a + b
         return resources
 
-    pipeline = Pipeline([j], default_resources={"num_gpus": 5, "num_cpus": 1000})
+    pipeline = Pipeline([j], default_resources={"gpus": 5, "cpus": 1000})
     result = pipeline(a=2, b=3)
-    assert result.num_cpus == 5
-    assert result.num_gpus == 5
+    assert result.cpus == 5
+    assert result.gpus == 5
     result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False, storage="dict")
-    assert result["i"].output.num_cpus == 5
-    assert result["i"].output.num_gpus == 5
+    assert result["i"].output.cpus == 5
+    assert result["i"].output.gpus == 5
