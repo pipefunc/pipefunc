@@ -119,7 +119,7 @@ class LearnersDict(LearnersDictType):
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
         if self.run_info is None:
-            msg = "The `run_info  must be provided. Set `learners_dict.run_info`."
+            msg = "`run_info` must be provided. Set `learners_dict.run_info`."
             raise ValueError(msg)
 
         details: AdaptiveSchedulerDetails = slurm_run_setup(

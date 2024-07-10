@@ -93,11 +93,11 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert info.cores_per_node == (8, 2)
 
     # Test ignoring resources
-    info = learners_dict.to_slurm_run(None, ignore_resources=True, returns="namedtuple")
+    info = learners_dict.to_slurm_run({"cpus": 10}, ignore_resources=True, returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
     assert info.extra_scheduler is None
-    assert info.cores_per_node is None
+    assert info.cores_per_node == (10, 10)
 
     # Test ignoring resources with default (now using "kwargs")
     info = learners_dict.to_slurm_run(

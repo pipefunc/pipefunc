@@ -108,7 +108,7 @@ def slurm_run_setup(
         del tracker.resources_dict["extra_scheduler"]
 
     # Combine cores_per_node and cpus
-    cores_per_node = tracker.maybe_get("cores_per_node")
+    cores_per_node = tracker.maybe_get("cpus_per_node")
     cpus = tracker.maybe_get("cpus")
     if cores_per_node is not None and cpus is not None:
         assert len(cores_per_node) == len(cpus)
@@ -160,6 +160,9 @@ class _Tracker:
     ) -> Any | Callable[[], Any] | None:
         if callable(resources):
             if key in ("cpus", "cpus_per_node", "nodes", "partition"):
+                # We cannot know in advance whether `resources` returns the key,
+                # so it might be None.
+                self._is_defined(key)
                 return functools.partial(
                     _attribute_from_resources,
                     key=key,
@@ -209,17 +212,9 @@ class _Tracker:
         else:
             r = resources.with_defaults(self.default_resources)
 
-        cpus_per_node = self._get(r, "cpus_per_node", func, run_info)
-        self.resources_dict["cores_per_node"].append(cpus_per_node)
-
-        cpus = self._get(r, "cpus", func, run_info)
-        self.resources_dict["cpus"].append(cpus)
-
-        nodes = self._get(r, "nodes", func, run_info)
-        self.resources_dict["nodes"].append(nodes)
-
-        partition = self._get(r, "partition", func, run_info)
-        self.resources_dict["partition"].append(partition)
+        for key in ["cpus_per_node", "cpus", "nodes", "partition"]:
+            if (v := self._get(r, key, func, run_info)) is not None:
+                self.resources_dict[key].append(v)
 
         # There is no requirement for these to be defined for all `PipeFunc`s.
         self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
