@@ -31,7 +31,6 @@ class AdaptiveSchedulerDetails(NamedTuple):
     cores_per_node: tuple[int | Callable[[], int], ...] | None
     extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
     partition: tuple[str | Callable[[], str], ...] | None
-    exclusive: bool = False
 
     def kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for `adaptive_scheduler.slurm_run`.
@@ -108,12 +107,21 @@ def slurm_run_setup(
     if not any(tracker.resources_dict["extra_scheduler"]):  # all are empty
         del tracker.resources_dict["extra_scheduler"]
 
+    # Combine cores_per_node and cpus
+    cores_per_node = tracker.maybe_get("cores_per_node")
+    cpus = tracker.maybe_get("cpus")
+    if cores_per_node is not None and cpus is not None:
+        assert len(cores_per_node) == len(cpus)
+        cores_per_node = tuple(_or(cpn, _cpus) for cpn, _cpus in zip(cores_per_node, cpus))
+    elif cpus is not None:
+        cores_per_node = cpus
+
     return AdaptiveSchedulerDetails(
         learners=learners,
         fnames=fnames,
         dependencies=dependencies,
         nodes=tracker.maybe_get("nodes"),
-        cores_per_node=tracker.maybe_get("cores_per_node"),
+        cores_per_node=cores_per_node,
         extra_scheduler=tracker.maybe_get("extra_scheduler"),
         partition=tracker.maybe_get("partition"),
     )
@@ -189,24 +197,29 @@ class _Tracker:
         if resources is None and self.default_resources is None:
             msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
             raise ValueError(msg)
-        r: Resources | Callable[[dict[str, Any]], Resources] | None
+        r: Resources | Callable[[dict[str, Any]], Resources]
         if resources is None:
+            assert self.default_resources is not None
             r = self.default_resources
         elif self.default_resources is None:
             r = resources
         elif callable(resources):
-            r = Resources.maybe_with_defaults(resources, self.default_resources)
+            r = Resources.maybe_with_defaults(resources, self.default_resources)  # type: ignore[assignment]
+            assert r is not None
         else:
             r = resources.with_defaults(self.default_resources)
 
-        key_mapping = {
-            "cpus_per_node": "cores_per_node",
-            "nodes": "nodes",
-            "partition": "partition",
-        }
-        for key, adaptive_key in key_mapping.items():
-            if (v := self._get(r, key, func, run_info)) is not None:
-                self.resources_dict[adaptive_key].append(v)
+        cpus_per_node = self._get(r, "cpus_per_node", func, run_info)
+        self.resources_dict["cores_per_node"].append(cpus_per_node)
+
+        cpus = self._get(r, "cpus", func, run_info)
+        self.resources_dict["cpus"].append(cpus)
+
+        nodes = self._get(r, "nodes", func, run_info)
+        self.resources_dict["nodes"].append(nodes)
+
+        partition = self._get(r, "partition", func, run_info)
+        self.resources_dict["partition"].append(partition)
 
         # There is no requirement for these to be defined for all `PipeFunc`s.
         self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
@@ -246,3 +259,20 @@ def _extra_scheduler(
         for key, value in resources.extra_args.items():
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
+
+
+def _or(
+    value_1: int | Callable[[], int | None] | None,
+    value_2: int | Callable[[], int | None] | None,
+) -> int | Callable[[], int | None] | None:
+    if value_1 is None:
+        return value_2
+    if value_2 is None:
+        return value_1
+    if callable(value_1) and callable(value_2):
+        return lambda: value_1() or value_2()
+    if callable(value_1) and not callable(value_2):
+        return lambda: value_1() or value_2
+    if not callable(value_1) and callable(value_2):
+        return lambda: value_1 or value_2()
+    return value_1 or value_2

@@ -56,7 +56,6 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
-        "exclusive",
     ]
 
 
@@ -238,6 +237,24 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
     kw = info.kwargs()
     assert len(kw["cores_per_node"]) == 1
     assert kw["cores_per_node"][0]() == 1
+    assert kw.keys() == {
+        "learners",
+        "fnames",
+        "dependencies",
+        "nodes",
+        "cores_per_node",
+        "extra_scheduler",
+        "partition",
+    }
+    f, *rest = kw["nodes"]
+    assert len(rest) == 0
+    assert f() is None
+    f, *rest = kw["extra_scheduler"]
+    assert len(rest) == 0
+    assert f() == []
+    f, *rest = kw["partition"]
+    assert len(rest) == 0
+    assert f() is None
 
 
 def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
