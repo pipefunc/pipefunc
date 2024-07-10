@@ -76,9 +76,6 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     inputs = {"a": list(range(4))}
     learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
-    with pytest.raises(ValueError, match="At least one `PipeFunc` provides `cpus`"):
-        learners_dict.to_slurm_run(None, returns="namedtuple")
-
     # Test including defaults
     info = learners_dict.to_slurm_run({"cpus": 8}, returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
@@ -87,9 +84,9 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert len(info.learners[0].sequence) == 4
     assert len(info.learners[1].sequence) == 1
     assert info.dependencies == {0: [], 1: [0]}
-    assert info.nodes is None
+    assert info.nodes == (None, None)
     assert info.extra_scheduler == (["--mem=8GB"], ["--mem=4GB", "--qos=high"])
-    assert info.partition is None
+    assert info.partition == (None, None)
     assert info.cores_per_node == (8, 2)
 
     # Test ignoring resources
@@ -175,10 +172,10 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     assert info.dependencies == {0: [], 1: [0]}
-    assert info.nodes is None
+    assert info.nodes == (None, None)
     assert info.cores_per_node == (2, 4)
     assert info.extra_scheduler is None
-    assert info.partition is None
+    assert info.partition == (None, None)
     kwargs = info.kwargs()
     assert "partition" not in kwargs
     assert "cores_per_node" in kwargs

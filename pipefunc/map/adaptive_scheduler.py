@@ -44,13 +44,21 @@ class AdaptiveSchedulerDetails(NamedTuple):
 
         """
         dct = self._asdict()
-        return {k: v for k, v in dct.items() if v is not None}
+        return {k: v for k, v in dct.items() if not _is_none(v)}
 
     def run_manager(self) -> adaptive_scheduler.RunManager:  # pragma: no cover
         """Get a `RunManager` for the adaptive scheduler."""
         import adaptive_scheduler
 
         return adaptive_scheduler.RunManager(**self.kwargs())
+
+
+def _is_none(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, tuple):
+        return all(_is_none(x) for x in value)
+    return False
 
 
 def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
@@ -68,7 +76,7 @@ def slurm_run_setup(
     assert learners_dict.run_info is not None
     default_resources = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
     assert isinstance(default_resources, Resources) or default_resources is None
-    tracker = _Tracker(default_resources)
+    tracker = _ResourcesContainer(default_resources)
     assert learners_dict.run_info is not None
     run_folder = Path(learners_dict.run_info.run_folder)
     learners: list[SequenceLearner] = []
@@ -84,32 +92,19 @@ def slurm_run_setup(
                 dependencies[i] = prev_indices
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
-                if not ignore_resources:
-                    assert (
-                        isinstance(learner.pipefunc.resources, Resources | Callable)
-                        or learner.pipefunc.resources is None
-                    )
-                    tracker.update_resources(
-                        learner.pipefunc.resources,
-                        learner.pipefunc,
-                        learners_dict.run_info,
-                    )
-                elif ignore_resources and default_resources is not None:
-                    tracker.update_resources(
-                        default_resources,
-                        learner.pipefunc,
-                        learners_dict.run_info,
-                    )
-                else:
-                    tracker.update_resources(None, learner.pipefunc, learners_dict.run_info)
+                tracker.update(
+                    learner.pipefunc.resources if not ignore_resources else None,
+                    learner.pipefunc,
+                    learners_dict.run_info,
+                )
             prev_indices = indices
 
-    if not any(tracker.resources_dict["extra_scheduler"]):  # all are empty
-        del tracker.resources_dict["extra_scheduler"]
+    if not any(tracker.data["extra_scheduler"]):  # all are empty
+        del tracker.data["extra_scheduler"]
 
     # Combine cores_per_node and cpus
-    cores_per_node = tracker.maybe_get("cpus_per_node")
-    cpus = tracker.maybe_get("cpus")
+    cores_per_node = tracker.get("cpus_per_node")
+    cpus = tracker.get("cpus")
     if cores_per_node is not None and cpus is not None:
         assert len(cores_per_node) == len(cpus)
         cores_per_node = tuple(_or(cpn, _cpus) for cpn, _cpus in zip(cores_per_node, cpus))
@@ -120,78 +115,41 @@ def slurm_run_setup(
         learners=learners,
         fnames=fnames,
         dependencies=dependencies,
-        nodes=tracker.maybe_get("nodes"),
+        nodes=tracker.get("nodes"),
         cores_per_node=cores_per_node,
-        extra_scheduler=tracker.maybe_get("extra_scheduler"),
-        partition=tracker.maybe_get("partition"),
+        extra_scheduler=tracker.get("extra_scheduler"),
+        partition=tracker.get("partition"),
     )
 
 
 @dataclass(frozen=True, slots=True)
-class _Tracker:
-    """Ensures that iff a resource is defined for one `PipeFunc`, it is defined for all of them."""
-
+class _ResourcesContainer:
     default_resources: Resources | None
-    defined: set[str] = field(default_factory=set)
-    missing: set[str] = field(default_factory=set)
-    resources_dict: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
+    data: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
 
-    def _is_defined(self, key: str) -> None:
-        self.defined.add(key)
-        if key in self.missing:
-            self._do_raise(key)
-
-    def _is_missing(self, key: str) -> None:
-        if (
-            self.default_resources is not None and getattr(self.default_resources, key) is not None
-        ):  # pragma: no cover
-            # Never happens because we strictly call `get` with combined defaults+resources
-            return
-        self.missing.add(key)
-        if key in self.defined:
-            self._do_raise(key)
-
-    def _get(
+    def _getattr_from_resources(
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources],
-        key: str,
+        name: str,
         func: PipeFunc,
         run_info: RunInfo,
     ) -> Any | Callable[[], Any] | None:
         if callable(resources):
-            if key in ("cpus", "cpus_per_node", "nodes", "partition"):
-                # We cannot know in advance whether `resources` returns the key,
-                # so it might be None.
-                self._is_defined(key)
-                return functools.partial(
-                    _attribute_from_resources,
-                    key=key,
-                    resources=resources,
-                    func=func,
-                    run_info=run_info,
-                )
-            msg = f"Unknown key: {key}"
-            raise ValueError(msg)
+            assert name in ("cpus", "cpus_per_node", "nodes", "partition")
+            # Note: we don't know if `resources.name` returns None or not
+            return functools.partial(
+                _getattr_from_resources,
+                name=name,
+                resources=resources,
+                func=func,
+                run_info=run_info,
+            )
+        return getattr(resources, name)
 
-        value = getattr(resources, key)
-        if value is not None:
-            self._is_defined(key)
-            return value
+    def get(self, key: str) -> tuple | None:
+        return tuple(self.data[key]) if key in self.data else None
 
-        self._is_missing(key)
-        return None
-
-    def maybe_get(self, key: str) -> tuple | None:
-        return tuple(self.resources_dict[key]) if key in self.resources_dict else None
-
-    def _do_raise(self, key: str) -> None:
-        msg = (
-            f"At least one `PipeFunc` provides `{key}`."
-            " It must either be defined for all `PipeFunc`s or in `default_resources`."
-        )
-        raise ValueError(msg)
-
-    def update_resources(
+    def update(
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
@@ -212,23 +170,23 @@ class _Tracker:
         else:
             r = resources.with_defaults(self.default_resources)
 
-        for key in ["cpus_per_node", "cpus", "nodes", "partition"]:
-            if (v := self._get(r, key, func, run_info)) is not None:
-                self.resources_dict[key].append(v)
+        for name in ["cpus_per_node", "cpus", "nodes", "partition"]:
+            value = self._getattr_from_resources(r, name, func, run_info)
+            self.data[name].append(value)
 
         # There is no requirement for these to be defined for all `PipeFunc`s.
-        self.resources_dict["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
+        self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
 
-def _attribute_from_resources(
+def _getattr_from_resources(
     *,
-    key: str,
+    name: str,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Any | None:
     kwargs = _func_kwargs(func, run_info, run_info.init_store())
-    return getattr(resources(kwargs), key)
+    return getattr(resources(kwargs), name)
 
 
 def _extra_scheduler(
