@@ -6,7 +6,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
-from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, slurm_run_setup
+from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, _or, slurm_run_setup
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -317,3 +317,19 @@ def test_cores_only(tmp_path: Path) -> None:
     assert len(info.learners) == 1
     assert info.cores_per_node == (1,)
     assert info.nodes is None
+
+
+def test_or() -> None:
+    assert _or(None, 1) == 1
+    assert _or(1, None) == 1
+
+    def cpus():
+        return 2
+
+    def none():
+        return None
+
+    assert _or(cpus, None)() == 2  # type: ignore[operator,misc]
+    assert _or(None, cpus)() == 2  # type: ignore[operator,misc]
+    assert _or(cpus, none)() == 2  # type: ignore[operator,misc]
+    assert _or(none, cpus)() == 2  # type: ignore[operator,misc]
