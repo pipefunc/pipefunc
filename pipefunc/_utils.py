@@ -92,7 +92,7 @@ def prod(iterable: Iterable[int]) -> int:
 
 
 def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
-    if type(a) != type(b):
+    if type(a) is not type(b):
         return False
     if isinstance(a, dict):
         return equal_dicts(a, b)
