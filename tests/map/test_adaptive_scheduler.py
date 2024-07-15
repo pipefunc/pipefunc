@@ -329,7 +329,8 @@ def test_or() -> None:
     def none():
         return None
 
-    assert _or(cpus, None)() == 2  # type: ignore[operator,misc]
-    assert _or(None, cpus)() == 2  # type: ignore[operator,misc]
+    assert _or(none, 1)() == 1  # type: ignore[operator,misc]
+    assert _or(1, none)() == 1  # type: ignore[operator,misc]
     assert _or(cpus, none)() == 2  # type: ignore[operator,misc]
     assert _or(none, cpus)() == 2  # type: ignore[operator,misc]
+    assert _or(1, 1) == 1  # type: ignore[operator,misc]
