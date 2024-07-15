@@ -84,9 +84,9 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert len(info.learners[0].sequence) == 4
     assert len(info.learners[1].sequence) == 1
     assert info.dependencies == {0: [], 1: [0]}
-    assert info.nodes == (None, None)
+    assert info.nodes is None
     assert info.extra_scheduler == (["--mem=8GB"], ["--mem=4GB", "--qos=high"])
-    assert info.partition == (None, None)
+    assert info.partition is None
     assert info.cores_per_node == (8, 2)
 
     # Test ignoring resources
@@ -172,10 +172,10 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     assert info.dependencies == {0: [], 1: [0]}
-    assert info.nodes == (None, None)
+    assert info.nodes is None
     assert info.cores_per_node == (2, 4)
     assert info.extra_scheduler is None
-    assert info.partition == (None, None)
+    assert info.partition is None
     kwargs = info.kwargs()
     assert "partition" not in kwargs
     assert "cores_per_node" in kwargs
@@ -185,10 +185,10 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
         resources=lambda kw: Resources(cpus=kw["a"]),
-        resources_variable="resources",
+        resources_variable="resources1",
     )
-    def f1(a: int, resources: Resources):
-        return a, resources
+    def f1(a: int, resources1: Resources):
+        return a, resources1
 
     pipeline = Pipeline([f1])
     inputs = {"a": 1}
@@ -236,7 +236,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
 def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
-        resources=lambda kw: Resources(cpus=max(kw["a"])),
+        resources=lambda kw: Resources(cpus=len(kw["a"])),
         mapspec="a[i] -> x[i]",
     )
     def f1(a: int) -> int:
@@ -258,7 +258,7 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     cpn1, cpn2 = info.cores_per_node
     assert callable(cpn1)
     assert not callable(cpn2)
-    assert cpn1() == 9
+    assert cpn1() == 10
     assert cpn2 == 2
 
     assert isinstance(info.partition, tuple)
@@ -283,3 +283,37 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     assert n1() is None
 
     assert info.dependencies == {0: [], 1: [0]}
+
+
+def test_cores_per_node_vs_cores(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", resources=Resources(cpus=1))
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y", resources=Resources(cpus_per_node=2, nodes=1))
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+    inputs = {"a": 1}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict)
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    assert info.cores_per_node == (1, 2)
+    assert info.nodes == (None, 1)
+
+
+def test_cores_only(tmp_path: Path) -> None:
+    @pipefunc(output_name="x", resources=Resources(cpus=1))
+    def f1(a: int) -> int:
+        return a
+
+    pipeline = Pipeline([f1])
+    inputs = {"a": 1}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict)
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 1
+    assert info.cores_per_node == (1,)
+    assert info.nodes is None

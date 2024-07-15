@@ -127,27 +127,13 @@ class _ResourcesContainer:
     default_resources: Resources | None
     data: dict[str, list[Any]] = field(default_factory=lambda: defaultdict(list))
 
-    def _getattr_from_resources(
-        self,
-        resources: Resources | Callable[[dict[str, Any]], Resources],
-        name: str,
-        func: PipeFunc,
-        run_info: RunInfo,
-    ) -> Any | Callable[[], Any] | None:
-        if callable(resources):
-            assert name in ("cpus", "cpus_per_node", "nodes", "partition")
-            # Note: we don't know if `resources.name` returns None or not
-            return functools.partial(
-                _getattr_from_resources,
-                name=name,
-                resources=resources,
-                func=func,
-                run_info=run_info,
-            )
-        return getattr(resources, name)
-
     def get(self, key: str) -> tuple | None:
-        return tuple(self.data[key]) if key in self.data else None
+        if key not in self.data:
+            return None
+        value = tuple(self.data[key])
+        if all(x is None for x in value):
+            return None
+        return value
 
     def update(
         self,
@@ -171,10 +157,19 @@ class _ResourcesContainer:
             r = resources.with_defaults(self.default_resources)
 
         for name in ["cpus_per_node", "cpus", "nodes", "partition"]:
-            value = self._getattr_from_resources(r, name, func, run_info)
+            if callable(r):
+                # Note: we don't know if `resources.name` returns None or not
+                value = functools.partial(
+                    _getattr_from_resources,
+                    name=name,
+                    resources=r,
+                    func=func,
+                    run_info=run_info,
+                )
+            else:
+                value = getattr(r, name)
             self.data[name].append(value)
 
-        # There is no requirement for these to be defined for all `PipeFunc`s.
         self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
 
