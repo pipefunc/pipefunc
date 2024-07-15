@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
+from pipefunc._cache import LRUCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -175,3 +176,13 @@ def test_sharing_defaults() -> None:
     assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
     assert pipeline.map(inputs={"a": 1})["d"].output == 3
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
+
+
+def test_autoset_cache() -> None:
+    @pipefunc(output_name="y", cache=True)
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    assert pipeline.cache is not None
+    assert isinstance(pipeline.cache, LRUCache)
