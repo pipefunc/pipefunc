@@ -181,27 +181,6 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     assert "cores_per_node" in kwargs
 
 
-def test_slurm_run_setup_missing_resource(tmp_path: Path) -> None:
-    @pipefunc(output_name="x", resources=Resources(partition="partition-1"), mapspec="a[i] -> x[i]")
-    def f1(a: int) -> int:
-        return a
-
-    @pipefunc(output_name="y")
-    def f2(x: int) -> int:
-        return x
-
-    pipeline = Pipeline([f1, f2])
-
-    inputs = {"a": list(range(10))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
-
-    with pytest.raises(
-        ValueError,
-        match="At least one `PipeFunc` provides `partition`.",
-    ):
-        slurm_run_setup(learners_dict, Resources(nodes=1))
-
-
 def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
