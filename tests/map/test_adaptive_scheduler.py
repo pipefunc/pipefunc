@@ -236,7 +236,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
 def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
-        resources=lambda kw: Resources(cpus=kw["a"]),
+        resources=lambda kw: Resources(cpus=max(kw["a"])),
         mapspec="a[i] -> x[i]",
     )
     def f1(a: int) -> int:
@@ -252,3 +252,34 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     info = slurm_run_setup(learners_dict, Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
+
+    assert isinstance(info.cores_per_node, tuple)
+    assert len(info.cores_per_node) == 2
+    cpn1, cpn2 = info.cores_per_node
+    assert callable(cpn1)
+    assert not callable(cpn2)
+    assert cpn1() == 9
+    assert cpn2 == 2
+
+    assert isinstance(info.partition, tuple)
+    assert len(info.partition) == 2
+    p1, p2 = info.partition
+    assert callable(p1)
+    assert p2 is None
+    assert p1() is None
+
+    assert isinstance(info.extra_scheduler, tuple)
+    assert len(info.extra_scheduler) == 2
+    e1, e2 = info.extra_scheduler
+    assert callable(e1)
+    assert e2 == []
+    assert e1() == []
+
+    assert isinstance(info.nodes, tuple)
+    assert len(info.nodes) == 2
+    n1, n2 = info.nodes
+    assert callable(n1)
+    assert n2 is None
+    assert n1() is None
+
+    assert info.dependencies == {0: [], 1: [0]}

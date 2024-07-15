@@ -27,10 +27,10 @@ class AdaptiveSchedulerDetails(NamedTuple):
     learners: list[SequenceLearner]
     fnames: list[Path]
     dependencies: dict[int, list[int]]
-    nodes: tuple[int | Callable[[], int], ...] | None
-    cores_per_node: tuple[int | Callable[[], int], ...] | None
+    nodes: tuple[int | None | Callable[[], int | None], ...] | None
+    cores_per_node: tuple[int | None | Callable[[], int | None], ...] | None
     extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
-    partition: tuple[str | Callable[[], str], ...] | None
+    partition: tuple[str | None | Callable[[], str | None], ...] | None
 
     def kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for `adaptive_scheduler.slurm_run`.
