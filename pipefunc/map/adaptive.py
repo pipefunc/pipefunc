@@ -66,11 +66,11 @@ class LearnersDict(LearnersDictType):
     def __init__(
         self,
         learners_dict: LearnersDictType | None = None,
-        run_folder: str | Path | None = None,
+        run_info: RunInfo | None = None,
     ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
-        self.run_folder = run_folder
+        self.run_info: RunInfo | None = run_info
 
     def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
         """Flatten the learners into a dictionary with the output names as keys."""
@@ -90,7 +90,6 @@ class LearnersDict(LearnersDictType):
 
     def to_slurm_run(
         self,
-        run_folder: str | Path | None = None,
         default_resources: dict | Resources | None = None,
         *,
         ignore_resources: bool = False,
@@ -100,8 +99,6 @@ class LearnersDict(LearnersDictType):
 
         Parameters
         ----------
-        run_folder
-            The folder to store the run information.
         default_resources
             The default resources to use for the run. Only needed if not all `PipeFunc`s have
             resources.
@@ -121,15 +118,12 @@ class LearnersDict(LearnersDictType):
         """
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
-        if run_folder is None:
-            if self.run_folder is None:
-                msg = "The `run_folder` must be provided."
-                raise ValueError(msg)
-            run_folder = self.run_folder
+        if self.run_info is None:
+            msg = "`run_info` must be provided. Set `learners_dict.run_info`."
+            raise ValueError(msg)
 
         details: AdaptiveSchedulerDetails = slurm_run_setup(
             self,
-            run_folder,
             default_resources,
             ignore_resources=ignore_resources,
         )
@@ -228,7 +222,7 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: LearnersDict = LearnersDict(run_folder=run_folder)
+    learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(
         pipeline,
         inputs,

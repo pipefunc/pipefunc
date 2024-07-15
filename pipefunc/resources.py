@@ -17,14 +17,14 @@ class Resources:
     ----------
     cpus
         The number of CPUs required for the job. Must be a positive integer.
-    gpus
-        The number of GPUs required for the job. Must be a non-negative integer.
-    nodes
-        The number of nodes required for the job. Must be a positive integer.
     cpus_per_node
         The number of CPUs per node required for the job. Must be a positive integer.
+    nodes
+        The number of nodes required for the job. Must be a positive integer.
     memory
         The memory required for the job. Must be a valid string (e.g., ``'2GB'``, ``'500MB'``).
+    gpus
+        The number of GPUs required for the job. Must be a non-negative integer.
     time
         The time required for the job. Must be a valid string (e.g., ``'2:00:00'``, ``'48:00:00'``).
     partition
@@ -55,10 +55,10 @@ class Resources:
     """
 
     cpus: int | None = None
-    gpus: int | None = None
-    nodes: int | None = None
     cpus_per_node: int | None = None
+    nodes: int | None = None
     memory: str | None = None
+    gpus: int | None = None
     time: str | None = None
     partition: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
