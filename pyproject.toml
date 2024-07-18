@@ -63,6 +63,7 @@ dev = [  # all + dev deps
     "mypy",
     "versioningit",
     "pipefunc[all,test,docs]",
+    "bump-my-version",
 ]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
