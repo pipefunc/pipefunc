@@ -94,6 +94,7 @@ class LearnersDict(LearnersDictType):
         *,
         ignore_resources: bool = False,
         returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
+        **slurm_run_kwargs: Any,
     ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
         """Helper for `adaptive_scheduler.slurm_run` which returns a `adaptive_scheduler.RunManager`.
 
@@ -110,6 +111,8 @@ class LearnersDict(LearnersDictType):
             If "run_manager", returns a `adaptive_scheduler.RunManager`.
             If "kwargs", returns a dictionary that can be passed to `adaptive_scheduler.slurm_run`.
             If "namedtuple", returns an `AdaptiveSchedulerDetails`.
+        slurm_run_kwargs
+            Additional keyword arguments to pass to `adaptive_scheduler.slurm_run`.
 
         Returns
         -------
@@ -128,11 +131,17 @@ class LearnersDict(LearnersDictType):
             ignore_resources=ignore_resources,
         )
         if returns == "namedtuple":
+            if slurm_run_kwargs:
+                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                raise ValueError(msg)
             return details
+        kwargs = details.kwargs()
+        if slurm_run_kwargs:
+            kwargs.update(slurm_run_kwargs)
         if returns == "run_manager":  # pragma: no cover
-            return details.run_manager()
+            return details.run_manager(kwargs)
         if returns == "kwargs":
-            return details.kwargs()
+            return kwargs
         msg = f"Invalid value for `returns`: {returns}"
         raise ValueError(msg)
 

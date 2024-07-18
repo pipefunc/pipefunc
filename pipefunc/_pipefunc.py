@@ -677,8 +677,13 @@ class PipeFunc(Generic[T]):
             A dictionary containing the picklable state of the object.
 
         """
-        state = {k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines")}
+        state = {
+            k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines", "resources")
+        }
         state["func"] = cloudpickle.dumps(self.func)
+        state["resources"] = (
+            cloudpickle.dumps(self.resources) if self.resources is not None else None
+        )
         return state
 
     def __setstate__(self, state: dict) -> None:
@@ -696,6 +701,7 @@ class PipeFunc(Generic[T]):
         self.__dict__.update(state)
         self._pipelines = weakref.WeakSet()
         self.func = cloudpickle.loads(self.func)
+        self.resources = cloudpickle.loads(self.resources) if self.resources is not None else None
 
     def _validate_mapspec(self) -> None:
         if self.mapspec is None:

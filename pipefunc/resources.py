@@ -73,31 +73,31 @@ class Resources:
 
         """
         if self.cpus is not None and self.cpus <= 0:
-            msg = "cpus must be a positive integer."
+            msg = "`cpus` must be a positive integer."
             raise ValueError(msg)
         if self.gpus is not None and self.gpus < 0:
-            msg = "gpus must be a non-negative integer."
+            msg = "`gpus` must be a non-negative integer."
             raise ValueError(msg)
         if self.nodes is not None and self.nodes <= 0:
-            msg = "nodes must be a positive integer."
+            msg = "`nodes` must be a positive integer."
             raise ValueError(msg)
         if self.cpus_per_node is not None and self.cpus_per_node <= 0:
-            msg = "cpus_per_node must be a positive integer."
+            msg = "`cpus_per_node` must be a positive integer."
             raise ValueError(msg)
         if self.memory is not None and not self._is_valid_memory(self.memory):
-            msg = f"memory must be a valid string (e.g., '2GB', '500MB'), not '{self.memory}'."
+            msg = f"`memory` must be a valid string (e.g., '2GB', '500MB'), not '{self.memory}'."
             raise ValueError(msg)
         if self.time is not None and not self._is_valid_wall_time(self.time):
-            msg = "time must be a valid string (e.g., '2:00:00', '48:00:00')."
+            msg = "`time` must be a valid string (e.g., '2:00:00', '48:00:00')."
             raise ValueError(msg)
         if self.nodes and self.cpus:
             msg = (
-                "nodes and cpus cannot be specified together."
-                " Either use nodes and cpus_per_node or use cpus alone."
+                "`nodes` and `cpus` cannot be specified together."
+                " Either use nodes and `cpus_per_node` or use `cpus` alone."
             )
             raise ValueError(msg)
         if self.cpus_per_node and not self.nodes:
-            msg = "cpus_per_node must be specified with nodes."
+            msg = "`cpus_per_node` must be specified with `nodes`."
             raise ValueError(msg)
 
     @staticmethod

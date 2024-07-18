@@ -483,3 +483,15 @@ def test_arg_and_output_name_identical_error():
         match="The `output_name` cannot be the same as any of the input parameter names",
     ):
         PipeFunc(lambda x: x, output_name="x")
+
+
+def test_picklable_resources() -> None:
+    @pipefunc(output_name="c", resources=lambda kwargs: Resources(memory="1GB"))  # noqa: ARG005
+    def f(a, b):
+        return a + b
+
+    p = pickle.dumps(f)
+    del f
+    f2 = pickle.loads(p)  # noqa: S301
+    assert f2.resources({}).memory == "1GB"
+    assert f2(a=1, b=2) == 3
