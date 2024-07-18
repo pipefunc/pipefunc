@@ -58,6 +58,15 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "partition",
     ]
 
+    with pytest.raises(
+        ValueError,
+        match="Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'.",
+    ):
+        learners_dict.to_slurm_run(
+            returns="namedtuple",
+            kwargs={"will": "fail"},
+        )
+
 
 def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     @pipefunc(output_name="x", resources=Resources(memory="8GB"), mapspec="a[i] -> x[i]")
@@ -101,11 +110,15 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
         {"cpus": 8},
         ignore_resources=True,
         returns="kwargs",
+        log_interval=10,
+        save_interval=20,
     )
     assert isinstance(info, dict)
     assert len(info["learners"]) == 2
     assert "extra_scheduler" not in info
     assert info["cores_per_node"] == (8, 8)
+    assert info["log_interval"] == 10
+    assert info["save_interval"] == 20
 
     with pytest.raises(ValueError, match="Invalid value for `returns`: not_exists"):
         learners_dict.to_slurm_run({"cpus": 8}, returns="not_exists")  # type: ignore[arg-type]

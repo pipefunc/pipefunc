@@ -131,6 +131,9 @@ class LearnersDict(LearnersDictType):
             ignore_resources=ignore_resources,
         )
         if returns == "namedtuple":
+            if slurm_run_kwargs:
+                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                raise ValueError(msg)
             return details
         kwargs = details.kwargs()
         if slurm_run_kwargs:
