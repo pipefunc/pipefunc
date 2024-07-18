@@ -19,25 +19,25 @@ def test_valid_resources_initialization():
 
 
 def test_invalid_num_cpus():
-    with pytest.raises(ValueError, match="cpus must be a positive integer."):
+    with pytest.raises(ValueError, match="`cpus` must be a positive integer."):
         Resources(cpus=-1)
 
 
 def test_invalid_num_gpus():
-    with pytest.raises(ValueError, match="gpus must be a non-negative integer."):
+    with pytest.raises(ValueError, match="`gpus` must be a non-negative integer."):
         Resources(gpus=-1)
 
 
 def test_invalid_memory_format():
     with pytest.raises(
         ValueError,
-        match=r"memory must be a valid string \(e\.g\., '2GB', '500MB'\).",
+        match=r"`memory` must be a valid string \(e\.g\., '2GB', '500MB'\).",
     ):
         Resources(memory="16XYZ")
 
     with pytest.raises(
         ValueError,
-        match=r"memory must be a valid string \(e\.g\., '2GB', '500MB'\).",
+        match=r"`memory` must be a valid string \(e\.g\., '2GB', '500MB'\).",
     ):
         Resources(memory=1)
 
@@ -45,7 +45,7 @@ def test_invalid_memory_format():
 def test_invalid_wall_time_format():
     with pytest.raises(
         ValueError,
-        match=r"time must be a valid string \(e\.g\., '2:00:00', '48:00:00'\).",
+        match=r"`time` must be a valid string \(e\.g\., '2:00:00', '48:00:00'\).",
     ):
         Resources(time="invalid")
 
@@ -151,30 +151,30 @@ def test_combine_max_memory_units():
 
 
 def test_invalid_num_nodes():
-    with pytest.raises(ValueError, match="nodes must be a positive integer."):
+    with pytest.raises(ValueError, match="`nodes` must be a positive integer."):
         Resources(nodes=0)
 
-    with pytest.raises(ValueError, match="nodes must be a positive integer."):
+    with pytest.raises(ValueError, match="`nodes` must be a positive integer."):
         Resources(nodes=-1)
 
 
 def test_invalid_num_cpus_per_node():
-    with pytest.raises(ValueError, match="cpus_per_node must be a positive integer."):
+    with pytest.raises(ValueError, match="`cpus_per_node` must be a positive integer."):
         Resources(cpus_per_node=0)
 
-    with pytest.raises(ValueError, match="cpus_per_node must be a positive integer."):
+    with pytest.raises(ValueError, match="`cpus_per_node` must be a positive integer."):
         Resources(cpus_per_node=-1)
 
 
 def test_num_cpus_and_num_nodes_conflict():
-    with pytest.raises(ValueError, match="nodes and cpus cannot be specified together."):
+    with pytest.raises(ValueError, match="`nodes` and `cpus` cannot be specified together."):
         Resources(cpus=4, nodes=2)
 
 
 def test_num_cpus_per_node_without_num_nodes():
     with pytest.raises(
         ValueError,
-        match="cpus_per_node must be specified with nodes.",
+        match="`cpus_per_node` must be specified with `nodes`.",
     ):
         Resources(cpus_per_node=4)
 

@@ -63,6 +63,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         match="Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'.",
     ):
         learners_dict.to_slurm_run(
+            default_resources=Resources(cpus_per_node=2, nodes=1),
             returns="namedtuple",
             kwargs={"will": "fail"},
         )
