@@ -37,7 +37,6 @@ class Resources:
         "external": The function should operate on a single core, with parallelization managed externally.
         Default is "external".
 
-
     Raises
     ------
     ValueError

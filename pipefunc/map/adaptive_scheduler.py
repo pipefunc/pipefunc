@@ -15,6 +15,7 @@ from pipefunc.resources import Resources
 if TYPE_CHECKING:
     import adaptive_scheduler
     from adaptive import SequenceLearner
+    from adaptive_scheduler.utils import EXECUTOR_TYPES
 
     from pipefunc._pipefunc import PipeFunc
     from pipefunc.map._run_info import RunInfo
@@ -31,6 +32,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
     cores_per_node: tuple[int | None | Callable[[], int | None], ...] | None
     extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
     partition: tuple[str | None | Callable[[], str | None], ...] | None
+    executor_type: tuple[EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES], ...] | None = None
 
     def kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for `adaptive_scheduler.slurm_run`.
@@ -119,6 +121,7 @@ def slurm_run_setup(
         cores_per_node=cores_per_node,
         extra_scheduler=tracker.get("extra_scheduler"),
         partition=tracker.get("partition"),
+        executor_type=tracker.get("executor_type"),
     )
 
 
@@ -169,6 +172,8 @@ class _ResourcesContainer:
             else:
                 value = getattr(r, name)
             self.data[name].append(value)
+        # TODO: Allow setting any of EXECUTOR_TYPES
+        self.data["executor_type"].append(_executor_type(r, func, run_info))
 
         self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
@@ -207,6 +212,22 @@ def _extra_scheduler(
         for key, value in resources.extra_args.items():
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
+
+
+def _executor_type(
+    resources: Resources | Callable[[dict[str, Any]], Resources],
+    func: PipeFunc,
+    run_info: RunInfo,
+) -> EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES]:
+    if callable(resources):
+
+        def _fn() -> EXECUTOR_TYPES:
+            kwargs = _func_kwargs(func, run_info, run_info.init_store())
+            resources_instance = resources(kwargs)
+            return _executor_type(resources_instance, func, run_info)
+
+        return _fn
+    return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
 
 
 def _or(
