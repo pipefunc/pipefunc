@@ -178,6 +178,16 @@ class _ResourcesContainer:
         self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
 
 
+def _eval_resources(
+    *,
+    resources: Callable[[dict[str, Any]], Resources],
+    func: PipeFunc,
+    run_info: RunInfo,
+) -> Resources:
+    kwargs = _func_kwargs(func, run_info, run_info.init_store())
+    return resources(kwargs)
+
+
 def _getattr_from_resources(
     *,
     name: str,
@@ -185,8 +195,8 @@ def _getattr_from_resources(
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Any | None:
-    kwargs = _func_kwargs(func, run_info, run_info.init_store())
-    return getattr(resources(kwargs), name)
+    resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+    return getattr(resources_instance, name)
 
 
 def _extra_scheduler(
@@ -197,8 +207,8 @@ def _extra_scheduler(
     if callable(resources):
 
         def _fn() -> list[str]:
-            kwargs = _func_kwargs(func, run_info, run_info.init_store())
-            return _extra_scheduler(resources(kwargs), func, run_info)  # type: ignore[return-value]
+            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+            return _extra_scheduler(resources_instance, func, run_info)  # type: ignore[return-value]
 
         return _fn
     extra_scheduler = []
@@ -222,8 +232,7 @@ def _executor_type(
     if callable(resources):
 
         def _fn() -> EXECUTOR_TYPES:
-            kwargs = _func_kwargs(func, run_info, run_info.init_store())
-            resources_instance = resources(kwargs)
+            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
             return _executor_type(resources_instance, func, run_info)
 
         return _fn
