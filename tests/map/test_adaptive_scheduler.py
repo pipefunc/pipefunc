@@ -48,7 +48,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         ["--gres=gpu:1", "--time=1:00:00"],
     )
     assert info.partition == ("partition-1", "partition-1")
-    assert list(info.kwargs().keys()) == [
+    assert info.kwargs().keys() == {
         "learners",
         "fnames",
         "dependencies",
@@ -56,7 +56,8 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
-    ]
+        "executor_type",
+    }
 
     with pytest.raises(
         ValueError,
@@ -235,6 +236,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
+        "executor_type",
     }
     f, *rest = kw["nodes"]
     assert len(rest) == 0
