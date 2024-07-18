@@ -6,7 +6,7 @@ import functools
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 
 @dataclass(frozen=True, eq=True)
@@ -31,6 +31,12 @@ class Resources:
         The partition to submit the job to.
     extra_args
         Extra arguments for the job. Default is an empty dictionary.
+    parallelization_mode
+        Specifies how parallelization should be handled.
+        "internal": The function should use the resources (e.g., cpus) to handle its own parallelization.
+        "external": The function should operate on a single core, with parallelization managed externally.
+        Default is "external".
+
 
     Raises
     ------
@@ -62,6 +68,7 @@ class Resources:
     time: str | None = None
     partition: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
+    parallelization_mode: Literal["internal", "external"] = "external"
 
     def __post_init__(self) -> None:
         """Validate input parameters after initialization.
