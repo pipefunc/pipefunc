@@ -350,3 +350,21 @@ def test_or() -> None:
     assert _or(cpus, none)() == 2  # type: ignore[operator,misc]
     assert _or(none, cpus)() == 2  # type: ignore[operator,misc]
     assert _or(1, 1) == 1  # type: ignore[operator,misc]
+
+
+def test_parallelization_mode(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda _: Resources(cpus=1, parallelization_mode="internal"),
+    )
+    def f1(a: int) -> int:
+        return a
+
+    pipeline = Pipeline([f1])
+    inputs = {"a": 1}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict)
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert info.executor_type is not None
+    assert len(info.executor_type) == 1
+    assert info.executor_type[0]() == "sequential"
