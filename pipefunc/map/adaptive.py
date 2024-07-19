@@ -138,6 +138,7 @@ class LearnersDict(LearnersDictType):
         kwargs = details.kwargs()
         if slurm_run_kwargs:
             kwargs.update(slurm_run_kwargs)
+        kwargs.setdefault("folder", self.run_info.run_folder / "adaptive_scheduler")
         if returns == "run_manager":  # pragma: no cover
             return details.run_manager(kwargs)
         if returns == "kwargs":

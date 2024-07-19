@@ -131,13 +131,18 @@ class Resources:
 
     @staticmethod
     def maybe_from_dict(
-        resources: dict[str, Any] | Resources | Callable[[dict[str, Any]], Resources] | None,
+        resources: dict[str, Any]
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None,
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
-        if isinstance(resources, Resources) or callable(resources):
+        if isinstance(resources, Resources):
             return resources
+        if callable(resources):
+            return functools.partial(_ensure_resources, resources_callable=resources)
         return Resources.from_dict(resources)
 
     @staticmethod
@@ -329,3 +334,14 @@ def _delayed_resources_with_defaults(
 ) -> Resources:
     resources = _resources(kwargs)
     return resources.with_defaults(_default_resources)
+
+
+def _ensure_resources(
+    kwargs: dict[str, Any],
+    *,
+    resources_callable: Callable[[dict[str, Any]], Resources | dict[str, Any]],
+) -> Resources:
+    resources_instance = resources_callable(kwargs)
+    if isinstance(resources_instance, dict):
+        return Resources(**resources_instance)
+    return resources_instance
