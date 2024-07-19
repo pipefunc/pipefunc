@@ -759,7 +759,10 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+    resources: dict
+    | Resources
+    | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+    | None = None,
     resources_variable: str | None = None,
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
