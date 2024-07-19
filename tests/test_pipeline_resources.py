@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
@@ -144,9 +146,9 @@ def test_resources_variable_in_nested_func_with_defaults() -> None:
 
 
 def test_resources_func_with_variable() -> None:
-    def resources_with_cpu(kwargs) -> Resources:
+    def resources_with_cpu(kwargs) -> dict[str, Any]:
         cpus = kwargs["a"] + kwargs["b"]
-        return Resources(cpus=cpus)
+        return {"cpus": cpus}  # Also tests that a dict is converted to Resources
 
     @pipefunc(
         output_name="i",
@@ -168,7 +170,7 @@ def test_resources_func_with_variable() -> None:
     assert result["i"].output == 6
 
 
-def test_with_resource_func_with_defaults():
+def test_with_resource_func_with_defaults() -> None:
     def resources_with_cpu(kwargs) -> Resources:
         cpus = kwargs["a"] + kwargs["b"]
         return Resources(cpus=cpus)
