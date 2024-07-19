@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._run import _func_kwargs
+from pipefunc.map._run import _func_kwargs, _load_file_array
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     import adaptive_scheduler
     from adaptive import SequenceLearner
+    from adaptive_scheduler.utils import EXECUTOR_TYPES
 
     from pipefunc._pipefunc import PipeFunc
     from pipefunc.map._run_info import RunInfo
@@ -31,6 +32,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
     cores_per_node: tuple[int | None | Callable[[], int | None], ...] | None
     extra_scheduler: tuple[list[str] | Callable[[], list[str]], ...] | None
     partition: tuple[str | None | Callable[[], str | None], ...] | None
+    executor_type: tuple[EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES], ...] | None = None
 
     def kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for `adaptive_scheduler.slurm_run`.
@@ -119,6 +121,7 @@ def slurm_run_setup(
         cores_per_node=cores_per_node,
         extra_scheduler=tracker.get("extra_scheduler"),
         partition=tracker.get("partition"),
+        executor_type=tracker.get("executor_type"),
     )
 
 
@@ -169,8 +172,21 @@ class _ResourcesContainer:
             else:
                 value = getattr(r, name)
             self.data[name].append(value)
+        # TODO: Allow setting any of EXECUTOR_TYPES
+        self.data["executor_type"].append(_executor_type(r, func, run_info))
 
         self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
+
+
+def _eval_resources(
+    *,
+    resources: Callable[[dict[str, Any]], Resources],
+    func: PipeFunc,
+    run_info: RunInfo,
+) -> Resources:
+    kwargs = _func_kwargs(func, run_info, run_info.init_store())
+    _load_file_array(kwargs)
+    return resources(kwargs)
 
 
 def _getattr_from_resources(
@@ -180,8 +196,8 @@ def _getattr_from_resources(
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Any | None:
-    kwargs = _func_kwargs(func, run_info, run_info.init_store())
-    return getattr(resources(kwargs), name)
+    resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+    return getattr(resources_instance, name)
 
 
 def _extra_scheduler(
@@ -192,8 +208,8 @@ def _extra_scheduler(
     if callable(resources):
 
         def _fn() -> list[str]:
-            kwargs = _func_kwargs(func, run_info, run_info.init_store())
-            return _extra_scheduler(resources(kwargs), func, run_info)  # type: ignore[return-value]
+            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+            return _extra_scheduler(resources_instance, func, run_info)  # type: ignore[return-value]
 
         return _fn
     extra_scheduler = []
@@ -207,6 +223,21 @@ def _extra_scheduler(
         for key, value in resources.extra_args.items():
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
+
+
+def _executor_type(
+    resources: Resources | Callable[[dict[str, Any]], Resources],
+    func: PipeFunc,
+    run_info: RunInfo,
+) -> EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES]:
+    if callable(resources):
+
+        def _fn() -> EXECUTOR_TYPES:
+            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+            return _executor_type(resources_instance, func, run_info)
+
+        return _fn
+    return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
 
 
 def _or(

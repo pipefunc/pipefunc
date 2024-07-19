@@ -48,7 +48,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         ["--gres=gpu:1", "--time=1:00:00"],
     )
     assert info.partition == ("partition-1", "partition-1")
-    assert list(info.kwargs().keys()) == [
+    assert info.kwargs().keys() == {
         "learners",
         "fnames",
         "dependencies",
@@ -56,7 +56,8 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
-    ]
+        "executor_type",
+    }
 
     with pytest.raises(
         ValueError,
@@ -235,6 +236,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
+        "executor_type",
     }
     f, *rest = kw["nodes"]
     assert len(rest) == 0
@@ -348,3 +350,21 @@ def test_or() -> None:
     assert _or(cpus, none)() == 2  # type: ignore[operator,misc]
     assert _or(none, cpus)() == 2  # type: ignore[operator,misc]
     assert _or(1, 1) == 1  # type: ignore[operator,misc]
+
+
+def test_parallelization_mode(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda _: Resources(cpus=1, parallelization_mode="internal"),
+    )
+    def f1(a: int) -> int:
+        return a
+
+    pipeline = Pipeline([f1])
+    inputs = {"a": 1}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict)
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert info.executor_type is not None
+    assert len(info.executor_type) == 1
+    assert info.executor_type[0]() == "sequential"

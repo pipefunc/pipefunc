@@ -6,7 +6,7 @@ import functools
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 
 @dataclass(frozen=True, eq=True)
@@ -31,6 +31,11 @@ class Resources:
         The partition to submit the job to.
     extra_args
         Extra arguments for the job. Default is an empty dictionary.
+    parallelization_mode
+        Specifies how parallelization should be handled.
+        "internal": The function should use the resources (e.g., cpus) to handle its own parallelization.
+        "external": The function should operate on a single core, with parallelization managed externally.
+        Default is "external".
 
     Raises
     ------
@@ -62,6 +67,7 @@ class Resources:
     time: str | None = None
     partition: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
+    parallelization_mode: Literal["internal", "external"] = "external"
 
     def __post_init__(self) -> None:
         """Validate input parameters after initialization.
@@ -125,13 +131,18 @@ class Resources:
 
     @staticmethod
     def maybe_from_dict(
-        resources: dict[str, Any] | Resources | Callable[[dict[str, Any]], Resources] | None,
+        resources: dict[str, Any]
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None,
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
-        if isinstance(resources, Resources) or callable(resources):
+        if isinstance(resources, Resources):
             return resources
+        if callable(resources):
+            return functools.partial(_ensure_resources, resources_callable=resources)
         return Resources.from_dict(resources)
 
     @staticmethod
@@ -323,3 +334,14 @@ def _delayed_resources_with_defaults(
 ) -> Resources:
     resources = _resources(kwargs)
     return resources.with_defaults(_default_resources)
+
+
+def _ensure_resources(
+    kwargs: dict[str, Any],
+    *,
+    resources_callable: Callable[[dict[str, Any]], Resources | dict[str, Any]],
+) -> Resources:
+    resources_instance = resources_callable(kwargs)
+    if isinstance(resources_instance, dict):
+        return Resources(**resources_instance)
+    return resources_instance
