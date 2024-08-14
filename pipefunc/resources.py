@@ -7,12 +7,16 @@ import inspect
 import json
 import re
 import subprocess
+import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal
 
-import tomllib
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 @dataclass(frozen=True, eq=True)
