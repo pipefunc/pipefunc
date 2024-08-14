@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import functools
 import inspect
+import json
 import re
+import subprocess
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Literal
+
+import tomllib
 
 
 @dataclass(frozen=True, eq=True)
@@ -345,3 +350,97 @@ def _ensure_resources(
     if isinstance(resources_instance, dict):
         return Resources(**resources_instance)
     return resources_instance
+
+
+@dataclass
+class NodeDescription:
+    """A dataclass representing the description of a node in a cluster."""
+
+    name: str
+    cpus: int
+    memory: int  # Memory in GB
+    gpu_model: str
+    gpus: int
+    partitions: list[str]
+
+
+@functools.cache
+def _slurm_node_info() -> dict[str, NodeDescription]:
+    result = subprocess.run(
+        ["scontrol", "show", "node", "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    node_info = json.loads(result.stdout)
+    nodes_dict = {}
+    for node in node_info["nodes"]:
+        gres_info = node["gres"].split(":")
+        gpu_model = gres_info[1] if len(gres_info) > 1 else "unknown"
+        gpus = int(gres_info[2]) if len(gres_info) > 2 else 0  # noqa: PLR2004
+        node_desc = NodeDescription(
+            name=node["name"],
+            cpus=node["cpus"],
+            memory=node["real_memory"] / 1024,  # MB -> GB
+            gpu_model=gpu_model,
+            gpus=gpus,
+            partitions=node["partitions"],
+        )
+        nodes_dict[node_desc.name] = node_desc
+    return nodes_dict
+
+
+def node_info() -> dict[str, NodeDescription]:
+    """Get information about the nodes in the SLURM cluster from a TOML file or via the SLURM command.
+
+    This function first attempts to load node information from a ``node_info.toml`` file.
+    The function looks for the file in the following locations, in order:
+
+    1. The current working directory.
+    2. The user's configuration directory (``~/.config/pipefunc/``).
+    3. A common global path (``/etc/pipefunc/node_info.toml``).
+
+    If the TOML file is found, it parses the file and returns the node information as a dictionary of
+    `NodeDescription` instances, where the key is the node name.
+
+    If the TOML file is not found or cannot be parsed, the function falls back to querying the SLURM cluster
+    directly using the ``scontrol show node --json`` command. The information from SLURM is also returned as
+    a dictionary of `NodeDescription` instances.
+
+    Returns
+    -------
+        A dictionary where the keys are node names and the values are `NodeDescription` instances
+        representing the nodes in the SLURM cluster.
+
+    """
+    possible_paths = [
+        Path.cwd() / "node_info.toml",
+        Path.home() / ".config" / "pipefunc" / "node_info.toml",
+        Path("/etc/pipefunc/node_info.toml"),
+    ]
+
+    for path in possible_paths:
+        if not path.exists():
+            continue
+        with path.open("rb") as file:
+            try:
+                toml_data = tomllib.load(file)
+            except tomllib.TOMLDecodeError as e:
+                print(f"Error parsing TOML file {path}: {e}")
+                break
+            else:
+                # Parse the TOML data into NodeDescription instances
+                return {
+                    node_name: NodeDescription(
+                        name=node_name,
+                        cpus=node_data["cpus"],
+                        memory=node_data["memory"],  # Assume memory is already in GB in TOML
+                        gpu_model=node_data["gpu_model"],
+                        gpus=node_data["gpus"],
+                        partitions=node_data["partitions"],
+                    )
+                    for node_name, node_data in toml_data.get("nodes", {}).items()
+                }
+
+    # Fallback to using the SLURM command if no TOML file is found or an error occurred
+    return _slurm_node_info()
