@@ -6,12 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pipefunc.resources import (
-    NodeInfo,
-    PartitionInfo,
-    node_info,
-    partition_info,
-)
+from pipefunc.resources import NodeInfo, PartitionInfo, node_info, partition_info
 
 if TYPE_CHECKING:
     from pathlib import Path
