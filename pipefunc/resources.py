@@ -7,6 +7,7 @@ import inspect
 import json
 import re
 import subprocess
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -353,7 +354,7 @@ def _ensure_resources(
 
 
 @dataclass
-class NodeDescription:
+class NodeInfo:
     """A dataclass representing the description of a node in a cluster."""
 
     name: str
@@ -365,7 +366,7 @@ class NodeDescription:
 
 
 @functools.cache
-def _slurm_node_info() -> dict[str, NodeDescription]:
+def _slurm_node_info() -> list[NodeInfo]:
     result = subprocess.run(
         ["scontrol", "show", "node", "--json"],
         capture_output=True,
@@ -373,12 +374,12 @@ def _slurm_node_info() -> dict[str, NodeDescription]:
         check=False,
     )
     node_info = json.loads(result.stdout)
-    nodes_dict = {}
+    nodes = []
     for node in node_info["nodes"]:
         gres_info = node["gres"].split(":")
         gpu_model = gres_info[1] if len(gres_info) > 1 else "unknown"
         gpus = int(gres_info[2]) if len(gres_info) > 2 else 0  # noqa: PLR2004
-        node_desc = NodeDescription(
+        node_desc = NodeInfo(
             name=node["name"],
             cpus=node["cpus"],
             memory=node["real_memory"] / 1024,  # MB -> GB
@@ -386,61 +387,161 @@ def _slurm_node_info() -> dict[str, NodeDescription]:
             gpus=gpus,
             partitions=node["partitions"],
         )
-        nodes_dict[node_desc.name] = node_desc
-    return nodes_dict
+        nodes.append(node_desc)
+    return nodes
 
 
-def node_info() -> dict[str, NodeDescription]:
+def _read_toml(resources_filename: str | Path | None) -> dict | None:
+    if isinstance(resources_filename, str):
+        resources_filename = Path(resources_filename)
+    possible_paths = [
+        resources_filename,
+        Path.cwd() / "resources.toml",
+        Path.home() / ".config" / "pipefunc" / "resources.toml",
+        Path("/etc/pipefunc/resources.toml"),
+    ]
+    for path in possible_paths:
+        if path is None:
+            continue
+        if path.exists():
+            with path.open("rb") as file:
+                return tomllib.load(file)
+    return None
+
+
+def node_info(resources_filename: str | Path | None = None) -> list[NodeInfo]:  # pragma: no cover
     """Get information about the nodes in the SLURM cluster from a TOML file or via the SLURM command.
 
-    This function first attempts to load node information from a ``node_info.toml`` file.
+    This function first attempts to load node information from a ``resources.toml`` file.
     The function looks for the file in the following locations, in order:
 
-    1. The current working directory.
-    2. The user's configuration directory (``~/.config/pipefunc/``).
-    3. A common global path (``/etc/pipefunc/node_info.toml``).
+    1. The path specified by the `resources_filename` argument.
+    2. The current working directory.
+    3. The user's configuration directory (``~/.config/pipefunc/``).
+    4. A common global path (``/etc/pipefunc/resources.toml``).
 
     If the TOML file is found, it parses the file and returns the node information as a dictionary of
-    `NodeDescription` instances, where the key is the node name.
+    `NodeInfo` instances, where the key is the node name.
 
     If the TOML file is not found or cannot be parsed, the function falls back to querying the SLURM cluster
     directly using the ``scontrol show node --json`` command. The information from SLURM is also returned as
-    a dictionary of `NodeDescription` instances.
+    a dictionary of `NodeInfo` instances.
 
     Returns
     -------
-        A dictionary where the keys are node names and the values are `NodeDescription` instances
-        representing the nodes in the SLURM cluster.
+        A list of `NodeInfo` instances representing the nodes in the SLURM cluster.
 
     """
-    possible_paths = [
-        Path.cwd() / "node_info.toml",
-        Path.home() / ".config" / "pipefunc" / "node_info.toml",
-        Path("/etc/pipefunc/node_info.toml"),
-    ]
-
-    for path in possible_paths:
-        if not path.exists():
-            continue
-        with path.open("rb") as file:
-            try:
-                toml_data = tomllib.load(file)
-            except tomllib.TOMLDecodeError as e:
-                print(f"Error parsing TOML file {path}: {e}")
-                break
-            else:
-                # Parse the TOML data into NodeDescription instances
-                return {
-                    node_name: NodeDescription(
-                        name=node_name,
-                        cpus=node_data["cpus"],
-                        memory=node_data["memory"],  # Assume memory is already in GB in TOML
-                        gpu_model=node_data["gpu_model"],
-                        gpus=node_data["gpus"],
-                        partitions=node_data["partitions"],
-                    )
-                    for node_name, node_data in toml_data.get("nodes", {}).items()
-                }
+    toml_data = _read_toml(resources_filename)
+    if toml_data is not None:
+        return [
+            NodeInfo(
+                name=node_name,
+                cpus=node_data["cpus"],
+                memory=node_data["memory"],  # Assume memory is already in GB in TOML
+                gpu_model=node_data["gpu_model"],
+                gpus=node_data["gpus"],
+                partitions=node_data["partitions"],
+            )
+            for node_name, node_data in toml_data.get("nodes", {}).items()
+        ]
 
     # Fallback to using the SLURM command if no TOML file is found or an error occurred
     return _slurm_node_info()
+
+
+@dataclass
+class PartitionInfo:
+    """A dataclass representing the description of a partition in a cluster.
+
+    If nodes in a partition have different resources, this class will contain the minimum resources.
+    """
+
+    name: str
+    nodes: list[str]
+    cpus: int
+    memory: int
+    gpus: int
+    gpu_model: str
+
+
+def partition_info(resources_filename: str | Path | None = None) -> list[PartitionInfo]:
+    """Get information about the partitions in the SLURM cluster.
+
+    This function first attempts to load partition information from a ``resources.toml`` file.
+    The function looks for the file in the following locations, in order:
+
+    1. The path specified by the `resources_filename` argument.
+    2. The current working directory.
+    3. The user's configuration directory (``~/.config/pipefunc/``).
+    4. A common global path (``/etc/pipefunc/resources.toml``).
+
+    If the TOML file is found, it parses the file and returns the partition information as a list of
+    `PartitionInfo` instances.
+
+    If the TOML file is not found, the function falls back to generating the partition
+    information by querying the SLURM cluster directly using the `node_info` function. The partition
+    information is derived by grouping nodes by their associated partitions and determining the minimum
+    resources (CPUs, memory, GPUs) available in each partition.
+
+    The resulting partition information includes the following:
+
+    - Partition name.
+    - List of node names in the partition.
+    - Minimum number of CPUs across all nodes in the partition.
+    - Minimum amount of memory (in GB) across all nodes in the partition.
+    - Minimum number of GPUs across all nodes in the partition.
+    - GPU model, or "various" if nodes in the partition have different GPU models.
+
+    Returns
+    -------
+        A list of `PartitionInfo` instances representing the partitions in the SLURM cluster, with each
+        partition containing the minimum resources available across its nodes.
+
+    """
+    toml_data = _read_toml(resources_filename)
+    if toml_data is not None:
+        return [
+            PartitionInfo(
+                name=partition_name,
+                nodes=data["nodes"],
+                cpus=data["cpus"],
+                memory=data["memory"],
+                gpus=data["gpus"],
+                gpu_model=data["gpu_model"],
+            )
+            for partition_name, data in toml_data.get("partition", {}).items()
+        ]
+
+    _node_info = node_info()
+    partitions = defaultdict(list)
+
+    # Group nodes by partition
+    for node in _node_info:
+        for partition in node.partitions:
+            partitions[partition].append(node)
+
+    # Create PartitionInfo objects
+    partition_infos = []
+    for partition_name, nodes in partitions.items():
+        # Determine the minimum resources across all nodes in the partition
+        min_cpus = min(node.cpus for node in nodes)
+        min_memory = min(node.memory for node in nodes)
+        min_gpus = min(node.gpus for node in nodes)
+        gpu_model = (
+            nodes[0].gpu_model
+            if all(node.gpu_model == nodes[0].gpu_model for node in nodes)
+            else "various"
+        )
+
+        partition_info = PartitionInfo(
+            name=partition_name,
+            nodes=[node.name for node in nodes],
+            gpus=min_gpus,
+            cpus=min_cpus,
+            memory=min_memory,
+            gpu_model=gpu_model,
+        )
+        partition_infos.append(partition_info)
+
+    return partition_infos
