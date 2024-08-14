@@ -23,14 +23,14 @@ cpus = 128
 memory = 512  # GB
 gpu_model = "a100"
 gpus = 8
-partitions = ["notebooks", "mycluster-64", "mycluster-all"]
+partitions = ["notebooks", "partition-1", "partition-all"]
 
 [nodes.mycluster-2]
 cpus = 256
 memory = 1024  # GB
 gpu_model = "a100"
 gpus = 8
-partitions = ["mycluster-128", "mycluster-all"]
+partitions = ["partition-2", "partition-all"]
 
 [nodes.mycluster-3]
 cpus = 64
@@ -56,7 +56,7 @@ def test_node_info_from_toml(tmp_path: Path) -> None:
             memory=512,  # GB
             gpu_model="a100",
             gpus=8,
-            partitions=["notebooks", "mycluster-64", "mycluster-all"],
+            partitions=["notebooks", "partition-1", "partition-all"],
         ),
         NodeInfo(
             name="mycluster-2",
@@ -64,7 +64,7 @@ def test_node_info_from_toml(tmp_path: Path) -> None:
             memory=1024,  # GB
             gpu_model="a100",
             gpus=8,
-            partitions=["mycluster-128", "mycluster-all"],
+            partitions=["partition-2", "partition-all"],
         ),
         NodeInfo(
             name="mycluster-3",
@@ -88,14 +88,14 @@ mock_scontrol_response = {
             "cpus": 128,
             "real_memory": 1031891,
             "gres": "gpu:a100:8",
-            "partitions": ["notebooks", "mycluster-64", "mycluster-all"],
+            "partitions": ["notebooks", "partition-1", "partition-all"],
         },
         {
             "name": "mycluster-2",
             "cpus": 256,
             "real_memory": 2051933,
             "gres": "gpu:a100:8",
-            "partitions": ["mycluster-128", "mycluster-all"],
+            "partitions": ["partition-2", "partition-all"],
         },
         {
             "name": "mycluster-3",
@@ -130,7 +130,7 @@ def test_slurm_node_info(mock_subprocess_run):
             memory=1031891 / 1024,  # Memory in GB
             gpu_model="a100",
             gpus=8,
-            partitions=["notebooks", "mycluster-64", "mycluster-all"],
+            partitions=["notebooks", "partition-1", "partition-all"],
         ),
         NodeInfo(
             name="mycluster-2",
@@ -138,7 +138,7 @@ def test_slurm_node_info(mock_subprocess_run):
             memory=2051933 / 1024,  # Memory in GB
             gpu_model="a100",
             gpus=8,
-            partitions=["mycluster-128", "mycluster-all"],
+            partitions=["partition-2", "partition-all"],
         ),
         NodeInfo(
             name="mycluster-3",
@@ -162,14 +162,14 @@ def test_slurm_node_info(mock_subprocess_run):
 
 # Sample mocked TOML content for partition information
 mock_partition_toml_content = """
-[partition.mycluster-64]
+[partition.partition-1]
 nodes = ["mycluster-1", "mycluster-2"]
 cpus = 128
 memory = 512  # GB
 gpus = 8
 gpu_model = "a100"
 
-[partition.mycluster-128]
+[partition.partition-2]
 nodes = ["mycluster-2"]
 cpus = 256
 memory = 1024  # GB
@@ -195,7 +195,7 @@ def test_partition_info_from_toml(tmp_path: Path) -> None:
     # Expected results
     expected_partitions = [
         PartitionInfo(
-            name="mycluster-64",
+            name="partition-1",
             nodes=["mycluster-1", "mycluster-2"],
             cpus=128,
             memory=512,
@@ -203,7 +203,7 @@ def test_partition_info_from_toml(tmp_path: Path) -> None:
             gpu_model="a100",
         ),
         PartitionInfo(
-            name="mycluster-128",
+            name="partition-2",
             nodes=["mycluster-2"],
             cpus=256,
             memory=1024,
@@ -245,7 +245,7 @@ def test_partition_info_from_node_info(tmp_path: Path) -> None:
                 gpu_model="a100",
             ),
             PartitionInfo(
-                name="mycluster-64",
+                name="partition-1",
                 nodes=["mycluster-1"],
                 cpus=128,
                 memory=512,
@@ -253,7 +253,7 @@ def test_partition_info_from_node_info(tmp_path: Path) -> None:
                 gpu_model="a100",
             ),
             PartitionInfo(
-                name="mycluster-all",
+                name="partition-all",
                 nodes=["mycluster-1", "mycluster-2"],
                 cpus=128,
                 memory=512,
@@ -261,7 +261,7 @@ def test_partition_info_from_node_info(tmp_path: Path) -> None:
                 gpu_model="a100",
             ),
             PartitionInfo(
-                name="mycluster-128",
+                name="partition-2",
                 nodes=["mycluster-2"],
                 cpus=256,
                 memory=1024,
