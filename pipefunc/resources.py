@@ -569,6 +569,13 @@ def calculate_resources_fit(partition: PartitionInfo, resources: Resources) -> i
     # Initialize fit to a large number
     fit = float("inf")
 
+    # Check if any constraints are specified
+    if all(
+        getattr(resources, attr) is None
+        for attr in ["cpus", "memory", "gpus", "nodes", "cpus_per_node"]
+    ):
+        return len(partition.nodes)
+
     # Check CPU constraint
     if resources.cpus is not None:
         cpu_fit = partition.cpus // resources.cpus

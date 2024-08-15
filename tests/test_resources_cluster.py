@@ -454,7 +454,7 @@ def test_calculate_resources_fit_no_constraints():
     resources = Resources()
 
     fit = calculate_resources_fit(partition, resources)
-    assert fit == float("inf")  # No constraints, so infinite fit
+    assert fit == 2  # Should return the number of nodes in the partition
 
 
 def test_calculate_resources_fit_memory_units():
