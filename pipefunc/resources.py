@@ -549,3 +549,57 @@ def partition_info(resources_filename: str | Path | None = None) -> list[Partiti
         partition_infos.append(partition_info)
 
     return partition_infos
+
+
+def calculate_resources_fit(partition: PartitionInfo, resources: Resources) -> int:
+    """Calculate how many instances of the given Resources can fit in the specified partition.
+
+    Parameters
+    ----------
+    partition
+        The partition information to check against.
+    resources
+        The resources configuration to fit into the partition.
+
+    Returns
+    -------
+        The number of instances of the Resources that can fit in the partition.
+
+    """
+    # Initialize fit to a large number
+    fit = float("inf")
+
+    # Check CPU constraint
+    if resources.cpus is not None:
+        cpu_fit = partition.cpus // resources.cpus
+        fit = min(fit, cpu_fit)
+
+    # Check memory constraint
+    if resources.memory is not None:
+        partition_memory_gb = partition.memory
+        resources_memory_gb = Resources._convert_to_gb(resources.memory)
+        memory_fit = int(partition_memory_gb // resources_memory_gb)
+        fit = min(fit, memory_fit)
+
+    # Check GPU constraint
+    if resources.gpus is not None and resources.gpus > 0:
+        if partition.gpus == 0:
+            return 0  # Partition has no GPUs, can't fit any
+        gpu_fit = partition.gpus // resources.gpus
+        fit = min(fit, gpu_fit)
+
+    # Check node constraint
+    if resources.nodes is not None:
+        if resources.nodes > len(partition.nodes):
+            return 0  # Resources require more nodes than the partition has
+        node_fit = len(partition.nodes) // resources.nodes
+        fit = min(fit, node_fit)
+
+    # If using cpus_per_node, check that constraint
+    if resources.cpus_per_node is not None:
+        if resources.cpus_per_node > partition.cpus:
+            return 0  # Resources require more CPUs per node than the partition has
+        cpus_per_node_fit = partition.cpus // resources.cpus_per_node
+        fit = min(fit, cpus_per_node_fit)
+
+    return int(fit)
