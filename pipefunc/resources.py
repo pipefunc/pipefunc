@@ -552,7 +552,7 @@ def partition_info(resources_filename: str | Path | None = None) -> list[Partiti
 
 
 def calculate_resources_fit(partition: PartitionInfo, resources: Resources) -> int:
-    """Calculate how many instances of the given Resources can fit in the specified partition.
+    """Calculate how many instances of the given `Resources` can fit in the specified `PartitionInfo`.
 
     Parameters
     ----------
@@ -563,7 +563,7 @@ def calculate_resources_fit(partition: PartitionInfo, resources: Resources) -> i
 
     Returns
     -------
-        The number of instances of the Resources that can fit in the partition.
+        The number of instances of the `Resources` that can fit in the partition.
 
     """
     # Initialize fit to a large number
