@@ -396,7 +396,7 @@ def _slurm_node_info() -> list[NodeInfo]:
 
 
 def _read_toml(resources_filename: str | Path | None) -> dict | None:
-    if isinstance(resources_filename, str):
+    if isinstance(resources_filename, str):  # pragma: no cover
         resources_filename = Path(resources_filename)
     possible_paths = [
         resources_filename,
