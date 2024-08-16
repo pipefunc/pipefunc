@@ -21,14 +21,14 @@ def _adaptive_wrapper(
     adaptive_dimensions: tuple[str, ...],
     adaptive_output: str,
     output_name: str,
-    datasaver: bool = False,
+    full_output: bool = False,
 ) -> float | dict[str, Any]:
     values: tuple[float, ...] = at_least_tuple(_adaptive_value)
     kwargs_ = kwargs.copy()
     for dim, val in zip(adaptive_dimensions, values):
         kwargs_[dim] = val
     results = pipeline.run(output_name, kwargs=kwargs_, full_output=True)
-    return results if datasaver else results[adaptive_output]
+    return results if full_output else results[adaptive_output]
 
 
 def to_adaptive_learner(
@@ -79,6 +79,9 @@ def to_adaptive_learner(
     _validate_adaptive(pipeline, kwargs, adaptive_dimensions)
     if adaptive_output is None:
         adaptive_output = output_name
+    if output_name != adaptive_output and not full_output:
+        msg = "If `adaptive_output != output_name`, `full_output` must be True."
+        raise ValueError(msg)
     dims, bounds = zip(*adaptive_dimensions.items())
     function = functools.partial(
         _adaptive_wrapper,
@@ -87,7 +90,7 @@ def to_adaptive_learner(
         adaptive_dimensions=dims,
         adaptive_output=adaptive_output,
         output_name=output_name,
-        datasaver=full_output,
+        full_output=full_output,
     )
     n = len(adaptive_dimensions)
     if n == 1:
