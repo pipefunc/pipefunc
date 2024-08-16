@@ -523,6 +523,22 @@ def _adaptive_wrapper(
     return results[adaptive_output].output
 
 
+def _validate_adaptive(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: dict[str, tuple[float, float]],
+) -> None:
+    if invalid := set(adaptive_dimensions) & set(inputs):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
+        raise ValueError(msg)
+    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
+        raise ValueError(msg)
+    if not adaptive_dimensions:
+        msg = "`adaptive_dimensions` must be a non-empty dict"
+        raise ValueError(msg)
+
+
 def to_adaptive_learner(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -566,16 +582,7 @@ def to_adaptive_learner(
         A `Learner1D`, `Learner2D`, or `LearnerND` object.
 
     """
-    if invalid := set(adaptive_dimensions) & set(inputs):
-        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
-        raise ValueError(msg)
-    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
-        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
-        raise ValueError(msg)
-    n = len(adaptive_dimensions)
-    if n == 0:
-        msg = "`adaptive_dimensions` must be a non-empty dict"
-        raise ValueError(msg)
+    _validate_adaptive(pipeline, inputs, adaptive_dimensions)
     dims, bounds = zip(*adaptive_dimensions.items())
     function = functools.partial(
         _adaptive_wrapper,
@@ -586,6 +593,7 @@ def to_adaptive_learner(
         run_folder_template=run_folder_template,
         map_kwargs=map_kwargs or {},
     )
+    n = len(adaptive_dimensions)
     if n == 1:
         return Learner1D(function, bounds[0], loss_per_interval=loss_function)
     if n == 2:  # noqa: PLR2004
