@@ -176,7 +176,7 @@ class _ResourcesContainer:
         self.data["executor_type"].append(_executor_type(index, r, resources_scope, func, run_info))
 
         self.data["extra_scheduler"].append(
-            _extra_scheduler(index, r, resources_scope, func, run_info)
+            _extra_scheduler(index, r, resources_scope, func, run_info),
         )
 
 
