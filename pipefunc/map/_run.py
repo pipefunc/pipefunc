@@ -273,6 +273,7 @@ def _run_iteration(
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
     try:
+        # TODO: cache here!
         return func(**selected)
     except Exception as e:
         handle_error(e, func, selected)
@@ -486,6 +487,7 @@ def _submit_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> 
     # Otherwise, run the function
     _load_file_array(kwargs)
     try:
+        # TODO: cache here!
         return func(**kwargs)
     except Exception as e:
         handle_error(e, func, kwargs)

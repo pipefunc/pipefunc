@@ -57,8 +57,6 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
-_empty = inspect.Parameter.empty
-
 
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
