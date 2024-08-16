@@ -58,3 +58,40 @@ def test_adaptive_run(full_output: bool):  # noqa: FBT001
         assert learner_1d.extra_data
         assert learner_2d.extra_data
         assert learner_3d.extra_data
+
+
+def test_different_output_and_adaptive_name():
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return {"random_object": [c, c + 1, c + 2]}
+
+    pipeline = Pipeline([f, g])
+
+    learner_2d = to_adaptive_learner(
+        pipeline,
+        output_name="d",
+        adaptive_output="c",
+        kwargs={},
+        adaptive_dimensions={"a": (0, 10), "b": (0, 10)},
+        full_output=True,
+    )
+    adaptive.runner.simple(learner_2d, npoints_goal=10)
+    assert len(learner_2d.data) == 10
+    assert len(learner_2d.extra_data) == 10
+
+    with pytest.raises(
+        ValueError,
+        match="If `adaptive_output != output_name`, `full_output` must be True",
+    ):
+        to_adaptive_learner(
+            pipeline,
+            output_name="d",
+            adaptive_output="c",
+            kwargs={},
+            adaptive_dimensions={"a": (0, 10), "b": (0, 10)},
+            full_output=False,  # This should raise an error
+        )
