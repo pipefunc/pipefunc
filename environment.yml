@@ -12,6 +12,7 @@ dependencies:
   - psutil
   - cloudpickle
   - numpy
+  - tomli
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.12.0
