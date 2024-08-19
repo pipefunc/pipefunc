@@ -375,7 +375,7 @@ def test_learners_dict_no_run_info():
         learners_dict.to_slurm_run()
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline() -> Pipeline:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: float, c: float) -> float:
