@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import functools
-import itertools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -240,24 +239,49 @@ def create_learners(
         pipeline,
         inputs,
         fixed_indices,
-        split_axis_mode,
-        internal_shapes,
+        split_independent_axes=split_axis_mode is not None,
+        internal_shapes=internal_shapes,
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
-            _learners = []
+            gen_learners = []
             for func in gen:
-                learner = _learner(
-                    func=func,
-                    run_info=run_info,
-                    store=store,
-                    fixed_indices=_fixed_indices,  # might be None
-                    return_output=return_output,
+                fixed_iter = (
+                    [_fixed_indices]
+                    if split_axis_mode != "all"
+                    else _split_fixed_indices(_fixed_indices, func, run_info)
                 )
-                _learners.append(LearnerPipeFunc(learner, func))
-            learners.setdefault(key, []).append(_learners)
+                for lrn_fixed_indices in fixed_iter:
+                    learner = _learner(
+                        func,
+                        run_info,
+                        store,
+                        fixed_indices=lrn_fixed_indices,  # type: ignore[arg-type]
+                        return_output=return_output,
+                    )
+                    gen_learners.append(LearnerPipeFunc(learner, func))
+            learners.setdefault(key, []).append(gen_learners)
     return learners
+
+
+def _split_fixed_indices(
+    fixed_indices: dict[str, int | slice] | None,
+    func: PipeFunc,
+    run_info: RunInfo,
+) -> Generator[dict[str, int], None, None]:
+    if fixed_indices is None:
+        fixed_indices = {}
+    itr = []
+    for spec in func.mapspec.inputs:
+        sel = {axis: idx for axis, idx in fixed_indices.items() if axis in spec.axes}
+        # Iterate over axes completely if they are not in `sel`, otherwise iterate
+        # over the fixed indices
+        for axis in spec.axes:
+            if axis in fixed_indices:
+                continue
+            shape = run_info.shapes[spec.name]
+    return fixed_indices
 
 
 def _learner(
@@ -492,24 +516,21 @@ def _maybe_iterate_axes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
-    split_axis_mode: Literal["all", "independent"] | None,
+    split_independent_axes: bool,  # noqa: FBT001
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-) -> Generator[dict[str, Any] | None, None, None]:
+) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
-        assert split_axis_mode is None
+        assert not split_independent_axes
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
         yield fixed_indices
         return
-    if split_axis_mode is None:
+    if not split_independent_axes:
         yield None
         return
-    if split_axis_mode == "independent":
-        split_axes = _identify_cross_product_axes(pipeline)
-    else:
-        split_axes = tuple(set(itertools.chain.from_iterable(pipeline.mapspec_axes.values())))
+    independent_axes = _identify_cross_product_axes(pipeline)
     axes = pipeline.mapspec_axes
     shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
-    for _fixed_indices in _iterate_axes(split_axes, inputs, axes, shapes):
+    for _fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
         _validate_fixed_indices(_fixed_indices, inputs, pipeline)
         yield _fixed_indices
 

@@ -368,3 +368,30 @@ def test_parallelization_mode(tmp_path: Path) -> None:
     assert info.executor_type is not None
     assert len(info.executor_type) == 1
     assert info.executor_type[0]() == "sequential"
+
+
+def test_slurm_run_split_all(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        mapspec="a[i] -> x[i]",
+        resources=lambda kw: Resources(cpus_per_node=kw["a"]),
+    )
+    def f1(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="y", resources=lambda kw: Resources(cpus_per_node=kw["x"][0]))
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+
+    inputs = {"a": list(range(3))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="all")
+
+    info = learners_dict.to_slurm_run(returns="namedtuple")
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    assert len(info.fnames) == 2
+    assert info.dependencies == {0: [], 1: [0]}
+    assert info.nodes == (1, 1)
+    assert info.cores_per_node == (2, 2)
