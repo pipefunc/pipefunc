@@ -244,7 +244,7 @@ def create_learners(
         internal_shapes,
     )
     for _fixed_indices in iterator:
-        key = _key(_fixed_indices) if _fixed_indices else None
+        key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
             _learners = []
             for func in gen:
@@ -291,7 +291,9 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
-def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
+    if fixed_indices is None:
+        return None
     # Makes `fixed_indices` hashable
     return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
 
@@ -504,7 +506,7 @@ def _maybe_iterate_axes(
     if split_axis_mode == "independent":
         split_axes = _identify_cross_product_axes(pipeline)
     else:
-        split_axes = tuple(itertools.chain.from_iterable(pipeline.mapspec_axes.values()))
+        split_axes = tuple(set(itertools.chain.from_iterable(pipeline.mapspec_axes.values())))
     axes = pipeline.mapspec_axes
     shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
     for _fixed_indices in _iterate_axes(split_axes, inputs, axes, shapes):
