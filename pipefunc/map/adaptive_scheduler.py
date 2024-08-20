@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from pipefunc._pipefunc import PipeFunc
     from pipefunc.map._run_info import RunInfo
-    from pipefunc.map.adaptive import LearnersDict
+    from pipefunc.map.adaptive import AxisIndex, LearnersDict
 
 
 class AdaptiveSchedulerDetails(NamedTuple):
@@ -68,6 +68,15 @@ def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
     return run_folder / "adaptive_scheduler" / output_name / f"{index}.pickle"
 
 
+def _key_to_fixed_indices(
+    axis_indices: tuple[AxisIndex, ...] | None,
+) -> dict[str, int | slice] | None:
+    if axis_indices is None:
+        return None
+    # Inverse of pipefunc.map.adaptive._key
+    return {axis_index.axis: axis_index.idx for axis_index in axis_indices}
+
+
 def slurm_run_setup(
     learners_dict: LearnersDict,
     default_resources: dict | Resources | None = None,
@@ -84,7 +93,8 @@ def slurm_run_setup(
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
     dependencies: dict[int, list[int]] = {}
-    for learners_lists in learners_dict.data.values():
+    for axis_indices, learners_lists in learners_dict.data.items():
+        fixed_indices = _key_to_fixed_indices(axis_indices)
         prev_indices: list[int] = []
         for learner_list in learners_lists:
             indices: list[int] = []
@@ -97,6 +107,7 @@ def slurm_run_setup(
                 tracker.update(
                     learner.pipefunc.resources if not ignore_resources else None,
                     learner.pipefunc,
+                    fixed_indices,
                     learners_dict.run_info,
                 )
             prev_indices = indices
@@ -142,6 +153,7 @@ class _ResourcesContainer:
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
+        fixed_indices: dict[str, int | slice] | None,
         run_info: RunInfo,
     ) -> None:
         if resources is None and self.default_resources is None:

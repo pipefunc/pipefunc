@@ -289,6 +289,7 @@ def _learner(
 
 
 def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+    # Makes `fixed_indices` hashable
     return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
 
 
