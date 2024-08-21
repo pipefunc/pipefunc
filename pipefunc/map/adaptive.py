@@ -246,9 +246,9 @@ def create_learners(
             gen_learners = []
             for func in gen:
                 learner = _learner(
-                    func,
-                    run_info,
-                    store,
+                    func=func,
+                    run_info=run_info,
+                    store=store,
                     fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
