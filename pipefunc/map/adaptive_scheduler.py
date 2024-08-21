@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from pipefunc._pipefunc import PipeFunc
     from pipefunc.map._run_info import RunInfo
-    from pipefunc.map.adaptive import AxisIndex, LearnersDict
+    from pipefunc.map.adaptive import LearnersDict
 
 
 class AdaptiveSchedulerDetails(NamedTuple):
@@ -66,15 +66,6 @@ def _is_none(value: Any) -> bool:
 def _fname(run_folder: Path, func: PipeFunc, index: int) -> Path:
     output_name = "-".join(at_least_tuple(func.output_name))
     return run_folder / "adaptive_scheduler" / output_name / f"{index}.pickle"
-
-
-def _key_to_fixed_indices(
-    axis_indices: tuple[AxisIndex, ...] | None,
-) -> dict[str, int | slice] | None:
-    if axis_indices is None:
-        return None
-    # Inverse of pipefunc.map.adaptive._key
-    return {axis_index.axis: axis_index.idx for axis_index in axis_indices}
 
 
 def slurm_run_setup(
