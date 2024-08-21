@@ -254,7 +254,7 @@ def create_learners(
                     fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
-                if split_axis_mode == "all":
+                if func.resources_scope == "element":
                     for lrn in _split_sequence_learner(learner):
                         gen_learners.append(LearnerPipeFunc(lrn, func))  # noqa: PERF401
                 else:
@@ -267,7 +267,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
     """Split a `SequenceLearner` into multiple learners."""
     if len(learner.sequence) == 1:
         return [learner]
-    return [SequenceLearner(learner.function, [x]) for x in learner.sequence]
+    return [SequenceLearner(learner._original_function, [x]) for x in learner.sequence]
 
 
 def _learner(
