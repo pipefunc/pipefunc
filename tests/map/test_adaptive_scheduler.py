@@ -6,7 +6,11 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
-from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, _or, slurm_run_setup
+from pipefunc.map.adaptive_scheduler import (
+    AdaptiveSchedulerDetails,
+    _or,
+    slurm_run_setup,
+)
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -253,9 +257,10 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
         resources=lambda kw: Resources(cpus=len(kw["a"])),
+        resources_variable="resources",
         mapspec="a[i] -> x[i]",
     )
-    def f1(a: int) -> int:
+    def f1(a: int, resources: Resources) -> int:  # noqa: ARG001
         return a
 
     @pipefunc(output_name="y")
@@ -268,6 +273,10 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     info = slurm_run_setup(learners_dict, Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
+
+    # Run one learner iteration
+    learner = info.learners[0]
+    learner.function((0, learner.sequence[0]))
 
     assert isinstance(info.cores_per_node, tuple)
     assert len(info.cores_per_node) == 2
@@ -299,6 +308,33 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     assert n1() is None
 
     assert info.dependencies == {0: [], 1: [0]}
+
+
+def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda kw: Resources(cpus=kw["a"]),
+        resources_variable="resources",
+        resources_scope="element",
+        mapspec="a[i] -> x[i]",
+    )
+    def f1(a: int, resources: Resources) -> int:
+        assert isinstance(resources.cpus, int)
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: int) -> int:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+    inputs = {"a": list(range(10))}
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict, Resources(cpus=2))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    info.cores_per_node[0]()
+    learner = info.learners[0]
+    learner.function((0, learner.sequence[0]))
 
 
 def test_cores_per_node_vs_cores(tmp_path: Path) -> None:
