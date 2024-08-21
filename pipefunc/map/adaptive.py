@@ -157,7 +157,7 @@ def create_learners(
     return_output: bool = False,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
-    split_independent_axes: bool = True,
+    split_independent_axes: bool = False,
 ) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
