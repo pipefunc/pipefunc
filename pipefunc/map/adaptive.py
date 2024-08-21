@@ -157,19 +157,17 @@ def create_learners(
     return_output: bool = False,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
-    split_axis_mode: Literal["all", "independent"] | None = None,
+    split_independent_axes: bool = True,
 ) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
     Creates learner(s) for each function node in the pipeline graph. The number of learners
-    created for each node depends on the `fixed_indices` and `split_axis_mode` parameters:
+    created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
 
-    - If `fixed_indices` is provided or `split_axis_mode` is `None`, a single learner
-      is created for each function node.
-    - If `split_axis_mode` is `"independent"`, multiple learners are created for each function
+    - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
+      is created for each function node (unless `resources_scope="element"`).
+    - If `split_independent_axes` is `True`, multiple learners are created for each function
       node, corresponding to different combinations of the independent axes in the pipeline.
-    - If `split_axis_mode` is `"all"`, multiple learners are created for each function
-      node, corresponding to the cross product axes in the pipeline.
 
     Returns a dictionary where the keys represent specific combinations of indices for the
     independent axes, and the values are lists of lists of learners:
@@ -178,11 +176,11 @@ def create_learners(
       learners in each stage depend on the outputs of the learners in the previous stage.
     - The inner lists contain learners that can be executed independently within each stage.
 
-    When `split_axis_mode` is `"all"` or `"independent"`, each key in the dictionary
-    corresponds to a different combination of indices for the axes, allowing for parallel
+    When `split_independent_axes` is `True`, each key in the dictionary corresponds to a
+    different combination of indices for the independent axes, allowing for parallel
     execution across different subsets of the input data.
 
-    If `fixed_indices` is `None` and `split_axis_mode` is `None`, the only key in
+    If `fixed_indices` is `None` and `split_independent_axes` is `False`, the only key in
     the dictionary is `None`, indicating that all indices are being processed together.
 
     Parameters
@@ -205,8 +203,8 @@ def create_learners(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
-    split_axis_mode
-        Split the axes into separate learners. Do not use
+    split_independent_axes
+        Whether to split the independent axes into separate learners. Do not use
         in conjunction with ``fixed_indices``.
 
     See Also
@@ -220,7 +218,7 @@ def create_learners(
         and the values are lists of lists of learners. The learners
         in the inner list can be executed in parallel, but the outer lists need
         to be executed in order. If ``fixed_indices`` is ``None`` and
-        ``split_axis_mode`` is ``None``, then the only key is ``None``.
+        ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
     run_folder = Path(run_folder)
@@ -239,7 +237,7 @@ def create_learners(
         pipeline,
         inputs,
         fixed_indices,
-        split_independent_axes=split_axis_mode is not None,
+        split_independent_axes=split_independent_axes is not None,
         internal_shapes=internal_shapes,
     )
     for _fixed_indices in iterator:

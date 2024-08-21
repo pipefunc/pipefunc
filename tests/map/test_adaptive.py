@@ -270,7 +270,7 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
         inputs,
         run_folder=tmp_path,
         return_output=True,
-        split_axis_mode="independent",
+        split_independent_axes=True,
     )
     flat_learners = learners.flatten()
     assert len(flat_learners) == 1
@@ -312,7 +312,7 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
         inputs,
         tmp_path,
         return_output=True,
-        split_axis_mode="independent",
+        split_independent_axes=True,
     )
     flat_learners = learners.flatten()
     for learners_list in flat_learners.values():
@@ -359,7 +359,7 @@ def test_internal_shapes(tmp_path: Path) -> None:
         tmp_path / "learners",
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         return_output=True,
-        split_axis_mode="independent",
+        split_independent_axes=True,
     )
     assert results
     assert learners

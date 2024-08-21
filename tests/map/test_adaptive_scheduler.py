@@ -29,7 +29,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
 
     inputs = {"a": list(range(10))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     info = learners_dict.to_slurm_run(
         Resources(
@@ -89,7 +89,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
 
     inputs = {"a": list(range(4))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     # Test including defaults
     info = learners_dict.to_slurm_run({"cpus": 8}, returns="namedtuple")
@@ -142,7 +142,7 @@ def test_missing_resources(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
 
     inputs = {"a": list(range(4))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     with pytest.raises(
         ValueError,
         match="Either all `PipeFunc`s must have resources or `default_resources` must be provided.",
@@ -165,7 +165,7 @@ def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> Non
     pipeline2 = Pipeline([f2])
     pipeline = pipeline1 | pipeline2
     inputs = {"a": list(range(4))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     kw = learners_dict.to_slurm_run(default_resources=Resources(cpus=4))
     assert isinstance(kw, dict)
     assert kw["cores_per_node"] == (2, 4)
@@ -183,7 +183,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
 
     inputs = {"a": list(range(10))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     default_resources = Resources(cpus=4)
     info = slurm_run_setup(learners_dict, default_resources)
@@ -215,7 +215,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
         pipeline,
         inputs,
         tmp_path,
-        split_axis_mode="independent",
+        split_independent_axes=True,
         return_output=True,
     )
     info = slurm_run_setup(learners_dict, Resources(cpus=2))
@@ -269,7 +269,7 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f1, f2])
     inputs = {"a": list(range(10))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     info = slurm_run_setup(learners_dict, Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
@@ -332,7 +332,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
         pipeline,
         inputs,
         tmp_path,
-        split_axis_mode="all",
+        split_independent_axes=True,
         return_output=True,
     )
     info = slurm_run_setup(learners_dict, Resources(cpus=2))
@@ -356,7 +356,7 @@ def test_cores_per_node_vs_cores(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f1, f2])
     inputs = {"a": 1}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     info = slurm_run_setup(learners_dict)
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
@@ -371,7 +371,7 @@ def test_cores_only(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f1])
     inputs = {"a": 1}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     info = slurm_run_setup(learners_dict)
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 1
@@ -406,7 +406,7 @@ def test_parallelization_mode(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f1])
     inputs = {"a": 1}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="independent")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
     info = slurm_run_setup(learners_dict)
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert info.executor_type is not None
@@ -432,7 +432,7 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
     pipeline = Pipeline([f1, f2])
 
     inputs = {"a": list(range(1, 4))}
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_axis_mode="all")
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
 
     info = learners_dict.to_slurm_run(returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
