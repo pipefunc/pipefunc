@@ -237,8 +237,8 @@ def create_learners(
         pipeline,
         inputs,
         fixed_indices,
-        split_independent_axes=split_independent_axes is not None,
-        internal_shapes=internal_shapes,
+        split_independent_axes,
+        internal_shapes,
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
