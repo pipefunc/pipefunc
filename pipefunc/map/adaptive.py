@@ -251,12 +251,12 @@ def create_learners(
                     func,
                     run_info,
                     store,
-                    fixed_indices=_fixed_indices,  # Might be None
+                    fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
                 if split_axis_mode == "all":
                     for lrn in _split_sequence_learner(learner):
-                        gen_learners.append(LearnerPipeFunc(lrn, func))
+                        gen_learners.append(LearnerPipeFunc(lrn, func))  # noqa: PERF401
                 else:
                     gen_learners.append(LearnerPipeFunc(learner, func))
             learners.setdefault(key, []).append(gen_learners)
