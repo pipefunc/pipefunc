@@ -94,7 +94,7 @@ class PipeFunc(Generic[T]):
         parallelization.
     resources_scope
         Determines how resources are allocated in relation to the mapspec:
-        - "mapspec": Allocate resources for the entire mapspec operation (default).
+        - "map": Allocate resources for the entire mapspec operation (default).
         - "element": Allocate resources for each element in the mapspec.
         If no mapspec is defined, this parameter is ignored.
     scope
@@ -151,7 +151,7 @@ class PipeFunc(Generic[T]):
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
         | None = None,
         resources_variable: str | None = None,
-        resources_scope: Literal["mapspec", "element"] = "mapspec",
+        resources_scope: Literal["map", "element"] = "map",
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -772,7 +772,7 @@ def pipefunc(
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
     | None = None,
     resources_variable: str | None = None,
-    resources_scope: Literal["mapspec", "element"] = "mapspec",
+    resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -826,7 +826,7 @@ def pipefunc(
         parallelization.
     resources_scope
         Determines how resources are allocated in relation to the mapspec:
-        - "mapspec": Allocate resources for the entire mapspec operation (default).
+        - "map": Allocate resources for the entire mapspec operation (default).
         - "element": Allocate resources for each element in the mapspec.
         If no mapspec is defined, this parameter is ignored.
     scope

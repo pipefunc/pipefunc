@@ -145,7 +145,7 @@ class _ResourcesContainer:
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
         learner: SequenceLearner,
-        resources_scope: Literal["mapspec", "element"],
+        resources_scope: Literal["map", "element"],
         run_info: RunInfo,
     ) -> None:
         if resources is None and self.default_resources is None:
@@ -185,7 +185,7 @@ class _ResourcesContainer:
 
 def _get_index(
     learner: SequenceLearner,
-    resources_scope: Literal["mapspec", "element"],
+    resources_scope: Literal["map", "element"],
     func: PipeFunc,
 ) -> int | None:
     if resources_scope == "element" and func.mapspec is not None:
