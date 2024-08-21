@@ -390,8 +390,8 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
 
     info = learners_dict.to_slurm_run(returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
-    assert len(info.learners) == 2
-    assert len(info.fnames) == 2
-    assert info.dependencies == {0: [], 1: [0]}
-    assert info.nodes == (1, 1)
+    assert len(info.learners) == 4
+    assert len(info.fnames) == 4
+    assert info.dependencies == {0: [], 1: [], 2: [], 3: [0, 1, 2]}
+    assert info.nodes[0]() == 1
     assert info.cores_per_node == (2, 2)

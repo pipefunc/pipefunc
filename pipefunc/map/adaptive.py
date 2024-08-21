@@ -247,41 +247,27 @@ def create_learners(
         for gen in pipeline.topological_generations.function_lists:
             gen_learners = []
             for func in gen:
-                fixed_iter = (
-                    [_fixed_indices]
-                    if split_axis_mode != "all"
-                    else _split_fixed_indices(_fixed_indices, func, run_info)
+                learner = _learner(
+                    func,
+                    run_info,
+                    store,
+                    fixed_indices=_fixed_indices,  # Might be None
+                    return_output=return_output,
                 )
-                for lrn_fixed_indices in fixed_iter:
-                    learner = _learner(
-                        func,
-                        run_info,
-                        store,
-                        fixed_indices=lrn_fixed_indices,  # type: ignore[arg-type]
-                        return_output=return_output,
-                    )
+                if split_axis_mode == "all":
+                    for lrn in _split_sequence_learner(learner):
+                        gen_learners.append(LearnerPipeFunc(lrn, func))
+                else:
                     gen_learners.append(LearnerPipeFunc(learner, func))
             learners.setdefault(key, []).append(gen_learners)
     return learners
 
 
-def _split_fixed_indices(
-    fixed_indices: dict[str, int | slice] | None,
-    func: PipeFunc,
-    run_info: RunInfo,
-) -> Generator[dict[str, int], None, None]:
-    if fixed_indices is None:
-        fixed_indices = {}
-    itr = []
-    for spec in func.mapspec.inputs:
-        sel = {axis: idx for axis, idx in fixed_indices.items() if axis in spec.axes}
-        # Iterate over axes completely if they are not in `sel`, otherwise iterate
-        # over the fixed indices
-        for axis in spec.axes:
-            if axis in fixed_indices:
-                continue
-            shape = run_info.shapes[spec.name]
-    return fixed_indices
+def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
+    """Split a `SequenceLearner` into multiple learners."""
+    if len(learner.sequence) == 1:
+        return [learner]
+    return [SequenceLearner(learner.function, [x]) for x in learner.sequence]
 
 
 def _learner(
