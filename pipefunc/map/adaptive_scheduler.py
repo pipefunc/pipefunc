@@ -187,10 +187,12 @@ def _get_index(
     learner: SequenceLearner,
     resources_scope: Literal["mapspec", "element"],
     func: PipeFunc,
-) -> int:
-    return (
-        learner.sequence[0] if resources_scope == "element" and func.mapspec is not None else None
-    )
+) -> int | None:
+    if resources_scope == "element" and func.mapspec is not None:
+        # Assumes that the learner is already split up
+        assert len(learner.sequence) == 1
+        return learner.sequence[0]
+    return None
 
 
 def _eval_resources(
