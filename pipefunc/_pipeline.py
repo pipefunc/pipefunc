@@ -2002,4 +2002,4 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                             f" `'{dep.__name__}' expects {input_type}`."
                             " Please make sure the shared input arguments have the same type."
                         )
-                        raise ValueError(msg)
+                        raise TypeError(msg)

@@ -731,3 +731,22 @@ def test_parameterless_pipefunc() -> None:
     ]
     r = pipeline.map({})
     assert r["e"].output == 3
+
+
+def test_invalid_type_hints():
+    @pipefunc(("y1", "y2"))
+    def f(a: int, b: str) -> tuple[int, str]:
+        return (a, b)
+
+    @pipefunc("z")
+    def g(
+        y1: int,
+        y2: float,  # Incorrect type hint (should be str)
+    ) -> str:
+        return f"{y1=}, {y2=}"
+
+    with pytest.raises(
+        TypeError,
+        match="Inconsistent type annotations for argument 'y2' in functions",
+    ):
+        Pipeline([f, g])
