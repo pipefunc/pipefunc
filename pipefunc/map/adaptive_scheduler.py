@@ -6,13 +6,15 @@ import functools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.map._run import _func_kwargs, _load_file_array, _select_kwargs
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import adaptive_scheduler
     from adaptive import SequenceLearner
     from adaptive_scheduler.utils import EXECUTOR_TYPES

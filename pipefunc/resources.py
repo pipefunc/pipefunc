@@ -6,7 +6,10 @@ import functools
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True, eq=True)

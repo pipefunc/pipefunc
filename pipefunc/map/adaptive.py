@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
@@ -28,7 +28,7 @@ from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
     import adaptive_scheduler
     import numpy.typing as npt
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from pipefunc.sweep import Sweep
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class LearnerPipeFunc(NamedTuple):

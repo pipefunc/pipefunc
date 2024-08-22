@@ -618,8 +618,8 @@ def test_nd_input_list(tmp_path: Path) -> None:
 def test_add_mapspec_axis(tmp_path: Path) -> None:
     @pipefunc(output_name="one", mapspec="a[i], b[j] -> one[i, j]")
     def one(a, b):
-        assert isinstance(a, (int, np.float64))
-        assert isinstance(b, (int, np.float64))
+        assert isinstance(a, int | np.float64)
+        assert isinstance(b, int | np.float64)
         return a * b
 
     @pipefunc(output_name="two")
