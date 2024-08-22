@@ -371,7 +371,9 @@ def _execute_iteration_in_map_spec(
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
-    return outputs if return_output else None
+    if not return_output:
+        return None
+    return outputs[0] if isinstance(func.output_name, str) else outputs
 
 
 @dataclass(frozen=True, slots=True)

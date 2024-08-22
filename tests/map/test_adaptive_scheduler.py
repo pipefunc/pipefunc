@@ -333,7 +333,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: list[int]) -> list[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -351,8 +351,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
     assert info.cores_per_node[0]() == 1  # type: ignore[operator,misc,index]
     learner = info.learners[0]
     y = learner.function((0, learner.sequence[0]))
-    # TODO: check if output type is correct
-    assert y == (1,)
+    assert y == 1
     run(info)
 
 
