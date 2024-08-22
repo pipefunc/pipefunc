@@ -458,3 +458,35 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
     assert info.cores_per_node[1]() == 2  # type: ignore[operator,misc,index]
 
     run(info)
+
+
+def test_slurm_run_delayed_resources_with_mapspec_scope_single_element(tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="x",
+        resources=lambda kw: Resources(cpus=kw["a"]),
+        resources_variable="resources",
+        resources_scope="element",
+        mapspec="a[i] -> x[i]",
+    )
+    def f1(a: int, resources: Resources) -> int:
+        assert isinstance(resources.cpus, int)
+        return a
+
+    @pipefunc(output_name="y")
+    def f2(x: list[int]) -> list[int]:
+        return x
+
+    pipeline = Pipeline([f1, f2])
+    inputs = {"a": [4]}
+    learners_dict = create_learners(
+        pipeline,
+        inputs,
+        tmp_path,
+        split_independent_axes=True,
+        return_output=True,
+    )
+    info = slurm_run_setup(learners_dict, Resources(cpus=2))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    assert info.cores_per_node[0]() == 4  # type: ignore[operator,misc,index]
+    run(info)
