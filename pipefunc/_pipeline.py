@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, get_args, get_origin
 
 import networkx as nx
+from numpy.typing import NDArray
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
@@ -939,8 +940,8 @@ class Pipeline:
         """Validate the pipeline."""
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
-        _check_consistent_type_annotations(self.graph)
         self._validate_mapspec()
+        _check_consistent_type_annotations(self.graph)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
@@ -2006,11 +2007,22 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
             continue
         deps = nx.descendants_at_distance(graph, node, 1)
         output_types = node.output_annotation
+        output_mapspec_names = node.mapspec.output_names if node.mapspec else ()
         for dep in deps:
+            input_mapspec_names = dep.mapspec.input_names if dep.mapspec else ()
             assert isinstance(dep, PipeFunc)
             for parameter_name, input_type in dep.parameter_annotations.items():
                 if parameter_name in output_types:
                     output_type = output_types[parameter_name]
+                    if (
+                        parameter_name in output_mapspec_names
+                        and parameter_name not in input_mapspec_names
+                    ):
+                        # Parameter is reduced, so now the 'input' is a
+                        # `NDArray[OriginalType]` if was `OriginalType`
+                        output_type = NDArray[output_type]  # type: ignore[valid-type]
+                        # TODO: fix this later
+                        continue
                     if not _compare_types(output_type, input_type):
                         msg = (
                             f"Inconsistent type annotations for argument '{parameter_name}' in"

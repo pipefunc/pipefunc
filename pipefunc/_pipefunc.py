@@ -656,13 +656,19 @@ class PipeFunc(Generic[T]):
     @functools.cached_property
     def parameter_annotations(self) -> dict[str, Any]:
         """Return the type annotations of the wrapped function's parameters."""
-        type_hints = get_type_hints(self.func)
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        type_hints = get_type_hints(func)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         """Return the type annotation of the wrapped function's output."""
-        hint = get_type_hints(self.func).get("return", Any)
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        hint = get_type_hints(func).get("return", Any)
         if not isinstance(self.output_name, tuple):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
