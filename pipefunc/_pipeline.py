@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, get_args, get_origin
 
 import networkx as nx
 
@@ -1983,6 +1983,22 @@ class _PipelineInternalCache:
     func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
+def _compare_types(type1: Any, type2: Any) -> bool:
+    """Recursively compare two types for structural compatibility."""
+    if type1 is Any or type2 is Any:
+        return True
+    if get_origin(type1) != get_origin(type2):
+        return False
+
+    args1 = get_args(type1)
+    args2 = get_args(type2)
+
+    if len(args1) != len(args2):
+        return False
+
+    return all(_compare_types(arg1, arg2) for arg1, arg2 in zip(args1, args2))
+
+
 def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
     """Check that the type annotations for shared arguments are consistent."""
     for node in graph.nodes:
@@ -1995,7 +2011,7 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
             for parameter_name, input_type in dep.parameter_annotations.items():
                 if parameter_name in output_types:
                     output_type = output_types[parameter_name]
-                    if output_type != input_type:
+                    if not _compare_types(output_type, input_type):
                         msg = (
                             f"Inconsistent type annotations for argument '{parameter_name}' in"
                             f" functions `'{node}' returns {output_type}` and"
