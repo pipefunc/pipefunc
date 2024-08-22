@@ -16,6 +16,7 @@ import functools
 import inspect
 import time
 import warnings
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
@@ -939,6 +940,7 @@ class Pipeline:
         """Validate the pipeline."""
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        _check_consistent_type_annotations(self.functions)
         self._validate_mapspec()
 
     def _validate_mapspec(self) -> None:
@@ -1980,3 +1982,22 @@ class _PipelineInternalCache:
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+
+
+def _check_consistent_type_annotations(functions: list[PipeFunc]) -> None:
+    """Check that the type annotations for shared arguments are consistent."""
+    arg_annotations = defaultdict(set)
+    for f in functions:
+        annotations = f.parameter_annotations.copy()
+        if f.output_picker is None:
+            assert isinstance(f.output_name, str)
+            annotations[f.output_name] = f.output_annotation
+        for arg, annotation in annotations.items():
+            arg_annotations[arg].add(annotation)
+            if len(arg_annotations[arg]) > 1:
+                msg = (
+                    f"Inconsistent type annotations for argument '{arg}' in"
+                    " functions. Please make sure the shared input arguments have"
+                    " the same type annotation or are set only for one function.",
+                )
+                raise ValueError(msg)

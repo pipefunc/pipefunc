@@ -16,7 +16,7 @@ import os
 import warnings
 import weakref
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_type_hints
 
 import cloudpickle
 
@@ -642,6 +642,17 @@ class PipeFunc(Generic[T]):
             else:
                 new_kwargs[k] = v
         return new_kwargs
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        type_hints = get_type_hints(self.func)
+        return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
+
+    @functools.cached_property
+    def output_annotation(self) -> Any:
+        """Return the type annotation of the wrapped function's output."""
+        return get_type_hints(self.func).get("return", Any)
 
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
