@@ -8,7 +8,7 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline():
     @pipefunc(output_name="c")
     def f1(a, b):

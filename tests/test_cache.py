@@ -150,7 +150,7 @@ def test_cache_property(shared):
     assert cache_dict == {"test": "value"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache_dir(tmp_path):
     return tmp_path / "cache"
 

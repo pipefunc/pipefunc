@@ -251,7 +251,7 @@ class MapSpec:
             in_, out_ = expr.split("->")
         except ValueError:
             msg = f"Expected expression of form 'a -> b', but got '{expr}''"
-            raise ValueError(msg)  # noqa: B904, TRY200
+            raise ValueError(msg)  # noqa: B904
 
         inputs = _parse_indexed_arrays(in_)
         outputs = _parse_indexed_arrays(out_)
