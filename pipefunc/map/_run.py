@@ -264,6 +264,9 @@ def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
     )
 
 
+_EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
+
+
 def _run_iteration(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -273,7 +276,7 @@ def _run_iteration(
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
     if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
-        selected["__evaluated_resources__"] = func.resources(kwargs)  # type: ignore[has-type]
+        selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
     try:
         return func(**selected)
     except Exception as e:

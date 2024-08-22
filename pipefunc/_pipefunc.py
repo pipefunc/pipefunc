@@ -29,6 +29,7 @@ from pipefunc._utils import (
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -550,7 +551,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
-        evaluated_resources = kwargs.pop("__evaluated_resources__", None)
+        evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
