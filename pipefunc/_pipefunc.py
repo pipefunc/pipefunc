@@ -566,13 +566,12 @@ class PipeFunc(Generic[T]):
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
-            if self.resources_variable:
-                if evaluated_resources is not None:
-                    kwargs[self.resources_variable] = evaluated_resources
-                elif callable(self.resources):
-                    kwargs[self.resources_variable] = self.resources(kwargs)
-                else:
-                    kwargs[self.resources_variable] = self.resources
+            _maybe_update_kwargs_with_resources(
+                kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
             result = self.func(*args, **kwargs)
 
         if self.debug:
@@ -1181,3 +1180,18 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     """Return either a MapSpec or None, depending on the input."""
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _maybe_update_kwargs_with_resources(
+    kwargs: dict[str, Any],
+    resources_variable: str | None,
+    evaluated_resources: Resources | None,
+    resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+) -> None:
+    if resources_variable:
+        if evaluated_resources is not None:
+            kwargs[resources_variable] = evaluated_resources
+        elif callable(resources):
+            kwargs[resources_variable] = resources(kwargs)
+        else:
+            kwargs[resources_variable] = resources
