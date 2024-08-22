@@ -16,7 +16,6 @@ import functools
 import inspect
 import time
 import warnings
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
@@ -940,7 +939,7 @@ class Pipeline:
         """Validate the pipeline."""
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
-        _check_consistent_type_annotations(self.functions)
+        _check_consistent_type_annotations(self.graph)
         self._validate_mapspec()
 
     def _validate_mapspec(self) -> None:
@@ -1984,20 +1983,23 @@ class _PipelineInternalCache:
     func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
-def _check_consistent_type_annotations(functions: list[PipeFunc]) -> None:
+def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
     """Check that the type annotations for shared arguments are consistent."""
-    arg_annotations = defaultdict(set)
-    for f in functions:
-        annotations = f.parameter_annotations.copy()
-        if f.output_picker is None:
-            assert isinstance(f.output_name, str)
-            annotations[f.output_name] = f.output_annotation
-        for arg, annotation in annotations.items():
-            arg_annotations[arg].add(annotation)
-            if len(arg_annotations[arg]) > 1:
-                msg = (
-                    f"Inconsistent type annotations for argument '{arg}' in"
-                    " functions. Please make sure the shared input arguments have"
-                    " the same type annotation or are set only for one function.",
-                )
-                raise ValueError(msg)
+    for node in graph.nodes:
+        if not isinstance(node, PipeFunc):
+            continue
+        deps = nx.descendants_at_distance(graph, node, 1)
+        output_types = node.output_annotation
+        for dep in deps:
+            assert isinstance(dep, PipeFunc)
+            for parameter_name, input_type in dep.parameter_annotations.items():
+                if parameter_name in output_types:
+                    output_type = output_types[parameter_name]
+                    if output_type != input_type:
+                        msg = (
+                            f"Inconsistent type annotations for argument '{parameter_name}' in"
+                            f" functions `'{node}' returns {output_type}` and"
+                            f" `'{dep.__name__}' expects {input_type}`."
+                            " Please make sure the shared input arguments have the same type."
+                        )
+                        raise ValueError(msg)
