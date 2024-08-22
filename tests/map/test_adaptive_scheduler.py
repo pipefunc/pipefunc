@@ -422,9 +422,10 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
         mapspec="a[i] -> x[i]",
         resources=lambda kw: Resources(cpus_per_node=kw["a"], nodes=2),
         resources_scope="element",
-        # TODO: Add `resources_variable="resources"` support
+        resources_variable="resources",
     )
-    def f1(a: int) -> int:
+    def f1(a: int, resources: Resources) -> int:
+        assert resources.cpus_per_node in (1, 2, 3)
         return a
 
     @pipefunc(output_name="y", resources=lambda kw: Resources(cpus_per_node=kw["x"][0], nodes=1))
