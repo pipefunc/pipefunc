@@ -16,7 +16,7 @@ import os
 import warnings
 import weakref
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar
 
 import cloudpickle
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 MAX_PARAMS_LEN = 15
 
 

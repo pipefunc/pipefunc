@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from pipefunc.map._run import Result
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 _empty = inspect.Parameter.empty
@@ -1934,7 +1934,7 @@ def _traverse_graph(
 
     def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         results = set()
-        if isinstance(x, (str, tuple)):
+        if isinstance(x, str | tuple):
             x = node_mapping[x]
         for neighbor in getattr(graph, direction)(x):
             if isinstance(neighbor, PipeFunc):
