@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import adaptive
 import pytest
 
 from pipefunc import Pipeline, pipefunc
@@ -11,6 +12,11 @@ from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def run(info: AdaptiveSchedulerDetails) -> None:
+    for lrn in info.learners:
+        adaptive.runner.simple(lrn)
 
 
 def test_slurm_run_setup(tmp_path: Path) -> None:
@@ -59,6 +65,8 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "executor_type",
     }
 
+    run(info)
+
     with pytest.raises(
         ValueError,
         match="Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'.",
@@ -106,6 +114,7 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert info.extra_scheduler is None
     assert info.cores_per_node == (10, 10)
+    run(info)
 
     # Test ignoring resources with default (now using "kwargs")
     info = learners_dict.to_slurm_run(
@@ -191,6 +200,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
     assert info.cores_per_node == (2, 4)
     assert info.extra_scheduler is None
     assert info.partition is None
+    run(info)
     kwargs = info.kwargs()
     assert "partition" not in kwargs
     assert "cores_per_node" in kwargs
@@ -224,6 +234,7 @@ def test_slurm_run_delayed_resources(tmp_path: Path) -> None:
     assert len(info.cores_per_node) == 1
     assert callable(info.cores_per_node[0])
     assert info.cores_per_node[0]() == 1
+    run(info)
 
     kw = info.kwargs()
     assert len(kw["cores_per_node"]) == 1
@@ -275,6 +286,7 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     # Run one learner iteration
     learner = info.learners[0]
     learner.function((0, learner.sequence[0]))
+    run(info)
 
     assert isinstance(info.cores_per_node, tuple)
     assert len(info.cores_per_node) == 2
@@ -341,6 +353,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
     y = learner.function((0, learner.sequence[0]))
     # TODO: check if output type is correct
     assert y == (1,)
+    run(info)
 
 
 def test_cores_per_node_vs_cores(tmp_path: Path) -> None:
@@ -360,6 +373,7 @@ def test_cores_per_node_vs_cores(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert info.cores_per_node == (1, 2)
     assert info.nodes == (None, 1)
+    run(info)
 
 
 def test_cores_only(tmp_path: Path) -> None:
@@ -375,6 +389,7 @@ def test_cores_only(tmp_path: Path) -> None:
     assert len(info.learners) == 1
     assert info.cores_per_node == (1,)
     assert info.nodes is None
+    run(info)
 
 
 def test_or() -> None:
@@ -410,6 +425,7 @@ def test_parallelization_mode(tmp_path: Path) -> None:
     assert info.executor_type is not None
     assert len(info.executor_type) == 1
     assert info.executor_type[0]() == "sequential"
+    run(info)
 
 
 def test_slurm_run_split_all(tmp_path: Path) -> None:
@@ -441,3 +457,5 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
     assert info.nodes[0]() == 2  # type: ignore[operator,misc,index]
     assert info.cores_per_node[0]() == 1  # type: ignore[operator,misc,index]
     assert info.cores_per_node[1]() == 2  # type: ignore[operator,misc,index]
+
+    run(info)
