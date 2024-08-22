@@ -48,17 +48,7 @@ def test_basic(tmp_path: Path) -> None:
     learners.simple_run()
     flat_learners = learners.flatten()
     assert len(flat_learners) == 2
-    assert flat_learners["foo.z"][0].data == {
-        0: (2,),
-        1: (3,),
-        2: (4,),
-        3: (3,),
-        4: (4,),
-        5: (5,),
-        6: (4,),
-        7: (5,),
-        8: (6,),
-    }
+    assert flat_learners["foo.z"][0].data == {0: 2, 1: 3, 2: 4, 3: 3, 4: 4, 5: 5, 6: 4, 7: 5, 8: 6}
     adaptive.runner.simple(flat_learners["prod"][0])
     assert flat_learners["prod"][0].data == {0: 172800}
 
@@ -98,7 +88,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     adaptive.runner.simple(flat_learners["x"][0])
     assert flat_learners["x"][0].data == {0: [0, 1, 2, 3]}
     adaptive.runner.simple(flat_learners["y"][0])
-    assert flat_learners["y"][0].data == {0: (0,), 1: (2,), 2: (4,), 3: (6,)}
+    assert flat_learners["y"][0].data == {0: 0, 1: 2, 2: 4, 3: 6}
     adaptive.runner.simple(flat_learners["sum"][0])
     assert flat_learners["sum"][0].data == {0: 12}
 
@@ -236,7 +226,7 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
     flat_learners = learners.flatten()
     assert len(flat_learners) == 1
     adaptive.runner.simple(flat_learners["z"][0])
-    assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    assert flat_learners["z"][0].data == {0: (1, 1), 1: (1, 2), 2: (1, 3)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
     assert store["z"].to_array().tolist() == [
@@ -277,7 +267,7 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     assert len(flat_learners["z"]) == 12
     for learner in flat_learners["z"][:-3]:
         adaptive.runner.simple(learner)
-    assert flat_learners["z"][0].data == {0: ((1, 1),)}
+    assert flat_learners["z"][0].data == {0: (1, 1)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
     assert store["z"].to_array().tolist() == [
