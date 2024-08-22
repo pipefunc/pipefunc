@@ -29,6 +29,7 @@ from pipefunc._utils import (
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -92,6 +93,11 @@ class PipeFunc(Generic[T]):
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -146,6 +152,7 @@ class PipeFunc(Generic[T]):
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
         | None = None,
         resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -163,6 +170,7 @@ class PipeFunc(Generic[T]):
         self._bound: dict[str, Any] = bound or {}
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
+        self.resources_scope: Literal["map", "element"] = resources_scope
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -529,6 +537,7 @@ class PipeFunc(Generic[T]):
             "mapspec": self.mapspec,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
+            "resources_scope": self.resources_scope,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -542,6 +551,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
@@ -557,10 +567,12 @@ class PipeFunc(Generic[T]):
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
-            if self.resources_variable:
-                kwargs[self.resources_variable] = (
-                    self.resources(kwargs) if callable(self.resources) else self.resources
-                )
+            _maybe_update_kwargs_with_resources(
+                kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
             result = self.func(*args, **kwargs)
 
         if self.debug:
@@ -764,6 +776,7 @@ def pipefunc(
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
     | None = None,
     resources_variable: str | None = None,
+    resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -815,6 +828,11 @@ def pipefunc(
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -879,6 +897,7 @@ def pipefunc(
             mapspec=mapspec,
             resources=resources,
             resources_variable=resources_variable,
+            resources_scope=resources_scope,
             scope=scope,
         )
 
@@ -1162,3 +1181,18 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     """Return either a MapSpec or None, depending on the input."""
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _maybe_update_kwargs_with_resources(
+    kwargs: dict[str, Any],
+    resources_variable: str | None,
+    evaluated_resources: Resources | None,
+    resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+) -> None:
+    if resources_variable:
+        if evaluated_resources is not None:
+            kwargs[resources_variable] = evaluated_resources
+        elif callable(resources):
+            kwargs[resources_variable] = resources(kwargs)
+        else:
+            kwargs[resources_variable] = resources

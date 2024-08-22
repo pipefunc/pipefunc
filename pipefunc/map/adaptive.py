@@ -165,7 +165,7 @@ def create_learners(
     created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
 
     - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
-      is created for each function node.
+      is created for each function node (unless `resources_scope="element"`).
     - If `split_independent_axes` is `True`, multiple learners are created for each function
       node, corresponding to different combinations of the independent axes in the pipeline.
 
@@ -241,9 +241,9 @@ def create_learners(
         internal_shapes,
     )
     for _fixed_indices in iterator:
-        key = _key(_fixed_indices) if _fixed_indices else None
+        key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
-            _learners = []
+            gen_learners = []
             for func in gen:
                 learner = _learner(
                     func=func,
@@ -252,9 +252,20 @@ def create_learners(
                     fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
-                _learners.append(LearnerPipeFunc(learner, func))
-            learners.setdefault(key, []).append(_learners)
+                if func.resources_scope == "element":
+                    for lrn in _split_sequence_learner(learner):
+                        gen_learners.append(LearnerPipeFunc(lrn, func))  # noqa: PERF401
+                else:
+                    gen_learners.append(LearnerPipeFunc(learner, func))
+            learners.setdefault(key, []).append(gen_learners)
     return learners
+
+
+def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
+    """Split a `SequenceLearner` into multiple learners."""
+    if len(learner.sequence) == 1:
+        return [learner]
+    return [SequenceLearner(learner._original_function, [x]) for x in learner.sequence]
 
 
 def _learner(
@@ -288,7 +299,10 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
-def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
+    if not fixed_indices:
+        return None
+    # Makes `fixed_indices` hashable
     return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
 
 
@@ -490,7 +504,7 @@ def _maybe_iterate_axes(
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-) -> Generator[dict[str, Any] | None, None, None]:
+) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
