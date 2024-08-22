@@ -6,7 +6,7 @@ import functools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.map._run import _func_kwargs, _load_file_array, _select_kwargs
@@ -99,7 +99,6 @@ def slurm_run_setup(
                 tracker.update(
                     resources=learner.pipefunc.resources if not ignore_resources else None,
                     func=learner.pipefunc,
-                    resources_scope=learner.pipefunc.resources_scope,
                     learner=learner.learner,
                     run_info=learners_dict.run_info,
                 )
@@ -147,7 +146,6 @@ class _ResourcesContainer:
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
         learner: SequenceLearner,
-        resources_scope: Literal["map", "element"],
         run_info: RunInfo,
     ) -> None:
         if resources is None and self.default_resources is None:
@@ -165,7 +163,7 @@ class _ResourcesContainer:
         else:
             r = resources.with_defaults(self.default_resources)
 
-        index = _get_index(learner, resources_scope, func)
+        index = _get_index(learner, func)
         for name in ["cpus_per_node", "cpus", "nodes", "partition"]:
             if callable(r):
                 # Note: we don't know if `resources.{name}` returns None or not
@@ -185,12 +183,8 @@ class _ResourcesContainer:
         self.data["extra_scheduler"].append(_extra_scheduler(index, r, func, run_info))
 
 
-def _get_index(
-    learner: SequenceLearner,
-    resources_scope: Literal["map", "element"],
-    func: PipeFunc,
-) -> int | None:
-    if resources_scope == "element" and func.mapspec is not None:
+def _get_index(learner: SequenceLearner, func: PipeFunc) -> int | None:
+    if func.resources_scope == "element" and func.mapspec is not None:
         # Assumes that the learner is already split up
         assert len(learner.sequence) == 1
         return learner.sequence[0]
