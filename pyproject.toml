@@ -148,6 +148,7 @@ ignore = [
 "tests/*" = ["SLF001", "ANN", "D", "PLR2004"]
 "tests/test_examples.py" = ["E501"]
 ".github/*" = ["INP001"]
+"example.ipynb" = ["D101", "D103", "DTZ005", "PLR2004", "ARG001", "ANN001", "ANN201"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18
