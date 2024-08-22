@@ -272,6 +272,8 @@ def _run_iteration(
     index: int,
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
+        selected["__evaluated_resources__"] = func.resources(kwargs)  # type: ignore[has-type]
     try:
         return func(**selected)
     except Exception as e:

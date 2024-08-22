@@ -169,7 +169,7 @@ class PipeFunc(Generic[T]):
         self._bound: dict[str, Any] = bound or {}
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
-        self.resources_scope = resources_scope
+        self.resources_scope: Literal["map", "element"] = resources_scope
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -550,6 +550,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        evaluated_resources = kwargs.pop("__evaluated_resources__", None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
@@ -566,9 +567,12 @@ class PipeFunc(Generic[T]):
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
             if self.resources_variable:
-                kwargs[self.resources_variable] = (
-                    self.resources(kwargs) if callable(self.resources) else self.resources
-                )
+                if evaluated_resources is not None:
+                    kwargs[self.resources_variable] = evaluated_resources
+                elif callable(self.resources):
+                    kwargs[self.resources_variable] = self.resources(kwargs)
+                else:
+                    kwargs[self.resources_variable] = self.resources
             result = self.func(*args, **kwargs)
 
         if self.debug:

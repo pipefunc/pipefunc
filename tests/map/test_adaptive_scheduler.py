@@ -257,10 +257,12 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
     @pipefunc(
         output_name="x",
         resources=lambda kw: Resources(cpus=len(kw["a"])),
-        # resources_variable="resources",
+        resources_variable="resources",
         mapspec="a[i] -> x[i]",
+        resources_scope="map",
     )
-    def f1(a: int) -> int:
+    def f1(a: int, resources: Resources) -> int:
+        assert resources.cpus == 10
         return a
 
     @pipefunc(output_name="y")
