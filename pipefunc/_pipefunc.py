@@ -31,6 +31,7 @@ from typing import (
 import cloudpickle
 
 from pipefunc._profile import ProfilingStats, ResourceProfiler
+from pipefunc._typing import NoAnnotation
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
@@ -668,7 +669,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        hint = get_type_hints(func).get("return", Any)
+        hint = get_type_hints(func).get("return", NoAnnotation)
         if not isinstance(self.output_name, tuple):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:

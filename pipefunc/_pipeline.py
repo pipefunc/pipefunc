@@ -26,6 +26,7 @@ from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
+from pipefunc._typing import is_type_compatible
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
@@ -2028,7 +2029,7 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     output_type = NDArray[output_type]  # type: ignore[valid-type]
                     # TODO: fix this later
                     continue
-                if not _compare_types(output_type, input_type):
+                if not is_type_compatible(output_type, input_type):
                     msg = (
                         f"Inconsistent type annotations for argument '{parameter_name}' in"
                         f" functions `'{node}' returns {output_type}` and"

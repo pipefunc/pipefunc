@@ -6,7 +6,7 @@ from typing import Any, Union
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._typing import is_type_compatible
+from pipefunc._typing import NoAnnotation, is_type_compatible
 
 
 def test_are_types_compatible_standard():
@@ -131,3 +131,11 @@ def test_check_none():
     assert not is_type_compatible(int, None)
     assert not is_type_compatible(None, int)
     assert not is_type_compatible(None, str)
+
+
+def test_no_annotation():
+    assert is_type_compatible(Any, NoAnnotation)
+    assert is_type_compatible(NoAnnotation, Any)
+    assert is_type_compatible(NoAnnotation, NoAnnotation)
+    assert is_type_compatible(int, NoAnnotation)
+    assert is_type_compatible(NoAnnotation, int)
