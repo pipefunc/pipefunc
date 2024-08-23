@@ -37,7 +37,8 @@ def test_are_types_compatible_numpy():
     assert is_type_compatible(npt.NDArray, npt.NDArray[Any])
     assert is_type_compatible(npt.NDArray[Any], npt.NDArray[Any])
     assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
-    assert is_type_compatible(npt.NDArray[Any], npt.NDArray)
+    # npt.NDArray without arguments turns into numpy.ndarray[typing.Any, numpy.dtype[+_ScalarType_co]]
+    assert not is_type_compatible(npt.NDArray[Any], npt.NDArray)
 
 
 def test_are_types_compatible_standard_edge_cases():
