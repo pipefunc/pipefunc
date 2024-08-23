@@ -58,15 +58,15 @@ def test_are_types_compatible_union_edge_cases():
     # Subset of a larger union
     assert is_type_compatible(int | str, int | str | float)
     # Completely different sets
-    assert not is_type_compatible(int | str, Union[float, complex])  # noqa: UP007
+    assert not is_type_compatible(int | str, float | complex)
 
     # Test with deeply nested unions
     assert is_type_compatible(Union[int | str, float], Union[str, int, float])  # noqa: UP007
     assert not is_type_compatible(Union[int | str, float], Union[float, complex])  # noqa: UP007
 
     # Test union with Any
-    assert is_type_compatible(int, Union[int, complex])  # noqa: UP007
-    assert is_type_compatible(complex, Union[int, complex])  # noqa: UP007
+    assert is_type_compatible(int, int | complex)
+    assert is_type_compatible(complex, int | complex)
     assert is_type_compatible(int | str, Any)
 
 
