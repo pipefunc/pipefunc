@@ -19,12 +19,12 @@ def test_are_types_compatible_standard():
 
 
 def test_are_types_compatible_union():
-    assert are_types_compatible(Union[int, str], str)  # noqa: UP007
-    assert are_types_compatible(int | str, str)
-    assert are_types_compatible(int | str, int)
-    assert not are_types_compatible(int, int | str)
+    assert not are_types_compatible(int | str, str)
+    assert not are_types_compatible(int | str, int)
+    assert are_types_compatible(int, int | str)
+    assert are_types_compatible(str, int | str)
     assert not are_types_compatible(Union[int, str], float)  # noqa: UP007
-    assert are_types_compatible(dict[int, str | int], dict[int, str])
+    assert are_types_compatible(dict[int, str], dict[int, str | int])
 
 
 def test_are_types_compatible_numpy():
@@ -64,8 +64,8 @@ def test_are_types_compatible_union_edge_cases():
     assert not are_types_compatible(Union[int | str, float], Union[float, complex])
 
     # Test union with Any
-    assert are_types_compatible(Union[int, complex], int)
-    assert are_types_compatible(Union[int, complex], complex)
+    assert are_types_compatible(int, Union[int, complex])
+    assert are_types_compatible(complex, Union[int, complex])
     assert are_types_compatible(Any, Union[int, str])
 
 
@@ -96,12 +96,12 @@ def test_are_types_compatible_numpy_edge_cases():
 def test_directionality_union():
     # Test directional compatibility
     # Broader incoming type is not compatible with narrower required type
-    assert are_types_compatible(int | str, str)
+    assert not are_types_compatible(int | str, str)
     # Narrower incoming type is compatible with broader required type
-    assert not are_types_compatible(str, int | str)
+    assert are_types_compatible(str, int | str)
 
     # Test specific type vs. Union
     # Compatible
-    assert are_types_compatible(int | str, int)
+    assert are_types_compatible(int, int | str)
     # Not compatible, broader incoming type isn't allowed
-    assert not are_types_compatible(int, int | str)
+    assert not are_types_compatible(int | str, int)
