@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Union
 
 import numpy as np
@@ -9,17 +11,19 @@ from pipefunc._typing import are_types_compatible
 def test_are_types_compatible_standard():
     assert are_types_compatible(list[int], list[int])
     assert not are_types_compatible(list[int], list[float])
-    assert are_types_compatible(Union[int, str], Union[str, float])
-    assert are_types_compatible(Union[int, str], Union[str, float])
+    assert not are_types_compatible(Union[int, str], Union[str, float])  # noqa: UP007
+    assert not are_types_compatible(Union[int, str], str | float)
     assert not are_types_compatible(int, float)
     assert are_types_compatible(Any, int)
     assert are_types_compatible(int, Any)
 
 
 def test_are_types_compatible_union():
-    assert are_types_compatible(Union[int, str], str)
-    assert are_types_compatible(int, Union[int, str])
-    assert not are_types_compatible(Union[int, str], float)
+    assert are_types_compatible(Union[int, str], str)  # noqa: UP007
+    assert are_types_compatible(int | str, str)
+    assert are_types_compatible(Union[int, str], int)
+    assert not are_types_compatible(int, Union[int, str])
+    assert not are_types_compatible(Union[int, str], float)  # noqa: UP007
     assert are_types_compatible(dict[int, str | int], dict[int, str])
 
 
@@ -60,8 +64,8 @@ def test_are_types_compatible_union_edge_cases():
     assert not are_types_compatible(Union[int | str, float], Union[float, complex])
 
     # Test union with Any
-    assert are_types_compatible(Union[int, Any], int)
-    assert are_types_compatible(Union[int, Any], float)
+    assert are_types_compatible(Union[int, complex], int)
+    assert are_types_compatible(Union[int, complex], complex)
     assert are_types_compatible(Any, Union[int, str])
 
 
@@ -84,6 +88,20 @@ def test_are_types_compatible_numpy_edge_cases():
 
     # Test scalar types compatibility
     # Can cast between NumPy integer types
-    assert are_types_compatible(np.int64, np.int32)
+    assert are_types_compatible(np.int64, np.int_)
     # Cannot cast from float to integer directly
     assert not are_types_compatible(np.float64, np.int32)
+
+
+def test_directionality_union():
+    # Test directional compatibility
+    # Broader incoming type is not compatible with narrower required type
+    assert are_types_compatible(int | str, str)
+    # Narrower incoming type is compatible with broader required type
+    assert not are_types_compatible(str, int | str)
+
+    # Test specific type vs. Union
+    # Compatible
+    assert are_types_compatible(int | str, int)
+    # Not compatible, broader incoming type isn't allowed
+    assert not are_types_compatible(int, int | str)
