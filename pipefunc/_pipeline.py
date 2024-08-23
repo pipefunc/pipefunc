@@ -2007,27 +2007,45 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
             continue
         deps = nx.descendants_at_distance(graph, node, 1)
         output_types = node.output_annotation
-        output_mapspec_names = node.mapspec.output_names if node.mapspec else ()
         for dep in deps:
-            input_mapspec_names = dep.mapspec.input_names if dep.mapspec else ()
             assert isinstance(dep, PipeFunc)
             for parameter_name, input_type in dep.parameter_annotations.items():
-                if parameter_name in output_types:
-                    output_type = output_types[parameter_name]
-                    if (
-                        parameter_name in output_mapspec_names
-                        and parameter_name not in input_mapspec_names
-                    ):
-                        # Parameter is reduced, so now the 'input' is a
-                        # `NDArray[OriginalType]` if was `OriginalType`
-                        output_type = NDArray[output_type]  # type: ignore[valid-type]
-                        # TODO: fix this later
-                        continue
-                    if not _compare_types(output_type, input_type):
-                        msg = (
-                            f"Inconsistent type annotations for argument '{parameter_name}' in"
-                            f" functions `'{node}' returns {output_type}` and"
-                            f" `'{dep.__name__}' expects {input_type}`."
-                            " Please make sure the shared input arguments have the same type."
-                        )
-                        raise TypeError(msg)
+                if parameter_name not in output_types:
+                    continue
+                output_type = output_types[parameter_name]
+                if _axis_is_generated(node, dep, parameter_name):
+                    # TODO: need to handle this case
+                    continue
+                if _axis_is_reduced(node, dep, parameter_name):
+                    # Now the 'input' is a `NDArray[OriginalType]` if was `OriginalType`
+                    output_type = NDArray[output_type]  # type: ignore[valid-type]
+                    # TODO: fix this later
+                    # continue
+                if not _compare_types(output_type, input_type):
+                    msg = (
+                        f"Inconsistent type annotations for argument '{parameter_name}' in"
+                        f" functions `'{node}' returns {output_type}` and"
+                        f" `'{dep.__name__}' expects {input_type}`."
+                        " Please make sure the shared input arguments have the same type."
+                    )
+                    raise TypeError(msg)
+
+
+def _axis_is_reduced(node: PipeFunc, dep: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was the result of a map, and the input takes the entire result."""
+    output_mapspec_names = node.mapspec.output_names if node.mapspec else ()
+    input_mapspec_names = dep.mapspec.input_names if dep.mapspec else ()
+    return parameter_name in output_mapspec_names and parameter_name not in input_mapspec_names
+
+
+def _axis_is_generated(node: PipeFunc, dep: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was not from a map operation but returned an array with internal shape."""
+    if (
+        node.mapspec is None
+        or dep.mapspec is None
+        or parameter_name not in node.mapspec.output_names
+        or parameter_name not in dep.mapspec.input_names
+    ):
+        return False
+    output_spec = next(s for s in node.mapspec.outputs if s.name == parameter_name)
+    return any(i not in dep.mapspec.input_indices for i in output_spec.axes)
