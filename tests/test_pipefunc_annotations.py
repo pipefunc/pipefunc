@@ -40,8 +40,8 @@ def test_axis_is_generated():
     def f(x: int) -> list[int]:
         return list(range(x))
 
-    @pipefunc("z")
-    def g(y: list[int]) -> list[int]:
+    @pipefunc("z", mapspec="y[i] -> z[i]")
+    def g(y: int) -> int:
         return y
 
     assert _axis_is_generated(f, g, "y")

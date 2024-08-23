@@ -17,7 +17,7 @@ import inspect
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union, get_args, get_origin
 
 import networkx as nx
 from numpy.typing import NDArray
@@ -1988,6 +1988,13 @@ def _compare_types(type1: Any, type2: Any) -> bool:
     """Recursively compare two types for structural compatibility."""
     if type1 is Any or type2 is Any:
         return True
+
+    if get_origin(type1) is Union:
+        return any(_compare_types(t, type2) for t in get_args(type1))
+
+    if get_origin(type2) is Union:
+        return any(_compare_types(type1, t) for t in get_args(type2))
+
     if get_origin(type1) != get_origin(type2):
         return False
 
@@ -2020,7 +2027,7 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     # Now the 'input' is a `NDArray[OriginalType]` if was `OriginalType`
                     output_type = NDArray[output_type]  # type: ignore[valid-type]
                     # TODO: fix this later
-                    # continue
+                    continue
                 if not _compare_types(output_type, input_type):
                     msg = (
                         f"Inconsistent type annotations for argument '{parameter_name}' in"
@@ -2040,8 +2047,18 @@ def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bo
 
 def _axis_is_generated(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
     """Whether the output was not from a map operation but returned an array with internal shape."""
-    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
+    # NOTE: The only relevant case is where f_in uses elements of f_out as input
+    # whereas, if f_in requires the entire output of f_out, it is not relevant.
+    # This is all in the context of type annotations.
+    if (
+        f_out.mapspec is None
+        or parameter_name not in f_out.mapspec.output_names
+        or f_in.mapspec is None
+        or parameter_name not in f_in.mapspec.input_names
+    ):
         return False
     output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
-    input_indices = f_in.mapspec.input_indices if f_in.mapspec else ()
-    return any(i not in input_indices for i in output_spec.axes)
+    output_generated = not set(output_spec.indices).issubset(f_out.mapspec.input_indices)
+    if not output_generated:
+        return False
+    return all(i in output_spec.indices for i in f_in.mapspec.input_indices)

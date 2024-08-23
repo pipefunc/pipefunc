@@ -258,11 +258,11 @@ def test_outer_product_functions(tmp_path: Path) -> None:
 
 
 def test_simple_from_step(tmp_path: Path) -> None:
-    @pipefunc(output_name="x")
+    @pipefunc(output_name="x", mapspec="... -> x[i]")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
 
-    @pipefunc(output_name="y")
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         assert isinstance(x, int)
         return 2 * x
@@ -274,7 +274,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     pipeline = Pipeline(
         [
             generate_ints,  # will autogen "... -> x[i]"
-            (double_it, "x[i] -> y[i]"),
+            double_it,
             take_sum,
         ],
     )
