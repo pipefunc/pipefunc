@@ -5,97 +5,98 @@ from typing import Any, Union
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._typing import are_types_compatible
+from pipefunc._typing import is_type_compatible
 
 
 def test_are_types_compatible_standard():
-    assert are_types_compatible(list[int], list[int])
-    assert not are_types_compatible(list[int], list[float])
-    assert not are_types_compatible(int | str, Union[str, float])  # noqa: UP007
-    assert not are_types_compatible(int | str, str | float)
-    assert not are_types_compatible(int, float)
-    assert are_types_compatible(Any, int)
-    assert are_types_compatible(int, Any)
+    assert is_type_compatible(list[int], list[int])
+    assert not is_type_compatible(list[int], list[float])
+    assert not is_type_compatible(int | str, Union[str, float])  # noqa: UP007
+    assert not is_type_compatible(int | str, str | float)
+    assert not is_type_compatible(int, float)
+    assert not is_type_compatible(Any, int)
+    assert is_type_compatible(int, Any)
 
 
 def test_are_types_compatible_union():
-    assert not are_types_compatible(int | str, str)
-    assert not are_types_compatible(int | str, int)
-    assert are_types_compatible(int, int | str)
-    assert are_types_compatible(str, int | str)
-    assert not are_types_compatible(Union[int, str], float)  # noqa: UP007
-    assert are_types_compatible(dict[int, str], dict[int, str | int])
+    assert not is_type_compatible(int | str, str)
+    assert not is_type_compatible(int | str, int)
+    assert is_type_compatible(int, int | str)
+    assert is_type_compatible(str, int | str)
+    assert not is_type_compatible(Union[int, str], float)  # noqa: UP007
+    assert is_type_compatible(dict[int, str], dict[int, str | int])
 
 
 def test_are_types_compatible_numpy():
-    assert are_types_compatible(npt.NDArray[np.int64], npt.NDArray[np.float64])
-    assert not are_types_compatible(npt.NDArray[np.float32], npt.NDArray[np.int64])
-    assert are_types_compatible(np.int32, np.int64)
-    assert not are_types_compatible(np.float64, np.int32)
-    assert are_types_compatible(npt.NDArray, npt.NDArray)
-    assert are_types_compatible(npt.NDArray[Any], npt.NDArray[np.int32])
+    assert is_type_compatible(npt.NDArray[np.int64], npt.NDArray[np.float64])
+    assert not is_type_compatible(npt.NDArray[np.float32], npt.NDArray[np.int64])
+    assert is_type_compatible(np.int32, np.int64)
+    assert not is_type_compatible(np.float64, np.int32)
+    assert is_type_compatible(npt.NDArray, npt.NDArray)
+    assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
 
 
 def test_are_types_compatible_standard_edge_cases():
     # Test with nested lists
-    assert are_types_compatible(list[list[int]], list[list[int]])
-    assert not are_types_compatible(list[list[int]], list[list[float]])
-    assert are_types_compatible(list[list[Any]], list[list[int]])
+    assert is_type_compatible(list[list[int]], list[list[int]])
+    assert not is_type_compatible(list[list[int]], list[list[float]])
+    assert is_type_compatible(list[list[int]], list[list[Any]])
 
     # Test with generic containers and Any
-    assert are_types_compatible(list[Any], list[int])
-    assert are_types_compatible(list[int], list[Any])
-    assert are_types_compatible(dict[Any, Any], dict[int, str])
-    assert not are_types_compatible(dict[int, str], dict[int, float])
-    assert not are_types_compatible(dict[int, str], list[int])  # Different container types
+    assert not is_type_compatible(list[Any], list[int])
+    assert is_type_compatible(list[int], list[Any])
+    assert is_type_compatible(dict[int, str], dict[Any, Any])
+    assert is_type_compatible(dict[int, str], dict[Any, Any])
+    assert not is_type_compatible(dict[int, str], dict[int, float])
+    assert not is_type_compatible(dict[int, str], list[int])  # Different container types
 
 
 def test_are_types_compatible_union_edge_cases():
     # Test with more complex unions
     # Same elements, different order
-    assert are_types_compatible(Union[int, str, float], Union[str, float, int])  # noqa: UP007
+    assert is_type_compatible(Union[int, str, float], Union[str, float, int])  # noqa: UP007
     # Subset of a larger union
-    assert are_types_compatible(Union[int, str], Union[int, str, float])  # noqa: UP007
+    assert is_type_compatible(Union[int, str], Union[int, str, float])  # noqa: UP007
     # Completely different sets
-    assert not are_types_compatible(Union[int, str], Union[float, complex])  # noqa: UP007
+    assert not is_type_compatible(Union[int, str], Union[float, complex])  # noqa: UP007
 
     # Test with deeply nested unions
-    assert are_types_compatible(Union[int | str, float], Union[str, int, float])  # noqa: UP007
-    assert not are_types_compatible(Union[int | str, float], Union[float, complex])  # noqa: UP007
+    assert is_type_compatible(Union[int | str, float], Union[str, int, float])  # noqa: UP007
+    assert not is_type_compatible(Union[int | str, float], Union[float, complex])  # noqa: UP007
 
     # Test union with Any
-    assert are_types_compatible(int, Union[int, complex])  # noqa: UP007
-    assert are_types_compatible(complex, Union[int, complex])  # noqa: UP007
-    assert are_types_compatible(Any, Union[int, str])  # noqa: UP007
+    assert is_type_compatible(int, Union[int, complex])  # noqa: UP007
+    assert is_type_compatible(complex, Union[int, complex])  # noqa: UP007
+    assert is_type_compatible(Union[int, str], Any)  # noqa: UP007
 
 
 def test_are_types_compatible_numpy_edge_cases():
     # Test NDArray with different type parameters
-    assert are_types_compatible(npt.NDArray[np.int32], npt.NDArray[np.int32])
-    assert not are_types_compatible(npt.NDArray[np.float64], npt.NDArray[np.int32])
+    assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[np.int32])
+    assert not is_type_compatible(npt.NDArray[np.float64], npt.NDArray[np.int32])
     # Any in NDArray should be compatible
-    assert are_types_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
+    assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
 
     # Test with numpy.generic (base class for all NumPy scalars)
-    assert are_types_compatible(np.int64, np.generic)
-    assert are_types_compatible(np.float64, np.generic)
+    assert is_type_compatible(np.int64, np.generic)
+    assert is_type_compatible(np.float64, np.generic)
 
     # Test scalar types compatibility
     # Can cast between NumPy integer types
-    assert are_types_compatible(np.int64, np.int_)
+    assert is_type_compatible(np.int64, np.int_)
     # Cannot cast from float to integer directly
-    assert not are_types_compatible(np.float64, np.int32)
+    assert not is_type_compatible(np.float64, np.int32)
 
 
 def test_directionality_union():
     # Test directional compatibility
     # Broader incoming type is not compatible with narrower required type
-    assert not are_types_compatible(int | str, str)
+    assert not is_type_compatible(int | str, str)
     # Narrower incoming type is compatible with broader required type
-    assert are_types_compatible(str, int | str)
+    assert is_type_compatible(str, int | str)
 
     # Test specific type vs. Union
     # Compatible
-    assert are_types_compatible(int, int | str)
+    assert is_type_compatible(int, int | str)
     # Not compatible, broader incoming type isn't allowed
-    assert not are_types_compatible(int | str, int)
+    assert not is_type_compatible(int | str, int)
