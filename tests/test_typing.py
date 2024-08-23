@@ -11,8 +11,8 @@ from pipefunc._typing import are_types_compatible
 def test_are_types_compatible_standard():
     assert are_types_compatible(list[int], list[int])
     assert not are_types_compatible(list[int], list[float])
-    assert not are_types_compatible(Union[int, str], Union[str, float])  # noqa: UP007
-    assert not are_types_compatible(Union[int, str], str | float)
+    assert not are_types_compatible(int | str, Union[str, float])  # noqa: UP007
+    assert not are_types_compatible(int | str, str | float)
     assert not are_types_compatible(int, float)
     assert are_types_compatible(Any, int)
     assert are_types_compatible(int, Any)
@@ -21,8 +21,8 @@ def test_are_types_compatible_standard():
 def test_are_types_compatible_union():
     assert are_types_compatible(Union[int, str], str)  # noqa: UP007
     assert are_types_compatible(int | str, str)
-    assert are_types_compatible(Union[int, str], int)
-    assert not are_types_compatible(int, Union[int, str])
+    assert are_types_compatible(int | str, int)
+    assert not are_types_compatible(int, int | str)
     assert not are_types_compatible(Union[int, str], float)  # noqa: UP007
     assert are_types_compatible(dict[int, str | int], dict[int, str])
 
