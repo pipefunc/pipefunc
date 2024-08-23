@@ -2,7 +2,7 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
 
-def check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) -> bool:
+def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) -> bool:
     """Check if types are identical or if required_type is Any."""
     return incoming_type == required_type or required_type is Any
 
@@ -15,7 +15,7 @@ def _all_types_compatible(
     return all(any(is_type_compatible(t1, t2) for t2 in required_args) for t1 in incoming_args)
 
 
-def handle_union_types(incoming_type: type[Any], required_type: type[Any]) -> bool | None:
+def _handle_union_types(incoming_type: type[Any], required_type: type[Any]) -> bool | None:
     """Handle compatibility logic for Union types with directional consideration."""
     if (isinstance(incoming_type, UnionType) or get_origin(incoming_type) == Union) and (
         isinstance(required_type, UnionType) or get_origin(required_type) == Union
@@ -33,7 +33,7 @@ def handle_union_types(incoming_type: type[Any], required_type: type[Any]) -> bo
     return None
 
 
-def handle_generic_types(incoming_type: type[Any], required_type: type[Any]) -> bool | None:
+def _handle_generic_types(incoming_type: type[Any], required_type: type[Any]) -> bool | None:
     incoming_origin = get_origin(incoming_type) or incoming_type
     required_origin = get_origin(required_type) or required_type
 
@@ -62,10 +62,10 @@ def handle_generic_types(incoming_type: type[Any], required_type: type[Any]) -> 
 
 def is_type_compatible(incoming_type: type[Any], required_type: type[Any]) -> bool:
     """Check if the incoming type is compatible with the required type."""
-    if check_identical_or_any(incoming_type, required_type):
+    if _check_identical_or_any(incoming_type, required_type):
         return True
-    if (result := handle_union_types(incoming_type, required_type)) is not None:
+    if (result := _handle_union_types(incoming_type, required_type)) is not None:
         return result
-    if (result := handle_generic_types(incoming_type, required_type)) is not None:
+    if (result := _handle_generic_types(incoming_type, required_type)) is not None:
         return result
     return False
