@@ -2,9 +2,18 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
 
+class NoAnnotation:
+    pass
+
+
 def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) -> bool:
     """Check if types are identical or if required_type is Any."""
-    return incoming_type == required_type or required_type is Any
+    return (
+        incoming_type == required_type
+        or required_type is Any
+        or incoming_type is NoAnnotation
+        or required_type is NoAnnotation
+    )
 
 
 def _all_types_compatible(
