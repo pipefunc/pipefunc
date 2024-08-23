@@ -1,4 +1,5 @@
-from pipefunc import PipeFunc
+from pipefunc import PipeFunc, pipefunc
+from pipefunc._pipeline import _axis_is_generated, _axis_is_reduced
 
 
 def test_pipeline_function_annotations_single_output():
@@ -32,3 +33,27 @@ def test_pipeline_function_annotations_multiple_outputs():
 
     assert str(add_func) == "add_numbers(...) → a_plus_one, b_plus_one"
     assert repr(add_func) == "PipeFunc(add_numbers)"
+
+
+def test_axis_is_generated():
+    @pipefunc("y", mapspec="... -> y[i]")
+    def f(x: int) -> list[int]:
+        return list(range(x))
+
+    @pipefunc("z")
+    def g(y: list[int]) -> list[int]:
+        return y
+
+    assert _axis_is_generated(f, g, "y")
+
+
+def test_axis_is_reduced():
+    @pipefunc("y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> list[int]:
+        return x
+
+    @pipefunc("z")
+    def g(y: list[int]) -> list[int]:
+        return y
+
+    assert _axis_is_reduced(f, g, "y")

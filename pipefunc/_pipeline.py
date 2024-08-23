@@ -2031,21 +2031,17 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     raise TypeError(msg)
 
 
-def _axis_is_reduced(node: PipeFunc, dep: PipeFunc, parameter_name: str) -> bool:
+def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
     """Whether the output was the result of a map, and the input takes the entire result."""
-    output_mapspec_names = node.mapspec.output_names if node.mapspec else ()
-    input_mapspec_names = dep.mapspec.input_names if dep.mapspec else ()
+    output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
+    input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
     return parameter_name in output_mapspec_names and parameter_name not in input_mapspec_names
 
 
-def _axis_is_generated(node: PipeFunc, dep: PipeFunc, parameter_name: str) -> bool:
+def _axis_is_generated(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
     """Whether the output was not from a map operation but returned an array with internal shape."""
-    if (
-        node.mapspec is None
-        or dep.mapspec is None
-        or parameter_name not in node.mapspec.output_names
-        or parameter_name not in dep.mapspec.input_names
-    ):
+    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
         return False
-    output_spec = next(s for s in node.mapspec.outputs if s.name == parameter_name)
-    return any(i not in dep.mapspec.input_indices for i in output_spec.axes)
+    output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
+    input_indices = f_in.mapspec.input_indices if f_in.mapspec else ()
+    return any(i not in input_indices for i in output_spec.axes)
