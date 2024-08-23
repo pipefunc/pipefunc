@@ -123,3 +123,11 @@ def test_generic_type_edge_cases():
     assert not is_type_compatible(list, list[int])
     assert is_type_compatible(dict[str, int], dict)
     assert not is_type_compatible(dict, dict[str, int])
+
+
+def test_check_none():
+    assert is_type_compatible(None, None)
+    assert is_type_compatible(None, Any)
+    assert not is_type_compatible(int, None)
+    assert not is_type_compatible(None, int)
+    assert not is_type_compatible(None, str)
