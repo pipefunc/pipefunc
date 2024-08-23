@@ -23,7 +23,7 @@ def test_are_types_compatible_union():
     assert not is_type_compatible(int | str, int)
     assert is_type_compatible(int, int | str)
     assert is_type_compatible(str, int | str)
-    assert not is_type_compatible(Union[int, str], float)  # noqa: UP007
+    assert not is_type_compatible(int | str, float)
     assert is_type_compatible(dict[int, str], dict[int, str | int])
 
 
@@ -54,11 +54,11 @@ def test_are_types_compatible_standard_edge_cases():
 def test_are_types_compatible_union_edge_cases():
     # Test with more complex unions
     # Same elements, different order
-    assert is_type_compatible(Union[int, str, float], Union[str, float, int])  # noqa: UP007
+    assert is_type_compatible(int | str | float, str | float | int)
     # Subset of a larger union
-    assert is_type_compatible(Union[int, str], Union[int, str, float])  # noqa: UP007
+    assert is_type_compatible(int | str, int | str | float)
     # Completely different sets
-    assert not is_type_compatible(Union[int, str], Union[float, complex])  # noqa: UP007
+    assert not is_type_compatible(int | str, Union[float, complex])  # noqa: UP007
 
     # Test with deeply nested unions
     assert is_type_compatible(Union[int | str, float], Union[str, int, float])  # noqa: UP007
@@ -67,7 +67,7 @@ def test_are_types_compatible_union_edge_cases():
     # Test union with Any
     assert is_type_compatible(int, Union[int, complex])  # noqa: UP007
     assert is_type_compatible(complex, Union[int, complex])  # noqa: UP007
-    assert is_type_compatible(Union[int, str], Any)  # noqa: UP007
+    assert is_type_compatible(int | str, Any)
 
 
 def test_are_types_compatible_numpy_edge_cases():
