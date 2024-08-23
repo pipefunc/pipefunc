@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Union
 
 import numpy as np
@@ -16,6 +17,7 @@ def test_are_types_compatible_standard():
     assert not is_type_compatible(int, float)
     assert not is_type_compatible(Any, int)
     assert is_type_compatible(int, Any)
+    assert is_type_compatible(dict[int, dict[str, str]], dict[int, dict[str, Any]])
 
 
 def test_are_types_compatible_union():
@@ -28,12 +30,14 @@ def test_are_types_compatible_union():
 
 
 def test_are_types_compatible_numpy():
-    assert is_type_compatible(npt.NDArray[np.int64], npt.NDArray[np.float64])
+    assert is_type_compatible(npt.NDArray[np.int64], npt.NDArray[np.int_])
     assert not is_type_compatible(npt.NDArray[np.float32], npt.NDArray[np.int64])
-    assert is_type_compatible(np.int32, np.int64)
+    assert not is_type_compatible(np.int32, np.int64)
     assert not is_type_compatible(np.float64, np.int32)
-    assert is_type_compatible(npt.NDArray, npt.NDArray)
+    assert is_type_compatible(npt.NDArray, npt.NDArray[Any])
+    assert is_type_compatible(npt.NDArray[Any], npt.NDArray[Any])
     assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
+    assert is_type_compatible(npt.NDArray[Any], npt.NDArray)
 
 
 def test_are_types_compatible_standard_edge_cases():
@@ -100,3 +104,21 @@ def test_directionality_union():
     assert is_type_compatible(int, int | str)
     # Not compatible, broader incoming type isn't allowed
     assert not is_type_compatible(int | str, int)
+
+
+def test_abc_compatibility():
+    assert is_type_compatible(list[int], Sequence[int])
+    assert is_type_compatible(list[int], Sequence[int])
+    assert is_type_compatible(dict[str, int], Mapping[str, int])
+    assert is_type_compatible(dict[str, int], Mapping[str, int])
+    assert not is_type_compatible(Sequence[int], list[int])
+    assert not is_type_compatible(Mapping[str, int], dict[str, int])
+
+
+def test_generic_type_edge_cases():
+    assert is_type_compatible(list, Sequence)
+    assert is_type_compatible(list, Sequence)
+    assert is_type_compatible(list[int], list)
+    assert not is_type_compatible(list, list[int])
+    assert is_type_compatible(dict[str, int], dict)
+    assert not is_type_compatible(dict, dict[str, int])
