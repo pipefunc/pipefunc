@@ -5,9 +5,9 @@ import numpy as np
 import numpy.typing as npt
 
 
-def check_identical_or_any(type1: type, type2: type) -> bool:
+def check_identical_or_any(incoming_type: type, required_type: type) -> bool:
     """Check if types are identical or if either type is Any."""
-    return type1 == type2 or Any in (type1, type2)
+    return incoming_type == required_type or Any in (incoming_type, required_type)
 
 
 def _all_types_compatible(args1: tuple[type, ...], args2: tuple[type, ...]) -> bool:
@@ -15,7 +15,7 @@ def _all_types_compatible(args1: tuple[type, ...], args2: tuple[type, ...]) -> b
     return all(any(are_types_compatible(t1, t2) for t2 in args2) for t1 in args1)
 
 
-def handle_union_types(incoming_type: type, required_type: type) -> bool:
+def handle_union_types(incoming_type: type, required_type: type) -> bool | None:
     """Handle compatibility logic for Union types with directional consideration."""
     if (isinstance(incoming_type, UnionType) or get_origin(incoming_type) == Union) and (
         isinstance(required_type, UnionType) or get_origin(required_type) == Union
@@ -38,66 +38,69 @@ def handle_union_types(incoming_type: type, required_type: type) -> bool:
     return None  # Indicate that this logic didn't apply
 
 
-def handle_generic_types(type1: type, type2: type) -> bool | None:
+def handle_generic_types(incoming_type: type, required_type: type) -> bool | None:
     """Handle compatibility logic for generic types like List, Dict, etc."""
-    origin1, origin2 = get_origin(type1), get_origin(type2)
-    if origin1 and origin2:
-        if origin1 != origin2:
+    incoming_origin = get_origin(incoming_type)
+    required_origin = get_origin(required_type)
+    if incoming_origin and required_origin:
+        if incoming_origin != required_origin:
             return False
-        return all(are_types_compatible(t1, t2) for t1, t2 in zip(get_args(type1), get_args(type2)))
+        return all(
+            are_types_compatible(t1, t2)
+            for t1, t2 in zip(get_args(incoming_type), get_args(required_type))
+        )
 
     return None  # Indicate that this logic didn't apply
 
 
-def handle_numpy_array_types(type1: type, type2: type) -> bool:
+def handle_numpy_array_types(incoming_type: type, required_type: type) -> bool | None:
     """Handle complex NumPy array types and ArrayLike."""
-    origin1, origin2 = get_origin(type1), get_origin(type2)
+    incoming_origin = get_origin(incoming_type)
+    required_origin = get_origin(required_type)
 
-    if npt.NDArray in (origin1, origin2):
-        return all(are_types_compatible(t1, t2) for t1, t2 in zip(get_args(type1), get_args(type2)))
-
-    if npt.ArrayLike in (type1, type2):
-        return True
+    if npt.NDArray in (incoming_origin, required_origin):
+        return all(
+            are_types_compatible(t1, t2)
+            for t1, t2 in zip(get_args(incoming_type), get_args(required_type))
+        )
 
     return None  # Indicate that this logic didn't apply
 
 
-def handle_numpy_scalar_types(type1: type, type2: type) -> bool:
+def handle_numpy_scalar_types(incoming_type: type, required_type: type) -> bool | None:
     """Handle compatibility logic for NumPy scalar types."""
-    if (
-        isinstance(type1, type)
-        and isinstance(type2, type)
-        and issubclass(type1, np.generic)
-        and issubclass(type2, np.generic)
-    ):
-        return np.can_cast(type1, type2)
+    if issubclass(incoming_type, np.generic) and issubclass(required_type, np.generic):
+        return np.can_cast(incoming_type, required_type)
 
     return None  # Indicate that this logic didn't apply
 
 
-def check_subclass_relationship(type1: type, type2: type) -> bool:
+def check_subclass_relationship(incoming_type: type, required_type: type) -> bool | None:
     """Check subclass relationships between types."""
-    if isinstance(type1, type) and isinstance(type2, type):
-        return issubclass(type1, type2) or issubclass(type2, type1)
+    if isinstance(incoming_type, type) and isinstance(required_type, type):
+        return issubclass(incoming_type, required_type) or issubclass(required_type, incoming_type)
 
-    return False
+    return None  # Indicate that this logic didn't apply
 
 
-def are_types_compatible(incoming_type: type, required_type: type) -> bool:
+def are_types_compatible(incoming_type: type, required_type: type) -> bool:  # noqa: PLR0911
     """Main function that combines all checks for type compatibility."""
     if check_identical_or_any(incoming_type, required_type):
         return True
 
-    if result := handle_union_types(incoming_type, required_type):
+    if (result := handle_union_types(incoming_type, required_type)) is not None:
         return result
 
-    if result := handle_generic_types(incoming_type, required_type):
+    if (result := handle_generic_types(incoming_type, required_type)) is not None:
         return result
 
-    if result := handle_numpy_array_types(incoming_type, required_type):
+    if (result := handle_numpy_array_types(incoming_type, required_type)) is not None:
         return result
 
-    if result := handle_numpy_scalar_types(incoming_type, required_type):
+    if (result := handle_numpy_scalar_types(incoming_type, required_type)) is not None:
         return result
 
-    return check_subclass_relationship(incoming_type, required_type)
+    if (result := check_subclass_relationship(incoming_type, required_type)) is not None:
+        return result
+
+    return False

@@ -53,20 +53,20 @@ def test_are_types_compatible_standard_edge_cases():
 def test_are_types_compatible_union_edge_cases():
     # Test with more complex unions
     # Same elements, different order
-    assert are_types_compatible(Union[int, str, float], Union[str, float, int])
+    assert are_types_compatible(Union[int, str, float], Union[str, float, int])  # noqa: UP007
     # Subset of a larger union
-    assert are_types_compatible(Union[int, str], Union[int, str, float])
+    assert are_types_compatible(Union[int, str], Union[int, str, float])  # noqa: UP007
     # Completely different sets
-    assert not are_types_compatible(Union[int, str], Union[float, complex])
+    assert not are_types_compatible(Union[int, str], Union[float, complex])  # noqa: UP007
 
     # Test with deeply nested unions
-    assert are_types_compatible(Union[int | str, float], Union[str, int, float])
-    assert not are_types_compatible(Union[int | str, float], Union[float, complex])
+    assert are_types_compatible(Union[int | str, float], Union[str, int, float])  # noqa: UP007
+    assert not are_types_compatible(Union[int | str, float], Union[float, complex])  # noqa: UP007
 
     # Test union with Any
-    assert are_types_compatible(int, Union[int, complex])
-    assert are_types_compatible(complex, Union[int, complex])
-    assert are_types_compatible(Any, Union[int, str])
+    assert are_types_compatible(int, Union[int, complex])  # noqa: UP007
+    assert are_types_compatible(complex, Union[int, complex])  # noqa: UP007
+    assert are_types_compatible(Any, Union[int, str])  # noqa: UP007
 
 
 def test_are_types_compatible_numpy_edge_cases():
@@ -76,15 +76,9 @@ def test_are_types_compatible_numpy_edge_cases():
     # Any in NDArray should be compatible
     assert are_types_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
 
-    # Test NDArray with ArrayLike
-    assert are_types_compatible(npt.NDArray, npt.ArrayLike)
-    assert are_types_compatible(npt.ArrayLike, npt.NDArray[np.int64])
-    # ArrayLike should be compatible with itself
-    assert are_types_compatible(npt.ArrayLike, npt.ArrayLike)
-
     # Test with numpy.generic (base class for all NumPy scalars)
-    assert are_types_compatible(np.generic, np.int64)
-    assert are_types_compatible(np.generic, np.float64)
+    assert are_types_compatible(np.int64, np.generic)
+    assert are_types_compatible(np.float64, np.generic)
 
     # Test scalar types compatibility
     # Can cast between NumPy integer types
