@@ -41,6 +41,9 @@ def test_are_types_compatible_numpy():
     assert is_type_compatible(npt.NDArray[np.int32], npt.NDArray[Any])
     # npt.NDArray without arguments turns into numpy.ndarray[typing.Any, numpy.dtype[+_ScalarType_co]]
     assert not is_type_compatible(npt.NDArray[Any], npt.NDArray)
+    # This is why test_multi_output_from_step is failing. However,
+    # perhaps it makes sense because dtype[int] isn't int. TODO: Investigate
+    assert is_type_compatible(npt.NDArray[int], np.ndarray[Any, int])
 
 
 def test_are_types_compatible_standard_edge_cases():
