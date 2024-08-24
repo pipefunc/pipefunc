@@ -56,13 +56,8 @@ def _handle_generic_types(incoming_type: type[Any], required_type: type[Any]) ->
         incoming_args = get_args(incoming_type)
         required_args = get_args(required_type)
 
-        # If required_type has no arguments, it's compatible with any parameterized version
-        if not required_args:
+        if not required_args or not incoming_args:
             return True
-
-        # If incoming_type has no arguments but required_type does, they're not compatible
-        if not incoming_args and required_args:
-            return False
 
         # If both have arguments, check compatibility of each argument
         return all(is_type_compatible(t1, t2) for t1, t2 in zip(incoming_args, required_args))

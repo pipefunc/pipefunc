@@ -1,3 +1,5 @@
+import numpy as np
+
 from pipefunc import PipeFunc, pipefunc
 from pipefunc._pipeline import _axis_is_generated, _axis_is_reduced
 
@@ -57,3 +59,17 @@ def test_axis_is_reduced():
         return y
 
     assert _axis_is_reduced(f, g, "y")
+
+
+def test_multi_output():
+    @pipefunc(output_name=("x", "y"), mapspec="... -> x[i, j], y[i, j]")
+    def generate_ints(n: int) -> tuple[np.ndarray, np.ndarray]:
+        return np.ones((n, n)), np.ones((n, n))
+
+    @pipefunc(output_name="z", mapspec="x[i, :], y[i, :] -> z[i]")
+    def double_it(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        assert len(x.shape) == 1
+        return 2 * sum(x) + 0 * sum(y)
+
+    assert _axis_is_generated(generate_ints, double_it, "x")
+    assert _axis_is_generated(generate_ints, double_it, "y")

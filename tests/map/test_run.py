@@ -908,12 +908,12 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         return np.ones((n, n)), np.ones((n, n))
 
     @pipefunc(output_name="z", mapspec="x[i, :], y[i, :] -> z[i]")
-    def double_it(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    def double_it(x: np.ndarray, y: np.ndarray) -> int:
         assert len(x.shape) == 1
         return 2 * sum(x) + 0 * sum(y)
 
     @pipefunc(output_name="sum")
-    def take_sum(z: list[int]) -> int:
+    def take_sum(z: np.ndarray[Any, int]) -> int:
         return sum(z)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])

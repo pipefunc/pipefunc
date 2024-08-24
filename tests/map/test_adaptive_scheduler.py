@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import adaptive
+import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
@@ -87,8 +88,8 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
         output_name="y",
         resources=Resources(cpus=2, memory="4GB", extra_args={"qos": "high"}),
     )
-    def f2(x: int) -> int:
-        return x
+    def f2(x: np.ndarray[Any, int]) -> int:
+        return sum(x)
 
     pipeline = Pipeline([f1, f2])
 

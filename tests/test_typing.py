@@ -18,6 +18,8 @@ def test_are_types_compatible_standard():
     assert not is_type_compatible(Any, int)
     assert is_type_compatible(int, Any)
     assert is_type_compatible(dict[int, dict[str, str]], dict[int, dict[str, Any]])
+    assert is_type_compatible(dict[int, str], dict)
+    assert is_type_compatible(dict, dict[int, str])
 
 
 def test_are_types_compatible_union():
