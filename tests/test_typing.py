@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping, Sequence
-from typing import Any, Union
+from typing import Any, ForwardRef, Union
 
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._typing import NoAnnotation, is_type_compatible
+from pipefunc._typing import NoAnnotation, TypeCheckMemo, is_type_compatible
 
 
 def test_are_types_compatible_standard():
@@ -144,3 +145,27 @@ def test_no_annotation():
     assert is_type_compatible(NoAnnotation, NoAnnotation)
     assert is_type_compatible(int, NoAnnotation)
     assert is_type_compatible(NoAnnotation, int)
+
+
+def test_forward_refs():
+    class Node:
+        def __init__(self, value: int, children: list[Node]):
+            self.value = value
+            self.children = children or []
+
+    # Automatically capture the current frame for memo initialization
+    frame = sys._getframe(0)
+    memo = TypeCheckMemo(frame.f_globals, frame.f_locals)
+
+    # Test with forward references using string annotations
+    assert is_type_compatible("Node", Node, memo)
+    assert is_type_compatible("list[Node]", list[Node], memo)
+
+    # Test with ForwardRef
+    node_ref = ForwardRef("Node")
+    assert is_type_compatible(node_ref, Node, memo)
+
+    # Test nested forward references
+    nested_ref = ForwardRef("list[Node]")
+    assert is_type_compatible(nested_ref, list[Node], memo)
+    assert not is_type_compatible(nested_ref, tuple[Node, ...], memo)
