@@ -31,7 +31,6 @@ from typing import (
 import cloudpickle
 
 from pipefunc._profile import ProfilingStats, ResourceProfiler
-from pipefunc._typing import NoAnnotation
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
@@ -42,6 +41,7 @@ from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
+from pipefunc.typing import NoAnnotation
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -660,7 +660,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        type_hints = get_type_hints(func)
+        type_hints = get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
@@ -669,7 +669,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        hint = get_type_hints(func).get("return", NoAnnotation)
+        hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         if not isinstance(self.output_name, tuple):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:

@@ -9,11 +9,10 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
 from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, _or, slurm_run_setup
 from pipefunc.resources import Resources
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from pipefunc._typing import Array
 
 
 def run(info: AdaptiveSchedulerDetails) -> None:

@@ -7,7 +7,7 @@ from typing import Any, ForwardRef, Union
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._typing import NoAnnotation, TypeCheckMemo, is_type_compatible
+from pipefunc.typing import NoAnnotation, TypeCheckMemo, is_type_compatible
 
 
 def test_are_types_compatible_standard():

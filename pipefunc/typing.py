@@ -1,27 +1,51 @@
+"""Custom type hinting utilities for pipefunc."""
+
 import sys
 from types import UnionType
-from typing import Any, ForwardRef, Generic, NamedTuple, TypeVar, Union, get_args, get_origin
+from typing import (
+    Annotated,
+    Any,
+    ForwardRef,
+    Generic,
+    NamedTuple,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 import numpy as np
 
 
 class NoAnnotation:
-    pass
+    """Marker class for missing type annotations."""
 
 
 T = TypeVar("T")
 
 
+class ArrayElementType(Generic[T]):
+    """Marker class for the element type of an annotated numpy array."""
+
+
 class Array(Generic[T]):
-    def __class_getitem__(cls, item: type) -> type:
-        # Check if the type is a NumPy type
-        if isinstance(item, type) and issubclass(item, np.generic):
-            return np.ndarray[Any, np.dtype[item]]  # type: ignore[valid-type]
-        # Otherwise, return the type without wrapping in np.dtype
-        return np.ndarray[Any, item]  # type: ignore[valid-type]
+    """Annotated numpy array type hint with element type."""
+
+    # NOTE: Ideally I would do something like this:
+    # `Array = Annotated[np.ndarray[Any, np.dtype[object]], ArrayElementType[T]]`
+    # however, Annotated doesn't support generics, see:
+    # https://github.com/python/typing/issues/1386#issuecomment-1500405617
+    def __class_getitem__(cls, item: T) -> Any:
+        """Return an annotated numpy array with the provided element type."""
+        return Annotated[
+            np.ndarray[Any, np.dtype[np.object_]],
+            ArrayElementType[item],  # type: ignore[valid-type]
+        ]
 
 
 class TypeCheckMemo(NamedTuple):
+    """Named tuple to store memoization data for type checking."""
+
     globals: dict[str, Any]
     locals: dict[str, Any]
     self_type: type | None = None
@@ -94,7 +118,7 @@ def _handle_union_types(
     return None
 
 
-def _handle_generic_types(
+def _handle_generic_types(  # noqa: PLR0911
     incoming_type: type[Any],
     required_type: type[Any],
     memo: TypeCheckMemo,
@@ -102,13 +126,33 @@ def _handle_generic_types(
     incoming_origin = get_origin(incoming_type) or incoming_type
     required_origin = get_origin(required_type) or required_type
 
+    # Handle Annotated types
+    if incoming_origin is Annotated and required_origin is Annotated:
+        # Compare the primary types and metadata
+        incoming_primary, *incoming_metadata = get_args(incoming_type)
+        required_primary, *required_metadata = get_args(required_type)
+
+        # Recursively check the primary types
+        if not is_type_compatible(incoming_primary, required_primary, memo):
+            return False
+
+        # Compare metadata (extras)
+        return incoming_metadata == required_metadata
+    if incoming_origin is Annotated:
+        # If only incoming is Annotated, compare its primary type
+        incoming_primary, *_ = get_args(incoming_type)
+        return is_type_compatible(incoming_primary, required_type, memo)
+    if required_origin is Annotated:
+        # If only required is Annotated, compare its primary type
+        required_primary, *_ = get_args(required_type)
+        return is_type_compatible(incoming_type, required_primary, memo)
+
     if incoming_origin and required_origin:
         if isinstance(incoming_origin, type) and isinstance(required_origin, type):
             if not issubclass(incoming_origin, required_origin):
                 return False
         elif incoming_origin != required_origin:
             return False
-
         incoming_args = get_args(incoming_type)
         required_args = get_args(required_type)
 

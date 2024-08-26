@@ -20,13 +20,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
-import numpy as np
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
-from pipefunc._typing import is_type_compatible
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
@@ -44,6 +42,7 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import run
 from pipefunc.resources import Resources
+from pipefunc.typing import Array, is_type_compatible
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -2003,7 +2002,8 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     continue
                 if _axis_is_reduced(node, dep, parameter_name):
                     # Now the 'input' is a `NDArray[OriginalType]` if was `OriginalType`
-                    output_type = np.ndarray[Any, output_type]  # type: ignore[valid-type]
+                    output_type = Array[output_type]  # type: ignore[valid-type]
+
                 if not is_type_compatible(output_type, input_type):
                     msg = (
                         f"Inconsistent type annotations for argument '{parameter_name}' in"
