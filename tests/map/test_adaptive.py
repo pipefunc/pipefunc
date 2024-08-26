@@ -16,6 +16,7 @@ from pipefunc.map.adaptive import (
     to_adaptive_learner,
 )
 from pipefunc.sweep import Sweep
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -372,7 +373,7 @@ def pipeline() -> Pipeline:
         return 2 * x + c
 
     @pipefunc(output_name="sum_")
-    def take_sum(y: list[float], d: float, e: float) -> float:
+    def take_sum(y: Array[float], d: float, e: float) -> float:
         return sum(y) / d + e
 
     return Pipeline([double_it, take_sum])

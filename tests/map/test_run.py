@@ -14,6 +14,7 @@ from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import storage_registry
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,7 +34,7 @@ def test_simple(storage, tmp_path: Path) -> None:
         return 2 * x
 
     @pipefunc(output_name="sum")
-    def take_sum(y: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+    def take_sum(y: Array[int]) -> int:
         assert isinstance(y, np.ndarray)
         return sum(y)
 
@@ -913,7 +914,7 @@ def test_multi_output_from_step(tmp_path: Path) -> None:
         return 2 * sum(x) + 0 * sum(y)
 
     @pipefunc(output_name="sum")
-    def take_sum(z: np.ndarray[Any, int]) -> int:
+    def take_sum(z: Array[int]) -> int:
         return sum(z)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
