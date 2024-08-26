@@ -15,10 +15,8 @@ class TypeCheckMemo(NamedTuple):
 
 def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
     """Evaluate a forward reference using the provided memo."""
-    if sys.version_info < (3, 13):
-        assert sys.version_info >= (3, 10), "PipeFunc requires Python 3.10+"
-        return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
-    return ref._evaluate(memo.globals, memo.locals, type_params=(), recursive_guard=frozenset())
+    kw = {} if sys.version_info < (3, 13) else {"self_type": memo.self_type}
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), **kw)
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
