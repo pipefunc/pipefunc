@@ -1,10 +1,24 @@
 import sys
 from types import UnionType
-from typing import Any, ForwardRef, NamedTuple, Union, get_args, get_origin
+from typing import Any, ForwardRef, Generic, NamedTuple, TypeVar, Union, get_args, get_origin
+
+import numpy as np
 
 
 class NoAnnotation:
     pass
+
+
+T = TypeVar("T")
+
+
+class Array(Generic[T]):
+    def __class_getitem__(cls, item: type) -> type:
+        # Check if the type is a NumPy type
+        if isinstance(item, type) and issubclass(item, np.generic):
+            return np.ndarray[Any, np.dtype[item]]  # type: ignore[valid-type]
+        # Otherwise, return the type without wrapping in np.dtype
+        return np.ndarray[Any, item]  # type: ignore[valid-type]
 
 
 class TypeCheckMemo(NamedTuple):

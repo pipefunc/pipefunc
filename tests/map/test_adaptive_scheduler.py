@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import adaptive
-import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
@@ -13,6 +12,8 @@ from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pipefunc._typing import Array
 
 
 def run(info: AdaptiveSchedulerDetails) -> None:
@@ -26,7 +27,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -88,8 +89,8 @@ def test_slurm_run_setup_with_resources(tmp_path: Path) -> None:
         output_name="y",
         resources=Resources(cpus=2, memory="4GB", extra_args={"qos": "high"}),
     )
-    def f2(x: np.ndarray[Any, int]) -> int:
-        return sum(x)
+    def f2(x: Array[int]) -> int:
+        return sum(x)  # type: ignore[call-overload]
 
     pipeline = Pipeline([f1, f2])
 
@@ -142,7 +143,7 @@ def test_missing_resources(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -162,7 +163,7 @@ def test_default_resources_from_pipeline_and_to_slurm_run(tmp_path: Path) -> Non
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline1 = Pipeline([f1], default_resources=Resources(cpus=2))
@@ -183,7 +184,7 @@ def test_slurm_run_setup_with_partial_default_resources(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -274,7 +275,7 @@ def test_slurm_run_delayed_resources_with_mapspec(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: int) -> int:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -334,7 +335,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: list[int]) -> list[int]:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -441,7 +442,7 @@ def test_slurm_run_split_all(tmp_path: Path) -> None:
         return a
 
     @pipefunc(output_name="y", resources=lambda kw: Resources(cpus_per_node=kw["x"][0], nodes=1))
-    def f2(x: list[int]) -> list[int]:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
@@ -474,7 +475,7 @@ def test_slurm_run_delayed_resources_with_mapspec_scope_single_element(tmp_path:
         return a
 
     @pipefunc(output_name="y")
-    def f2(x: list[int]) -> list[int]:
+    def f2(x: Array[int]) -> Array[int]:
         return x
 
     pipeline = Pipeline([f1, f2])
