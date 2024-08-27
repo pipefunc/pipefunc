@@ -28,13 +28,13 @@ class ArrayElementType(Generic[T]):
     """Marker class for the element type of an annotated numpy array."""
 
 
-class Array(Generic[T]):
+class Array(Generic[T], np.ndarray[Any, np.dtype[np.object_]]):
     """Annotated numpy array type hint with element type."""
 
     # NOTE: Ideally I would do something like this:
     # `Array = Annotated[np.ndarray[Any, np.dtype[object]], ArrayElementType[T]]`
-    # however, Annotated doesn't support generics, see:
-    # https://github.com/python/typing/issues/1386#issuecomment-1500405617
+    # however, Annotated doesn't support generics in metadata, see:
+    # https://discuss.python.org/t/generics-in-metadata-of-annotated/62059
     def __class_getitem__(cls, item: T) -> Any:
         """Return an annotated numpy array with the provided element type."""
         return Annotated[
@@ -137,7 +137,20 @@ def _handle_generic_types(  # noqa: PLR0911
             return False
 
         # Compare metadata (extras)
-        return incoming_metadata == required_metadata
+        incomming_array_element_type = next(
+            (get_args(t)[0] for t in incoming_metadata if (get_origin(t) is ArrayElementType)),
+            None,
+        )
+        required_array_element_type = next(
+            (get_args(t)[0] for t in required_metadata if (get_origin(t) is ArrayElementType)),
+            None,
+        )
+        if incomming_array_element_type is not None and required_array_element_type is not None:
+            return is_type_compatible(
+                incomming_array_element_type,
+                required_array_element_type,
+                memo,
+            )
     if incoming_origin is Annotated:
         # If only incoming is Annotated, compare its primary type
         incoming_primary, *_ = get_args(incoming_type)

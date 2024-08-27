@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Any, ForwardRef, Union
+from typing import Annotated, Any, ForwardRef, TypeAlias, Union
 
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc.typing import NoAnnotation, TypeCheckMemo, is_type_compatible
+from pipefunc.typing import Array, ArrayElementType, NoAnnotation, TypeCheckMemo, is_type_compatible
 
 
 def test_are_types_compatible_standard():
@@ -166,3 +166,18 @@ def test_forward_refs():
     nested_ref = ForwardRef("list[Node]")
     assert is_type_compatible(nested_ref, list[Node], memo)
     assert not is_type_compatible(nested_ref, tuple[Node, ...], memo)
+
+
+def test_array_type_alias():
+    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype[np.object_]])
+    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(np.object_)])
+    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(object)])
+    assert not is_type_compatible(Array[int], np.ndarray[Any, np.dtype[np.int_]])
+
+    ObjArray: TypeAlias = np.ndarray[Any, np.dtype[np.object_]]  # ObjArray
+    # Test with Annotated and ArrayElementType
+    assert is_type_compatible(Array[int], Annotated[ObjArray, ArrayElementType[int]])
+    assert not is_type_compatible(Array[int], Annotated[ObjArray, ArrayElementType[float]])
+    # Here float is not wrapped in ArrayElementType, so the metadata
+    # is ignored and therefore compatible
+    assert is_type_compatible(Array[int], Annotated[ObjArray, float])
