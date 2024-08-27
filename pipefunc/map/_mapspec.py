@@ -106,6 +106,7 @@ class MapSpec:
 
     inputs: tuple[ArraySpec, ...]
     outputs: tuple[ArraySpec, ...]
+    _is_generated: bool = False
 
     def __post_init__(self) -> None:
         if any(x is None for x in self.outputs[0].axes):

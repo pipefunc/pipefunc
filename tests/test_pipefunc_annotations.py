@@ -1,7 +1,7 @@
 import numpy as np
 
 from pipefunc import PipeFunc, pipefunc
-from pipefunc._pipeline import _axis_is_generated, _axis_is_reduced
+from pipefunc._pipeline import _axis_from_internal_shape, _axis_is_reduced
 
 
 def test_pipeline_function_annotations_single_output():
@@ -46,12 +46,12 @@ def test_axis_is_generated():
     def g(y: int) -> int:
         return y
 
-    assert _axis_is_generated(f, g, "y")
+    assert _axis_from_internal_shape(f, g, "y")
 
 
 def test_axis_is_reduced():
     @pipefunc("y", mapspec="x[i] -> y[i]")
-    def f(x: int) -> list[int]:
+    def f(x: int) -> int:
         return x
 
     @pipefunc("z")
@@ -71,5 +71,5 @@ def test_multi_output():
         assert len(x.shape) == 1
         return 2 * sum(x) + 0 * sum(y)
 
-    assert _axis_is_generated(generate_ints, double_it, "x")
-    assert _axis_is_generated(generate_ints, double_it, "y")
+    assert _axis_from_internal_shape(generate_ints, double_it, "x")
+    assert _axis_from_internal_shape(generate_ints, double_it, "y")

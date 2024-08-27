@@ -1034,6 +1034,7 @@ class NestedPipeFunc(PipeFunc):
         return MapSpec(
             tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
+            _is_generated=True,
         )
 
     @functools.cached_property
