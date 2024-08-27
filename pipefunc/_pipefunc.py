@@ -669,12 +669,18 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+        if self._output_picker is None:
+            hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+        else:
+            # We cannot determine the output type if a custom output picker
+            # is used, however, if the output is a tuple and the _default_output_picker
+            # is used, we can determine the output type.
+            hint = NoAnnotation
         if not isinstance(self.output_name, tuple):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
-        return {name: Any for name in self.output_name}
+        return {name: NoAnnotation for name in self.output_name}
 
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.

@@ -259,7 +259,7 @@ def test_outer_product_functions(tmp_path: Path) -> None:
 
 
 def test_simple_from_step(tmp_path: Path) -> None:
-    @pipefunc(output_name="x", mapspec="... -> x[i]")
+    @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
 
@@ -269,7 +269,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         return 2 * x
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: Array[int]) -> int:
         return sum(y)
 
     pipeline = Pipeline(
@@ -317,7 +317,11 @@ def double_it_tuple(x: int) -> tuple[int, int]:
     return (x, 2 * x)
 
 
-@pipefunc(output_name=("single", "double"), output_picker=dict.__getitem__)
+def output_picker(x: dict[str, int], key: str) -> int:
+    return x[key]
+
+
+@pipefunc(output_name=("single", "double"), output_picker=output_picker)
 def double_it_dict(x: int) -> dict[str, int]:
     assert isinstance(x, int)
     return {"single": x, "double": 2 * x}
@@ -694,7 +698,7 @@ def test_mapspec_internal_shapes(tmp_path: Path) -> None:
         return x + z
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: Array[int]) -> int:
         return sum(y)
 
     pipeline = Pipeline([generate_ints, add, take_sum])
@@ -811,7 +815,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         return list(range(n))
 
     @pipefunc(output_name="y")
-    def double_it(x: int) -> int:
+    def double_it(x: Array[int]) -> Array[int]:
         return 2 * x
 
     @pipefunc(output_name="side")
