@@ -660,7 +660,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        type_hints = get_type_hints(func, include_extras=True)
+        type_hints = _try_get_type_hints(func)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
@@ -670,7 +670,7 @@ class PipeFunc(Generic[T]):
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
         if self._output_picker is None:
-            hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+            hint = _try_get_type_hints(func).get("return", NoAnnotation)
         else:
             # We cannot determine the output type if a custom output picker
             # is used, however, if the output is a tuple and the _default_output_picker
@@ -1236,3 +1236,10 @@ def _maybe_update_kwargs_with_resources(
             kwargs[resources_variable] = resources(kwargs)
         else:
             kwargs[resources_variable] = resources
+
+
+def _try_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+    try:
+        return get_type_hints(func, include_extras=True)
+    except NameError:
+        return {}
