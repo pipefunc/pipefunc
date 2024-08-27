@@ -16,7 +16,17 @@ import os
 import warnings
 import weakref
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    TypeAlias,
+    TypeVar,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 import cloudpickle
 
@@ -31,6 +41,7 @@ from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
+from pipefunc.typing import NoAnnotation
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -643,6 +654,34 @@ class PipeFunc(Generic[T]):
                 new_kwargs[k] = v
         return new_kwargs
 
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        type_hints = get_type_hints(func, include_extras=True)
+        return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
+
+    @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+        """Return the type annotation of the wrapped function's output."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        if self._output_picker is None:
+            hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+        else:
+            # We cannot determine the output type if a custom output picker
+            # is used, however, if the output is a tuple and the _default_output_picker
+            # is used, we can determine the output type.
+            hint = NoAnnotation
+        if not isinstance(self.output_name, tuple):
+            return {self.output_name: hint}
+        if get_origin(hint) is tuple:
+            return dict(zip(self.output_name, get_args(hint)))
+        return {name: NoAnnotation for name in self.output_name}
+
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
 
@@ -995,6 +1034,7 @@ class NestedPipeFunc(PipeFunc):
         return MapSpec(
             tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
+            _is_generated=True,
         )
 
     @functools.cached_property
