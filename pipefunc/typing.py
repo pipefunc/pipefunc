@@ -102,17 +102,17 @@ def _handle_union_types(
     memo: TypeCheckMemo,
 ) -> bool | None:
     """Handle compatibility logic for Union types with directional consideration."""
-    if (isinstance(incoming_type, UnionType) or get_origin(incoming_type) == Union) and (
-        isinstance(required_type, UnionType) or get_origin(required_type) == Union
+    if (isinstance(incoming_type, UnionType) or get_origin(incoming_type) is Union) and (
+        isinstance(required_type, UnionType) or get_origin(required_type) is Union
     ):
         incoming_type_args = get_args(incoming_type)
         required_type_args = get_args(required_type)
         return _all_types_compatible(incoming_type_args, required_type_args, memo)
 
-    if isinstance(incoming_type, UnionType) or get_origin(incoming_type) == Union:
+    if isinstance(incoming_type, UnionType) or get_origin(incoming_type) is Union:
         return all(is_type_compatible(t, required_type, memo) for t in get_args(incoming_type))
 
-    if isinstance(required_type, UnionType) or get_origin(required_type) == Union:
+    if isinstance(required_type, UnionType) or get_origin(required_type) is Union:
         return any(is_type_compatible(incoming_type, t, memo) for t in get_args(required_type))
 
     return None
