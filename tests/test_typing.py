@@ -159,19 +159,19 @@ def test_forward_refs():
             self.value = value
             self.children = children or []
 
-    # Automatically capture the current frame for memo initialization
+    # Case: Automatically capture the current frame for memo initialization
     frame = sys._getframe(0)
     memo = TypeCheckMemo(frame.f_globals, frame.f_locals)
 
-    # Test with forward references using string annotations
+    # Case: Test with forward references using string annotations
     assert is_type_compatible("Node", Node, memo)
     assert is_type_compatible("list[Node]", list[Node], memo)
 
-    # Test with ForwardRef
+    # Case: Test with ForwardRef
     node_ref = ForwardRef("Node")
     assert is_type_compatible(node_ref, Node, memo)
 
-    # Test nested forward references
+    # Case: Test nested forward references
     nested_ref = ForwardRef("list[Node]")
     assert is_type_compatible(nested_ref, list[Node], memo)
     assert not is_type_compatible(nested_ref, tuple[Node, ...], memo)
