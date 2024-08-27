@@ -118,7 +118,64 @@ def _handle_union_types(
     return None
 
 
-def _handle_generic_types(  # noqa: PLR0911
+def _extract_array_element_type(metadata: list[Any]) -> Any | None:
+    """Extract the ArrayElementType from the metadata if it exists."""
+    return next((get_args(t)[0] for t in metadata if get_origin(t) is ArrayElementType), None)
+
+
+def _compare_annotated_types(
+    incoming_type: type[Any],
+    required_type: type[Any],
+    memo: TypeCheckMemo,
+) -> bool:
+    """Compare Annotated types including metadata."""
+    incoming_primary, *incoming_metadata = get_args(incoming_type)
+    required_primary, *required_metadata = get_args(required_type)
+
+    # Recursively check the primary types
+    if not is_type_compatible(incoming_primary, required_primary, memo):
+        return False
+
+    # Compare metadata (extras)
+    incoming_array_element_type = _extract_array_element_type(incoming_metadata)
+    required_array_element_type = _extract_array_element_type(required_metadata)
+    if incoming_array_element_type is not None and required_array_element_type is not None:
+        return is_type_compatible(incoming_array_element_type, required_array_element_type, memo)
+    return True
+
+
+def _compare_single_annotated_type(
+    annotated_type: type[Any],
+    other_type: type[Any],
+    memo: TypeCheckMemo,
+) -> bool:
+    """Handle cases where only one of the types is Annotated."""
+    primary_type, *_ = get_args(annotated_type)
+    return is_type_compatible(primary_type, other_type, memo)
+
+
+def _compare_generic_type_origins(
+    incoming_origin: type[Any],
+    required_origin: type[Any],
+) -> bool:
+    """Compare the origins of generic types for compatibility."""
+    if isinstance(incoming_origin, type) and isinstance(required_origin, type):
+        return issubclass(incoming_origin, required_origin)
+    return incoming_origin == required_origin
+
+
+def _compare_generic_type_args(
+    incoming_args: tuple[Any, ...],
+    required_args: tuple[Any, ...],
+    memo: TypeCheckMemo,
+) -> bool:
+    """Compare the arguments of generic types for compatibility."""
+    if not required_args or not incoming_args:
+        return True
+    return all(is_type_compatible(t1, t2, memo) for t1, t2 in zip(incoming_args, required_args))
+
+
+def _handle_generic_types(
     incoming_type: type[Any],
     required_type: type[Any],
     memo: TypeCheckMemo,
@@ -128,51 +185,20 @@ def _handle_generic_types(  # noqa: PLR0911
 
     # Handle Annotated types
     if incoming_origin is Annotated and required_origin is Annotated:
-        # Compare the primary types and metadata
-        incoming_primary, *incoming_metadata = get_args(incoming_type)
-        required_primary, *required_metadata = get_args(required_type)
-
-        # Recursively check the primary types
-        if not is_type_compatible(incoming_primary, required_primary, memo):
-            return False
-
-        # Compare metadata (extras)
-        incomming_array_element_type = next(
-            (get_args(t)[0] for t in incoming_metadata if (get_origin(t) is ArrayElementType)),
-            None,
-        )
-        required_array_element_type = next(
-            (get_args(t)[0] for t in required_metadata if (get_origin(t) is ArrayElementType)),
-            None,
-        )
-        if incomming_array_element_type is not None and required_array_element_type is not None:
-            return is_type_compatible(
-                incomming_array_element_type,
-                required_array_element_type,
-                memo,
-            )
+        return _compare_annotated_types(incoming_type, required_type, memo)
     if incoming_origin is Annotated:
-        # If only incoming is Annotated, compare its primary type
-        incoming_primary, *_ = get_args(incoming_type)
-        return is_type_compatible(incoming_primary, required_type, memo)
+        return _compare_single_annotated_type(incoming_type, required_type, memo)
     if required_origin is Annotated:
-        # If only required is Annotated, compare its primary type
-        required_primary, *_ = get_args(required_type)
-        return is_type_compatible(incoming_type, required_primary, memo)
+        return _compare_single_annotated_type(required_type, incoming_type, memo)
 
+    # Handle generic types
     if incoming_origin and required_origin:
-        if isinstance(incoming_origin, type) and isinstance(required_origin, type):
-            if not issubclass(incoming_origin, required_origin):
-                return False
-        elif incoming_origin != required_origin:
+        if not _compare_generic_type_origins(incoming_origin, required_origin):
             return False
         incoming_args = get_args(incoming_type)
         required_args = get_args(required_type)
+        return _compare_generic_type_args(incoming_args, required_args, memo)
 
-        if not required_args or not incoming_args:
-            return True
-        # If both have arguments, check compatibility of each argument
-        return all(is_type_compatible(t1, t2, memo) for t1, t2 in zip(incoming_args, required_args))
     return None
 
 
