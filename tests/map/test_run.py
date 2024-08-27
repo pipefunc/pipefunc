@@ -907,6 +907,7 @@ def test_return_2d_from_step(tmp_path: Path) -> None:
         return sum(y)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])
+    assert pipeline.mapspecs_as_strings == ["... -> x[i, unnamed_0]", "x[i, :] -> y[i]"]
     r = pipeline.map({"n": 4}, tmp_path, internal_shapes={"x": (4, 4)}, parallel=False)
     assert r["x"].output.tolist() == np.ones((4, 4)).tolist()
     assert r["y"].output.tolist() == [8, 8, 8, 8]
