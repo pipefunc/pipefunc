@@ -2017,7 +2017,17 @@ def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bo
     """Whether the output was the result of a map, and the input takes the entire result."""
     output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
     input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
-    return parameter_name in output_mapspec_names and parameter_name not in input_mapspec_names
+    if f_in.mapspec:
+        input_spec_axes = next(
+            (s.axes for s in f_in.mapspec.inputs if s.name == parameter_name),
+            None,
+        )
+    else:
+        input_spec_axes = None
+    return parameter_name in output_mapspec_names and (
+        parameter_name not in input_mapspec_names
+        or (input_spec_axes is not None and None in input_spec_axes)
+    )
 
 
 def _axis_is_generated(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:

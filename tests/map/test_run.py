@@ -815,7 +815,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         return list(range(n))
 
     @pipefunc(output_name="y")
-    def double_it(x: Array[int]) -> Array[int]:
+    def double_it(x: int) -> int:
         return 2 * x
 
     @pipefunc(output_name="side")
