@@ -243,3 +243,15 @@ def test_compare_annotated_types_with_different_primary_types():
 
     # Since np.ndarray and list[int] are different primary types, this should return False
     assert not is_type_compatible(AnnotatedType1, AnnotatedType2)
+
+
+def test_compatible_types_with_multiple_annotated_fields():
+    # Case: Annotated types with multiple annotated fields
+    # This should not care about other metadata than ArrayElementType
+    AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], float]  # noqa: N806
+    AnnotatedType2 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], int]  # noqa: N806
+    assert is_type_compatible(AnnotatedType1, AnnotatedType2)
+
+    AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], float]  # noqa: N806
+    AnnotatedType2 = Annotated[np.ndarray[Any, np.dtype[np.object_]], int, ArrayElementType[int]]  # noqa: N806
+    assert is_type_compatible(AnnotatedType1, AnnotatedType2)
