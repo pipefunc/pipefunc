@@ -220,3 +220,26 @@ def is_type_compatible(
     if (result := _handle_generic_types(incoming_type, required_type, memo)) is not None:
         return result
     return False
+
+
+def is_array_type(tp: Any) -> bool:
+    """Check if the given type has the structure of ``Array[T]``.
+
+    1. ``Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], ArrayElementType[T]]``
+    2. ``numpy.ndarray[Any, numpy.dtype[numpy.object_]]``
+    """
+    if get_origin(tp) is Annotated:
+        args = get_args(tp)
+        if len(args) == 2:  # noqa: PLR2004
+            array_type, element_type_marker = args
+            if (
+                get_origin(array_type) is np.ndarray
+                and get_args(array_type) == (Any, np.dtype[np.object_])
+                and get_origin(element_type_marker) is ArrayElementType
+            ):
+                return True
+    elif get_origin(tp) is np.ndarray:
+        if get_args(tp) == (Any, np.dtype[np.object_]):
+            return True
+
+    return False

@@ -6,8 +6,16 @@ from typing import Annotated, Any, ForwardRef, TypeAlias, Union
 
 import numpy as np
 import numpy.typing as npt
+import pytest
 
-from pipefunc.typing import Array, ArrayElementType, NoAnnotation, TypeCheckMemo, is_type_compatible
+from pipefunc.typing import (
+    Array,
+    ArrayElementType,
+    NoAnnotation,
+    TypeCheckMemo,
+    is_array_type,
+    is_type_compatible,
+)
 
 
 def test_are_types_compatible_standard():
@@ -181,3 +189,46 @@ def test_array_type_alias():
     # Here float is not wrapped in ArrayElementType, so the metadata
     # is ignored and therefore compatible
     assert is_type_compatible(Array[int], Annotated[ObjArray, float])
+
+
+@pytest.mark.parametrize(
+    ("tp", "expected"),
+    [
+        # Case: `Array`
+        (Array[int], True),
+        # Case: `numpy.ndarray[typing.Any, numpy.dtype[numpy.object_]]`
+        (np.ndarray[Any, np.dtype[np.object_]], True),
+        # Case: Annotated type that doesn't match expected structure
+        (Annotated[np.ndarray[Any, np.dtype[np.float64]], ArrayElementType[int]], False),
+        # Case: numpy.ndarray with different dtype
+        (np.ndarray[Any, np.dtype[np.float64]], False),
+        # Case: Completely unrelated type (e.g., int)
+        (int, False),
+        # Case: Annotated type that is not related to numpy ndarray
+        (Annotated[int, ArrayElementType[int]], False),
+    ],
+)
+def test_is_array_type(tp, expected):
+    assert is_array_type(tp) == expected
+
+
+@pytest.mark.parametrize(
+    "x",
+    [
+        Array[int],  # Valid Annotated type
+        np.ndarray[Any, np.dtype[np.object_]],  # Valid plain ndarray
+        Annotated[
+            np.ndarray[Any, np.dtype[np.float64]],
+            ArrayElementType[int],
+        ],  # Non-matching Annotated
+        np.ndarray[Any, np.dtype[np.float64]],  # Non-matching ndarray
+        int,  # Unrelated type
+        Annotated[int, ArrayElementType[int]],  # Annotated, but not ndarray
+    ],
+)
+def test_is_valid_array_type(x):
+    expected_result = x in [
+        Array[int],  # Valid Annotated type
+        np.ndarray[Any, np.dtype[np.object_]],  # Valid plain ndarray
+    ]
+    assert is_array_type(x) == expected_result
