@@ -31,7 +31,7 @@ class ArrayElementType(Generic[T]):
 class Array(Generic[T], np.ndarray[Any, np.dtype[np.object_]]):
     """Annotated numpy array type hint with element type."""
 
-    # NOTE: Ideally I would do something like this:
+    # NOTE: Ideally we would do something like this:
     # `Array = Annotated[np.ndarray[Any, np.dtype[object]], ArrayElementType[T]]`
     # however, Annotated doesn't support generics in metadata, see:
     # https://discuss.python.org/t/generics-in-metadata-of-annotated/62059
