@@ -1,17 +1,20 @@
 """Custom type hinting utilities for pipefunc."""
 
 import sys
+from collections.abc import Callable
 from types import UnionType
 from typing import (
     Annotated,
     Any,
     ForwardRef,
     Generic,
+    GenericAlias,
     NamedTuple,
     TypeVar,
     Union,
     get_args,
     get_origin,
+    get_type_hints,
 )
 
 import numpy as np
@@ -237,3 +240,56 @@ def is_object_array_type(tp: Any) -> bool:
         return is_object_array_type(array_type)
 
     return False
+
+
+class Unresolvable:
+    """Class to represent an unresolvable type hint."""
+
+    def __init__(self, type_str: str) -> None:
+        """Initialize the Unresolvable instance."""
+        self.type_str = type_str
+
+    def __repr__(self) -> str:
+        """Return a string representation of the Unresolvable instance."""
+        return f"Unresolvable[{self.type_str}]"
+
+
+def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+    """Safely get type hints for a function, resolving forward references."""
+    try:
+        hints = get_type_hints(func)
+    except Exception:  # noqa: BLE001
+        hints = func.__annotations__
+
+    resolved_hints = {}
+    for arg, hint in hints.items():
+        if isinstance(hint, str):
+            # String annotations (from __future__ import annotations)
+            try:
+                resolved_hints[arg] = eval(hint, func.__globals__)  # noqa: S307
+            except NameError:
+                resolved_hints[arg] = Unresolvable(hint)
+        elif isinstance(hint, ForwardRef):
+            # Forward references
+            try:
+                resolved_hints[arg] = hint._evaluate(func.__globals__, None)
+            except NameError:
+                resolved_hints[arg] = Unresolvable(hint.__forward_arg__)
+        elif isinstance(hint, GenericAlias):
+            # Handle generics, recursively resolve arguments
+            origin = hint.__origin__
+            args = hint.__args__
+            resolved_args = []
+            for arg_type in args:
+                try:
+                    if isinstance(arg_type, ForwardRef):
+                        resolved_args.append(arg_type._evaluate(func.__globals__, None))
+                    else:
+                        resolved_args.append(arg_type)
+                except NameError:  # noqa: PERF203
+                    resolved_args.append(Unresolvable(str(arg_type)))
+            resolved_hints[arg] = origin[tuple(resolved_args)]
+        else:
+            resolved_hints[arg] = hint
+
+    return resolved_hints

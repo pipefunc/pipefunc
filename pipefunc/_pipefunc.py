@@ -25,7 +25,6 @@ from typing import (
     TypeVar,
     get_args,
     get_origin,
-    get_type_hints,
 )
 
 import cloudpickle
@@ -41,7 +40,7 @@ from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
-from pipefunc.typing import NoAnnotation
+from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -660,7 +659,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        type_hints = _try_get_type_hints(func)
+        type_hints = safe_get_type_hints(func)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
@@ -670,7 +669,7 @@ class PipeFunc(Generic[T]):
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
         if self._output_picker is None:
-            hint = _try_get_type_hints(func).get("return", NoAnnotation)
+            hint = safe_get_type_hints(func).get("return", NoAnnotation)
         else:
             # We cannot determine the output type if a custom output picker
             # is used, however, if the output is a tuple and the _default_output_picker
@@ -1236,10 +1235,3 @@ def _maybe_update_kwargs_with_resources(
             kwargs[resources_variable] = resources(kwargs)
         else:
             kwargs[resources_variable] = resources
-
-
-def _try_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
-    try:
-        return get_type_hints(func, include_extras=True)
-    except NameError:
-        return {}
