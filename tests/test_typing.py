@@ -13,7 +13,7 @@ from pipefunc.typing import (
     ArrayElementType,
     NoAnnotation,
     TypeCheckMemo,
-    is_array_type,
+    is_object_array_type,
     is_type_compatible,
 )
 
@@ -29,6 +29,7 @@ def test_are_types_compatible_standard():
     assert is_type_compatible(dict[int, dict[str, str]], dict[int, dict[str, Any]])
     assert is_type_compatible(dict[int, str], dict)
     assert is_type_compatible(dict, dict[int, str])
+    assert is_type_compatible(dict[int, str], Annotated[dict[int, str], float])
 
 
 def test_are_types_compatible_union():
@@ -209,7 +210,7 @@ def test_array_type_alias():
     ],
 )
 def test_is_array_type(tp, expected):
-    assert is_array_type(tp) == expected
+    assert is_object_array_type(tp) == expected
 
 
 @pytest.mark.parametrize(
@@ -231,4 +232,14 @@ def test_is_valid_array_type(x):
         Array[int],  # Valid Annotated type
         np.ndarray[Any, np.dtype[np.object_]],  # Valid plain ndarray
     ]
-    assert is_array_type(x) == expected_result
+    assert is_object_array_type(x) == expected_result
+
+
+def test_compare_annotated_types_with_different_primary_types():
+    # Case: Annotated types with different primary types
+    # This should trigger the uncovered lines where primary types are compared and found to be incompatible
+    AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int]]  # noqa: N806
+    AnnotatedType2 = Annotated[list[int], ArrayElementType[int]]  # noqa: N806
+
+    # Since np.ndarray and list[int] are different primary types, this should return False
+    assert not is_type_compatible(AnnotatedType1, AnnotatedType2)

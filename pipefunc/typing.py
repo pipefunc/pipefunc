@@ -222,24 +222,18 @@ def is_type_compatible(
     return False
 
 
-def is_array_type(tp: Any) -> bool:
-    """Check if the given type has the structure of ``Array[T]``.
+def is_object_array_type(tp: Any) -> bool:
+    """Check if the given type is similar to `Array[T]`.
 
-    1. ``Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], ArrayElementType[T]]``
-    2. ``numpy.ndarray[Any, numpy.dtype[numpy.object_]]``
+    2. `Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], T]`
+    3. `numpy.ndarray[Any, numpy.dtype[numpy.object_]]`
     """
+    if get_origin(tp) is np.ndarray:
+        # Base case: directly an np.ndarray[Any, np.dtype[np.object_]]
+        return get_args(tp) == (Any, np.dtype[np.object_])
     if get_origin(tp) is Annotated:
-        args = get_args(tp)
-        if len(args) == 2:  # noqa: PLR2004
-            array_type, element_type_marker = args
-            if (
-                get_origin(array_type) is np.ndarray
-                and get_args(array_type) == (Any, np.dtype[np.object_])
-                and get_origin(element_type_marker) is ArrayElementType
-            ):
-                return True
-    elif get_origin(tp) is np.ndarray:
-        if get_args(tp) == (Any, np.dtype[np.object_]):
-            return True
+        # Recursive case: strip the Annotated and check the first argument
+        array_type, _ = get_args(tp)
+        return is_object_array_type(array_type)
 
     return False
