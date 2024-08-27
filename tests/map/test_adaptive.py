@@ -65,7 +65,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         return x * 2
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: Array[int]) -> int:
         return sum(y)
 
     pipeline = Pipeline(

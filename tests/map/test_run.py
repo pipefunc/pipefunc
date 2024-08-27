@@ -311,15 +311,22 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert "x" not in ds.coords
 
 
-@pytest.mark.parametrize("output_picker", [None, dict.__getitem__])
-def test_simple_multi_output(tmp_path: Path, output_picker) -> None:
-    @pipefunc(output_name=("single", "double"), output_picker=output_picker)
-    def double_it(x: int) -> tuple[int, int] | dict[str, int]:
-        assert isinstance(x, int)
-        return (x, 2 * x) if output_picker is None else {"single": x, "double": 2 * x}
+@pipefunc(output_name=("single", "double"))
+def double_it_tuple(x: int) -> tuple[int, int]:
+    assert isinstance(x, int)
+    return (x, 2 * x)
 
+
+@pipefunc(output_name=("single", "double"), output_picker=dict.__getitem__)
+def double_it_dict(x: int) -> dict[str, int]:
+    assert isinstance(x, int)
+    return {"single": x, "double": 2 * x}
+
+
+@pytest.mark.parametrize("double_it", [double_it_tuple, double_it_dict])
+def test_simple_multi_output(tmp_path: Path, double_it) -> None:
     @pipefunc(output_name="sum")
-    def take_sum(single: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+    def take_sum(single: Array[int]) -> int:
         return sum(single)
 
     pipeline = Pipeline(
@@ -543,7 +550,7 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
         return sum(z)
 
     @pipefunc(output_name=("r1", "r2"))
-    def h(sum_: np.ndarray) -> tuple[int, int]:
+    def h(sum_: int) -> tuple[int, int]:
         return int(-sum_), int(sum_)  # make to int for mypy
 
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g, h])
@@ -812,7 +819,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         return z
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int], z: int) -> int:
+    def take_sum(y: Array[int], z: int) -> int:
         return sum(y) + z
 
     pipeline = Pipeline(
@@ -883,16 +890,16 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
 
 def test_return_2d_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
-    def generate_ints(n: int) -> np.ndarray:
-        return np.ones((n, n))
+    def generate_ints(n: int) -> np.ndarray[Any, np.dtype[np.int_]]:
+        return np.ones((n, n), dtype=int)
 
     @pipefunc(output_name="y", mapspec="x[i, :] -> y[i]")
-    def double_it(x: np.ndarray) -> np.ndarray:
+    def double_it(x: np.ndarray[Any, np.dtype[np.int_]]) -> Array[int]:
         assert len(x.shape) == 1
         return 2 * sum(x)
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: Array[int]) -> int:
         return sum(y)
 
     pipeline = Pipeline([generate_ints, double_it, take_sum])

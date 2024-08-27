@@ -2001,15 +2001,14 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     # TODO: need to handle this case
                     continue
                 if _axis_is_reduced(node, dep, parameter_name):
-                    # Now the 'input' is a `NDArray[OriginalType]` if was `OriginalType`
                     output_type = Array[output_type]  # type: ignore[valid-type]
-
                 if not is_type_compatible(output_type, input_type):
                     msg = (
-                        f"Inconsistent type annotations for argument '{parameter_name}' in"
-                        f" functions '{node}' returns `{output_type}` and"
-                        f" '{dep.__name__}' expects `{input_type}`."
-                        " Please make sure the shared input arguments have the same type."
+                        f"Inconsistent type annotations for:"
+                        f"\n  - Argument `{parameter_name}`"
+                        f"\n  - Function `{node.__name__}(...)` returns:\n      `{output_type}`."
+                        f"\n  - Function `{dep.__name__}(...)` expects:\n      `{input_type}`."
+                        "\nPlease make sure the shared input arguments have the same type."
                     )
                     raise TypeError(msg)
 

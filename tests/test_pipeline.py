@@ -747,6 +747,6 @@ def test_invalid_type_hints():
 
     with pytest.raises(
         TypeError,
-        match="Inconsistent type annotations for argument 'y2' in functions",
+        match="Inconsistent type annotations for",
     ):
         Pipeline([f, g])
