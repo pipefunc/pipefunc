@@ -659,7 +659,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        type_hints = safe_get_type_hints(func)
+        type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
@@ -669,7 +669,7 @@ class PipeFunc(Generic[T]):
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
         if self._output_picker is None:
-            hint = safe_get_type_hints(func).get("return", NoAnnotation)
+            hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         else:
             # We cannot determine the output type if a custom output picker
             # is used, however, if the output is a tuple and the _default_output_picker
