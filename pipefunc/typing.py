@@ -2,13 +2,12 @@
 
 import sys
 from collections.abc import Callable
-from types import UnionType
+from types import GenericAlias, UnionType
 from typing import (
     Annotated,
     Any,
     ForwardRef,
     Generic,
-    GenericAlias,
     NamedTuple,
     TypeVar,
     Union,
@@ -253,8 +252,18 @@ class Unresolvable:
         """Return a string representation of the Unresolvable instance."""
         return f"Unresolvable[{self.type_str}]"
 
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two Unresolvable instances."""
+        if isinstance(other, Unresolvable):
+            return self.type_str == other.type_str
+        return False
 
-def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+    def __hash__(self) -> int:
+        """Return a hash of the Unresolvable instance."""
+        return hash(self.type_str)
+
+
+def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:  # noqa: PLR0912
     """Safely get type hints for a function, resolving forward references."""
     try:
         hints = get_type_hints(func)
@@ -289,6 +298,20 @@ def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
                 except NameError:  # noqa: PERF203
                     resolved_args.append(Unresolvable(str(arg_type)))
             resolved_hints[arg] = origin[tuple(resolved_args)]
+        elif hint is type(None):
+            resolved_hints[arg] = None
+        elif isinstance(hint, GenericAlias) and origin is Union:
+            # Handle Union types
+            resolved_args = []
+            for arg_type in hint.__args__:
+                if isinstance(arg_type, ForwardRef):
+                    try:
+                        resolved_args.append(arg_type._evaluate(func.__globals__, None))
+                    except NameError:
+                        resolved_args.append(Unresolvable(arg_type.__forward_arg__))
+                else:
+                    resolved_args.append(arg_type)
+            resolved_hints[arg] = Union[tuple(resolved_args)]  # noqa: UP007
         else:
             resolved_hints[arg] = hint
 

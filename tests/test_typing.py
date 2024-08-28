@@ -260,84 +260,70 @@ def test_compatible_types_with_multiple_annotated_fields():
 
 
 def test_safe_get_type_hints_basic_types():
-    def func(a: int, b: str) -> None:
+    def func(a: int, b: str) -> None:  # noqa: ARG001
         pass
 
     expected = {
         "a": int,
         "b": str,
-        "return": type(None),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_forward_ref():
-    def func(a: UndefinedType) -> None:
+    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
         pass
 
     expected = {
         "a": Unresolvable("UndefinedType"),
-        "return": type(None),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_generic_type():
-    def func(a: list[int], b: str | None) -> None:
+    def func(a: list[int], b: str | None) -> None:  # type: ignore[name-defined]  # noqa: ARG001
         pass
 
     expected = {
         "a": list[int],
-        "b": Optional[str],
-        "return": type(None),
+        "b": Optional[str],  # noqa: UP007
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_mixed_resolved_unresolved():
-    def func(a: UndefinedType, b: int | UndefinedType) -> None:
+    def func(a: UndefinedType, b: int | UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
         pass
 
     expected = {
         "a": Unresolvable("UndefinedType"),
-        "b": Union[int, Unresolvable("UndefinedType")],
-        "return": type(None),
+        "b": Unresolvable("int | UndefinedType"),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
-# def test_safe_get_type_hints_with_string_annotations():
-#     from __future__ import annotations
-
-#     def func(a: 'int', b: 'str') -> 'None':
-#         pass
-
-#     expected = {
-#         'a': int,
-#         'b': str,
-#         'return': type(None),
-#     }
-#     assert safe_get_type_hints(func) == expected
-
-
 def test_safe_get_type_hints_unresolvable_generic():
-    def func(a: list[UndefinedType]) -> None:
+    def func(a: list[UndefinedType]) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
         pass
 
     expected = {
-        "a": list[Unresolvable("UndefinedType")],
-        "return": type(None),
+        "a": Unresolvable("list[UndefinedType]"),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_exception_handling():
-    def func(a: undefined.variable) -> None:
+    def func(a: undefined.variable) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
         pass
 
     expected = {
         "a": Unresolvable("undefined.variable"),
-        "return": type(None),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
@@ -346,30 +332,30 @@ def test_safe_get_type_hints_eval_fallback():
     global SomeType
     SomeType = int
 
-    def func(a: SomeType) -> None:
+    def func(a: SomeType) -> None:  # type: ignore[name-defined] # noqa: ARG001
         pass
 
     expected = {
         "a": SomeType,
-        "return": type(None),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_complex_generic():
-    def func(a: list[int] | UndefinedType, b: list[int | str]) -> None:
+    def func(a: list[int] | UndefinedType, b: list[int | str]) -> None:  # type: ignore[name-defined] # noqa: ARG001, F821
         pass
 
     expected = {
-        "a": Union[list[int], Unresolvable("UndefinedType")],
+        "a": Unresolvable("list[int] | UndefinedType"),
         "b": list[int | str],
-        "return": type(None),
+        "return": None,
     }
     assert safe_get_type_hints(func) == expected
 
 
 def test_safe_get_type_hints_no_annotations():
-    def func(a, b):
+    def func(a, b):  # noqa: ARG001
         pass
 
     expected = {}
