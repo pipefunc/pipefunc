@@ -332,16 +332,9 @@ class Pipeline:
 
     @functools.cached_property
     def graph(self) -> nx.DiGraph:
-        """Create a directed graph representing the pipeline.
-
-        Returns
-        -------
-            A directed graph with nodes representing functions and edges
-            representing dependencies between functions.
-
-        """
+        """Create a directed graph representing the pipeline."""
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
-        g = nx.DiGraph()
+        g = nx.MultiDiGraph()  # Use MultiDiGraph instead of DiGraph
         for f in self.functions:
             g.add_node(f)
             assert f.parameters is not None
@@ -349,25 +342,18 @@ class Pipeline:
                 if arg in self.output_to_func:  # is function output
                     if arg in f._bound:
                         bound = _Bound(arg, f.output_name)
-                        g.add_edge(bound, f)
+                        g.add_edge(bound, f, arg=arg)
                     else:
-                        edge = (self.output_to_func[arg], f)
-                        if edge not in g.edges:
-                            g.add_edge(*edge, arg=arg)
-                        else:
-                            # edge already exists because of multiple outputs
-                            assert isinstance(edge[0].output_name, tuple)
-                            current = g.edges[edge]["arg"]
-                            g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
-                else:  # noqa: PLR5501
-                    if arg in f._bound:
-                        bound = _Bound(arg, f.output_name)
-                        g.add_edge(bound, f)
-                    else:
-                        if arg not in g:
-                            # Add the node only if it doesn't exist
-                            g.add_node(arg)
-                        g.add_edge(arg, f, arg=arg)
+                        source_func = self.output_to_func[arg]
+                        g.add_edge(source_func, f, arg=arg)  # Add edge with arg as key
+                elif arg in f._bound:
+                    bound = _Bound(arg, f.output_name)
+                    g.add_edge(bound, f, arg=arg)
+                else:
+                    if arg not in g:
+                        # Add the node only if it doesn't exist
+                        g.add_node(arg)
+                    g.add_edge(arg, f, arg=arg)
             if f.resources_variable is not None:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
