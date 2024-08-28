@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, ForwardRef, Optional, TypeAlias, Union, get_type_hints
+from numbers import Number
+from typing import (
+    Annotated,
+    Any,
+    ForwardRef,
+    Optional,
+    TypeAlias,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
 import numpy as np
 import numpy.typing as npt
@@ -259,6 +269,83 @@ def test_compatible_types_with_multiple_annotated_fields():
     AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], float]  # noqa: N806
     AnnotatedType2 = Annotated[np.ndarray[Any, np.dtype[np.object_]], int, ArrayElementType[int]]  # noqa: N806
     assert is_type_compatible(AnnotatedType1, AnnotatedType2)
+
+
+def test_is_type_compatible_with_generics():
+    T = TypeVar("T")
+    S = TypeVar("S", str, int)  # Constrained TypeVar
+    N = TypeVar("N", bound=Number)  # Bounded TypeVar
+
+    # Original tests
+    assert is_type_compatible(list[str], T)
+    assert is_type_compatible(list[str], list[T])
+    assert is_type_compatible(list[T], list[T])
+    assert is_type_compatible(list[list[str]], list[list[T]])
+    assert not is_type_compatible(list[list[str]], list[tuple[T]])
+    assert not is_type_compatible(list[str], tuple[T])
+
+    # Tests with constrained TypeVar
+    assert is_type_compatible(str, S)
+    assert is_type_compatible(int, S)
+    assert not is_type_compatible(float, S)
+    assert is_type_compatible(list[str], list[S])
+    assert not is_type_compatible(list[float], list[S])
+
+    # Tests with bounded TypeVar
+    assert is_type_compatible(int, N)
+    assert is_type_compatible(float, N)
+    assert not is_type_compatible(str, N)
+    assert is_type_compatible(list[int], list[N])
+    assert not is_type_compatible(list[str], list[N])
+
+    # More complex nested structures
+    assert is_type_compatible(dict[str, list[int]], dict[T, list[N]])
+    assert not is_type_compatible(dict[str, list[str]], dict[T, list[N]])
+    assert is_type_compatible(tuple[list[int], dict[str, float]], tuple[list[N], dict[S, N]])
+    assert not is_type_compatible(tuple[list[int], dict[str, str]], tuple[list[N], dict[S, N]])
+
+    # Union types with TypeVars
+    assert is_type_compatible(Union[int, str], Union[T, S])  # noqa: UP007
+    assert is_type_compatible(Union[int, float], Union[N, T])  # noqa: UP007
+    assert is_type_compatible(Union[int, str], Union[N, T])  # noqa: UP007
+
+    # Nested TypeVars
+    R = TypeVar("R", bound=Sequence[T])
+    assert is_type_compatible(list[list[int]], R)
+    assert is_type_compatible(tuple[list[str], list[int]], tuple[R, R])
+    assert is_type_compatible(list[dict[str, int]], R)
+    Q = TypeVar("Q", bound=Sequence[S])
+    assert not is_type_compatible(list[dict[str, int]], Q)
+
+    # TypeVar with Any
+    A = TypeVar("A", bound=Any)
+    assert is_type_compatible(int, A)
+    assert is_type_compatible(str, A)
+    assert is_type_compatible(list[int], A)
+    assert is_type_compatible(dict[str, float], A)
+
+    # Multiple TypeVars
+    M = TypeVar("M")
+    K = TypeVar("K")
+    assert is_type_compatible(dict[str, int], dict[M, K])
+    assert is_type_compatible(dict[int, list[str]], dict[M, list[K]])
+    assert not is_type_compatible(dict[int, tuple[str, int]], dict[M, list[K]])
+
+
+def test_is_type_compatible_with_generics_incoming_generic():
+    # TODO: We need to properly handle incoming generic types
+    # by resolving the generic type parameters. For now, we just
+    # skip the check and return True if the incoming type is a TypeVar.
+    T = TypeVar("T")
+    assert is_type_compatible(T, list[str])
+    assert is_type_compatible(list[T], list[str])
+    assert is_type_compatible(list[T], list[T])
+
+
+def test_is_type_compatible_with_unresolvable():
+    with pytest.warns(UserWarning, match="Unresolvable type"):
+        assert is_type_compatible(Unresolvable("UndefinedType"), int)
+        assert is_type_compatible(int, Unresolvable("UndefinedType"))
 
 
 def test_safe_get_type_hints_basic_types():

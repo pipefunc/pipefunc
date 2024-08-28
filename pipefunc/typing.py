@@ -1,6 +1,7 @@
 """Custom type hinting utilities for pipefunc."""
 
 import sys
+import warnings
 from collections.abc import Callable
 from types import UnionType
 from typing import (
@@ -77,6 +78,13 @@ def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
 
 def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) -> bool:
     """Check if types are identical or if required_type is Any."""
+    for t in (incoming_type, required_type):
+        if isinstance(t, Unresolvable):
+            warnings.warn(
+                f"⚠️ Unresolvable type hint: `{t.type_str}`. Skipping type comparison.",
+                stacklevel=3,
+            )
+            return True
     return (
         incoming_type == required_type
         or required_type is Any
@@ -213,13 +221,42 @@ def is_type_compatible(
     incoming_type = _resolve_type(incoming_type, memo)
     required_type = _resolve_type(required_type, memo)
 
+    if isinstance(incoming_type, TypeVar):
+        # TODO: the incoming type needs to be resolved to a concrete type
+        # using the types of the arguments passed to the function. This might
+        # require a more complex implementation. For now, we just return True.
+        return True
+
     if _check_identical_or_any(incoming_type, required_type):
         return True
+    if (result := _is_typevar_compatible(incoming_type, required_type, memo)) is not None:
+        return result
     if (result := _handle_union_types(incoming_type, required_type, memo)) is not None:
         return result
     if (result := _handle_generic_types(incoming_type, required_type, memo)) is not None:
         return result
     return False
+
+
+def _is_typevar_compatible(
+    incoming_type: Any,
+    required_type: Any,
+    memo: TypeCheckMemo,
+) -> bool | None:
+    """Check if the required type is a TypeVar and is compatible with incoming type."""
+    if not isinstance(required_type, TypeVar):
+        return None
+    if not required_type.__constraints__ and not required_type.__bound__:
+        return True
+    if required_type.__constraints__ and any(
+        is_type_compatible(incoming_type, c, memo) for c in required_type.__constraints__
+    ):
+        return True
+    return required_type.__bound__ and is_type_compatible(
+        incoming_type,
+        required_type.__bound__,
+        memo,
+    )
 
 
 def is_object_array_type(tp: Any) -> bool:
