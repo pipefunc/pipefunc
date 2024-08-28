@@ -368,6 +368,7 @@ def test_safe_get_type_hints_complex_generic():
         "return": NoneType,
     }
     assert safe_get_type_hints(func) == expected
+    assert str(expected["a"]) == "Unresolvable[list[int] | UndefinedType]"
 
 
 def test_safe_get_type_hints_no_annotations():
@@ -376,3 +377,11 @@ def test_safe_get_type_hints_no_annotations():
 
     expected = {}
     assert safe_get_type_hints(func) == expected
+
+
+def test_unresolvable_equality():
+    a = Unresolvable("A")
+    a2 = Unresolvable("A")
+    b = Unresolvable("B")
+    assert a == a2
+    assert a != b
