@@ -281,15 +281,15 @@ def test_tuple_outputs() -> None:
     assert r.h == 2
 
     edges = {
-        (pipeline["c"], pipeline["d"]): {"arg": "c"},
-        (pipeline["c"], pipeline["g"]): {"arg": "c"},
-        ("a", pipeline["c"]): {"arg": "a"},
-        ("b", pipeline["c"]): {"arg": "b"},
-        ("b", pipeline["d"]): {"arg": "b"},
-        (pipeline["d"], pipeline["g"]): {"arg": "e"},
-        ("x", pipeline["d"]): {"arg": "x"},
-        ("x", pipeline["g"]): {"arg": "x"},
-        (pipeline["g"], pipeline["i"]): {"arg": ("h", "g")},
+        (pipeline["c"], pipeline["d"]): {"arg": {"c"}},
+        (pipeline["c"], pipeline["g"]): {"arg": {"c"}},
+        ("a", pipeline["c"]): {"arg": {"a"}},
+        ("b", pipeline["c"]): {"arg": {"b"}},
+        ("b", pipeline["d"]): {"arg": {"b"}},
+        (pipeline["d"], pipeline["g"]): {"arg": {"e"}},
+        ("x", pipeline["d"]): {"arg": {"x"}},
+        ("x", pipeline["g"]): {"arg": {"x"}},
+        (pipeline["g"], pipeline["i"]): {"arg": {"h", "g"}},
     }
     assert edges == dict(pipeline.graph.edges)
 

@@ -11,7 +11,6 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
-from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -157,7 +156,7 @@ def visualize(  # noqa: PLR0912, PLR0915
         elif isinstance(a, PipeFunc):
             output_str = []
             with_mapspec = False
-            for name in at_least_tuple(attrs["arg"]):
+            for name in attrs["arg"]:
                 if b.mapspec and name in b.mapspec.input_names:
                     with_mapspec = True
                     spec = next(i for i in b.mapspec.inputs if i.name == name)
