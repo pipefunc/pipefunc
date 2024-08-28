@@ -91,7 +91,7 @@ def test_plot_nested_func():
 
 def test_plotting_resources():
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
-    def f_c(a, b, resources):  # noqa: ARG001
+    def f_c(a, b, resources):
         return resources.gpus
 
     pipeline = Pipeline([f_c])

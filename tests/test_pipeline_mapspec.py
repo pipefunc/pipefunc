@@ -211,7 +211,7 @@ def test_combining_mapspecs() -> None:
         output_name="electrostatics",
         mapspec="'V_left[i], V_right[j], mesh[a, b, c], materials[a, b] -> electrostatics[i, j, a, b, c]'",
     )
-    def electrostatics(V_left, V_right, mesh, materials):  # noqa: N803, ARG001
+    def electrostatics(V_left, V_right, mesh, materials):  # noqa: N803
         return 1
 
     @pipefunc(

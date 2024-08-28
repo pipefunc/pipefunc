@@ -225,7 +225,7 @@ def test_nested_func() -> None:
     def g(f):
         return f
 
-    def h(g, x):  # noqa: ARG001
+    def h(g, x):
         return g
 
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")])

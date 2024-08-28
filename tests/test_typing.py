@@ -262,7 +262,7 @@ def test_compatible_types_with_multiple_annotated_fields():
 
 
 def test_safe_get_type_hints_basic_types():
-    def func(a: int, b: str) -> None:  # noqa: ARG001
+    def func(a: int, b: str) -> None:
         pass
 
     expected = {
@@ -275,7 +275,7 @@ def test_safe_get_type_hints_basic_types():
 
 
 def test_safe_get_type_hints_forward_ref():
-    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
+    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: F821
         pass
 
     expected = {
@@ -287,8 +287,8 @@ def test_safe_get_type_hints_forward_ref():
 
 def test_safe_get_type_hints_generic_type():
     def func(
-        a: list[int],  # noqa: ARG001
-        b: str | None,  # noqa: ARG001
+        a: list[int],
+        b: str | None,
     ) -> None:
         pass
 
@@ -302,8 +302,8 @@ def test_safe_get_type_hints_generic_type():
 
 def test_safe_get_type_hints_mixed_resolved_unresolved():
     def func(
-        a: UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
-        b: int | UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: UndefinedType,  # type: ignore[name-defined]  # noqa: F821
+        b: int | UndefinedType,  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -317,7 +317,7 @@ def test_safe_get_type_hints_mixed_resolved_unresolved():
 
 def test_safe_get_type_hints_unresolvable_generic():
     def func(
-        a: list[UndefinedType],  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: list[UndefinedType],  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -330,7 +330,7 @@ def test_safe_get_type_hints_unresolvable_generic():
 
 def test_safe_get_type_hints_exception_handling():
     def func(
-        a: undefined.variable,  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: undefined.variable,  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -345,7 +345,7 @@ def test_safe_get_type_hints_eval_fallback():
     global SomeType
     SomeType = int
 
-    def func(a: SomeType) -> None:  # type: ignore[name-defined] # noqa: ARG001
+    def func(a: SomeType) -> None:  # type: ignore[name-defined]
         pass
 
     expected = {
@@ -357,8 +357,8 @@ def test_safe_get_type_hints_eval_fallback():
 
 def test_safe_get_type_hints_complex_generic():
     def func(
-        a: list[int] | UndefinedType,  # type: ignore[name-defined] # noqa: ARG001, F821
-        b: list[int | str],  # noqa: ARG001
+        a: list[int] | UndefinedType,  # type: ignore[name-defined] # noqa: F821
+        b: list[int | str],
     ) -> None:
         pass
 
@@ -372,7 +372,7 @@ def test_safe_get_type_hints_complex_generic():
 
 
 def test_safe_get_type_hints_no_annotations():
-    def func(a, b):  # noqa: ARG001
+    def func(a, b):
         pass
 
     expected = {}
@@ -389,7 +389,7 @@ def test_unresolvable_equality():
 
 
 def test_safe_get_type_hints_with_annotated():
-    def func(a: Annotated[int, str]) -> None:  # noqa: ARG001
+    def func(a: Annotated[int, str]) -> None:
         pass
 
     expected1 = {
