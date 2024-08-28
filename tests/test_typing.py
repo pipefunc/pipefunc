@@ -332,6 +332,16 @@ def test_is_type_compatible_with_generics():
     assert not is_type_compatible(dict[int, tuple[str, int]], dict[M, list[K]])
 
 
+def test_is_type_compatible_with_generics_incoming_generic():
+    # TODO: We need to properly handle incoming generic types
+    # by resolving the generic type parameters. For now, we just
+    # skip the check and return True if the incoming type is a TypeVar.
+    T = TypeVar("T")
+    assert is_type_compatible(T, list[str])
+    assert is_type_compatible(list[T], list[str])
+    assert is_type_compatible(list[T], list[T])
+
+
 def test_is_type_compatible_with_unresolvable():
     with pytest.warns(UserWarning, match="Unresolvable type"):
         assert is_type_compatible(Unresolvable("UndefinedType"), int)

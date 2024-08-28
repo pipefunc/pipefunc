@@ -221,6 +221,12 @@ def is_type_compatible(
     incoming_type = _resolve_type(incoming_type, memo)
     required_type = _resolve_type(required_type, memo)
 
+    if isinstance(incoming_type, TypeVar):
+        # TODO: the incoming type needs to be resolved to a concrete type
+        # using the types of the arguments passed to the function. This might
+        # require a more complex implementation. For now, we just return True.
+        return True
+
     if _check_identical_or_any(incoming_type, required_type):
         return True
     if (result := _is_typevar_compatible(incoming_type, required_type, memo)) is not None:
