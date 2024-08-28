@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, ForwardRef, TypeAlias, Union
+from typing import Annotated, Any, ForwardRef, Optional, TypeAlias, Union, get_type_hints
 
 import numpy as np
 import numpy.typing as npt
@@ -13,9 +13,13 @@ from pipefunc.typing import (
     ArrayElementType,
     NoAnnotation,
     TypeCheckMemo,
+    Unresolvable,
     is_object_array_type,
     is_type_compatible,
+    safe_get_type_hints,
 )
+
+NoneType = type(None)
 
 
 def test_are_types_compatible_standard():
@@ -255,3 +259,163 @@ def test_compatible_types_with_multiple_annotated_fields():
     AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], float]  # noqa: N806
     AnnotatedType2 = Annotated[np.ndarray[Any, np.dtype[np.object_]], int, ArrayElementType[int]]  # noqa: N806
     assert is_type_compatible(AnnotatedType1, AnnotatedType2)
+
+
+def test_safe_get_type_hints_basic_types():
+    def func(a: int, b: str) -> None:  # noqa: ARG001
+        pass
+
+    expected = {
+        "a": int,
+        "b": str,
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+    assert safe_get_type_hints(func) == get_type_hints(func)
+
+
+def test_safe_get_type_hints_forward_ref():
+    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
+        pass
+
+    expected = {
+        "a": Unresolvable("UndefinedType"),
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_generic_type():
+    def func(
+        a: list[int],  # noqa: ARG001
+        b: str | None,  # noqa: ARG001
+    ) -> None:
+        pass
+
+    expected = {
+        "a": list[int],
+        "b": Optional[str],  # noqa: UP007
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_mixed_resolved_unresolved():
+    def func(
+        a: UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
+        b: int | UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
+    ) -> None:
+        pass
+
+    expected = {
+        "a": Unresolvable("UndefinedType"),
+        "b": Unresolvable("int | UndefinedType"),
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_unresolvable_generic():
+    def func(
+        a: list[UndefinedType],  # type: ignore[name-defined]  # noqa: ARG001, F821
+    ) -> None:
+        pass
+
+    expected = {
+        "a": Unresolvable("list[UndefinedType]"),
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_exception_handling():
+    def func(
+        a: undefined.variable,  # type: ignore[name-defined]  # noqa: ARG001, F821
+    ) -> None:
+        pass
+
+    expected = {
+        "a": Unresolvable("undefined.variable"),
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_eval_fallback():
+    global SomeType
+    SomeType = int
+
+    def func(a: SomeType) -> None:  # type: ignore[name-defined] # noqa: ARG001
+        pass
+
+    expected = {
+        "a": SomeType,
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+
+
+def test_safe_get_type_hints_complex_generic():
+    def func(
+        a: list[int] | UndefinedType,  # type: ignore[name-defined] # noqa: ARG001, F821
+        b: list[int | str],  # noqa: ARG001
+    ) -> None:
+        pass
+
+    expected = {
+        "a": Unresolvable("list[int] | UndefinedType"),
+        "b": list[int | str],
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected
+    assert str(expected["a"]) == "Unresolvable[list[int] | UndefinedType]"
+
+
+def test_safe_get_type_hints_no_annotations():
+    def func(a, b):  # noqa: ARG001
+        pass
+
+    expected = {}
+    assert safe_get_type_hints(func) == expected
+
+
+def test_unresolvable_equality():
+    a = Unresolvable("A")
+    a2 = Unresolvable("A")
+    b = Unresolvable("B")
+    assert a == a2
+    assert a != b
+    assert a != 1
+
+
+def test_safe_get_type_hints_with_annotated():
+    def func(a: Annotated[int, str]) -> None:  # noqa: ARG001
+        pass
+
+    expected1 = {
+        "a": int,
+        "return": NoneType,
+    }
+    expected2 = {
+        "a": Annotated[int, str],
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected1
+    assert safe_get_type_hints(func, include_extras=True) == expected2
+
+
+def test_safe_get_type_hints_with_class():
+    class MyClass:
+        x: int
+
+        def __init__(self, a: int, b: str) -> None:
+            self.a = a
+            self.b = b
+
+    expected = {
+        "a": int,
+        "b": str,
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(MyClass.__init__) == expected
+    assert safe_get_type_hints(MyClass.__init__) == get_type_hints(MyClass.__init__)

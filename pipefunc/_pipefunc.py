@@ -25,7 +25,6 @@ from typing import (
     TypeVar,
     get_args,
     get_origin,
-    get_type_hints,
 )
 
 import cloudpickle
@@ -41,7 +40,7 @@ from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
-from pipefunc.typing import NoAnnotation
+from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -660,7 +659,9 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        type_hints = get_type_hints(func, include_extras=True)
+        if inspect.isclass(func):
+            func = func.__init__
+        type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
     @functools.cached_property
@@ -669,8 +670,10 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
+        if inspect.isclass(func) and isinstance(self.output_name, str):
+            return {self.output_name: func}
         if self._output_picker is None:
-            hint = get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+            hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         else:
             # We cannot determine the output type if a custom output picker
             # is used, however, if the output is a tuple and the _default_output_picker

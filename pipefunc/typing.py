@@ -1,6 +1,7 @@
 """Custom type hinting utilities for pipefunc."""
 
 import sys
+from collections.abc import Callable
 from types import UnionType
 from typing import (
     Annotated,
@@ -12,6 +13,7 @@ from typing import (
     Union,
     get_args,
     get_origin,
+    get_type_hints,
 )
 
 import numpy as np
@@ -46,8 +48,8 @@ class Array(Generic[T], np.ndarray[Any, np.dtype[np.object_]]):
 class TypeCheckMemo(NamedTuple):
     """Named tuple to store memoization data for type checking."""
 
-    globals: dict[str, Any]
-    locals: dict[str, Any]
+    globals: dict[str, Any] | None
+    locals: dict[str, Any] | None
     self_type: type | None = None
 
 
@@ -64,13 +66,11 @@ def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
     if isinstance(type_, ForwardRef):
         return _evaluate_forwardref(type_, memo)
     origin = get_origin(type_)
-    if origin in {Union, UnionType}:  # Handle both Union and new | syntax
-        args = get_args(type_)
-        resolved_args = tuple(_resolve_type(arg, memo) for arg in args)
-        return Union[resolved_args]  # noqa: UP007
     if origin:
         args = get_args(type_)
         resolved_args = tuple(_resolve_type(arg, memo) for arg in args)
+        if origin in {Union, UnionType}:  # Handle both Union and new | syntax
+            return Union[resolved_args]  # noqa: UP007
         return origin[resolved_args]  # Ensure correct subscripting for generic types
     return type_
 
@@ -237,3 +237,42 @@ def is_object_array_type(tp: Any) -> bool:
         return is_object_array_type(array_type)
 
     return False
+
+
+class Unresolvable:
+    """Class to represent an unresolvable type hint."""
+
+    def __init__(self, type_str: str) -> None:
+        """Initialize the Unresolvable instance."""
+        self.type_str = type_str
+
+    def __repr__(self) -> str:
+        """Return a string representation of the Unresolvable instance."""
+        return f"Unresolvable[{self.type_str}]"
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality between two Unresolvable instances."""
+        if isinstance(other, Unresolvable):
+            return self.type_str == other.type_str
+        return False
+
+
+def safe_get_type_hints(
+    func: Callable[..., Any],
+    include_extras: bool = False,  # noqa: FBT001, FBT002
+) -> dict[str, Any]:
+    """Safely get type hints for a function, resolving forward references."""
+    try:
+        hints = get_type_hints(func, include_extras=include_extras)
+    except Exception:  # noqa: BLE001
+        hints = func.__annotations__
+
+    memo = TypeCheckMemo(globals=func.__globals__, locals=None)
+    resolved_hints = {}
+    for arg, hint in hints.items():
+        try:
+            resolved_hints[arg] = _resolve_type(hint, memo)
+        except (NameError, Exception):  # noqa: PERF203
+            resolved_hints[arg] = Unresolvable(str(hint))
+
+    return resolved_hints
