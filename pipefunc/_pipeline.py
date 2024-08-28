@@ -81,8 +81,10 @@ class Pipeline:
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
-    check_type_annotations
-        Flag indicating whether type validation should be performed.
+    validate_type_annotations
+        Flag indicating whether type validation should be performed. If ``True``,
+        the type annotations of the functions are validated during the pipeline
+        initialization. If ``False``, the type annotations are not validated.
     scope
         If provided, *all* parameter names and output names of the pipeline functions will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -115,7 +117,7 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
-        check_type_annotations: bool = True,
+        validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | Resources | None = None,
     ) -> None:
@@ -125,7 +127,7 @@ class Pipeline:
         self._debug = debug
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
-        self.check_type_annotations = check_type_annotations
+        self.validate_type_annotations = validate_type_annotations
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -945,7 +947,7 @@ class Pipeline:
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
-        if self.check_type_annotations:
+        if self.validate_type_annotations:
             _check_consistent_type_annotations(self.graph)
 
     def _validate_mapspec(self) -> None:
@@ -2024,7 +2026,7 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                         "\nPlease make sure the shared input arguments have the same type."
                         "\nNote that the output type displayed above might be wrapped in"
                         " `pipefunc.typing.Array` if using `MapSpec`s."
-                        " Disable this check by setting `check_type_annotations=False`."
+                        " Disable this check by setting `validate_type_annotations=False`."
                     )
                     raise TypeError(msg)
 
