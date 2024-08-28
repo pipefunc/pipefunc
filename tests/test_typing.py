@@ -402,3 +402,18 @@ def test_safe_get_type_hints_with_annotated():
     }
     assert safe_get_type_hints(func) == expected1
     assert safe_get_type_hints(func, include_extras=True) == expected2
+
+
+def test_safe_get_type_hints_with_class():
+    class MyClass:
+        def __init__(self, a: int, b: str) -> None:
+            self.a = a
+            self.b = b
+
+    expected = {
+        "a": int,
+        "b": str,
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(MyClass.__init__) == expected
+    assert safe_get_type_hints(MyClass.__init__) == get_type_hints(MyClass.__init__)
