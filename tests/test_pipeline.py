@@ -236,11 +236,11 @@ def test_tuple_outputs() -> None:
         return {"c": a + b, "_throw": 1}
 
     @pipefunc(output_name=("d", "e"))
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c, x=1):
         return b * c, 1
 
     @pipefunc(output_name=("g", "h"), output_picker=getattr)
-    def f_g(c, e, x=1):  # noqa: ARG001
+    def f_g(c, e, x=1):
         from types import SimpleNamespace
 
         print(f"Called f_g with c={c} and e={e}")
@@ -418,7 +418,7 @@ def test_used_variable() -> None:
 
 def test_handle_error() -> None:
     @pipefunc(output_name="c")
-    def f1(a, b):  # noqa: ARG001
+    def f1(a, b):
         msg = "Test error"
         raise ValueError(msg)
 

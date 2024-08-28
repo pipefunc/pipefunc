@@ -8,7 +8,7 @@ NoneType = type(None)
 
 
 def test_safe_get_type_hints_with_string_annotations():
-    def func(a: int, b: str) -> None:  # noqa: ARG001
+    def func(a: int, b: str) -> None:
         pass
 
     expected = {

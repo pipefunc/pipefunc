@@ -446,7 +446,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         def make_mesh(
             geo: Geometry,
             mesh_size: float,
-            coarse_mesh_size: float,  # noqa: ARG001
+            coarse_mesh_size: float,
         ) -> Mesh:
             return Mesh(geo, mesh_size)
 
@@ -1227,7 +1227,7 @@ def test_bound():
         return a + b
 
     @pipefunc(output_name="d")
-    def f_d(b, c=5, x=1):  # noqa: ARG001
+    def f_d(b, c=5, x=1):
         return b * c
 
     @pipefunc(output_name="e", bound={"x": 2})
@@ -1243,7 +1243,7 @@ def test_bound():
 
 def test_bound_2():
     @pipefunc(output_name="d", bound={"x": 3})
-    def f(b, c, x=1):  # noqa: ARG001
+    def f(b, c, x=1):
         return b * c
 
     @pipefunc(output_name="e", bound={"x": 2})
@@ -1372,7 +1372,7 @@ def test_bound_with_mapspec() -> None:
 
 def test_map_func_exception():
     @pipefunc(output_name="y")
-    def f(x):  # noqa: ARG001
+    def f(x):
         msg = "Error"
         raise ValueError(msg)
 
