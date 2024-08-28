@@ -750,3 +750,13 @@ def test_invalid_type_hints():
         match="Inconsistent type annotations for",
     ):
         Pipeline([f, g])
+
+
+def test_func_with_duplicate_renamed_args():
+    @pipefunc(output_name="a")
+    def a(): ...
+
+    @pipefunc(output_name="z", renames={"x": "a", "y": "a"})
+    def f(x, y): ...
+
+    Pipeline([a, f])
