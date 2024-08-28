@@ -73,3 +73,14 @@ def test_multi_output():
 
     assert _mapspec_with_internal_shape(generate_ints, double_it, "x")
     assert _mapspec_with_internal_shape(generate_ints, double_it, "y")
+
+
+def test_pipefunc_from_class():
+    class Adder:
+        def __init__(self, a: int) -> None:
+            self.a = a
+
+    adder_func = PipeFunc(Adder, output_name="sum")
+    assert isinstance(adder_func(a=1), Adder)
+    assert adder_func.parameter_annotations == {"a": int}
+    assert adder_func.output_annotation == {"sum": Adder}

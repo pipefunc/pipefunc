@@ -406,6 +406,8 @@ def test_safe_get_type_hints_with_annotated():
 
 def test_safe_get_type_hints_with_class():
     class MyClass:
+        x: int
+
         def __init__(self, a: int, b: str) -> None:
             self.a = a
             self.b = b
