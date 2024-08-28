@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, ForwardRef, Optional, TypeAlias, Union, get_type_hints
+from typing import Annotated, Any, ForwardRef, Optional, TypeAlias, TypeVar, Union, get_type_hints
 
 import numpy as np
 import numpy.typing as npt
@@ -259,6 +259,16 @@ def test_compatible_types_with_multiple_annotated_fields():
     AnnotatedType1 = Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int], float]  # noqa: N806
     AnnotatedType2 = Annotated[np.ndarray[Any, np.dtype[np.object_]], int, ArrayElementType[int]]  # noqa: N806
     assert is_type_compatible(AnnotatedType1, AnnotatedType2)
+
+
+def test_is_type_compatible_with_generics():
+    T = TypeVar("T")
+    assert is_type_compatible(list[str], T)
+    assert is_type_compatible(list[str], list[T])
+    assert is_type_compatible(list[T], list[T])
+    assert is_type_compatible(list[list[str]], list[list[T]])
+    assert not is_type_compatible(list[list[str]], list[tuple[T]])
+    assert not is_type_compatible(list[str], tuple[T])
 
 
 def test_safe_get_type_hints_basic_types():

@@ -82,6 +82,8 @@ def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) 
         or required_type is Any
         or incoming_type is NoAnnotation
         or required_type is NoAnnotation
+        or isinstance(incoming_type, Unresolvable)
+        or isinstance(required_type, Unresolvable)
     )
 
 
@@ -213,12 +215,20 @@ def is_type_compatible(
     incoming_type = _resolve_type(incoming_type, memo)
     required_type = _resolve_type(required_type, memo)
 
+    if isinstance(incoming_type, TypeVar):
+        # TODO: the incoming type needs to be resolved to a concrete type
+        # using the types of the arguments passed to the function. This might
+        # require a more complex implementation. For now, we just return True.
+        return True
+    if isinstance(required_type, TypeVar):
+        return True  # A TypeVar is compatible with any type
     if _check_identical_or_any(incoming_type, required_type):
         return True
     if (result := _handle_union_types(incoming_type, required_type, memo)) is not None:
         return result
     if (result := _handle_generic_types(incoming_type, required_type, memo)) is not None:
         return result
+
     return False
 
 
