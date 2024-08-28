@@ -385,3 +385,19 @@ def test_unresolvable_equality():
     b = Unresolvable("B")
     assert a == a2
     assert a != b
+
+
+def test_safe_get_type_hints_with_annotated():
+    def func(a: Annotated[int, str]) -> None:  # noqa: ARG001
+        pass
+
+    expected1 = {
+        "a": int,
+        "return": NoneType,
+    }
+    expected2 = {
+        "a": Annotated[int, str],
+        "return": NoneType,
+    }
+    assert safe_get_type_hints(func) == expected1
+    assert safe_get_type_hints(func, include_extras=True) == expected2

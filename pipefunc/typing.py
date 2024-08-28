@@ -257,10 +257,13 @@ class Unresolvable:
         return False
 
 
-def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+def safe_get_type_hints(
+    func: Callable[..., Any],
+    include_extras: bool = False,  # noqa: FBT001, FBT002
+) -> dict[str, Any]:
     """Safely get type hints for a function, resolving forward references."""
     try:
-        hints = get_type_hints(func)
+        hints = get_type_hints(func, include_extras=include_extras)
     except Exception:  # noqa: BLE001
         hints = func.__annotations__
 
@@ -269,9 +272,7 @@ def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
     for arg, hint in hints.items():
         try:
             resolved_hints[arg] = _resolve_type(hint, memo)
-        except NameError:  # noqa: PERF203
+        except (NameError, Exception):  # noqa: PERF203
             resolved_hints[arg] = Unresolvable(str(hint))
-        except Exception:  # noqa: BLE001
-            resolved_hints[arg] = hint
 
     return resolved_hints
