@@ -332,6 +332,12 @@ def test_is_type_compatible_with_generics():
     assert not is_type_compatible(dict[int, tuple[str, int]], dict[M, list[K]])
 
 
+def test_is_type_compatible_with_unresolvable():
+    with pytest.warns(UserWarning, match="Unresolvable type"):
+        assert is_type_compatible(Unresolvable("UndefinedType"), int)
+        assert is_type_compatible(int, Unresolvable("UndefinedType"))
+
+
 def test_safe_get_type_hints_basic_types():
     def func(a: int, b: str) -> None:
         pass
