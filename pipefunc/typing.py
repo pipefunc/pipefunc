@@ -2,7 +2,7 @@
 
 import sys
 from collections.abc import Callable
-from types import GenericAlias, UnionType
+from types import UnionType
 from typing import (
     Annotated,
     Any,
@@ -48,8 +48,8 @@ class Array(Generic[T], np.ndarray[Any, np.dtype[np.object_]]):
 class TypeCheckMemo(NamedTuple):
     """Named tuple to store memoization data for type checking."""
 
-    globals: dict[str, Any]
-    locals: dict[str, Any]
+    globals: dict[str, Any] | None
+    locals: dict[str, Any] | None
     self_type: type | None = None
 
 
@@ -258,61 +258,22 @@ class Unresolvable:
             return self.type_str == other.type_str
         return False
 
-    def __hash__(self) -> int:
-        """Return a hash of the Unresolvable instance."""
-        return hash(self.type_str)
 
-
-def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:  # noqa: PLR0912
+def safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
     """Safely get type hints for a function, resolving forward references."""
     try:
         hints = get_type_hints(func)
     except Exception:  # noqa: BLE001
         hints = func.__annotations__
 
+    memo = TypeCheckMemo(globals=func.__globals__, locals=None)
     resolved_hints = {}
     for arg, hint in hints.items():
-        if isinstance(hint, str):
-            # String annotations (from __future__ import annotations)
-            try:
-                resolved_hints[arg] = eval(hint, func.__globals__)  # noqa: S307
-            except NameError:
-                resolved_hints[arg] = Unresolvable(hint)
-        elif isinstance(hint, ForwardRef):
-            # Forward references
-            try:
-                resolved_hints[arg] = hint._evaluate(func.__globals__, None)
-            except NameError:
-                resolved_hints[arg] = Unresolvable(hint.__forward_arg__)
-        elif isinstance(hint, GenericAlias):
-            # Handle generics, recursively resolve arguments
-            origin = hint.__origin__
-            args = hint.__args__
-            resolved_args = []
-            for arg_type in args:
-                try:
-                    if isinstance(arg_type, ForwardRef):
-                        resolved_args.append(arg_type._evaluate(func.__globals__, None))
-                    else:
-                        resolved_args.append(arg_type)
-                except NameError:  # noqa: PERF203
-                    resolved_args.append(Unresolvable(str(arg_type)))
-            resolved_hints[arg] = origin[tuple(resolved_args)]
-        elif hint is type(None):
-            resolved_hints[arg] = None
-        elif isinstance(hint, GenericAlias) and origin is Union:
-            # Handle Union types
-            resolved_args = []
-            for arg_type in hint.__args__:
-                if isinstance(arg_type, ForwardRef):
-                    try:
-                        resolved_args.append(arg_type._evaluate(func.__globals__, None))
-                    except NameError:
-                        resolved_args.append(Unresolvable(arg_type.__forward_arg__))
-                else:
-                    resolved_args.append(arg_type)
-            resolved_hints[arg] = Union[tuple(resolved_args)]  # noqa: UP007
-        else:
+        try:
+            resolved_hints[arg] = _resolve_type(hint, memo)
+        except NameError:  # noqa: PERF203
+            resolved_hints[arg] = Unresolvable(str(hint))
+        except Exception:  # noqa: BLE001
             resolved_hints[arg] = hint
 
     return resolved_hints
