@@ -1,6 +1,7 @@
 """Custom type hinting utilities for pipefunc."""
 
 import sys
+import warnings
 from collections.abc import Callable
 from types import UnionType
 from typing import (
@@ -77,13 +78,18 @@ def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
 
 def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) -> bool:
     """Check if types are identical or if required_type is Any."""
+    for t in (incoming_type, required_type):
+        if isinstance(t, Unresolvable):
+            warnings.warn(
+                f"⚠️ Unresolvable type hint: `{t}`. Skipping type comparison.",
+                stacklevel=2,
+            )
+            return True
     return (
         incoming_type == required_type
         or required_type is Any
         or incoming_type is NoAnnotation
         or required_type is NoAnnotation
-        or isinstance(incoming_type, Unresolvable)
-        or isinstance(required_type, Unresolvable)
     )
 
 
