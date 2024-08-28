@@ -352,14 +352,13 @@ class Pipeline:
                         g.add_edge(bound, f, arg={arg})
                     else:
                         edge = (self.output_to_func[arg], f)
-                        if edge in g.edges:
-                            # Edge already exists, add the new argument to the existing set of arguments
+                        if edge not in g.edges:
+                            g.add_edge(*edge, arg={arg})
+                        else:
+                            # edge already exists because of multiple outputs
                             current_args = g.edges[edge].get("arg", set())
                             current_args.add(arg)
                             g.edges[edge]["arg"] = current_args
-                        else:
-                            # Add a new edge with the argument in a set
-                            g.add_edge(*edge, arg={arg})
                 else:  # noqa: PLR5501
                     if arg in f._bound:
                         bound = _Bound(arg, f.output_name)
