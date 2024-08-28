@@ -351,8 +351,7 @@ class Pipeline:
                         bound = _Bound(arg, f.output_name)
                         g.add_edge(bound, f, arg={arg})
                     else:
-                        source_func = self.output_to_func[arg]
-                        edge = (source_func, f)
+                        edge = (self.output_to_func[arg], f)
                         if edge in g.edges:
                             # Edge already exists, add the new argument to the existing set of arguments
                             current_args = g.edges[edge].get("arg", set())
@@ -360,7 +359,7 @@ class Pipeline:
                             g.edges[edge]["arg"] = current_args
                         else:
                             # Add a new edge with the argument in a set
-                            g.add_edge(source_func, f, arg={arg})
+                            g.add_edge(*edge, arg={arg})
                 elif arg in f._bound:
                     bound = _Bound(arg, f.output_name)
                     g.add_edge(bound, f, arg={arg})
