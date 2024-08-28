@@ -355,9 +355,8 @@ class Pipeline:
                         if edge not in g.edges:
                             g.add_edge(*edge, arg={arg})
                         else:
-                            current_args = g.edges[edge].get("arg", set())
+                            current_args = g.edges[edge].setdefault("arg", set())
                             current_args.add(arg)
-                            g.edges[edge]["arg"] = current_args
                 else:  # noqa: PLR5501
                     if arg in f._bound:
                         bound = _Bound(arg, f.output_name)
