@@ -223,7 +223,6 @@ def is_type_compatible(
         return result
     if (result := _handle_generic_types(incoming_type, required_type, memo)) is not None:
         return result
-
     return False
 
 
