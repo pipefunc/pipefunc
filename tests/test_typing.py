@@ -313,7 +313,9 @@ def test_is_type_compatible_with_generics():
     R = TypeVar("R", bound=Sequence[T])
     assert is_type_compatible(list[list[int]], R)
     assert is_type_compatible(tuple[list[str], list[int]], tuple[R, R])
-    assert not is_type_compatible(list[dict[str, int]], R)
+    assert is_type_compatible(list[dict[str, int]], R)
+    Q = TypeVar("Q", bound=Sequence[S])
+    assert not is_type_compatible(list[dict[str, int]], Q)
 
     # TypeVar with Any
     A = TypeVar("A", bound=Any)
