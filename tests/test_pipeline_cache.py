@@ -25,11 +25,11 @@ def test_tuple_outputs_with_cache() -> None:
         return {"c": a + b, "_throw": 1}
 
     @pipefunc(output_name=("d", "e"), cache=True)
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c, x=1):
         return b * c, 1
 
     @pipefunc(output_name=("g", "h"), output_picker=getattr, cache=True)
-    def f_g(c, e, x=1):  # noqa: ARG001
+    def f_g(c, e, x=1):
         from types import SimpleNamespace
 
         print(f"Called f_g with c={c} and e={e}")

@@ -51,7 +51,7 @@ def test_default_resources_from_pipeline() -> None:
 
 def test_resources_variable():
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
-    def f_c(a, b, resources):  # noqa: ARG001
+    def f_c(a, b, resources):
         return resources.gpus
 
     assert f_c(a=1, b=2) == 8
@@ -68,7 +68,7 @@ def test_resources_variable():
 
 def test_resources_variable_nested_func():
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
-    def f_c(a, b, resources):  # noqa: ARG001
+    def f_c(a, b, resources):
         return resources.gpus
 
     @pipefunc(output_name="d")
@@ -89,7 +89,7 @@ def test_resources_variable_with_callable_resources() -> None:
         resources=lambda kwargs: Resources(gpus=kwargs["a"] + kwargs["b"]),
         resources_variable="resources",
     )
-    def f_c(a, b, resources):  # noqa: ARG001
+    def f_c(a, b, resources):
         return resources
 
     @pipefunc(output_name="d", resources=lambda kwargs: kwargs["c"])  # 'c' is the resources of f_c
@@ -121,7 +121,7 @@ def test_resources_variable_with_callable_resources() -> None:
 
 
 def test_resources_variable_in_nested_func_with_defaults() -> None:
-    def resources_func(kwargs) -> Resources:  # noqa: ARG001
+    def resources_func(kwargs) -> Resources:
         msg = "Should not be called"
         raise ValueError(msg)
 
@@ -130,7 +130,7 @@ def test_resources_variable_in_nested_func_with_defaults() -> None:
         return a + b
 
     @pipefunc("d", resources_variable="resources", resources=resources_func)
-    def g(c, resources):  # noqa: ARG001
+    def g(c, resources):
         assert isinstance(resources, Resources)
         return resources
 

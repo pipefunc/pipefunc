@@ -12,7 +12,7 @@ def test_adaptive_run(full_output: bool):  # noqa: FBT001
         return a + b
 
     @pipefunc(output_name="d", cache=True)
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c, x=1):
         return b * c
 
     @pipefunc(output_name="e", cache=True)

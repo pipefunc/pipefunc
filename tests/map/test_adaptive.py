@@ -331,7 +331,7 @@ def test_internal_shapes(tmp_path: Path) -> None:
         return x
 
     @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
-    def g(y, z) -> int:  # noqa: ARG001
+    def g(y, z) -> int:
         return z
 
     pipeline = Pipeline([f, g])
