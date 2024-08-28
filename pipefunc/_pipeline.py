@@ -360,14 +360,15 @@ class Pipeline:
                         else:
                             # Add a new edge with the argument in a set
                             g.add_edge(*edge, arg={arg})
-                elif arg in f._bound:
-                    bound = _Bound(arg, f.output_name)
-                    g.add_edge(bound, f, arg={arg})
-                else:
-                    if arg not in g:
-                        # Add the node only if it doesn't exist
-                        g.add_node(arg)
-                    g.add_edge(arg, f, arg={arg})
+                else:  # noqa: PLR5501
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name)
+                        g.add_edge(bound, f, arg={arg})
+                    else:
+                        if arg not in g:
+                            # Add the node only if it doesn't exist
+                            g.add_node(arg)
+                        g.add_edge(arg, f, arg={arg})
             if f.resources_variable is not None:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
