@@ -81,8 +81,8 @@ def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) 
     for t in (incoming_type, required_type):
         if isinstance(t, Unresolvable):
             warnings.warn(
-                f"⚠️ Unresolvable type hint: `{t}`. Skipping type comparison.",
-                stacklevel=2,
+                f"⚠️ Unresolvable type hint: `{t.type_str}`. Skipping type comparison.",
+                stacklevel=3,
             )
             return True
     return (
