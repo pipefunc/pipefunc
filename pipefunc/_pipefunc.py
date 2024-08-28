@@ -15,6 +15,7 @@ import inspect
 import os
 import warnings
 import weakref
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from typing import (
     TYPE_CHECKING,
@@ -520,6 +521,17 @@ class PipeFunc(Generic[T]):
             msg = (
                 "The `output_name` cannot be the same as any of the input"
                 f" parameter names. The overlap is: {overlap}"
+            )
+            raise ValueError(msg)
+        if len(self._renames) != len(self._inverse_renames):
+            inverse_renames = defaultdict(list)
+            for k, v in self._renames.items():
+                inverse_renames[v].append(k)
+            violations = {k: v for k, v in inverse_renames.items() if len(v) > 1}
+            violation_details = "; ".join(f"`{k}: {v}`" for k, v in violations.items())
+            msg = (
+                f"The `renames` should be a one-to-one mapping. Found violations where "
+                f"multiple keys map to the same value: {violation_details}."
             )
             raise ValueError(msg)
         self._validate_update(
