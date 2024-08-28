@@ -355,7 +355,6 @@ class Pipeline:
                         if edge not in g.edges:
                             g.add_edge(*edge, arg={arg})
                         else:
-                            # edge already exists because of multiple outputs
                             current_args = g.edges[edge].get("arg", set())
                             current_args.add(arg)
                             g.edges[edge]["arg"] = current_args
