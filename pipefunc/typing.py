@@ -66,13 +66,11 @@ def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
     if isinstance(type_, ForwardRef):
         return _evaluate_forwardref(type_, memo)
     origin = get_origin(type_)
-    if origin in {Union, UnionType}:  # Handle both Union and new | syntax
-        args = get_args(type_)
-        resolved_args = tuple(_resolve_type(arg, memo) for arg in args)
-        return Union[resolved_args]  # noqa: UP007
     if origin:
         args = get_args(type_)
         resolved_args = tuple(_resolve_type(arg, memo) for arg in args)
+        if origin in {Union, UnionType}:  # Handle both Union and new | syntax
+            return Union[resolved_args]  # noqa: UP007
         return origin[resolved_args]  # Ensure correct subscripting for generic types
     return type_
 
