@@ -385,6 +385,7 @@ def test_unresolvable_equality():
     b = Unresolvable("B")
     assert a == a2
     assert a != b
+    assert a != 1
 
 
 def test_safe_get_type_hints_with_annotated():
