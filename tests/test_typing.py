@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, ForwardRef, Optional, TypeAlias, TypeVar, Union, get_type_hints
+from numbers import Number
+from typing import (
+    Annotated,
+    Any,
+    ForwardRef,
+    Optional,
+    TypeAlias,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
 import numpy as np
 import numpy.typing as npt
@@ -263,6 +273,10 @@ def test_compatible_types_with_multiple_annotated_fields():
 
 def test_is_type_compatible_with_generics():
     T = TypeVar("T")
+    S = TypeVar("S", str, int)  # Constrained TypeVar
+    N = TypeVar("N", bound=Number)  # Bounded TypeVar
+
+    # Original tests
     assert is_type_compatible(list[str], T)
     assert is_type_compatible(list[str], list[T])
     assert is_type_compatible(list[T], list[T])
@@ -270,9 +284,54 @@ def test_is_type_compatible_with_generics():
     assert not is_type_compatible(list[list[str]], list[tuple[T]])
     assert not is_type_compatible(list[str], tuple[T])
 
+    # Tests with constrained TypeVar
+    assert is_type_compatible(str, S)
+    assert is_type_compatible(int, S)
+    assert not is_type_compatible(float, S)
+    assert is_type_compatible(list[str], list[S])
+    assert not is_type_compatible(list[float], list[S])
+
+    # Tests with bounded TypeVar
+    assert is_type_compatible(int, N)
+    assert is_type_compatible(float, N)
+    assert not is_type_compatible(str, N)
+    assert is_type_compatible(list[int], list[N])
+    assert not is_type_compatible(list[str], list[N])
+
+    # More complex nested structures
+    assert is_type_compatible(dict[str, list[int]], dict[T, list[N]])
+    assert not is_type_compatible(dict[str, list[str]], dict[T, list[N]])
+    assert is_type_compatible(tuple[list[int], dict[str, float]], tuple[list[N], dict[S, N]])
+    assert not is_type_compatible(tuple[list[int], dict[str, str]], tuple[list[N], dict[S, N]])
+
+    # Union types with TypeVars
+    assert is_type_compatible(Union[int, str], Union[T, S])  # noqa: UP007
+    assert is_type_compatible(Union[int, float], Union[N, T])  # noqa: UP007
+    assert is_type_compatible(Union[int, str], Union[N, T])  # noqa: UP007
+
+    # Nested TypeVars
+    R = TypeVar("R", bound=Sequence[T])
+    assert is_type_compatible(list[list[int]], R)
+    assert is_type_compatible(tuple[list[str], list[int]], tuple[R, R])
+    assert not is_type_compatible(list[dict[str, int]], R)
+
+    # TypeVar with Any
+    A = TypeVar("A", bound=Any)
+    assert is_type_compatible(int, A)
+    assert is_type_compatible(str, A)
+    assert is_type_compatible(list[int], A)
+    assert is_type_compatible(dict[str, float], A)
+
+    # Multiple TypeVars
+    M = TypeVar("M")
+    K = TypeVar("K")
+    assert is_type_compatible(dict[str, int], dict[M, K])
+    assert is_type_compatible(dict[int, list[str]], dict[M, list[K]])
+    assert not is_type_compatible(dict[int, tuple[str, int]], dict[M, list[K]])
+
 
 def test_safe_get_type_hints_basic_types():
-    def func(a: int, b: str) -> None:  # noqa: ARG001
+    def func(a: int, b: str) -> None:
         pass
 
     expected = {
@@ -285,7 +344,7 @@ def test_safe_get_type_hints_basic_types():
 
 
 def test_safe_get_type_hints_forward_ref():
-    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: ARG001, F821
+    def func(a: UndefinedType) -> None:  # type: ignore[name-defined]  # noqa: F821
         pass
 
     expected = {
@@ -297,8 +356,8 @@ def test_safe_get_type_hints_forward_ref():
 
 def test_safe_get_type_hints_generic_type():
     def func(
-        a: list[int],  # noqa: ARG001
-        b: str | None,  # noqa: ARG001
+        a: list[int],
+        b: str | None,
     ) -> None:
         pass
 
@@ -312,8 +371,8 @@ def test_safe_get_type_hints_generic_type():
 
 def test_safe_get_type_hints_mixed_resolved_unresolved():
     def func(
-        a: UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
-        b: int | UndefinedType,  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: UndefinedType,  # type: ignore[name-defined]  # noqa: F821
+        b: int | UndefinedType,  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -327,7 +386,7 @@ def test_safe_get_type_hints_mixed_resolved_unresolved():
 
 def test_safe_get_type_hints_unresolvable_generic():
     def func(
-        a: list[UndefinedType],  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: list[UndefinedType],  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -340,7 +399,7 @@ def test_safe_get_type_hints_unresolvable_generic():
 
 def test_safe_get_type_hints_exception_handling():
     def func(
-        a: undefined.variable,  # type: ignore[name-defined]  # noqa: ARG001, F821
+        a: undefined.variable,  # type: ignore[name-defined]  # noqa: F821
     ) -> None:
         pass
 
@@ -355,7 +414,7 @@ def test_safe_get_type_hints_eval_fallback():
     global SomeType
     SomeType = int
 
-    def func(a: SomeType) -> None:  # type: ignore[name-defined] # noqa: ARG001
+    def func(a: SomeType) -> None:  # type: ignore[name-defined]
         pass
 
     expected = {
@@ -367,8 +426,8 @@ def test_safe_get_type_hints_eval_fallback():
 
 def test_safe_get_type_hints_complex_generic():
     def func(
-        a: list[int] | UndefinedType,  # type: ignore[name-defined] # noqa: ARG001, F821
-        b: list[int | str],  # noqa: ARG001
+        a: list[int] | UndefinedType,  # type: ignore[name-defined] # noqa: F821
+        b: list[int | str],
     ) -> None:
         pass
 
@@ -382,7 +441,7 @@ def test_safe_get_type_hints_complex_generic():
 
 
 def test_safe_get_type_hints_no_annotations():
-    def func(a, b):  # noqa: ARG001
+    def func(a, b):
         pass
 
     expected = {}
@@ -399,7 +458,7 @@ def test_unresolvable_equality():
 
 
 def test_safe_get_type_hints_with_annotated():
-    def func(a: Annotated[int, str]) -> None:  # noqa: ARG001
+    def func(a: Annotated[int, str]) -> None:
         pass
 
     expected1 = {
