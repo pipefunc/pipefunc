@@ -2008,7 +2008,7 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                 if _mapspec_is_generated(node, dep):
                     # NOTE: We cannot check the type-hints for auto-generated MapSpecs
                     continue
-                if _mapspec_with_internal_shape(node, dep, parameter_name):
+                if _mapspec_with_internal_shape(node, parameter_name):
                     # NOTE: We cannot verify the type hints because the output
                     # might be any iterable instead of an Array as returned by
                     # a map operation.
@@ -2057,17 +2057,9 @@ def _mapspec_is_generated(f_out: PipeFunc, f_in: PipeFunc) -> bool:
     return f_out.mapspec._is_generated or f_in.mapspec._is_generated
 
 
-def _mapspec_with_internal_shape(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
+def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
     """Whether the output was not from a map operation but returned an array with internal shape."""
-    # NOTE: The only relevant case is where f_in uses elements of f_out as input
-    # whereas, if f_in requires the entire output of f_out, it is not relevant.
-    # This is all in the context of type annotations.
-    if (
-        f_out.mapspec is None
-        or f_in.mapspec is None
-        or parameter_name not in f_out.mapspec.output_names
-        or parameter_name not in f_in.mapspec.input_names
-    ):
+    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
         return False
     output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
     all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
