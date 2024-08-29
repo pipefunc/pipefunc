@@ -360,11 +360,12 @@ def take_sum(y: Array[int]) -> int:
     # y is a numpy object array of integers
     # the original types are always preserved!
     assert isinstance(y, np.ndarray)
-    assert isinstance(y.dtype, np.dtype(object))
+    assert isinstance(y.dtype, object)
     assert isinstance(y[0], int)
     return sum(y)
 
 pipeline_map = Pipeline([double_it, take_sum])
+pipeline_map.map({"x": [1, 2, 3]})
 ```
 
 For completeness, this is the type hint for `Array[int]`:
