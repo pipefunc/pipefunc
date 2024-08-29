@@ -82,7 +82,7 @@ match = ["v*"]
 default-tag = "0.0.0"
 
 [tool.setuptools.package-data]
-"pkgname" = ["py.typed"]
+"pipefunc" = ["py.typed"]
 
 [tool.setuptools.packages.find]
 include = ["pipefunc.*", "pipefunc"]
