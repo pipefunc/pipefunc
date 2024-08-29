@@ -292,6 +292,35 @@ Handling multiple outputs allows for more modular and reusable functions in your
 It's particularly useful when a function computes multiple related values that might be used independently by different downstream functions.
 This way, you can avoid recomputing the same values multiple times and can mix and match the outputs as needed.
 
+## How does type checking work in `pipefunc`?
+
+`pipefunc` supports type checking for function arguments and outputs using Python type hints.
+It ensures that the output of one function matches the expected input types of the next function in the pipeline.
+
+Here's an example of `pipefunc` raising a `TypeError` when the input types don't match:
+
+```{code-cell} ipython3
+:tags: [raises-exception]
+
+# All type hints that are not relevant for this example are omitted!
+
+@pipefunc(output_name="y")
+def f(a) -> int:  # output 'y' is expected to be an `int`
+    return 2 * a
+
+@pipefunc(output_name="z")
+def g(y: str):  # here 'y' is expected to be a `str`
+    return b.upper()
+
+pipeline = Pipeline([f, g])
+```
+
+To turn off this type checking, you can set the `validate_type_annotations` argument to `False` in the `Pipeline` constructor:
+
+```{code-cell} ipython3
+pipeline = Pipeline([f, g], validate_type_annotations=False)
+```
+
 (run-vs-map)=
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
@@ -592,7 +621,6 @@ print(f"Result: {result}")
 
 By using a callable for `resources`, you can dynamically determine the resources based on the input arguments.
 Additionally, by using the `resources_variable` argument, you can pass the dynamically created `Resources` instance directly to the function, allowing it to access and utilize the resource information as needed.
-
 
 ## How to use `adaptive` with `pipefunc`?
 
