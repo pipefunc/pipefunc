@@ -296,10 +296,11 @@ This way, you can avoid recomputing the same values multiple times and can mix a
 
 `pipefunc` supports type checking for function arguments and outputs using Python type hints.
 It ensures that the output of one function matches the expected input types of the next function in the pipeline.
+This is crucial for maintaining data integrity and catching errors early in pipeline-based workflows.
 
 ### Basic type checking
 
-Here's an example of `pipefunc` raising a `TypeError` when the input types don't match:
+Here's an example of `pipefunc` raising a `TypeError` when the types don't match:
 
 ```{code-cell} ipython3
 :tags: [raises-exception]
@@ -314,14 +315,20 @@ def f(a) -> int:  # output 'y' is expected to be an `int`
 def g(y: str):  # here 'y' is expected to be a `str`
     return y.upper()
 
-pipeline = Pipeline([f, g])  # This will raise a TypeError
+# Creating the `Pipeline` will raise a `TypeError`
+pipeline = Pipeline([f, g])
 ```
+
+In this example, function `f` outputs an `int`, but function `g` expects a `str` input.
+When we try to create the pipeline, it will raise a `TypeError` due to this type mismatch.
 
 To turn off this type checking, you can set the `validate_type_annotations` argument to `False` in the `Pipeline` constructor:
 
 ```{code-cell} ipython3
 pipeline = Pipeline([f, g], validate_type_annotations=False)
 ```
+
+Note that while disabling type checking allows the pipeline to run, it may lead to runtime errors or unexpected results if the types are not compatible.
 
 ### Type checking for Pipelines with `MapSpec`
 
