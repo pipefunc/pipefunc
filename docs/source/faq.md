@@ -322,6 +322,11 @@ pipeline = Pipeline([f, g])
 In this example, function `f` outputs an `int`, but function `g` expects a `str` input.
 When we try to create the pipeline, it will raise a `TypeError` due to this type mismatch.
 
+```{note}
+`pipefunc` only checks the type hints during pipeline construction, not during function execution.
+However, *soon* we will add runtime type checking as an option.
+```
+
 To turn off this type checking, you can set the `validate_type_annotations` argument to `False` in the `Pipeline` constructor:
 
 ```{code-cell} ipython3
