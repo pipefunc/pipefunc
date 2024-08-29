@@ -81,6 +81,12 @@ method = "git"
 match = ["v*"]
 default-tag = "0.0.0"
 
+[tool.setuptools.package-data]
+"pkgname" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+include = ["pipefunc.*", "pipefunc"]
+
 [tool.setuptools.cmdclass]
 sdist = "versioningit.cmdclass.sdist"
 build_py = "versioningit.cmdclass.build_py"
@@ -93,9 +99,6 @@ distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 [tool.versioningit.onbuild]
 build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
-
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
 
 [tool.pytest.ini_options]
 addopts = """
