@@ -297,6 +297,8 @@ This way, you can avoid recomputing the same values multiple times and can mix a
 `pipefunc` supports type checking for function arguments and outputs using Python type hints.
 It ensures that the output of one function matches the expected input types of the next function in the pipeline.
 
+### Basic type checking
+
 Here's an example of `pipefunc` raising a `TypeError` when the input types don't match:
 
 ```{code-cell} ipython3
@@ -310,15 +312,62 @@ def f(a) -> int:  # output 'y' is expected to be an `int`
 
 @pipefunc(output_name="z")
 def g(y: str):  # here 'y' is expected to be a `str`
-    return b.upper()
+    return y.upper()
 
-pipeline = Pipeline([f, g])
+pipeline = Pipeline([f, g])  # This will raise a TypeError
 ```
 
 To turn off this type checking, you can set the `validate_type_annotations` argument to `False` in the `Pipeline` constructor:
 
 ```{code-cell} ipython3
 pipeline = Pipeline([f, g], validate_type_annotations=False)
+```
+
+### Type checking for Pipelines with `MapSpec`
+
+When using a `MapSpec` in a `pipefunc`, the type checking is more complex.
+
+The results of a `MapSpec` are always stored in a numpy object array, which means that the original types are preserved.
+This means the type hints for the function should be `numpy.ndarray[Any, np.dtype[numpy.object_]]`.
+Unfortunately, it is not possible to statically check the types of the elements in the object array (e.g., with `mypy`).
+We can however, check the types of the elements at runtime.
+To do this, we can use the {class}`~pipefunc.typing.Array` type hint from `pipefunc.typing`.
+This `Array` generic contains the correct `numpy.ndarray` type hint for object arrays, but annotated with the element type using `typing.Annotated`.
+When using e.g., `Array[int]`, the type hint is `numpy.ndarray[Any, np.dtype[numpy.object_]]` with the element type `int`.
+MyPy will ensure the numpy array type, however, `PipeFunc` will ensure the element type.
+Use it like this:
+
+```{code-cell} ipython3
+import numpy as np
+
+from pipefunc import Pipeline, pipefunc
+from pipefunc.typing import Array
+
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def double_it(x: int) -> int:
+    assert isinstance(x, int)
+    return 2 * x
+
+
+@pipefunc(output_name="sum")
+def take_sum(y: Array[int]) -> int:
+    # y is a numpy object array of integers
+    # the original types are always preserved!
+    assert isinstance(y, np.ndarray)
+    assert isinstance(y.dtype, np.dtype(object))
+    assert isinstance(y[0], int)
+    return sum(y)
+
+
+pipeline_map = Pipeline([double_it, take_sum])
+```
+
+For completeness, this is the type hint for `Array[int]`:
+
+```{code-cell} ipython3
+from pipefunc.typing import Array
+Array[int]
 ```
 
 (run-vs-map)=
