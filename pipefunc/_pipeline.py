@@ -42,7 +42,7 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import run
 from pipefunc.resources import Resources
-from pipefunc.typing import Array, is_object_array_type, is_type_compatible
+from pipefunc.typing import Array, NoAnnotation, is_object_array_type, is_type_compatible
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -2014,6 +2014,8 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     # a map operation.
                     continue
                 output_type = output_types[parameter_name]
+                if output_type is NoAnnotation:
+                    continue
                 if _axis_is_reduced(node, dep, parameter_name) and not is_object_array_type(
                     output_type,
                 ):
