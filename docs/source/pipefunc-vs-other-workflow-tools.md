@@ -20,10 +20,11 @@ We'll examine how PipeFunc's approach to pipeline construction, execution, and p
 
 We'll compare PipeFunc with the following libraries:
 
-1. Airflow: A platform for programmatically authoring, scheduling, and monitoring workflows.
-2. Dask: A flexible library for parallel computing in Python.
-3. Kedro: An open-source framework for creating reproducible, maintainable, and modular data science code.
-4. Luigi: A Python package that helps you build complex pipelines of batch jobs.
+1. Pydra: A dataflow engine designed for scientific workflows, with a focus on neuroimaging.
+2. Airflow: A platform for programmatically authoring, scheduling, and monitoring workflows.
+3. Dask: A flexible library for parallel computing in Python.
+4. Kedro: An open-source framework for creating reproducible, maintainable, and modular data science code.
+5. Luigi: A Python package that helps you build complex pipelines of batch jobs.
 
 Each comparison will include a brief overview of the library, an example implementation of a simple pipeline, and a discussion of key differences from PipeFunc.
 This will help illustrate where PipeFunc fits in the ecosystem and what unique advantages it offers for certain types of workflows, particularly in scientific computing and rapid prototyping scenarios.
@@ -35,19 +36,16 @@ from pipefunc import pipefunc, Pipeline
 
 
 @pipefunc(output_name="c")
-def f_c(a, b):
+def f_c(a: int, b: int) -> int:
     return a + b
 
-
 @pipefunc(output_name="d")
-def f_d(b, c, x=1):  # "c" is the output of f_c
+def f_d(b: int, c: int, x: int = 1):  # "c" is the output of f_c
     return b * c
 
-
 @pipefunc(output_name="e")
-def f_e(c, d, x=1):  # "d" is the output ˝of f_d
+def f_e(c: int, d: int, x: int = 1):  # "d" is the output ˝of f_d
     return c * d * x
-
 
 pipeline = Pipeline([f_c, f_d, f_e])
 ```
@@ -98,6 +96,98 @@ ds.e.astype(float).plot(x="i", y="j")
 
 Now, let's see how this same pipeline might be implemented in other libraries and discuss the differences.
 
+## Pydra
+
+Of all the libraries we're comparing, Pydra is the most similar to PipeFunc in terms of its focus on scientific workflows and data processing.
+Pydra is a dataflow engine designed for scientific workflows, with a particular focus on neuroimaging.
+It's part of the Nipype ecosystem and emphasizes flexibility, scalability, and reproducibility in complex scientific computations.
+
+Here's how you might implement our example pipeline using Pydra:
+
+```python
+import nest_asyncio
+
+nest_asyncio.apply()
+
+import pydra
+
+
+@pydra.mark.task
+def f_c(a: int, b: int) -> int:
+    return a + b
+
+@pydra.mark.task
+def f_d(b: int, c: int, x: int = 1) -> int:
+    return b * c
+
+@pydra.mark.task
+def f_e(c: int, d: int, x: int = 1) -> int:
+    return c * d * x
+
+# Create a workflow
+wf = pydra.Workflow(name="example_workflow", input_spec=["a", "b", "x"])
+wf.inputs.a = 1
+wf.inputs.b = 2
+wf.inputs.x = 1
+
+# Add tasks to the workflow
+wf.add(f_c(name="task_c", a=wf.lzin.a, b=wf.lzin.b))
+wf.add(f_d(name="task_d", b=wf.lzin.b, c=wf.task_c.lzout.out, x=wf.lzin.x))
+wf.add(f_e(name="task_e", c=wf.task_c.lzout.out, d=wf.task_d.lzout.out, x=wf.lzin.x))
+
+# Set the workflow output
+wf.set_output([("final_output", wf.task_e.lzout.out)])
+
+# Run the workflow
+with pydra.Submitter(plugin="cf") as sub:
+    sub(wf)
+
+result = wf.result()
+print(f"Result: {result.output.final_output}")
+
+# Parameter sweep
+wf.split(["a", "b"], a=[1, 2, 3], b=[4, 5, 6])
+
+with pydra.Submitter(plugin="cf") as sub:
+    sub(wf)
+
+results = wf.result()
+for res in results:
+    print(f"Result: {res.output.final_output}")
+```
+
+Key differences from PipeFunc:
+
+1. **Task Definition**: Pydra uses the `@mark.task` decorator to define tasks, similar to PipeFunc's `@pipefunc` decorator, but with a focus on type annotations.
+
+2. **Workflow Construction**: Pydra requires explicit workflow construction using the `Workflow` class, whereas PipeFunc infers the workflow structure from function dependencies.
+
+3. **Data Flow**: Pydra uses a system of lazy inputs (`lzin`) and outputs (`lzout`) to define data flow between tasks. PipeFunc's approach is more implicit, based on function arguments and return values.
+
+4. **Type Checking**: Pydra emphasizes type annotations and provides runtime type checking, which can catch errors early but requires more upfront specification compared to PipeFunc.
+
+5. **Parallel Execution**: Pydra's `submitgraph` feature provides a way to run parameter sweeps in parallel, similar to PipeFunc's `map` method, but with a different syntax.
+
+6. **Caching**: Both Pydra and PipeFunc support caching of task results. Pydra's caching is deeply integrated into its workflow system, while PipeFunc offers flexible caching options that can be enabled per function or for the entire pipeline.
+
+7. **Type Annotations**: Both Pydra and PipeFunc support and utilize Python type annotations. Pydra emphasizes these for its internal type checking system, while PipeFunc uses them for documentation and can leverage them for runtime type checking.
+
+8. **Flexibility**: Pydra is designed to work with Python functions, shell commands, and containers, making it highly flexible for various types of tasks. PipeFunc is primarily focused on Python functions but offers great flexibility within this domain.
+
+9. **Resource Specification**: Both Pydra and PipeFunc allow for specifying computational resources for tasks. PipeFunc's approach is particularly flexible, allowing for dynamic resource allocation based on input parameters.
+
+10. **Audit Trail**: Pydra provides built-in support for generating audit trails, enhancing reproducibility. While this is not a native feature of PipeFunc, its integration with tools like MLflow can provide similar capabilities.
+
+11. **Pipeline Composition**: PipeFunc offers a simple and intuitive way to combine pipelines using the `|` operator, which is not a feature in Pydra.
+
+Pydra excels in scenarios requiring complex scientific workflows, especially those involving neuroimaging tasks.
+Its emphasis on type checking and audit trails makes it well-suited for environments where reproducibility and error prevention are critical.
+
+PipeFunc, in comparison, offers a more lightweight and intuitive approach to pipeline construction.
+Its simplicity in defining and combining pipelines, along with its straightforward parameter sweep capabilities, makes it particularly suitable for rapid prototyping and iterative development in scientific computing workflows.
+
+Both tools prioritize flexibility and scalability, but PipeFunc's design leans more towards ease of use and quick setup, while Pydra provides a more comprehensive framework for managing complex, long-running scientific workflows.
+
 ## Airflow
 
 Apache Airflow is a platform to programmatically author, schedule, and monitor workflows.
@@ -113,6 +203,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from airflow.utils.dates import days_ago
 
+
 # Define the functions
 def f_c(a, b):
     return a + b
@@ -125,37 +216,37 @@ def f_e(c, d, x=1):
 
 # Define default arguments
 default_args = {
-    'owner': 'airflow',
-    'start_date': days_ago(1),
+    "owner": "airflow",
+    "start_date": days_ago(1),
 }
 
 # Create the DAG
 dag = DAG(
-    'simple_example',
+    "simple_example",
     default_args=default_args,
-    description='A simple DAG example',
+    description="A simple DAG example",
     schedule_interval=None,
 )
 
 # Define the tasks
 task_c = PythonOperator(
-    task_id='f_c',
+    task_id="f_c",
     python_callable=f_c,
-    op_kwargs={'a': 1, 'b': 2},
+    op_kwargs={"a": 1, "b": 2},
     dag=dag,
 )
 
 task_d = PythonOperator(
-    task_id='f_d',
+    task_id="f_d",
     python_callable=f_d,
-    op_kwargs={'b': 2, 'c': task_c.output},
+    op_kwargs={"b": 2, "c": task_c.output},
     dag=dag,
 )
 
 task_e = PythonOperator(
-    task_id='f_e',
+    task_id="f_e",
     python_callable=f_e,
-    op_kwargs={'c': task_c.output, 'd': task_d.output},
+    op_kwargs={"c": task_c.output, "d": task_d.output},
     dag=dag,
 )
 
@@ -201,32 +292,26 @@ import dask
 from dask import delayed
 from itertools import product
 
-
 @delayed
 def f_c(a, b):
     return a + b
-
 
 @delayed
 def f_d(b, c, x=1):
     return b * c
 
-
 @delayed
 def f_e(c, d, x=1):
     return c * d * x
-
 
 def pipeline_e(a, b, x=1):
     c = f_c(a, b)
     d = f_d(b, c, x)
     return f_e(c, d, x)
 
-
 def pipeline_d(a, b, x=1):
     c = f_c(a, b)
     return f_d(b, c, x)
-
 
 # Single input
 result_e = pipeline_e(1, 2).compute()
@@ -292,11 +377,13 @@ pipeline = Pipeline([node_c, node_d, node_e])
 # This is a simplified example of how you might run it
 from kedro.io import DataCatalog, MemoryDataSet
 
-data_catalog = DataCatalog({
-    "a": MemoryDataSet(1),
-    "b": MemoryDataSet(2),
-    "x": MemoryDataSet(1),
-})
+data_catalog = DataCatalog(
+    {
+        "a": MemoryDataSet(1),
+        "b": MemoryDataSet(2),
+        "x": MemoryDataSet(1),
+    }
+)
 
 from kedro.runner import SequentialRunner
 
@@ -345,11 +432,11 @@ class TaskC(luigi.Task):
 
     def run(self):
         result = self.a + self.b
-        with self.output().open('w') as f:
+        with self.output().open("w") as f:
             f.write(str(result))
 
     def output(self):
-        return luigi.LocalTarget(f'c_{self.a}_{self.b}.txt')
+        return luigi.LocalTarget(f"c_{self.a}_{self.b}.txt")
 
 class TaskD(luigi.Task):
     a = luigi.IntParameter()
@@ -360,14 +447,14 @@ class TaskD(luigi.Task):
         return TaskC(a=self.a, b=self.b)
 
     def run(self):
-        with self.input().open('r') as f:
+        with self.input().open("r") as f:
             c = int(f.read())
         result = self.b * c * self.x
-        with self.output().open('w') as f:
+        with self.output().open("w") as f:
             f.write(str(result))
 
     def output(self):
-        return luigi.LocalTarget(f'd_{self.a}_{self.b}_{self.x}.txt')
+        return luigi.LocalTarget(f"d_{self.a}_{self.b}_{self.x}.txt")
 
 class TaskE(luigi.Task):
     a = luigi.IntParameter()
@@ -375,23 +462,22 @@ class TaskE(luigi.Task):
     x = luigi.IntParameter(default=1)
 
     def requires(self):
-        return {'c': TaskC(a=self.a, b=self.b),
-                'd': TaskD(a=self.a, b=self.b, x=self.x)}
+        return {"c": TaskC(a=self.a, b=self.b), "d": TaskD(a=self.a, b=self.b, x=self.x)}
 
     def run(self):
-        with self.input()['c'].open('r') as f:
+        with self.input()["c"].open("r") as f:
             c = int(f.read())
-        with self.input()['d'].open('r') as f:
+        with self.input()["d"].open("r") as f:
             d = int(f.read())
         result = c * d * self.x
-        with self.output().open('w') as f:
+        with self.output().open("w") as f:
             f.write(str(result))
 
     def output(self):
-        return luigi.LocalTarget(f'e_{self.a}_{self.b}_{self.x}.txt')
+        return luigi.LocalTarget(f"e_{self.a}_{self.b}_{self.x}.txt")
 
 # Run the pipeline
-if __name__ == '__main__':
+if __name__ == "__main__":
     luigi.build([TaskE(a=1, b=2, x=1)], local_scheduler=True)
 
 # For parameter sweep
