@@ -34,7 +34,6 @@ Let's start with a basic PipeFunc example that we'll use as a reference point fo
 ```python
 from pipefunc import pipefunc, Pipeline
 
-
 @pipefunc(output_name="c")
 def f_c(a: int, b: int) -> int:
     return a + b
