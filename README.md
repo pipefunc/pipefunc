@@ -33,6 +33,8 @@
 
 ## :thinking: What is this?
 
+[![asciicast](https://asciinema.org/a/w5WVNcej1FslXb7hXLuMMpOaF.svg)](https://asciinema.org/a/w5WVNcej1FslXb7hXLuMMpOaF)
+
 `pipefunc` is a Python library for creating and running function pipelines. By annotating functions and specifying their outputs, it forms a pipeline that automatically organizes the execution order to satisfy dependencies. Just specify the names of the outputs you want to compute, and `pipefunc` will handle the rest by leveraging the parameter names of the annotated functions.
 
 Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
