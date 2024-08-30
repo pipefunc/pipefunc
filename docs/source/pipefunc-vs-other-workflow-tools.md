@@ -20,11 +20,11 @@ We'll examine how PipeFunc's approach to pipeline construction, execution, and p
 
 We'll compare PipeFunc with the following libraries:
 
-1. Pydra: A dataflow engine designed for scientific workflows, with a focus on neuroimaging.
-2. Airflow: A platform for programmatically authoring, scheduling, and monitoring workflows.
-3. Dask: A flexible library for parallel computing in Python.
-4. Kedro: An open-source framework for creating reproducible, maintainable, and modular data science code.
-5. Luigi: A Python package that helps you build complex pipelines of batch jobs.
+1. [Pydra](https://github.com/nipype/pydra): A dataflow engine designed for scientific workflows, with a focus on neuroimaging.
+2. [Airflow](https://github.com/apache/airflow): A platform for programmatically authoring, scheduling, and monitoring workflows.
+3. [Dask](https://github.com/dask/dask): A flexible library for parallel computing in Python.
+4. [Kedro](https://github.com/kedro-org/kedro): An open-source framework for creating reproducible, maintainable, and modular data science code.
+5. [Luigi](https://github.com/spotify/luigi): A Python package that helps you build complex pipelines of batch jobs.
 
 Each comparison will include a brief overview of the library, an example implementation of a simple pipeline, and a discussion of key differences from PipeFunc.
 This will help illustrate where PipeFunc fits in the ecosystem and what unique advantages it offers for certain types of workflows, particularly in scientific computing and rapid prototyping scenarios.
@@ -40,11 +40,11 @@ def f_c(a: int, b: int) -> int:
     return a + b
 
 @pipefunc(output_name="d")
-def f_d(b: int, c: int, x: int = 1):  # "c" is the output of f_c
+def f_d(b: int, c: int, x: int = 1) -> int:  # "c" is the output of f_c
     return b * c
 
 @pipefunc(output_name="e")
-def f_e(c: int, d: int, x: int = 1):  # "d" is the output ˝of f_d
+def f_e(c: int, d: int, x: int = 1) -> int:  # "d" is the output ˝of f_d
     return c * d * x
 
 pipeline = Pipeline([f_c, f_d, f_e])
@@ -369,13 +369,13 @@ pipeline = Pipeline([node_c, node_d, node_e])
 
 # To run the pipeline, you would typically use Kedro's run command or a DataCatalog
 # This is a simplified example of how you might run it
-from kedro.io import DataCatalog, MemoryDataSet
+from kedro.io import DataCatalog, MemoryDataset
 
 data_catalog = DataCatalog(
     {
-        "a": MemoryDataSet(1),
-        "b": MemoryDataSet(2),
-        "x": MemoryDataSet(1),
+        "a": MemoryDataset(1),
+        "b": MemoryDataset(2),
+        "x": MemoryDataset(1),
     }
 )
 
@@ -471,11 +471,10 @@ class TaskE(luigi.Task):
         return luigi.LocalTarget(f"e_{self.a}_{self.b}_{self.x}.txt")
 
 # Run the pipeline
-if __name__ == "__main__":
-    luigi.build([TaskE(a=1, b=2, x=1)], local_scheduler=True)
+luigi.build([TaskE(a=1, b=2, x=1)], local_scheduler=True)
 
 # For parameter sweep
-sweep_tasks = [TaskE(a=a, b=b) for a in [1, 2, 3] for b in [4, 5, 6]]
+sweep_tasks = [TaskE(a=a, b=b) for a in [1, 2] for b in [4, 5]]
 luigi.build(sweep_tasks, local_scheduler=True)
 ```
 
