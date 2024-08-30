@@ -164,21 +164,17 @@ Key differences from PipeFunc:
 
 3. **Data Flow**: Pydra uses a system of lazy inputs (`lzin`) and outputs (`lzout`) to define data flow between tasks. PipeFunc's approach is more implicit, based on function arguments and return values.
 
-4. **Type Checking**: Pydra emphasizes type annotations and provides runtime type checking, which can catch errors early but requires more upfront specification compared to PipeFunc.
+4. **Parallel Execution**: Pydra's `wf.split` feature provides a way to run parameter sweeps in parallel, similar to PipeFunc's `map` method, but with a different syntax.
 
-5. **Parallel Execution**: Pydra's `submitgraph` feature provides a way to run parameter sweeps in parallel, similar to PipeFunc's `map` method, but with a different syntax.
+5. **Type Annotations**: Both Pydra and PipeFunc support and utilize Python type annotations, allowing to catch type errors early in the development process.
 
-6. **Caching**: Both Pydra and PipeFunc support caching of task results. Pydra's caching is deeply integrated into its workflow system, while PipeFunc offers flexible caching options that can be enabled per function or for the entire pipeline.
+6. **Flexibility**: Pydra is designed to work with Python functions, shell commands, and containers, making it highly flexible for various types of tasks. PipeFunc is primarily focused on Python functions but offers great flexibility within this domain.
 
-7. **Type Annotations**: Both Pydra and PipeFunc support and utilize Python type annotations. Pydra emphasizes these for its internal type checking system, while PipeFunc uses them for documentation and can leverage them for runtime type checking.
+7. **Resource Specification**: Both Pydra and PipeFunc allow for specifying computational resources for tasks. PipeFunc's approach is particularly flexible, allowing for dynamic resource allocation based on input parameters.
 
-8. **Flexibility**: Pydra is designed to work with Python functions, shell commands, and containers, making it highly flexible for various types of tasks. PipeFunc is primarily focused on Python functions but offers great flexibility within this domain.
+8.  **Audit Trail**: Pydra provides built-in support for generating audit trails, enhancing reproducibility. While this is not a native feature of PipeFunc, its integration with tools like MLflow can provide similar capabilities.
 
-9. **Resource Specification**: Both Pydra and PipeFunc allow for specifying computational resources for tasks. PipeFunc's approach is particularly flexible, allowing for dynamic resource allocation based on input parameters.
-
-10. **Audit Trail**: Pydra provides built-in support for generating audit trails, enhancing reproducibility. While this is not a native feature of PipeFunc, its integration with tools like MLflow can provide similar capabilities.
-
-11. **Pipeline Composition**: PipeFunc offers a simple and intuitive way to combine pipelines using the `|` operator, which is not a feature in Pydra.
+9.  **Pipeline Composition**: PipeFunc offers a simple and intuitive way to combine pipelines using the `|` operator, which is not a feature in Pydra.
 
 Pydra excels in scenarios requiring complex scientific workflows, especially those involving neuroimaging tasks.
 Its emphasis on type checking and audit trails makes it well-suited for environments where reproducibility and error prevention are critical.
@@ -200,9 +196,7 @@ Here's how you might implement a similar pipeline using Airflow:
 ```python
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
 from airflow.utils.dates import days_ago
-
 
 # Define the functions
 def f_c(a, b):
