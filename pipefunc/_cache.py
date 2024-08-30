@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import abc
+import functools
 import hashlib
 import pickle
+from collections.abc import Callable
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -484,3 +486,77 @@ class DiskCache(_CacheBase):
     def shared(self) -> bool:
         """Return whether the cache is shared."""
         return self.lru_cache.shared
+
+
+def memoize(
+    cache: _CacheBase | None = None,
+    key_func: Callable[..., Hashable] | None = None,
+) -> Callable:
+    """A flexible memoization decorator that works with different cache types.
+
+    Parameters
+    ----------
+    cache
+        An instance of a cache class (_CacheBase). If None, a SimpleCache is used.
+    key_func
+        A function to generate cache keys. If None, args and kwargs are used.
+
+    Returns
+    -------
+    Decorated function with memoization.
+
+    """
+    if cache is None:
+        from pipefunc._cache import SimpleCache
+
+        cache = SimpleCache()
+
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if key_func:
+                key = key_func(*args, **kwargs)
+            else:
+                # Use a more robust key generation method
+                key = _generate_key(args, kwargs)
+
+            result = cache.get(key)
+            if result is None:
+                result = func(*args, **kwargs)
+                if isinstance(cache, HybridCache):
+                    # For HybridCache, we need to provide a duration
+                    # Here, we're using a default duration of 1.0
+                    cache.put(key, result, 1.0)
+                else:
+                    cache.put(key, result)
+
+            # Preserve the 'calls' attribute if it exists
+            if hasattr(func, "calls"):
+                wrapper.calls = func.calls
+
+            return result
+
+        # Initialize 'calls' attribute
+        if hasattr(func, "calls"):
+            wrapper.calls = func.calls
+
+        return wrapper
+
+    return decorator
+
+
+def _generate_key(args, kwargs):
+    """Generate a hashable key from args and kwargs."""
+    key = []
+    for arg in args:
+        if isinstance(arg, (list, dict, set)):
+            # Convert unhashable types to a hashable representation
+            key.append(str(arg))
+        else:
+            key.append(arg)
+    for k, v in sorted(kwargs.items()):
+        if isinstance(v, (list, dict, set)):
+            key.append((k, str(v)))
+        else:
+            key.append((k, v))
+    return tuple(key)
