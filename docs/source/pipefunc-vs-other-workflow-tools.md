@@ -1,15 +1,15 @@
 ---
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.16.1
-  kernelspec:
-    display_name: pipefunc
-    language: python
-    name: python3
+jupytext:
+  formats: md:myst
+  text_representation:
+    extension: .md
+    format_name: myst
+    format_version: 0.13
+    jupytext_version: 1.16.1
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
 ---
 
 # Comparing PipeFunc to other libraries
@@ -31,7 +31,7 @@ This will help illustrate where PipeFunc fits in the ecosystem and what unique a
 
 Let's start with a basic PipeFunc example that we'll use as a reference point for our comparisons:
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
 @pipefunc(output_name="c")
@@ -51,7 +51,7 @@ pipeline = Pipeline([f_c, f_d, f_e])
 
 We can call the pipeline for a single set of inputs.
 
-```python
+```{code-cell} ipython3
 pipeline("e", a=1, b=2)
 ```
 
@@ -59,37 +59,37 @@ Alternatively, we can call the pipeline for different values of `a` and `b` and 
 
 We can do this by adding mapspec axes to the pipeline:
 
-```python
+```{code-cell} ipython3
 pipeline.add_mapspec_axis("a", axis="i")
 pipeline.add_mapspec_axis("b", axis="j")
 ```
 
 Now we can call the pipeline with inputs for `a` and `b` using the `pipeline.map` method, which automatically runs in parallel with a `~concurrent.futures.ProcessPoolExecutor`.
 
-```python
+```{code-cell} ipython3
 r = pipeline.map(inputs={"a": [1, 2, 3], "b": [4, 5, 6, 7]}, run_folder="my_run_folder")
 ```
 
 We can look at any of the intermediate and final results:
 
-```python
+```{code-cell} ipython3
 r["d"].output
 ```
 
-```python
+```{code-cell} ipython3
 r["e"].output
 ```
 
 Or we load the data as an xarray dataset and plot it:
 
-```python
+```{code-cell} ipython3
 from pipefunc.map import load_xarray_dataset
 
 ds = load_xarray_dataset(run_folder="my_run_folder")
 ds
 ```
 
-```python
+```{code-cell} ipython3
 ds.e.astype(float).plot(x="i", y="j")
 ```
 
@@ -103,7 +103,7 @@ It's part of the Nipype ecosystem and emphasizes flexibility, scalability, and r
 
 Here's how you might implement our example pipeline using Pydra:
 
-```python
+```{code-cell} ipython3
 import nest_asyncio
 
 nest_asyncio.apply()
@@ -192,7 +192,7 @@ It's particularly well-suited for ETL processes, machine learning pipelines, and
 
 Here's how you might implement a similar pipeline using Airflow:
 
-```python
+```{code-cell} ipython3
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
@@ -280,7 +280,7 @@ While powerful for parallelization, it differs from PipeFunc in pipeline managem
 
 Here's a Dask implementation of our pipeline:
 
-```python
+```{code-cell} ipython3
 import dask
 from dask import delayed
 from itertools import product
@@ -345,7 +345,7 @@ It provides a standard structure for data pipeline projects, emphasizing best pr
 
 Here's how you might implement our example pipeline using Kedro:
 
-```python
+```{code-cell} ipython3
 from kedro.pipeline import Pipeline, node
 
 # Define the functions
@@ -416,7 +416,7 @@ Developed by Spotify, Luigi is designed to handle long-running batch processes.
 
 Here's how you might implement our example pipeline using Luigi:
 
-```python
+```{code-cell} ipython3
 import luigi
 
 class TaskC(luigi.Task):
