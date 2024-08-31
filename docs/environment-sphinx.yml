@@ -36,4 +36,5 @@ dependencies:
   - sphinx-togglebutton
   - sphinx-copybutton
   - pip:
+    - pydra
     - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip
