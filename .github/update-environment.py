@@ -57,8 +57,6 @@ def generate_environment_yml(
     if pip_deps is None:
         pip_deps = []
     dependencies = clean_deps(data["project"]["dependencies"])
-    if conda_deps is not None:
-        conda_deps += dependencies
     pip_deps += generate_pip_deps(dependencies)
 
     env_yaml = "# This file is generated from pyproject.toml using .github/update-environment.py\n"
@@ -74,6 +72,8 @@ def generate_environment_yml(
         [REPLACE_DEPS.get(dep, dep) for dep in dependencies if dep not in PIP_ONLY_DEPS],
         "from pyproject.toml",
     )
+    if conda_deps is not None:
+        env_yaml += write_deps(conda_deps, "extras from `.github/update-environment.py`")
 
     # Optional dependencies
     for group in data["project"]["optional-dependencies"]:
