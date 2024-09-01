@@ -541,7 +541,7 @@ def memoize(
     return decorator
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: C901, FBT001, FBT002, PLR0911, PLR0912
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
     Parameters
@@ -577,48 +577,50 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
         items = sorted(mapping.items()) if sort else mapping.items()
         return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
-    match obj:
-        case collections.OrderedDict():
-            return "OrderedDict", hashable_mapping(obj)
-        case collections.defaultdict():
-            return "defaultdict", (
+    if isinstance(obj, collections.OrderedDict):
+        return ("OrderedDict", hashable_mapping(obj))
+    if isinstance(obj, collections.defaultdict):
+        return (
+            "defaultdict",
+            (
                 to_hashable(obj.default_factory, fallback_to_str),
                 hashable_mapping(obj, sort=True),
-            )
-        case collections.Counter():
-            return "Counter", tuple(sorted(obj.items()))
-        case dict():
-            return "dict", hashable_mapping(obj, sort=True)
-        case set() | frozenset():
-            return type(obj).__name__, hashable_iterable(obj, sort=True)
-        case list():
-            return "list", hashable_iterable(obj)
-        case tuple():
-            return "tuple", hashable_iterable(obj)
-        case collections.deque():
-            return "deque", (obj.maxlen, hashable_iterable(obj))
-        case array.array():
-            return "array", (obj.typecode, tuple(obj))
-        case bytearray():
-            return "bytearray", tuple(obj)
-        case _:
-            # Handle numpy arrays
-            if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
-                return "ndarray", (obj.shape, obj.dtype.str, tuple(obj.flatten()))
-            # Handle pandas Series and DataFrames
-            if "pandas" in sys.modules:
-                if isinstance(obj, sys.modules["pandas"].Series):
-                    return "Series", (obj.name, to_hashable(obj.to_dict(), fallback_to_str))
-                if isinstance(obj, sys.modules["pandas"].DataFrame):
-                    return "DataFrame", to_hashable(obj.to_dict("list"), fallback_to_str)
-            # Try hashing, if fails, either convert to string or raise an exception
-            try:
-                return type(obj).__name__, hash(obj)
-            except TypeError as e:
-                if fallback_to_str:
-                    return "unhashable", str(obj)
-                msg = f"Object of type {type(obj)} cannot be hashed"
-                raise TypeError(msg) from e
+            ),
+        )
+    if isinstance(obj, collections.Counter):
+        return ("Counter", tuple(sorted(obj.items())))
+    if isinstance(obj, dict):
+        return ("dict", hashable_mapping(obj, sort=True))
+    if isinstance(obj, set | frozenset):
+        return (type(obj).__name__, hashable_iterable(obj, sort=True))
+    if isinstance(obj, list | tuple):
+        return (type(obj).__name__, hashable_iterable(obj))
+    if isinstance(obj, collections.deque):
+        return ("deque", (obj.maxlen, hashable_iterable(obj)))
+    if isinstance(obj, array.array):
+        return ("array", (obj.typecode, tuple(obj)))
+    if isinstance(obj, bytearray):
+        return ("bytearray", tuple(obj))
+
+    # Handle numpy arrays
+    if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
+        return ("ndarray", (obj.shape, obj.dtype.str, tuple(obj.flatten())))
+
+    # Handle pandas Series and DataFrames
+    if "pandas" in sys.modules:
+        if isinstance(obj, sys.modules["pandas"].Series):
+            return ("Series", (obj.name, to_hashable(obj.to_dict(), fallback_to_str)))
+        if isinstance(obj, sys.modules["pandas"].DataFrame):
+            return ("DataFrame", to_hashable(obj.to_dict("list"), fallback_to_str))
+
+    # Try hashing, if fails, either convert to string or raise an exception
+    try:
+        return (type(obj).__name__, hash(obj))
+    except TypeError as e:
+        if fallback_to_str:
+            return ("unhashable", str(obj))
+        msg = f"Object of type {type(obj)} cannot be hashed"
+        raise TypeError(msg) from e
 
 
 def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:
