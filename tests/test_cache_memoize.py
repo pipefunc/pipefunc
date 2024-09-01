@@ -98,7 +98,7 @@ def test_memoize_with_keyword_arguments():
 
 
 def test_memoize_with_none_result():
-    cache = SimpleCache()
+    cache = None  # uses SimpleCache by default
     calls = {"count": 0}
 
     @memoize(cache=cache)
