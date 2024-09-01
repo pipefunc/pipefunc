@@ -619,7 +619,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: FB
                     return "DataFrame", to_hashable(obj.to_dict("list"), fallback_to_str)
             # Try hashing, if fails, either convert to string or raise an exception
             try:
-                return "hashable", hash(obj)
+                return type(obj).__name__, hash(obj)
             except TypeError as e:
                 if fallback_to_str:
                     return "unhashable", str(obj)
