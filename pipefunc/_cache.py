@@ -522,17 +522,18 @@ def memoize(
             else:
                 key = _generate_cache_key(args, kwargs)
 
-            result = cache.get(key)
-            if result is None:
-                if isinstance(cache, HybridCache):
-                    t_start = time.monotonic()
-                result = func(*args, **kwargs)
-                if isinstance(cache, HybridCache):
-                    # For HybridCache, we need to provide a duration
-                    # Here, we're using a default duration of 1.0
-                    cache.put(key, result, time.monotonic() - t_start)
-                else:
-                    cache.put(key, result)
+            if key in cache:
+                return cache.get(key)
+
+            if isinstance(cache, HybridCache):
+                t_start = time.monotonic()
+            result = func(*args, **kwargs)
+            if isinstance(cache, HybridCache):
+                # For HybridCache, we need to provide a duration
+                # Here, we're using a default duration of 1.0
+                cache.put(key, result, time.monotonic() - t_start)
+            else:
+                cache.put(key, result)
             return result
 
         return wrapper
