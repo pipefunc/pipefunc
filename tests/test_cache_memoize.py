@@ -93,8 +93,10 @@ def test_memoize_with_keyword_arguments():
             return x + y
         if operation == "multiply":
             return x * y
+        msg = f"Unknown operation: {operation}"
+        raise ValueError(msg)
 
-    assert calculate(2, 3) == 5
+    assert calculate(2, 3, operation="add") == 5
     assert calculate.calls == 1
     assert calculate(2, 3, operation="add") == 5
     assert calculate.calls == 1  # Should not increase, result from cache

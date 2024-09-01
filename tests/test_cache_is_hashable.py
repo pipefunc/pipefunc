@@ -120,7 +120,8 @@ def test_to_hashable_nested_structures() -> None:
 def test_to_hashable_unhashable_object() -> None:
     class Unhashable:
         def __hash__(self):
-            raise TypeError("unhashable type")
+            msg = "unhashable type"
+            raise TypeError(msg)
 
     obj = Unhashable()
     result = to_hashable(obj)
@@ -130,7 +131,8 @@ def test_to_hashable_unhashable_object() -> None:
 def test_to_hashable_unhashable_object_no_fallback() -> None:
     class Unhashable:
         def __hash__(self):
-            raise TypeError("unhashable type")
+            msg = "unhashable type"
+            raise TypeError(msg)
 
     obj = Unhashable()
     with pytest.raises(TypeError):
@@ -148,7 +150,7 @@ def test_to_hashable_custom_hashable_object() -> None:
 
 
 @pytest.mark.parametrize(
-    "obj, expected",
+    ("obj", "expected"),
     [
         (None, ("NoneType", hash(None))),
         (True, ("bool", hash(True))),  # noqa: FBT003
