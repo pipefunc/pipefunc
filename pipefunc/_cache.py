@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import abc
+import array
+import collections
 import functools
 import hashlib
 import pickle
-from collections.abc import Callable
+import sys
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -13,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 import cloudpickle
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable
+    from collections.abc import Callable, Hashable, Iterable
 
 
 class _CacheBase(abc.ABC):
@@ -545,18 +547,110 @@ def memoize(
     return decorator
 
 
-def _generate_key(args, kwargs):
-    """Generate a hashable key from args and kwargs."""
-    key = []
-    for arg in args:
-        if isinstance(arg, (list, dict, set)):
-            # Convert unhashable types to a hashable representation
-            key.append(str(arg))
-        else:
-            key.append(arg)
-    for k, v in sorted(kwargs.items()):
-        if isinstance(v, (list, dict, set)):
-            key.append((k, str(v)))
-        else:
-            key.append((k, v))
-    return tuple(key)
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: FBT001, FBT002
+    """Convert any object to a hashable representation.
+
+    Parameters
+    ----------
+    obj
+        The object to convert.
+    fallback_to_str
+        If True, unhashable objects will be converted to strings as a last resort.
+        If False, an exception will be raised for unhashable objects.
+
+    Returns
+    -------
+    A hashable representation of the input object.
+
+    Raises
+    ------
+    TypeError
+        If the object cannot be made hashable and fallback_to_str is False.
+
+    Notes
+    -----
+    This function attempts to create a hashable representation of any input object.
+    It handles most built-in Python types and some common third-party types like
+    numpy arrays and pandas Series/DataFrames.
+
+    """
+
+    def hashable_iterable(iterable: Iterable, *, sort: bool = False) -> tuple:
+        items = sorted(iterable) if sort else iterable
+        return tuple(to_hashable(item, fallback_to_str) for item in items)
+
+    def hashable_mapping(mapping: dict, *, sort: bool = False) -> tuple:
+        items = sorted(mapping.items()) if sort else mapping.items()
+        return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
+
+    match obj:
+        case collections.OrderedDict():
+            return "OrderedDict", hashable_mapping(obj)
+        case collections.defaultdict():
+            return "defaultdict", (
+                to_hashable(obj.default_factory, fallback_to_str),
+                hashable_mapping(obj, sort=True),
+            )
+        case collections.Counter():
+            return "Counter", tuple(sorted(obj.items()))
+        case dict():
+            return "dict", hashable_mapping(obj, sort=True)
+        case set() | frozenset():
+            return type(obj).__name__, hashable_iterable(obj, sort=True)
+        case list():
+            return "list", hashable_iterable(obj)
+        case tuple():
+            return "tuple", hashable_iterable(obj)
+        case collections.deque():
+            return "deque", (obj.maxlen, hashable_iterable(obj))
+        case array.array():
+            return "array", (obj.typecode, tuple(obj))
+        case bytearray():
+            return "bytearray", tuple(obj)
+        case _:
+            # Handle numpy arrays
+            if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
+                return "ndarray", (obj.shape, obj.dtype.str, tuple(obj.flatten()))
+            # Handle pandas Series and DataFrames
+            if "pandas" in sys.modules:
+                if isinstance(obj, sys.modules["pandas"].Series):
+                    return "Series", (obj.name, to_hashable(obj.to_dict(), fallback_to_str))
+                if isinstance(obj, sys.modules["pandas"].DataFrame):
+                    return "DataFrame", to_hashable(obj.to_dict("list"), fallback_to_str)
+            # Try hashing, if fails, either convert to string or raise an exception
+            try:
+                return "hashable", hash(obj)
+            except TypeError as e:
+                if fallback_to_str:
+                    return "unhashable", str(obj)
+                msg = f"Object of type {type(obj)} cannot be hashed"
+                raise TypeError(msg) from e
+
+
+def generate_cache_key(args: tuple, kwargs: dict, fallback_to_str: bool = True) -> int:
+    """Generate a hashable key from function arguments.
+
+    Parameters
+    ----------
+    args
+        Positional arguments to be included in the key.
+    kwargs
+        Keyword arguments to be included in the key.
+    fallback_to_str
+        If True, unhashable objects will be converted to strings as a last resort.
+        If False, an exception will be raised for unhashable objects.
+
+    Returns
+    -------
+    A hash value that can be used as a cache key.
+
+    Notes
+    -----
+    This function creates a hashable representation of both positional and keyword
+    arguments, allowing for effective caching of function calls with various
+    argument types.
+
+    """
+    args_key = tuple(to_hashable(arg, fallback_to_str) for arg in args)
+    kwargs_key = tuple(sorted((k, to_hashable(v, fallback_to_str)) for k, v in kwargs.items()))
+    return hash((args_key, kwargs_key))
