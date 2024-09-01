@@ -7,6 +7,7 @@ import functools
 import hashlib
 import pickle
 import sys
+import time
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -513,22 +514,23 @@ def memoize(
 
         cache = SimpleCache()
 
-    def decorator(func: Callable):
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            if key_func:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if key_func:  # noqa: SIM108
                 key = key_func(*args, **kwargs)
             else:
-                # Use a more robust key generation method
-                key = _generate_key(args, kwargs)
+                key = _generate_cache_key(args, kwargs)
 
             result = cache.get(key)
             if result is None:
+                if isinstance(cache, HybridCache):
+                    t_start = time.monotonic()
                 result = func(*args, **kwargs)
                 if isinstance(cache, HybridCache):
                     # For HybridCache, we need to provide a duration
                     # Here, we're using a default duration of 1.0
-                    cache.put(key, result, 1.0)
+                    cache.put(key, result, time.monotonic() - t_start)
                 else:
                     cache.put(key, result)
 
@@ -547,7 +549,7 @@ def memoize(
     return decorator
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: FBT001, FBT002
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: C901, FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
     Parameters
@@ -627,7 +629,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: FB
                 raise TypeError(msg) from e
 
 
-def generate_cache_key(args: tuple, kwargs: dict, fallback_to_str: bool = True) -> int:
+def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> int:
     """Generate a hashable key from function arguments.
 
     Parameters
@@ -651,6 +653,4 @@ def generate_cache_key(args: tuple, kwargs: dict, fallback_to_str: bool = True) 
     argument types.
 
     """
-    args_key = tuple(to_hashable(arg, fallback_to_str) for arg in args)
-    kwargs_key = tuple(sorted((k, to_hashable(v, fallback_to_str)) for k, v in kwargs.items()))
-    return hash((args_key, kwargs_key))
+    return to_hashable((args, kwargs), fallback_to_str)
