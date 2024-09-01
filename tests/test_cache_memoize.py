@@ -1,94 +1,87 @@
-from collections.abc import Callable
-
 import pytest
 
 from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache, memoize
 
 
-# Helper function to count function calls
-def call_counter(func: Callable) -> Callable:
-    def wrapper(*args, **kwargs):
-        wrapper.calls += 1
-        return func(*args, **kwargs)
-
-    wrapper.calls = 0
-    return wrapper
-
-
 @pytest.mark.parametrize("cache_type", [SimpleCache, LRUCache, HybridCache])
 def test_memoize_with_different_caches(cache_type):
     cache = cache_type()
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def add(x, y):
+        calls["count"] += 1
         return x + y
 
     assert add(2, 3) == 5
-    assert add.calls == 1
+    assert calls["count"] == 1
     assert add(2, 3) == 5
-    assert add.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
     assert add(3, 4) == 7
-    assert add.calls == 2  # New arguments, should increase
+    assert calls["count"] == 2  # New arguments, should increase
 
 
 def test_memoize_with_disk_cache(tmp_path):
     cache = DiskCache(str(tmp_path))
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def multiply(x, y):
+        calls["count"] += 1
         return x * y
 
     assert multiply(2, 3) == 6
-    assert multiply.calls == 1
+    assert calls["count"] == 1
     assert multiply(2, 3) == 6
-    assert multiply.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
     assert multiply(3, 4) == 12
-    assert multiply.calls == 2  # New arguments, should increase
+    assert calls["count"] == 2  # New arguments, should increase
 
 
 def test_memoize_with_custom_key_function():
     cache = SimpleCache()
+    calls = {"count": 0}
 
     def custom_key(*args, **kwargs):
         return args[0]  # Only use the first argument as the key
 
     @memoize(cache=cache, key_func=custom_key)
-    @call_counter
     def greet(name, greeting="Hello"):
+        calls["count"] += 1
         return f"{greeting}, {name}!"
 
     assert greet("Alice") == "Hello, Alice!"
-    assert greet.calls == 1
+    assert calls["count"] == 1
     assert greet("Alice", greeting="Hi") == "Hello, Alice!"  # Should use cached value
-    assert greet.calls == 1
+    assert calls["count"] == 1
     assert greet("Bob") == "Hello, Bob!"
-    assert greet.calls == 2
+    assert calls["count"] == 2
 
 
 def test_memoize_with_unhashable_arguments():
     cache = SimpleCache()
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def process_list(lst):
+        calls["count"] += 1
         return sum(lst)
 
     assert process_list([1, 2, 3]) == 6
-    assert process_list.calls == 1
+    assert calls["count"] == 1
     assert process_list([1, 2, 3]) == 6
-    assert process_list.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
     assert process_list([4, 5, 6]) == 15
-    assert process_list.calls == 2  # New arguments, should increase
+    assert calls["count"] == 2  # New arguments, should increase
 
 
 def test_memoize_with_keyword_arguments():
     cache = SimpleCache()
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def calculate(x, y, operation="add"):
+        calls["count"] += 1
         if operation == "add":
             return x + y
         if operation == "multiply":
@@ -97,41 +90,42 @@ def test_memoize_with_keyword_arguments():
         raise ValueError(msg)
 
     assert calculate(2, 3, operation="add") == 5
-    assert calculate.calls == 1
+    assert calls["count"] == 1
     assert calculate(2, 3, operation="add") == 5
-    assert calculate.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
     assert calculate(2, 3, operation="multiply") == 6
-    assert calculate.calls == 2  # New operation, should increase
+    assert calls["count"] == 2  # New operation, should increase
 
 
 def test_memoize_with_none_result():
     cache = SimpleCache()
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def return_none(x):
-        return None
+        calls["count"] += 1
 
     assert return_none(1) is None
-    assert return_none.calls == 1
+    assert calls["count"] == 1
     assert return_none(1) is None
-    assert return_none.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
 
 
 def test_memoize_clear_cache():
     cache = SimpleCache()
+    calls = {"count": 0}
 
     @memoize(cache=cache)
-    @call_counter
     def add(x, y):
+        calls["count"] += 1
         return x + y
 
     assert add(2, 3) == 5
-    assert add.calls == 1
+    assert calls["count"] == 1
     assert add(2, 3) == 5
-    assert add.calls == 1  # Should not increase, result from cache
+    assert calls["count"] == 1  # Should not increase, result from cache
 
     cache.clear()
 
     assert add(2, 3) == 5
-    assert add.calls == 2  # Should increase after cache clear
+    assert calls["count"] == 2  # Should increase after cache clear

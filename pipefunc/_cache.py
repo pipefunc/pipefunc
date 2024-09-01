@@ -533,16 +533,7 @@ def memoize(
                     cache.put(key, result, time.monotonic() - t_start)
                 else:
                     cache.put(key, result)
-
-            # Preserve the 'calls' attribute if it exists
-            if hasattr(func, "calls"):
-                wrapper.calls = func.calls
-
             return result
-
-        # Initialize 'calls' attribute
-        if hasattr(func, "calls"):
-            wrapper.calls = func.calls
 
         return wrapper
 
@@ -629,7 +620,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: C9
                 raise TypeError(msg) from e
 
 
-def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> int:
+def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:
     """Generate a hashable key from function arguments.
 
     Parameters
