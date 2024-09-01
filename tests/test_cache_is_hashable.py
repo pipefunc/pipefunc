@@ -12,45 +12,21 @@ from pipefunc._cache import to_hashable
 @pytest.mark.parametrize(
     ("obj", "expected"),
     [
-        ({1: "a", 2: "b"}, ("dict", ((1, ("str", hash("a"))), (2, ("str", hash("b")))))),
+        ({1: "a", 2: "b"}, ("dict", ((1, "a"), (2, "b")))),
         (
             collections.OrderedDict([(1, "a"), (2, "b")]),
-            ("OrderedDict", ((1, ("str", hash("a"))), (2, ("str", hash("b"))))),
+            ("OrderedDict", ((1, "a"), (2, "b"))),
         ),
         (
             collections.defaultdict(int, {1: "a", 2: "b"}),  # type: ignore[arg-type]
-            (
-                "defaultdict",
-                (
-                    ("type", hash(int)),
-                    ((1, ("str", hash("a"))), (2, ("str", hash("b")))),
-                ),
-            ),
+            ("defaultdict", (int, ((1, "a"), (2, "b")))),
         ),
-        (
-            collections.Counter({1: 2, 3: 4}),
-            ("Counter", ((1, 2), (3, 4))),
-        ),
-        (
-            {1, 2, 3},
-            ("set", (("int", hash(1)), ("int", hash(2)), ("int", hash(3)))),
-        ),
-        (
-            frozenset([1, 2, 3]),
-            ("frozenset", (("int", hash(1)), ("int", hash(2)), ("int", hash(3)))),
-        ),
-        (
-            [1, 2, 3],
-            ("list", (("int", hash(1)), ("int", hash(2)), ("int", hash(3)))),
-        ),
-        (
-            (1, 2, 3),
-            ("tuple", (("int", hash(1)), ("int", hash(2)), ("int", hash(3)))),
-        ),
-        (
-            collections.deque([1, 2, 3], maxlen=5),
-            ("deque", (5, (("int", hash(1)), ("int", hash(2)), ("int", hash(3))))),
-        ),
+        (collections.Counter({1: 2, 3: 4}), ("Counter", ((1, 2), (3, 4)))),
+        ({1, 2, 3}, ("set", (1, 2, 3))),
+        (frozenset([1, 2, 3]), frozenset([1, 2, 3])),
+        ([1, 2, 3], ("list", (1, 2, 3))),
+        ((1, 2, 3), (1, 2, 3)),
+        (collections.deque([1, 2, 3], maxlen=5), ("deque", (5, (1, 2, 3)))),
         (array.array("i", [1, 2, 3]), ("array", ("i", (1, 2, 3)))),
     ],
 )
@@ -74,11 +50,8 @@ def test_to_hashable_pandas_series() -> None:
     result = to_hashable(series)
     assert isinstance(result, tuple)
     assert result[0] == "Series"
-    assert result[1][0] == "test"  # type: ignore[index]
-    assert result[1][1] == (  # type: ignore[index]
-        "dict",
-        ((0, ("int", hash(1))), (1, ("int", hash(2))), (2, ("int", hash(3)))),
-    )
+    assert result[1][0] == "test"
+    assert result[1][1] == ("dict", ((0, 1), (1, 2), (2, 3)))
 
 
 def test_to_hashable_pandas_dataframe() -> None:
@@ -89,8 +62,8 @@ def test_to_hashable_pandas_dataframe() -> None:
     assert result[1] == (
         "dict",
         (
-            ("A", ("list", (("int", hash(1)), ("int", hash(2))))),
-            ("B", ("list", (("int", hash(3)), ("int", hash(4))))),
+            ("A", ("list", (1, 2))),
+            ("B", ("list", (3, 4))),
         ),
     )
 
@@ -101,24 +74,16 @@ def test_to_hashable_nested_structures() -> None:
     expected = (
         "dict",
         (
-            (
-                "a",
-                (
-                    "list",
-                    (
-                        ("int", hash(1)),
-                        ("int", hash(2)),
-                        (
-                            "dict",
-                            (("b", ("tuple", (("int", hash(3)), ("int", hash(4))))),),
-                        ),
-                    ),
-                ),
-            ),
-            ("c", ("set", (("int", hash(5)), ("int", hash(6))))),
+            ("a", ("list", (1, 2, ("dict", (("b", (3, 4)),))))),
+            ("c", ("set", (5, 6))),
         ),
     )
     assert result == expected
+
+    # Additional test for set order consistency
+    result_set = dict(result[1])["c"][1]
+    expected_set = (5, 6)
+    assert set(result_set) == set(expected_set)
 
 
 def test_to_hashable_unhashable_object() -> None:
@@ -150,20 +115,20 @@ def test_to_hashable_custom_hashable_object() -> None:
 
     obj = CustomHashable()
     result = to_hashable(obj)
-    assert result == ("CustomHashable", 42)
+    assert result == obj
 
 
 @pytest.mark.parametrize(
     ("obj", "expected"),
     [
-        (None, ("NoneType", hash(None))),
-        (True, ("bool", hash(True))),  # noqa: FBT003
-        (False, ("bool", hash(False))),  # noqa: FBT003
-        (42, ("int", hash(42))),
-        (3.14, ("float", hash(3.14))),
-        ("hello", ("str", hash("hello"))),
-        (complex(1, 2), ("complex", hash(complex(1, 2)))),
-        (b"bytes", ("bytes", hash(b"bytes"))),
+        (None, None),
+        (True, True),
+        (False, False),
+        (42, 42),
+        (3.14, 3.14),
+        ("hello", "hello"),
+        (complex(1, 2), complex(1, 2)),
+        (b"bytes", b"bytes"),
         (bytearray(b"bytearray"), ("bytearray", tuple(bytearray(b"bytearray")))),
     ],
 )

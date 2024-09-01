@@ -541,6 +541,26 @@ def memoize(
     return decorator
 
 
+def _hashable_iterable(
+    iterable: Iterable,
+    *,
+    fallback_to_str: bool = True,
+    sort: bool = False,
+) -> tuple:
+    items = sorted(iterable) if sort else iterable
+    return tuple(to_hashable(item, fallback_to_str) for item in items)
+
+
+def _hashable_mapping(
+    mapping: dict,
+    *,
+    fallback_to_str: bool = True,
+    sort: bool = False,
+) -> tuple:
+    items = sorted(mapping.items()) if sort else mapping.items()
+    return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
+
+
 def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
@@ -568,35 +588,36 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
     numpy arrays and pandas Series/DataFrames.
 
     """
-
-    def hashable_iterable(iterable: Iterable, *, sort: bool = False) -> tuple:
-        items = sorted(iterable) if sort else iterable
-        return tuple(to_hashable(item, fallback_to_str) for item in items)
-
-    def hashable_mapping(mapping: dict, *, sort: bool = False) -> tuple:
-        items = sorted(mapping.items()) if sort else mapping.items()
-        return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
+    try:
+        hash(obj)
+    except TypeError:
+        pass
+    else:
+        return obj
 
     if isinstance(obj, collections.OrderedDict):
-        return ("OrderedDict", hashable_mapping(obj))
+        return ("OrderedDict", _hashable_mapping(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.defaultdict):
         return (
             "defaultdict",
             (
                 to_hashable(obj.default_factory, fallback_to_str),
-                hashable_mapping(obj, sort=True),
+                _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
             ),
         )
     if isinstance(obj, collections.Counter):
         return ("Counter", tuple(sorted(obj.items())))
     if isinstance(obj, dict):
-        return ("dict", hashable_mapping(obj, sort=True))
+        return ("dict", _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
     if isinstance(obj, set | frozenset):
-        return (type(obj).__name__, hashable_iterable(obj, sort=True))
+        return (
+            type(obj).__name__,
+            _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str),
+        )
     if isinstance(obj, list | tuple):
-        return (type(obj).__name__, hashable_iterable(obj))
+        return (type(obj).__name__, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.deque):
-        return ("deque", (obj.maxlen, hashable_iterable(obj)))
+        return ("deque", (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
     if isinstance(obj, array.array):
         return ("array", (obj.typecode, tuple(obj)))
     if isinstance(obj, bytearray):
