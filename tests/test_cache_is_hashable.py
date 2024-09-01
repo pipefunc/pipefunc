@@ -18,7 +18,7 @@ from pipefunc._cache import to_hashable
             ("OrderedDict", ((1, ("str", hash("a"))), (2, ("str", hash("b"))))),
         ),
         (
-            collections.defaultdict(int, {1: "a", 2: "b"}),
+            collections.defaultdict(int, {1: "a", 2: "b"}),  # type: ignore[arg-type]
             (
                 "defaultdict",
                 (
@@ -61,18 +61,21 @@ def test_to_hashable_basic_types(obj: Any, expected: Any) -> None:
 def test_to_hashable_numpy_array() -> None:
     arr = np.array([[1, 2], [3, 4]])
     result = to_hashable(arr)
+    assert isinstance(result, tuple)
     assert result[0] == "ndarray"
-    assert result[1][0] == (2, 2)  # shape
-    assert result[1][1] == "<i8"  # dtype
-    assert result[1][2] == (1, 2, 3, 4)  # flattened array
+    # (shape, dtype, flattened array)
+    assert result[1][0] == (2, 2)  # type: ignore[index]
+    assert result[1][1] == "<i8"  # type: ignore[index]
+    assert result[1][2] == (1, 2, 3, 4)  # type: ignore[index]
 
 
 def test_to_hashable_pandas_series() -> None:
     series = pd.Series([1, 2, 3], name="test")
     result = to_hashable(series)
+    assert isinstance(result, tuple)
     assert result[0] == "Series"
-    assert result[1][0] == "test"  # name
-    assert result[1][1] == (
+    assert result[1][0] == "test"  # type: ignore[index]
+    assert result[1][1] == (  # type: ignore[index]
         "dict",
         ((0, ("int", hash(1))), (1, ("int", hash(2))), (2, ("int", hash(3)))),
     )
@@ -81,6 +84,7 @@ def test_to_hashable_pandas_series() -> None:
 def test_to_hashable_pandas_dataframe() -> None:
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
     result = to_hashable(df)
+    assert isinstance(result, tuple)
     assert result[0] == "DataFrame"
     assert result[1] == (
         "dict",
@@ -168,7 +172,7 @@ def test_to_hashable_builtin_types(obj: Any, expected: Any) -> None:
 
 
 def test_to_hashable_recursive_structure() -> None:
-    lst = [1, 2]
+    lst: list[Any] = [1, 2]
     lst.append(lst)
     with pytest.raises(RecursionError):
         to_hashable(lst)

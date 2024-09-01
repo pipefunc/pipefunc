@@ -541,7 +541,7 @@ def memoize(
     return decorator
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> Hashable:  # noqa: C901, FBT001, FBT002, PLR0911, PLR0912
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: C901, FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
     Parameters
