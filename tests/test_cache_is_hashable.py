@@ -6,28 +6,30 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipefunc._cache import to_hashable
+from pipefunc._cache import _HASH_MARKER, to_hashable
+
+M = _HASH_MARKER
 
 
 @pytest.mark.parametrize(
     ("obj", "expected"),
     [
-        ({1: "a", 2: "b"}, (dict, ((1, "a"), (2, "b")))),
+        ({1: "a", 2: "b"}, (M, dict, ((1, "a"), (2, "b")))),
         (
             OrderedDict([(1, "a"), (2, "b")]),
-            (OrderedDict, ((1, "a"), (2, "b"))),
+            (M, OrderedDict, ((1, "a"), (2, "b"))),
         ),
         (
             defaultdict(int, {1: "a", 2: "b"}),  # type: ignore[arg-type]
-            (defaultdict, (int, ((1, "a"), (2, "b")))),
+            (M, defaultdict, (int, ((1, "a"), (2, "b")))),
         ),
-        (Counter({1: 2, 3: 4}), (Counter, ((1, 2), (3, 4)))),
-        ({1, 2, 3}, (set, (1, 2, 3))),
+        (Counter({1: 2, 3: 4}), (M, Counter, ((1, 2), (3, 4)))),
+        ({1, 2, 3}, (M, set, (1, 2, 3))),
         (frozenset([1, 2, 3]), frozenset([1, 2, 3])),
-        ([1, 2, 3], (list, (1, 2, 3))),
+        ([1, 2, 3], (M, list, (1, 2, 3))),
         ((1, 2, 3), (1, 2, 3)),
-        (deque([1, 2, 3], maxlen=5), (deque, (5, (1, 2, 3)))),
-        (array.array("i", [1, 2, 3]), (array.array, ("i", (1, 2, 3)))),
+        (deque([1, 2, 3], maxlen=5), (M, deque, (5, (1, 2, 3)))),
+        (array.array("i", [1, 2, 3]), (M, array.array, ("i", (1, 2, 3)))),
     ],
 )
 def test_to_hashable_basic_types(obj: Any, expected: Any) -> None:
@@ -38,33 +40,33 @@ def test_to_hashable_numpy_array() -> None:
     arr = np.array([[1, 2], [3, 4]])
     result = to_hashable(arr)
     assert isinstance(result, tuple)
-    assert result[0] == np.ndarray
+    assert result[1] == np.ndarray
     # (shape, dtype, flattened array)
-    assert result[1][0] == (2, 2)  # type: ignore[index]
-    assert result[1][1] == "<i8"  # type: ignore[index]
-    assert result[1][2] == (1, 2, 3, 4)  # type: ignore[index]
+    assert result[2][0] == (2, 2)  # type: ignore[index]
+    assert result[2][1] == "<i8"  # type: ignore[index]
+    assert result[2][2] == (1, 2, 3, 4)  # type: ignore[index]
 
 
 def test_to_hashable_pandas_series() -> None:
     series = pd.Series([1, 2, 3], name="test")
     result = to_hashable(series)
     assert isinstance(result, tuple)
-    assert result[0] == pd.Series
-    assert result[1][0] == "test"  # type: ignore[index]
-    assert result[1][1] == (dict, ((0, 1), (1, 2), (2, 3)))  # type: ignore[index]
+    assert result[0] == M
+    assert result[1] == pd.Series
+    assert result[2][0] == "test"  # type: ignore[index]
+    assert result[2][1] == (M, dict, ((0, 1), (1, 2), (2, 3)))  # type: ignore[index]
 
 
 def test_to_hashable_pandas_dataframe() -> None:
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
     result = to_hashable(df)
     assert isinstance(result, tuple)
-    assert result[0] == pd.DataFrame
-    assert result[1] == (
+    assert result[0] == M
+    assert result[1] == pd.DataFrame
+    assert result[2] == (
+        M,
         dict,
-        (
-            ("A", (list, (1, 2))),
-            ("B", (list, (3, 4))),
-        ),
+        (("A", (M, list, (1, 2))), ("B", (M, list, (3, 4)))),
     )
 
 
@@ -72,10 +74,11 @@ def test_to_hashable_nested_structures() -> None:
     nested = {"a": [1, 2, {"b": (3, 4)}], "c": {5, 6}}
     result = to_hashable(nested)
     expected = (
+        M,
         dict,
         (
-            ("a", (list, (1, 2, (dict, (("b", (3, 4)),))))),
-            ("c", (set, (5, 6))),
+            ("a", (M, list, (1, 2, (M, dict, (("b", (3, 4)),))))),
+            ("c", (M, set, (5, 6))),
         ),
     )
     assert result == expected
@@ -89,7 +92,7 @@ def test_to_hashable_unhashable_object() -> None:
 
     obj = Unhashable()
     result = to_hashable(obj)
-    assert result == (Unhashable, str(obj))
+    assert result == (M, Unhashable, str(obj))
 
 
 def test_to_hashable_unhashable_object_no_fallback() -> None:
@@ -124,7 +127,7 @@ def test_to_hashable_custom_hashable_object() -> None:
         ("hello", "hello"),
         (complex(1, 2), complex(1, 2)),
         (b"bytes", b"bytes"),
-        (bytearray(b"bytearray"), (bytearray, tuple(bytearray(b"bytearray")))),
+        (bytearray(b"bytearray"), (M, bytearray, tuple(bytearray(b"bytearray")))),
     ],
 )
 def test_to_hashable_builtin_types(obj: Any, expected: Any) -> None:
@@ -143,5 +146,5 @@ def test_hash_duplicates():
     h1 = to_hashable(x1)
     x2 = [1]
     h2 = to_hashable(x2)
-    assert h1 == h2
+    assert h1 != h2
     assert hash(h1) != hash(h2)

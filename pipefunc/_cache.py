@@ -559,6 +559,9 @@ def _hashable_mapping(
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
 
+_HASH_MARKER = "__CONVERTED__"
+
+
 def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
@@ -598,11 +601,12 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
         hash(tp)
     except TypeError:
         tp = tp.__name__  # type: ignore[union-attr]
-
+    m = _HASH_MARKER
     if isinstance(obj, collections.OrderedDict):
-        return (tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.defaultdict):
         return (
+            m,
             tp,
             (
                 to_hashable(obj.default_factory, fallback_to_str),
@@ -610,33 +614,33 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
             ),
         )
     if isinstance(obj, collections.Counter):
-        return (tp, tuple(sorted(obj.items())))
+        return (m, tp, tuple(sorted(obj.items())))
     if isinstance(obj, dict):
-        return (tp, _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
     if isinstance(obj, set | frozenset):
-        return (tp, _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str))
     if isinstance(obj, list | tuple):
-        return (tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.deque):
-        return (tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
+        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
     if isinstance(obj, bytearray):
-        return (tp, tuple(obj))
+        return (m, tp, tuple(obj))
     if isinstance(obj, array.array):
-        return (tp, (obj.typecode, tuple(obj)))
+        return (m, tp, (obj.typecode, tuple(obj)))
 
     # Handle numpy arrays
     if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
-        return (tp, (obj.shape, obj.dtype.str, tuple(obj.flatten())))
+        return (m, tp, (obj.shape, obj.dtype.str, tuple(obj.flatten())))
 
     # Handle pandas Series and DataFrames
     if "pandas" in sys.modules:
         if isinstance(obj, sys.modules["pandas"].Series):
-            return (tp, (obj.name, to_hashable(obj.to_dict(), fallback_to_str)))
+            return (m, tp, (obj.name, to_hashable(obj.to_dict(), fallback_to_str)))
         if isinstance(obj, sys.modules["pandas"].DataFrame):
-            return (tp, to_hashable(obj.to_dict("list"), fallback_to_str))
+            return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_str))
 
     if fallback_to_str:
-        return (tp, str(obj))
+        return (m, tp, str(obj))
     msg = f"Object of type {type(obj)} cannot be hashed"
     raise TypeError(msg)
 
