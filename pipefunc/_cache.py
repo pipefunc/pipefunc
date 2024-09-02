@@ -510,8 +510,6 @@ def memoize(
 
     """
     if cache is None:
-        from pipefunc._cache import SimpleCache
-
         cache = SimpleCache()
 
     def decorator(func: Callable) -> Callable:
