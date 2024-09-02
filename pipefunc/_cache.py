@@ -559,21 +559,6 @@ def _hashable_mapping(
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
 
-class _Type:
-    __slots__ = ["name"]
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, _Type):
-            return False
-        return self.name == other.name
-
-    def __hash__(self) -> int:
-        return hash(self.name)
-
-
 def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation.
 
@@ -608,7 +593,12 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
     else:
         return obj
 
-    tp = _Type(type(obj).__name__)
+    tp: type | str = type(obj)
+    try:
+        hash(tp)
+    except TypeError:
+        tp = tp.__name__  # type: ignore[union-attr]
+
     if isinstance(obj, collections.OrderedDict):
         return (tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.defaultdict):
@@ -629,10 +619,10 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
         return (tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.deque):
         return (tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
-    if isinstance(obj, array.array):
-        return (tp, (obj.typecode, tuple(obj)))
     if isinstance(obj, bytearray):
         return (tp, tuple(obj))
+    if isinstance(obj, array.array):
+        return (tp, (obj.typecode, tuple(obj)))
 
     # Handle numpy arrays
     if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
@@ -646,7 +636,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
             return (tp, to_hashable(obj.to_dict("list"), fallback_to_str))
 
     if fallback_to_str:
-        return (_Type("unhashable"), str(obj))
+        return (tp, str(obj))
     msg = f"Object of type {type(obj)} cannot be hashed"
     raise TypeError(msg)
 
