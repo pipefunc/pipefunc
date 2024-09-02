@@ -136,3 +136,12 @@ def test_to_hashable_recursive_structure() -> None:
     lst.append(lst)
     with pytest.raises(RecursionError):
         to_hashable(lst)
+
+
+def test_hash_duplicates():
+    x1 = (list, (1,))
+    h1 = to_hashable(x1)
+    x2 = [1]
+    h2 = to_hashable(x2)
+    assert h1 == h2
+    assert hash(h1) != hash(h2)
