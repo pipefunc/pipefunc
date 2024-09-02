@@ -15,10 +15,7 @@ M = _HASH_MARKER
     ("obj", "expected"),
     [
         ({1: "a", 2: "b"}, (M, dict, ((1, "a"), (2, "b")))),
-        (
-            OrderedDict([(1, "a"), (2, "b")]),
-            (M, OrderedDict, ((1, "a"), (2, "b"))),
-        ),
+        (OrderedDict([(1, "a"), (2, "b")]), (M, OrderedDict, ((1, "a"), (2, "b")))),
         (
             defaultdict(int, {1: "a", 2: "b"}),  # type: ignore[arg-type]
             (M, defaultdict, (int, ((1, "a"), (2, "b")))),
@@ -63,11 +60,7 @@ def test_to_hashable_pandas_dataframe() -> None:
     assert isinstance(result, tuple)
     assert result[0] == M
     assert result[1] == pd.DataFrame
-    assert result[2] == (
-        M,
-        dict,
-        (("A", (M, list, (1, 2))), ("B", (M, list, (3, 4)))),
-    )
+    assert result[2] == (M, dict, (("A", (M, list, (1, 2))), ("B", (M, list, (3, 4)))))
 
 
 def test_to_hashable_nested_structures() -> None:
@@ -76,10 +69,7 @@ def test_to_hashable_nested_structures() -> None:
     expected = (
         M,
         dict,
-        (
-            ("a", (M, list, (1, 2, (M, dict, (("b", (3, 4)),))))),
-            ("c", (M, set, (5, 6))),
-        ),
+        (("a", (M, list, (1, 2, (M, dict, (("b", (3, 4)),))))), ("c", (M, set, (5, 6)))),
     )
     assert result == expected
 

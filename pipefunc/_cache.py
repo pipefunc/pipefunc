@@ -559,11 +559,12 @@ def _hashable_mapping(
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
 
+# Unique string added to hashable representations to avoid hash collisions
 _HASH_MARKER = "__CONVERTED__"
 
 
 def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
-    """Convert any object to a hashable representation.
+    """Convert any object to a hashable representation if not hashable yet.
 
     Parameters
     ----------
