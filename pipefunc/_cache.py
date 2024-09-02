@@ -560,6 +560,8 @@ def _hashable_mapping(
 
 
 class _Type:
+    __slots__ = ["name"]
+
     def __init__(self, name: str) -> None:
         self.name = name
 
