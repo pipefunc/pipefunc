@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import abc
+import array
+import collections
+import functools
 import hashlib
 import pickle
+import sys
+import time
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -11,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import cloudpickle
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable
+    from collections.abc import Callable, Hashable, Iterable
 
 
 class _CacheBase(abc.ABC):
@@ -484,3 +489,183 @@ class DiskCache(_CacheBase):
     def shared(self) -> bool:
         """Return whether the cache is shared."""
         return self.lru_cache.shared
+
+
+def memoize(
+    cache: _CacheBase | None = None,
+    key_func: Callable[..., Hashable] | None = None,
+) -> Callable:
+    """A flexible memoization decorator that works with different cache types.
+
+    Parameters
+    ----------
+    cache
+        An instance of a cache class (_CacheBase). If None, a SimpleCache is used.
+    key_func
+        A function to generate cache keys. If None, the default key generation which
+        attempts to make all arguments hashable.
+
+    Returns
+    -------
+    Decorated function with memoization.
+
+    """
+    if cache is None:
+        cache = SimpleCache()
+
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if key_func:  # noqa: SIM108
+                key = key_func(*args, **kwargs)
+            else:
+                key = _generate_cache_key(args, kwargs)
+
+            if key in cache:
+                return cache.get(key)
+
+            if isinstance(cache, HybridCache):
+                t_start = time.monotonic()
+            result = func(*args, **kwargs)
+            if isinstance(cache, HybridCache):
+                # For HybridCache, we need to provide a duration
+                # Here, we're using a default duration of 1.0
+                cache.put(key, result, time.monotonic() - t_start)
+            else:
+                cache.put(key, result)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def _hashable_iterable(
+    iterable: Iterable,
+    *,
+    fallback_to_str: bool = True,
+    sort: bool = False,
+) -> tuple:
+    items = sorted(iterable) if sort else iterable
+    return tuple(to_hashable(item, fallback_to_str) for item in items)
+
+
+def _hashable_mapping(
+    mapping: dict,
+    *,
+    fallback_to_str: bool = True,
+    sort: bool = False,
+) -> tuple:
+    items = sorted(mapping.items()) if sort else mapping.items()
+    return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
+
+
+# Unique string added to hashable representations to avoid hash collisions
+_HASH_MARKER = "__CONVERTED__"
+
+
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001, FBT002, PLR0911, PLR0912
+    """Convert any object to a hashable representation if not hashable yet.
+
+    Parameters
+    ----------
+    obj
+        The object to convert.
+    fallback_to_str
+        If True, unhashable objects will be converted to strings as a last resort.
+        If False, an exception will be raised for unhashable objects.
+
+    Returns
+    -------
+    A hashable representation of the input object.
+
+    Raises
+    ------
+    TypeError
+        If the object cannot be made hashable and fallback_to_str is False.
+
+    Notes
+    -----
+    This function attempts to create a hashable representation of any input object.
+    It handles most built-in Python types and some common third-party types like
+    numpy arrays and pandas Series/DataFrames.
+
+    """
+    try:
+        hash(obj)
+    except Exception:  # noqa: BLE001, S110
+        pass
+    else:
+        return obj
+
+    tp: type | str = type(obj)
+    try:
+        hash(tp)
+    except Exception:  # noqa: BLE001
+        tp = tp.__name__  # type: ignore[union-attr]
+    m = _HASH_MARKER
+    if isinstance(obj, collections.OrderedDict):
+        return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
+    if isinstance(obj, collections.defaultdict):
+        data = (
+            to_hashable(obj.default_factory, fallback_to_str),
+            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
+        )
+        return (m, tp, data)
+    if isinstance(obj, collections.Counter):
+        return (m, tp, tuple(sorted(obj.items())))
+    if isinstance(obj, dict):
+        return (m, tp, _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
+    if isinstance(obj, set | frozenset):
+        return (m, tp, _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str))
+    if isinstance(obj, list | tuple):
+        return (m, tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
+    if isinstance(obj, collections.deque):
+        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
+    if isinstance(obj, bytearray):
+        return (m, tp, tuple(obj))
+    if isinstance(obj, array.array):
+        return (m, tp, (obj.typecode, tuple(obj)))
+
+    # Handle numpy arrays
+    if "numpy" in sys.modules and isinstance(obj, sys.modules["numpy"].ndarray):
+        return (m, tp, (obj.shape, obj.dtype.str, tuple(obj.flatten())))
+
+    # Handle pandas Series and DataFrames
+    if "pandas" in sys.modules:
+        if isinstance(obj, sys.modules["pandas"].Series):
+            return (m, tp, (obj.name, to_hashable(obj.to_dict(), fallback_to_str)))
+        if isinstance(obj, sys.modules["pandas"].DataFrame):
+            return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_str))
+
+    if fallback_to_str:
+        return (m, tp, str(obj))
+    msg = f"Object of type {type(obj)} cannot be hashed"
+    raise TypeError(msg)
+
+
+def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:
+    """Generate a hashable key from function arguments.
+
+    Parameters
+    ----------
+    args
+        Positional arguments to be included in the key.
+    kwargs
+        Keyword arguments to be included in the key.
+    fallback_to_str
+        If True, unhashable objects will be converted to strings as a last resort.
+        If False, an exception will be raised for unhashable objects.
+
+    Returns
+    -------
+    A hash value that can be used as a cache key.
+
+    Notes
+    -----
+    This function creates a hashable representation of both positional and keyword
+    arguments, allowing for effective caching of function calls with various
+    argument types.
+
+    """
+    return to_hashable((args, kwargs), fallback_to_str)

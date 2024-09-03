@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc._cache import LRUCache
+from pipefunc._cache import _HASH_MARKER, LRUCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -139,10 +139,17 @@ def test_simple_cache() -> None:
     assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
-    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
+    m = _HASH_MARKER
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, dict, (("a", 1),))), ("b", (m, list, (2,))))): ({"a": 1}, [2]),
+    }
+    assert len(pipeline.cache.cache) == 1
     pipeline.cache.clear()
     assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
-    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, set, ("a",))), ("b", (m, list, (2,))))): ({"a"}, [2]),
+    }
+    assert len(pipeline.cache.cache) == 1
 
 
 def test_cache_non_root_args() -> None:
@@ -173,7 +180,10 @@ def test_sharing_defaults() -> None:
     pipeline = Pipeline([f, g], cache_type="simple")
     assert pipeline("d", a=1) == 3
     assert pipeline.cache is not None
-    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
+    assert pipeline.cache.cache == {
+        ("c", (("a", 1), ("b", 1))): 2,
+        ("d", (("a", 1), ("b", 1))): 3,
+    }
     assert pipeline.map(inputs={"a": 1})["d"].output == 3
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
 

@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
@@ -1634,16 +1634,6 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _valid_key(key: Any) -> Any:
-    if isinstance(key, dict):
-        return tuple(sorted(key.items()))
-    if isinstance(key, list):
-        return tuple(key)
-    if isinstance(key, set):
-        return tuple(sorted(key))
-    return key
-
-
 def _update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
@@ -1784,7 +1774,7 @@ def _compute_cache_key(
             # i.e., the output of a function was directly provided as an input to
             # another function. In this case, we don't want to cache the result.
             return None
-        key = _valid_key(kwargs[k])
+        key = to_hashable(kwargs[k])
         cache_key_items.append((k, key))
 
     return output_name, tuple(cache_key_items)
