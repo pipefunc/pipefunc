@@ -542,6 +542,7 @@ def memoize(
                 cache.put(key, result)
             return result
 
+        wrapper.cache = cache  # type: ignore[attr-defined]
         return wrapper
 
     return decorator
