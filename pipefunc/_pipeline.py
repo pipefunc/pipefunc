@@ -1634,16 +1634,6 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _valid_key(key: Any) -> Any:
-    if isinstance(key, dict):
-        return tuple(sorted(key.items()))
-    if isinstance(key, list):
-        return tuple(key)
-    if isinstance(key, set):
-        return tuple(sorted(key))
-    return key
-
-
 def _update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
