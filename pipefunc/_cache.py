@@ -593,7 +593,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
     """
     try:
         hash(obj)
-    except TypeError:
+    except Exception:  # noqa: BLE001, S110
         pass
     else:
         return obj
@@ -601,7 +601,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
     tp: type | str = type(obj)
     try:
         hash(tp)
-    except TypeError:
+    except Exception:  # noqa: BLE001
         tp = tp.__name__  # type: ignore[union-attr]
     m = _HASH_MARKER
     if isinstance(obj, collections.OrderedDict):

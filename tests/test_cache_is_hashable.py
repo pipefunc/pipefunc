@@ -138,3 +138,23 @@ def test_hash_duplicates():
     h2 = to_hashable(x2)
     assert h1 != h2
     assert hash(h1) != hash(h2)
+
+
+def test_unhashable_type():
+    # Test the case where a hash(type(obj)) AND hash(obj) doesn't work
+    class Meta(type):
+        def __hash__(cls):
+            msg = "Not implemented"
+            raise NotImplementedError(msg)
+
+    class Unhashable(metaclass=Meta):
+        def __hash__(self):
+            msg = "Not implemented"
+            raise NotImplementedError(msg)
+
+    with pytest.raises(NotImplementedError, match="Not implemented"):
+        hash(Unhashable)
+    with pytest.raises(NotImplementedError, match="Not implemented"):
+        hash(Unhashable())
+    x = Unhashable()
+    assert to_hashable(x) == (_HASH_MARKER, "Unhashable", str(x))
