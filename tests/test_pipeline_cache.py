@@ -136,7 +136,7 @@ def test_simple_cache() -> None:
     pipeline = Pipeline([f], cache_type="simple")
     assert pipeline("c", a=1, b=2) == (1, 2)
     assert pipeline.cache is not None
-    assert len(pipeline.cache.cache) == 1
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
     m = _HASH_MARKER
