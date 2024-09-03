@@ -502,7 +502,8 @@ def memoize(
     cache
         An instance of a cache class (_CacheBase). If None, a SimpleCache is used.
     key_func
-        A function to generate cache keys. If None, args and kwargs are used.
+        A function to generate cache keys. If None, the default key generation which
+        attempts to make all arguments hashable.
 
     Returns
     -------
@@ -563,7 +564,7 @@ def _hashable_mapping(
 _HASH_MARKER = "__CONVERTED__"
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:  # noqa: FBT001, FBT002, PLR0911, PLR0912
+def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001, FBT002, PLR0911, PLR0912
     """Convert any object to a hashable representation if not hashable yet.
 
     Parameters
@@ -606,14 +607,11 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> tuple[Hashable, ...]:
     if isinstance(obj, collections.OrderedDict):
         return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
     if isinstance(obj, collections.defaultdict):
-        return (
-            m,
-            tp,
-            (
-                to_hashable(obj.default_factory, fallback_to_str),
-                _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
-            ),
+        data = (
+            to_hashable(obj.default_factory, fallback_to_str),
+            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
         )
+        return (m, tp, data)
     if isinstance(obj, collections.Counter):
         return (m, tp, tuple(sorted(obj.items())))
     if isinstance(obj, dict):

@@ -1784,9 +1784,10 @@ def _compute_cache_key(
             # i.e., the output of a function was directly provided as an input to
             # another function. In this case, we don't want to cache the result.
             return None
-        cache_key_items.append((k, kwargs[k]))
+        key = to_hashable(kwargs[k])
+        cache_key_items.append((k, key))
 
-    return output_name, to_hashable(tuple(cache_key_items))
+    return output_name, tuple(cache_key_items)
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
