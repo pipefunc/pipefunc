@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc._cache import _HASH_MARKER, LRUCache
+from pipefunc.cache import _HASH_MARKER, LRUCache
 
 if TYPE_CHECKING:
     from pathlib import Path

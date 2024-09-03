@@ -1,3 +1,5 @@
+"""Provides `pipefunc.cache` module with cache classes for memoization and caching."""
+
 from __future__ import annotations
 
 import abc
@@ -425,6 +427,7 @@ class DiskCache(_CacheBase):
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
+        """Get a value from the cache by key."""
         if self.with_lru_cache and key in self.lru_cache:
             return self.lru_cache.get(key)
 
@@ -440,6 +443,7 @@ class DiskCache(_CacheBase):
         return None
 
     def put(self, key: Hashable, value: Any) -> None:
+        """Insert a key value pair into the cache."""
         file_path = self._get_file_path(key)
         with file_path.open("wb") as f:
             if self.use_cloudpickle:
@@ -461,16 +465,19 @@ class DiskCache(_CacheBase):
                 oldest_file.unlink()
 
     def __contains__(self, key: Hashable) -> bool:
+        """Check if a key is present in the cache."""
         if self.with_lru_cache and key in self.lru_cache:
             return True
         file_path = self._get_file_path(key)
         return file_path.exists()
 
     def __len__(self) -> int:
+        """Return the number of cache files."""
         files = self._all_files()
         return len(files)
 
     def clear(self) -> None:
+        """Clear the cache by deleting all cache files."""
         for file_path in self._all_files():
             with suppress(Exception):
                 file_path.unlink()

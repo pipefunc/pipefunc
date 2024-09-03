@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import networkx as nx
 
-from pipefunc._cache import SimpleCache
 from pipefunc._utils import format_function_call
+from pipefunc.cache import SimpleCache
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
