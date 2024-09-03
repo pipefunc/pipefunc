@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
@@ -28,7 +28,7 @@ from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
     import adaptive_scheduler
     import numpy.typing as npt
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from pipefunc.sweep import Sweep
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class LearnerPipeFunc(NamedTuple):
@@ -66,11 +66,11 @@ class LearnersDict(LearnersDictType):
     def __init__(
         self,
         learners_dict: LearnersDictType | None = None,
-        run_folder: str | Path | None = None,
+        run_info: RunInfo | None = None,
     ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
-        self.run_folder = run_folder
+        self.run_info: RunInfo | None = run_info
 
     def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
         """Flatten the learners into a dictionary with the output names as keys."""
@@ -90,18 +90,16 @@ class LearnersDict(LearnersDictType):
 
     def to_slurm_run(
         self,
-        run_folder: str | Path | None = None,
         default_resources: dict | Resources | None = None,
         *,
         ignore_resources: bool = False,
         returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
+        **slurm_run_kwargs: Any,
     ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
         """Helper for `adaptive_scheduler.slurm_run` which returns a `adaptive_scheduler.RunManager`.
 
         Parameters
         ----------
-        run_folder
-            The folder to store the run information.
         default_resources
             The default resources to use for the run. Only needed if not all `PipeFunc`s have
             resources.
@@ -113,6 +111,8 @@ class LearnersDict(LearnersDictType):
             If "run_manager", returns a `adaptive_scheduler.RunManager`.
             If "kwargs", returns a dictionary that can be passed to `adaptive_scheduler.slurm_run`.
             If "namedtuple", returns an `AdaptiveSchedulerDetails`.
+        slurm_run_kwargs
+            Additional keyword arguments to pass to `adaptive_scheduler.slurm_run`.
 
         Returns
         -------
@@ -121,24 +121,28 @@ class LearnersDict(LearnersDictType):
         """
         from pipefunc.map.adaptive_scheduler import slurm_run_setup
 
-        if run_folder is None:
-            if self.run_folder is None:
-                msg = "The `run_folder` must be provided."
-                raise ValueError(msg)
-            run_folder = self.run_folder
+        if self.run_info is None:
+            msg = "`run_info` must be provided. Set `learners_dict.run_info`."
+            raise ValueError(msg)
 
         details: AdaptiveSchedulerDetails = slurm_run_setup(
             self,
-            run_folder,
             default_resources,
             ignore_resources=ignore_resources,
         )
         if returns == "namedtuple":
+            if slurm_run_kwargs:
+                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                raise ValueError(msg)
             return details
+        kwargs = details.kwargs()
+        if slurm_run_kwargs:
+            kwargs.update(slurm_run_kwargs)
+        kwargs.setdefault("folder", self.run_info.run_folder / "adaptive_scheduler")
         if returns == "run_manager":  # pragma: no cover
-            return details.run_manager()
+            return details.run_manager(kwargs)
         if returns == "kwargs":
-            return details.kwargs()
+            return kwargs
         msg = f"Invalid value for `returns`: {returns}"
         raise ValueError(msg)
 
@@ -161,7 +165,7 @@ def create_learners(
     created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
 
     - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
-      is created for each function node.
+      is created for each function node (unless `resources_scope="element"`).
     - If `split_independent_axes` is `True`, multiple learners are created for each function
       node, corresponding to different combinations of the independent axes in the pipeline.
 
@@ -228,7 +232,7 @@ def create_learners(
     )
     run_info.dump(run_folder)
     store = run_info.init_store()
-    learners: LearnersDict = LearnersDict(run_folder=run_folder)
+    learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(
         pipeline,
         inputs,
@@ -236,21 +240,32 @@ def create_learners(
         split_independent_axes,
         internal_shapes,
     )
-    for fixed_indices in iterator:
-        key = _key(fixed_indices) if fixed_indices else None
+    for _fixed_indices in iterator:
+        key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
-            _learners = []
+            gen_learners = []
             for func in gen:
                 learner = _learner(
                     func=func,
                     run_info=run_info,
                     store=store,
-                    fixed_indices=fixed_indices,  # might be None
+                    fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
-                _learners.append(LearnerPipeFunc(learner, func))
-            learners.setdefault(key, []).append(_learners)
+                if func.resources_scope == "element":
+                    for lrn in _split_sequence_learner(learner):
+                        gen_learners.append(LearnerPipeFunc(lrn, func))  # noqa: PERF401
+                else:
+                    gen_learners.append(LearnerPipeFunc(learner, func))
+            learners.setdefault(key, []).append(gen_learners)
     return learners
+
+
+def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
+    """Split a `SequenceLearner` into multiple learners."""
+    if len(learner.sequence) == 1:
+        return [learner]
+    return [SequenceLearner(learner._original_function, [x]) for x in learner.sequence]
 
 
 def _learner(
@@ -284,7 +299,10 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
-def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
+    if not fixed_indices:
+        return None
+    # Makes `fixed_indices` hashable
     return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
 
 
@@ -353,7 +371,9 @@ def _execute_iteration_in_map_spec(
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
-    return outputs if return_output else None
+    if not return_output:
+        return None
+    return outputs if isinstance(func.output_name, tuple) else outputs[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -484,7 +504,7 @@ def _maybe_iterate_axes(
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-) -> Generator[dict[str, Any] | None, None, None]:
+) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
         _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -496,9 +516,9 @@ def _maybe_iterate_axes(
     independent_axes = _identify_cross_product_axes(pipeline)
     axes = pipeline.mapspec_axes
     shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
-    for fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
-        _validate_fixed_indices(fixed_indices, inputs, pipeline)
-        yield fixed_indices
+    for _fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
+        _validate_fixed_indices(_fixed_indices, inputs, pipeline)
+        yield _fixed_indices
 
 
 def _adaptive_wrapper(
@@ -517,6 +537,22 @@ def _adaptive_wrapper(
         inputs_[dim] = val
     results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
     return results[adaptive_output].output
+
+
+def _validate_adaptive(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: dict[str, tuple[float, float]],
+) -> None:
+    if invalid := set(adaptive_dimensions) & set(inputs):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
+        raise ValueError(msg)
+    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
+        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
+        raise ValueError(msg)
+    if not adaptive_dimensions:
+        msg = "`adaptive_dimensions` must be a non-empty dict"
+        raise ValueError(msg)
 
 
 def to_adaptive_learner(
@@ -562,16 +598,7 @@ def to_adaptive_learner(
         A `Learner1D`, `Learner2D`, or `LearnerND` object.
 
     """
-    if invalid := set(adaptive_dimensions) & set(inputs):
-        msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
-        raise ValueError(msg)
-    if invalid := set(adaptive_dimensions) & set(pipeline.mapspec_names):
-        msg = f"Adaptive dimensions `{invalid}` cannot be in `MapSpec`s"
-        raise ValueError(msg)
-    n = len(adaptive_dimensions)
-    if n == 0:
-        msg = "`adaptive_dimensions` must be a non-empty dict"
-        raise ValueError(msg)
+    _validate_adaptive(pipeline, inputs, adaptive_dimensions)
     dims, bounds = zip(*adaptive_dimensions.items())
     function = functools.partial(
         _adaptive_wrapper,
@@ -582,6 +609,7 @@ def to_adaptive_learner(
         run_folder_template=run_folder_template,
         map_kwargs=map_kwargs or {},
     )
+    n = len(adaptive_dimensions)
     if n == 1:
         return Learner1D(function, bounds[0], loss_per_interval=loss_function)
     if n == 2:  # noqa: PLR2004

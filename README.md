@@ -33,6 +33,8 @@
 
 ## :thinking: What is this?
 
+[![asciicast](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod.svg)](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod)
+
 `pipefunc` is a Python library for creating and running function pipelines. By annotating functions and specifying their outputs, it forms a pipeline that automatically organizes the execution order to satisfy dependencies. Just specify the names of the outputs you want to compute, and `pipefunc` will handle the rest by leveraging the parameter names of the annotated functions.
 
 Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
@@ -44,12 +46,13 @@ Whether you're working with data processing, scientific computations, machine le
 3. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
 4. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
 5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to run multiple functions in a single step.
-6. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-7. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
-8. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
-9. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
-10. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
-11. 🤓 **Nerd stats**: >400 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
+6. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
+7. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
+8. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
+9. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+10. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
+11. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
+12. 🤓 **Nerd stats**: >500 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
 
 ## :test_tube: How does it work?
 

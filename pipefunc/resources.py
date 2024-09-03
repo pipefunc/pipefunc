@@ -6,7 +6,10 @@ import functools
 import inspect
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True, eq=True)
@@ -15,22 +18,27 @@ class Resources:
 
     Parameters
     ----------
-    num_cpus
+    cpus
         The number of CPUs required for the job. Must be a positive integer.
-    num_gpus
-        The number of GPUs required for the job. Must be a non-negative integer.
-    num_nodes
-        The number of nodes required for the job. Must be a positive integer.
-    num_cpus_per_node
+    cpus_per_node
         The number of CPUs per node required for the job. Must be a positive integer.
+    nodes
+        The number of nodes required for the job. Must be a positive integer.
     memory
         The memory required for the job. Must be a valid string (e.g., ``'2GB'``, ``'500MB'``).
-    wall_time
-        The wall time required for the job. Must be a valid string (e.g., ``'2:00:00'``, ``'48:00:00'``).
+    gpus
+        The number of GPUs required for the job. Must be a non-negative integer.
+    time
+        The time required for the job. Must be a valid string (e.g., ``'2:00:00'``, ``'48:00:00'``).
     partition
         The partition to submit the job to.
     extra_args
         Extra arguments for the job. Default is an empty dictionary.
+    parallelization_mode
+        Specifies how parallelization should be handled.
+        "internal": The function should use the resources (e.g., cpus) to handle its own parallelization.
+        "external": The function should operate on a single core, with parallelization managed externally.
+        Default is "external".
 
     Raises
     ------
@@ -39,29 +47,30 @@ class Resources:
 
     Notes
     -----
-    - `num_cpus` and `num_nodes` cannot be specified together.
-    - `num_cpus_per_node` must be specified with `num_nodes`.
+    - `cpus` and `nodes` cannot be specified together.
+    - `cpus_per_node` must be specified with `nodes`.
 
     Examples
     --------
-    >>> resources = Resources(num_cpus=4, memory='16GB', wall_time='2:00:00')
-    >>> resources.num_cpus
+    >>> resources = Resources(cpus=4, memory='16GB', time='2:00:00')
+    >>> resources.cpus
     4
     >>> resources.memory
     '16GB'
-    >>> resources.wall_time
+    >>> resources.time
     '2:00:00'
 
     """
 
-    num_cpus: int | None = None
-    num_gpus: int | None = None
-    num_nodes: int | None = None
-    num_cpus_per_node: int | None = None
+    cpus: int | None = None
+    cpus_per_node: int | None = None
+    nodes: int | None = None
     memory: str | None = None
-    wall_time: str | None = None
+    gpus: int | None = None
+    time: str | None = None
     partition: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
+    parallelization_mode: Literal["internal", "external"] = "external"
 
     def __post_init__(self) -> None:
         """Validate input parameters after initialization.
@@ -72,32 +81,32 @@ class Resources:
             If any of the input parameters do not meet the specified constraints.
 
         """
-        if self.num_cpus is not None and self.num_cpus <= 0:
-            msg = "num_cpus must be a positive integer."
+        if self.cpus is not None and self.cpus <= 0:
+            msg = "`cpus` must be a positive integer."
             raise ValueError(msg)
-        if self.num_gpus is not None and self.num_gpus < 0:
-            msg = "num_gpus must be a non-negative integer."
+        if self.gpus is not None and self.gpus < 0:
+            msg = "`gpus` must be a non-negative integer."
             raise ValueError(msg)
-        if self.num_nodes is not None and self.num_nodes <= 0:
-            msg = "num_nodes must be a positive integer."
+        if self.nodes is not None and self.nodes <= 0:
+            msg = "`nodes` must be a positive integer."
             raise ValueError(msg)
-        if self.num_cpus_per_node is not None and self.num_cpus_per_node <= 0:
-            msg = "num_cpus_per_node must be a positive integer."
+        if self.cpus_per_node is not None and self.cpus_per_node <= 0:
+            msg = "`cpus_per_node` must be a positive integer."
             raise ValueError(msg)
         if self.memory is not None and not self._is_valid_memory(self.memory):
-            msg = f"memory must be a valid string (e.g., '2GB', '500MB'), not '{self.memory}'."
+            msg = f"`memory` must be a valid string (e.g., '2GB', '500MB'), not '{self.memory}'."
             raise ValueError(msg)
-        if self.wall_time is not None and not self._is_valid_wall_time(self.wall_time):
-            msg = "wall_time must be a valid string (e.g., '2:00:00', '48:00:00')."
+        if self.time is not None and not self._is_valid_wall_time(self.time):
+            msg = "`time` must be a valid string (e.g., '2:00:00', '48:00:00')."
             raise ValueError(msg)
-        if self.num_nodes and self.num_cpus:
+        if self.nodes and self.cpus:
             msg = (
-                "num_nodes and num_cpus cannot be specified together."
-                " Either use num_nodes and num_cpus_per_node or use num_cpus alone."
+                "`nodes` and `cpus` cannot be specified together."
+                " Either use nodes and `cpus_per_node` or use `cpus` alone."
             )
             raise ValueError(msg)
-        if self.num_cpus_per_node and not self.num_nodes:
-            msg = "num_cpus_per_node must be specified with num_nodes."
+        if self.cpus_per_node and not self.nodes:
+            msg = "`cpus_per_node` must be specified with `nodes`."
             raise ValueError(msg)
 
     @staticmethod
@@ -125,13 +134,18 @@ class Resources:
 
     @staticmethod
     def maybe_from_dict(
-        resources: dict[str, Any] | Resources | Callable[[dict[str, Any]], Resources] | None,
+        resources: dict[str, Any]
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None,
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
             return None
-        if isinstance(resources, Resources) or callable(resources):
+        if isinstance(resources, Resources):
             return resources
+        if callable(resources):
+            return functools.partial(_ensure_resources, resources_callable=resources)
         return Resources.from_dict(resources)
 
     @staticmethod
@@ -156,9 +170,9 @@ class Resources:
         raise ValueError(msg)
 
     @staticmethod
-    def _is_valid_wall_time(wall_time: str) -> bool:
+    def _is_valid_wall_time(time: str) -> bool:
         pattern = re.compile(r"^(\d+:)?(\d{2}:)?\d{2}:\d{2}$")
-        return bool(pattern.match(wall_time))
+        return bool(pattern.match(time))
 
     def to_slurm_options(self) -> str:
         """Convert the Resources instance to SLURM options.
@@ -170,18 +184,18 @@ class Resources:
 
         """
         options = []
-        if self.num_cpus:
-            options.append(f"--cpus-per-task={self.num_cpus}")
-        if self.num_gpus:
-            options.append(f"--gres=gpu:{self.num_gpus}")
-        if self.num_nodes:
-            options.append(f"--nodes={self.num_nodes}")
-        if self.num_cpus_per_node:
-            options.append(f"--cpus-per-node={self.num_cpus_per_node}")
+        if self.cpus:
+            options.append(f"--cpus-per-task={self.cpus}")
+        if self.gpus:
+            options.append(f"--gres=gpu:{self.gpus}")
+        if self.nodes:
+            options.append(f"--nodes={self.nodes}")
+        if self.cpus_per_node:
+            options.append(f"--cpus-per-node={self.cpus_per_node}")
         if self.memory:
             options.append(f"--mem={self.memory}")
-        if self.wall_time:
-            options.append(f"--time={self.wall_time}")
+        if self.time:
+            options.append(f"--time={self.time}")
         if self.partition:
             options.append(f"--partition={self.partition}")
         for key, value in self.extra_args.items():
@@ -229,26 +243,26 @@ class Resources:
             return Resources()
 
         max_data: dict[str, Any] = {
-            "num_cpus": None,
-            "num_gpus": None,
+            "cpus": None,
+            "gpus": None,
             "memory": None,
-            "wall_time": None,
+            "time": None,
             "partition": None,
             "extra_args": {},
         }
 
         for resources in resources_list:
-            if resources.num_cpus is not None:
-                max_data["num_cpus"] = (
-                    resources.num_cpus
-                    if max_data["num_cpus"] is None
-                    else max(max_data["num_cpus"], resources.num_cpus)
+            if resources.cpus is not None:
+                max_data["cpus"] = (
+                    resources.cpus
+                    if max_data["cpus"] is None
+                    else max(max_data["cpus"], resources.cpus)
                 )
-            if resources.num_gpus is not None:
-                max_data["num_gpus"] = (
-                    resources.num_gpus
-                    if max_data["num_gpus"] is None
-                    else max(max_data["num_gpus"], resources.num_gpus)
+            if resources.gpus is not None:
+                max_data["gpus"] = (
+                    resources.gpus
+                    if max_data["gpus"] is None
+                    else max(max_data["gpus"], resources.gpus)
                 )
             if resources.memory is not None:
                 max_memory_gb = (
@@ -259,11 +273,11 @@ class Resources:
                 current_memory_gb = Resources._convert_to_gb(resources.memory)
                 if current_memory_gb > max_memory_gb:
                     max_data["memory"] = resources.memory
-            if resources.wall_time is not None:
-                max_data["wall_time"] = (
-                    resources.wall_time
-                    if max_data["wall_time"] is None
-                    else max(max_data["wall_time"], resources.wall_time)
+            if resources.time is not None:
+                max_data["time"] = (
+                    resources.time
+                    if max_data["time"] is None
+                    else max(max_data["time"], resources.time)
                 )
             if resources.partition is not None:
                 max_data["partition"] = resources.partition
@@ -323,3 +337,14 @@ def _delayed_resources_with_defaults(
 ) -> Resources:
     resources = _resources(kwargs)
     return resources.with_defaults(_default_resources)
+
+
+def _ensure_resources(
+    kwargs: dict[str, Any],
+    *,
+    resources_callable: Callable[[dict[str, Any]], Resources | dict[str, Any]],
+) -> Resources:
+    resources_instance = resources_callable(kwargs)
+    if isinstance(resources_instance, dict):
+        return Resources(**resources_instance)
+    return resources_instance

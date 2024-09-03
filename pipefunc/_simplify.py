@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import TYPE_CHECKING, TypeAlias, Union
+from typing import TYPE_CHECKING, TypeAlias
 
 import networkx as nx
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pipefunc._pipeline import Pipeline
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def simplified_pipeline(

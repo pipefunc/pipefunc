@@ -225,7 +225,7 @@ def test_nested_func() -> None:
     def g(f):
         return f
 
-    def h(g, x):  # noqa: ARG001
+    def h(g, x):
         return g
 
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")])
@@ -353,51 +353,51 @@ def test_nested_pipefunc_with_resources() -> None:
     # Test the resources are combined correctly
     nf = NestedPipeFunc(
         [
-            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
-            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+            PipeFunc(f, "f", resources={"memory": "1GB", "cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "cpus": 1}),
         ],
         output_name="g",
     )
     assert isinstance(nf.resources, Resources)
-    assert nf.resources.num_cpus == 2
+    assert nf.resources.cpus == 2
     assert nf.resources.memory == "2GB"
 
     # Test that the resources specified in NestedPipeFunc are used
     nf2 = NestedPipeFunc(
         [
-            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
-            PipeFunc(g, "g", resources={"memory": "2GB", "num_cpus": 1}),
+            PipeFunc(f, "f", resources={"memory": "1GB", "cpus": 2}),
+            PipeFunc(g, "g", resources={"memory": "2GB", "cpus": 1}),
         ],
         output_name="g",
-        resources={"memory": "3GB", "num_cpus": 3},
+        resources={"memory": "3GB", "cpus": 3},
     )
     assert isinstance(nf2.resources, Resources)
-    assert nf2.resources.num_cpus == 3
+    assert nf2.resources.cpus == 3
     assert nf2.resources.memory == "3GB"
 
     # Test that the resources specified in PipeFunc are used, with the other None
     nf3 = NestedPipeFunc(
         [
-            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(f, "f", resources={"memory": "1GB", "cpus": 2}),
             PipeFunc(g, "g", resources=None),
         ],
         output_name="g",
     )
     assert isinstance(nf3.resources, Resources)
-    assert nf3.resources.num_cpus == 2
+    assert nf3.resources.cpus == 2
     assert nf3.resources.memory == "1GB"
 
     # Test that Resources instance in NestedPipeFunc is used
     nf3 = NestedPipeFunc(
         [
-            PipeFunc(f, "f", resources={"memory": "1GB", "num_cpus": 2}),
+            PipeFunc(f, "f", resources={"memory": "1GB", "cpus": 2}),
             PipeFunc(g, "g", resources=None),
         ],
         output_name="g",
-        resources=Resources(num_cpus=3, memory="3GB"),
+        resources=Resources(cpus=3, memory="3GB"),
     )
     assert isinstance(nf3.resources, Resources)
-    assert nf3.resources.num_cpus == 3
+    assert nf3.resources.cpus == 3
     assert nf3.resources.memory == "3GB"
 
 
@@ -449,13 +449,13 @@ def test_delayed_resources_in_nested_func() -> None:
     def g(c):
         return c
 
-    nf = NestedPipeFunc([f, g], resources={"num_gpus": 3})
+    nf = NestedPipeFunc([f, g], resources={"gpus": 3})
     assert isinstance(nf.resources, Resources)
-    assert nf.resources.num_gpus == 3
+    assert nf.resources.gpus == 3
     with pytest.raises(TypeError, match="`NestedPipeFunc` cannot have callable `resources`."):
         NestedPipeFunc(
             [f, g],
-            resources=lambda kwargs: Resources(num_gpus=kwargs["c"]),  # type: ignore[arg-type]
+            resources=lambda kwargs: Resources(gpus=kwargs["c"]),  # type: ignore[arg-type]
         )
 
 
@@ -483,3 +483,23 @@ def test_arg_and_output_name_identical_error():
         match="The `output_name` cannot be the same as any of the input parameter names",
     ):
         PipeFunc(lambda x: x, output_name="x")
+
+
+def test_picklable_resources() -> None:
+    @pipefunc(output_name="c", resources=lambda kwargs: Resources(memory="1GB"))  # noqa: ARG005
+    def f(a, b):
+        return a + b
+
+    p = pickle.dumps(f)
+    del f
+    f2 = pickle.loads(p)  # noqa: S301
+    assert f2.resources({}).memory == "1GB"
+    assert f2(a=1, b=2) == 3
+
+
+def test_func_with_duplicate_renamed_args():
+    with pytest.raises(ValueError, match="should be a one-to-one mapping."):
+
+        @pipefunc(output_name="z", renames={"x": "a", "y": "a"})
+        def f(x, y):
+            return x + y

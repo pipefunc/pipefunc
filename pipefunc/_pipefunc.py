@@ -15,8 +15,18 @@ import inspect
 import os
 import warnings
 import weakref
+from collections import defaultdict
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    TypeAlias,
+    TypeVar,
+    get_args,
+    get_origin,
+)
 
 import cloudpickle
 
@@ -29,14 +39,16 @@ from pipefunc._utils import (
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
+from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
 
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 MAX_PARAMS_LEN = 15
 
 
@@ -92,6 +104,11 @@ class PipeFunc(Generic[T]):
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -141,8 +158,12 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+        resources: dict
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None = None,
         resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -160,6 +181,7 @@ class PipeFunc(Generic[T]):
         self._bound: dict[str, Any] = bound or {}
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
+        self.resources_scope: Literal["map", "element"] = resources_scope
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -501,6 +523,17 @@ class PipeFunc(Generic[T]):
                 f" parameter names. The overlap is: {overlap}"
             )
             raise ValueError(msg)
+        if len(self._renames) != len(self._inverse_renames):
+            inverse_renames = defaultdict(list)
+            for k, v in self._renames.items():
+                inverse_renames[v].append(k)
+            violations = {k: v for k, v in inverse_renames.items() if len(v) > 1}
+            violation_details = "; ".join(f"`{k}: {v}`" for k, v in violations.items())
+            msg = (
+                f"The `renames` should be a one-to-one mapping. Found violations where "
+                f"multiple keys map to the same value: {violation_details}."
+            )
+            raise ValueError(msg)
         self._validate_update(
             self._renames,
             "renames",
@@ -526,6 +559,7 @@ class PipeFunc(Generic[T]):
             "mapspec": self.mapspec,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
+            "resources_scope": self.resources_scope,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -539,6 +573,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
@@ -554,10 +589,12 @@ class PipeFunc(Generic[T]):
         with self._maybe_profiler():
             args = evaluate_lazy(args)
             kwargs = evaluate_lazy(kwargs)
-            if self.resources_variable:
-                kwargs[self.resources_variable] = (
-                    self.resources(kwargs) if callable(self.resources) else self.resources
-                )
+            _maybe_update_kwargs_with_resources(
+                kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
             result = self.func(*args, **kwargs)
 
         if self.debug:
@@ -628,6 +665,38 @@ class PipeFunc(Generic[T]):
                 new_kwargs[k] = v
         return new_kwargs
 
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        if inspect.isclass(func):
+            func = func.__init__
+        type_hints = safe_get_type_hints(func, include_extras=True)
+        return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
+
+    @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+        """Return the type annotation of the wrapped function's output."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        if inspect.isclass(func) and isinstance(self.output_name, str):
+            return {self.output_name: func}
+        if self._output_picker is None:
+            hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+        else:
+            # We cannot determine the output type if a custom output picker
+            # is used, however, if the output is a tuple and the _default_output_picker
+            # is used, we can determine the output type.
+            hint = NoAnnotation
+        if not isinstance(self.output_name, tuple):
+            return {self.output_name: hint}
+        if get_origin(hint) is tuple:
+            return dict(zip(self.output_name, get_args(hint)))
+        return {name: NoAnnotation for name in self.output_name}
+
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
 
@@ -677,8 +746,13 @@ class PipeFunc(Generic[T]):
             A dictionary containing the picklable state of the object.
 
         """
-        state = {k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines")}
+        state = {
+            k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines", "resources")
+        }
         state["func"] = cloudpickle.dumps(self.func)
+        state["resources"] = (
+            cloudpickle.dumps(self.resources) if self.resources is not None else None
+        )
         return state
 
     def __setstate__(self, state: dict) -> None:
@@ -696,6 +770,7 @@ class PipeFunc(Generic[T]):
         self.__dict__.update(state)
         self._pipelines = weakref.WeakSet()
         self.func = cloudpickle.loads(self.func)
+        self.resources = cloudpickle.loads(self.resources) if self.resources is not None else None
 
     def _validate_mapspec(self) -> None:
         if self.mapspec is None:
@@ -750,8 +825,12 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    resources: dict | Resources | Callable[[dict[str, Any]], Resources] | None = None,
+    resources: dict
+    | Resources
+    | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+    | None = None,
     resources_variable: str | None = None,
+    resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -803,6 +882,11 @@ def pipefunc(
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -867,6 +951,7 @@ def pipefunc(
             mapspec=mapspec,
             resources=resources,
             resources_variable=resources_variable,
+            resources_scope=resources_scope,
             scope=scope,
         )
 
@@ -964,6 +1049,7 @@ class NestedPipeFunc(PipeFunc):
         return MapSpec(
             tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
+            _is_generated=True,
         )
 
     @functools.cached_property
@@ -1150,3 +1236,18 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     """Return either a MapSpec or None, depending on the input."""
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _maybe_update_kwargs_with_resources(
+    kwargs: dict[str, Any],
+    resources_variable: str | None,
+    evaluated_resources: Resources | None,
+    resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+) -> None:
+    if resources_variable:
+        if evaluated_resources is not None:
+            kwargs[resources_variable] = evaluated_resources
+        elif callable(resources):
+            kwargs[resources_variable] = resources(kwargs)
+        else:
+            kwargs[resources_variable] = resources

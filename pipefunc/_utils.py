@@ -83,7 +83,7 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     if sys.version_info <= (3, 11):  # pragma: no cover
         raise type(e)(e.args[0] + msg) from e
     e.add_note(msg)
-    raise
+    raise  # noqa: PLE0704
 
 
 def prod(iterable: Iterable[int]) -> int:
@@ -92,7 +92,7 @@ def prod(iterable: Iterable[int]) -> int:
 
 
 def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
-    if type(a) != type(b):
+    if type(a) is not type(b):
         return False
     if isinstance(a, dict):
         return equal_dicts(a, b)
@@ -100,11 +100,11 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
         return np.array_equal(a, b, equal_nan=True)
     if isinstance(a, set):
         return a == b
-    if isinstance(a, (float, np.floating)):
+    if isinstance(a, float | np.floating):
         return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
     if isinstance(a, str):
         return a == b
-    if isinstance(a, (list, tuple)):
+    if isinstance(a, list | tuple):
         if len(a) != len(b):  # type: ignore[arg-type]
             return False
         return all(_is_equal(x, y) for x, y in zip(a, b))

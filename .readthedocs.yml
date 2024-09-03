@@ -8,5 +8,9 @@ build:
         post_checkout:
             - git fetch --unshallow || true
 
+sphinx:
+    configuration: docs/source/conf.py
+    builder: dirhtml
+
 conda:
     environment: docs/environment-sphinx.yml

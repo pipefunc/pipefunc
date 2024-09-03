@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
@@ -81,6 +81,12 @@ method = "git"
 match = ["v*"]
 default-tag = "0.0.0"
 
+[tool.setuptools.package-data]
+"pipefunc" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+include = ["pipefunc.*", "pipefunc"]
+
 [tool.setuptools.cmdclass]
 sdist = "versioningit.cmdclass.sdist"
 build_py = "versioningit.cmdclass.build_py"
@@ -93,9 +99,6 @@ distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 [tool.versioningit.onbuild]
 build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
-
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
 
 [tool.pytest.ini_options]
 addopts = """
@@ -120,7 +123,7 @@ omit = []
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -142,12 +145,14 @@ ignore = [
     "FIX002",  # Line contains TODO"
     "E501",    # Line too long
     "D107",    # Missing docstring in `__init__`
+    "B905",    # `zip()` without an explicit `strict=` parameter
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["SLF001", "ANN", "D", "PLR2004"]
+"tests/*" = ["SLF001", "ANN", "D", "PLR2004", "ARG001"]
 "tests/test_examples.py" = ["E501"]
 ".github/*" = ["INP001"]
+"example.ipynb" = ["D101", "D103", "DTZ005", "PLR2004", "ARG001", "ANN001", "ANN201"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18
