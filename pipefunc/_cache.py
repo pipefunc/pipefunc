@@ -492,7 +492,7 @@ class DiskCache(_CacheBase):
 
 
 def memoize(
-    cache: _CacheBase | None = None,
+    cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
     key_func: Callable[..., Hashable] | None = None,
 ) -> Callable:
     """A flexible memoization decorator that works with different cache types.
@@ -603,6 +603,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
         hash(tp)
     except Exception:  # noqa: BLE001
         tp = tp.__name__  # type: ignore[union-attr]
+
     m = _HASH_MARKER
     if isinstance(obj, collections.OrderedDict):
         return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
