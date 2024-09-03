@@ -171,9 +171,9 @@ Key differences from PipeFunc:
 
 7. **Resource Specification**: Both Pydra and PipeFunc allow for specifying computational resources for tasks. PipeFunc's approach is particularly flexible, allowing for dynamic resource allocation based on input parameters.
 
-8.  **Audit Trail**: Pydra provides built-in support for generating audit trails, enhancing reproducibility. While this is not a native feature of PipeFunc, its integration with tools like MLflow can provide similar capabilities.
+8. **Audit Trail**: Pydra provides built-in support for generating audit trails, enhancing reproducibility. While this is not a native feature of PipeFunc, its integration with tools like MLflow can provide similar capabilities.
 
-9.  **Pipeline Composition**: PipeFunc offers a simple and intuitive way to combine pipelines using the `|` operator, which is not a feature in Pydra.
+9. **Pipeline Composition**: PipeFunc offers a simple and intuitive way to combine pipelines using the `|` operator, which is not a feature in Pydra.
 
 Pydra excels in scenarios requiring complex scientific workflows, especially those involving neuroimaging tasks.
 Its emphasis on type checking and audit trails makes it well-suited for environments where reproducibility and error prevention are critical.
