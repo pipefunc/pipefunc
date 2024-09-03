@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipefunc._cache import _HASH_MARKER, to_hashable
+from pipefunc.cache import _HASH_MARKER, to_hashable
 
 M = _HASH_MARKER
 

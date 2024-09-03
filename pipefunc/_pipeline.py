@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
@@ -31,6 +30,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     handle_error,
 )
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (

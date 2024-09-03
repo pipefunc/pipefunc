@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 
 if TYPE_CHECKING:
     from pathlib import Path

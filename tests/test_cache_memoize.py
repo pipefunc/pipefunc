@@ -1,6 +1,6 @@
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache, memoize
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, memoize
 
 
 @pytest.mark.parametrize("cache_type", [SimpleCache, LRUCache, HybridCache])
