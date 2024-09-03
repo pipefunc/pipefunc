@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc._cache import LRUCache
+from pipefunc._cache import _HASH_MARKER, LRUCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -139,9 +139,16 @@ def test_simple_cache() -> None:
     assert len(pipeline.cache.cache) == 1
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
+    m = _HASH_MARKER
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, dict, (("a", 1),))), ("b", (m, list, (2,))))): ({"a": 1}, [2]),
+    }
     assert len(pipeline.cache.cache) == 1
     pipeline.cache.clear()
     assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, set, ("a",))), ("b", (m, list, (2,))))): ({"a"}, [2]),
+    }
     assert len(pipeline.cache.cache) == 1
 
 
