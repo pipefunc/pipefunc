@@ -158,3 +158,10 @@ def test_unhashable_type():
         hash(Unhashable())
     x = Unhashable()
     assert to_hashable(x) == (_HASH_MARKER, "Unhashable", str(x))
+
+    class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
+        def __hash__(self) -> int:
+            return 1
+
+    x = UnhashableWithMeta()
+    assert to_hashable(x) == x
