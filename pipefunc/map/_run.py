@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc.cache import _CacheBase
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
@@ -293,7 +294,13 @@ def _run_iteration_and_process(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     file_arrays: Sequence[StorageBase],
+    root_args: tuple[str, ...],
+    cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
+    if cache is not None:
+        key = root_args
+        if key in cache:
+            return cache.get(key)
     output = _run_iteration(func, kwargs, shape, shape_mask, index)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
@@ -415,12 +422,14 @@ def _prepare_submit_map_spec(
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
+    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = shapes[func.output_name]
     mask = shape_masks[func.output_name]
     file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     result_arrays = _init_result_arrays(func.output_name, shape)
+    root_args_ = root_args[func.output_name]
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -428,6 +437,7 @@ def _prepare_submit_map_spec(
         shape=shape,
         shape_mask=mask,
         file_arrays=file_arrays,
+        root_args=root_args_,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
@@ -555,6 +565,7 @@ def _submit_func(
             run_info.shape_masks,
             store,
             fixed_indices,
+            run_info.root_args,
         )
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
