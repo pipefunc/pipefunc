@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from adaptive import DataSaver, Learner1D, Learner2D, LearnerND
 
@@ -10,6 +10,8 @@ from pipefunc._utils import at_least_tuple
 from pipefunc.map.adaptive import _validate_adaptive
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pipefunc import Pipeline
 
 

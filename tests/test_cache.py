@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -150,7 +150,7 @@ def test_cache_property(shared):
     assert cache_dict == {"test": "value"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache_dir(tmp_path):
     return tmp_path / "cache"
 

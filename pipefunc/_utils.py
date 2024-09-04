@@ -100,11 +100,11 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
         return np.array_equal(a, b, equal_nan=True)
     if isinstance(a, set):
         return a == b
-    if isinstance(a, (float, np.floating)):
+    if isinstance(a, float | np.floating):
         return math.isclose(a, b, rel_tol=1e-9, abs_tol=0.0)
     if isinstance(a, str):
         return a == b
-    if isinstance(a, (list, tuple)):
+    if isinstance(a, list | tuple):
         if len(a) != len(b):  # type: ignore[arg-type]
             return False
         return all(_is_equal(x, y) for x, y in zip(a, b))

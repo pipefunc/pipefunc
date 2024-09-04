@@ -225,7 +225,7 @@ def test_nested_func() -> None:
     def g(f):
         return f
 
-    def h(g, x):  # noqa: ARG001
+    def h(g, x):
         return g
 
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")])
@@ -495,3 +495,11 @@ def test_picklable_resources() -> None:
     f2 = pickle.loads(p)  # noqa: S301
     assert f2.resources({}).memory == "1GB"
     assert f2(a=1, b=2) == 3
+
+
+def test_func_with_duplicate_renamed_args():
+    with pytest.raises(ValueError, match="should be a one-to-one mapping."):
+
+        @pipefunc(output_name="z", renames={"x": "a", "y": "a"})
+        def f(x, y):
+            return x + y

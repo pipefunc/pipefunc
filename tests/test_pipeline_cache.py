@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc._cache import LRUCache
+from pipefunc.cache import _HASH_MARKER, LRUCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,11 +25,11 @@ def test_tuple_outputs_with_cache() -> None:
         return {"c": a + b, "_throw": 1}
 
     @pipefunc(output_name=("d", "e"), cache=True)
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c, x=1):
         return b * c, 1
 
     @pipefunc(output_name=("g", "h"), output_picker=getattr, cache=True)
-    def f_g(c, e, x=1):  # noqa: ARG001
+    def f_g(c, e, x=1):
         from types import SimpleNamespace
 
         print(f"Called f_g with c={c} and e={e}")
@@ -139,10 +139,17 @@ def test_simple_cache() -> None:
     assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
-    assert pipeline.cache.cache == {("c", (("a", (("a", 1),)), ("b", (2,)))): ({"a": 1}, [2])}
+    m = _HASH_MARKER
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, dict, (("a", 1),))), ("b", (m, list, (2,))))): ({"a": 1}, [2]),
+    }
+    assert len(pipeline.cache.cache) == 1
     pipeline.cache.clear()
     assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
-    assert pipeline.cache.cache == {("c", (("a", ("a",)), ("b", (2,)))): ({"a"}, [2])}
+    assert pipeline.cache.cache == {
+        ("c", (("a", (m, set, ("a",))), ("b", (m, list, (2,))))): ({"a"}, [2]),
+    }
+    assert len(pipeline.cache.cache) == 1
 
 
 def test_cache_non_root_args() -> None:
@@ -173,7 +180,10 @@ def test_sharing_defaults() -> None:
     pipeline = Pipeline([f, g], cache_type="simple")
     assert pipeline("d", a=1) == 3
     assert pipeline.cache is not None
-    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 1))): 2, ("d", (("a", 1), ("b", 1))): 3}
+    assert pipeline.cache.cache == {
+        ("c", (("a", 1), ("b", 1))): 2,
+        ("d", (("a", 1), ("b", 1))): 3,
+    }
     assert pipeline.map(inputs={"a": 1})["d"].output == 3
     assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
 

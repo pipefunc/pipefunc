@@ -5,7 +5,7 @@ import json
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -15,7 +15,7 @@ from pipefunc.map._storage_base import StorageBase, storage_registry
 if TYPE_CHECKING:
     from pipefunc import Pipeline
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class Shapes(NamedTuple):
@@ -221,7 +221,7 @@ def _compare_to_previous_run_info(
 def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
     input_dimensions = pipeline.mapspec_dimensions
     for name, value in inputs.items():
-        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, (list, tuple)):
+        if (dim := input_dimensions.get(name, 0)) > 1 and isinstance(value, list | tuple):
             msg = f"Expected {dim}D `numpy.ndarray` for input `{name}`, got {type(value)}."
             raise ValueError(msg)
 

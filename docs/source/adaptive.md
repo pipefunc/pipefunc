@@ -39,6 +39,7 @@ Let's set the stage by setting up a simple pipeline with a reduction operation.
 
 ```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
+from pipefunc.typing import Array
 
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -47,7 +48,7 @@ def double_it(x: int, c: int) -> int:
 
 
 @pipefunc(output_name="sum_")
-def take_sum(y: list[int], d: int) -> float:
+def take_sum(y: Array[int], d: int) -> float:
     return sum(y) / d
 
 
@@ -115,6 +116,7 @@ We redefine the `pipeline` with the single reduction operation.
 
 ```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
+from pipefunc.typing import Array
 
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -123,7 +125,7 @@ def double_it(x: int, c: int) -> int:
 
 
 @pipefunc(output_name="sum_")
-def take_sum(y: list[int], d: int) -> float:
+def take_sum(y: Array[int], d: int) -> float:
     return sum(y) / d
 
 

@@ -6,13 +6,15 @@ import functools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._run import _func_kwargs, _load_file_array
+from pipefunc.map._run import _func_kwargs, _load_file_array, _select_kwargs
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import adaptive_scheduler
     from adaptive import SequenceLearner
     from adaptive_scheduler.utils import EXECUTOR_TYPES
@@ -95,9 +97,10 @@ def slurm_run_setup(
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 tracker.update(
-                    learner.pipefunc.resources if not ignore_resources else None,
-                    learner.pipefunc,
-                    learners_dict.run_info,
+                    resources=learner.pipefunc.resources if not ignore_resources else None,
+                    func=learner.pipefunc,
+                    learner=learner.learner,
+                    run_info=learners_dict.run_info,
                 )
             prev_indices = indices
 
@@ -142,6 +145,7 @@ class _ResourcesContainer:
         self,
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
+        learner: SequenceLearner,
         run_info: RunInfo,
     ) -> None:
         if resources is None and self.default_resources is None:
@@ -159,12 +163,14 @@ class _ResourcesContainer:
         else:
             r = resources.with_defaults(self.default_resources)
 
+        index = _get_index(learner, func)
         for name in ["cpus_per_node", "cpus", "nodes", "partition"]:
             if callable(r):
-                # Note: we don't know if `resources.name` returns None or not
+                # Note: we don't know if `resources.{name}` returns None or not
                 value = functools.partial(
                     _getattr_from_resources,
                     name=name,
+                    index=index,
                     resources=r,
                     func=func,
                     run_info=run_info,
@@ -173,34 +179,47 @@ class _ResourcesContainer:
                 value = getattr(r, name)
             self.data[name].append(value)
         # TODO: Allow setting any of EXECUTOR_TYPES
-        self.data["executor_type"].append(_executor_type(r, func, run_info))
+        self.data["executor_type"].append(_executor_type(index, r, func, run_info))
+        self.data["extra_scheduler"].append(_extra_scheduler(index, r, func, run_info))
 
-        self.data["extra_scheduler"].append(_extra_scheduler(r, func, run_info))
+
+def _get_index(learner: SequenceLearner, func: PipeFunc) -> int | None:
+    if func.resources_scope == "element" and func.mapspec is not None:
+        # Assumes that the learner is already split up
+        assert len(learner.sequence) == 1
+        return learner.sequence[0]
+    return None
 
 
 def _eval_resources(
-    *,
+    index: int | None,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Resources:
     kwargs = _func_kwargs(func, run_info, run_info.init_store())
     _load_file_array(kwargs)
+    if index is not None:
+        shape = run_info.shapes[func.output_name]
+        shape_mask = run_info.shape_masks[func.output_name]
+        kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
     return resources(kwargs)
 
 
 def _getattr_from_resources(
     *,
     name: str,
+    index: int | None,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Any | None:
-    resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
+    resources_instance = _eval_resources(index, resources, func, run_info)
     return getattr(resources_instance, name)
 
 
 def _extra_scheduler(
+    index: int | None,
     resources: Resources | Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
@@ -208,8 +227,8 @@ def _extra_scheduler(
     if callable(resources):
 
         def _fn() -> list[str]:
-            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
-            return _extra_scheduler(resources_instance, func, run_info)  # type: ignore[return-value]
+            resources_instance = _eval_resources(index, resources, func, run_info)
+            return _extra_scheduler(index, resources_instance, func, run_info)  # type: ignore[return-value]
 
         return _fn
     extra_scheduler = []
@@ -226,6 +245,7 @@ def _extra_scheduler(
 
 
 def _executor_type(
+    index: int | None,
     resources: Resources | Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
     run_info: RunInfo,
@@ -233,8 +253,8 @@ def _executor_type(
     if callable(resources):
 
         def _fn() -> EXECUTOR_TYPES:
-            resources_instance = _eval_resources(resources=resources, func=func, run_info=run_info)
-            return _executor_type(resources_instance, func, run_info)
+            resources_instance = _eval_resources(index, resources, func, run_info)
+            return _executor_type(index, resources_instance, func, run_info)
 
         return _fn
     return "sequential" if resources.parallelization_mode == "internal" else "process-pool"

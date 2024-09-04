@@ -17,11 +17,10 @@ import inspect
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
@@ -31,6 +30,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     handle_error,
 )
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
@@ -42,6 +42,13 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import run
 from pipefunc.resources import Resources
+from pipefunc.typing import (
+    Array,
+    NoAnnotation,
+    Unresolvable,
+    is_object_array_type,
+    is_type_compatible,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -54,7 +61,7 @@ if TYPE_CHECKING:
     from pipefunc.map._run import Result
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
@@ -78,6 +85,10 @@ class Pipeline:
         The type of cache to use.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
+    validate_type_annotations
+        Flag indicating whether type validation should be performed. If ``True``,
+        the type annotations of the functions are validated during the pipeline
+        initialization. If ``False``, the type annotations are not validated.
     scope
         If provided, *all* parameter names and output names of the pipeline functions will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -110,6 +121,7 @@ class Pipeline:
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
+        validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | Resources | None = None,
     ) -> None:
@@ -119,6 +131,7 @@ class Pipeline:
         self._debug = debug
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
+        self.validate_type_annotations = validate_type_annotations
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -938,6 +951,8 @@ class Pipeline:
         _validate_scopes(self.functions)
         _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
+        if self.validate_type_annotations:
+            _check_consistent_type_annotations(self.graph)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
@@ -1213,6 +1228,7 @@ class Pipeline:
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
+            "validate_type_annotations": self.validate_type_annotations,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
@@ -1616,16 +1632,6 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _valid_key(key: Any) -> Any:
-    if isinstance(key, dict):
-        return tuple(sorted(key.items()))
-    if isinstance(key, list):
-        return tuple(key)
-    if isinstance(key, set):
-        return tuple(sorted(key))
-    return key
-
-
 def _update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
@@ -1766,7 +1772,7 @@ def _compute_cache_key(
             # i.e., the output of a function was directly provided as an input to
             # another function. In this case, we don't want to cache the result.
             return None
-        key = _valid_key(kwargs[k])
+        key = to_hashable(kwargs[k])
         cache_key_items.append((k, key))
 
     return output_name, tuple(cache_key_items)
@@ -1829,6 +1835,7 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 
 def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
+    # Modify the MapSpec of functions that depend on `p` to include the new axis
     for f in functions:
         if p not in f.parameters or p in f._bound:
             continue
@@ -1849,7 +1856,7 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
             output_specs = [
                 s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
             ]
-        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
+        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs), _is_generated=True)
         for o in output_specs:
             dims[o.name] = len(o.axes)
             _add_mapspec_axis(o.name, dims, axis, functions)
@@ -1916,7 +1923,7 @@ def _create_missing_mapspecs(
             continue  # already added a MapSpec because of multiple outputs
         axes = tuple(non_root_inputs[p])
         outputs = tuple(ArraySpec(x, axes) for x in at_least_tuple(func.output_name))
-        func.mapspec = MapSpec(inputs=(), outputs=outputs)
+        func.mapspec = MapSpec(inputs=(), outputs=outputs, _is_generated=True)
         func_with_new_mapspecs.add(func)
         print(f"Autogenerated MapSpec for `{func}`: `{func.mapspec}`")
     return func_with_new_mapspecs
@@ -1932,7 +1939,7 @@ def _traverse_graph(
 
     def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
         results = set()
-        if isinstance(x, (str, tuple)):
+        if isinstance(x, str | tuple):
             x = node_mapping[x]
         for neighbor in getattr(graph, direction)(x):
             if isinstance(neighbor, PipeFunc):
@@ -1978,3 +1985,77 @@ class _PipelineInternalCache:
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+
+
+def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
+    """Check that the type annotations for shared arguments are consistent."""
+    for node in graph.nodes:
+        if not isinstance(node, PipeFunc):
+            continue
+        deps = nx.descendants_at_distance(graph, node, 1)
+        output_types = node.output_annotation
+        for dep in deps:
+            assert isinstance(dep, PipeFunc)
+            for parameter_name, input_type in dep.parameter_annotations.items():
+                if parameter_name not in output_types:
+                    continue
+                if _mapspec_is_generated(node, dep):
+                    # NOTE: We cannot check the type-hints for auto-generated MapSpecs
+                    continue
+                if _mapspec_with_internal_shape(node, parameter_name):
+                    # NOTE: We cannot verify the type hints because the output
+                    # might be any iterable instead of an Array as returned by
+                    # a map operation.
+                    continue
+                output_type = output_types[parameter_name]
+                if (
+                    _axis_is_reduced(node, dep, parameter_name)
+                    and not is_object_array_type(output_type)
+                    and not isinstance(output_type, Unresolvable)
+                    and output_type is not NoAnnotation
+                ):
+                    output_type = Array[output_type]  # type: ignore[valid-type]
+                if not is_type_compatible(output_type, input_type):
+                    msg = (
+                        f"Inconsistent type annotations for:"
+                        f"\n  - Argument `{parameter_name}`"
+                        f"\n  - Function `{node.__name__}(...)` returns:\n      `{output_type}`."
+                        f"\n  - Function `{dep.__name__}(...)` expects:\n      `{input_type}`."
+                        "\nPlease make sure the shared input arguments have the same type."
+                        "\nNote that the output type displayed above might be wrapped in"
+                        " `pipefunc.typing.Array` if using `MapSpec`s."
+                        " Disable this check by setting `validate_type_annotations=False`."
+                    )
+                    raise TypeError(msg)
+
+
+def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was the result of a map, and the input takes the entire result."""
+    output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
+    input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
+    if f_in.mapspec:
+        input_spec_axes = next(
+            (s.axes for s in f_in.mapspec.inputs if s.name == parameter_name),
+            None,
+        )
+    else:
+        input_spec_axes = None
+    return parameter_name in output_mapspec_names and (
+        parameter_name not in input_mapspec_names
+        or (input_spec_axes is not None and None in input_spec_axes)
+    )
+
+
+def _mapspec_is_generated(f_out: PipeFunc, f_in: PipeFunc) -> bool:
+    if f_out.mapspec is None or f_in.mapspec is None:
+        return False
+    return f_out.mapspec._is_generated or f_in.mapspec._is_generated
+
+
+def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was not from a map operation but returned an array with internal shape."""
+    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
+        return False
+    output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
+    all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
+    return not all_inputs_in_outputs

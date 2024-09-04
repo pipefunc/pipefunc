@@ -6,7 +6,7 @@ import functools
 from collections import UserDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, NamedTuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
@@ -28,7 +28,7 @@ from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
     import adaptive_scheduler
     import numpy.typing as npt
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from pipefunc.sweep import Sweep
 
 
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class LearnerPipeFunc(NamedTuple):
@@ -165,7 +165,7 @@ def create_learners(
     created for each node depends on the `fixed_indices` and `split_independent_axes` parameters:
 
     - If `fixed_indices` is provided or `split_independent_axes` is `False`, a single learner
-      is created for each function node.
+      is created for each function node (unless `resources_scope="element"`).
     - If `split_independent_axes` is `True`, multiple learners are created for each function
       node, corresponding to different combinations of the independent axes in the pipeline.
 
@@ -241,9 +241,9 @@ def create_learners(
         internal_shapes,
     )
     for _fixed_indices in iterator:
-        key = _key(_fixed_indices) if _fixed_indices else None
+        key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
-            _learners = []
+            gen_learners = []
             for func in gen:
                 learner = _learner(
                     func=func,
@@ -252,9 +252,20 @@ def create_learners(
                     fixed_indices=_fixed_indices,  # might be None
                     return_output=return_output,
                 )
-                _learners.append(LearnerPipeFunc(learner, func))
-            learners.setdefault(key, []).append(_learners)
+                if func.resources_scope == "element":
+                    for lrn in _split_sequence_learner(learner):
+                        gen_learners.append(LearnerPipeFunc(lrn, func))  # noqa: PERF401
+                else:
+                    gen_learners.append(LearnerPipeFunc(learner, func))
+            learners.setdefault(key, []).append(gen_learners)
     return learners
+
+
+def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
+    """Split a `SequenceLearner` into multiple learners."""
+    if len(learner.sequence) == 1:
+        return [learner]
+    return [SequenceLearner(learner._original_function, [x]) for x in learner.sequence]
 
 
 def _learner(
@@ -288,7 +299,10 @@ def _learner(
     return SequenceLearner(f, sequence)
 
 
-def _key(fixed_indices: dict[str, int | slice]) -> tuple[AxisIndex, ...]:
+def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
+    if not fixed_indices:
+        return None
+    # Makes `fixed_indices` hashable
     return tuple(AxisIndex(axis=axis, idx=idx) for axis, idx in sorted(fixed_indices.items()))
 
 
@@ -357,7 +371,9 @@ def _execute_iteration_in_map_spec(
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
-    return outputs if return_output else None
+    if not return_output:
+        return None
+    return outputs if isinstance(func.output_name, tuple) else outputs[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,7 +504,7 @@ def _maybe_iterate_axes(
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-) -> Generator[dict[str, Any] | None, None, None]:
+) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
         _validate_fixed_indices(fixed_indices, inputs, pipeline)

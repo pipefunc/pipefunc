@@ -3,7 +3,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline() -> Pipeline:
     @pipefunc(output_name="out1", defaults={"c": 1, "d": 1, "e": 1})
     def f1(a, b, c, d, e):
@@ -28,7 +28,7 @@ def pipeline() -> Pipeline:
     return Pipeline([f1, f2, f3, f4, f5])
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline_mapspec(pipeline: Pipeline) -> Pipeline:
     pipeline = pipeline.copy()
     pipeline.add_mapspec_axis("a", axis="i")
@@ -36,7 +36,7 @@ def pipeline_mapspec(pipeline: Pipeline) -> Pipeline:
     return pipeline
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline_with_cache(pipeline: Pipeline) -> Pipeline:
     pipeline = pipeline.copy(cache_type="simple")
     for func in pipeline.functions:
@@ -44,21 +44,21 @@ def pipeline_with_cache(pipeline: Pipeline) -> Pipeline:
     return pipeline
 
 
-@pytest.mark.benchmark()
+@pytest.mark.benchmark
 def test_calling_pipeline_directly(pipeline: Pipeline) -> None:
     for a in range(10):
         for b in range(10):
             pipeline(a=a, b=b)
 
 
-@pytest.mark.benchmark()
+@pytest.mark.benchmark
 def test_calling_pipeline_directly_with_cache(pipeline_with_cache: Pipeline) -> None:
     for a in range(10):
         for b in range(10):
             pipeline_with_cache(a=a, b=b)
 
 
-@pytest.mark.benchmark()
+@pytest.mark.benchmark
 def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
     a = list(range(10))
     b = list(range(10))
