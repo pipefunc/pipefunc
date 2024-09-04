@@ -11,4 +11,5 @@ pipefunc.cache
 pipefunc.resources
 pipefunc.lazy
 pipefunc.sweep
+pipefunc.typing
 ```
