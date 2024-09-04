@@ -496,7 +496,12 @@ def _maybe_load_single_output(
     return None, False
 
 
-def _submit_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> Any:
+def _submit_single(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    run_folder: Path,
+    cache: _CacheBase | None,
+) -> Any:
     # Load the output if it exists
     output, exists = _maybe_load_single_output(func, run_folder)
     if exists:
@@ -504,13 +509,23 @@ def _submit_single(func: PipeFunc, kwargs: dict[str, Any], run_folder: Path) -> 
 
     # Otherwise, run the function
     _load_file_array(kwargs)
+
+    if cache is not None:
+        cache_key = (func.output_name, to_hashable(kwargs))
+        if cache_key in cache:
+            return cache.get(cache_key)
+
     try:
         # TODO: cache here!
-        return func(**kwargs)
+        result = func(**kwargs)
     except Exception as e:
         handle_error(e, func, kwargs)
         # handle_error raises but mypy doesn't know that
         raise  # pragma: no cover
+    else:
+        if cache is not None:
+            cache.put(cache_key, result)
+        return result
 
 
 def _maybe_load_file_array(x: Any) -> Any:
@@ -567,7 +582,7 @@ def _submit_func(
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder, cache)
     return _KwargsTask(kwargs, task)
 
 
