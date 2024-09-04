@@ -115,7 +115,7 @@ class Pipeline:
     Important note about caching. The caching behavior of the pipeline is different between
     calling ``pipeline.map`` and ``pipeline.run`` (or ``pipeline(...)``). When calling the
     pipeline as a function (``pipeline.run`` or ``pipeline(...)``), the cache key is computed
-    based on the root arguments of the pipeline. This means that only the root arguments need
+    based *only on the root arguments of the pipeline. This means that only the root arguments need
     to be hashable. However, when calling ``pipeline.map``, the same approach is not possible.
     In that case the cache key is computed based on the input values of the `PipeFunc`s. This
     means that whenever a `PipeFunc` sets ``cache=True``, the input values must be hashable.
