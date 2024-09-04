@@ -418,18 +418,16 @@ class _MapSpecArgs(NamedTuple):
 def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
+    run_info: RunInfo,
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
-    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    shape = shapes[func.output_name]
-    mask = shape_masks[func.output_name]
+    shape = run_info.shapes[func.output_name]
+    mask = run_info.shape_masks[func.output_name]
     file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     result_arrays = _init_result_arrays(func.output_name, shape)
-    root_args_ = root_args[func.output_name]
+    root_args_ = run_info.root_args[func.output_name]
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -558,15 +556,7 @@ def _submit_func(
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     if func.mapspec and func.mapspec.inputs:
-        args = _prepare_submit_map_spec(
-            func,
-            kwargs,
-            run_info.shapes,
-            run_info.shape_masks,
-            store,
-            fixed_indices,
-            run_info.root_args,
-        )
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices)
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
