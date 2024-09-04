@@ -63,7 +63,6 @@ class RunInfo:
     input_paths: dict[str, Path]
     defaults_path: Path
     all_output_names: set[str]
-    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
@@ -96,7 +95,6 @@ class RunInfo:
             input_paths=input_paths,
             defaults_path=defaults_path,
             all_output_names=pipeline.all_output_names,
-            root_args=pipeline.all_root_args,
             shapes=shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
@@ -139,7 +137,7 @@ class RunInfo:
         data = asdict(self)
         data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
         data["all_output_names"] = sorted(data["all_output_names"])
-        for key in ["shapes", "shape_masks", "root_args"]:
+        for key in ["shapes", "shape_masks"]:
             data[key] = {",".join(at_least_tuple(k)): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
         data["defaults_path"] = str(data["defaults_path"])
@@ -153,7 +151,7 @@ class RunInfo:
             data = json.load(f)
         data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
         data["all_output_names"] = set(data["all_output_names"])
-        for key in ["shapes", "shape_masks", "root_args"]:
+        for key in ["shapes", "shape_masks"]:
             data[key] = {_maybe_tuple(k): tuple(v) for k, v in data[key].items()}
         if data["internal_shapes"] is not None:
             data["internal_shapes"] = {

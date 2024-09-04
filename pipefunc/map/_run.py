@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
+from pipefunc.cache import to_hashable
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
@@ -119,6 +120,7 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                cache=pipeline.cache,
             )
 
     if persist_memory:  # Only relevant for memory based storage
@@ -274,17 +276,25 @@ def _run_iteration(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
+    cache: _CacheBase | None,
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    if cache is not None:
+        cache_key = (func.output_name, to_hashable(selected))
+        if cache_key in cache:
+            return cache.get(cache_key)
     if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
         selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
     try:
-        # TODO: cache here!
-        return func(**selected)
+        result = func(**selected)
     except Exception as e:
         handle_error(e, func, selected)
         # handle_error raises but mypy doesn't know that
         raise  # pragma: no cover
+    else:
+        if cache is not None:
+            cache.put(cache_key, result)
+        return result
 
 
 def _run_iteration_and_process(
@@ -294,14 +304,9 @@ def _run_iteration_and_process(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     file_arrays: Sequence[StorageBase],
-    root_args: tuple[str, ...],
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    if cache is not None:
-        key = root_args
-        if key in cache:
-            return cache.get(key)
-    output = _run_iteration(func, kwargs, shape, shape_mask, index)
+    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
@@ -421,13 +426,13 @@ def _prepare_submit_map_spec(
     run_info: RunInfo,
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
+    cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
     result_arrays = _init_result_arrays(func.output_name, shape)
-    root_args_ = run_info.root_args[func.output_name]
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -435,7 +440,7 @@ def _prepare_submit_map_spec(
         shape=shape,
         shape_mask=mask,
         file_arrays=file_arrays,
-        root_args=root_args_,
+        cache=cache,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
@@ -538,10 +543,11 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    cache: _CacheBase | None = None,
 ) -> None:
     tasks: dict[PipeFunc, _KwargsTask] = {}
     for func in generation:
-        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor)
+        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
     for func in generation:
         _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
         outputs.update(_outputs)
@@ -553,10 +559,11 @@ def _submit_func(
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     if func.mapspec and func.mapspec.inputs:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices)
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
