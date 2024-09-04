@@ -82,7 +82,7 @@ class Pipeline:
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
     cache_type
-        The type of cache to use.
+        The type of cache to use. See the notes below for more *important* information.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
     validate_type_annotations
@@ -109,6 +109,20 @@ class Pipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+
+    Notes
+    -----
+    Important note about caching. The caching behavior of the pipeline is different between
+    calling ``pipeline.map`` and ``pipeline.run`` (or ``pipeline(...)``). When calling the
+    pipeline as a function (``pipeline.run`` or ``pipeline(...)``), the cache key is computed
+    based on the root arguments of the pipeline. This means that only the root arguments need
+    to be hashable. However, when calling ``pipeline.map``, the same approach is not possible.
+    In that case the cache key is computed based on the input values of the `PipeFunc`s. This
+    means that whenever a `PipeFunc` sets ``cache=True``, the input values must be hashable.
+    The `pipefunc.cache.to_hashable` function will attempt to make certain common types hashable,
+    but it is not guaranteed to work for all types. If it cannot make the input values hashable,
+    the cache key will be computed based the `str` representation of the input values. This can
+    lead to unexpected behavior if the input values are not unique for different function calls!
 
     """
 
