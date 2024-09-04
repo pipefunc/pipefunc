@@ -112,17 +112,26 @@ class Pipeline:
 
     Notes
     -----
-    Important note about caching. The caching behavior of the pipeline is different between
-    calling ``pipeline.map`` and ``pipeline.run`` (or ``pipeline(...)``). When calling the
-    pipeline as a function (``pipeline.run`` or ``pipeline(...)``), the cache key is computed
-    based *only on the root arguments of the pipeline. This means that only the root arguments need
-    to be hashable. However, when calling ``pipeline.map``, the same approach is not possible.
-    In that case the cache key is computed based on the input values of the `PipeFunc`s. This
-    means that whenever a `PipeFunc` sets ``cache=True``, the input values must be hashable.
-    The `pipefunc.cache.to_hashable` function will attempt to make certain common types hashable,
-    but it is not guaranteed to work for all types. If it cannot make the input values hashable,
-    the cache key will be computed based the `str` representation of the input values. This can
-    lead to unexpected behavior if the input values are not unique for different function calls!
+    Important note about caching: The caching behavior differs between `pipeline.map` and
+    `pipeline.run` or `pipeline(...)`.
+
+    1. For `pipeline.run` or `pipeline(...)`:
+    - The cache key is computed based *only* on the root arguments of the pipeline.
+    - Only the root arguments need to be hashable.
+
+    2. For `pipeline.map`:
+    - The cache key is computed based on the input values of each `PipeFunc`.
+    - So a ``PipeFunc`` with ``cache=True``, all its input values must be hashable.
+
+    For both methods:
+    - The `pipefunc.cache.to_hashable` function is used to attempt to make input values hashable.
+    - This function works for many common types but is not guaranteed to work for all types.
+    - If `to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
+    - Caution: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
+
+    The key difference is that `pipeline.map` operates on individual `PipeFunc` instances,
+    while `pipeline.run` considers the pipeline as a whole, which affects which values
+    need to be made hashable.
 
     """
 
