@@ -81,11 +81,11 @@ def run(
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
     storage
-        The storage class to use for the file arrays. Can use any registered storage class.
+        The storage class to use for the file arrays.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the ``run_folder`` before running the pipeline.
     fixed_indices
