@@ -262,8 +262,10 @@ def _is_typevar_compatible(
 def is_object_array_type(tp: Any) -> bool:
     """Check if the given type is similar to `Array[T]`.
 
-    2. `Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], T]`
-    3. `numpy.ndarray[Any, numpy.dtype[numpy.object_]]`
+    Specifically, this function checks if the type is either:
+
+    1. `Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], T]`
+    2. `numpy.ndarray[Any, numpy.dtype[numpy.object_]]`
     """
     if get_origin(tp) is np.ndarray:
         # Base case: directly an np.ndarray[Any, np.dtype[np.object_]]
