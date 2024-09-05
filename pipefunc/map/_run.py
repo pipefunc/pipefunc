@@ -302,7 +302,6 @@ def _run_iteration(
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
 
-    # Wrap the computation in a callable
     def compute_fn() -> Any:
         if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
             selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
@@ -530,7 +529,6 @@ def _submit_single(
     # Otherwise, run the function
     _load_file_array(kwargs)
 
-    # Wrap the computation in a callable
     def compute_fn() -> Any:
         try:
             return func(**kwargs)
