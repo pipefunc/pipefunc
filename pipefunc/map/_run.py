@@ -308,7 +308,6 @@ def _run_iteration(
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
-    # Use the cache utility function
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
@@ -533,7 +532,6 @@ def _submit_single(
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
-    # Use the cache utility function
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
