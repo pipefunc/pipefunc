@@ -267,6 +267,28 @@ def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
     )
 
 
+def _get_or_set_cache(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    cache: _CacheBase | None,
+    compute_fn: Callable[[], Any],
+) -> Any:
+    if cache is None:
+        # Cache not provided; directly compute and return the result
+        return compute_fn()
+
+    cache_key = (func.output_name, to_hashable(kwargs))
+
+    # Check if the result is already in the cache
+    if cache_key in cache:
+        return cache.get(cache_key)
+
+    # Compute the result and cache it
+    result = compute_fn()
+    cache.put(cache_key, result)
+    return result
+
+
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
@@ -279,22 +301,20 @@ def _run_iteration(
     cache: _CacheBase | None,
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    if cache is not None:
-        cache_key = (func.output_name, to_hashable(selected))
-        if cache_key in cache:
-            return cache.get(cache_key)
-    if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
-        selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
-    try:
-        result = func(**selected)
-    except Exception as e:
-        handle_error(e, func, selected)
-        # handle_error raises but mypy doesn't know that
-        raise  # pragma: no cover
-    else:
-        if cache is not None:
-            cache.put(cache_key, result)
-        return result
+
+    # Wrap the computation in a callable
+    def compute_fn() -> Any:
+        if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
+            selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
+        try:
+            return func(**selected)
+        except Exception as e:
+            handle_error(e, func, selected)
+            # handle_error raises but mypy doesn't know that
+            raise  # pragma: no cover
+
+    # Use the cache utility function
+    return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
 def _run_iteration_and_process(
@@ -510,22 +530,17 @@ def _submit_single(
     # Otherwise, run the function
     _load_file_array(kwargs)
 
-    if cache is not None:
-        cache_key = (func.output_name, to_hashable(kwargs))
-        if cache_key in cache:
-            return cache.get(cache_key)
+    # Wrap the computation in a callable
+    def compute_fn() -> Any:
+        try:
+            return func(**kwargs)
+        except Exception as e:
+            handle_error(e, func, kwargs)
+            # handle_error raises but mypy doesn't know that
+            raise  # pragma: no cover
 
-    try:
-        # TODO: cache here!
-        result = func(**kwargs)
-    except Exception as e:
-        handle_error(e, func, kwargs)
-        # handle_error raises but mypy doesn't know that
-        raise  # pragma: no cover
-    else:
-        if cache is not None:
-            cache.put(cache_key, result)
-        return result
+    # Use the cache utility function
+    return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
 def _maybe_load_file_array(x: Any) -> Any:
