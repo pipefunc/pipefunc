@@ -106,8 +106,10 @@ class PipeFunc(Generic[T]):
         parallelization.
     resources_scope
         Determines how resources are allocated in relation to the mapspec:
+
         - "map": Allocate resources for the entire mapspec operation (default).
         - "element": Allocate resources for each element in the mapspec.
+
         If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
@@ -884,8 +886,10 @@ def pipefunc(
         parallelization.
     resources_scope
         Determines how resources are allocated in relation to the mapspec:
+
         - "map": Allocate resources for the entire mapspec operation (default).
         - "element": Allocate resources for each element in the mapspec.
+
         If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will

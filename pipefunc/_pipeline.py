@@ -1015,6 +1015,7 @@ class Pipeline:
 
         This method uses `networkx.topological_generations` on the pipeline graph to group
         functions by their dependency order. The result includes:
+
         - Root arguments: Initial inputs to the pipeline.
         - Function generations: Subsequent groups of functions in topological order.
 
