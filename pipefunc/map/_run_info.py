@@ -90,7 +90,8 @@ class RunInfo:
         _check_inputs(pipeline, inputs)
         input_paths = _dump_inputs(inputs, run_folder)
         defaults_path = _dump_defaults(pipeline.defaults, run_folder)
-        shapes, masks = map_shapes(pipeline, inputs, internal_shapes or {})
+        internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
+        shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         return cls(
             input_paths=input_paths,
             defaults_path=defaults_path,
@@ -165,6 +166,24 @@ class RunInfo:
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+
+def _construct_internal_shapes(
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    pipeline: Pipeline,
+) -> dict[str, int | tuple[int, ...]] | None:
+    if internal_shapes is None:
+        internal_shapes = {}
+    for f in pipeline.functions:
+        if f.output_name in internal_shapes:
+            continue
+        if f.internal_shape is None:
+            continue
+        for output_name in at_least_tuple(f.output_name):
+            internal_shapes[output_name] = f.internal_shape
+    if not internal_shapes:
+        return None
+    return internal_shapes
 
 
 def _cleanup_run_folder(run_folder: str | Path) -> None:

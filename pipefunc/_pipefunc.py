@@ -91,10 +91,12 @@ class PipeFunc(Generic[T]):
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        The shape of the returned value. This is only required when there is a `mapspec`
-        like ``... -> out[i]``, which means the shape of the output is not known. The shape
-        can be a single integer, a tuple of integers, or a string that with a parameter name.
-        Some examples are: ``3``, ``(3, 3)``, ``"n"``, ``(3, "n")``, and ``(1, "x.shape[0]")``.
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs should be the same.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -165,7 +167,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | str | tuple[int | str, ...] | None = None,
+        internal_shape: int | tuple[int, ...] | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -182,7 +184,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: tuple[int | str, ...] = at_least_tuple(internal_shape)
+        self.internal_shape: int | tuple[int, ...] | None = internal_shape
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -566,6 +568,7 @@ class PipeFunc(Generic[T]):
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
+            "internal_shape": self.internal_shape,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
@@ -834,7 +837,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | str | tuple[int | str, ...] | None = None,
+    internal_shape: int | tuple[int, ...] | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -879,10 +882,12 @@ def pipefunc(
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        The shape of the returned value. This is only required when there is a `mapspec`
-        like ``... -> out[i]``, which means the shape of the output is not known. The shape
-        can be a single integer, a tuple of integers, or a string that with a parameter name.
-        Some examples are: ``3``, ``(3, 3)``, ``"n"``, ``(3, "n")``, and ``(1, "x.shape[0]")``.
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs should be the same.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
