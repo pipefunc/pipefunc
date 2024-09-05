@@ -211,3 +211,32 @@ def test_autoset_cache() -> None:
     pipeline = Pipeline([f])
     assert pipeline.cache is not None
     assert isinstance(pipeline.cache, LRUCache)
+
+
+def test_cache_with_map():
+    calls = {"f": 0, "g": 0}
+
+    @pipefunc(
+        output_name="c",
+        defaults={"b": 1},
+        cache=True,
+        mapspec="a[i] -> c[i]",
+    )
+    def f(a, b):
+        calls["f"] += 1
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(b, c):
+        calls["g"] += 1
+        return b + sum(c)
+
+    pipeline = Pipeline([f, g], cache_type="simple")
+    a = [1, 2, 3]
+    for _ in range(3):
+        assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
+        assert calls == {"f": len(a), "g": 1}
+    for _ in range(3):
+        # Call with different arguments
+        assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
+        assert calls == {"f": 2 * len(a), "g": 2}
