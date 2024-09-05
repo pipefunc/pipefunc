@@ -13,6 +13,10 @@ kernelspec:
 
 # ❓ FAQ: Frequently Asked Questions
 
+```{contents} ToC – Questions
+:depth: 3
+```
+
 ## How to handle defaults?
 
 You can provide defaults in
