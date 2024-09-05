@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import tempfile
+import time
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ import numpy as np
 import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
-from pipefunc.cache import to_hashable
+from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import (
     MapSpec,
     _shape_to_key,
@@ -279,9 +280,13 @@ def _get_or_set_cache(
 
     if cache_key in cache:
         return cache.get(cache_key)
-
+    if isinstance(cache, HybridCache):
+        t = time.monotonic()
     result = compute_fn()
-    cache.put(cache_key, result)
+    if isinstance(cache, HybridCache):
+        cache.put(cache_key, result, time.monotonic() - t)
+    else:
+        cache.put(cache_key, result)
     return result
 
 
