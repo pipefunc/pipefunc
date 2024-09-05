@@ -17,6 +17,8 @@ kernelspec:
 :depth: 3
 ```
 
+Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
+
 ## How to handle defaults?
 
 You can provide defaults in
