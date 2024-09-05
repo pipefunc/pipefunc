@@ -274,16 +274,12 @@ def _get_or_set_cache(
     compute_fn: Callable[[], Any],
 ) -> Any:
     if cache is None:
-        # Cache not provided; directly compute and return the result
         return compute_fn()
-
     cache_key = (func.output_name, to_hashable(kwargs))
 
-    # Check if the result is already in the cache
     if cache_key in cache:
         return cache.get(cache_key)
 
-    # Compute the result and cache it
     result = compute_fn()
     cache.put(cache_key, result)
     return result
