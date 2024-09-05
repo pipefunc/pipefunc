@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -195,11 +195,11 @@ def test_sharing_defaults() -> None:
     calls["f"] = 0
     calls["g"] = 0
     for _ in range(2):
-        assert pipeline.map(inputs={"a": 1}, parallel=False)["d"].output == 3
+        assert pipeline.map(inputs={"a": 1})["d"].output == 3
         assert calls == {"f": 1, "g": 1}
     for _ in range(2):
         # Call with different arguments
-        assert pipeline.map(inputs={"a": 1, "b": 2}, parallel=False)["d"].output == 5
+        assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
         assert calls == {"f": 2, "g": 2}
 
 
@@ -232,13 +232,19 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
         calls["g"] += 1
         return b + sum(c)
 
-    cache_kwargs = {} if cache_type != "disk" else {"cache_dir": tmp_path}
+    cache_kwargs: dict[str, Any]
+    if cache_type == "disk":
+        cache_kwargs = {"cache_dir": tmp_path}
+    elif cache_type in ("lru", "hybrid"):
+        cache_kwargs = {"shared": False}
+    else:
+        cache_kwargs = {}
     pipeline = Pipeline([f, g], cache_type=cache_type, cache_kwargs=cache_kwargs)
     a = [1, 2, 3]
     for _ in range(3):
-        assert pipeline.map(inputs={"a": a})["d"].output == 10
+        assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
         assert calls == {"f": len(a), "g": 1}
     for _ in range(3):
         # Call with different arguments
-        assert pipeline.map(inputs={"a": a, "b": 2})["d"].output == 14
+        assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
         assert calls == {"f": 2 * len(a), "g": 2}
