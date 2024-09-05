@@ -116,22 +116,24 @@ class Pipeline:
     `pipeline.run` / `pipeline(...)`.
 
     1. For `pipeline.run` and `pipeline(...)` ("calling the pipeline as a function"):
-    - The cache key is computed based *only* on the root arguments of the pipeline.
+    - The cache key is computed based solely on the root arguments provided to the pipeline.
     - Only the root arguments need to be hashable.
+    - The root arguments uniquely determine the output across the entire pipeline, allowing
+      caching to be simple and effective when computing the final result.
 
     2. For `pipeline.map`:
     - The cache key is computed based on the input values of each `PipeFunc`.
     - So a ``PipeFunc`` with ``cache=True`` must have hashable input values.
 
     For both methods:
-    - The `pipefunc.cache.to_hashable` function is used to attempt to make input values hashable.
+    - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
+      which is a requirement for storing results in a cache.
     - This function works for many common types but is not guaranteed to work for all types.
     - If `to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
     - Caution: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
 
-    The key difference is that `pipeline.map` operates on individual `PipeFunc` instances,
-    while `pipeline.run` considers the pipeline as a whole, which affects which values
-    need to be made hashable.
+    The key difference is that `pipeline.run`'s output is uniquely determined by the root arguments,
+    while `pipeline.map` is not because it may contain reduction operations as described by from `MapSpec`s.
 
     """
 
