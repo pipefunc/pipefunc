@@ -1,14 +1,14 @@
 # 📜 API Documentation
 
-```{note}
+```{admonition} tl;dr
 The API documentation is comprehensive and can be overwhelming.
 The most important parts are:
 
-- {class}`pipefunc.pipefunc`
-- {class}`pipefunc.PipeFunc`
-- {class}`pipefunc.Pipeline`
-- {class}`pipefunc.Pipeline.map`
-- {class}`pipefunc.Pipeline.run`
+- {class}`pipefunc.pipefunc`: the ``@pipefunc`` decorator
+- {class}`pipefunc.PipeFunc`: the class that is returned by the ``@pipefunc`` decorator
+- {class}`pipefunc.Pipeline`: the pipeline class containing the ``PipeFunc`` instances
+- {class}`pipefunc.Pipeline.run`: run functions inline sequentially
+- {class}`pipefunc.Pipeline.map`: run functions that *may* contain map-reduce operation in parallel
 
 ```
 
