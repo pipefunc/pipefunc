@@ -728,7 +728,7 @@ class Pipeline:
 
         See Also
         --------
-        func_predecessors
+        func_dependents
 
         """
         return _traverse_graph(output_name, "predecessors", self.graph, self.node_mapping)
@@ -738,7 +738,7 @@ class Pipeline:
 
         See Also
         --------
-        func_successors
+        func_dependencies
 
         """
         return _traverse_graph(name, "successors", self.graph, self.node_mapping)
