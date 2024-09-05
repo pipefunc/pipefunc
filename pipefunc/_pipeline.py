@@ -121,7 +121,7 @@ class Pipeline:
 
     2. For `pipeline.map`:
     - The cache key is computed based on the input values of each `PipeFunc`.
-    - So a ``PipeFunc`` with ``cache=True``, all its input values must be hashable.
+    - So a ``PipeFunc`` with ``cache=True`` must have hashable input values.
 
     For both methods:
     - The `pipefunc.cache.to_hashable` function is used to attempt to make input values hashable.
