@@ -7,7 +7,7 @@ from pipefunc.map._filearray import FileArray
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo
-from pipefunc.map._storage_base import StorageBase, register_storage
+from pipefunc.map._storage_base import StorageBase, register_storage, storage_registry
 
 __all__ = [
     "DictArray",
@@ -19,6 +19,7 @@ __all__ = [
     "run",
     "RunInfo",
     "SharedMemoryDictArray",
+    "storage_registry",
     "StorageBase",
 ]
 
