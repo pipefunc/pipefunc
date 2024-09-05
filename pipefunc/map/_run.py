@@ -35,6 +35,12 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
+def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
+    return all(f.mapspec is None for f in pipeline.functions) and all(
+        len(fs) == 1 for fs in pipeline.topological_generations.function_lists
+    )
+
+
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -110,6 +116,8 @@ def run(
     run_info.dump(run_folder)
     outputs: dict[str, Result] = OrderedDict()
     store = run_info.init_store()
+    if _cannot_be_parallelized(pipeline):
+        parallel = False
     _check_parallel(parallel, store)
 
     with _maybe_executor(executor, parallel) as ex:

@@ -236,9 +236,9 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
     pipeline = Pipeline([f, g], cache_type=cache_type, cache_kwargs=cache_kwargs)
     a = [1, 2, 3]
     for _ in range(3):
-        assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
+        assert pipeline.map(inputs={"a": a})["d"].output == 10
         assert calls == {"f": len(a), "g": 1}
     for _ in range(3):
         # Call with different arguments
-        assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
+        assert pipeline.map(inputs={"a": a, "b": 2})["d"].output == 14
         assert calls == {"f": 2 * len(a), "g": 2}
