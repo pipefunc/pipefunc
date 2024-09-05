@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc.cache import _CacheBase
     from pipefunc.map._storage_base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources
@@ -250,6 +251,7 @@ def create_learners(
                     run_info=run_info,
                     store=store,
                     fixed_indices=_fixed_indices,  # might be None
+                    cache=pipeline.cache,
                     return_output=return_output,
                 )
                 if func.resources_scope == "element":
@@ -273,6 +275,7 @@ def _learner(
     run_info: RunInfo,
     store: dict[str, StorageBase],
     fixed_indices: dict[str, int | slice] | None,
+    cache: _CacheBase | None,
     *,
     return_output: bool,
 ) -> SequenceLearner:
@@ -283,6 +286,7 @@ def _learner(
             run_info=run_info,
             store=store,
             return_output=return_output,
+            cache=cache,
         )
         shape = run_info.shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
@@ -352,6 +356,7 @@ def _execute_iteration_in_map_spec(
     func: PipeFunc,
     run_info: RunInfo,
     store: dict[str, StorageBase],
+    cache: _CacheBase | None,
     *,
     return_output: bool = False,
 ) -> tuple[Any, ...] | None:
@@ -370,7 +375,7 @@ def _execute_iteration_in_map_spec(
     kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays, cache)
     if not return_output:
         return None
     return outputs if isinstance(func.output_name, tuple) else outputs[0]

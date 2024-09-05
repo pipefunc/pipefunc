@@ -64,8 +64,6 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
-_empty = inspect.Parameter.empty
-
 
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
@@ -84,7 +82,7 @@ class Pipeline:
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
     cache_type
-        The type of cache to use.
+        The type of cache to use. See the notes below for more *important* information.
     cache_kwargs
         Keyword arguments passed to the cache constructor.
     validate_type_annotations
@@ -111,6 +109,37 @@ class Pipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+
+    Notes
+    -----
+    Important note about caching: The caching behavior differs between ``pipeline.map`` and
+    ``pipeline.run`` / ``pipeline(...)``.
+
+    1. For ``pipeline.run`` and ``pipeline(...)`` ("calling the pipeline as a function"):
+
+    - The cache key is computed based solely on the root arguments provided to the pipeline.
+    - Only the root arguments need to be hashable.
+    - The root arguments uniquely determine the output across the entire pipeline, allowing
+      caching to be simple and effective when computing the final result.
+
+    2. For ``pipeline.map``:
+
+    - The cache key is computed based on the input values of each `PipeFunc`.
+    - So a `PipeFunc` with ``cache=True`` must have hashable input values.
+    - When using ``pipeline.map(..., parallel=True)``, the cache itself will be serialized,
+      so one must use a cache that supports shared memory, such as `~pipefunc.cache.LRUCache`
+      with ``shared=True`` or uses a disk cache like `~pipefunc.cache.DiskCache`.
+
+    For both methods:
+
+    - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
+      which is a requirement for storing results in a cache.
+    - This function works for many common types but is not guaranteed to work for all types.
+    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
+    - Caution ⛔️: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
+
+    The key difference is that ``pipeline.run``'s output is uniquely determined by the root arguments,
+    while ``pipeline.map`` is not because it may contain reduction operations as described by `~pipefunc.map.MapSpec`.
 
     """
 
