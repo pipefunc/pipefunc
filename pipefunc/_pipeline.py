@@ -124,9 +124,9 @@ class Pipeline:
     2. For `pipeline.map`:
     - The cache key is computed based on the input values of each `PipeFunc`.
     - So a ``PipeFunc`` with ``cache=True`` must have hashable input values.
-    - When using `pipeline.map(parallel=True)`, the cache itself will be serialized,
-      so one must use a cache that supports shared memory, such as `LRUCache(shared=True)`
-      or uses a disk cache like `DiskCache`.
+    - When using ``pipeline.map(..., parallel=True)``, the cache itself will be serialized,
+      so one must use a cache that supports shared memory, such as ``LRUCache(shared=True)``
+      or uses a disk cache like `~pipefunc.cache.DiskCache`.
 
     For both methods:
     - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
