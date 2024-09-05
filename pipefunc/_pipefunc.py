@@ -96,7 +96,7 @@ class PipeFunc(Generic[T]):
         be derived from the inputs. The shape can be a single integer or a tuple of
         integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
         provide the shape for one of the outputs. This works because the shape of all
-        outputs should be the same.
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -887,7 +887,7 @@ def pipefunc(
         be derived from the inputs. The shape can be a single integer or a tuple of
         integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
         provide the shape for one of the outputs. This works because the shape of all
-        outputs should be the same.
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
