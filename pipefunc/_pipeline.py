@@ -115,7 +115,7 @@ class Pipeline:
     Important note about caching: The caching behavior differs between `pipeline.map` and
     `pipeline.run` / `pipeline(...)`.
 
-    1. For `pipeline.run` and `pipeline(...)`:
+    1. For `pipeline.run` and `pipeline(...)` ("calling the pipeline as a function"):
     - The cache key is computed based *only* on the root arguments of the pipeline.
     - Only the root arguments need to be hashable.
 
