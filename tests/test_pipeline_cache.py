@@ -213,7 +213,8 @@ def test_autoset_cache() -> None:
     assert isinstance(pipeline.cache, LRUCache)
 
 
-def test_cache_with_map():
+@pytest.mark.parametrize("cache_type", ["simple", "lru", "hybrid", "disk"])
+def test_cache_with_map(cache_type, tmp_path: Path) -> None:
     calls = {"f": 0, "g": 0}
 
     @pipefunc(
@@ -231,7 +232,8 @@ def test_cache_with_map():
         calls["g"] += 1
         return b + sum(c)
 
-    pipeline = Pipeline([f, g], cache_type="simple")
+    cache_kwargs = {} if cache_type != "disk" else {"cache_dir": tmp_path}
+    pipeline = Pipeline([f, g], cache_type=cache_type, cache_kwargs=cache_kwargs)
     a = [1, 2, 3]
     for _ in range(3):
         assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
