@@ -35,6 +35,12 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
+def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
+    return all(f.mapspec is None for f in pipeline.functions) and all(
+        len(fs) == 1 for fs in pipeline.topological_generations.function_lists
+    )
+
+
 def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -75,11 +81,11 @@ def run(
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
     storage
-        The storage class to use for the file arrays. Can use any registered storage class.
+        The storage class to use for the file arrays.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
     cleanup
         Whether to clean up the ``run_folder`` before running the pipeline.
     fixed_indices
@@ -110,6 +116,8 @@ def run(
     run_info.dump(run_folder)
     outputs: dict[str, Result] = OrderedDict()
     store = run_info.init_store()
+    if _cannot_be_parallelized(pipeline):
+        parallel = False
     _check_parallel(parallel, store)
 
     with _maybe_executor(executor, parallel) as ex:
