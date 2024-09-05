@@ -90,6 +90,13 @@ class PipeFunc(Generic[T]):
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    internal_shape
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -160,6 +167,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
+        internal_shape: int | tuple[int, ...] | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -176,6 +184,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
+        self.internal_shape: int | tuple[int, ...] | None = internal_shape
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -559,6 +568,7 @@ class PipeFunc(Generic[T]):
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
+            "internal_shape": self.internal_shape,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
@@ -827,6 +837,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
+    internal_shape: int | tuple[int, ...] | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -870,6 +881,13 @@ def pipefunc(
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    internal_shape
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -953,6 +971,7 @@ def pipefunc(
             debug=debug,
             cache=cache,
             mapspec=mapspec,
+            internal_shape=internal_shape,
             resources=resources,
             resources_variable=resources_variable,
             resources_scope=resources_scope,

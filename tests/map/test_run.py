@@ -1389,3 +1389,25 @@ def test_map_func_exception():
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
         pipeline.map({"x": 1}, None, parallel=False)
+
+
+def test_internal_shape_in_pipefunc():
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(3,))
+    def f(x):
+        return [x] * 3
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y):
+        return y
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": 1}
+    r1 = pipeline.map(inputs, parallel=False)
+    assert r1["y"].output == [1, 1, 1]
+    assert r1["z"].output.tolist() == [1, 1, 1]
+
+    f_no_shape = f.copy(internal_shape=None)
+    pipeline = Pipeline([f_no_shape, g])
+    r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False)
+    assert r2["y"].output == [1, 1, 1]
+    assert r2["z"].output.tolist() == [1, 1, 1]
