@@ -90,7 +90,7 @@ class PipelineWidget:
         )
 
     def show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
-        """Displays pipeline parameters and types for all functions in a structured and visually attractive way."""
+        """Displays pipeline parameters and types using the factored-out helper functions."""
         with self.info_output_display:
             self.info_output_display.clear_output(wait=True)
 
@@ -98,107 +98,42 @@ class PipelineWidget:
             root_args = set(self.pipeline.topological_generations.root_args)
             defaults = self.pipeline.defaults
 
-            # Starting HTML content with embedded CSS for styling
-            html_content = """
-                <style>
-                    .pipeline-info h3 {
-                        font-family: Arial, Helvetica, sans-serif;
-                        color: #2c3e50;
-                        text-align: center;
-                    }
-                    .pipeline-info table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 15px 0;
-                        font-family: Arial, sans-serif;
-                        font-size: 14px;
-                        text-align: left;
-                    }
-                    .pipeline-info th, .pipeline-info td {
-                        padding: 8px 12px;
-                        border: 1px solid #dee2e6;
-                    }
-                    .pipeline-info th {
-                        background-color: #3498db;
-                        color: white;
-                    }
-                    .pipeline-info td.key-root {
-                        font-weight: bold;
-                        color: #e74c3c;
-                    }
-                    .pipeline-info td.default {
-                        color: #2ecc71;
-                    }
-                    .pipeline-info hr {
-                        margin: 25px 0;
-                    }
-                    .pipeline-info .output {
-                        color: #8e44ad;
-                    }
-                </style>
-                <div class="pipeline-info">
-                <h3>Pipeline Parameters and Types</h3>
+            # Start the HTML content, including the legend
+            html_content = f"""
+                {_build_legend()}
             """
 
             # Iterate through functions in the pipeline
             for func in self.pipeline.functions:
                 html_content += f"<h4><b>Function:</b> {func.__name__}</h4>"
 
-                html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Parameter</th>
-                            <th>Type</th>
-                            <th>Default Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                """
+                # Prepare headers for the table
+                headers = ["Parameter", "Type", "Default Value"]
 
-                # For each function, go through its parameters
-                for param in func.parameters:
-                    is_root_arg = param in root_args
-                    param_type = func.parameter_annotations.get(
+                # Build the rows for the table
+                rows = [
+                    _format_param(
                         param,
-                        "Any",
-                    )  # Fallback to 'Any' if no type
-                    default_value = defaults.get(param, None)
-
-                    # Define CSS classes for custom styling
-                    param_class = "key-root" if is_root_arg else ""
-                    default_display = (
-                        f"<span class='default'>{default_value}</span>"
-                        if default_value is not None
-                        else "—"
+                        func.parameter_annotations.get(param, "Any"),
+                        is_root=param in root_args,
+                        default_value=defaults.get(param),
                     )
+                    for param in func.parameters
+                ]
 
-                    # Add the table row with the parameter, type, and default value
-                    html_content += f"""
-                    <tr>
-                        <td class='{param_class}'>{param}</td>
-                        <td>{param_type}</td>
-                        <td>{default_display}</td>
-                    </tr>
-                    """
+                # Generate the table for this function
+                html_content += _build_table(headers, rows)
 
-                html_content += "</tbody></table>"
-
-                # Outputs of the function
+                # Outputs of the function (if any)
                 if func.output_annotation:
                     html_content += "<h4>Outputs</h4><ul>"
                     for output_name, output_type in func.output_annotation.items():
-                        html_content += (
-                            f"<li class='output'><b>{output_name}</b>: {output_type.__name__}</li>"
-                        )
+                        html_content += f"<li class='output-type'><b>{output_name}</b>: {output_type.__name__}</li>"
                     html_content += "</ul>"
 
-                # Divider to separate sections
                 html_content += "<hr>"
 
-            # End of the HTML div
-            html_content += "</div>"
-
+            # Display the content
             display(widgets.HTML(html_content))
 
     def visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
@@ -242,3 +177,56 @@ class PipelineWidget:
     def display(self) -> None:
         """Displays the widget in the notebook."""
         display(self.tab)
+
+
+def _build_table(headers: list[str], rows: list[list[str]]) -> str:
+    # Build the header row
+    header_html = _build_row(headers, cell_tag="th")
+
+    # Build each row, joining them together
+    rows_html = "".join([_build_row(row) for row in rows])
+
+    # Wrap everything in <table> tags with overall table styling
+    return f"""
+        <table>
+            <thead>{header_html}</thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    """
+
+
+def _build_row(cells: list[str], cell_tag: str = "td") -> str:
+    return f"<tr>{''.join([f'<{cell_tag}>{cell}</{cell_tag}>' for cell in cells])}</tr>"
+
+
+def _format_param(
+    param: str,
+    param_type: str,
+    *,
+    is_root: bool,
+    default_value: str | None,
+) -> list[str]:
+    # Format the parameter name, bold and red if it's a root argument
+    param_html = (
+        f"<span style='color: #e74c3c; font-weight: bold;'>{param}</span>" if is_root else param
+    )
+
+    # Format the default value, green if it exists
+    if default_value is not None:
+        default_html = f"<span style='color: #2ecc71;'>{default_value}</span>"
+    else:
+        default_html = "—"
+
+    return [param_html, param_type, default_html]
+
+
+def _build_legend() -> str:
+    return """
+        <div class="legend" style="font-size: 14px; margin-bottom: 15px;">
+            <b>Legend:</b>
+            <ul>
+                <li><span style="color: #e74c3c; font-weight: bold;">Bold & Red</span> parameters are pipeline root arguments (root_args).</li>
+                <li>Parameters with <span style="color: #2ecc71;">green text</span> have default values.</li>
+            </ul>
+        </div>
+    """
