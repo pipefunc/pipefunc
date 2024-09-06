@@ -61,6 +61,7 @@ class PipeFunc(Generic[T]):
         The original function to be wrapped.
     output_name
         The identifier for the output of the wrapped function.
+        Provide a tuple of strings for multiple outputs.
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the ``output_name`` (str) as second argument, and returns the desired output.
@@ -159,7 +160,7 @@ class PipeFunc(Generic[T]):
         func: T,
         output_name: _OUTPUT_TYPE,
         *,
-        output_picker: Callable[[str, Any], Any] | None = None,
+        output_picker: Callable[[Any, str], Any] | None = None,
         renames: dict[str, str] | None = None,
         defaults: dict[str, Any] | None = None,
         bound: dict[str, Any] | None = None,
@@ -852,6 +853,7 @@ def pipefunc(
     ----------
     output_name
         The identifier for the output of the decorated function.
+        Provide a tuple of strings for multiple outputs.
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the ``output_name`` (str) as second argument, and returns the desired output.
@@ -932,7 +934,8 @@ def pipefunc(
     See Also
     --------
     PipeFunc
-        A function wrapper class for pipeline functions with additional attributes.
+        A function wrapper class for pipeline functions. Has the same functionality
+        as the `pipefunc` decorator but can be used to wrap existing functions.
 
     Examples
     --------
