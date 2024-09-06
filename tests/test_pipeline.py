@@ -766,7 +766,7 @@ def test_from_nodes_and_edges():
         return c * d * x
 
     graph = {f_c: [f_d, f_e], f_d: [f_e]}
-    pipeline = Pipeline.from_explicit_graph(graph)
+    pipeline = Pipeline.from_explicit_connections(graph)
     assert pipeline(a=1, b=2) == 18
 
     with pytest.raises(
@@ -774,4 +774,4 @@ def test_from_nodes_and_edges():
         match="Expected edges:",
     ):
         # Missing the connection between f_d and f_e
-        Pipeline.from_explicit_graph({f_c: [f_d, f_e]})
+        Pipeline.from_explicit_connections({f_c: [f_d, f_e]})

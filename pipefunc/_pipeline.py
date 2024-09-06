@@ -1514,14 +1514,14 @@ class Pipeline:
         return pipeline
 
     @classmethod
-    def from_explicit_graph(cls, graph: dict[PipeFunc, set[PipeFunc]]) -> Pipeline:
-        """Create a pipeline from an explicit graph.
+    def from_explicit_connections(cls, connections: dict[PipeFunc, set[PipeFunc]]) -> Pipeline:
+        """Create a pipeline from an explicit connections.
 
         This function ensures that connections in the graph are as expected.
 
         Parameters
         ----------
-        graph
+        connections
             A dictionary mapping functions to sets of functions that depend on them.
 
         Returns
@@ -1548,30 +1548,37 @@ class Pipeline:
         """
         pipeline = cls([])
         added = set()
-        expected_edges: set[tuple[_OUTPUT_TYPE, _OUTPUT_TYPE]] = set()
-        for f, dependents in graph.items():
+        added_edges: set[tuple[_OUTPUT_TYPE, _OUTPUT_TYPE]] = set()
+        for f, dependents in connections.items():
             if f not in added:
                 pipeline.add(f)
                 added.add(f)
             for dependent in dependents:
-                expected_edges.add((f.output_name, dependent.output_name))
+                added_edges.add((f.output_name, dependent.output_name))
                 if dependent not in added:
                     pipeline.add(dependent)
                     added.add(dependent)
+        # We're first keeping the output names as the functions themselves are
+        # copied when calling `add`. Then we get the actual functions in the pipeline.
+        expected_nodes = {pipeline.output_to_func[f.output_name] for f in added}
+        expected_edges = {
+            (pipeline.output_to_func[u], pipeline.output_to_func[v]) for u, v in added_edges
+        }
 
         # Now check that the connections are as in the provided graph
-        expected_nodes: set[_OUTPUT_TYPE] = {f.output_name for f in added}
-        nodes = {n.output_name for n in pipeline.graph.nodes if isinstance(n, PipeFunc)}
+        nodes = {n for n in pipeline.graph.nodes if isinstance(n, PipeFunc)}
         edges = {
-            (u.output_name, v.output_name)
+            (u, v)
             for u, v in pipeline.graph.edges
             if isinstance(u, PipeFunc) and isinstance(v, PipeFunc)
         }
         if nodes != expected_nodes:
-            msg = f"Expected nodes: {expected_nodes}, got: {nodes}"
+            extra_nodes = nodes - expected_nodes
+            msg = f"Expected nodes: `{expected_nodes}`\ngot: `{nodes}`\nextra: `{extra_nodes}`"
             raise ValueError(msg)
         if edges != expected_edges:
-            msg = f"Expected edges: {expected_edges}, got: {edges}"
+            extra_edges = edges - expected_edges
+            msg = f"Expected edges: `{expected_edges}`\ngot: `{edges}`\nextra: `{extra_edges}`"
             raise ValueError(msg)
         return pipeline
 
