@@ -1,3 +1,5 @@
+from typing import Any
+
 import ipywidgets as widgets
 from IPython.display import display
 
@@ -103,18 +105,18 @@ class PipelineWidget:
                 {_build_legend()}
             """
 
-            # Iterate through functions in the pipeline
+            # Add parameter table for each function
             for func in self.pipeline.functions:
-                html_content += f"<h4><b>Function:</b> {func.__name__}</h4>"
+                html_content += f"<h4><b>Function:</b> {_format_code(func.__name__)}</h4>"
 
-                # Prepare headers for the table
+                # Prepare headers for the parameter table
                 headers = ["Parameter", "Type", "Default Value", "Returned By"]
 
-                # Build the rows for the table
+                # Build the rows for the parameter table
                 rows = [
                     _format_param(
                         param,
-                        func.parameter_annotations.get(param, "—"),
+                        param_type=func.parameter_annotations.get(param, "—"),
                         is_root=param in root_args,
                         default_value=defaults.get(param),
                         returned_by=self.pipeline.output_to_func.get(param, "—"),
@@ -122,19 +124,21 @@ class PipelineWidget:
                     for param in func.parameters
                 ]
 
-                # Generate the table for this function
+                # Generate the parameter table for this function
                 html_content += _build_table(headers, rows)
-
                 # Outputs of the function (if any)
                 if func.output_annotation:
                     html_content += "<h4>Outputs</h4><ul>"
                     for output_name, output_type in func.output_annotation.items():
                         html_content += f"<li class='output-type'><b>{output_name}</b>: {output_type.__name__}</li>"
                     html_content += "</ul>"
-
                 html_content += "<hr>"
 
-            # Display the content
+            # Single combined table for the PipeFunc attribute information
+            html_content += "<h3>PipeFunc Attributes Overview</h3>"
+            html_content += _build_combined_pipefunc_info_table(self.pipeline.functions)
+
+            # Display the resulting content
             display(widgets.HTML(html_content))
 
     def visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
@@ -202,8 +206,8 @@ def _build_row(cells: list[str], cell_tag: str = "td") -> str:
 
 def _format_param(
     param: str,
-    param_type: str,
     *,
+    param_type: Any,
     is_root: bool,
     default_value: str | None,
     returned_by: PipeFunc | str,
@@ -220,7 +224,10 @@ def _format_param(
         default_html = "—"
 
     if isinstance(returned_by, PipeFunc):
-        returned_by = returned_by.__name__
+        returned_by = _format_code(returned_by.__name__)
+
+    if param_type != "—":
+        param_type = _format_code(param_type.__name__)
 
     return [param_html, param_type, default_html, returned_by]
 
@@ -235,3 +242,39 @@ def _build_legend() -> str:
             </ul>
         </div>
     """
+
+
+def _build_combined_pipefunc_info_table(functions: list[PipeFunc]) -> str:
+    """Build a combined table of functions with each function as a column."""
+    headers = ["Attribute"] + [func.__name__ for func in functions]
+
+    # Attributes to be displayed
+    attributes = ["Cache", "Profile", "MapSpec", "Resources", "Debug"]
+
+    # Collect the value rows for each function
+    rows = []
+    for attribute in attributes:
+        row = [attribute]
+        for func in functions:
+            # Get attribute based on the name in the attributes list
+            value = getattr(func, attribute.lower(), None)
+            if isinstance(value, bool):
+                # For basic types: convert to string directly
+                row.append("✅" if value else "❌")
+            elif isinstance(value, int | str):
+                # For basic types: convert to string directly
+                row.append(str(value))
+            elif value is None:
+                # handle None-values
+                row.append("—")
+            else:
+                # handle special cases (like MapSpec, Resources, etc.)
+                row.append(str(value) if value is not None else "—")
+        rows.append(row)
+
+    # Generate the table HTML by plugging in the headers and rows
+    return _build_table(headers, rows)
+
+
+def _format_code(text: str) -> str:
+    return f"<code>{text}</code>"
