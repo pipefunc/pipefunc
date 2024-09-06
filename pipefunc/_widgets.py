@@ -1,7 +1,7 @@
 import ipywidgets as widgets
 from IPython.display import display
 
-from pipefunc import Pipeline
+from pipefunc import PipeFunc, Pipeline
 
 
 class PipelineWidget:
@@ -108,15 +108,16 @@ class PipelineWidget:
                 html_content += f"<h4><b>Function:</b> {func.__name__}</h4>"
 
                 # Prepare headers for the table
-                headers = ["Parameter", "Type", "Default Value"]
+                headers = ["Parameter", "Type", "Default Value", "Returned By"]
 
                 # Build the rows for the table
                 rows = [
                     _format_param(
                         param,
-                        func.parameter_annotations.get(param, "Any"),
+                        func.parameter_annotations.get(param, "—"),
                         is_root=param in root_args,
                         default_value=defaults.get(param),
+                        returned_by=self.pipeline.output_to_func.get(param, "—"),
                     )
                     for param in func.parameters
                 ]
@@ -205,6 +206,7 @@ def _format_param(
     *,
     is_root: bool,
     default_value: str | None,
+    returned_by: PipeFunc | str,
 ) -> list[str]:
     # Format the parameter name, bold and red if it's a root argument
     param_html = (
@@ -217,7 +219,10 @@ def _format_param(
     else:
         default_html = "—"
 
-    return [param_html, param_type, default_html]
+    if isinstance(returned_by, PipeFunc):
+        returned_by = returned_by.__name__
+
+    return [param_html, param_type, default_html, returned_by]
 
 
 def _build_legend() -> str:
