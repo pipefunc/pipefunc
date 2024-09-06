@@ -24,6 +24,7 @@ dependencies:
   - pygraphviz
   - holoviews
   - bokeh
+  - jupyter_bokeh
   # optional-dependencies: docs
   - sphinx
   - sphinx-book-theme
