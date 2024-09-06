@@ -1,86 +1,116 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pipefunc import Pipeline
-
 import ipywidgets as widgets
-import matplotlib.pyplot as plt
-from IPython.display import clear_output, display
+from IPython.display import display
 
 from pipefunc import Pipeline
+
+CNT = {"count": 0}
 
 
 class PipelineWidget:
     def __init__(self, pipeline: Pipeline):
         self.pipeline = pipeline
 
-        # Initializing Widgets
-        self.info_button = widgets.Button(description="Show Pipeline Info")
-        self.visualize_button = widgets.Button(description="Visualize Pipeline")
-        self.function_selector = widgets.Dropdown(
-            options=[func.__name__ for func in self.pipeline.functions],
-            description="Choose Function:",
+        # Initializing Widgets with styles
+        self.info_button = widgets.Button(
+            description="Show Pipeline Info",
+            button_style="info",
+            tooltip="Click to view pipeline information",
         )
-        self.input_output_display = widgets.Output()
-        self.function_info_display = widgets.Output()
-
-        # Layout and Organization
-        self.actions_box = widgets.HBox([self.info_button, self.visualize_button])
-        self.main_box = widgets.VBox(
-            [
-                self.actions_box,
-                self.input_output_display,
-                self.function_selector,
-                self.function_info_display,
-            ],
+        self.visualize_button = widgets.Button(
+            description="Visualize Pipeline",
+            button_style="primary",
+            tooltip="Click to visualize the pipeline",
         )
 
-        # Event Handlers
+        # Widgets to control figure size
+        self.fig_width = widgets.IntSlider(
+            value=5,
+            min=1,
+            max=20,
+            step=1,
+            description="Width:",
+        )
+        self.fig_height = widgets.IntSlider(
+            value=4,
+            min=1,
+            max=20,
+            step=1,
+            description="Height:",
+        )
+
+        # Output areas for each tab
+        self.info_output_display = widgets.Output()
+        self.visualize_output_display = widgets.Output()
+
+        # Tab setup
+        self.tab = widgets.Tab()
+        self.tab.children = [self.create_info_tab(), self.create_visualize_tab()]
+        self.tab.set_title(0, "Info")
+        self.tab.set_title(1, "Visualize")
+
+        # Bind the button click events
         self.info_button.on_click(self.show_pipeline_info)
         self.visualize_button.on_click(self.visualize_pipeline)
-        self.function_selector.observe(self.show_function_details, "value")
+
+        # Bind the slider change events
+        self.fig_width.observe(self.on_size_change, names="value")
+        self.fig_height.observe(self.on_size_change, names="value")
+
+    def create_info_tab(self):
+        """Creates the info tab layout."""
+        return widgets.VBox(
+            [
+                widgets.HTML("<h2>Pipeline Information</h2>"),
+                self.info_button,
+                widgets.HTML("<hr>"),
+                self.info_output_display,
+            ]
+        )
+
+    def create_visualize_tab(self):
+        """Creates the visualize tab layout."""
+        return widgets.VBox(
+            [
+                widgets.HTML("<h2>Visualize Pipeline</h2>"),
+                self.fig_width,
+                self.fig_height,
+                widgets.HTML("<hr>"),
+                self.visualize_button,
+                self.visualize_output_display,
+            ]
+        )
 
     def show_pipeline_info(self, b=None):
         """Displays pipeline parameters and types for all functions."""
-        with self.input_output_display:
-            clear_output()
-            print("Pipeline Parameters and Types:")
-            for func in self.pipeline.functions:
-                print(f"\nFunction: {func.__name__}")
-                for param, typ in func.parameter_annotations.items():
-                    print(f"  - {param}: {typ.__name__}")
+        with self.info_output_display:
+            self.info_output_display.clear_output(wait=True)
 
+            html_content = "<h3>Pipeline Parameters and Types</h3>"
+            for func in self.pipeline.functions:
+                html_content += f"<b>Function:</b> {func.__name__}<br>"
+                for param, typ in func.parameter_annotations.items():
+                    html_content += f"  - <i>{param}:</i> {typ.__name__}<br>"
                 for output_name, output_type in func.output_annotation.items():
-                    print(f"Output: {output_name} -> {output_type.__name__}")
+                    html_content += f"<b>Output:</b> {output_name} -> {output_type.__name__}<br>"
+                html_content += "<hr>"
+
+            display(widgets.HTML(html_content))
 
     def visualize_pipeline(self, b=None):
-        """Visualizes the pipeline."""
-        with self.input_output_display:
-            clear_output()
-            plt.clf()  # Clear the current figure
-            print("Pipeline Visualization:")
-            self.pipeline.visualize()
-            plt.show()
+        """Visualizes the pipeline with the specified figure size."""
+        with self.visualize_output_display:
+            self.visualize_output_display.clear_output(wait=True)
 
-    def show_function_details(self, change):
-        """Displays details about the selected function."""
-        selected_func_name = change.new
-        if selected_func_name:
-            func = next(f for f in self.pipeline.functions if f.__name__ == selected_func_name)
-            with self.function_info_display:
-                clear_output()
-                print(f"Function: {func.__name__}")
-                # Handle output annotation, which may be a dict or a single value
-                output_annotation = func.output_annotation
-                if isinstance(output_annotation, dict):
-                    for output_name, output_type in output_annotation.items():
-                        print(f"Output: {output_name} -> {output_type.__name__}")
-                else:
-                    print(f"Output: {func.output_name} -> {output_annotation.__name__}")
+            # Get the figure size from the widgets
+            figsize = (self.fig_width.value, self.fig_height.value)
 
-                for param, typ in func.parameter_annotations.items():
-                    print(f"  - {param}: {typ.__name__}")
+            display(widgets.HTML("<h3>Pipeline Visualization</h3>"))
+            self.pipeline.visualize(figsize=figsize)  # Pass the figsize to visualize function
+
+    def on_size_change(self, change):
+        """Called when the figure size sliders are updated. Automatically re-renders the visualization."""
+        self.visualize_pipeline()  # Automatically re-visualize pipeline when slider values change.
 
     def display(self):
         """Displays the widget in the notebook."""
-        display(self.main_box)
+        display(self.tab)
