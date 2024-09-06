@@ -3,11 +3,9 @@ from IPython.display import display
 
 from pipefunc import Pipeline
 
-CNT = {"count": 0}
-
 
 class PipelineWidget:
-    def __init__(self, pipeline: Pipeline):
+    def __init__(self, pipeline: Pipeline) -> None:
         self.pipeline = pipeline
 
         # Initializing Widgets with styles
@@ -22,18 +20,25 @@ class PipelineWidget:
             tooltip="Click to visualize the pipeline",
         )
 
-        # Widgets to control figure size
+        # Dropdown for choosing visualization type
+        self.visualize_type = widgets.Dropdown(
+            options=["matplotlib", "holoviews"],
+            value="matplotlib",
+            description="Type:",
+        )
+
+        # Widgets to control figure size (only relevant for matplotlib)
         self.fig_width = widgets.IntSlider(
-            value=5,
+            value=10,
             min=1,
-            max=20,
+            max=50,
             step=1,
             description="Width:",
         )
         self.fig_height = widgets.IntSlider(
-            value=4,
+            value=10,
             min=1,
-            max=20,
+            max=50,
             step=1,
             description="Height:",
         )
@@ -56,7 +61,10 @@ class PipelineWidget:
         self.fig_width.observe(self.on_size_change, names="value")
         self.fig_height.observe(self.on_size_change, names="value")
 
-    def create_info_tab(self):
+        # Bind the dropdown change event
+        self.visualize_type.observe(self.on_visualize_type_change, names="value")
+
+    def create_info_tab(self) -> widgets.VBox:
         """Creates the info tab layout."""
         return widgets.VBox(
             [
@@ -64,23 +72,24 @@ class PipelineWidget:
                 self.info_button,
                 widgets.HTML("<hr>"),
                 self.info_output_display,
-            ]
+            ],
         )
 
-    def create_visualize_tab(self):
+    def create_visualize_tab(self) -> widgets.VBox:
         """Creates the visualize tab layout."""
         return widgets.VBox(
             [
                 widgets.HTML("<h2>Visualize Pipeline</h2>"),
-                self.fig_width,
-                self.fig_height,
+                self.visualize_type,  # Dropdown to select visualization type
+                self.fig_width,  # Sliders for size, potentially hidden
+                self.fig_height,  # Sliders for size, potentially hidden
                 widgets.HTML("<hr>"),
                 self.visualize_button,
                 self.visualize_output_display,
-            ]
+            ],
         )
 
-    def show_pipeline_info(self, b=None):
+    def show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
         """Displays pipeline parameters and types for all functions."""
         with self.info_output_display:
             self.info_output_display.clear_output(wait=True)
@@ -96,21 +105,44 @@ class PipelineWidget:
 
             display(widgets.HTML(html_content))
 
-    def visualize_pipeline(self, b=None):
-        """Visualizes the pipeline with the specified figure size."""
+    def visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
+        """Visualizes the pipeline with the selected method and size."""
+        if self.visualize_type.value == "holoviews":
+            import holoviews as hv
+            import panel as pn
+
+            hv.extension("bokeh")
+
         with self.visualize_output_display:
             self.visualize_output_display.clear_output(wait=True)
 
-            # Get the figure size from the widgets
-            figsize = (self.fig_width.value, self.fig_height.value)
+            # Determine which visualization method to use
+            if self.visualize_type.value == "matplotlib":
+                figsize = (self.fig_width.value, self.fig_height.value)
+                display(widgets.HTML("<h3>Pipeline Visualization (Matplotlib)</h3>"))
+                self.pipeline.visualize(figsize=figsize)  # Pass the figsize to visualize function
 
-            display(widgets.HTML("<h3>Pipeline Visualization</h3>"))
-            self.pipeline.visualize(figsize=figsize)  # Pass the figsize to visualize function
+            elif self.visualize_type.value == "holoviews":
+                display(widgets.HTML("<h3>Pipeline Visualization (HoloViews)</h3>"))
+                hv_output = self.pipeline.visualize_holoviews()
+                display(pn.ipywidget(hv_output))  # Render the HoloViews object
 
-    def on_size_change(self, change):
+    def on_size_change(self, _change: dict) -> None:
         """Called when the figure size sliders are updated. Automatically re-renders the visualization."""
-        self.visualize_pipeline()  # Automatically re-visualize pipeline when slider values change.
+        if self.visualize_type.value == "matplotlib":
+            self.visualize_pipeline()  # Automatically re-visualize pipeline when slider values change.
 
-    def display(self):
+    def on_visualize_type_change(self, change: dict) -> None:
+        """Called when the visualization type is changed. Shows/hides the size sliders."""
+        if change["new"] == "matplotlib":
+            self.fig_width.layout.display = ""  # Make the sliders visible
+            self.fig_height.layout.display = ""  # Make the sliders visible
+            self.visualize_pipeline()  # Trigger visualization with size control
+        else:  # For HoloViews
+            self.fig_width.layout.display = "none"  # Hide the sliders for HoloViews
+            self.fig_height.layout.display = "none"  # Hide the sliders for HoloViews
+            self.visualize_pipeline()  # Trigger the chosen visualization method
+
+    def display(self) -> None:
         """Displays the widget in the notebook."""
         display(self.tab)
