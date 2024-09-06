@@ -1517,7 +1517,8 @@ class Pipeline:
     def from_explicit_connections(cls, connections: dict[PipeFunc, set[PipeFunc]]) -> Pipeline:
         """Create a pipeline from an explicit connections.
 
-        This function ensures that connections in the graph are as expected.
+        This function ensures that connections in the graph are as expected. In
+        case of mismatches, it raises a `ValueError` with the details of the mismatch.
 
         Parameters
         ----------
