@@ -700,7 +700,7 @@ This method not only builds the pipeline based on the provided connections but a
 
 This feature is particularly useful for those who want to ensure that their pipeline's structure is precisely as they expect, without relying solely on the auto-connection feature.
 
-### **How Does It Work?**
+### How Does It Work?
 
 When you provide a dictionary of connections, `from_explicit_connections` will:
 
@@ -711,7 +711,7 @@ When you provide a dictionary of connections, `from_explicit_connections` will:
 This allows for precise control over the pipeline's structure, making sure that each function is connected exactly as intended.
 This might be especially important in complex workflows where the accuracy of connections is critical.
 
-### **Example Usage:**
+### Example Usage
 
 ```python
 from pipefunc import pipefunc, Pipeline
@@ -738,7 +738,7 @@ connections = {
 pipeline = Pipeline.from_explicit_connections(connections)
 ```
 
-### **Why Use This Method?**
+### Why Use This Method?
 
 - **Exact Control**: You may prefer explicit connections when you need to guarantee the pipeline's structure—ensuring it precisely mirrors your expectations.
 - **Verification**: If there's any discrepancy between what you intend and what the pipeline builds, the method will immediately raise an error, allowing you to catch mistakes early.
