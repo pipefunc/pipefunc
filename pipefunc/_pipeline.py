@@ -1513,6 +1513,68 @@ class Pipeline:
 
         return pipeline
 
+    @classmethod
+    def from_explicit_graph(cls, graph: dict[PipeFunc, set[PipeFunc]]) -> Pipeline:
+        """Create a pipeline from an explicit graph.
+
+        This function ensures that connections in the graph are as expected.
+
+        Parameters
+        ----------
+        graph
+            A dictionary mapping functions to sets of functions that depend on them.
+
+        Returns
+        -------
+            A new pipeline with the functions and connections specified in the graph.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="c")
+        ... def f_c(a, b):
+        ...     return a + b
+
+        >>> @pipefunc(output_name="d")
+        ... def f_d(b, c, x=1):  # "c" is the output of f_c
+        ...     return b * c
+
+        >>> @pipefunc(output_name="e")
+        ... def f_e(c, d, x=1):  # "d" is the output of f_d
+        ...     return c * d * x
+
+        >>> graph = {f_c: [f_d, f_e], f_d: [f_e]}
+        >>> pipeline = Pipeline.from_explicit_graph(graph)
+
+        """
+        pipeline = cls([])
+        added = set()
+        expected_edges: set[tuple[_OUTPUT_TYPE, _OUTPUT_TYPE]] = set()
+        for f, dependents in graph.items():
+            if f not in added:
+                pipeline.add(f)
+                added.add(f)
+            for dependent in dependents:
+                expected_edges.add((f.output_name, dependent.output_name))
+                if dependent not in added:
+                    pipeline.add(dependent)
+                    added.add(dependent)
+
+        # Now check that the connections are as in the provided graph
+        expected_nodes: set[_OUTPUT_TYPE] = {f.output_name for f in added}
+        nodes = {n.output_name for n in pipeline.graph.nodes if isinstance(n, PipeFunc)}
+        edges = {
+            (u.output_name, v.output_name)
+            for u, v in pipeline.graph.edges
+            if isinstance(u, PipeFunc) and isinstance(v, PipeFunc)
+        }
+        if nodes != expected_nodes:
+            msg = f"Expected nodes: {expected_nodes}, got: {nodes}"
+            raise ValueError(msg)
+        if edges != expected_edges:
+            msg = f"Expected edges: {expected_edges}, got: {edges}"
+            raise ValueError(msg)
+        return pipeline
+
 
 class Generations(NamedTuple):
     root_args: list[str]
