@@ -771,7 +771,7 @@ def test_from_nodes_and_edges():
 
     with pytest.raises(
         ValueError,
-        match="Expected edges:",
+        match="Edge Mismatch Found",
     ):
         # Missing the connection between f_d and f_e
         Pipeline.from_explicit_connections({f_c: [f_d, f_e]})

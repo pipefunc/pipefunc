@@ -1572,14 +1572,37 @@ class Pipeline:
             for u, v in pipeline.graph.edges
             if isinstance(u, PipeFunc) and isinstance(v, PipeFunc)
         }
+
+        # Check for node mismatches
         if nodes != expected_nodes:
             extra_nodes = nodes - expected_nodes
-            msg = f"Expected nodes: `{expected_nodes}`\ngot: `{nodes}`\nextra: `{extra_nodes}`"
+            msg = (
+                "Node Mismatch Found:\n"
+                "-------------------\n"
+                "Expected Nodes:\n"
+                f"{expected_nodes}\n\n"
+                "Actual Nodes:\n"
+                f"{nodes}\n\n"
+                "Extra Nodes:\n"
+                f"{extra_nodes}"
+            )
             raise ValueError(msg)
+
+        # Check for edge mismatches
         if edges != expected_edges:
             extra_edges = edges - expected_edges
-            msg = f"Expected edges: `{expected_edges}`\ngot: `{edges}`\nextra: `{extra_edges}`"
+            msg = (
+                "Edge Mismatch Found:\n"
+                "-------------------\n"
+                "Expected Edges:\n"
+                f"{expected_edges}\n\n"
+                "Actual Edges:\n"
+                f"{edges}\n\n"
+                "Extra Edges:\n"
+                f"{extra_edges}"
+            )
             raise ValueError(msg)
+
         return pipeline
 
 
