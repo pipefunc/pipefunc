@@ -8,6 +8,7 @@ import collections
 import functools
 import hashlib
 import pickle
+import pickletools
 import sys
 import time
 from contextlib import nullcontext, suppress
@@ -423,7 +424,9 @@ class DiskCache(_CacheBase):
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
-        key_hash = hashlib.md5(repr(key).encode()).hexdigest()  # noqa: S324
+        data = pickle.dumps(key, protocol=pickle.HIGHEST_PROTOCOL)
+        result = pickletools.optimize(data)
+        key_hash = hashlib.md5(result).hexdigest()  # noqa: S324
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
