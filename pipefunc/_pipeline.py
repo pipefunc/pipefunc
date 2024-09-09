@@ -29,6 +29,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_notebook,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
@@ -1512,6 +1513,16 @@ class Pipeline:
                 raise ValueError(msg)
 
         return pipeline
+
+    def _ipython_display_(self) -> None:
+        """Display the pipeline widget."""
+        if is_notebook():
+            from ._widgets import PipelineWidget
+
+            widget = PipelineWidget(self)
+            widget.display()
+        else:
+            print(repr(self))
 
 
 class Generations(NamedTuple):

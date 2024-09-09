@@ -51,22 +51,22 @@ class PipelineWidget:
 
         # Tab setup
         self.tab = widgets.Tab()
-        self.tab.children = [self.create_info_tab(), self.create_visualize_tab()]
+        self.tab.children = [self._create_info_tab(), self._create_visualize_tab()]
         self.tab.set_title(0, "Info")
         self.tab.set_title(1, "Visualize")
 
         # Bind the button click events
-        self.info_button.on_click(self.show_pipeline_info)
-        self.visualize_button.on_click(self.visualize_pipeline)
+        self.info_button.on_click(self._show_pipeline_info)
+        self.visualize_button.on_click(self._visualize_pipeline)
 
         # Bind the slider change events
-        self.fig_width.observe(self.on_size_change, names="value")
-        self.fig_height.observe(self.on_size_change, names="value")
+        self.fig_width.observe(self._on_size_change, names="value")
+        self.fig_height.observe(self._on_size_change, names="value")
 
         # Bind the dropdown change event
-        self.visualize_type.observe(self.on_visualize_type_change, names="value")
+        self.visualize_type.observe(self._on_visualize_type_change, names="value")
 
-    def create_info_tab(self) -> widgets.VBox:
+    def _create_info_tab(self) -> widgets.VBox:
         """Creates the info tab layout."""
         return widgets.VBox(
             [
@@ -77,7 +77,7 @@ class PipelineWidget:
             ],
         )
 
-    def create_visualize_tab(self) -> widgets.VBox:
+    def _create_visualize_tab(self) -> widgets.VBox:
         """Creates the visualize tab layout."""
         return widgets.VBox(
             [
@@ -91,7 +91,7 @@ class PipelineWidget:
             ],
         )
 
-    def show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
+    def _show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
         """Displays pipeline parameters and types using the factored-out helper functions."""
         with self.info_output_display:
             self.info_output_display.clear_output(wait=True)
@@ -141,7 +141,7 @@ class PipelineWidget:
             # Display the resulting content
             display(widgets.HTML(html_content))
 
-    def visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
+    def _visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
         """Visualizes the pipeline with the selected method and size."""
         if self.visualize_type.value == "holoviews":
             import holoviews as hv
@@ -163,21 +163,21 @@ class PipelineWidget:
                 hv_output = self.pipeline.visualize_holoviews()
                 display(pn.ipywidget(hv_output))  # Render the HoloViews object
 
-    def on_size_change(self, _change: dict) -> None:
+    def _on_size_change(self, _change: dict) -> None:
         """Called when the figure size sliders are updated. Automatically re-renders the visualization."""
         if self.visualize_type.value == "matplotlib":
-            self.visualize_pipeline()  # Automatically re-visualize pipeline when slider values change.
+            self._visualize_pipeline()  # Automatically re-visualize pipeline when slider values change.
 
-    def on_visualize_type_change(self, change: dict) -> None:
+    def _on_visualize_type_change(self, change: dict) -> None:
         """Called when the visualization type is changed. Shows/hides the size sliders."""
         if change["new"] == "matplotlib":
             self.fig_width.layout.display = ""  # Make the sliders visible
             self.fig_height.layout.display = ""  # Make the sliders visible
-            self.visualize_pipeline()  # Trigger visualization with size control
+            self._visualize_pipeline()  # Trigger visualization with size control
         else:  # For HoloViews
             self.fig_width.layout.display = "none"  # Hide the sliders for HoloViews
             self.fig_height.layout.display = "none"  # Hide the sliders for HoloViews
-            self.visualize_pipeline()  # Trigger the chosen visualization method
+            self._visualize_pipeline()  # Trigger the chosen visualization method
 
     def display(self) -> None:
         """Displays the widget in the notebook."""

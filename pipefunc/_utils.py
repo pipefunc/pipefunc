@@ -196,3 +196,11 @@ def assert_complete_kwargs(
         valid_kwargs -= set(skip)
     missing = valid_kwargs - set(kwargs)
     assert not missing, f"Missing required kwargs: {missing}"
+
+
+def is_notebook() -> bool:
+    """Check if the code is running in a Jupyter notebook."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
+    except NameError:
+        return False  # Probably standard Python interpreter
