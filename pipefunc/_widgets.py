@@ -91,54 +91,57 @@ class PipelineWidget:
             ],
         )
 
+    def _pipeline_info_html(self, _button: widgets.Button | None = None) -> str:
+        # Root arguments and defaults from the pipeline
+        root_args = set(self.pipeline.topological_generations.root_args)
+        defaults = self.pipeline.defaults
+
+        # Start the HTML content, including the legend
+        html_content = f"""
+            {_build_legend()}
+        """
+
+        # Add parameter table for each function
+        for func in self.pipeline.functions:
+            html_content += f"<h4><b>Function:</b> {_format_code(func.__name__)}</h4>"
+
+            # Prepare headers for the parameter table
+            headers = ["Parameter", "Type", "Default Value", "Returned By"]
+
+            # Build the rows for the parameter table
+            rows = [
+                _format_param(
+                    param,
+                    param_type=func.parameter_annotations.get(param, "—"),
+                    is_root=param in root_args,
+                    default_value=defaults.get(param),
+                    returned_by=self.pipeline.output_to_func.get(param, "—"),
+                )
+                for param in func.parameters
+            ]
+
+            # Generate the parameter table for this function
+            html_content += _build_table(headers, rows)
+            # Outputs of the function (if any)
+            if func.output_annotation:
+                html_content += "<h4>Outputs</h4><ul>"
+                for output_name, output_type in func.output_annotation.items():
+                    html_content += (
+                        f"<li class='output-type'><b>{output_name}</b>: {output_type.__name__}</li>"
+                    )
+                html_content += "</ul>"
+            html_content += "<hr>"
+
+        # Single combined table for the PipeFunc attribute information
+        html_content += "<h3>PipeFunc Attributes Overview</h3>"
+        html_content += _build_combined_pipefunc_info_table(self.pipeline.functions)
+        return html_content
+
     def _show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
         """Displays pipeline parameters and types using the factored-out helper functions."""
+        html_content = self._pipeline_info_html()
         with self.info_output_display:
             self.info_output_display.clear_output(wait=True)
-
-            # Root arguments and defaults from the pipeline
-            root_args = set(self.pipeline.topological_generations.root_args)
-            defaults = self.pipeline.defaults
-
-            # Start the HTML content, including the legend
-            html_content = f"""
-                {_build_legend()}
-            """
-
-            # Add parameter table for each function
-            for func in self.pipeline.functions:
-                html_content += f"<h4><b>Function:</b> {_format_code(func.__name__)}</h4>"
-
-                # Prepare headers for the parameter table
-                headers = ["Parameter", "Type", "Default Value", "Returned By"]
-
-                # Build the rows for the parameter table
-                rows = [
-                    _format_param(
-                        param,
-                        param_type=func.parameter_annotations.get(param, "—"),
-                        is_root=param in root_args,
-                        default_value=defaults.get(param),
-                        returned_by=self.pipeline.output_to_func.get(param, "—"),
-                    )
-                    for param in func.parameters
-                ]
-
-                # Generate the parameter table for this function
-                html_content += _build_table(headers, rows)
-                # Outputs of the function (if any)
-                if func.output_annotation:
-                    html_content += "<h4>Outputs</h4><ul>"
-                    for output_name, output_type in func.output_annotation.items():
-                        html_content += f"<li class='output-type'><b>{output_name}</b>: {output_type.__name__}</li>"
-                    html_content += "</ul>"
-                html_content += "<hr>"
-
-            # Single combined table for the PipeFunc attribute information
-            html_content += "<h3>PipeFunc Attributes Overview</h3>"
-            html_content += _build_combined_pipefunc_info_table(self.pipeline.functions)
-
-            # Display the resulting content
             display(widgets.HTML(html_content))
 
     def _visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
