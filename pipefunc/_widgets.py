@@ -91,7 +91,7 @@ class PipelineWidget:
             ],
         )
 
-    def _pipeline_info_html(self, _button: widgets.Button | None = None) -> str:
+    def _pipeline_info_html(self) -> str:
         # Root arguments and defaults from the pipeline
         root_args = set(self.pipeline.topological_generations.root_args)
         defaults = self.pipeline.defaults
@@ -141,11 +141,20 @@ class PipelineWidget:
         self,
         _button: widgets.Button | None = None,
     ) -> None:  # pragma: no cover
-        """Displays pipeline parameters and types using the factored-out helper functions."""
-        html_content = self._pipeline_info_html()
+        """Toggles the display of pipeline parameters and type information."""
         with self.info_output_display:
-            self.info_output_display.clear_output(wait=True)
-            display(widgets.HTML(html_content))
+            if self.info_output_display.outputs:
+                # If information is already displayed, hide it and change the button description and color
+                self.info_output_display.clear_output()
+                self.info_button.description = "Show Pipeline Info"
+                self.info_button.button_style = "info"
+            else:
+                # Otherwise, display the information and adjust the button description and color
+                html_content = self._pipeline_info_html()
+                self.info_output_display.clear_output(wait=True)
+                display(widgets.HTML(html_content))
+                self.info_button.description = "Hide Pipeline Info"
+                self.info_button.button_style = "warning"
 
     def _visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
         """Visualizes the pipeline with the selected method and size."""
