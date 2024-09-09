@@ -423,7 +423,7 @@ class DiskCache(_CacheBase):
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
-        key_hash = hashlib.md5(str(key).encode()).hexdigest()  # noqa: S324
+        key_hash = hashlib.md5(repr(key).encode()).hexdigest()  # noqa: S324
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
