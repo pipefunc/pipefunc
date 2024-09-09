@@ -1,9 +1,28 @@
+import getpass
+import importlib.metadata
+from importlib.util import find_spec
 from typing import Any
 
 import ipywidgets as widgets
 from IPython.display import display
 
 from pipefunc import PipeFunc, Pipeline
+
+
+def _get_installed_version(module_name: str) -> str | None:
+    try:
+        return importlib.metadata.version(module_name)
+    except AttributeError:
+        return "unknown"
+    except ModuleNotFoundError:
+        return None
+
+
+def _check_dependency(dependency: str) -> str:
+    if find_spec(dependency):
+        version = _get_installed_version(dependency)
+        return f"✅ {version}"
+    return "❌"
 
 
 class PipelineWidget:
@@ -65,6 +84,90 @@ class PipelineWidget:
 
         # Bind the dropdown change event
         self.visualize_type.observe(self._on_visualize_type_change, names="value")
+
+        # Output areas for package info
+        self.package_output_display = widgets.Output()
+
+        # Adding the new Package Info tab
+        self.tab.children = [
+            self._create_info_tab(),
+            self._create_visualize_tab(),
+            self._create_package_info_tab(),
+        ]
+        self.tab.set_title(0, "Info")
+        self.tab.set_title(1, "Visualize")
+        self.tab.set_title(2, "Package Info")
+
+        # Bind the package info button click event
+        self.package_button.on_click(self._show_package_info)
+
+    def _create_package_info_tab(self) -> widgets.VBox:
+        """Creates the package info tab layout."""
+        self.package_button = widgets.Button(
+            description="Show Package Info",
+            button_style="primary",
+            tooltip="Click to view package information",
+        )
+        return widgets.VBox(
+            [
+                widgets.HTML("<h2>Package Information</h2>"),
+                self.package_button,
+                widgets.HTML("<hr>"),
+                self.package_output_display,
+            ],
+        )
+
+    def _show_package_info(self, _button: widgets.Button | None = None) -> None:
+        """Displays package information including dependencies."""
+        with self.package_output_display:
+            self.package_output_display.clear_output(wait=True)
+            info = self._package_info_html()
+            display(widgets.HTML(info))
+
+    def _package_info_html(self) -> str:
+        # Get package information
+        pipefunc_version = _get_installed_version("pipefunc") or "Unknown"
+        location = find_spec("pipefunc").origin if find_spec("pipefunc") else "Not installed"
+        user = getpass.getuser()
+
+        # Build the HTML table for package info
+        html_content = f"""
+            <h3>PipeFunc Package Details</h3>
+            <table>
+                <tr><th>Attribute</th><th>Value</th></tr>
+                <tr><td>Version</td><td>{pipefunc_version}</td></tr>
+                <tr><td>Installed Location</td><td>{location}</td></tr>
+                <tr><td>Current User</td><td>{user}</td></tr>
+            </table>
+            <h3>Dependencies</h3>
+            <table>
+                <tr><th>Dependency</th><th>Status</th></tr>
+        """
+
+        # List dependencies and show their status
+        dependencies = [
+            "networkx",
+            "psutil",
+            "cloudpickle",
+            "numpy",
+            "adaptive",
+            "adaptive_scheduler",
+            "xarray",
+            "zarr",
+            "ipywidgets",
+            "matplotlib",
+            "pygraphviz",
+            "holoviews",
+            "bokeh",
+            "jupyter_bokeh",
+        ]
+        for dep in dependencies:
+            status = _check_dependency(dep)
+            html_content += f"<tr><td>{dep}</td><td>{status}</td></tr>"
+
+        html_content += "</table>"
+
+        return html_content
 
     def _create_info_tab(self) -> widgets.VBox:
         """Creates the info tab layout."""
