@@ -175,6 +175,10 @@ class PipelineWidget:
         return html_content + "<hr>"
 
     def _visualize_pipeline(self, _button: widgets.Button | None = None) -> None:
+        if self.visualize_type.value == "holoviews":
+            import holoviews as hv
+
+            hv.extension("bokeh")
         with self.visualize_output_display:
             self.visualize_output_display.clear_output(wait=True)
             self._render_visualization()
@@ -185,10 +189,8 @@ class PipelineWidget:
             display(widgets.HTML("<h3>Pipeline Visualization (Matplotlib)</h3>"))
             self.pipeline.visualize(figsize=figsize)
         else:
-            import holoviews as hv
             import panel as pn
 
-            hv.extension("bokeh")
             display(widgets.HTML("<h3>Pipeline Visualization (HoloViews)</h3>"))
             hv_output = self.pipeline.visualize_holoviews()
             display(pn.ipywidget(hv_output))
@@ -216,21 +218,19 @@ class PipelineWidget:
         return f"<h3>PipeFunc Package Details</h3>{info_table}<h3>Dependencies</h3>{dependencies_table}"
 
     def _create_package_info_table(self, version: str, location: str, user: str) -> str:
+        v = sys.version_info
         return _build_table(
             ["Attribute", "Value"],
             [
                 ["Version", version],
                 ["Installed Location", location],
                 ["Current User", user],
-                [
-                    "Python Version",
-                    f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-                ],
+                ["Python Version", f"{v.major}.{v.minor}.{v.micro}"],
             ],
         )
 
     def _create_dependencies_table(self) -> str:
-        rows = [[dep, _check_dependency(dep)] for dep in DEPENDENCIES]
+        rows = [[dep, _check_dependency(dep)] for dep in sorted(DEPENDENCIES)]
         return _build_table(["Dependency", "Status"], rows)
 
     def display(self) -> None:
