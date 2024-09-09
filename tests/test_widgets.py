@@ -19,20 +19,20 @@ def mock_pipeline():
 def pipeline():
     """Create a real Pipeline object."""
 
-    @pipefunc
-    def add_one(x):
+    @pipefunc("y")
+    def add_one(x: int):
         return x + 1
 
-    @pipefunc
-    def multiply_by_two(x):
-        return x * 2
+    @pipefunc("z")
+    def multiply_by_two(y, a=1):
+        return y * 2 * a
 
     return Pipeline([add_one, multiply_by_two])
 
 
-def test_initial_widget_state(mock_pipeline):
+def test_initial_widget_state(pipeline: Pipeline) -> None:
     """Test initial state of the widget."""
-    widget = PipelineWidget(pipeline=mock_pipeline)
+    widget = PipelineWidget(pipeline=pipeline)
     assert isinstance(widget.info_button, widgets.Button)
     assert widget.info_button.description == "Show Pipeline Info"
 
@@ -49,13 +49,14 @@ def test_initial_widget_state(mock_pipeline):
     assert widget.fig_height.value == 10
 
 
-def test_show_pipeline_info_calls(mock_pipeline):
+def test_show_pipeline_info_calls(pipeline: Pipeline):
     """Test the _show_pipeline_info method to ensure it interacts with pipeline correctly."""
-    widget = PipelineWidget(pipeline=mock_pipeline)
-    widget._show_pipeline_info()
-    # Check the methods that should be called on the pipeline
-    # You have to adapt this part according to what the mock pipeline should do
-    # Add assertions here based on expected interactions
+    widget = PipelineWidget(pipeline=pipeline)
+    html = widget._pipeline_info_html()
+    assert "<b>Legend:</b>" in html
+    assert "parameters are pipeline root arguments" in html
+    assert "<th>Parameter</th>" in html
+    assert "<b>Function:</b>" in html
 
 
 def test_visualize_pipeline_matplotlib(mock_pipeline):

@@ -137,7 +137,10 @@ class PipelineWidget:
         html_content += _build_combined_pipefunc_info_table(self.pipeline.functions)
         return html_content
 
-    def _show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
+    def _show_pipeline_info(
+        self,
+        _button: widgets.Button | None = None,
+    ) -> None:  # pragma: no cover
         """Displays pipeline parameters and types using the factored-out helper functions."""
         html_content = self._pipeline_info_html()
         with self.info_output_display:
@@ -182,7 +185,7 @@ class PipelineWidget:
             self.fig_height.layout.display = "none"  # Hide the sliders for HoloViews
             self._visualize_pipeline()  # Trigger the chosen visualization method
 
-    def display(self) -> None:
+    def display(self) -> None:  # pragma: no cover
         """Displays the widget in the notebook."""
         display(self.tab)
 
