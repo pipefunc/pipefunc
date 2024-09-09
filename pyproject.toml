@@ -28,6 +28,7 @@ dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
 zarr = ["zarr"]
+widgets = ["ipywidgets"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "jupyter_bokeh"]
 test = [
     "pytest",
@@ -55,7 +56,7 @@ docs = [
     "sphinx-togglebutton",
     "sphinx-copybutton",
 ]
-all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
 dev = [  # all + dev deps
     "black[jupyter]",
     "pre-commit",

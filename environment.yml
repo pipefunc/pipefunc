@@ -19,6 +19,8 @@ dependencies:
   - xarray
   # optional-dependencies: zarr
   - zarr
+  # optional-dependencies: widgets
+  - ipywidgets
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
