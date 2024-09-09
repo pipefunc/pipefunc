@@ -255,7 +255,7 @@ def _build_combined_pipefunc_info_table(functions: list[PipeFunc]) -> str:
     headers = ["Attribute"] + [func.__name__ for func in functions]
 
     # Attributes to be displayed
-    attributes = ["Cache", "Profile", "MapSpec", "Resources", "Debug"]
+    attributes = ["Output name", "Cache", "Profile", "MapSpec", "Resources", "Debug"]
 
     # Collect the value rows for each function
     rows = []
@@ -263,7 +263,7 @@ def _build_combined_pipefunc_info_table(functions: list[PipeFunc]) -> str:
         row = [attribute]
         for func in functions:
             # Get attribute based on the name in the attributes list
-            value = getattr(func, attribute.lower(), None)
+            value = getattr(func, attribute.lower().replace(" ", "_"), None)
             if isinstance(value, bool):
                 # For basic types: convert to string directly
                 row.append("✅" if value else "❌")

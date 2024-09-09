@@ -23,7 +23,7 @@ def pipeline():
     def add_one(x: int):
         return x + 1
 
-    @pipefunc("z")
+    @pipefunc("z", mapspec="y[i] -> z[i]")
     def multiply_by_two(y, a=1):
         return y * 2 * a
 
