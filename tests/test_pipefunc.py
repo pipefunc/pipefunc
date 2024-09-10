@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import pickle
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
+from pipefunc._pipefunc import ErrorSnapshot
 from pipefunc.resources import Resources
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_pipe_func_profile() -> None:
@@ -503,3 +508,23 @@ def test_func_with_duplicate_renamed_args():
         @pipefunc(output_name="z", renames={"x": "a", "y": "a"})
         def f(x, y):
             return x + y
+
+
+def test_error_snapshot(tmp_path: Path) -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        msg = "This is a test error"
+        raise ValueError(msg)
+
+    with pytest.raises(ValueError, match="This is a test error"):
+        f(a=1, b=2)
+    snap = f.error_snapshot
+    assert snap is not None
+    assert isinstance(snap, ErrorSnapshot)
+    with pytest.raises(ValueError, match="This is a test error"):
+        snap.reproduce()
+    assert isinstance(snap.exception, ValueError)
+    assert "ErrorSnapshot occurred" in str(snap)
+    snap.save_to_file(tmp_path / "snap.pkl")
+    snap2 = ErrorSnapshot.load_from_file(tmp_path / "snap.pkl")
+    assert snap2.exception.args == snap.exception.args

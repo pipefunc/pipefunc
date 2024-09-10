@@ -423,6 +423,7 @@ def test_handle_error() -> None:
         raise ValueError(msg)
 
     pipeline = Pipeline([f1])
+    assert pipeline.error_snapshot is None
     try:
         pipeline("c", a=1, b=2)
     except ValueError as e:
@@ -431,6 +432,7 @@ def test_handle_error() -> None:
         # NOTE: with pytest.raises match="..." does not work
         # with add_note for some reason on my Mac, however,
         # on CI it works fine (Linux)...
+    assert pipeline.error_snapshot is not None
 
 
 def test_output_picker_single_output() -> None:

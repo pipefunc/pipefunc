@@ -1185,7 +1185,7 @@ class ErrorSnapshot:
     """A snapshot that represents an error in a function call."""
 
     function: Callable[..., Any]
-    error: Exception
+    exception: Exception
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
     traceback: str = field(init=False)
@@ -1196,7 +1196,11 @@ class ErrorSnapshot:
     current_directory: str = field(default_factory=os.getcwd)
 
     def __post_init__(self) -> None:
-        tb = traceback.format_exception(type(self.error), self.error, self.error.__traceback__)
+        tb = traceback.format_exception(
+            type(self.exception),
+            self.exception,
+            self.exception.__traceback__,
+        )
         self.traceback = "".join(tb)
 
     def __str__(self) -> str:
@@ -1207,7 +1211,7 @@ class ErrorSnapshot:
         return (
             f"ErrorSnapshot occurred:\n"
             f"- Function: {func_name}\n"
-            f"- Error: {self.error}\n"
+            f"- Error: {self.exception}\n"
             f"- Args: ({args_repr})\n"
             f"- Kwargs: {{{kwargs_repr}}}\n"
             f"- Timestamp: {self.timestamp}\n"
@@ -1237,7 +1241,7 @@ class ErrorSnapshot:
         with open(filename, "rb") as f:  # noqa: PTH123
             return cloudpickle.load(f)
 
-    def _ipython_display_(self) -> None:
+    def _ipython_display_(self) -> None:  # pragma: no cover
         from IPython.display import HTML, display
 
         display(HTML(f"<pre>{self}</pre>"))
