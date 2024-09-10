@@ -524,7 +524,7 @@ def test_error_snapshot(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="This is a test error"):
         snap.reproduce()
     assert isinstance(snap.exception, ValueError)
-    assert "ErrorSnapshot occurred" in str(snap)
+    assert "ErrorSnapshot:" in str(snap)
     snap.save_to_file(tmp_path / "snap.pkl")
     snap2 = ErrorSnapshot.load_from_file(tmp_path / "snap.pkl")
     assert snap2.exception.args == snap.exception.args

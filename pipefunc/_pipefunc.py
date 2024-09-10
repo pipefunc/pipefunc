@@ -1206,24 +1206,25 @@ class ErrorSnapshot:
     def __str__(self) -> str:
         args_repr = ", ".join(repr(a) for a in self.args)
         kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
-        func_name = getattr(self.function, "__name__", str(self.function))
+        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
 
         return (
-            f"ErrorSnapshot occurred:\n"
-            f"- Function: {func_name}\n"
-            f"- Exception type: {type(self.exception).__name__}\n"
-            f"- Exception message: {self.exception}\n"
-            f"- Args: ({args_repr})\n"
-            f"- Kwargs: {{{kwargs_repr}}}\n"
-            f"- Timestamp: {self.timestamp}\n"
-            f"- User: {self.user}\n"
-            f"- Machine: {self.machine}\n"
-            f"- IP Address: {self.ip_address}\n"
-            f"- Current Directory: {self.current_directory}\n"
-            "\n\nReproduce the error by calling `error_snapshot.reproduce()`.\n"
-            "Or see the full stored traceback using `error_snapshot.traceback`.\n"
-            "Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
-            "Or save the error to a file using `error_snapshot.save_to_file(filename)`"
+            "ErrorSnapshot:\n"
+            "--------------\n"
+            f" - 🛠 Function: {func_name}\n"
+            f" - ⚠️ Exception type: {type(self.exception).__name__}\n"
+            f" - 💥 Exception message: {self.exception}\n"
+            f" - 📋 Args: ({args_repr})\n"
+            f" - 🗂 Kwargs: {{{kwargs_repr}}}\n"
+            f" - 🕒 Timestamp: {self.timestamp}\n"
+            f" - 👤 User: {self.user}\n"
+            f" - 💻 Machine: {self.machine}\n"
+            f" - 📡 IP Address: {self.ip_address}\n"
+            f" - 📂 Current Directory: {self.current_directory}\n"
+            "\n🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
+            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
+            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
+            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
             " and load it using `ErrorSnapshot.load_from_file(filename)`."
         )
 
