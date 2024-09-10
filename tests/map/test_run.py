@@ -63,9 +63,11 @@ def test_simple(storage, tmp_path: Path) -> None:
     dimensions = pipeline.mapspec_dimensions
     assert dimensions.keys() == axes.keys()
     assert all(dimensions[k] == len(v) for k, v in axes.items())
-    ds = load_xarray_dataset(run_folder=tmp_path)
-    assert ds["y"].data.tolist() == [0, 2, 4, 6]
-    assert ds["sum"] == 12
+    ds1 = load_xarray_dataset(run_folder=tmp_path)
+    ds2 = xarray_from_results(inputs, results, pipeline)
+    for ds in [ds1, ds2]:
+        assert ds["y"].data.tolist() == [0, 2, 4, 6]
+        assert ds["sum"] == 12
 
     run_info = RunInfo.load(tmp_path)
     run_info.dump(tmp_path)
@@ -109,6 +111,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     assert results2["sum"].output.tolist() == [24, 30, 36, 42]
     # Load the results as xarray
     load_xarray_dataset(run_folder=tmp_path)
+    xarray_from_results(inputs, results, pipeline)
 
 
 def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
@@ -309,9 +312,16 @@ def test_simple_from_step(tmp_path: Path) -> None:
     ):
         pipeline("sum", n=4)
     assert pipeline("x", n=4) == list(range(4))
+    # Load from the run folder
     ds = load_xarray_dataset("y", run_folder=tmp_path)
     assert "x" in ds.coords
     ds = load_xarray_dataset("y", run_folder=tmp_path, load_intermediate=False)
+    assert "x" not in ds.coords
+
+    # Load from the results
+    ds = xarray_from_results(inputs, results, pipeline)
+    assert "x" in ds.coords
+    ds = xarray_from_results(inputs, results, pipeline, load_intermediate=False)
     assert "x" not in ds.coords
 
 
