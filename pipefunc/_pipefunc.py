@@ -11,12 +11,17 @@ from __future__ import annotations
 import contextlib
 import datetime
 import functools
+import getpass
 import inspect
 import os
+import platform
+import socket
+import traceback
 import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -44,6 +49,8 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipefunc import Pipeline
 
 
@@ -138,6 +145,12 @@ class PipeFunc(Generic[T]):
     -------
         A `PipeFunc` instance that wraps the original function with the specified return identifier.
 
+    Attributes
+    ----------
+    error_snapshot
+        If an error occurs while calling the function, this attribute will contain
+        an `ErrorSnapshot` instance with information about the error.
+
     Examples
     --------
     >>> def add_one(a, b):
@@ -198,6 +211,7 @@ class PipeFunc(Generic[T]):
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
         self._validate()
+        self.error_snapshot: ErrorSnapshot | None = None
 
     @property
     def renames(self) -> dict[str, str]:
@@ -608,7 +622,15 @@ class PipeFunc(Generic[T]):
                 evaluated_resources,
                 self.resources,
             )
-            result = self.func(*args, **kwargs)
+            try:
+                result = self.func(*args, **kwargs)
+            except Exception as e:
+                print(
+                    f"An error occurred while calling the function `{self.__name__}`"
+                    f" with the arguments `{args=}` and `{kwargs=}`.",
+                )
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                raise
 
         if self.debug:
             func_str = format_function_call(self.__name__, (), kwargs)
@@ -1152,6 +1174,80 @@ class _NestedFuncWrapper:
         if isinstance(self.output_name, str):
             return result_dict[self.output_name]
         return tuple(result_dict[name] for name in self.output_name)
+
+
+def _timestamp() -> str:
+    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+
+
+@dataclass
+class ErrorSnapshot:
+    """A snapshot that represents an error in a function call."""
+
+    function: Callable[..., Any]
+    exception: Exception
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+    traceback: str = field(init=False)
+    timestamp: str = field(default_factory=_timestamp)
+    user: str = field(default_factory=getpass.getuser)
+    machine: str = field(default_factory=platform.node)
+    ip_address: str = field(default_factory=lambda: socket.gethostbyname(socket.gethostname()))
+    current_directory: str = field(default_factory=os.getcwd)
+
+    def __post_init__(self) -> None:
+        tb = traceback.format_exception(
+            type(self.exception),
+            self.exception,
+            self.exception.__traceback__,
+        )
+        self.traceback = "".join(tb)
+
+    def __str__(self) -> str:
+        args_repr = ", ".join(repr(a) for a in self.args)
+        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
+
+        return (
+            "ErrorSnapshot:\n"
+            "--------------\n"
+            f"- 🛠 Function: {func_name}\n"
+            f"- ⚠️ Exception type: {type(self.exception).__name__}\n"
+            f"- 💥 Exception message: {self.exception}\n"
+            f"- 📋 Args: ({args_repr})\n"
+            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
+            f"- 🕒 Timestamp: {self.timestamp}\n"
+            f"- 👤 User: {self.user}\n"
+            f"- 💻 Machine: {self.machine}\n"
+            f"- 📡 IP Address: {self.ip_address}\n"
+            f"- 📂 Current Directory: {self.current_directory}\n"
+            "\n"
+            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
+            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
+            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
+            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
+            " and load it using `ErrorSnapshot.load_from_file(filename)`."
+        )
+
+    def reproduce(self) -> Any | None:
+        """Attempt to recreate the error by calling the function with stored arguments."""
+        return self.function(*self.args, **self.kwargs)
+
+    def save_to_file(self, filename: str | Path) -> None:
+        """Save the error snapshot to a file using cloudpickle."""
+        with open(filename, "wb") as f:  # noqa: PTH123
+            cloudpickle.dump(self, f)
+
+    @classmethod
+    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
+        """Load an error snapshot from a file using cloudpickle."""
+        with open(filename, "rb") as f:  # noqa: PTH123
+            return cloudpickle.load(f)
+
+    def _ipython_display_(self) -> None:  # pragma: no cover
+        from IPython.display import HTML, display
+
+        display(HTML(f"<pre>{self}</pre>"))
 
 
 def _validate_identifier(name: str, value: Any) -> None:
