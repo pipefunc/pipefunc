@@ -46,7 +46,7 @@ def load_xarray(
     load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
-    return _load_xarray(
+    return _xarray(
         output_name,
         mapspecs,
         inputs,
@@ -55,7 +55,7 @@ def load_xarray(
     )
 
 
-def _load_xarray(
+def _xarray(
     output_name: str,
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
@@ -110,7 +110,7 @@ def load_xarray_dataset(
     if not output_names:
         run_info = RunInfo.load(run_folder)
         output_names = sorted(run_info.all_output_names)
-    return _load_xarray_dataset(
+    return _xarray_dataset(
         mapspecs,
         inputs,
         data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
@@ -119,7 +119,7 @@ def load_xarray_dataset(
     )
 
 
-def _load_xarray_dataset(
+def _xarray_dataset(
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
     *,
@@ -131,7 +131,7 @@ def _load_xarray_dataset(
     mapspec_output_names = [n for ms in mapspecs for n in ms.output_names if n in output_names]
     single_output_names = [n for n in output_names if n not in mapspec_output_names]
     data_arrays = {
-        name: _load_xarray(
+        name: _xarray(
             name,
             mapspecs,
             inputs,
@@ -160,7 +160,7 @@ def xarray_dataset_from_results(
     """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
     mapspecs = pipeline.mapspecs()
     output_names = sorted(result.keys())
-    return _load_xarray_dataset(
+    return _xarray_dataset(
         mapspecs,
         inputs,
         data_loader=partial(_data_loader, data=result),
