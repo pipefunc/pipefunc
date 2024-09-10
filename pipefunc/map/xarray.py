@@ -157,7 +157,7 @@ def xarray_dataset_from_results(
     *,
     load_intermediate: bool = True,
 ) -> xr.Dataset:
-    """Load the xarray dataset from the results."""
+    """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
     mapspecs = pipeline.mapspecs()
     output_names = sorted(result.keys())
     return _load_xarray_dataset(
