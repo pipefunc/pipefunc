@@ -51,6 +51,7 @@ from pipefunc.typing import (
 )
 
 if TYPE_CHECKING:
+    from collections import OrderedDict
     from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
@@ -634,7 +635,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-    ) -> dict[str, Result]:
+    ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters

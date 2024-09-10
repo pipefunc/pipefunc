@@ -55,7 +55,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-) -> dict[str, Result]:
+) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -114,7 +114,7 @@ def run(
         cleanup=cleanup,
     )
     run_info.dump(run_folder)
-    outputs: dict[str, Result] = OrderedDict()
+    outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
     if _cannot_be_parallelized(pipeline):
         parallel = False
