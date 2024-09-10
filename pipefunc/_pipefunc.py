@@ -16,6 +16,7 @@ import inspect
 import os
 import platform
 import socket
+import traceback
 import warnings
 import weakref
 from collections import defaultdict
@@ -1179,7 +1180,7 @@ def _timestamp() -> str:
     return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
 
 
-@dataclass(frozen=True)
+@dataclass
 class ErrorSnapshot:
     """A snapshot that represents an error in a function call."""
 
@@ -1187,11 +1188,16 @@ class ErrorSnapshot:
     error: Exception
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
+    traceback: str = field(init=False)
     timestamp: str = field(default_factory=_timestamp)
     user: str = field(default_factory=getpass.getuser)
     machine: str = field(default_factory=platform.node)
     ip_address: str = field(default_factory=lambda: socket.gethostbyname(socket.gethostname()))
     current_directory: str = field(default_factory=os.getcwd)
+
+    def __post_init__(self) -> None:
+        tb = traceback.format_exception(type(self.error), self.error, self.error.__traceback__)
+        self.traceback = "".join(tb)
 
     def __str__(self) -> str:
         args_repr = ", ".join(repr(a) for a in self.args)
@@ -1210,6 +1216,7 @@ class ErrorSnapshot:
             f"- IP Address: {self.ip_address}\n"
             f"- Current Directory: {self.current_directory}\n"
             "\n\nReproduce the error by calling `error_snapshot.reproduce()`.\n"
+            "Or see the full stored traceback using `error_snapshot.traceback`.\n"
             "Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
             "Or save the error to a file using `error_snapshot.save_to_file(filename)`"
             " and load it using `ErrorSnapshot.load_from_file(filename)`."

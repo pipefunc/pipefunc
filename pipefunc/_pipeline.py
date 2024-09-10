@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -1267,6 +1267,14 @@ class Pipeline:
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    @property
+    def error_snapshot(self) -> ErrorSnapshot | None:
+        """Return an error snapshot for the pipeline."""
+        for f in self.functions:
+            if f.error_snapshot:
+                return f.error_snapshot
+        return None
 
     def nest_funcs(
         self,
