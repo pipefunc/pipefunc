@@ -150,7 +150,7 @@ def _load_xarray_dataset(
     return ds
 
 
-def xarray_from_results(
+def xarray_dataset_from_results(
     inputs: dict[str, Any],
     result: OrderedDict[str, Result],
     pipeline: Pipeline,
