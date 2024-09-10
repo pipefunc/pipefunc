@@ -1270,7 +1270,11 @@ class Pipeline:
 
     @property
     def error_snapshot(self) -> ErrorSnapshot | None:
-        """Return an error snapshot for the pipeline."""
+        """Return an error snapshot for the pipeline.
+
+        This value is `None` if no errors have occurred during
+        the pipeline execution.
+        """
         for f in self.functions:
             if f.error_snapshot:
                 return f.error_snapshot
