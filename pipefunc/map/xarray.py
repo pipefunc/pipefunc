@@ -152,18 +152,18 @@ def _xarray_dataset(
 
 def xarray_dataset_from_results(
     inputs: dict[str, Any],
-    result: OrderedDict[str, Result],
+    results: OrderedDict[str, Result],
     pipeline: Pipeline,
     *,
     load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
     mapspecs = pipeline.mapspecs()
-    output_names = sorted(result.keys())
+    output_names = sorted(results.keys())
     return _xarray_dataset(
         mapspecs,
         inputs,
-        data_loader=partial(_data_loader, data=result),
+        data_loader=partial(_data_loader, data=results),
         output_names=output_names,
         load_intermediate=load_intermediate,
     )
