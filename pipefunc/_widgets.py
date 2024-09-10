@@ -53,11 +53,9 @@ class PipelineWidget:
         )
         self.fig_width = widgets.IntSlider(value=10, min=1, max=50, step=1, description="Width:")
         self.fig_height = widgets.IntSlider(value=10, min=1, max=50, step=1, description="Height:")
-        self.info_output_display, self.visualize_output_display, self.package_output_display = (
-            widgets.Output(),
-            widgets.Output(),
-            widgets.Output(),
-        )
+        self.info_output_display = widgets.Output()
+        self.visualize_output_display = widgets.Output()
+        self.package_output_display = widgets.Output()
         self.package_button = self._create_button(
             "Show Package Info",
             "primary",
@@ -119,25 +117,24 @@ class PipelineWidget:
             ],
         )
 
-    def _show_pipeline_info(self, _button: widgets.Button | None = None) -> None:
+    def _show_pipeline_info(
+        self,
+        _button: widgets.Button | None = None,
+    ) -> None:  # pragma: no cover
         with self.info_output_display:
             if self.info_output_display.outputs:
                 self.info_output_display.clear_output()
-                self.info_button.description, self.info_button.button_style = (
-                    "Show Pipeline Info",
-                    "info",
-                )
+                self.info_button.description = "Show Pipeline Info"
+                self.info_button.button_style = "info"
             else:
                 self._display_pipeline_info()
 
-    def _display_pipeline_info(self) -> None:
+    def _display_pipeline_info(self) -> None:  # pragma: no cover
         html_content = self._pipeline_info_html()
         self.info_output_display.clear_output(wait=True)
         display(widgets.HTML(html_content))
-        self.info_button.description, self.info_button.button_style = (
-            "Hide Pipeline Info",
-            "warning",
-        )
+        self.info_button.description = "Hide Pipeline Info"
+        self.info_button.button_style = "warning"
 
     def _pipeline_info_html(self) -> str:
         html_content = _build_legend() + "".join(
@@ -204,7 +201,7 @@ class PipelineWidget:
         self.fig_width.layout.display = self.fig_height.layout.display = display_visibility
         self._visualize_pipeline()
 
-    def _show_package_info(self, _button: widgets.Button | None = None) -> None:
+    def _show_package_info(self, _button: widgets.Button | None = None) -> None:  # pragma: no cover
         with self.package_output_display:
             self.package_output_display.clear_output(wait=True)
             display(widgets.HTML(self._package_info_html()))
@@ -233,7 +230,7 @@ class PipelineWidget:
         rows = [[dep, _check_dependency(dep)] for dep in sorted(DEPENDENCIES)]
         return _build_table(["Dependency", "Status"], rows)
 
-    def display(self) -> None:
+    def display(self) -> None:  # pragma: no cover
         """Displays the widget in the notebook."""
         display(self.tab)
 
@@ -241,9 +238,9 @@ class PipelineWidget:
 def _get_installed_version(module_name: str) -> str | None:
     try:
         return importlib.metadata.version(module_name)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError:  # pragma: no cover
         return None
-    except AttributeError:
+    except AttributeError:  # pragma: no cover
         return "unknown"
 
 

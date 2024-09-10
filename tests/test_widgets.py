@@ -115,3 +115,11 @@ def test_on_visualize_type_change(mock_pipeline):
     widget._on_visualize_type_change({"name": "value", "old": "holoviews", "new": "matplotlib"})
     assert widget.fig_width.layout.display == ""
     assert widget.fig_height.layout.display == ""
+
+
+def test_package_info(pipeline: Pipeline):
+    """Test the package info."""
+    widget = PipelineWidget(pipeline=pipeline)
+    html = widget._package_info_html()
+    assert "Dependencies" in html
+    assert "pipefunc" in html
