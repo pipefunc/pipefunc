@@ -1211,7 +1211,8 @@ class ErrorSnapshot:
         return (
             f"ErrorSnapshot occurred:\n"
             f"- Function: {func_name}\n"
-            f"- Error: {self.exception}\n"
+            f"- Exception type: {type(self.exception).__name__}\n"
+            f"- Exception message: {self.exception}\n"
             f"- Args: ({args_repr})\n"
             f"- Kwargs: {{{kwargs_repr}}}\n"
             f"- Timestamp: {self.timestamp}\n"
