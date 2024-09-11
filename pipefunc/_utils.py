@@ -207,5 +207,5 @@ def get_local_ip() -> str:
             # This does not actually connect to '8.8.8.8', it is simply used to find the local IP
             s.connect(("8.8.8.8", 80))
             return s.getsockname()[0]
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001  # pragma: no cover
         return "unknown"
