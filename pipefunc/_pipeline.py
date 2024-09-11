@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import tempfile
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -1760,6 +1761,7 @@ def _create_cache(
         return HybridCache(**cache_kwargs)
     if cache_type == "disk":
         cache_kwargs.setdefault("lru_shared", not lazy)
+        cache_kwargs.setdefault("cache_dir", tempfile.gettempdir())
         return DiskCache(**cache_kwargs)
     if cache_type == "simple":
         return SimpleCache()
