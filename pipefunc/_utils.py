@@ -5,6 +5,7 @@ import functools
 import inspect
 import math
 import operator
+import socket
 import sys
 import warnings
 from pathlib import Path
@@ -196,3 +197,15 @@ def assert_complete_kwargs(
         valid_kwargs -= set(skip)
     missing = valid_kwargs - set(kwargs)
     assert not missing, f"Missing required kwargs: {missing}"
+
+
+def get_local_ip() -> str:
+    try:
+        # Create a socket to connect to a remote host
+        # This helps in getting the network interface's IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # This does not actually connect to '8.8.8.8', it is simply used to find the local IP
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:  # noqa: BLE001
+        return "unknown"

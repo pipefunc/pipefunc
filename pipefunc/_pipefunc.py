@@ -15,7 +15,6 @@ import getpass
 import inspect
 import os
 import platform
-import socket
 import traceback
 import warnings
 import weakref
@@ -41,6 +40,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
+    get_local_ip,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -1192,7 +1192,7 @@ class ErrorSnapshot:
     timestamp: str = field(default_factory=_timestamp)
     user: str = field(default_factory=getpass.getuser)
     machine: str = field(default_factory=platform.node)
-    ip_address: str = field(default_factory=lambda: socket.gethostbyname(socket.gethostname()))
+    ip_address: str = field(default_factory=get_local_ip)
     current_directory: str = field(default_factory=os.getcwd)
 
     def __post_init__(self) -> None:
