@@ -695,7 +695,7 @@ See [this tutorial](adaptive.md) for a detailed example of how to use `adaptive`
 
 ## What is the `ErrorSnapshot` feature in `pipefunc`?
 
-The `~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
+The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
 
 **Key Features:**
 
@@ -740,4 +740,4 @@ except Exception:
     print(snapshot)
 ```
 
-`~pipefunc.ErrorSnapshot` is invaluable for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
+{class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
