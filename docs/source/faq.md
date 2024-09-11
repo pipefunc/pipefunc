@@ -692,3 +692,52 @@ Additionally, by using the `resources_variable` argument, you can pass the dynam
 There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive sweeps over parameter spaces.
 Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
 See [this tutorial](adaptive.md) for a detailed example of how to use `adaptive` with `pipefunc`.
+
+## What is the `ErrorSnapshot` feature in `pipefunc`?
+
+The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
+
+**Key Features:**
+
+- **Error Details**: Captures function name, exception, arguments, traceback, user, machine, timestamp, and directory.
+- **Reproduction**: Offers a `reproduce()` method to recreate the error with the stored arguments.
+- **Persistence**: Allows saving and loading snapshots using `save_to_file` and `load_from_file`.
+
+**Usage:**
+
+1. **Accessing Snapshots**:
+   ```python
+   result = my_pipefunc_or_pipeline(args)
+   if my_pipefunc_or_pipeline.error_snapshot:
+       print(my_pipefunc_or_pipeline.error_snapshot)
+   ```
+
+2. **Reproducing Errors**:
+   ```python
+   error_snapshot = my_pipefunc_or_pipeline.error_snapshot
+   if error_snapshot:
+       error_snapshot.reproduce()
+   ```
+
+3. **Saving and Loading**:
+   ```python
+   error_snapshot.save_to_file("snapshot.pkl")
+   loaded_snapshot = ErrorSnapshot.load_from_file("snapshot.pkl")
+   ```
+
+**Example:**
+
+```{code-cell} ipython3
+@pipefunc(output_name="c")
+def faulty_function(a, b):
+    # Simulate an error
+    raise ValueError("Intentional error")
+
+try:
+    faulty_function(a=1, b=2)
+except Exception:
+    snapshot = faulty_function.error_snapshot
+    print(snapshot)
+```
+
+{class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
