@@ -95,4 +95,4 @@ def test_plotting_resources():
         return resources.gpus
 
     pipeline = Pipeline([f_c])
-    pipeline.visualize()
+    pipeline.visualize(figsize=10)

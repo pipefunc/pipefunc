@@ -1114,7 +1114,7 @@ class Pipeline:
 
     def visualize(
         self,
-        figsize: tuple[int, int] = (10, 10),
+        figsize: tuple[int, int] | int = (10, 10),
         filename: str | Path | None = None,
         *,
         color_combinable: bool = False,
@@ -1127,6 +1127,7 @@ class Pipeline:
         ----------
         figsize
             The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
         filename
             The filename to save the figure to.
         color_combinable
