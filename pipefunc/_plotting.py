@@ -66,9 +66,9 @@ class _Nodes:
             raise TypeError(msg)
 
 
-def visualize(  # noqa: PLR0912, PLR0915
+def visualize(  # noqa: C901, PLR0912, PLR0915
     graph: nx.DiGraph,
-    figsize: tuple[int, int] = (10, 10),
+    figsize: tuple[int, int] | int = (10, 10),
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
 ) -> None:
@@ -80,6 +80,7 @@ def visualize(  # noqa: PLR0912, PLR0915
         The directed graph representing the pipeline.
     figsize
         The width and height of the figure in inches.
+        If a single integer is provided, the figure will be a square.
     filename
         The filename to save the figure to.
     func_node_colors
@@ -92,7 +93,8 @@ def visualize(  # noqa: PLR0912, PLR0915
     nodes = _Nodes()
     for node in graph.nodes:
         nodes.append(node)
-
+    if isinstance(figsize, int):
+        figsize = (figsize, figsize)
     plt.figure(figsize=figsize)
 
     for _nodes, color, shape, edgecolor in [
