@@ -16,6 +16,7 @@ from pipefunc._utils import at_least_tuple
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import graphviz
     import holoviews as hv
 
 
@@ -196,6 +197,127 @@ def visualize(  # noqa: C901, PLR0912, PLR0915
     if filename is not None:
         plt.savefig(filename)
     plt.show()
+
+
+def visualize_graphviz(
+    graph: nx.DiGraph,
+    filename: str | Path | None = None,
+    func_node_colors: str | list[str] | None = None,
+    orient: str = "LR",
+    graphviz_kwargs: dict = None,
+) -> graphviz.Digraph:
+    """Visualize the pipeline as a directed graph using Graphviz.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        The directed graph representing the pipeline.
+    filename : str | Path | None
+        The filename to save the figure to, if provided.
+    func_node_colors : str | list[str] | None
+        The colors for function nodes.
+    orient : str
+        Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+    graphviz_kwargs : dict
+        Graphviz-specific keyword arguments for customizing the graph's appearance.
+
+    Returns
+    -------
+    digraph : graphviz.Digraph
+        The resulting Graphviz Digraph object.
+
+    """
+    import graphviz
+
+    if graphviz_kwargs is None:
+        graphviz_kwargs = {}
+
+    # Prepare nodes data
+    nodes = _Nodes()
+    for node in graph.nodes:
+        nodes.append(node)
+
+    # Graphviz Setup
+    digraph = graphviz.Digraph(
+        comment="Graph Visualization",
+        graph_attr={"rankdir": orient},
+        node_attr={"shape": "rectangle"},
+        **graphviz_kwargs,
+    )
+
+    # Add nodes to visual graph
+    for nodelist, color, shape, edgecolor, style in [
+        (nodes.arg, "lightgreen", "rectangle", None, "filled,dashed"),
+        (nodes.func, func_node_colors or "skyblue", "box", None, "rounded,filled"),
+        (nodes.nested_func, func_node_colors or "skyblue", "box", "red", "filled"),
+        (nodes.bound, "red", "hexagon", None, "filled"),
+        (nodes.resources, "orange", "polygon", None, "filled"),
+    ]:
+        for node in nodelist:
+            attribs = {
+                "color": color,
+                "style": style,
+                "shape": shape,
+                "width": "0.75",
+                "height": "0.5",
+            }
+            if edgecolor:
+                attribs["color"] = edgecolor
+            digraph.node(str(node), **attribs)
+
+    # Add edges and labels with function outputs
+    outputs = {}
+    inputs = {}
+    bound = {}
+    outputs_mapspec = {}
+    inputs_mapspec = {}
+
+    for edge, attrs in graph.edges.items():
+        a, b = edge
+        if isinstance(a, str):
+            assert not isinstance(b, str)  # `b` is PipeFunc
+            default_value = b.defaults.get(a, _empty)
+            if b.mapspec and a in b.mapspec.input_names:
+                spec = next(i for i in b.mapspec.inputs if i.name == a)
+                inputs_mapspec[edge] = str(spec)
+            elif default_value is not _empty:
+                inputs[edge] = f"{a}={_trim(default_value)}"
+            else:
+                inputs[edge] = a
+        elif isinstance(a, PipeFunc):
+            output_str = []
+            with_mapspec = False
+            for name in at_least_tuple(attrs["arg"]):
+                if b.mapspec and name in b.mapspec.input_names:
+                    with_mapspec = True
+                    spec = next(i for i in b.mapspec.inputs if i.name == name)
+                    output_str.append(str(spec))
+                else:
+                    output_str.append(name)
+            if with_mapspec:
+                outputs_mapspec[edge] = ", ".join(output_str)
+            else:
+                outputs[edge] = ", ".join(output_str)
+        elif isinstance(a, _Bound):
+            bound_value = b._bound[a.name]
+            bound[edge] = f"{a.name}={bound_value}"
+        else:
+            assert isinstance(a, _Resources)
+
+    for labels, color in [
+        (outputs, "blue"),
+        (outputs_mapspec, "darkblue"),
+        (inputs, "green"),
+        (inputs_mapspec, "darkgreen"),
+        (bound, "red"),
+    ]:
+        for edge, label in labels.items():
+            digraph.edge(str(edge[0]), str(edge[1]), label=label, color=color)
+
+    if filename is not None:
+        digraph.render(filename, format="png", cleanup=True)
+
+    return digraph
 
 
 def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | None:
