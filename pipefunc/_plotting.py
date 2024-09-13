@@ -113,6 +113,7 @@ class _Labels(NamedTuple):
     inputs: dict
     inputs_mapspec: dict
     bound: dict
+    resources: dict
 
     @classmethod
     def from_graph(cls, graph: nx.DiGraph) -> _Labels:  # noqa: PLR0912
@@ -122,6 +123,7 @@ class _Labels(NamedTuple):
         bound = {}
         outputs_mapspec = {}
         inputs_mapspec = {}
+        resources = {}
 
         for edge, attrs in graph.edges.items():
             a, b = edge
@@ -154,12 +156,19 @@ class _Labels(NamedTuple):
                 bound[edge] = f"{a.name}={bound_value}"
             else:
                 assert isinstance(a, _Resources)
+                resources[edge] = a.name
 
-        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
+        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources)
 
 
-def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, Any] | None) -> str:
+def _generate_node_label(
+    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc,
+    hints: dict[str, type],
+    defaults: dict[str, Any] | None,
+) -> str:
     """Generate an HTML-like label for a graph node including type annotations and default values."""
+    if isinstance(node, _Bound | _Resources):
+        return f"<<b>{node.name}</b>>"
     name = str(node).split(" → ")[0]
     label = f"<<b>{name}</b>"
 
@@ -170,9 +179,9 @@ def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, 
         default_value: Any,
     ) -> str:
         if type_string:
-            type_string = html.escape(_trim(type_string, 1000))
+            type_string = html.escape(_trim(type_string))
             if default_value is not _empty:
-                default_value = html.escape(_trim(default_value, 100))
+                default_value = html.escape(_trim(default_value))
                 label += f"<br /><br />{output_name}: <i>{type_string}</i>  = {default_value}"
             else:
                 label += f"<br /><br />{output_name}: <i>{type_string}</i>"
@@ -240,9 +249,6 @@ def visualize_graphviz(
     if graphviz_kwargs is None:
         graphviz_kwargs = {}
 
-    # Prepare nodes data
-    nodes = _Nodes.from_graph(graph)
-
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
@@ -252,6 +258,7 @@ def visualize_graphviz(
     )
     hints = _all_type_annotations(graph)
     # Add nodes to visual graph
+    nodes = _Nodes.from_graph(graph)
     for nodelist, color, shape, style in [
         (nodes.arg, _COLORS["lightgreen"], "rectangle", "filled,dashed"),
         (nodes.func, func_node_colors or _COLORS["skyblue"], "box", "rounded,filled"),
@@ -285,9 +292,11 @@ def visualize_graphviz(
         (labels.inputs, _COLORS["lightgreen"]),
         (labels.inputs_mapspec, _COLORS["darkgreen"]),
         (labels.bound, _COLORS["red"]),
+        (labels.resources, _COLORS["orange"]),
     ]:
-        for edge, label in _labels.items():
-            digraph.edge(str(edge[0]), str(edge[1]), label=label, color=color)
+        for edge in _labels:
+            # NOTE: This function doesn't put labels on the edges
+            digraph.edge(str(edge[0]), str(edge[1]), color=color)
 
     if filename is not None:
         digraph.render(filename, format="png", cleanup=True)
@@ -319,11 +328,11 @@ def visualize(
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
-    nodes = _Nodes.from_graph(graph)
     if isinstance(figsize, int):
         figsize = (figsize, figsize)
     plt.figure(figsize=figsize)
 
+    nodes = _Nodes.from_graph(graph)
     colors_shapes_edgecolors = [
         (nodes.arg, "lightgreen", "s", None),
         (nodes.func, func_node_colors or "skyblue", "o", None),
