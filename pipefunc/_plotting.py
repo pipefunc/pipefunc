@@ -372,7 +372,8 @@ def visualize_graphviz(
         digraph.subgraph(legend_subgraph)
 
     if filename is not None:
-        digraph.render(filename, format="png", cleanup=True)
+        name, extension = str(filename).rsplit(".", 1)
+        digraph.render(name, format=extension, cleanup=True)
 
     return digraph
 
