@@ -280,6 +280,7 @@ def visualize_graphviz(
         graph_attr["size"] = (
             f"{figsize[0]},{figsize[1]}" if isinstance(figsize, tuple) else f" {figsize},{figsize}"
         )
+        graph_attr["ratio"] = "fill"
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
