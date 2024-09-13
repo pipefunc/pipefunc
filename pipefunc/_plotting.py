@@ -167,50 +167,47 @@ def _generate_node_label(
     defaults: dict[str, Any] | None,
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
+
+    def _format_type_and_default(
+        name: str,
+        type_string: str | None,
+        default_value: Any = _empty,
+    ) -> str:
+        """Formats the part of the label with type and default value."""
+        parts = [f"<b>{html.escape(name)}</b>"]
+
+        if type_string:
+            type_string = html.escape(_trim(type_string))
+            parts.append(f": <i>{type_string}</i>")
+
+        if default_value is not _empty:
+            default_value = html.escape(_trim(default_value))
+            parts.append(f" = {default_value}")
+
+        return " ".join(parts)
+
     if isinstance(node, _Bound | _Resources):
         return f"<b>{html.escape(node.name)}</b>"
 
     if isinstance(node, str):
-        # Handle string nodes with specific format
         type_string = _type_as_string(hints.get(node))
         default_value = defaults.get(node, _empty) if defaults else _empty
-        node_label_parts = [f"<b>{html.escape(node)}</b>"]
+        label = _format_type_and_default(node, type_string, default_value)
 
-        if type_string:
-            type_string = html.escape(_trim(type_string))
-            node_label_parts.append(f": <i>{type_string}</i>")
-
-        if default_value is not _empty:
-            default_value = html.escape(_trim(default_value))
-            node_label_parts.append(f" = {default_value}")
-
-        # Wrap the whole string in angle brackets
-        label = " ".join(node_label_parts)
-    elif isinstance(node, PipeFunc):
-        # Handle non-string nodes
+    elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
         label = f"<b>{html.escape(name)}</b>"
-
-        def _append_type_and_default(
-            label: str,
-            output_name: str,
-            type_string: str | None,
-            default_value: Any,
-        ) -> str:
-            if type_string:
-                type_string = html.escape(_trim(type_string))
-                if default_value is not _empty:
-                    default_value = html.escape(_trim(default_value))
-                    label += f"<br/><br/>{html.escape(output_name)}: <i>{type_string}</i> = {default_value}"
-                else:
-                    label += f"<br/><br/>{html.escape(output_name)}: <i>{type_string}</i>"
-            return label
 
         for output in at_least_tuple(node.output_name):
             h = node.output_annotation.get(output)
             type_string = _type_as_string(h) if h is not NoAnnotation else None
             default_value = defaults.get(output, _empty) if defaults else _empty
-            label = _append_type_and_default(label, output, type_string, default_value)
+            formatted_label = _format_type_and_default(output, type_string, default_value)
+            label += f"<br/><br/>{formatted_label}"
+    else:
+        msg = f"Unexpected node type: {type(node)}"
+        raise TypeError(msg)
+
     return label
 
 
