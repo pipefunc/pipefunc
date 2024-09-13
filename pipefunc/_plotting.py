@@ -150,7 +150,30 @@ def _prepare_labels(graph: nx.DiGraph) -> Labels:  # noqa: PLR0912
     return Labels(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
 
 
-def visualize_graphviz(  # noqa: PLR0912
+def _generate_node_label(node: Any, hints: dict[str, type]) -> str:
+    """Generate an HTML-like label for a graph node."""
+    name = str(node).split(" → ")[0]
+    label = f"<<b>{name}</b>"
+
+    def _append_type(label: str, type_string: str | None) -> str:
+        if type_string:
+            label += f"<br /><br /><i>{type_string}</i>"
+        return label
+
+    if isinstance(node, str):
+        type_string = _type_as_string(hints.get(node))
+        label = _append_type(label, type_string)
+    else:
+        for output in at_least_tuple(node.output_name):
+            h = node.output_annotation.get(output)
+            if h is not NoAnnotation:
+                type_string = _type_as_string(h)
+                label = _append_type(label, type_string)
+    label += ">"
+    return label
+
+
+def visualize_graphviz(
     graph: nx.DiGraph,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
@@ -205,21 +228,7 @@ def visualize_graphviz(  # noqa: PLR0912
         (nodes.resources, "orange", "polygon", "filled"),
     ]:
         for node in nodelist:  # type: ignore[attr-defined]
-            # Creating HTML-like labels
-            name = str(node).split(" → ")[0]
-            label = f"<<b>{name}</b>"
-            if isinstance(node, str):
-                type_string = _type_as_string(hints.get(node))
-                if type_string:
-                    label += f"<br /><br /><i>{type_string}</i>"
-            else:
-                for output in at_least_tuple(node.output_name):
-                    h = node.output_annotation.get(output)
-                    if h is not NoAnnotation:
-                        type_string = _type_as_string(h)
-                        if type_string:
-                            label += f"<br /><br />{output} → <i>{type_string}</i>"
-            label += ">"
+            label = _generate_node_label(node, hints)
             attribs = {
                 "color": color,
                 "style": style,
