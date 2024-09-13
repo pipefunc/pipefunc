@@ -1133,6 +1133,15 @@ class Pipeline:
         -------
             The output of the plotting function.
 
+        See Also
+        --------
+        visualize_graphviz
+            Create a directed graph using Graphviz (``backend="graphviz"``).
+        visualize_matplotlib
+            Create a directed graph using Matplotlib (``backend="matplotlib"``).
+        visualize_holoviews
+            Create a directed graph using HoloViews (``backend="holoviews"``).
+
         """
 
         def is_installed(name: str) -> bool:
