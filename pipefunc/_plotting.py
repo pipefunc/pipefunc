@@ -196,14 +196,19 @@ def _generate_node_label(
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
-        label = f"<b>{html.escape(name)}</b>"
+        label = f'<TABLE BORDER="0"><TR><TD><B>{html.escape(name)}</B></TD></TR><HR/>'
 
         for output in at_least_tuple(node.output_name):
             h = node.output_annotation.get(output)
             type_string = _type_as_string(h) if h is not NoAnnotation else None
             default_value = defaults.get(output, _empty) if defaults else _empty
             formatted_label = _format_type_and_default(output, type_string, default_value)
-            label += f"<br/><br/>{formatted_label}"
+            label += f"<TR><TD>{formatted_label}</TD></TR>"
+        if node.mapspec:
+            s = html.escape(str(node.mapspec))
+            label += f'<HR/><TR><TD><FONT FACE="Courier New">{s}</FONT></TD></TR>'
+
+        label += "</TABLE>"
     else:
         msg = f"Unexpected node type: {type(node)}"
         raise TypeError(msg)
