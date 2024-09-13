@@ -272,39 +272,46 @@ def visualize_graphviz(
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(graph)
 
-    legend_items = {}
-
-    # Add nodes to visual graph
-    for nodelist, color, shape, style, legend_label in [
-        (nodes.arg, _COLORS["lightgreen"], "rectangle", "filled,dashed", "Argument"),
-        (nodes.func, func_node_colors or _COLORS["skyblue"], "box", "rounded,filled", "Function"),
-        (
-            nodes.nested_func,
-            func_node_colors or _COLORS["skyblue"],
-            "box",
-            "filled",
-            "Nested Function",
+    # Define a mapping for node configurations
+    blue = func_node_colors or _COLORS["skyblue"]
+    node_types: dict[str, tuple[list, dict]] = {
+        "Argument": (
+            nodes.arg,
+            {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
-        (nodes.bound, _COLORS["red"], "hexagon", "filled", "Bound"),
-        (nodes.resources, _COLORS["orange"], "polygon", "filled", "Resources"),
-    ]:
+        "PipeFunc": (
+            nodes.func,
+            {"fillcolor": blue, "shape": "box", "style": "rounded,filled"},
+        ),
+        "NestedPipeFunction": (
+            nodes.nested_func,
+            {"fillcolor": blue, "shape": "box", "style": "rounded,filled", "color": _COLORS["red"]},
+        ),
+        "Bound": (
+            nodes.bound,
+            {"fillcolor": _COLORS["red"], "shape": "hexagon", "style": "filled"},
+        ),
+        "Resources": (
+            nodes.resources,
+            {"fillcolor": _COLORS["orange"], "shape": "polygon", "style": "filled"},
+        ),
+    }
+    node_defaults = {
+        "width": "0.75",
+        "height": "0.5",
+        "margin": "0.15",
+        "fontname": "Helvetica",
+        "penwidth": "1",
+        "color": "black",  # Border color
+    }
+    # Add nodes to visual graph
+    legend_items: dict[str, dict[str, Any]] = {}
+    for legend_label, (nodelist, config) in node_types.items():
         if nodelist:  # Only add legend entry if nodes of this type exist
-            legend_items[legend_label] = (shape, color, style)
+            legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(node, hints, defaults)
-            attribs = {
-                "fillcolor": color,
-                "style": style,
-                "shape": shape,
-                "width": "0.75",
-                "height": "0.5",
-                "label": f"<{label}>",
-                "margin": "0.15",
-                "fontname": "Helvetica",
-                "penwidth": "1",
-                "color": "black",
-            }
-
+            attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
@@ -327,6 +334,7 @@ def visualize_graphviz(
             name="cluster_legend",
             graph_attr={
                 "label": "Legend",
+                "rankdir": orient,
                 "fontsize": "20",
                 "fontcolor": "black",
                 "color": "black",
@@ -334,8 +342,10 @@ def visualize_graphviz(
                 "fillcolor": "lightgrey",
             },
         )
-        for name, (shape, color, style) in legend_items.items():
-            legend_subgraph.node(name, shape=shape, fillcolor=color, style=style, label=name)
+        for name, config in legend_items.items():
+            attribs = dict(node_defaults, label=name, **config)
+            del attribs["margin"]  # To make the legend more compact
+            legend_subgraph.node(name, **attribs)
 
         digraph.subgraph(legend_subgraph)
 
