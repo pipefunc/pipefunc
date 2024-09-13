@@ -4,7 +4,7 @@ import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, get_origin
+from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
@@ -26,6 +26,7 @@ MAX_LABEL_LENGTH = 20
 
 
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
+    """Gets the layout of the graph using Graphviz if available, otherwise defaults to a spring layout."""
     try:
         return graphviz_layout(graph, prog="dot")
     except ImportError:  # pragma: no cover
@@ -38,6 +39,7 @@ def _get_graph_layout(graph: nx.DiGraph) -> dict:
 
 
 def _trim(s: Any, max_len: int = MAX_LABEL_LENGTH) -> str:
+    """Trims a string to a specified maximum length, adding ellipses if trimmed."""
     s = str(s)
     if len(s) > max_len:
         return s[: max_len - 3] + "..."
@@ -46,6 +48,8 @@ def _trim(s: Any, max_len: int = MAX_LABEL_LENGTH) -> str:
 
 @dataclass
 class _Nodes:
+    """Contains lists of different node types for the purpose of graph visualization."""
+
     arg: list[str] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
@@ -53,6 +57,7 @@ class _Nodes:
     resources: list[_Resources] = field(default_factory=list)
 
     def append(self, node: Any) -> None:
+        """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
         elif isinstance(node, NestedPipeFunc):
@@ -68,8 +73,9 @@ class _Nodes:
             raise TypeError(msg)
 
 
-def _type_as_string(type_: type) -> str | None:
+def _type_as_string(type_: Any) -> str | None:
     """Get a string representation of a type."""
+    type_string: str | None
     if getattr(type_, "__name__", None):
         type_string = type_.__name__
     elif get_origin(type_):
@@ -79,12 +85,12 @@ def _type_as_string(type_: type) -> str | None:
         type_string = type_.__repr__()
     else:
         type_string = None
-
     return type_string
 
 
 def _all_type_annotations(graph: nx.DiGraph) -> dict[str, type]:
-    hints = {}
+    """Returns a dictionary of all type annotations from the graph nodes."""
+    hints: dict[str, type] = {}
     for node in graph.nodes:
         if isinstance(node, str):
             continue
@@ -93,12 +99,63 @@ def _all_type_annotations(graph: nx.DiGraph) -> dict[str, type]:
     return hints
 
 
-def visualize_graphviz(
+class Labels(NamedTuple):
+    outputs: dict
+    outputs_mapspec: dict
+    inputs: dict
+    inputs_mapspec: dict
+    bound: dict
+
+
+def _prepare_labels(graph: nx.DiGraph) -> Labels:  # noqa: PLR0912
+    """Prepares the edge labels for graph visualization."""
+    outputs = {}
+    inputs = {}
+    bound = {}
+    outputs_mapspec = {}
+    inputs_mapspec = {}
+
+    for edge, attrs in graph.edges.items():
+        a, b = edge
+        if isinstance(a, str):
+            assert not isinstance(b, str)  # `b` is PipeFunc
+            default_value = b.defaults.get(a, _empty)
+            if b.mapspec and a in b.mapspec.input_names:
+                spec = next(i for i in b.mapspec.inputs if i.name == a)
+                inputs_mapspec[edge] = str(spec)
+            elif default_value is not _empty:
+                inputs[edge] = f"{a}={_trim(default_value)}"
+            else:
+                inputs[edge] = a
+        elif isinstance(a, PipeFunc):
+            output_str = []
+            with_mapspec = False
+            for name in at_least_tuple(attrs["arg"]):
+                if b.mapspec and name in b.mapspec.input_names:
+                    with_mapspec = True
+                    spec = next(i for i in b.mapspec.inputs if i.name == name)
+                    output_str.append(str(spec))
+                else:
+                    output_str.append(name)
+            if with_mapspec:
+                outputs_mapspec[edge] = ", ".join(output_str)
+            else:
+                outputs[edge] = ", ".join(output_str)
+        elif isinstance(a, _Bound):
+            bound_value = b._bound[a.name]
+            bound[edge] = f"{a.name}={bound_value}"
+        else:
+            assert isinstance(a, _Resources)
+
+    return Labels(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
+
+
+def visualize_graphviz(  # noqa: PLR0912
     graph: nx.DiGraph,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
     orient: str = "LR",
-    graphviz_kwargs: dict = None,
+    graphviz_kwargs: dict | None = None,
 ) -> graphviz.Digraph:
     """Visualize the pipeline as a directed graph using Graphviz.
 
@@ -147,7 +204,7 @@ def visualize_graphviz(
         (nodes.bound, "red", "hexagon", "filled"),
         (nodes.resources, "orange", "polygon", "filled"),
     ]:
-        for node in nodelist:
+        for node in nodelist:  # type: ignore[attr-defined]
             # Creating HTML-like labels
             name = str(node).split(" → ")[0]
             label = f"<<b>{name}</b>"
@@ -177,52 +234,16 @@ def visualize_graphviz(
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    outputs = {}
-    inputs = {}
-    bound = {}
-    outputs_mapspec = {}
-    inputs_mapspec = {}
+    labels = _prepare_labels(graph)
 
-    for edge, attrs in graph.edges.items():
-        a, b = edge
-        if isinstance(a, str):
-            assert not isinstance(b, str)  # `b` is PipeFunc
-            default_value = b.defaults.get(a, _empty)
-            if b.mapspec and a in b.mapspec.input_names:
-                spec = next(i for i in b.mapspec.inputs if i.name == a)
-                inputs_mapspec[edge] = str(spec)
-            elif default_value is not _empty:
-                inputs[edge] = f"{a}={_trim(default_value)}"
-            else:
-                inputs[edge] = a
-        elif isinstance(a, PipeFunc):
-            output_str = []
-            with_mapspec = False
-            for name in at_least_tuple(attrs["arg"]):
-                if b.mapspec and name in b.mapspec.input_names:
-                    with_mapspec = True
-                    spec = next(i for i in b.mapspec.inputs if i.name == name)
-                    output_str.append(str(spec))
-                else:
-                    output_str.append(name)
-            if with_mapspec:
-                outputs_mapspec[edge] = ", ".join(output_str)
-            else:
-                outputs[edge] = ", ".join(output_str)
-        elif isinstance(a, _Bound):
-            bound_value = b._bound[a.name]
-            bound[edge] = f"{a.name}={bound_value}"
-        else:
-            assert isinstance(a, _Resources)
-
-    for labels, color in [
-        (outputs, "blue"),
-        (outputs_mapspec, "darkblue"),
-        (inputs, "green"),
-        (inputs_mapspec, "darkgreen"),
-        (bound, "red"),
+    for _labels, color in [
+        (labels.outputs, "blue"),
+        (labels.outputs_mapspec, "darkblue"),
+        (labels.inputs, "green"),
+        (labels.inputs_mapspec, "darkgreen"),
+        (labels.bound, "red"),
     ]:
-        for edge, label in labels.items():
+        for edge, label in _labels.items():
             digraph.edge(str(edge[0]), str(edge[1]), label=label, color=color)
 
     if filename is not None:
@@ -231,7 +252,7 @@ def visualize_graphviz(
     return digraph
 
 
-def visualize(  # noqa: C901, PLR0912, PLR0915
+def visualize(
     graph: nx.DiGraph,
     figsize: tuple[int, int] | int = (10, 10),
     filename: str | Path | None = None,
@@ -262,13 +283,14 @@ def visualize(  # noqa: C901, PLR0912, PLR0915
         figsize = (figsize, figsize)
     plt.figure(figsize=figsize)
 
-    for _nodes, color, shape, edgecolor in [
+    colors_shapes_edgecolors = [
         (nodes.arg, "lightgreen", "s", None),
         (nodes.func, func_node_colors or "skyblue", "o", None),
         (nodes.nested_func, func_node_colors or "skyblue", "o", "red"),
         (nodes.bound, "red", "h", None),
         (nodes.resources, "C1", "p", None),
-    ]:
+    ]
+    for _nodes, color, shape, edgecolor in colors_shapes_edgecolors:
         nx.draw_networkx_nodes(
             graph,
             pos,
@@ -280,6 +302,7 @@ def visualize(  # noqa: C901, PLR0912, PLR0915
         )
 
     def func_with_mapspec(func: PipeFunc) -> str:
+        """Add mapspec to function output if applicable."""
         s = str(func)
         if not func.mapspec:
             return s
@@ -303,43 +326,7 @@ def visualize(  # noqa: C901, PLR0912, PLR0915
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
     # Add edge labels with function outputs
-    outputs = {}
-    inputs = {}
-    bound = {}
-    outputs_mapspec = {}
-    inputs_mapspec = {}
-
-    for edge, attrs in graph.edges.items():
-        a, b = edge
-        if isinstance(a, str):
-            assert not isinstance(b, str)  # `b` is PipeFunc
-            default_value = b.defaults.get(a, _empty)
-            if b.mapspec and a in b.mapspec.input_names:
-                spec = next(i for i in b.mapspec.inputs if i.name == a)
-                inputs_mapspec[edge] = str(spec)
-            elif default_value is not _empty:
-                inputs[edge] = f"{a}={_trim(default_value)}"
-            else:
-                inputs[edge] = a
-        elif isinstance(a, PipeFunc):
-            output_str = []
-            with_mapspec = False
-            for name in at_least_tuple(attrs["arg"]):
-                if b.mapspec and name in b.mapspec.input_names:
-                    with_mapspec = True
-                    spec = next(i for i in b.mapspec.inputs if i.name == name)
-                    output_str.append(str(spec))
-                else:
-                    output_str.append(name)
-            if with_mapspec:
-                outputs_mapspec[edge] = ", ".join(output_str)
-            else:
-                outputs[edge] = ", ".join(output_str)
-        elif isinstance(a, _Bound):
-            bound_value = b._bound[a.name]
-            bound[edge] = f"{a.name}={bound_value}"
-        else:
-            assert isinstance(a, _Resources)
+    outputs, outputs_mapspec, inputs, inputs_mapspec, bound = _prepare_labels(graph)
 
     for labels, color in [
         (outputs, "skyblue"),
