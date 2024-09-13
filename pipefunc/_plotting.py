@@ -182,6 +182,17 @@ def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, 
     return label
 
 
+# Matplotlib colors to hex
+_COLORS = {
+    "skyblue": "#87CEEB",
+    "blue": "#0000FF",
+    "lightgreen": "#90EE90",
+    "darkgreen": "#006400",
+    "red": "#FF0000",
+    "orange": "#FFA500",
+}
+
+
 def visualize_graphviz(
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
@@ -233,11 +244,11 @@ def visualize_graphviz(
     hints = _all_type_annotations(graph)
     # Add nodes to visual graph
     for nodelist, color, shape, style in [
-        (nodes.arg, "lightgreen", "rectangle", "filled,dashed"),
-        (nodes.func, func_node_colors or "#87CEEB", "box", "rounded,filled"),
-        (nodes.nested_func, func_node_colors or "#87CEEB", "box", "filled"),
-        (nodes.bound, "red", "hexagon", "filled"),
-        (nodes.resources, "orange", "polygon", "filled"),
+        (nodes.arg, _COLORS["lightgreen"], "rectangle", "filled,dashed"),
+        (nodes.func, func_node_colors or _COLORS["skyblue"], "box", "rounded,filled"),
+        (nodes.nested_func, func_node_colors or _COLORS["skyblue"], "box", "filled"),
+        (nodes.bound, _COLORS["red"], "hexagon", "filled"),
+        (nodes.resources, _COLORS["orange"], "polygon", "filled"),
     ]:
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(node, hints, defaults)
@@ -258,11 +269,11 @@ def visualize_graphviz(
     labels = _prepare_labels(graph)
 
     for _labels, color in [
-        (labels.outputs, "blue"),
-        (labels.outputs_mapspec, "darkblue"),
-        (labels.inputs, "green"),
-        (labels.inputs_mapspec, "darkgreen"),
-        (labels.bound, "red"),
+        (labels.outputs, _COLORS["skyblue"]),
+        (labels.outputs_mapspec, _COLORS["blue"]),
+        (labels.inputs, _COLORS["lightgreen"]),
+        (labels.inputs_mapspec, _COLORS["darkgreen"]),
+        (labels.bound, _COLORS["red"]),
     ]:
         for edge, label in _labels.items():
             digraph.edge(str(edge[0]), str(edge[1]), label=label, color=color)
@@ -347,19 +358,19 @@ def visualize(
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
     # Add edge labels with function outputs
-    outputs, outputs_mapspec, inputs, inputs_mapspec, bound = _prepare_labels(graph)
+    labels = _prepare_labels(graph)
 
-    for labels, color in [
-        (outputs, "skyblue"),
-        (outputs_mapspec, "blue"),
-        (inputs, "lightgreen"),
-        (inputs_mapspec, "green"),
-        (bound, "red"),
+    for _labels, color in [
+        (labels.outputs, "skyblue"),
+        (labels.outputs_mapspec, "blue"),
+        (labels.inputs, "lightgreen"),
+        (labels.inputs_mapspec, "green"),
+        (labels.bound, "red"),
     ]:
         nx.draw_networkx_edge_labels(
             graph,
             pos,
-            edge_labels=labels,
+            edge_labels=_labels,
             font_size=12,
             font_color=color,
         )
