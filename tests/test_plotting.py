@@ -8,7 +8,7 @@ from unittest.mock import patch
 import matplotlib.pyplot as plt
 import pytest
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import NestedPipeFunc, Pipeline, pipefunc
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -96,3 +96,26 @@ def test_plotting_resources():
 
     pipeline = Pipeline([f_c])
     pipeline.visualize(figsize=10)
+
+
+def test_visualize_graphviz():
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(output_name="d")
+    def g(b: int, c: int, x: int = 1) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(
+        output_name="e",
+        bound={"x": 2},
+        resources={"cpus": 1, "gpus": 1},
+        resources_variable="resources",
+        mapspec="c[i] -> e[i]",
+    )
+    def h(c: int, d: int, x: int = 1, *, resources) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(output_name="i1")
+    def i1(a: int): ...
+    @pipefunc(output_name="i2")
+    def i2(i1: dict[str, int]): ...
+
+    i = NestedPipeFunc([i1, i2], output_name="i2")
+    pipeline = Pipeline([f, g, h, i])
+    pipeline.visualize()

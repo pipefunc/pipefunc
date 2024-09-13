@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from concurrent.futures import Executor
     from pathlib import Path
 
+    import graphviz
     import holoviews as hv
 
     from pipefunc._profile import ProfilingStats
@@ -1114,6 +1115,96 @@ class Pipeline:
 
     def visualize(
         self,
+        *,
+        backend: Literal["matplotlib", "graphviz", "holoviews"] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Visualize the pipeline as a directed graph.
+
+        Parameters
+        ----------
+        backend
+            The plotting backend to use. If ``None``, the best backend available
+            will be used in the following order: Graphviz, Matplotlib, and HoloViews.
+        kwargs
+            Additional keyword arguments passed to the plotting function.
+
+        Returns
+        -------
+            The output of the plotting function.
+
+        """
+
+        def is_installed(name: str) -> bool:
+            try:
+                __import__(name)
+                return True  # noqa: TRY300
+            except ImportError:
+                return False
+
+        if backend is None:
+            if is_installed("graphviz"):
+                backend = "graphviz"
+            elif is_installed("matplotlib"):
+                backend = "matplotlib"
+            elif is_installed("holoviews"):
+                backend = "holoviews"
+            else:
+                msg = "No plotting backends are installed."
+                raise ImportError(msg)
+        if backend == "graphviz":
+            return self.visualize_graphviz(**kwargs)
+        if backend == "matplotlib":
+            return self.visualize_matplotlib(**kwargs)
+        if backend == "holoviews":
+            return self.visualize_holoviews(**kwargs)
+        msg = f"Invalid backend: {backend}. Must be 'graphviz', 'matplotlib', or 'holoviews'."
+        raise ValueError(msg)
+
+    def visualize_graphviz(
+        self,
+        *,
+        filename: str | Path | None = None,
+        func_node_colors: str | list[str] | None = None,
+        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        graphviz_kwargs: dict[str, Any] | None = None,
+        show_legend: bool = True,
+    ) -> graphviz.Digraph:
+        """Visualize the pipeline as a directed graph using Graphviz.
+
+        Parameters
+        ----------
+        filename
+            The filename to save the figure to, if provided.
+        func_node_colors
+            The colors for function nodes.
+        orient
+            Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+        graphviz_kwargs
+            Graphviz-specific keyword arguments for customizing the graph's appearance.
+        show_legend
+            Whether to show the legend in the graph visualization.
+
+        Returns
+        -------
+        graphviz.Digraph
+            The resulting Graphviz Digraph object.
+
+        """
+        from pipefunc._plotting import visualize_graphviz
+
+        return visualize_graphviz(
+            self.graph,
+            self.defaults,
+            filename=filename,
+            func_node_colors=func_node_colors,
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            show_legend=show_legend,
+        )
+
+    def visualize_matplotlib(
+        self,
         figsize: tuple[int, int] | int = (10, 10),
         filename: str | Path | None = None,
         *,
@@ -1138,7 +1229,7 @@ class Pipeline:
             Argument as passed to `Pipeline.simply_pipeline`.
 
         """
-        from pipefunc._plotting import visualize
+        from pipefunc._plotting import visualize_matplotlib
 
         if color_combinable:
             func_node_colors = self._func_node_colors(
@@ -1147,7 +1238,7 @@ class Pipeline:
             )
         else:
             func_node_colors = None
-        visualize(
+        visualize_matplotlib(
             self.graph,
             figsize=figsize,
             filename=filename,

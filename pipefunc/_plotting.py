@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     import graphviz
     import holoviews as hv
+    import matplotlib.pyplot as plt
 
 
 _empty = inspect.Parameter.empty
@@ -363,12 +364,12 @@ def visualize_graphviz(
     return digraph
 
 
-def visualize(
+def visualize_matplotlib(
     graph: nx.DiGraph,
     figsize: tuple[int, int] | int = (10, 10),
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
-) -> None:
+) -> plt.Figure:
     """Visualize the pipeline as a directed graph.
 
     Parameters
@@ -383,13 +384,17 @@ def visualize(
     func_node_colors
         The color of the nodes.
 
+    Returns
+    -------
+        The resulting Matplotlib figure.
+
     """
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
     if isinstance(figsize, int):
         figsize = (figsize, figsize)
-    plt.figure(figsize=figsize)
+    fig = plt.figure(figsize=figsize)
 
     nodes = _Nodes.from_graph(graph)
     colors_shapes_edgecolors = [
@@ -457,6 +462,7 @@ def visualize(
     if filename is not None:
         plt.savefig(filename)
     plt.show()
+    return fig
 
 
 def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | None:
