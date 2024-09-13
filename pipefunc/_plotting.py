@@ -92,10 +92,9 @@ def _all_type_annotations(graph: nx.DiGraph) -> dict[str, type]:
     """Returns a dictionary of all type annotations from the graph nodes."""
     hints: dict[str, type] = {}
     for node in graph.nodes:
-        if isinstance(node, str):
-            continue
-        outputs = {k: v for k, v in node.output_annotation.items() if v is not NoAnnotation}
-        hints |= outputs | node.parameter_annotations
+        if isinstance(node, PipeFunc):
+            outputs = {k: v for k, v in node.output_annotation.items() if v is not NoAnnotation}
+            hints |= outputs | node.parameter_annotations
     return hints
 
 
@@ -172,7 +171,7 @@ def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, 
         type_string = _type_as_string(hints.get(node))
         default_value = defaults.get(node, _empty) if defaults else _empty
         label = _append_type_and_default(label, node, type_string, default_value)
-    else:
+    elif isinstance(node, PipeFunc):
         for output in at_least_tuple(node.output_name):
             h = node.output_annotation.get(output)
             type_string = _type_as_string(h) if h is not NoAnnotation else None
