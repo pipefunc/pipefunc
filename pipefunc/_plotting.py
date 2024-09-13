@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import html
 import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_origin
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
@@ -72,6 +73,14 @@ class _Nodes:
             msg = "Should not happen. Please report this as a bug."
             raise TypeError(msg)
 
+    @classmethod
+    def from_graph(cls, graph: nx.DiGraph) -> _Nodes:
+        """Extracts nodes from a graph."""
+        nodes = cls()
+        for node in graph.nodes:
+            nodes.append(node)
+        return nodes
+
 
 def _type_as_string(type_: Any) -> str | None:
     """Get a string representation of a type."""
@@ -98,55 +107,55 @@ def _all_type_annotations(graph: nx.DiGraph) -> dict[str, type]:
     return hints
 
 
-class Labels(NamedTuple):
+class _Labels(NamedTuple):
     outputs: dict
     outputs_mapspec: dict
     inputs: dict
     inputs_mapspec: dict
     bound: dict
 
+    @classmethod
+    def from_graph(cls, graph: nx.DiGraph) -> _Labels:  # noqa: PLR0912
+        """Prepares the edge labels for graph visualization."""
+        outputs = {}
+        inputs = {}
+        bound = {}
+        outputs_mapspec = {}
+        inputs_mapspec = {}
 
-def _prepare_labels(graph: nx.DiGraph) -> Labels:  # noqa: PLR0912
-    """Prepares the edge labels for graph visualization."""
-    outputs = {}
-    inputs = {}
-    bound = {}
-    outputs_mapspec = {}
-    inputs_mapspec = {}
-
-    for edge, attrs in graph.edges.items():
-        a, b = edge
-        if isinstance(a, str):
-            assert not isinstance(b, str)  # `b` is PipeFunc
-            default_value = b.defaults.get(a, _empty)
-            if b.mapspec and a in b.mapspec.input_names:
-                spec = next(i for i in b.mapspec.inputs if i.name == a)
-                inputs_mapspec[edge] = str(spec)
-            elif default_value is not _empty:
-                inputs[edge] = f"{a}={_trim(default_value)}"
-            else:
-                inputs[edge] = a
-        elif isinstance(a, PipeFunc):
-            output_str = []
-            with_mapspec = False
-            for name in at_least_tuple(attrs["arg"]):
-                if b.mapspec and name in b.mapspec.input_names:
-                    with_mapspec = True
-                    spec = next(i for i in b.mapspec.inputs if i.name == name)
-                    output_str.append(str(spec))
+        for edge, attrs in graph.edges.items():
+            a, b = edge
+            if isinstance(a, str):
+                assert not isinstance(b, str)  # `b` is PipeFunc
+                default_value = b.defaults.get(a, _empty)
+                if b.mapspec and a in b.mapspec.input_names:
+                    spec = next(i for i in b.mapspec.inputs if i.name == a)
+                    inputs_mapspec[edge] = str(spec)
+                elif default_value is not _empty:
+                    inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
-                    output_str.append(name)
-            if with_mapspec:
-                outputs_mapspec[edge] = ", ".join(output_str)
+                    inputs[edge] = a
+            elif isinstance(a, PipeFunc):
+                output_str = []
+                with_mapspec = False
+                for name in at_least_tuple(attrs["arg"]):
+                    if b.mapspec and name in b.mapspec.input_names:
+                        with_mapspec = True
+                        spec = next(i for i in b.mapspec.inputs if i.name == name)
+                        output_str.append(str(spec))
+                    else:
+                        output_str.append(name)
+                if with_mapspec:
+                    outputs_mapspec[edge] = ", ".join(output_str)
+                else:
+                    outputs[edge] = ", ".join(output_str)
+            elif isinstance(a, _Bound):
+                bound_value = b._bound[a.name]
+                bound[edge] = f"{a.name}={bound_value}"
             else:
-                outputs[edge] = ", ".join(output_str)
-        elif isinstance(a, _Bound):
-            bound_value = b._bound[a.name]
-            bound[edge] = f"{a.name}={bound_value}"
-        else:
-            assert isinstance(a, _Resources)
+                assert isinstance(a, _Resources)
 
-    return Labels(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
+        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
 
 
 def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, Any] | None) -> str:
@@ -161,7 +170,9 @@ def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, 
         default_value: Any,
     ) -> str:
         if type_string:
+            type_string = html.escape(_trim(type_string, 1000))
             if default_value is not _empty:
+                default_value = html.escape(_trim(default_value, 100))
                 label += f"<br /><br />{output_name}: <i>{type_string}</i>  = {default_value}"
             else:
                 label += f"<br /><br />{output_name}: <i>{type_string}</i>"
@@ -198,7 +209,7 @@ def visualize_graphviz(
     defaults: dict[str, Any] | None = None,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
-    orient: str = "LR",
+    orient: Literal["TB", "LR", "BT", "RL"] = "TB",
     graphviz_kwargs: dict | None = None,
 ) -> graphviz.Digraph:
     """Visualize the pipeline as a directed graph using Graphviz.
@@ -230,9 +241,7 @@ def visualize_graphviz(
         graphviz_kwargs = {}
 
     # Prepare nodes data
-    nodes = _Nodes()
-    for node in graph.nodes:
-        nodes.append(node)
+    nodes = _Nodes.from_graph(graph)
 
     # Graphviz Setup
     digraph = graphviz.Digraph(
@@ -253,7 +262,7 @@ def visualize_graphviz(
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(node, hints, defaults)
             attribs = {
-                "color": color,
+                "fillcolor": color,
                 "style": style,
                 "shape": shape,
                 "width": "0.75",
@@ -261,12 +270,14 @@ def visualize_graphviz(
                 "label": label,
                 "margin": "0.15",
                 "fontname": "Helvetica",
+                "penwidth": "1",
+                "color": "black",
             }
 
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    labels = _prepare_labels(graph)
+    labels = _Labels.from_graph(graph)
 
     for _labels, color in [
         (labels.outputs, _COLORS["skyblue"]),
@@ -308,9 +319,7 @@ def visualize(
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
-    nodes = _Nodes()
-    for node in graph.nodes:
-        nodes.append(node)
+    nodes = _Nodes.from_graph(graph)
     if isinstance(figsize, int):
         figsize = (figsize, figsize)
     plt.figure(figsize=figsize)
@@ -358,7 +367,7 @@ def visualize(
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
     # Add edge labels with function outputs
-    labels = _prepare_labels(graph)
+    labels = _Labels.from_graph(graph)
 
     for _labels, color in [
         (labels.outputs, "skyblue"),
