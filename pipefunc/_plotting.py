@@ -150,31 +150,42 @@ def _prepare_labels(graph: nx.DiGraph) -> Labels:  # noqa: PLR0912
     return Labels(outputs, outputs_mapspec, inputs, inputs_mapspec, bound)
 
 
-def _generate_node_label(node: Any, hints: dict[str, type]) -> str:
-    """Generate an HTML-like label for a graph node."""
+def _generate_node_label(node: Any, hints: dict[str, type], defaults: dict[str, Any] | None) -> str:
+    """Generate an HTML-like label for a graph node including type annotations and default values."""
     name = str(node).split(" → ")[0]
     label = f"<<b>{name}</b>"
 
-    def _append_type(label: str, type_string: str | None) -> str:
+    def _append_type_and_default(
+        label: str,
+        output_name: str,
+        type_string: str | None,
+        default_value: Any,
+    ) -> str:
         if type_string:
-            label += f"<br /><br /><i>{type_string}</i>"
+            if default_value is not _empty:
+                label += f"<br /><br />{output_name}: <i>{type_string}</i>  = {default_value}"
+            else:
+                label += f"<br /><br />{output_name}: <i>{type_string}</i>"
         return label
 
     if isinstance(node, str):
         type_string = _type_as_string(hints.get(node))
-        label = _append_type(label, type_string)
+        default_value = defaults.get(node, _empty) if defaults else _empty
+        label = _append_type_and_default(label, node, type_string, default_value)
     else:
         for output in at_least_tuple(node.output_name):
             h = node.output_annotation.get(output)
-            if h is not NoAnnotation:
-                type_string = _type_as_string(h)
-                label = _append_type(label, type_string)
+            type_string = _type_as_string(h) if h is not NoAnnotation else None
+            default_value = defaults.get(output, _empty) if defaults else _empty
+            label = _append_type_and_default(label, output, type_string, default_value)
+
     label += ">"
     return label
 
 
 def visualize_graphviz(
     graph: nx.DiGraph,
+    defaults: dict[str, Any] | None = None,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
     orient: str = "LR",
@@ -184,20 +195,22 @@ def visualize_graphviz(
 
     Parameters
     ----------
-    graph : nx.DiGraph
+    graph
         The directed graph representing the pipeline.
-    filename : str | Path | None
+    defaults
+        Default values for the function arguments.
+    filename
         The filename to save the figure to, if provided.
-    func_node_colors : str | list[str] | None
+    func_node_colors
         The colors for function nodes.
-    orient : str
+    orient
         Graph orientation: 'TB', 'LR', 'BT', 'RL'.
-    graphviz_kwargs : dict
+    graphviz_kwargs
         Graphviz-specific keyword arguments for customizing the graph's appearance.
 
     Returns
     -------
-    digraph : graphviz.Digraph
+    graphviz.Digraph
         The resulting Graphviz Digraph object.
 
     """
@@ -228,7 +241,7 @@ def visualize_graphviz(
         (nodes.resources, "orange", "polygon", "filled"),
     ]:
         for node in nodelist:  # type: ignore[attr-defined]
-            label = _generate_node_label(node, hints)
+            label = _generate_node_label(node, hints, defaults)
             attribs = {
                 "color": color,
                 "style": style,
