@@ -218,8 +218,8 @@ def visualize_graphviz(
     defaults: dict[str, Any] | None = None,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
-    orient: Literal["TB", "LR", "BT", "RL"] = "TB",
-    graphviz_kwargs: dict | None = None,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
 ) -> graphviz.Digraph:
     """Visualize the pipeline as a directed graph using Graphviz.
 
