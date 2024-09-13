@@ -13,7 +13,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
 from pipefunc._utils import at_least_tuple
-from pipefunc.typing import NoAnnotation
+from pipefunc.typing import NoAnnotation, Unresolvable
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -86,7 +86,9 @@ class _Nodes:
 def _type_as_string(type_: Any) -> str | None:
     """Get a string representation of a type."""
     type_string: str | None
-    if getattr(type_, "__name__", None):
+    if isinstance(type_, Unresolvable):
+        type_string = type_.type_str
+    elif getattr(type_, "__name__", None):
         type_string = type_.__name__
     elif get_origin(type_):
         base_type = get_origin(type_)
@@ -191,7 +193,7 @@ def _generate_node_label(
         return f"<b>{html.escape(node.name)}</b>"
 
     if isinstance(node, str):
-        type_string = _type_as_string(hints.get(node))
+        type_string = _type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
         label = _format_type_and_default(node, type_string, default_value)
 
@@ -299,13 +301,13 @@ def visualize_graphviz(
         ),
         "Resources": (
             nodes.resources,
-            {"fillcolor": _COLORS["orange"], "shape": "polygon", "style": "filled"},
+            {"fillcolor": _COLORS["orange"], "shape": "hexagon", "style": "filled"},
         ),
     }
     node_defaults = {
         "width": "0.75",
         "height": "0.5",
-        "margin": "0.15",
+        "margin": "0.05",
         "fontname": "Helvetica",
         "penwidth": "1",
         "color": "black",  # Border color

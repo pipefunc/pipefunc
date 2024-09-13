@@ -56,7 +56,7 @@ def test_plot_with_defaults_and_bound():
         return b, c, x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize(color_combinable=True)
+    pipeline.visualize_matplotlib(color_combinable=True)
 
 
 def test_plot_with_mapspec(tmp_path: Path):
@@ -95,7 +95,7 @@ def test_plotting_resources():
         return resources.gpus
 
     pipeline = Pipeline([f_c])
-    pipeline.visualize(figsize=10)
+    pipeline.visualize_matplotlib(figsize=10)
 
 
 def test_visualize_graphviz():
@@ -118,4 +118,4 @@ def test_visualize_graphviz():
 
     i = NestedPipeFunc([i1, i2], output_name="i2")
     pipeline = Pipeline([f, g, h, i])
-    pipeline.visualize()
+    pipeline.visualize_graphviz()
