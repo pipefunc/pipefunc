@@ -225,10 +225,12 @@ _COLORS = {
 def visualize_graphviz(
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
+    *,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
+    show_legend: bool = True,
 ) -> graphviz.Digraph:
     """Visualize the pipeline as a directed graph using Graphviz.
 
@@ -246,6 +248,8 @@ def visualize_graphviz(
         Graph orientation: 'TB', 'LR', 'BT', 'RL'.
     graphviz_kwargs
         Graphviz-specific keyword arguments for customizing the graph's appearance.
+    show_legend
+        Whether to show the legend in the graph visualization.
 
     Returns
     -------
@@ -266,15 +270,26 @@ def visualize_graphviz(
         **graphviz_kwargs,
     )
     hints = _all_type_annotations(graph)
-    # Add nodes to visual graph
     nodes = _Nodes.from_graph(graph)
-    for nodelist, color, shape, style in [
-        (nodes.arg, _COLORS["lightgreen"], "rectangle", "filled,dashed"),
-        (nodes.func, func_node_colors or _COLORS["skyblue"], "box", "rounded,filled"),
-        (nodes.nested_func, func_node_colors or _COLORS["skyblue"], "box", "filled"),
-        (nodes.bound, _COLORS["red"], "hexagon", "filled"),
-        (nodes.resources, _COLORS["orange"], "polygon", "filled"),
+
+    legend_items = {}
+
+    # Add nodes to visual graph
+    for nodelist, color, shape, style, legend_label in [
+        (nodes.arg, _COLORS["lightgreen"], "rectangle", "filled,dashed", "Argument"),
+        (nodes.func, func_node_colors or _COLORS["skyblue"], "box", "rounded,filled", "Function"),
+        (
+            nodes.nested_func,
+            func_node_colors or _COLORS["skyblue"],
+            "box",
+            "filled",
+            "Nested Function",
+        ),
+        (nodes.bound, _COLORS["red"], "hexagon", "filled", "Bound"),
+        (nodes.resources, _COLORS["orange"], "polygon", "filled", "Resources"),
     ]:
+        if nodelist:  # Only add legend entry if nodes of this type exist
+            legend_items[legend_label] = (shape, color, style)
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(node, hints, defaults)
             attribs = {
@@ -306,6 +321,23 @@ def visualize_graphviz(
         for edge in _labels:
             # NOTE: This function doesn't put labels on the edges
             digraph.edge(str(edge[0]), str(edge[1]), color=color)
+
+    if show_legend and legend_items:
+        legend_subgraph = graphviz.Digraph(
+            name="cluster_legend",
+            graph_attr={
+                "label": "Legend",
+                "fontsize": "20",
+                "fontcolor": "black",
+                "color": "black",
+                "style": "filled",
+                "fillcolor": "lightgrey",
+            },
+        )
+        for name, (shape, color, style) in legend_items.items():
+            legend_subgraph.node(name, shape=shape, fillcolor=color, style=style, label=name)
+
+        digraph.subgraph(legend_subgraph)
 
     if filename is not None:
         digraph.render(filename, format="png", cleanup=True)
