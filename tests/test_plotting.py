@@ -43,7 +43,7 @@ def test_plot_with_defaults():
         return b, c, x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize()
+    pipeline.visualize_matplotlib()
 
 
 def test_plot_with_defaults_and_bound():
@@ -70,7 +70,7 @@ def test_plot_with_mapspec(tmp_path: Path):
 
     pipeline = Pipeline([f, g])
     filename = tmp_path / "pipeline.png"
-    pipeline.visualize(filename=filename)
+    pipeline.visualize_matplotlib(filename=filename)
     assert filename.exists()
     pipeline.visualize_holoviews()
 
@@ -86,7 +86,7 @@ def test_plot_nested_func():
 
     pipeline = Pipeline([f, g])
     pipeline.nest_funcs("*")
-    pipeline.visualize()
+    pipeline.visualize(backend="matplotlib")
 
 
 def test_plotting_resources():
