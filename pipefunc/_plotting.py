@@ -342,10 +342,13 @@ def visualize_graphviz(
                 "fillcolor": "lightgrey",
             },
         )
-        for name, config in legend_items.items():
-            attribs = dict(node_defaults, label=name, **config)
-            del attribs["margin"]  # To make the legend more compact
-            legend_subgraph.node(name, **attribs)
+        for i, (name, config) in enumerate(legend_items.items()):
+            node_name = f"legend_{i}"
+            attribs = {**node_defaults, "label": name, **config}
+            del attribs["margin"]  # Remove margin for legend nodes, to make them more compact
+            legend_subgraph.node(node_name, **attribs)
+            if i > 0:
+                legend_subgraph.edge(f"legend_{i-1}", node_name, style="invis")
 
         digraph.subgraph(legend_subgraph)
 
