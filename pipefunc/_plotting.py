@@ -212,7 +212,7 @@ def _generate_node_label(
             label += f'<HR/><TR><TD><FONT FACE="Courier New">{s}</FONT></TD></TR>'
 
         label += "</TABLE>"
-    else:
+    else:  # pragma: no cover
         msg = f"Unexpected node type: {type(node)}"
         raise TypeError(msg)
 

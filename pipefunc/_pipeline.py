@@ -1148,10 +1148,10 @@ class Pipeline:
             try:
                 __import__(name)
                 return True  # noqa: TRY300
-            except ImportError:
+            except ImportError:  # pragma: no cover
                 return False
 
-        if backend is None:
+        if backend is None:  # pragma: no cover
             if is_installed("graphviz"):
                 backend = "graphviz"
             elif is_installed("matplotlib"):
@@ -1167,8 +1167,8 @@ class Pipeline:
             return self.visualize_matplotlib(**kwargs)
         if backend == "holoviews":
             return self.visualize_holoviews(**kwargs)
-        msg = f"Invalid backend: {backend}. Must be 'graphviz', 'matplotlib', or 'holoviews'."
-        raise ValueError(msg)
+        msg = f"Invalid backend: {backend}. Must be 'graphviz', 'matplotlib', or 'holoviews'."  # pragma: no cover
+        raise ValueError(msg)  # pragma: no cover
 
     def visualize_graphviz(
         self,

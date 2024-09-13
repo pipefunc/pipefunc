@@ -20,7 +20,7 @@ def patched_show():
         yield mock_show
 
 
-def test_plot():
+def test_plot() -> None:
     @pipefunc("c")
     def a(b):
         return b
@@ -33,7 +33,8 @@ def test_plot():
     pipeline.visualize()
 
 
-def test_plot_with_defaults():
+@pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
+def test_plot_with_defaults(backend) -> None:
     @pipefunc("c")
     def f(a, b, x):
         return a, b, x
@@ -43,10 +44,10 @@ def test_plot_with_defaults():
         return b, c, x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize_matplotlib()
+    pipeline.visualize(backend=backend)
 
 
-def test_plot_with_defaults_and_bound():
+def test_plot_with_defaults_and_bound() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -59,7 +60,7 @@ def test_plot_with_defaults_and_bound():
     pipeline.visualize_matplotlib(color_combinable=True)
 
 
-def test_plot_with_mapspec(tmp_path: Path):
+def test_plot_with_mapspec(tmp_path: Path) -> None:
     @pipefunc("c", mapspec="a[i] -> c[i]")
     def f(a, b, x):
         return a, b, x
@@ -75,7 +76,7 @@ def test_plot_with_mapspec(tmp_path: Path):
     pipeline.visualize_holoviews()
 
 
-def test_plot_nested_func():
+def test_plot_nested_func() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -89,7 +90,7 @@ def test_plot_nested_func():
     pipeline.visualize(backend="matplotlib")
 
 
-def test_plotting_resources():
+def test_plotting_resources() -> None:
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):
         return resources.gpus
@@ -98,7 +99,8 @@ def test_plotting_resources():
     pipeline.visualize_matplotlib(figsize=10)
 
 
-def test_visualize_graphviz():
+@pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
+def test_visualize_graphviz(backend, tmp_path: Path) -> None:
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> int: ...  # type: ignore[empty-body]
     @pipefunc(output_name="d")
@@ -118,4 +120,6 @@ def test_visualize_graphviz():
 
     i = NestedPipeFunc([i1, i2], output_name="i2")
     pipeline = Pipeline([f, g, h, i])
-    pipeline.visualize_graphviz()
+    pipeline.visualize(backend=backend)
+    if backend == "graphviz":
+        pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg")
