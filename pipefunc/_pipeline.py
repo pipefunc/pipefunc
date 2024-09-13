@@ -1173,6 +1173,7 @@ class Pipeline:
     def visualize_graphviz(
         self,
         *,
+        figsize: tuple[int, int] | int | None = None,
         filename: str | Path | None = None,
         func_node_colors: str | list[str] | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1183,6 +1184,10 @@ class Pipeline:
 
         Parameters
         ----------
+        figsize
+            The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
+            If ``None``, the size will be determined automatically.
         filename
             The filename to save the figure to, if provided.
         func_node_colors
@@ -1205,6 +1210,7 @@ class Pipeline:
         return visualize_graphviz(
             self.graph,
             self.defaults,
+            figsize=figsize,
             filename=filename,
             func_node_colors=func_node_colors,
             orient=orient,

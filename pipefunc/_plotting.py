@@ -234,6 +234,7 @@ def visualize_graphviz(
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
     *,
+    figsize: tuple[int, int] | int | None = None,
     filename: str | Path | None = None,
     func_node_colors: str | list[str] | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -248,6 +249,10 @@ def visualize_graphviz(
         The directed graph representing the pipeline.
     defaults
         Default values for the function arguments.
+    figsize
+        The width and height of the figure in inches.
+        If a single integer is provided, the figure will be a square.
+        If ``None``, the size will be determined automatically.
     filename
         The filename to save the figure to, if provided.
     func_node_colors
@@ -270,10 +275,15 @@ def visualize_graphviz(
     if graphviz_kwargs is None:
         graphviz_kwargs = {}
 
+    graph_attr: dict[str, Any] = {"rankdir": orient}
+    if figsize:
+        graph_attr["size"] = (
+            f"{figsize[0]},{figsize[1]}" if isinstance(figsize, tuple) else f" {figsize},{figsize}"
+        )
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
-        graph_attr={"rankdir": orient},
+        graph_attr=graph_attr,
         node_attr={"shape": "rectangle"},
         **graphviz_kwargs,
     )
