@@ -50,36 +50,27 @@
         // Function to retrieve nodes connected in the specified direction
         function getConnectedNodes(nodeSet, mode = "bidirectional") {
             let resultSet = $().add(nodeSet);
-            if (mode === "bidirectional" || mode === "downstream") {
-                nodeSet.each((i, el) => {
-                    if (el.className.baseVal === "edge") {
-                        const edge = $(el).data("name");
-                        const nodes = graphVizObject.nodesByName();
-                        const downstreamNode = edge.split("->")[1];
-                        if (downstreamNode) {
-                            resultSet = resultSet.add(nodes[downstreamNode]);
-                            resultSet = resultSet.add(graphVizObject.linkedFrom(nodes[downstreamNode], true));
-                        }
-                    } else {
-                        resultSet = resultSet.add(graphVizObject.linkedFrom(el, true));
+            const nodes = graphVizObject.nodesByName();
+
+            nodeSet.each((i, el) => {
+                if (el.className.baseVal === "edge") {
+                    const [startNode, endNode] = $(el).data("name").split("->");
+                    if ((mode === "bidirectional" || mode === "upstream") && startNode) {
+                        resultSet = resultSet.add(nodes[startNode]).add(graphVizObject.linkedTo(nodes[startNode], true));
                     }
-                });
-            }
-            if (mode === "bidirectional" || mode === "upstream") {
-                nodeSet.each((i, el) => {
-                    if (el.className.baseVal === "edge") {
-                        const edge = $(el).data("name");
-                        const nodes = graphVizObject.nodesByName();
-                        const upstreamNode = edge.split("->")[0];
-                        if (upstreamNode) {
-                            resultSet = resultSet.add(nodes[upstreamNode]);
-                            resultSet = resultSet.add(graphVizObject.linkedTo(nodes[upstreamNode], true));
-                        }
-                    } else {
+                    if ((mode === "bidirectional" || mode === "downstream") && endNode) {
+                        resultSet = resultSet.add(nodes[endNode]).add(graphVizObject.linkedFrom(nodes[endNode], true));
+                    }
+                } else {
+                    if (mode === "bidirectional" || mode === "upstream") {
                         resultSet = resultSet.add(graphVizObject.linkedTo(el, true));
                     }
-                });
-            }
+                    if (mode === "bidirectional" || mode === "downstream") {
+                        resultSet = resultSet.add(graphVizObject.linkedFrom(el, true));
+                    }
+                }
+            });
+
             return resultSet;
         }
 
@@ -153,8 +144,7 @@
                 }
             });
         });
-
-        // Load the graph from the DOT source file from the specified URL
+        // As an example, we load the graph from a DOT source file from a URL:
         var dotSource;
         var url = "https://gist.githubusercontent.com/basnijholt/02e2ed6675a752e55f969ca42cb81460/raw/8adadcef38456a4a3e8894b3e171a0da61f7ff16/pipefunc-example.dot";
         $.get(url, function (data) {
