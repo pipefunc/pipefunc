@@ -49,4 +49,9 @@ def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> wid
     direction_selector.observe(update_direction, names="value")
 
     # Display widgets
-    return widgets.VBox([reset_button, direction_selector, pipe_func_graph_widget])
+    return widgets.VBox(
+        [
+            widgets.HBox([reset_button, direction_selector]),
+            pipe_func_graph_widget,
+        ],
+    )
