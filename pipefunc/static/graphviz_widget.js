@@ -25,18 +25,28 @@ async function render({ model, el }) {
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
     const graphEl = $(el).find('#graph');
 
+    // Initialize a d3-graphviz renderer instance
     var graphviz = d3.select("#graph").graphviz();
 
+    // Configuration for transitions in rendering the graph
     var d3Config = {
         transitionDelay: 0,
         transitionDuration: 500
     };
 
-    var selectedEngine = "dot"; // Hardcoded to "dot"
+    // Variable for storing the selected graph rendering engine
+    var selectedEngine = "dot";
+
+    // Object for saving the current GraphVizSVG
     var graphVizObject;
+
+    // Variable for storing the selected direction for highlighting
     var selectedDirection = model.get("selected_direction") || "bidirectional";
+
+    // Array holding the current selections
     var currentSelection = [];
 
+    // Function to highlight selected nodes and their connected nodes
     function highlightSelection() {
         let highlightedNodes = $();
         currentSelection.forEach(selection => {
@@ -46,6 +56,7 @@ async function render({ model, el }) {
         graphVizObject.highlight(highlightedNodes, true);
     }
 
+    // Function to retrieve nodes connected in the specified direction
     function getConnectedNodes(nodeSet, mode = "bidirectional") {
         let resultSet = $().add(nodeSet);
         const nodes = graphVizObject.nodesByName();
@@ -71,17 +82,20 @@ async function render({ model, el }) {
         return resultSet;
     }
 
+    // Function to reset the graph zoom and selection highlights
     function resetGraph() {
         graphviz.resetZoom();
-        graphVizObject.highlight();
+        graphVizObject.highlight(); // Reset node selection on reset
         currentSelection = [];
     }
 
+    // Function to update the selected direction for highlighting
     function updateDirection(newDirection) {
         selectedDirection = newDirection;
         resetGraph();
     }
 
+    // Main function to render the graph from DOT source
     function render(dotSource) {
         var transition = d3.transition("graphTransition")
             .ease(d3.easeLinear)
@@ -98,17 +112,21 @@ async function render({ model, el }) {
             .zoom(true)
             .renderDot(dotSource)
             .on("end", function () {
-                $('#graph').data('graphviz.svg').setup();
+                // Calls the jquery.graphviz.svg setup directly
+                $('#graph').data('graphviz.svg').setup();  // Re-setup after rendering
             });
     }
 
+    // Document ready function
     $(document).ready(function () {
+        // Initialize the GraphVizSVG object from jquery.graphviz.svg.js
         $("#graph").graphviz({
             shrink: null,
             zoom: false,
             ready: function () {
                 graphVizObject = this;
 
+                // Event listener for node clicks to handle selection
                 graphVizObject.nodes().click(function (event) {
                     const nodeSet = $().add(this);
                     const selectionObject = {
@@ -116,6 +134,7 @@ async function render({ model, el }) {
                         direction: selectedDirection
                     };
 
+                    // If CMD, CTRL, or SHIFT is pressed, add to the selection
                     if (event.ctrlKey || event.metaKey || event.shiftKey) {
                         currentSelection.push(selectionObject);
                     } else {
@@ -124,7 +143,7 @@ async function render({ model, el }) {
 
                     highlightSelection();
                 });
-
+                // Event listener for pressing the escape key to cancel highlights
                 $(document).keydown(function (event) {
                     if (event.keyCode === 27) {
                         graphVizObject.highlight();
@@ -134,6 +153,7 @@ async function render({ model, el }) {
         });
     });
 
+    // Event listeners for `anywidget` events
     model.on("change:dot_source", () => {
         render(model.get("dot_source"));
     });
