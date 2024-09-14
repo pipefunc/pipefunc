@@ -3,6 +3,16 @@ import traitlets
 
 
 class PipeFuncGraphWidget(anywidget.AnyWidget):
+    """A widget for rendering a graphviz graph using d3-graphviz.
+
+    Example:
+    -------
+    >>> dot_string = "digraph { a -> b; b -> c; c -> a; }"
+    >>> pipe_func_graph_widget = PipeFuncGraphWidget(dotSource=dot_string)
+    >>> pipe_func_graph_widget
+
+    """
+
     _esm = """
     function loadScript(url) {
         return new Promise((resolve, reject) => {
@@ -24,24 +34,25 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
         await loadScript("https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js");
         await loadScript("https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js");
 
-        // jQuery, d3, and other dependencies should now be available globally
         const $ = window.jQuery;
         const d3 = window.d3;
 
         // Prepare the graph container
-        const container = document.createElement('div');
-        container.id = "graph";
-        container.style.textAlign = "center";
-        el.appendChild(container);
+        el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
+        const graphEl = $(el).find('#graph');
 
-        // Initialize Graphviz with extra functionalities
-        var graphvizInstance = d3.select("#graph").graphviz();
+        var graphviz = d3.select("#graph").graphviz();
 
-        var currentSelection = [];
-        var selectedDirection = "bidirectional";
+        var d3Config = {
+            transitionDelay: 0,
+            transitionDuration: 500
+        };
+
+        var selectedEngine = "dot";
         var graphVizObject;
+        var selectedDirection = "bidirectional";
+        var currentSelection = [];
 
-        // Function to highlight nodes
         function highlightSelection() {
             let highlightedNodes = $();
             currentSelection.forEach(selection => {
@@ -73,24 +84,27 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
                     }
                 }
             });
-
             return resultSet;
         }
 
         function resetGraph() {
-            graphvizInstance.resetZoom();
+            graphviz.resetZoom();
             graphVizObject.highlight();
             currentSelection = [];
         }
 
-        // Main function to render the graph from DOT source
-        function renderGraph(dotSource) {
+        function updateEngine(newEngine) {
+            selectedEngine = newEngine;
+        }
+
+        function render(dotSource) {
             var transition = d3.transition("graphTransition")
                 .ease(d3.easeLinear)
-                .delay(0)
-                .duration(500);
+                .delay(d3Config.transitionDelay)
+                .duration(d3Config.transitionDuration);
 
-            graphvizInstance
+            graphviz
+                .engine(selectedEngine)
                 .fade(true)
                 .transition(transition)
                 .tweenPaths(true)
@@ -109,17 +123,20 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
                 zoom: false,
                 ready: function () {
                     graphVizObject = this;
+
                     graphVizObject.nodes().click(function (event) {
                         const nodeSet = $().add(this);
                         const selectionObject = {
                             set: nodeSet,
                             direction: selectedDirection
                         };
+
                         if (event.ctrlKey || event.metaKey || event.shiftKey) {
                             currentSelection.push(selectionObject);
                         } else {
                             currentSelection = [selectionObject];
                         }
+
                         highlightSelection();
                     });
 
@@ -132,14 +149,12 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             });
         });
 
-        // Listen for changes to the dotSource and render it
         model.on("change:dotSource", () => {
             const dotSource = model.get("dotSource");
-            renderGraph(dotSource);
+            render(dotSource);
         });
 
-        // Initial render
-        renderGraph(model.get("dotSource"));
+        render(model.get("dotSource"));
     }
     export default { render };
     """
@@ -151,9 +166,3 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
     """
 
     dotSource = traitlets.Unicode("").tag(sync=True)
-
-
-# Example usage:
-dot_string = "digraph { a -> b; b -> c; c -> a; }"
-pipe_func_graph_widget = PipeFuncGraphWidget(dotSource=dot_string)
-pipe_func_graph_widget
