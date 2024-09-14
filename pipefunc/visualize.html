@@ -19,20 +19,11 @@
         }
     </style>
 
-    <script src="dist/jquery.min.js"></script>
-    <script src="dist/jquery.mousewheel.js"></script>
-    <script src="dist/jquery.color.min.js"></script>
-    <script src="graphvizSvg/jquery.graphviz.svg.js"></script>
-
-    <script src="dist/d3.min.js"></script>
-    <script src="dist/hpccjswasm.js"></script>
-    <script src="dist/d3-graphviz.min.js"></script>
-
-    <script type="module" src="dist/webviewuitoolkit.min.js"></script>
-    <script src="./save.js"></script>
-    <script src="./search.js"></script>
-    <script src="./highlighting.js"></script>
-    <link rel="stylesheet" href="dist/codicon.css" />
+    <script src="https://unpkg.com/jquery@3.6.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js"></script>
+    <script src="https://d3js.org/d3.v7.6.1.min.js"></script>
+    <script src="https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js"></script>
+    <script src="https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js"></script>
 </head>
 
 <body>
@@ -65,6 +56,54 @@
 
         // Array with the current Selections
         var currentSelection = [];
+
+        function highlight() {
+            let highlightedNodes = $();
+            for (const selection of currentSelection) {
+                const nodes = getAffectedNodes(selection.set, selection.direction);
+                highlightedNodes = highlightedNodes.add(nodes);
+            }
+
+            gv.highlight(highlightedNodes, true);
+            //gv.bringToFront(highlightedNodes);
+        }
+
+        // start from highlighting.js
+        function getAffectedNodes($set, $mode = "bidirectional") {
+            $result = $().add($set);
+            if ($mode === "bidirectional" || $mode === "downstream") {
+                $set.each((i, el) => {
+                    if (el.className.baseVal === "edge") {
+                        const edge = $(el).data("name");
+                        const nodes = gv.nodesByName();
+                        const downStreamNode = edge.split("->")[1];
+                        if (downStreamNode) {
+                            $result.push(nodes[downStreamNode]);
+                            $result = $result.add(gv.linkedFrom(nodes[downStreamNode], true));
+                        }
+                    } else {
+                        $result = $result.add(gv.linkedFrom(el, true));
+                    }
+                });
+            }
+            if ($mode === "bidirectional" || $mode === "upstream") {
+                $set.each((i, el) => {
+                    if (el.className.baseVal === "edge") {
+                        const edge = $(el).data("name");
+                        const nodes = gv.nodesByName();
+                        const upStreamNode = edge.split("->")[0];
+                        if (upStreamNode) {
+                            $result.push(nodes[upStreamNode]);
+                            $result = $result.add(gv.linkedTo(nodes[upStreamNode], true));
+                        }
+                    } else {
+                        $result = $result.add(gv.linkedTo(el, true));
+                    }
+                });
+            }
+            return $result;
+        }
+        // end from highlighting.js
 
         function reset() {
             graphviz.resetZoom();
