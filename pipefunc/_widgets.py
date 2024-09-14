@@ -8,7 +8,7 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
     Example:
     -------
     >>> dot_string = "digraph { a -> b; b -> c; c -> a; }"
-    >>> pipe_func_graph_widget = PipeFuncGraphWidget(dotSource=dot_string)
+    >>> pipe_func_graph_widget = PipeFuncGraphWidget(dot_source=dot_string)
     >>> pipe_func_graph_widget
 
     """
@@ -149,12 +149,12 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             });
         });
 
-        model.on("change:dotSource", () => {
-            const dotSource = model.get("dotSource");
-            render(dotSource);
+        model.on("change:dot_source", () => {
+            const dot_source = model.get("dot_source");
+            render(dot_source);
         });
 
-        render(model.get("dotSource"));
+        render(model.get("dot_source"));
     }
     export default { render };
     """
@@ -165,4 +165,4 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
     }
     """
 
-    dotSource = traitlets.Unicode("").tag(sync=True)
+    dot_source = traitlets.Unicode("").tag(sync=True)
