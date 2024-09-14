@@ -25,6 +25,7 @@ dependencies:
   - holoviews
   - bokeh
   - python-graphviz
+  - anywidget
   # optional-dependencies: test
   - pytest
   - coverage
