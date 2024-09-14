@@ -1,4 +1,5 @@
 import anywidget
+import ipywidgets as widgets
 import traitlets
 
 
@@ -48,7 +49,7 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             transitionDuration: 500
         };
 
-        var selectedEngine = "dot";
+        var selectedEngine = model.get("selected_engine") || "dot";
         var graphVizObject;
         var selectedDirection = "bidirectional";
         var currentSelection = [];
@@ -95,6 +96,7 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
 
         function updateEngine(newEngine) {
             selectedEngine = newEngine;
+            render(model.get("dot_source"));
         }
 
         function render(dotSource) {
@@ -150,8 +152,17 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
         });
 
         model.on("change:dot_source", () => {
-            const dot_source = model.get("dot_source");
-            render(dot_source);
+            render(model.get("dot_source"));
+        });
+
+        model.on("change:selected_engine", () => {
+            updateEngine(model.get("selected_engine"));
+        });
+
+        model.on("msg:custom", (msg) => {
+            if (msg.action === "reset_zoom") {
+                resetGraph();
+            }
         });
 
         render(model.get("dot_source"));
@@ -166,3 +177,27 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
     """
 
     dot_source = traitlets.Unicode("").tag(sync=True)
+    selected_engine = traitlets.Unicode("dot").tag(sync=True)
+
+
+def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }"):
+    pipe_func_graph_widget = PipeFuncGraphWidget(dot_source=dot_string)
+    reset_button = widgets.Button(description="Reset Zoom")
+    engine_selector = widgets.Dropdown(
+        options=["dot", "circo", "fdp", "neato", "osage", "patchwork", "twopi"],
+        value="dot",
+        description="Engine:",
+    )
+
+    # Define button actions
+    def reset_graph(*args):
+        pipe_func_graph_widget.send({"action": "reset_zoom"})
+
+    def update_engine(change):
+        pipe_func_graph_widget.selected_engine = change.new
+
+    reset_button.on_click(reset_graph)
+    engine_selector.observe(update_engine, names="value")
+
+    # Display widgets
+    return widgets.VBox([reset_button, engine_selector, pipe_func_graph_widget])
