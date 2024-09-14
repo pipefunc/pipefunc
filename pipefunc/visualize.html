@@ -45,12 +45,9 @@
                 const nodes = getAffectedNodes(selection.set, selection.direction);
                 highlightedNodes = highlightedNodes.add(nodes);
             }
-
             gv.highlight(highlightedNodes, true);
-            //gv.bringToFront(highlightedNodes);
         }
 
-        // start from highlighting.js
         function getAffectedNodes($set, $mode = "bidirectional") {
             $result = $().add($set);
             if ($mode === "bidirectional" || $mode === "downstream") {
@@ -85,7 +82,6 @@
             }
             return $result;
         }
-        // end from highlighting.js
 
         function reset() {
             graphviz.resetZoom();
@@ -161,8 +157,6 @@
                 }
             });
         });
-
-        var TRange = null;
 
         if (typeof render === 'function') {
             render(`
@@ -361,8 +355,7 @@ digraph {
 	"_Resources(name='resources', output_name='e')" -> "h(...) → e"	[color="#FFA500",
 		pos="e,497.25,65.744 427.26,30.269 438.14,34.529 450.09,39.603 460.7,45 469.51,49.482 478.57,54.555 487.4,59.789"];
 }
-
-                    `);
+`);
         } else {
             console.error('render function is not defined');
         }
