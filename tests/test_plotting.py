@@ -122,4 +122,4 @@ def test_visualize_graphviz(backend, tmp_path: Path) -> None:
     pipeline = Pipeline([f, g, h, i])
     pipeline.visualize(backend=backend)
     if backend == "graphviz":
-        pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg")
+        pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg", figsize=10)
