@@ -1,3 +1,5 @@
+from typing import Any
+
 import anywidget
 import ipywidgets as widgets
 import traitlets
@@ -49,9 +51,9 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             transitionDuration: 500
         };
 
-        var selectedEngine = model.get("selected_engine") || "dot";
+        var selectedEngine = "dot"; // Hardcoded to "dot"
         var graphVizObject;
-        var selectedDirection = "bidirectional";
+        var selectedDirection = model.get("selected_direction") || "bidirectional";
         var currentSelection = [];
 
         function highlightSelection() {
@@ -94,9 +96,9 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             currentSelection = [];
         }
 
-        function updateEngine(newEngine) {
-            selectedEngine = newEngine;
-            render(model.get("dot_source"));
+        function updateDirection(newDirection) {
+            selectedDirection = newDirection;
+            resetGraph();
         }
 
         function render(dotSource) {
@@ -155,8 +157,8 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
             render(model.get("dot_source"));
         });
 
-        model.on("change:selected_engine", () => {
-            updateEngine(model.get("selected_engine"));
+        model.on("change:selected_direction", () => {
+            updateDirection(model.get("selected_direction"));
         });
 
         model.on("msg:custom", (msg) => {
@@ -177,27 +179,27 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
     """
 
     dot_source = traitlets.Unicode("").tag(sync=True)
-    selected_engine = traitlets.Unicode("dot").tag(sync=True)
+    selected_direction = traitlets.Unicode("bidirectional").tag(sync=True)
 
 
-def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }"):
+def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> widgets.VBox:
     pipe_func_graph_widget = PipeFuncGraphWidget(dot_source=dot_string)
     reset_button = widgets.Button(description="Reset Zoom")
-    engine_selector = widgets.Dropdown(
-        options=["dot", "circo", "fdp", "neato", "osage", "patchwork", "twopi"],
-        value="dot",
-        description="Engine:",
+    direction_selector = widgets.Dropdown(
+        options=["bidirectional", "downstream", "upstream", "single"],
+        value="bidirectional",
+        description="Direction:",
     )
 
     # Define button actions
-    def reset_graph(*args):
+    def reset_graph(_: Any) -> None:
         pipe_func_graph_widget.send({"action": "reset_zoom"})
 
-    def update_engine(change):
-        pipe_func_graph_widget.selected_engine = change.new
+    def update_direction(change: dict) -> None:
+        pipe_func_graph_widget.selected_direction = change["new"]
 
     reset_button.on_click(reset_graph)
-    engine_selector.observe(update_engine, names="value")
+    direction_selector.observe(update_direction, names="value")
 
     # Display widgets
-    return widgets.VBox([reset_button, engine_selector, pipe_func_graph_widget])
+    return widgets.VBox([reset_button, direction_selector, pipe_func_graph_widget])
