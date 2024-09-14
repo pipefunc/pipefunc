@@ -1,11 +1,13 @@
-from IPython.display import display, HTML
 from string import Template
 
-def render_graphviz(dot_content, selected_engine='dot', vs_code_message=None):
+from IPython.display import HTML, display
+
+
+def render_graphviz(dot_content, selected_engine="dot", vs_code_message=None):
     if vs_code_message is None:
         vs_code_message = {}
 
-    html_template = Template('''
+    html_template = Template("""
     <!DOCTYPE html>
     <meta charset="utf-8">
     <body>
@@ -68,14 +70,15 @@ def render_graphviz(dot_content, selected_engine='dot', vs_code_message=None):
     }
     </script>
     </body>
-    ''')
+    """)
 
     html_content = html_template.substitute(
         dot_content=dot_content,
         selected_engine=selected_engine,
-        vs_code_message=str(vs_code_message)
+        vs_code_message=str(vs_code_message),
     )
     display(HTML(html_content))
 
+
 # Example usage:
-render_graphviz('digraph {a -> b}')
+render_graphviz("digraph {a -> b}")
