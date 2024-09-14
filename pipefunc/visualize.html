@@ -4,10 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Graph</title>
-
     <script src="https://unpkg.com/jquery@3.6.1/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js"></script>
+    <script src="https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js"></script>
+    <script src="https://unpkg.com/d3@7.6.1/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js"></script>
-    <script src="https://d3js.org/d3.v7.6.1.min.js"></script>
     <script src="https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js"></script>
     <script src="https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js"></script>
 </head>
@@ -15,12 +16,14 @@
 <body>
     <div id="graph" style="text-align: center;"></div>
     <script>
-        const currentHighlight = $();
         /** graphviz globals **/
         // creates a d3-graphviz renderer instance, not to be confused with jquery.graphviz.svg
         var graphviz = d3.select("#graph").graphviz();
-        // object for saving configuration from the extension
-        var viewConfig;
+        // d3 transition object
+        var config = {
+            transitionDelay: 0,
+            transitionaDuration: 500
+        };
 
         // currently selected graphviz render engine
         var selectedEngine = "dot";
@@ -30,14 +33,7 @@
 
         // SearchObject which holds the current Search Settings
         const searchObject = {
-            type: "included",
-            case: "insensitive",
             direction: "bidirectional",
-            nodeName: true,
-            nodeLabel: true,
-            edgeLabel: true,
-            clusterName: true,
-            clusterLabel: true,
         }
 
         // Array with the current Selections
@@ -97,10 +93,6 @@
             currentSelection = [];
         }
 
-        function changeDirection(newDirection) {
-            searchObject.direction = newDirection;
-        }
-
         function changeEngine(newEngine) {
             selectedEngine = newEngine;
         }
@@ -109,8 +101,8 @@
         function render(dotSrc) {
             transition = d3.transition("startTransition")
                 .ease(d3.easeLinear)
-                .delay(viewConfig.transitionDelay)
-                .duration(viewConfig.transitionaDuration);
+                .delay(config.transitionDelay)
+                .duration(config.transitionaDuration);
 
             graphviz
                 .engine(selectedEngine)
@@ -172,8 +164,211 @@
 
         var TRange = null;
 
+        if (typeof render === 'function') {
+            render(`
+digraph {
+	graph [bb="0,0,783.73,403",
+		rankdir=LR
+	];
+	node [label="\N",
+		shape=rectangle
+	];
+	subgraph cluster_legend {
+		graph [bb="8,312,775.73,395",
+			color=black,
+			fillcolor=lightgrey,
+			fontcolor=black,
+			fontsize=20,
+			label=Legend,
+			lheight=0.31,
+			lp="391.86,379.75",
+			lwidth=0.82,
+			rankdir=LR,
+			style=filled
+		];
+		legend_0	[color=black,
+			fillcolor="#90EE90",
+			fontname=Helvetica,
+			height=0.5,
+			label=Argument,
+			penwidth=1,
+			pos="53.625,338",
+			style="filled,dashed",
+			width=1.0451];
+		legend_1	[color=black,
+			fillcolor="#87CEEB",
+			fontname=Helvetica,
+			height=0.5,
+			label=PipeFunc,
+			penwidth=1,
+			pos="207.23,338",
+			shape=box,
+			style="rounded,filled",
+			width=1.0139];
+		legend_0 -> legend_1	[pos="e,170.31,338 91.711,338 112,338 137.34,338 159.02,338",
+			style=invis];
+		legend_2	[color="#FF0000",
+			fillcolor="#87CEEB",
+			fontname=Helvetica,
+			height=0.5,
+			label=NestedPipeFunction,
+			penwidth=1,
+			pos="391.95,338",
+			shape=box,
+			style="rounded,filled",
+			width=1.9097];
+		legend_1 -> legend_2	[pos="e,322.82,338 243.89,338 263.17,338 287.8,338 311.37,338",
+			style=invis];
+		legend_3	[color=black,
+			fillcolor="#FF0000",
+			fontname=Helvetica,
+			height=0.5,
+			label=Bound,
+			penwidth=1,
+			pos="553.8,338",
+			shape=hexagon,
+			style=filled,
+			width=1.1466];
+		legend_2 -> legend_3	[pos="e,511.78,338 460.74,338 474.03,338 487.78,338 500.47,338",
+			style=invis];
+		legend_4	[color=black,
+			fillcolor="#FFA500",
+			fontname=Helvetica,
+			height=0.5,
+			label=Resources,
+			penwidth=1,
+			pos="707.31,338",
+			shape=hexagon,
+			style=filled,
+			width=1.6782];
+		legend_3 -> legend_4	[pos="e,645.93,338 595.8,338 607.85,338 621.4,338 634.77,338",
+			style=invis];
+	}
+	a	[color=black,
+		fillcolor="#90EE90",
+		fontname=Helvetica,
+		height=0.5,
+		label=<<b>a</b> : <i>int</i>>,
+		margin=0.05,
+		penwidth=1,
+		pos="53.625,225",
+		style="filled,dashed",
+		width=0.75];
+	"f(...) → c"	[color=black,
+		fillcolor="#87CEEB",
+		fontname=Helvetica,
+		height=1.0236,
+		label=<<TABLE BORDER="0"><TR><TD><B>f(...)</B></TD></TR><HR/><TR><TD><b>c</b> : <i>int</i></TD></TR><HR/><TR><TD><FONT FACE="Courier New">... -&gt; c[i]</FONT></TD></TR></TABLE>>,
+		margin=0.05,
+		penwidth=1,
+		pos="207.23,196",
+		shape=box,
+		style="rounded,filled",
+		width=1.4715];
+	a -> "f(...) → c"	[color="#90EE90",
+		pos="e,153.76,206.04 81.032,219.95 98.08,216.69 121.03,212.3 142.63,208.17"];
+	"NestedPipeFunc_i2(...) → i2"	[color="#FF0000",
+		fillcolor="#87CEEB",
+		fontname=Helvetica,
+		height=0.71111,
+		label=<<TABLE BORDER="0"><TR><TD><B>NestedPipeFunc_i2(...)</B></TD></TR><HR/><TR><TD><b>i2</b> : <i>dict</i></TD></TR></TABLE>>,
+		margin=0.05,
+		penwidth=1,
+		pos="207.23,276",
+		shape=box,
+		style="rounded,filled",
+		width=2.2215];
+	a -> "NestedPipeFunc_i2(...) → i2"	[color="#90EE90",
+		pos="e,128.66,249.91 81.032,233.88 91.608,237.44 104.46,241.76 117.84,246.27"];
+	b	[color=black,
+		fillcolor="#90EE90",
+		fontname=Helvetica,
+		height=0.5,
+		label=<<b>b</b> : <i>int</i>>,
+		margin=0.05,
+		penwidth=1,
+		pos="53.625,166",
+		style="filled,dashed",
+		width=0.75];
+	b -> "f(...) → c"	[color="#90EE90",
+		pos="e,153.76,185.62 81.032,171.23 98.08,174.6 121.03,179.14 142.63,183.42"];
+	"g(...) → d"	[color=black,
+		fillcolor="#87CEEB",
+		fontname=Helvetica,
+		height=0.71111,
+		label=<<TABLE BORDER="0"><TR><TD><B>g(...)</B></TD></TR><HR/><TR><TD><b>d</b> : <i>int</i></TD></TR></TABLE>>,
+		margin=0.05,
+		penwidth=1,
+		pos="391.95,134",
+		shape=box,
+		style="rounded,filled",
+		width=0.75];
+	b -> "g(...) → d"	[color="#90EE90",
+		pos="e,364.62,134.24 81.005,159.15 94.707,155.85 111.78,152.16 127.25,150 207.15,138.84 301.75,135.46 353.12,134.44"];
+	x	[color=black,
+		fillcolor="#90EE90",
+		fontname=Helvetica,
+		height=0.5,
+		label=<<b>x</b> : <i>int</i>  = 1>,
+		margin=0.05,
+		penwidth=1,
+		pos="207.23,85",
+		style="filled,dashed",
+		width=0.93333];
+	x -> "g(...) → d"	[color="#90EE90",
+		pos="e,364.62,126.94 241.32,93.874 272.96,102.36 320.62,115.14 353.61,123.99"];
+	"f(...) → c" -> "g(...) → d"	[color="#87CEEB",
+		pos="e,364.7,142.91 260.59,178.23 290.39,168.12 327.01,155.69 353.85,146.59"];
+	"h(...) → e"	[color=black,
+		fillcolor="#87CEEB",
+		fontname=Helvetica,
+		height=1.0236,
+		label=<<TABLE BORDER="0"><TR><TD><B>h(...)</B></TD></TR><HR/><TR><TD><b>e</b> : <i>int</i></TD></TR><HR/><TR><TD><FONT FACE="Courier New">c[i] -&gt; e[i]</FONT></TD></TR></TABLE>>,
+		margin=0.05,
+		penwidth=1,
+		pos="553.8,103",
+		shape=box,
+		style="rounded,filled",
+		width=1.5861];
+	"f(...) → c" -> "h(...) → e"	[color="#0000FF",
+		pos="e,510.52,140.24 260.31,198.05 312.65,198.39 394.79,194.12 460.7,169 474.76,163.64 488.64,155.59 501.2,146.94"];
+	"g(...) → d" -> "h(...) → e"	[color="#87CEEB",
+		pos="e,496.51,113.92 419.35,128.88 437.33,125.39 462.01,120.61 485.25,116.1"];
+	"_Bound(name='x', output_name='e')"	[color=black,
+		fillcolor="#FF0000",
+		fontname=Helvetica,
+		height=0.5,
+		label=<<b>x</b>>,
+		margin=0.05,
+		penwidth=1,
+		pos="391.95,72",
+		shape=hexagon,
+		style=filled,
+		width=0.75];
+	"_Bound(name='x', output_name='e')" -> "h(...) → e"	[color="#FF0000",
+		pos="e,496.38,92.059 416.19,76.508 434.37,80.032 460.59,85.118 485.21,89.893"];
+	"_Resources(name='resources', output_name='e')"	[color=black,
+		fillcolor="#FFA500",
+		fontname=Helvetica,
+		height=0.5,
+		label=<<b>resources</b>>,
+		margin=0.05,
+		penwidth=1,
+		pos="391.95,18",
+		shape=hexagon,
+		style=filled,
+		width=1.4607];
+	"_Resources(name='resources', output_name='e')" -> "h(...) → e"	[color="#FFA500",
+		pos="e,497.25,65.744 427.26,30.269 438.14,34.529 450.09,39.603 460.7,45 469.51,49.482 478.57,54.555 487.4,59.789"];
+}
 
+                    `);
+        } else {
+            console.error('render function is not defined');
+        }
     </script>
+
+
 </body>
 
 </html>
