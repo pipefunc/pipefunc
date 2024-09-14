@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Graph</title>
+    <title>PipeFunc Graph</title>
     <script src="https://unpkg.com/jquery@3.6.1/dist/jquery.min.js"></script>
     <script src="https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js"></script>
     <script src="https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js"></script>
@@ -16,148 +16,145 @@
 <body>
     <div id="graph" style="text-align: center;"></div>
     <script>
-        /** graphviz globals **/
-        // creates a d3-graphviz renderer instance, not to be confused with jquery.graphviz.svg
+        // Initialize a d3-graphviz renderer instance
         var graphviz = d3.select("#graph").graphviz();
-        // d3 transition object
+
+        // Configuration for transitions in rendering the graph
         var config = {
             transitionDelay: 0,
-            transitionaDuration: 500
+            transitionDuration: 500
         };
 
-        // currently selected graphviz render engine
+        // Variable for storing the selected graph rendering engine
         var selectedEngine = "dot";
 
-        // Object for saving the current GraphVizSVG Object
-        var gv;
+        // Object for saving the current GraphVizSVG
+        var graphVizObject;
 
-        // SearchObject which holds the current Search Settings
-        const searchObject = {
-            direction: "bidirectional",
-        }
+        // Variable for storing the selected direction for highlighting
+        var selectedDirection = "bidirectional";
 
-        // Array with the current Selections
+        // Array holding the current selections
         var currentSelection = [];
 
-        function highlight() {
+        // Function to highlight selected nodes and their connected nodes
+        function highlightSelection() {
             let highlightedNodes = $();
-            for (const selection of currentSelection) {
-                const nodes = getAffectedNodes(selection.set, selection.direction);
+            currentSelection.forEach(selection => {
+                const nodes = getConnectedNodes(selection.set, selection.direction);
                 highlightedNodes = highlightedNodes.add(nodes);
-            }
-            gv.highlight(highlightedNodes, true);
+            });
+            graphVizObject.highlight(highlightedNodes, true);
         }
 
-        function getAffectedNodes($set, $mode = "bidirectional") {
-            $result = $().add($set);
-            if ($mode === "bidirectional" || $mode === "downstream") {
-                $set.each((i, el) => {
+        // Function to retrieve nodes connected in the specified direction
+        function getConnectedNodes(nodeSet, mode = "bidirectional") {
+            let resultSet = $().add(nodeSet);
+            if (mode === "bidirectional" || mode === "downstream") {
+                nodeSet.each((i, el) => {
                     if (el.className.baseVal === "edge") {
                         const edge = $(el).data("name");
-                        const nodes = gv.nodesByName();
-                        const downStreamNode = edge.split("->")[1];
-                        if (downStreamNode) {
-                            $result.push(nodes[downStreamNode]);
-                            $result = $result.add(gv.linkedFrom(nodes[downStreamNode], true));
+                        const nodes = graphVizObject.nodesByName();
+                        const downstreamNode = edge.split("->")[1];
+                        if (downstreamNode) {
+                            resultSet = resultSet.add(nodes[downstreamNode]);
+                            resultSet = resultSet.add(graphVizObject.linkedFrom(nodes[downstreamNode], true));
                         }
                     } else {
-                        $result = $result.add(gv.linkedFrom(el, true));
+                        resultSet = resultSet.add(graphVizObject.linkedFrom(el, true));
                     }
                 });
             }
-            if ($mode === "bidirectional" || $mode === "upstream") {
-                $set.each((i, el) => {
+            if (mode === "bidirectional" || mode === "upstream") {
+                nodeSet.each((i, el) => {
                     if (el.className.baseVal === "edge") {
                         const edge = $(el).data("name");
-                        const nodes = gv.nodesByName();
-                        const upStreamNode = edge.split("->")[0];
-                        if (upStreamNode) {
-                            $result.push(nodes[upStreamNode]);
-                            $result = $result.add(gv.linkedTo(nodes[upStreamNode], true));
+                        const nodes = graphVizObject.nodesByName();
+                        const upstreamNode = edge.split("->")[0];
+                        if (upstreamNode) {
+                            resultSet = resultSet.add(nodes[upstreamNode]);
+                            resultSet = resultSet.add(graphVizObject.linkedTo(nodes[upstreamNode], true));
                         }
                     } else {
-                        $result = $result.add(gv.linkedTo(el, true));
+                        resultSet = resultSet.add(graphVizObject.linkedTo(el, true));
                     }
                 });
             }
-            return $result;
+            return resultSet;
         }
 
-        function reset() {
+        // Function to reset the graph zoom and selection highlights
+        function resetGraph() {
             graphviz.resetZoom();
-            gv.highlight(); // reset node selection on reset
+            graphVizObject.highlight(); // Reset node selection on reset
             currentSelection = [];
         }
 
-        function changeEngine(newEngine) {
+        // Function to update the graph rendering engine
+        function updateEngine(newEngine) {
             selectedEngine = newEngine;
         }
 
-        /** main render funcs **/
-        function render(dotSrc) {
-            transition = d3.transition("startTransition")
+        // Main function to render the graph from DOT source
+        function render(dotSource) {
+            var transition = d3.transition("graphTransition")
                 .ease(d3.easeLinear)
                 .delay(config.transitionDelay)
-                .duration(config.transitionaDuration);
+                .duration(config.transitionDuration);  // Using corrected variable name
 
             graphviz
                 .engine(selectedEngine)
                 .fade(true)
                 .transition(transition)
-                .tweenPaths(true) // default
-                .tweenShapes(true) // default
+                .tweenPaths(true)
+                .tweenShapes(true)
                 .zoomScaleExtent([0, Infinity])
                 .zoom(true)
-                .renderDot(dotSrc)
+                .renderDot(dotSource)
                 .on("end", function () {
-                    // this calls the jquery.graphviz.svg setup() directly,
-                    // it is normaly called internaly on object init
-                    // we need to call it manualy, bcs. the svg was regenerated by d3-graphviz
-                    $('#graph').data('graphviz.svg').setup()  //resetup
+                    // Calls the jquery.graphviz.svg setup directly
+                    $('#graph').data('graphviz.svg').setup(); // Re-setup after rendering
                 });
         }
 
+        // Document ready function
         $(document).ready(function () {
-            // this inits the graphviz object from jquery.grapviz.svg.js
+            // Initialize the GraphVizSVG object from jquery.graphviz.svg.js
             $("#graph").graphviz({
-                // see jquery.graphviz.svg.js -> GraphvizSvg.DEFAULTS
-                // and https://github.com/mountainstorm/jquery.graphviz.svg
-                // to see what can be passed in this init-object
                 shrink: null,
                 zoom: false,
                 ready: function () {
-                    gv = this
+                    graphVizObject = this;
 
-                    gv.nodes().click(function (event) {
-                        const set = $();
-                        set.push(this);
-
-                        var obj = {
-                            set: set,
-                            direction: searchObject.direction
+                    // Event listener for node clicks to handle selection
+                    graphVizObject.nodes().click(function (event) {
+                        const nodeSet = $().add(this);
+                        const selectionObject = {
+                            set: nodeSet,
+                            direction: selectedDirection
                         };
 
-                        // If CMD or CTRL is pressed, then add this to the selection
+                        // If CMD, CTRL, or SHIFT is pressed, add to the selection
                         if (event.ctrlKey || event.metaKey || event.shiftKey) {
-                            currentSelection.push(obj);
+                            currentSelection.push(selectionObject);
                         } else {
-                            currentSelection = [obj];
+                            currentSelection = [selectionObject];
                         }
 
-                        highlight();
-                    })
+                        highlightSelection();
+                    });
 
-                    $(document).keydown(function (evt) {
-                        // press escape to cancel highlight
-                        if (evt.keyCode == 27) {
-                            gv.highlight()
+                    // Event listener for pressing the escape key to cancel highlights
+                    $(document).keydown(function (event) {
+                        if (event.keyCode === 27) {
+                            graphVizObject.highlight();
                         }
-                    })
-
+                    });
                 }
             });
         });
 
+        // Check if render function is defined and invoke it if true
         if (typeof render === 'function') {
             render(`
 digraph {
@@ -355,13 +352,11 @@ digraph {
 	"_Resources(name='resources', output_name='e')" -> "h(...) → e"	[color="#FFA500",
 		pos="e,497.25,65.744 427.26,30.269 438.14,34.529 450.09,39.603 460.7,45 469.51,49.482 478.57,54.555 487.4,59.789"];
 }
-`);
+            `);
         } else {
-            console.error('render function is not defined');
+            console.error('The render function is not defined.');
         }
     </script>
-
-
 </body>
 
 </html>
