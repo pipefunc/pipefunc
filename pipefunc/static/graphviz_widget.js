@@ -25,7 +25,6 @@ async function render({ model, el }) {
 
     // Prepare the graph container
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
-    const graphEl = $(el).find("#graph");
 
     // Initialize a d3-graphviz renderer instance
     var graphviz = d3.select("#graph").graphviz();
@@ -68,7 +67,7 @@ async function render({ model, el }) {
     });
 
     // Main search function to find nodes and edges
-    function search(text, mode = "highlight", options = {}) {
+    function search(text, options = {}) {
         const opt = {
             type: options.type || "included",
             case: options.case || "insensitive",
@@ -76,14 +75,6 @@ async function render({ model, el }) {
             nodeLabel: options.nodeLabel !== false,
             edgeLabel: options.edgeLabel !== false,
         };
-
-        if (mode === "search") {
-            if (Object.keys(options).length > 0) {
-                sendMessage("Options are not available in mode 'search'!");
-            }
-            findString(text);
-            return;
-        }
 
         let searchFunction;
         if (opt.type === "exact") {
@@ -101,28 +92,17 @@ async function render({ model, el }) {
             };
         }
 
-        if (mode === "highlight") {
-            let $edges = $();
-            if (opt.edgeLabel) {
-                $edges = findEdges(text, searchFunction);
-            }
-
-            let $nodes = $();
-            if (opt.nodeLabel || opt.nodeName) {
-                $nodes = findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel);
-            }
-
-            if (!opt.edgeLabel && !opt.nodeLabel && !opt.nodeName) {
-                sendMessage("No search option chosen!");
-            }
-
-            return {
-                nodes: $nodes,
-                edges: $edges,
-            };
+        let $edges = $();
+        if (opt.edgeLabel) {
+            $edges = findEdges(text, searchFunction);
         }
 
-        sendMessage("Invalid search Mode!");
+        let $nodes = $();
+        if (opt.nodeLabel || opt.nodeName) {
+            $nodes = findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel);
+        }
+
+        return { nodes: $nodes, edges: $edges };
     }
 
     // Function to find edges matching the search criteria
@@ -137,7 +117,7 @@ async function render({ model, el }) {
     }
 
     // Function to find nodes matching the search criteria
-    function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
+        function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
         const $set = $();
         const nodes = GraphvizSvg.nodesByName();
 
@@ -266,7 +246,7 @@ async function render({ model, el }) {
 
     // Function to search nodes and edges and highlight results
     function searchAndHighlight(query) {
-        const searchResults = search(query, "highlight", searchObject);
+        const searchResults = search(query, searchObject);
         GraphvizSvg.highlight(searchResults.nodes, searchResults.edges);
     }
 
