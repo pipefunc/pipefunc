@@ -46,6 +46,70 @@ async function render({ model, el }) {
     // Array holding the current selections
     var currentSelection = [];
 
+    // Search-related variables
+    const searchObject = {
+        type: "included",
+        case: "insensitive",
+        nodeName: true,
+        nodeLabel: true,
+        edgeLabel: true,
+    };
+
+    // Main search function to find nodes and edges
+    function search(text, mode = "highlight", options = {}) {
+        const opt = {
+            type: options.type || "included",
+            case: options.case || "insensitive",
+            nodeName: options.nodeName !== false,
+            nodeLabel: options.nodeLabel !== false,
+            edgeLabel: options.edgeLabel !== false,
+        };
+
+        let searchFunction;
+        if (opt.type === "included") {
+            searchFunction = (search, str) => {
+                const searchStr = opt.case === "insensitive" ? search.toLowerCase() : search;
+                const valStr = opt.case === "insensitive" ? str.toLowerCase() : str;
+                return valStr.indexOf(searchStr) !== -1;
+            };
+        } else if (opt.type === "regex") {
+            searchFunction = (search, str) => {
+                const regex = new RegExp(search, opt.case === "insensitive" ? "i" : undefined);
+                return regex.test(str);
+            };
+        }
+
+        const $nodes = opt.nodeLabel || opt.nodeName ? findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel) : $();
+        const $edges = opt.edgeLabel ? findEdges(text, searchFunction) : $();
+
+        return { nodes: $nodes, edges: $edges };
+    }
+
+    // Function to find edges matching the search criteria
+    function findEdges(text, searchFunction) {
+        const $set = $();
+        graphVizObject.edges().each((index, edge) => {
+            if (edge.textContent && searchFunction(text, edge.textContent)) {
+                $set.push(edge);
+            }
+        });
+        return $set;
+    }
+
+    // Function to find nodes matching the search criteria
+    function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
+        const $set = $();
+        const nodes = graphVizObject.nodesByName();
+
+        for (const [nodeID, node] of Object.entries(nodes)) {
+            if ((nodeName && searchFunction(text, nodeID)) ||
+                (nodeLabel && node.textContent && searchFunction(text, node.textContent))) {
+                $set.push(node);
+            }
+        }
+        return $set;
+    }
+
     // Function to highlight selected nodes and their connected nodes
     function highlightSelection() {
         let highlightedNodes = $();
@@ -153,6 +217,12 @@ async function render({ model, el }) {
         });
     });
 
+    // Function to search nodes and edges and highlight results
+    function searchAndHighlight(query) {
+        const searchResults = search(query, "highlight", searchObject);
+        graphVizObject.highlight(searchResults.nodes, searchResults.edges);
+    }
+
     // Event listeners for `anywidget` events
     model.on("change:dot_source", () => {
         render(model.get("dot_source"));
@@ -165,6 +235,8 @@ async function render({ model, el }) {
     model.on("msg:custom", (msg) => {
         if (msg.action === "reset_zoom") {
             resetGraph();
+        } else if (msg.action === "search") {
+            searchAndHighlight(msg.query);
         }
     });
 

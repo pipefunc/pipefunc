@@ -37,6 +37,12 @@ def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> wid
         value="bidirectional",
         description="Direction:",
     )
+    search_input = widgets.Text(
+        value="",
+        placeholder="Search...",
+        description="Search:",
+        disabled=False,
+    )
 
     # Define button actions
     def reset_graph(_: Any) -> None:
@@ -45,13 +51,17 @@ def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> wid
     def update_direction(change: dict) -> None:
         pipe_func_graph_widget.selected_direction = change["new"]
 
+    def perform_search(change: dict) -> None:
+        pipe_func_graph_widget.send({"action": "search", "query": change["new"]})
+
     reset_button.on_click(reset_graph)
     direction_selector.observe(update_direction, names="value")
+    search_input.observe(perform_search, names="value")
 
     # Display widgets
     return widgets.VBox(
         [
-            widgets.HBox([reset_button, direction_selector]),
+            widgets.HBox([reset_button, direction_selector, search_input]),
             pipe_func_graph_widget,
         ],
     )
