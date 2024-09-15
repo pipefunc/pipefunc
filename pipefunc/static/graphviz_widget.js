@@ -14,7 +14,9 @@ async function render({ model, el }) {
     await loadScript("https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js");
     await loadScript("https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js");
     await loadScript("https://unpkg.com/d3@7.6.1/dist/d3.min.js");
-    await loadScript("https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js");
+    await loadScript(
+        "https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js"
+    );
     await loadScript("https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js");
     await loadScript("https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js");
 
@@ -23,7 +25,7 @@ async function render({ model, el }) {
 
     // Prepare the graph container
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
-    const graphEl = $(el).find('#graph');
+    const graphEl = $(el).find("#graph");
 
     // Initialize a d3-graphviz renderer instance
     var graphviz = d3.select("#graph").graphviz();
@@ -31,14 +33,14 @@ async function render({ model, el }) {
     // Configuration for transitions in rendering the graph
     var d3Config = {
         transitionDelay: 0,
-        transitionDuration: 500
+        transitionDuration: 500,
     };
 
     // Variable for storing the selected graph rendering engine
     var selectedEngine = "dot";
 
     // Object for saving the current GraphVizSVG
-    var graphVizObject;
+    var GraphvizSvg;
 
     // Variable for storing the selected direction for highlighting
     var selectedDirection = model.get("selected_direction") || "bidirectional";
@@ -48,12 +50,22 @@ async function render({ model, el }) {
 
     // Search-related variables
     const searchObject = {
-        type: "included",
-        case: "insensitive",
+        type: model.get("search_type") || "included",
+        case: model.get("case_sensitive") ? "sensitive" : "insensitive",
         nodeName: true,
         nodeLabel: true,
         edgeLabel: true,
     };
+
+    // Listener for changes in search type
+    model.on("change:search_type", () => {
+        searchObject.type = model.get("search_type");
+    });
+
+    // Listener for changes in case sensitivity
+    model.on("change:case_sensitive", () => {
+        searchObject.case = model.get("case_sensitive") ? "sensitive" : "insensitive";
+    });
 
     // Main search function to find nodes and edges
     function search(text, mode = "highlight", options = {}) {
@@ -65,8 +77,18 @@ async function render({ model, el }) {
             edgeLabel: options.edgeLabel !== false,
         };
 
+        if (mode === "search") {
+            if (Object.keys(options).length > 0) {
+                sendMessage("Options are not available in mode 'search'!");
+            }
+            findString(text);
+            return;
+        }
+
         let searchFunction;
-        if (opt.type === "included") {
+        if (opt.type === "exact") {
+            searchFunction = (search, str) => str.trim() === search.trim();
+        } else if (opt.type === "included") {
             searchFunction = (search, str) => {
                 const searchStr = opt.case === "insensitive" ? search.toLowerCase() : search;
                 const valStr = opt.case === "insensitive" ? str.toLowerCase() : str;
@@ -75,20 +97,38 @@ async function render({ model, el }) {
         } else if (opt.type === "regex") {
             searchFunction = (search, str) => {
                 const regex = new RegExp(search, opt.case === "insensitive" ? "i" : undefined);
-                return regex.test(str);
+                return !!str.trim().match(regex);
             };
         }
 
-        const $nodes = opt.nodeLabel || opt.nodeName ? findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel) : $();
-        const $edges = opt.edgeLabel ? findEdges(text, searchFunction) : $();
+        if (mode === "highlight") {
+            let $edges = $();
+            if (opt.edgeLabel) {
+                $edges = findEdges(text, searchFunction);
+            }
 
-        return { nodes: $nodes, edges: $edges };
+            let $nodes = $();
+            if (opt.nodeLabel || opt.nodeName) {
+                $nodes = findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel);
+            }
+
+            if (!opt.edgeLabel && !opt.nodeLabel && !opt.nodeName) {
+                sendMessage("No search option chosen!");
+            }
+
+            return {
+                nodes: $nodes,
+                edges: $edges,
+            };
+        }
+
+        sendMessage("Invalid search Mode!");
     }
 
     // Function to find edges matching the search criteria
     function findEdges(text, searchFunction) {
         const $set = $();
-        graphVizObject.edges().each((index, edge) => {
+        GraphvizSvg.edges().each((index, edge) => {
             if (edge.textContent && searchFunction(text, edge.textContent)) {
                 $set.push(edge);
             }
@@ -99,11 +139,13 @@ async function render({ model, el }) {
     // Function to find nodes matching the search criteria
     function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
         const $set = $();
-        const nodes = graphVizObject.nodesByName();
+        const nodes = GraphvizSvg.nodesByName();
 
         for (const [nodeID, node] of Object.entries(nodes)) {
-            if ((nodeName && searchFunction(text, nodeID)) ||
-                (nodeLabel && node.textContent && searchFunction(text, node.textContent))) {
+            if (
+                (nodeName && searchFunction(text, nodeID)) ||
+                (nodeLabel && node.textContent && searchFunction(text, node.textContent))
+            ) {
                 $set.push(node);
             }
         }
@@ -113,33 +155,37 @@ async function render({ model, el }) {
     // Function to highlight selected nodes and their connected nodes
     function highlightSelection() {
         let highlightedNodes = $();
-        currentSelection.forEach(selection => {
+        currentSelection.forEach((selection) => {
             const nodes = getConnectedNodes(selection.set, selection.direction);
             highlightedNodes = highlightedNodes.add(nodes);
         });
-        graphVizObject.highlight(highlightedNodes, true);
+        GraphvizSvg.highlight(highlightedNodes, true);
     }
 
     // Function to retrieve nodes connected in the specified direction
     function getConnectedNodes(nodeSet, mode = "bidirectional") {
         let resultSet = $().add(nodeSet);
-        const nodes = graphVizObject.nodesByName();
+        const nodes = GraphvizSvg.nodesByName();
 
         nodeSet.each((i, el) => {
             if (el.className.baseVal === "edge") {
                 const [startNode, endNode] = $(el).data("name").split("->");
                 if ((mode === "bidirectional" || mode === "upstream") && startNode) {
-                    resultSet = resultSet.add(nodes[startNode]).add(graphVizObject.linkedTo(nodes[startNode], true));
+                    resultSet = resultSet
+                        .add(nodes[startNode])
+                        .add(GraphvizSvg.linkedTo(nodes[startNode], true));
                 }
                 if ((mode === "bidirectional" || mode === "downstream") && endNode) {
-                    resultSet = resultSet.add(nodes[endNode]).add(graphVizObject.linkedFrom(nodes[endNode], true));
+                    resultSet = resultSet
+                        .add(nodes[endNode])
+                        .add(GraphvizSvg.linkedFrom(nodes[endNode], true));
                 }
             } else {
                 if (mode === "bidirectional" || mode === "upstream") {
-                    resultSet = resultSet.add(graphVizObject.linkedTo(el, true));
+                    resultSet = resultSet.add(GraphvizSvg.linkedTo(el, true));
                 }
                 if (mode === "bidirectional" || mode === "downstream") {
-                    resultSet = resultSet.add(graphVizObject.linkedFrom(el, true));
+                    resultSet = resultSet.add(GraphvizSvg.linkedFrom(el, true));
                 }
             }
         });
@@ -149,7 +195,7 @@ async function render({ model, el }) {
     // Function to reset the graph zoom and selection highlights
     function resetGraph() {
         graphviz.resetZoom();
-        graphVizObject.highlight(); // Reset node selection on reset
+        GraphvizSvg.highlight(); // Reset node selection on reset
         currentSelection = [];
     }
 
@@ -161,7 +207,8 @@ async function render({ model, el }) {
 
     // Main function to render the graph from DOT source
     function render(dotSource) {
-        var transition = d3.transition("graphTransition")
+        var transition = d3
+            .transition("graphTransition")
             .ease(d3.easeLinear)
             .delay(d3Config.transitionDelay)
             .duration(d3Config.transitionDuration);
@@ -177,7 +224,7 @@ async function render({ model, el }) {
             .renderDot(dotSource)
             .on("end", function () {
                 // Calls the jquery.graphviz.svg setup directly
-                $('#graph').data('graphviz.svg').setup();  // Re-setup after rendering
+                $("#graph").data("graphviz.svg").setup(); // Re-setup after rendering
             });
     }
 
@@ -188,14 +235,14 @@ async function render({ model, el }) {
             shrink: null,
             zoom: false,
             ready: function () {
-                graphVizObject = this;
+                GraphvizSvg = this;
 
                 // Event listener for node clicks to handle selection
-                graphVizObject.nodes().click(function (event) {
+                GraphvizSvg.nodes().click(function (event) {
                     const nodeSet = $().add(this);
                     const selectionObject = {
                         set: nodeSet,
-                        direction: selectedDirection
+                        direction: selectedDirection,
                     };
 
                     // If CMD, CTRL, or SHIFT is pressed, add to the selection
@@ -210,17 +257,17 @@ async function render({ model, el }) {
                 // Event listener for pressing the escape key to cancel highlights
                 $(document).keydown(function (event) {
                     if (event.keyCode === 27) {
-                        graphVizObject.highlight();
+                        GraphvizSvg.highlight();
                     }
                 });
-            }
+            },
         });
     });
 
     // Function to search nodes and edges and highlight results
     function searchAndHighlight(query) {
         const searchResults = search(query, "highlight", searchObject);
-        graphVizObject.highlight(searchResults.nodes, searchResults.edges);
+        GraphvizSvg.highlight(searchResults.nodes, searchResults.edges);
     }
 
     // Event listeners for `anywidget` events

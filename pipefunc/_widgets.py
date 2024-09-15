@@ -27,6 +27,8 @@ class PipeFuncGraphWidget(anywidget.AnyWidget):
 
     dot_source = traitlets.Unicode("").tag(sync=True)
     selected_direction = traitlets.Unicode("bidirectional").tag(sync=True)
+    search_type = traitlets.Unicode("included").tag(sync=True)
+    case_sensitive = traitlets.Bool(False).tag(sync=True)  # noqa: FBT003
 
 
 def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> widgets.VBox:
@@ -38,10 +40,18 @@ def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> wid
         description="Direction:",
     )
     search_input = widgets.Text(
-        value="",
         placeholder="Search...",
         description="Search:",
-        disabled=False,
+    )
+    search_type_selector = widgets.Dropdown(
+        options=["exact", "included", "regex"],
+        value="exact",
+        description="Search Type:",
+    )
+    case_toggle = widgets.ToggleButton(
+        value=False,
+        description="Case Sensitive",
+        icon="check",
     )
 
     # Define button actions
@@ -54,14 +64,23 @@ def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> wid
     def perform_search(change: dict) -> None:
         pipe_func_graph_widget.send({"action": "search", "query": change["new"]})
 
+    def update_search_type(change: dict) -> None:
+        pipe_func_graph_widget.search_type = change["new"]
+
+    def toggle_case_sensitive(change: dict) -> None:
+        pipe_func_graph_widget.case_sensitive = change["new"]
+
     reset_button.on_click(reset_graph)
     direction_selector.observe(update_direction, names="value")
     search_input.observe(perform_search, names="value")
+    search_type_selector.observe(update_search_type, names="value")
+    case_toggle.observe(toggle_case_sensitive, names="value")
 
     # Display widgets
     return widgets.VBox(
         [
-            widgets.HBox([reset_button, direction_selector, search_input]),
+            widgets.HBox([reset_button, direction_selector]),
+            widgets.HBox([search_input, search_type_selector, case_toggle]),
             pipe_func_graph_widget,
         ],
     )
