@@ -24,7 +24,7 @@ jobs:
 
       - name: Update Python version in environment.yml
         run: |
-          sed -i '/^- python$/s/$/=${{ matrix.python-version }}/' environment.yml
+          sed -i '/^\s*-\s*python\s*$/ s/$/=${{ matrix.python-version }}/' environment.yml
           echo "Updated environment.yml content:"
           cat environment.yml
 
