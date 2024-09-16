@@ -2,14 +2,16 @@
 
 import sys
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from types import UnionType
 from typing import (
     Annotated,
     Any,
     ForwardRef,
     Generic,
+    Literal,
     NamedTuple,
+    Optional,
     TypeVar,
     Union,
     get_args,
@@ -126,7 +128,7 @@ def _handle_union_types(
     return None
 
 
-def _extract_array_element_type(metadata: list[Any]) -> Any | None:
+def _extract_array_element_type(metadata: Iterable[Any]) -> Any | None:
     """Extract the ArrayElementType from the metadata if it exists."""
     return next((get_args(t)[0] for t in metadata if get_origin(t) is ArrayElementType), None)
 
@@ -315,3 +317,61 @@ def safe_get_type_hints(
             resolved_hints[arg] = Unresolvable(str(hint))
 
     return resolved_hints
+
+
+def type_as_string(type_: Any, memo: TypeCheckMemo | None = None) -> str:  # noqa: PLR0911, PLR0912
+    """Get a string representation of a type."""
+    if memo is None:
+        memo = TypeCheckMemo(globals={}, locals={})
+
+    # Resolve forward references
+    type_ = _resolve_type(type_, memo)
+
+    if isinstance(type_, str):
+        return type_  # Handle forward references
+    if isinstance(type_, Unresolvable):
+        return type_.type_str
+    if isinstance(type_, ForwardRef):
+        return type_.__forward_arg__
+    if hasattr(type_, "__name__"):
+        return type_.__name__
+    if hasattr(type_, "_name"):
+        return type_._name
+
+    origin = get_origin(type_)
+    if origin is not None:
+        args = get_args(type_)
+        if origin is Union or origin is UnionType:
+            return f"Union[{', '.join(type_as_string(arg, memo) for arg in args)}]"
+        if origin is Optional:
+            return f"Optional[{type_as_string(args[0], memo)}]"
+        if origin is list:
+            return f"List[{type_as_string(args[0], memo)}]"
+        if origin is dict:
+            return f"Dict[{type_as_string(args[0], memo)}, {type_as_string(args[1], memo)}]"
+        if origin is tuple:
+            return f"Tuple[{', '.join(type_as_string(arg, memo) for arg in args)}]"
+        if origin is Callable:
+            return f"Callable[[{', '.join(type_as_string(arg, memo) for arg in args[:-1])}], {type_as_string(args[-1], memo)}]"
+        if origin is Literal:
+            return f"Literal[{', '.join(repr(arg) for arg in args)}]"
+        if origin is Annotated:
+            base_type = type_as_string(args[0], memo)
+            metadata = ", ".join(type_as_string(arg, memo) for arg in args[1:])
+            return f"Annotated[{base_type}, {metadata}]"
+        if is_object_array_type(type_):
+            element_type = _extract_array_element_type(args[1:])
+            return f"Array[{type_as_string(element_type, memo)}]" if element_type else "Array"
+        return f"{origin.__name__}[{', '.join(type_as_string(arg, memo) for arg in args)}]"
+
+    if isinstance(type_, TypeVar):
+        constraints = (
+            f", {', '.join(type_as_string(c, memo) for c in type_.__constraints__)}"
+            if type_.__constraints__
+            else ""
+        )
+        bound = f", bound={type_as_string(type_.__bound__, memo)}" if type_.__bound__ else ""
+        return f"TypeVar('{type_.__name__}'{constraints}{bound})"
+
+    # Fall back to string representation if all else fails
+    return str(type_)

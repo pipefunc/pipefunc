@@ -5,7 +5,7 @@ import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_origin
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
@@ -13,7 +13,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
 from pipefunc._utils import at_least_tuple
-from pipefunc.typing import NoAnnotation, Unresolvable
+from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,23 +81,6 @@ class _Nodes:
         for node in graph.nodes:
             nodes.append(node)
         return nodes
-
-
-def _type_as_string(type_: Any) -> str | None:
-    """Get a string representation of a type."""
-    type_string: str | None
-    if isinstance(type_, Unresolvable):
-        type_string = type_.type_str
-    elif getattr(type_, "__name__", None):
-        type_string = type_.__name__
-    elif get_origin(type_):
-        base_type = get_origin(type_)
-        type_string = _type_as_string(base_type)
-    elif getattr(type_, "__repr__", None):
-        type_string = type_.__repr__()
-    else:
-        type_string = None
-    return type_string
 
 
 def _all_type_annotations(graph: nx.DiGraph) -> dict[str, type]:
@@ -193,7 +176,7 @@ def _generate_node_label(
         return f"<b>{html.escape(node.name)}</b>"
 
     if isinstance(node, str):
-        type_string = _type_as_string(hints[node]) if node in hints else None
+        type_string = type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
         label = _format_type_and_default(node, type_string, default_value)
 
@@ -203,7 +186,7 @@ def _generate_node_label(
 
         for output in at_least_tuple(node.output_name):
             h = node.output_annotation.get(output)
-            type_string = _type_as_string(h) if h is not NoAnnotation else None
+            type_string = type_as_string(h) if h is not NoAnnotation else None
             default_value = defaults.get(output, _empty) if defaults else _empty
             formatted_label = _format_type_and_default(output, type_string, default_value)
             label += f"<TR><TD>{formatted_label}</TD></TR>"

@@ -123,3 +123,16 @@ def test_visualize_graphviz(backend, tmp_path: Path) -> None:
     pipeline.visualize(backend=backend)
     if backend == "graphviz":
         pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg", figsize=10)
+
+
+def test_visualize_graphviz_with_typing():
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> UnresolvableTypeHere:  # type: ignore[name-defined]  # noqa: F821
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(b: int, c: int, x: int = 1) -> int:
+        return b + c + x
+
+    pipeline = Pipeline([f, g])
+    pipeline.visualize_graphviz()
