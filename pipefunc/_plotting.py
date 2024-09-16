@@ -381,7 +381,14 @@ def visualize_graphviz(  # noqa: PLR0912
     if return_type == "html":
         from IPython.display import HTML
 
-        return HTML(f"<div>{digraph._repr_image_svg_xml()}</div>")
+        svg_content = digraph._repr_image_svg_xml()
+        html_content = (
+            f'<div id="svg-container" style="max-width: 100%;">{svg_content}</div>'
+            "<style>#svg-container svg {max-width: 100%; height: auto;}</style>"
+        )
+
+        return HTML(html_content)
+
     return digraph
 
 
