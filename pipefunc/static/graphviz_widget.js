@@ -47,6 +47,27 @@ async function render({ model, el }) {
     // Array holding the current selections
     var currentSelection = [];
 
+    // Function to get the legend elements from the graph
+    function getLegendElements() {
+        const legendNodes = [];
+        const legendEdges = [];
+
+        GraphvizSvg.nodes().each(function () {
+            const $node = $(this);
+            if ($node.attr("data-name").startsWith("legend_")) {
+                legendNodes.push($node[0]);
+            }
+        });
+
+        GraphvizSvg.edges().each(function () {
+            const $edge = $(this);
+            if ($edge.attr("data-name").startsWith("legend_")) {
+                legendEdges.push($edge[0]);
+            }
+        });
+        return { legendNodes: $(legendNodes), legendEdges: $(legendEdges) };
+    }
+
     // Search-related variables
     const searchObject = {
         type: model.get("search_type") || "included",
@@ -98,7 +119,7 @@ async function render({ model, el }) {
         if (searchObject.nodeLabel || searchObject.nodeName) {
             $nodes = findNodes(text, searchFunction, searchObject.nodeName, searchObject.nodeLabel);
         }
-
+        console.log($nodes, $edges);
         return { nodes: $nodes, edges: $edges };
     }
     // Function to find edges matching the search criteria
@@ -131,11 +152,18 @@ async function render({ model, el }) {
     // Function to highlight selected nodes and their connected nodes
     function highlightSelection() {
         let highlightedNodes = $();
+        let highlightedEdges = $();
+
         currentSelection.forEach((selection) => {
             const nodes = getConnectedNodes(selection.set, selection.direction);
             highlightedNodes = highlightedNodes.add(nodes);
         });
-        GraphvizSvg.highlight(highlightedNodes, true);
+
+        const { legendNodes, legendEdges } = getLegendElements();
+        highlightedNodes = highlightedNodes.add(legendNodes);
+        highlightedEdges = highlightedEdges.add(legendEdges);
+
+        GraphvizSvg.highlight(highlightedNodes, highlightedEdges);
     }
 
     // Function to retrieve nodes connected in the specified direction
@@ -243,7 +271,12 @@ async function render({ model, el }) {
     // Function to search nodes and edges and highlight results
     function searchAndHighlight(query) {
         const searchResults = search(query);
-        GraphvizSvg.highlight(searchResults.nodes, searchResults.edges);
+        const { legendNodes, legendEdges } = getLegendElements();
+
+        // Highlight search results and keep legend highlighted
+        const nodesToHighlight = searchResults.nodes.add(legendNodes);
+        const edgesToHighlight = searchResults.edges.add(legendEdges);
+        GraphvizSvg.highlight(nodesToHighlight, edgesToHighlight);
     }
 
     // Event listeners for `anywidget` events
