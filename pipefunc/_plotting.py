@@ -12,7 +12,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, is_running_in_ipynb
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     import graphviz
     import holoviews as hv
+    import IPython.display
     import matplotlib.pyplot as plt
 
 
@@ -213,7 +214,7 @@ _COLORS = {
 }
 
 
-def visualize_graphviz(
+def visualize_graphviz(  # noqa: PLR0912
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
     *,
@@ -223,7 +224,8 @@ def visualize_graphviz(
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
-) -> graphviz.Digraph:
+    return_type: Literal["graphviz", "html"] | None = None,
+) -> graphviz.Digraph | IPython.display.HTML:
     """Visualize the pipeline as a directed graph using Graphviz.
 
     Parameters
@@ -246,6 +248,12 @@ def visualize_graphviz(
         Graphviz-specific keyword arguments for customizing the graph's appearance.
     show_legend
         Whether to show the legend in the graph visualization.
+    return_type
+        The format to return the visualization in.
+        If ``'html'``, the visualization is returned as a `IPython.display.html`,
+        if ``'graphviz'``, the `graphviz.Digraph` object is returned.
+        If ``None``, the format is ``'html'`` if running in a Jupyter notebook,
+        otherwise ``'graphviz'``.
 
     Returns
     -------
@@ -367,6 +375,13 @@ def visualize_graphviz(
         name, extension = str(filename).rsplit(".", 1)
         digraph.render(name, format=extension, cleanup=True)
 
+    if return_type is None and is_running_in_ipynb():
+        return_type = "html"
+
+    if return_type == "html":
+        from IPython.display import HTML
+
+        return HTML(f"<div>{digraph._repr_image_svg_xml()}</div>")
     return digraph
 
 

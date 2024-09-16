@@ -61,6 +61,7 @@ if TYPE_CHECKING:
 
     import graphviz
     import holoviews as hv
+    import IPython.display
     import ipywidgets
 
     from pipefunc._profile import ProfilingStats
@@ -1194,7 +1195,8 @@ class Pipeline:
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
-    ) -> graphviz.Digraph:
+        return_type: Literal["graphviz", "html"] | None = None,
+    ) -> graphviz.Digraph | IPython.display.HTML:
         """Visualize the pipeline as a directed graph using Graphviz.
 
         Parameters
@@ -1213,6 +1215,12 @@ class Pipeline:
             Graphviz-specific keyword arguments for customizing the graph's appearance.
         show_legend
             Whether to show the legend in the graph visualization.
+        return_type
+            The format to return the visualization in.
+            If ``'html'``, the visualization is returned as a `IPython.display.html`,
+            if ``'graphviz'``, the `graphviz.Digraph` object is returned.
+            If ``None``, the format is ``'html'`` if running in a Jupyter notebook,
+            otherwise ``'graphviz'``.
 
         Returns
         -------
@@ -1231,6 +1239,7 @@ class Pipeline:
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,
+            return_type=return_type,
         )
 
     def visualize_graphviz_widget(
@@ -1254,9 +1263,16 @@ class Pipeline:
             The resulting Graphviz Digraph object.
 
         """
+        import graphviz
+
         from pipefunc._widgets import graph_widget
 
-        graph = self.visualize_graphviz(orient=orient, graphviz_kwargs=graphviz_kwargs)
+        graph = self.visualize_graphviz(
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            return_type="graphviz",
+        )
+        assert isinstance(graph, graphviz.Digraph)
         dot_source = graph.source
         return graph_widget(dot_source)
 
