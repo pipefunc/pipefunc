@@ -22,7 +22,7 @@ jobs:
 
       - name: Update Python version in environment.yml
         run: |
-          sed -i 's/- python/- python=${{ env.python-version }}/g' environment.yml
+          sed -i '/^- python$/s/$/=${{ env.python-version }}/' environment.yml
           echo "Updated environment.yml content:"
           cat environment.yml
 
