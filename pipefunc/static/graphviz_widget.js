@@ -67,44 +67,40 @@ async function render({ model, el }) {
     });
 
     // Main search function to find nodes and edges
-    function search(text, options = {}) {
-        const opt = {
-            type: options.type || "included",
-            case: options.case || "insensitive",
-            nodeName: options.nodeName !== false,
-            nodeLabel: options.nodeLabel !== false,
-            edgeLabel: options.edgeLabel !== false,
-        };
-
+    function search(text) {
         let searchFunction;
-        if (opt.type === "exact") {
+
+        if (searchObject.type === "exact") {
             searchFunction = (search, str) => str.trim() === search.trim();
-        } else if (opt.type === "included") {
+        } else if (searchObject.type === "included") {
             searchFunction = (search, str) => {
-                const searchStr = opt.case === "insensitive" ? search.toLowerCase() : search;
-                const valStr = opt.case === "insensitive" ? str.toLowerCase() : str;
+                const searchStr =
+                    searchObject.case === "insensitive" ? search.toLowerCase() : search;
+                const valStr = searchObject.case === "insensitive" ? str.toLowerCase() : str;
                 return valStr.indexOf(searchStr) !== -1;
             };
-        } else if (opt.type === "regex") {
+        } else if (searchObject.type === "regex") {
             searchFunction = (search, str) => {
-                const regex = new RegExp(search, opt.case === "insensitive" ? "i" : undefined);
+                const regex = new RegExp(
+                    search,
+                    searchObject.case === "insensitive" ? "i" : undefined
+                );
                 return !!str.trim().match(regex);
             };
         }
 
         let $edges = $();
-        if (opt.edgeLabel) {
+        if (searchObject.edgeLabel) {
             $edges = findEdges(text, searchFunction);
         }
 
         let $nodes = $();
-        if (opt.nodeLabel || opt.nodeName) {
-            $nodes = findNodes(text, searchFunction, opt.nodeName, opt.nodeLabel);
+        if (searchObject.nodeLabel || searchObject.nodeName) {
+            $nodes = findNodes(text, searchFunction, searchObject.nodeName, searchObject.nodeLabel);
         }
 
         return { nodes: $nodes, edges: $edges };
     }
-
     // Function to find edges matching the search criteria
     function findEdges(text, searchFunction) {
         const $set = $();
@@ -117,7 +113,7 @@ async function render({ model, el }) {
     }
 
     // Function to find nodes matching the search criteria
-        function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
+    function findNodes(text, searchFunction, nodeName = true, nodeLabel = true) {
         const $set = $();
         const nodes = GraphvizSvg.nodesByName();
 
@@ -246,7 +242,7 @@ async function render({ model, el }) {
 
     // Function to search nodes and edges and highlight results
     function searchAndHighlight(query) {
-        const searchResults = search(query, searchObject);
+        const searchResults = search(query);
         GraphvizSvg.highlight(searchResults.nodes, searchResults.edges);
     }
 
