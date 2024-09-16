@@ -159,6 +159,57 @@ function highlightSelection(GraphvizSvg, currentSelection, $) {
     GraphvizSvg.highlight(highlightedNodes, highlightedEdges);
 }
 
+function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirection) {
+    // Add hover event listeners for edges
+    GraphvizSvg.edges().each(function () {
+        const $edge = $(this);
+
+        // Store the original color if not already stored
+        $edge.data("original-stroke", $edge.find("path").attr("stroke-width"));
+
+        $edge.on("mouseenter", function () {
+            // Highlight edge by making the stroke width thicker
+            $(this).find("path").attr("stroke-width", "3");
+            // Highlight edge label by making the text visible
+            $(this).find("text").attr("fill", "black");
+        });
+
+        $edge.on("mouseleave", function () {
+            // Revert edge highlight by restoring the original stroke color
+            const originalStroke = $(this).data("original-stroke");
+            $(this).find("path").attr("stroke-width", originalStroke);
+            // Revert edge label highlight by making the text transparent
+            $(this).find("text").attr("fill", "transparent");
+        });
+    });
+
+    // Add event listeners for nodes
+    GraphvizSvg.nodes().click(function (event) {
+        const nodeSet = $().add(this);
+        const selectionObject = {
+            set: nodeSet,
+            direction: selectedDirection,
+        };
+
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            currentSelection.push(selectionObject);
+        } else {
+            currentSelection.splice(0, currentSelection.length, selectionObject);
+        }
+
+        highlightSelection(GraphvizSvg, currentSelection, $);
+    });
+
+    // Add a keydown event listener for escape key to reset highlights
+    $(document).keydown(function (event) {
+        if (event.keyCode === 27) {
+            // Escape key
+            GraphvizSvg.highlight();
+        }
+    });
+}
+
+
 async function render({ model, el }) {
     await loadAllScripts();
 
@@ -250,53 +301,7 @@ async function render({ model, el }) {
             zoom: false,
             ready: function () {
                 GraphvizSvg = this;
-
-                // Add hover event listeners for edges
-                GraphvizSvg.edges().each(function () {
-                    const $edge = $(this);
-
-                    // Store the original color if not already stored
-                    $edge.data("original-stroke", $edge.find("path").attr("stroke-width"));
-
-                    $edge.on("mouseenter", function () {
-                        // Highlight edge by making the stroke width thicker
-                        $(this).find("path").attr("stroke-width", "3");
-                        // Highlight edge label by making the text visible
-                        $(this).find("text").attr("fill", "black");
-
-                    });
-
-                    $edge.on("mouseleave", function () {
-                        // Revert edge highlight by restoring the original stroke color
-                        const originalStroke = $(this).data("original-stroke");
-                        $(this).find("path").attr("stroke-width", originalStroke);
-                        // Revert edge label highlight by making the text transparent
-                        $(this).find("text").attr("fill", "transparent");
-                    });
-                });
-
-                GraphvizSvg.nodes().click(function (event) {
-                    const nodeSet = $().add(this);
-                    const selectionObject = {
-                        set: nodeSet,
-                        direction: selectedDirection,
-                    };
-
-                    if (event.ctrlKey || event.metaKey || event.shiftKey) {
-                        currentSelection.push(selectionObject);
-                    } else {
-                        currentSelection.splice(0, currentSelection.length, selectionObject);
-                    }
-
-                    highlightSelection(GraphvizSvg, currentSelection, $);
-                });
-
-                $(document).keydown(function (event) {
-                    if (event.keyCode === 27) {
-                        // Escape key
-                        GraphvizSvg.highlight();
-                    }
-                });
+                handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirection);
             },
         });
     });
