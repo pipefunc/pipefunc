@@ -375,7 +375,7 @@ def visualize_graphviz(  # noqa: PLR0912
         name, extension = str(filename).rsplit(".", 1)
         digraph.render(name, format=extension, cleanup=True)
 
-    if return_type is None and is_running_in_ipynb():
+    if return_type is None and is_running_in_ipynb():  # pragma: no cover
         return_type = "html"
 
     if return_type == "html":

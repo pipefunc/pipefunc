@@ -1126,7 +1126,7 @@ class Pipeline:
         ----------
         backend
             The plotting backend to use. If ``None``, the best backend available
-            will be used in the following order: Graphviz (widget), Graphviz,
+            will be used in the following order: Graphviz,
             Matplotlib, and HoloViews.
         kwargs
             Additional keyword arguments passed to the plotting function.

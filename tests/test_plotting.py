@@ -139,4 +139,4 @@ def test_visualize_graphviz_with_typing():
         return b + c + x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize_graphviz()
+    pipeline.visualize_graphviz(return_type="html")
