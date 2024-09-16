@@ -194,10 +194,10 @@ def test_forward_refs():
     assert not is_type_compatible(nested_ref, tuple[Node, ...], memo)
 
 
-def test_array_type_alias():
+def test_array_type_alias() -> None:
     assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype[np.object_]])
-    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(np.object_)])
-    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(object)])
+    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(np.object_)])  # type: ignore[misc]
+    assert is_type_compatible(Array[int], np.ndarray[Any, np.dtype(object)])  # type: ignore[misc]
     assert not is_type_compatible(Array[int], np.ndarray[Any, np.dtype[np.int_]])
 
     ObjArray: TypeAlias = np.ndarray[Any, np.dtype[np.object_]]  # ObjArray
@@ -226,7 +226,7 @@ def test_array_type_alias():
         (Annotated[int, ArrayElementType[int]], False),
     ],
 )
-def test_is_array_type(tp, expected):
+def test_is_array_type(tp, expected) -> None:
     assert is_object_array_type(tp) == expected
 
 
@@ -244,7 +244,7 @@ def test_is_array_type(tp, expected):
         Annotated[int, ArrayElementType[int]],  # Annotated, but not ndarray
     ],
 )
-def test_is_valid_array_type(x):
+def test_is_valid_array_type(x) -> None:
     expected_result = x in [
         Array[int],  # Valid Annotated type
         np.ndarray[Any, np.dtype[np.object_]],  # Valid plain ndarray
@@ -494,7 +494,7 @@ def test_safe_get_type_hints_with_annotated():
     assert safe_get_type_hints(func, include_extras=True) == expected2
 
 
-def test_safe_get_type_hints_with_class():
+def test_safe_get_type_hints_with_class() -> None:
     class MyClass:
         x: int
 
@@ -551,6 +551,7 @@ U = TypeVar("U", bound=int)
         (T, "T"),
         (S, "S"),
         (U, "U"),
+        (Generic[T], "Generic[T]"),
         (Annotated[int, "metadata"], "Annotated[int, metadata]"),
         (np.ndarray, "ndarray"),
         (Array[int], "Array[int]"),

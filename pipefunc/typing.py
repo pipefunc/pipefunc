@@ -212,8 +212,8 @@ def _handle_generic_types(
 
 
 def is_type_compatible(
-    incoming_type: type[Any],
-    required_type: type[Any],
+    incoming_type: Any,
+    required_type: Any,
     memo: TypeCheckMemo | None = None,
 ) -> bool:
     """Check if the incoming type is compatible with the required type, resolving forward references."""
