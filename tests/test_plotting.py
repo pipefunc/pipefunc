@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import pytest
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
-from pipefunc._widgets import graph_widget
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -128,20 +127,6 @@ def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Pa
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
         everything_pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg", figsize=10)
-
-
-def test_plotting_widget(everything_pipeline: Pipeline) -> None:
-    # Note: Not sure how to test this properly, just make sure it runs
-    src = everything_pipeline.visualize_graphviz().source
-    widget = graph_widget(src)
-    first, second, widget = widget.children
-    reset_button, direction_selector = first.children
-    search_input, search_type_selector, case_toggle = second.children
-    reset_button.click()
-    direction_selector.value = "downstream"
-    search_input.value = "c"
-    search_type_selector.value = "included"
-    case_toggle.value = True
 
 
 def test_visualize_graphviz_with_typing():

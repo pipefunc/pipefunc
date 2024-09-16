@@ -5,7 +5,6 @@ import functools
 import inspect
 import math
 import operator
-import os
 import socket
 import sys
 import warnings
@@ -218,8 +217,3 @@ def is_running_in_ipynb() -> bool:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
     except NameError:
         return False  # Probably standard Python interpreter
-
-
-def is_running_in_vscode() -> bool:
-    """Check if the code is running inside VS Code."""
-    return "VSCODE_PID" in os.environ
