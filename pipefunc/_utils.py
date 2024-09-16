@@ -5,6 +5,7 @@ import functools
 import inspect
 import math
 import operator
+import os
 import socket
 import sys
 import warnings
@@ -209,3 +210,16 @@ def get_local_ip() -> str:
             return s.getsockname()[0]
     except Exception:  # noqa: BLE001  # pragma: no cover
         return "unknown"
+
+
+def is_running_in_ipynb() -> bool:
+    """Check if the code is running in a Jupyter notebook."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
+    except NameError:
+        return False  # Probably standard Python interpreter
+
+
+def is_running_in_vscode() -> bool:
+    """Check if the code is running inside VS Code."""
+    return "VSCODE_PID" in os.environ
