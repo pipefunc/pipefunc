@@ -346,7 +346,13 @@ def visualize_graphviz(
     ]:
         for edge in _labels:
             # NOTE: This function doesn't put labels on the edges
-            digraph.edge(str(edge[0]), str(edge[1]), color=color)
+            digraph.edge(
+                str(edge[0]),
+                str(edge[1]),
+                color=color,
+                penwidth="1.01",
+                tooltip=str(edge[0]),
+            )
 
     if show_legend and legend_items:
         legend_subgraph = graphviz.Digraph(
