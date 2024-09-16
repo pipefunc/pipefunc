@@ -2,23 +2,30 @@ function loadScript(url) {
     return new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = url;
-        script.onload = () => resolve();
+        script.onload = resolve;
         script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
         document.head.append(script);
     });
 }
 
+async function loadAllScripts() {
+    const scripts = [
+        "https://unpkg.com/jquery@3.6.1/dist/jquery.min.js",
+        "https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js",
+        "https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js",
+        "https://unpkg.com/d3@7.6.1/dist/d3.min.js",
+        "https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js",
+        "https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js",
+        "https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js"
+    ];
+
+    for (const script of scripts) {
+        await loadScript(script);
+    }
+}
+
 async function render({ model, el }) {
-    // Load scripts in order
-    await loadScript("https://unpkg.com/jquery@3.6.1/dist/jquery.min.js");
-    await loadScript("https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js");
-    await loadScript("https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js");
-    await loadScript("https://unpkg.com/d3@7.6.1/dist/d3.min.js");
-    await loadScript(
-        "https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js"
-    );
-    await loadScript("https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js");
-    await loadScript("https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js");
+    await loadAllScripts();
 
     const $ = window.jQuery;
     const d3 = window.d3;
@@ -27,7 +34,7 @@ async function render({ model, el }) {
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
 
     // Initialize a d3-graphviz renderer instance
-    var graphviz = d3.select("#graph").graphviz();
+    var d3graphviz = d3.select("#graph").graphviz();
 
     // Configuration for transitions in rendering the graph
     var d3Config = {
@@ -46,6 +53,15 @@ async function render({ model, el }) {
 
     // Array holding the current selections
     var currentSelection = [];
+
+    // Search-related variables
+    const searchObject = {
+        type: model.get("search_type") || "included",
+        case: model.get("case_sensitive") ? "sensitive" : "insensitive",
+        nodeName: true,
+        nodeLabel: true,
+        edgeLabel: true,
+    };
 
     // Function to get the legend elements from the graph
     function getLegendElements() {
@@ -67,15 +83,6 @@ async function render({ model, el }) {
         });
         return { legendNodes: $(legendNodes), legendEdges: $(legendEdges) };
     }
-
-    // Search-related variables
-    const searchObject = {
-        type: model.get("search_type") || "included",
-        case: model.get("case_sensitive") ? "sensitive" : "insensitive",
-        nodeName: true,
-        nodeLabel: true,
-        edgeLabel: true,
-    };
 
     // Listener for changes in search type
     model.on("change:search_type", () => {
@@ -119,7 +126,6 @@ async function render({ model, el }) {
         if (searchObject.nodeLabel || searchObject.nodeName) {
             $nodes = findNodes(text, searchFunction, searchObject.nodeName, searchObject.nodeLabel);
         }
-        console.log($nodes, $edges);
         return { nodes: $nodes, edges: $edges };
     }
     // Function to find edges matching the search criteria
@@ -167,7 +173,7 @@ async function render({ model, el }) {
     }
 
     // Function to retrieve nodes connected in the specified direction
-    function getConnectedNodes(nodeSet, mode = "bidirectional") {
+    function getConnectedNodes(nodeSet, mode) {
         let resultSet = $().add(nodeSet);
         const nodes = GraphvizSvg.nodesByName();
 
@@ -198,7 +204,7 @@ async function render({ model, el }) {
 
     // Function to reset the graph zoom and selection highlights
     function resetGraph() {
-        graphviz.resetZoom();
+        d3graphviz.resetZoom();
         GraphvizSvg.highlight(); // Reset node selection on reset
         currentSelection = [];
     }
@@ -217,7 +223,7 @@ async function render({ model, el }) {
             .delay(d3Config.transitionDelay)
             .duration(d3Config.transitionDuration);
 
-        graphviz
+        d3graphviz
             .engine(selectedEngine)
             .fade(true)
             .transition(transition)
