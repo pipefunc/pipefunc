@@ -28,7 +28,7 @@ dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
 zarr = ["zarr"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
+plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
     "coverage",

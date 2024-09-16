@@ -209,3 +209,11 @@ def get_local_ip() -> str:
             return s.getsockname()[0]
     except Exception:  # noqa: BLE001  # pragma: no cover
         return "unknown"
+
+
+def is_running_in_ipynb() -> bool:
+    """Check if the code is running in a Jupyter notebook."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
+    except NameError:
+        return False  # Probably standard Python interpreter
