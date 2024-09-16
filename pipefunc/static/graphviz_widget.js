@@ -119,7 +119,9 @@ function getConnectedNodes(nodeSet, mode, GraphvizSvg) {
     const nodes = GraphvizSvg.nodesByName();
 
     nodeSet.each((i, el) => {
-        if (el.className.baseVal === "edge") {
+        if (mode === "single") {
+            resultSet = resultSet.add(el);
+        } else if (el.className.baseVal === "edge") {
             const [startNode, endNode] = $(el).data("name").split("->");
             if ((mode === "bidirectional" || mode === "upstream") && startNode) {
                 resultSet = resultSet
@@ -159,7 +161,7 @@ function highlightSelection(GraphvizSvg, currentSelection, $) {
     GraphvizSvg.highlight(highlightedNodes, highlightedEdges);
 }
 
-function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirection) {
+function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, getSelectedDirection) {
     // Add hover event listeners for edges
     GraphvizSvg.edges().each(function () {
         const $edge = $(this);
@@ -188,9 +190,8 @@ function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirec
         const nodeSet = $().add(this);
         const selectionObject = {
             set: nodeSet,
-            direction: selectedDirection,
+            direction: getSelectedDirection(),
         };
-
         if (event.ctrlKey || event.metaKey || event.shiftKey) {
             currentSelection.push(selectionObject);
         } else {
@@ -208,7 +209,6 @@ function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirec
         }
     });
 }
-
 
 async function render({ model, el }) {
     await loadAllScripts();
@@ -301,7 +301,7 @@ async function render({ model, el }) {
             zoom: false,
             ready: function () {
                 GraphvizSvg = this;
-                handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, selectedDirection);
+                handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, () => selectedDirection);
             },
         });
     });
