@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from numbers import Number
 from typing import (
     Annotated,
     Any,
     ForwardRef,
+    Generic,
+    Literal,
     Optional,
     TypeAlias,
     TypeVar,
@@ -27,6 +29,7 @@ from pipefunc.typing import (
     is_object_array_type,
     is_type_compatible,
     safe_get_type_hints,
+    type_as_string,
 )
 
 NoneType = type(None)
@@ -506,3 +509,131 @@ def test_safe_get_type_hints_with_class():
     }
     assert safe_get_type_hints(MyClass.__init__) == expected
     assert safe_get_type_hints(MyClass.__init__) == get_type_hints(MyClass.__init__)
+
+
+# Mock classes and functions for testing
+class MockUnresolvable(Unresolvable):
+    pass
+
+
+class MockClass:
+    pass
+
+
+def mock_function():
+    pass
+
+
+T = TypeVar("T")
+S = TypeVar("S", int, str)
+U = TypeVar("U", bound=int)
+
+
+@pytest.mark.parametrize(
+    ("type_", "expected"),
+    [
+        (int, "int"),
+        (str, "str"),
+        (float, "float"),
+        (bool, "bool"),
+        (Any, "Any"),
+        (None, "None"),
+        (MockClass, "MockClass"),
+        (MockUnresolvable("UnresolvedType"), "UnresolvedType"),
+        (ForwardRef("FutureType"), "FutureType"),
+        (Union[int, str], "Union[int, str]"),  # noqa: UP007
+        (Optional[int], "Union[int, NoneType]"),  # noqa: UP007
+        (list[int], "list[int]"),
+        (dict[str, int], "dict[str, int]"),
+        (tuple[int, str, float], "tuple[int, str, float]"),
+        (Callable[[int, str], bool], "Callable[[int, str], bool]"),
+        (Literal[1, 2, 3], "Literal[1, 2, 3]"),
+        (T, "T"),
+        (S, "S"),
+        (U, "U"),
+        (Annotated[int, "metadata"], "Annotated[int, metadata]"),
+        (np.ndarray, "ndarray"),
+        (Array[int], "Array[int]"),
+        (np.ndarray[Any, np.dtype[np.object_]], "Array"),
+        (Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int]], "Array[int]"),
+        (Union[int, Union[str, float]], "Union[int, str, float]"),  # noqa: UP007
+        (list[tuple[int, str]], "list[tuple[int, str]]"),
+        (dict[str, list[int]], "dict[str, list[int]]"),
+        (Callable[[int, str], dict[str, Any]], "Callable[[int, str], dict[str, Any]]"),
+        (mock_function, "mock_function"),
+    ],
+)
+def test_type_as_string(type_, expected):
+    assert type_as_string(type_) == expected
+
+
+def test_unresolvable_type():
+    unresolvable = Unresolvable("ComplexType")
+    assert type_as_string(unresolvable) == "ComplexType"
+
+
+def test_forward_ref():
+    forward_ref = ForwardRef("FutureClass")
+    assert type_as_string(forward_ref) == "FutureClass"
+
+
+def test_annotated_with_array():
+    annotated_array = Annotated[np.ndarray, Array[int]]
+    assert type_as_string(annotated_array) == "Annotated[ndarray, Array[int]]"
+
+
+def test_complex_nested_type():
+    complex_type = dict[str, list[tuple[int, str | float]]]
+    expected = "dict[str, list[tuple[int, Union[str, float]]]]"
+    assert type_as_string(complex_type) == expected
+
+
+def test_type_with_no_name():
+    class NoNameType:
+        pass
+
+    no_name_type = NoNameType()
+    assert type_as_string(type(no_name_type)) == "NoNameType"
+
+
+def test_union_type():
+    union_type = int | str  # Python 3.10+ syntax
+    assert type_as_string(union_type) == "Union[int, str]"
+
+
+@pytest.mark.parametrize(
+    "type_",
+    [
+        list,
+        dict,
+        tuple,
+        set,
+        frozenset,
+    ],
+)
+def test_generic_types_without_args(type_):
+    assert type_as_string(type_) == type_.__name__
+
+
+def test_numpy_array_types():
+    assert type_as_string(np.ndarray[Any, np.dtype[np.int64]]) == "ndarray[Any, dtype[int64]]"
+
+
+def test_custom_generic_type():
+    class GenericType(Generic[T]):
+        pass
+
+    assert type_as_string(GenericType[int]) == "GenericType[int]"
+
+
+def test_nested_annotated():
+    nested = Annotated[list[Annotated[int, "pos"]], "metadata"]
+    assert type_as_string(nested) == "Annotated[list[Annotated[int, pos]], metadata]"
+
+
+def test_unexpected_type():
+    class WeirdType:
+        pass
+
+    weird = WeirdType()
+    assert "WeirdType" in type_as_string(weird)
