@@ -210,8 +210,11 @@ function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, getSelectedDi
     });
 }
 
-async function render({ model, el }) {
+async function initialize({ model }) {
     await loadAllScripts();
+}
+
+async function render({ model, el }) {
 
     const $ = window.jQuery;
     const d3 = window.d3;
@@ -309,4 +312,4 @@ async function render({ model, el }) {
     renderGraph(model.get("dot_source"));
 }
 
-export default { render };
+export default { initialize, render };
