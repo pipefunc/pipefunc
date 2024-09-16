@@ -261,12 +261,17 @@ async function render({ model, el }) {
                     $edge.on("mouseenter", function () {
                         // Highlight edge by making the stroke width thicker
                         $(this).find("path").attr("stroke-width", "3");
+                        // Highlight edge label by making the text visible
+                        $(this).find("text").attr("fill", "black");
+
                     });
 
                     $edge.on("mouseleave", function () {
                         // Revert edge highlight by restoring the original stroke color
                         const originalStroke = $(this).data("original-stroke");
                         $(this).find("path").attr("stroke-width", originalStroke);
+                        // Revert edge label highlight by making the text transparent
+                        $(this).find("text").attr("fill", "transparent");
                     });
                 });
 

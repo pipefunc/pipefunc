@@ -344,14 +344,17 @@ def visualize_graphviz(
         (labels.bound, _COLORS["red"]),
         (labels.resources, _COLORS["orange"]),
     ]:
-        for edge in _labels:
-            # NOTE: This function doesn't put labels on the edges
+        for edge, label in _labels.items():
+            # Labels are transparent and become visible on hover in widget
             digraph.edge(
                 str(edge[0]),
                 str(edge[1]),
                 color=color,
+                label=label,
+                tooltip=f"<<b>{html.escape(label)}</b>>",
                 penwidth="1.01",
-                tooltip=str(edge[0]),
+                fontcolor="transparent",
+                fontname="Helvetica",
             )
 
     if show_legend and legend_items:
