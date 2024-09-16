@@ -30,6 +30,8 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_running_in_ipynb,
+    is_running_in_vscode,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
@@ -60,6 +62,7 @@ if TYPE_CHECKING:
     import graphviz
     import holoviews as hv
     import IPython.display
+    import ipywidgets
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
@@ -1122,11 +1125,14 @@ class Pipeline:
     ) -> Any:
         """Visualize the pipeline as a directed graph.
 
+        If running in a Jupyter notebook and *not* in VS Code a widget-based backend
+        will be used if available.
+
         Parameters
         ----------
         backend
             The plotting backend to use. If ``None``, the best backend available
-            will be used in the following order: Graphviz,
+            will be used in the following order: Graphviz (widget), Graphviz,
             Matplotlib, and HoloViews.
         kwargs
             Additional keyword arguments passed to the plotting function.
@@ -1139,6 +1145,8 @@ class Pipeline:
         --------
         visualize_graphviz
             Create a directed graph using Graphviz (``backend="graphviz"``).
+        visualize_graphviz_widget
+            Create a directed graph using Graphviz and ipywidgets (``backend="graphviz_widget"``).
         visualize_matplotlib
             Create a directed graph using Matplotlib (``backend="matplotlib"``).
         visualize_holoviews
@@ -1155,7 +1163,11 @@ class Pipeline:
 
         if backend is None:  # pragma: no cover
             if is_installed("graphviz"):
-                backend = "graphviz"
+                backend = (
+                    "graphviz_widget"
+                    if is_running_in_ipynb() and not is_running_in_vscode()
+                    else "graphviz"
+                )
             elif is_installed("matplotlib"):
                 backend = "matplotlib"
             elif is_installed("holoviews"):
@@ -1165,6 +1177,8 @@ class Pipeline:
                 raise ImportError(msg)
         if backend == "graphviz":
             return self.visualize_graphviz(**kwargs)
+        if backend == "graphviz_widget":
+            return self.visualize_graphviz_widget(**kwargs)
         if backend == "matplotlib":
             return self.visualize_matplotlib(**kwargs)
         if backend == "holoviews":
@@ -1227,6 +1241,40 @@ class Pipeline:
             show_legend=show_legend,
             return_type=return_type,
         )
+
+    def visualize_graphviz_widget(
+        self,
+        *,
+        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        graphviz_kwargs: dict[str, Any] | None = None,
+    ) -> ipywidgets.VBox:
+        """Visualize the pipeline interactively as a directed graph using Graphviz and ipywidgets.
+
+        Parameters
+        ----------
+        orient
+            Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+        graphviz_kwargs
+            Graphviz-specific keyword arguments for customizing the graph's appearance.
+
+        Returns
+        -------
+        ipywidgets.VBox
+            The resulting Graphviz Digraph object.
+
+        """
+        import graphviz
+
+        from pipefunc._widgets import graph_widget
+
+        graph = self.visualize_graphviz(
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            return_type="graphviz",
+        )
+        assert isinstance(graph, graphviz.Digraph)
+        dot_source = graph.source
+        return graph_widget(dot_source)
 
     def visualize_matplotlib(
         self,
