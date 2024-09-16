@@ -215,7 +215,6 @@ async function render({ model, el }) {
     const searchAndHighlight = (query) => {
         const searchResults = search(query, searchObject, GraphvizSvg, $);
         const { legendNodes, legendEdges } = getLegendElements(GraphvizSvg, $);
-
         const nodesToHighlight = searchResults.nodes.add(legendNodes);
         const edgesToHighlight = searchResults.edges.add(legendEdges);
         GraphvizSvg.highlight(nodesToHighlight, edgesToHighlight);
