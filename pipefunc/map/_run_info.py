@@ -289,6 +289,10 @@ def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) 
     return load(path, cache=cache)
 
 
+def _output_path(output_name: str, run_folder: Path) -> Path:
+    return run_folder / "outputs" / f"{output_name}.cloudpickle"
+
+
 def _init_storage(
     all_output_names: set[str],
     mapspecs: list[MapSpec],
@@ -297,8 +301,6 @@ def _init_storage(
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
 ) -> dict[str, StorageBase | Path | DirectValue]:
-    from pipefunc.map._run import _output_path
-
     store: dict[str, StorageBase | Path | DirectValue] = {}
     for mapspec in mapspecs:
         if not mapspec.inputs:

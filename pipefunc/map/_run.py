@@ -5,7 +5,6 @@ import itertools
 import tempfile
 import time
 from collections import OrderedDict, defaultdict
-from collections.abc import MutableMapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -200,10 +199,6 @@ def load_xarray_dataset(
     )
 
 
-def _output_path(output_name: str, run_folder: Path) -> Path:
-    return run_folder / "outputs" / f"{output_name}.cloudpickle"
-
-
 def _dump_output(
     func: PipeFunc,
     output: Any,
@@ -227,11 +222,13 @@ def _dump_single_output(
     store: dict[str, StorageBase | Path | DirectValue],
 ) -> None:
     storage = store[output_name]
+    assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
         dump(output, path=storage)
     else:
-        assert isinstance(storage, MutableMapping), storage
-        storage[output_name] = output
+        assert isinstance(storage, DirectValue)
+        storage.value = output
+        storage.exists = True
 
 
 def _load_output(output_name: str, store: dict[str, StorageBase | Path | DirectValue]) -> Any:
