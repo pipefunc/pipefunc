@@ -291,6 +291,8 @@ def _init_storage(
 
     store: dict[str, StorageBase | Path | dict[str, Any]] = {}
     for mapspec in mapspecs:
+        if not mapspec.inputs:
+            continue
         output_names = mapspec.output_names
         shape = shapes[output_names[0]]
         mask = shape_masks[output_names[0]]
