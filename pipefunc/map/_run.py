@@ -79,8 +79,8 @@ def run(
         corresponding input data, these are either single values for functions without ``mapspec``
         or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
     run_folder
-        The folder to store the run information. If ``None``, a temporary folder
-        is created.
+        The folder to store the run information. If ``None``, either a temporary folder
+        is created or no folder is used, depending on the storage class.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
@@ -117,11 +117,7 @@ def run(
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     if _cannot_be_parallelized(pipeline):
         parallel = False
-    if run_folder is None and _get_storage_class(storage).requires_disk:
-        run_folder = tempfile.mkdtemp()
-        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
-        warnings.warn(msg, stacklevel=2)
-    run_folder = Path(run_folder) if run_folder is not None else None
+    run_folder = _maybe_run_folder(run_folder, storage)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -204,6 +200,14 @@ def load_xarray_dataset(
         output_names=output_name,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
+
+
+def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
+    if run_folder is None and _get_storage_class(storage).requires_disk:
+        run_folder = tempfile.mkdtemp()
+        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
+        warnings.warn(msg, stacklevel=2)
+    return Path(run_folder) if run_folder is not None else None
 
 
 def _dump_output(
@@ -546,7 +550,7 @@ def _load_from_store(  # noqa: PLR0912
             else:
                 exists.append(False)
                 outputs.append(None)
-        else:
+        else:  # pragma: no cover
             msg = f"Unknown storage type: {storage}"
             raise TypeError(msg)
     if return_output:

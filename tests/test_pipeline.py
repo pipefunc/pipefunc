@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import pickle
 import re
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -763,7 +767,7 @@ class Unpicklable:
         raise RuntimeError(msg)
 
 
-def test_unpicklable_run():
+def test_unpicklable_run(tmp_path: Path) -> None:
     @pipefunc(output_name="y")
     def f(a):
         return Unpicklable(a)
