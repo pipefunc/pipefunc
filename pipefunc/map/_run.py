@@ -146,8 +146,8 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
-    outputs = [_load_parameter(output_name, store) for output_name in output_names]
-    outputs = [_maybe_load_file_array(o) for o in outputs]
+    outputs = [_load_from_store(output_name, store).value for output_name in output_names]
+    outputs = [_maybe_load_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
 
@@ -230,7 +230,7 @@ def _func_kwargs(
         if p in func._bound:
             kwargs[p] = func._bound[p]
         elif p in run_info.inputs or p in run_info.all_output_names:
-            kwargs[p] = _load_parameter(p, store)
+            kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
@@ -253,7 +253,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_file_array(selected)
+    _load_file_arrays(selected)
     return selected
 
 
@@ -494,12 +494,17 @@ def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: An
     return func(*args)
 
 
+class _StoredValue(NamedTuple):
+    value: Any
+    exists: bool
+
+
 def _load_from_store(  # noqa: PLR0912
     output_name: _OUTPUT_TYPE,
     store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = True,
-) -> tuple[Any, bool]:
+) -> _StoredValue:
     storages = [store[name] for name in at_least_tuple(output_name)]
     outputs: list[Any] = []
     exists: list[bool] = []
@@ -527,10 +532,11 @@ def _load_from_store(  # noqa: PLR0912
         else:  # pragma: no cover
             msg = f"Unknown storage type: {storage}"
             raise TypeError(msg)
+    all_exist = all(exists)
     if return_output:
         output = outputs if isinstance(output_name, tuple) else outputs[0]
-        return output, all(exists)
-    return None, all(exists)
+        return _StoredValue(output, all_exist)
+    return _StoredValue(None, all_exist)
 
 
 def _submit_single(
@@ -545,7 +551,7 @@ def _submit_single(
         return output
 
     # Otherwise, run the function
-    _load_file_array(kwargs)
+    _load_file_arrays(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -558,15 +564,15 @@ def _submit_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_file_array(x: Any) -> Any:
+def _maybe_load_array(x: Any) -> Any:
     if isinstance(x, StorageBase):
         return x.to_array()
     return x
 
 
-def _load_file_array(kwargs: dict[str, Any]) -> None:
+def _load_file_arrays(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_file_array(v)
+        kwargs[k] = _maybe_load_array(v)
 
 
 class _KwargsTask(NamedTuple):
