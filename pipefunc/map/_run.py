@@ -202,12 +202,8 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
 def _dump_output(
     func: PipeFunc,
     output: Any,
-    run_folder: Path,
     store: dict[str, StorageBase | Path | dict[str, Any]],
 ) -> tuple[Any, ...]:
-    folder = run_folder / "outputs"
-    folder.mkdir(parents=True, exist_ok=True)
-
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
@@ -650,7 +646,7 @@ def _process_task(
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
         r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_output(func, r, run_folder, store)
+        output = _dump_output(func, r, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
