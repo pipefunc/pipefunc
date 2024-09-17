@@ -88,7 +88,9 @@ class RunInfo:
         else:
             _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
+        # TODO: keep inputs in store too!
         input_paths = _dump_inputs(inputs, run_folder)
+        # TODO: keep defaults in defaults store
         defaults_path = _dump_defaults(pipeline.defaults, run_folder)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)

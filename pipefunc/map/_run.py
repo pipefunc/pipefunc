@@ -147,7 +147,6 @@ class Result(NamedTuple):
     output_name: str
     output: Any
     store: StorageBase | Path | dict[str, Any] | None
-    run_folder: Path
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -229,8 +228,9 @@ def _dump_single_output(
         storage[output_name] = output
 
 
-def _load_output(output_name: str, run_folder: Path) -> Any:
-    path = _output_path(output_name, run_folder)
+def _load_output(output_name: str, store: dict[str, StorageBase | Path | dict[str, Any]]) -> Any:
+    path = store[output_name]
+    assert isinstance(path, Path)
     return load(path)
 
 
@@ -242,7 +242,7 @@ def _load_parameter(
     if parameter in run_info.input_paths:
         return _load_input(parameter, run_info.input_paths)
     if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
-        return _load_output(parameter, run_info.run_folder)
+        return _load_output(parameter, store)
     return store[parameter]
 
 
@@ -522,7 +522,7 @@ def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: An
 
 def _maybe_load_single_output(
     func: PipeFunc,
-    run_folder: Path,
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     *,
     return_output: bool = True,
 ) -> tuple[Any, bool]:
@@ -530,7 +530,8 @@ def _maybe_load_single_output(
 
     Returns the output and a boolean indicating whether the output exists.
     """
-    output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
+    # TODO: deal with the case where output is dict!
+    output_paths = [store[name] for name in at_least_tuple(func.output_name)]
     if all(p.is_file() for p in output_paths):
         if not return_output:
             return None, True
@@ -544,11 +545,11 @@ def _maybe_load_single_output(
 def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    run_folder: Path,
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
-    output, exists = _maybe_load_single_output(func, run_folder)
+    output, exists = _maybe_load_single_output(func, store)
     if exists:
         return output
 
@@ -602,7 +603,7 @@ def _run_and_process_generation(
     for func in generation:
         tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
     for func in generation:
-        _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
+        _outputs = _process_task(func, tasks[func], store, executor)
         outputs.update(_outputs)
 
 
@@ -620,14 +621,13 @@ def _submit_func(
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder, cache)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    run_folder: Path,
     store: dict[str, StorageBase | Path | dict[str, Any]],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
@@ -657,7 +657,6 @@ def _process_task(
             output_name=output_name,
             output=_output,
             store=store[output_name],
-            run_folder=run_folder,  # TODO: remove run_folder from Result?
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }

@@ -273,7 +273,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -328,7 +328,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -336,15 +336,11 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    output, exists = _maybe_load_single_output(
-        func,
-        run_info.run_folder,
-        return_output=return_output,
-    )
+    output, exists = _maybe_load_single_output(func, store, return_output=return_output)
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, run_info.run_folder, store)
+    result = _process_task(func, kwargs_task, store)
     if not return_output:
         return None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
@@ -355,7 +351,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
