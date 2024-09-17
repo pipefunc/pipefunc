@@ -140,12 +140,16 @@ class RunInfo:
 
     @property
     def input_paths(self) -> dict[str, Path]:
-        assert self.run_folder is not None
+        if self.run_folder is None:
+            msg = "Cannot get `input_paths` without `run_folder`."
+            raise ValueError(msg)
         return {k: _input_path(k, self.run_folder) for k in self.inputs}
 
     @property
     def defaults_path(self) -> Path:
-        assert self.run_folder is not None
+        if self.run_folder is None:
+            msg = "Cannot get `defaults_path` without `run_folder`."
+            raise ValueError(msg)
         return _default_path(self.run_folder)
 
     @functools.cached_property
@@ -243,9 +247,9 @@ def _compare_to_previous_run_info(
         msg = "Internal shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
     if pipeline.mapspecs_as_strings != old.mapspecs_as_strings:
-        msg = "Mapspecs do not match previous run, cannot use `cleanup=False`."
+        msg = "`MapSpec`s do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
-    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    shapes, _masks = map_shapes(pipeline, inputs, internal_shapes)
     if shapes != old.shapes:
         msg = "Shapes do not match previous run, cannot use `cleanup=False`."
         raise ValueError(msg)
@@ -283,11 +287,6 @@ def _maybe_tuple(x: str) -> tuple[str, ...] | str:
     if "," in x:
         return tuple(x.split(","))
     return x
-
-
-def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:
-    path = input_paths[name]
-    return load(path, cache=cache)
 
 
 def _output_path(output_name: str, run_folder: Path) -> Path:

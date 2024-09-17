@@ -14,22 +14,9 @@ import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.cache import HybridCache, to_hashable
-from pipefunc.map._mapspec import (
-    MapSpec,
-    _shape_to_key,
-    validate_consistent_axes,
-)
-from pipefunc.map._run_info import (
-    DirectValue,
-    RunInfo,
-    _external_shape,
-    _internal_shape,
-)
-from pipefunc.map._storage_base import (
-    StorageBase,
-    _iterate_shape_indices,
-    _select_by_mask,
-)
+from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
+from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
+from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -112,8 +99,6 @@ def run(
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    if _cannot_be_parallelized(pipeline):
-        parallel = False
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -124,6 +109,8 @@ def run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
+    if _cannot_be_parallelized(pipeline):
+        parallel = False
     _check_parallel(parallel, store)
 
     with _maybe_executor(executor, parallel) as ex:
