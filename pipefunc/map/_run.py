@@ -138,14 +138,15 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | Path | DirectValue | None
+    store: StorageBase | Path | DirectValue
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
-    outputs = [_load_parameter(output_name, run_info.init_store()) for output_name in output_names]
+    store = run_info.init_store()
+    outputs = [_load_parameter(output_name, store) for output_name in output_names]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
