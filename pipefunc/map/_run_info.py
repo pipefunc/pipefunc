@@ -140,16 +140,12 @@ class RunInfo:
 
     @property
     def input_paths(self) -> dict[str, Path]:
-        if self.run_folder is None:
-            msg = "Cannot get `input_paths` without `run_folder`."
-            raise ValueError(msg)
+        assert self.run_folder is not None
         return {k: _input_path(k, self.run_folder) for k in self.inputs}
 
     @property
     def defaults_path(self) -> Path:
-        if self.run_folder is None:
-            msg = "Cannot get `defaults_path` without `run_folder`."
-            raise ValueError(msg)
+        assert self.run_folder is not None
         return _default_path(self.run_folder)
 
     @functools.cached_property
