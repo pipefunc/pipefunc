@@ -215,11 +215,6 @@ def _dump_single_output(
         storage.value = output
 
 
-def _load_parameter(parameter: str, store: dict[str, StorageBase | Path | DirectValue]) -> Any:
-    r, _ = _load_from_store(parameter, store)
-    return r
-
-
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
