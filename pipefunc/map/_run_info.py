@@ -18,6 +18,14 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
+class DirectValue:
+    __slots__ = ["value", "exists"]
+
+    def __init__(self, value: Any | None = None) -> None:
+        self.value = value
+        self.exists = False
+
+
 class Shapes(NamedTuple):
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
@@ -114,7 +122,7 @@ class RunInfo:
             raise ValueError(msg)
         return storage_registry[self.storage]
 
-    def init_store(self) -> dict[str, StorageBase | Path | dict[str, Any]]:
+    def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
         return _init_storage(
             self.all_output_names,
             self.mapspecs,
@@ -288,10 +296,10 @@ def _init_storage(
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
-) -> dict[str, StorageBase | Path | dict[str, Any]]:
+) -> dict[str, StorageBase | Path | DirectValue]:
     from pipefunc.map._run import _output_path
 
-    store: dict[str, StorageBase | Path | dict[str, Any]] = {}
+    store: dict[str, StorageBase | Path | DirectValue] = {}
     for mapspec in mapspecs:
         if not mapspec.inputs:
             continue

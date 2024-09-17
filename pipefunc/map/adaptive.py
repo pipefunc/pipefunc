@@ -15,8 +15,8 @@ from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     _func_kwargs,
+    _load_from_store,
     _mask_fixed_axes,
-    _maybe_load_single_output,
     _process_task,
     _reduced_axes,
     _run_iteration_and_process,
@@ -24,7 +24,7 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
+from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -273,7 +273,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -328,7 +328,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -336,7 +336,7 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    output, exists = _maybe_load_single_output(func, store, return_output=return_output)
+    output, exists = _load_from_store(func.output_name, store, return_output=return_output)
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
@@ -351,7 +351,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -360,7 +360,7 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
+    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:

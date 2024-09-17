@@ -21,7 +21,13 @@ from pipefunc.map._mapspec import (
     _shape_to_key,
     validate_consistent_axes,
 )
-from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
+from pipefunc.map._run_info import (
+    DirectValue,
+    RunInfo,
+    _external_shape,
+    _internal_shape,
+    _load_input,
+)
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
@@ -146,7 +152,7 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | Path | dict[str, Any] | None
+    store: StorageBase | Path | DirectValue | None
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -201,7 +207,7 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
 def _dump_output(
     func: PipeFunc,
     output: Any,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
@@ -218,7 +224,7 @@ def _dump_output(
 def _dump_single_output(
     output: Any,
     output_name: str,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> None:
     storage = store[output_name]
     if isinstance(storage, Path):
@@ -228,7 +234,7 @@ def _dump_single_output(
         storage[output_name] = output
 
 
-def _load_output(output_name: str, store: dict[str, StorageBase | Path | dict[str, Any]]) -> Any:
+def _load_output(output_name: str, store: dict[str, StorageBase | Path | DirectValue]) -> Any:
     path = store[output_name]
     assert isinstance(path, Path)
     return load(path)
@@ -237,7 +243,7 @@ def _load_output(output_name: str, store: dict[str, StorageBase | Path | dict[st
 def _load_parameter(
     parameter: str,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> Any:
     if parameter in run_info.input_paths:
         return _load_input(parameter, run_info.input_paths)
@@ -249,7 +255,7 @@ def _load_parameter(
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
@@ -469,7 +475,7 @@ def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
@@ -520,36 +526,53 @@ def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: An
     return func(*args)
 
 
-def _maybe_load_single_output(
-    func: PipeFunc,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+def _load_from_store(  # noqa: PLR0912
+    output_name: _OUTPUT_TYPE,
+    store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = True,
 ) -> tuple[Any, bool]:
-    """Load the output if it exists.
-
-    Returns the output and a boolean indicating whether the output exists.
-    """
-    # TODO: deal with the case where output is dict!
-    output_paths = [store[name] for name in at_least_tuple(func.output_name)]
-    if all(p.is_file() for p in output_paths):
-        if not return_output:
-            return None, True
-        outputs = [load(p) for p in output_paths]
-        if isinstance(func.output_name, tuple):
-            return outputs, True
-        return outputs[0], True
-    return None, False
+    storages = [store[name] for name in at_least_tuple(output_name)]
+    outputs: list[Any] = []
+    exists: list[bool] = []
+    for storage in storages:
+        if isinstance(storage, StorageBase):
+            exists.append(True)
+            if return_output:
+                outputs.append(storage.to_array())
+        elif isinstance(storage, Path):
+            if storage.is_file():
+                exists.append(True)
+                if return_output:
+                    outputs.append(load(storage))
+            else:
+                exists.append(False)
+                outputs.append(None)
+        elif isinstance(storage, DirectValue):
+            if storage.exists:
+                exists.append(True)
+                if return_output:
+                    outputs.append(storage.value)
+            else:
+                exists.append(False)
+                outputs.append(None)
+        else:
+            msg = f"Unknown storage type: {storage}"
+            raise TypeError(msg)
+    if return_output:
+        output = outputs if isinstance(output_name, tuple) else outputs[0]
+        return output, all(exists)
+    return None, all(exists)
 
 
 def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
-    output, exists = _maybe_load_single_output(func, store)
+    output, exists = _load_from_store(func.output_name, store, return_output=True)
     if exists:
         return output
 
@@ -593,7 +616,7 @@ class _KwargsTask(NamedTuple):
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
@@ -610,7 +633,7 @@ def _run_and_process_generation(
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
     cache: _CacheBase | None = None,
@@ -628,7 +651,7 @@ def _submit_func(
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
@@ -664,7 +687,7 @@ def _process_task(
 
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
-    store: dict[str, StorageBase | Path | dict[str, Any]],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> None:
     if not parallel or not store:
         return
