@@ -9,7 +9,6 @@ import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map import DictArray, register_storage
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -775,9 +774,6 @@ def test_unpicklable_run():
 
     pipeline = Pipeline([f, g])
 
-    class LocalDictArray(DictArray):
-        def persist(self) -> None:
-            pass
-
-    register_storage(LocalDictArray, "local-dict")
-    pipeline.map({"a": 1}, storage="local-dict", parallel=False)
+    r = pipeline.map({"a": 1}, storage="dict", parallel=False)
+    assert isinstance(r["y"].output, Unpicklable)
+    assert r["z"].output == 1
