@@ -26,7 +26,7 @@ class DictArray(StorageBase):
     """A `numpy.ndarray` backed by a `dict` with internal structure."""
 
     storage_id = "dict"
-    requires_disk = False
+    requires_serialization = False
 
     def __init__(
         self,
@@ -224,7 +224,7 @@ class SharedMemoryDictArray(DictArray):
     """Array interface to a shared memory dict store."""
 
     storage_id = "shared_memory_dict"
-    requires_disk = False
+    requires_serialization = False
 
     def __init__(
         self,

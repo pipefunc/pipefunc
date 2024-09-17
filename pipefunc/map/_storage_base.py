@@ -50,7 +50,7 @@ class StorageBase(abc.ABC):
     internal_shape: tuple[int, ...]
     shape_mask: tuple[bool, ...]
     storage_id: str
-    requires_disk: bool
+    requires_serialization: bool
 
     @abc.abstractmethod
     def __init__(

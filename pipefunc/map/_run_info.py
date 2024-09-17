@@ -199,7 +199,7 @@ class RunInfo:
 
 
 def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
-    if run_folder is None and _get_storage_class(storage).requires_disk:
+    if run_folder is None and _get_storage_class(storage).requires_serialization:
         run_folder = tempfile.mkdtemp()
         msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
         warnings.warn(msg, stacklevel=2)

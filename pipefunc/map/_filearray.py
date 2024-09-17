@@ -44,7 +44,7 @@ class FileArray(StorageBase):
     """
 
     storage_id = "file_array"
-    requires_disk = True
+    requires_serialization = True
 
     def __init__(
         self,

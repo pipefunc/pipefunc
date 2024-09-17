@@ -22,7 +22,7 @@ class ZarrFileArray(StorageBase):
     """Array interface to a Zarr store."""
 
     storage_id = "zarr_file_array"
-    requires_disk = True
+    requires_serialization = True
 
     def __init__(
         self,
@@ -244,7 +244,7 @@ class ZarrMemoryArray(ZarrFileArray):
     """Array interface to an in-memory Zarr store."""
 
     storage_id = "zarr_memory"
-    requires_disk = False
+    requires_serialization = False
 
     def __init__(
         self,
@@ -300,7 +300,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
     """Array interface to a shared memory Zarr store."""
 
     storage_id = "zarr_shared_memory"
-    requires_disk = False
+    requires_serialization = False
 
     def __init__(
         self,
