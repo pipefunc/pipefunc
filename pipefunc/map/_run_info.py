@@ -112,8 +112,9 @@ class RunInfo:
             raise ValueError(msg)
         return storage_registry[self.storage]
 
-    def init_store(self) -> dict[str, StorageBase]:
+    def init_store(self) -> dict[str, StorageBase | Path | dict[str, Any]]:
         return _init_storage(
+            self.all_output_names,
             self.mapspecs,
             self.storage_class,
             self.shapes,
@@ -279,13 +280,16 @@ def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) 
 
 
 def _init_storage(
+    all_output_names: set[str],
     mapspecs: list[MapSpec],
     storage_class: type[StorageBase],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
     run_folder: Path,
-) -> dict[str, StorageBase]:
-    store: dict[str, StorageBase] = {}
+) -> dict[str, StorageBase | Path | dict[str, Any]]:
+    from pipefunc.map._run import _output_path
+
+    store: dict[str, StorageBase | Path | dict[str, Any]] = {}
     for mapspec in mapspecs:
         output_names = mapspec.output_names
         shape = shapes[output_names[0]]
@@ -293,6 +297,9 @@ def _init_storage(
         arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
         for output_name, arr in zip(output_names, arrays):
             store[output_name] = arr  # noqa: PERF403
+    for output_name in all_output_names:
+        if output_name not in store:
+            store[output_name] = _output_path(output_name, run_folder)
     return store
 
 

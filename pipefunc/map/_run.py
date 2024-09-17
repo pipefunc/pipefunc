@@ -5,6 +5,7 @@ import itertools
 import tempfile
 import time
 from collections import OrderedDict, defaultdict
+from collections.abc import MutableMapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -134,7 +135,8 @@ def run(
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
-            arr.persist()
+            if isinstance(arr, StorageBase):
+                arr.persist()
 
     return outputs
 
@@ -144,7 +146,7 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | None
+    store: StorageBase | Path | dict[str, Any] | None
     run_folder: Path
 
 
@@ -197,7 +199,12 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
-def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> tuple[Any, ...]:
+def _dump_output(
+    func: PipeFunc,
+    output: Any,
+    run_folder: Path,
+    store: dict[str, StorageBase | Path | dict[str, Any]],
+) -> tuple[Any, ...]:
     folder = run_folder / "outputs"
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -207,12 +214,23 @@ def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> tuple[Any, ..
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, run_folder)
-            dump(_output, path)
+            _dump_single_output(_output, output_name, store)
         return tuple(new_output)
-    path = _output_path(func.output_name, run_folder)
-    dump(output, path)
+    _dump_single_output(output, func.output_name, store)
     return (output,)
+
+
+def _dump_single_output(
+    output: Any,
+    output_name: str,
+    store: dict[str, StorageBase | Path | dict[str, Any]],
+) -> None:
+    storage = store[output_name]
+    if isinstance(storage, Path):
+        dump(output, path=storage)
+    else:
+        assert isinstance(storage, MutableMapping), storage
+        storage[output_name] = output
 
 
 def _load_output(output_name: str, run_folder: Path) -> Any:
@@ -220,7 +238,11 @@ def _load_output(output_name: str, run_folder: Path) -> Any:
     return load(path)
 
 
-def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageBase]) -> Any:
+def _load_parameter(
+    parameter: str,
+    run_info: RunInfo,
+    store: dict[str, StorageBase | Path | dict[str, Any]],
+) -> Any:
     if parameter in run_info.input_paths:
         return _load_input(parameter, run_info.input_paths)
     if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
@@ -231,7 +253,7 @@ def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageB
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
@@ -451,14 +473,14 @@ def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
+    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
@@ -574,7 +596,7 @@ class _KwargsTask(NamedTuple):
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
@@ -591,7 +613,7 @@ def _run_and_process_generation(
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
     cache: _CacheBase | None = None,
@@ -610,7 +632,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     run_folder: Path,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | dict[str, Any]],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
@@ -628,7 +650,7 @@ def _process_task(
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
         r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_output(func, r, run_folder)
+        output = _dump_output(func, r, run_folder, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
@@ -638,24 +660,26 @@ def _process_task(
             kwargs=kwargs,
             output_name=output_name,
             output=_output,
-            store=store.get(output_name),
+            store=store[output_name],
             run_folder=run_folder,
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
 
 
-def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
+def _check_parallel(
+    parallel: bool,  # noqa: FBT001
+    store: dict[str, StorageBase | Path | dict[str, Any]],
+) -> None:
     if not parallel or not store:
         return
-    # Assumes all storage classes are the same! Might change in the future.
-    storage = next(iter(store.values()))
-    if not storage.parallelizable:
-        msg = (
-            f"Parallel execution is not supported with `{storage.storage_id}` storage."
-            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
-        )
-        raise ValueError(msg)
+    for storage in store.values():
+        if isinstance(storage, StorageBase) and not storage.parallelizable:
+            msg = (
+                f"Parallel execution is not supported with `{storage.storage_id}` storage."
+                " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+            )
+            raise ValueError(msg)
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
