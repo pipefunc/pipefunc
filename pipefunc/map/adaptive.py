@@ -139,6 +139,7 @@ class LearnersDict(LearnersDictType):
         kwargs = details.kwargs()
         if slurm_run_kwargs:
             kwargs.update(slurm_run_kwargs)
+        assert self.run_info.run_folder is not None
         kwargs.setdefault("folder", self.run_info.run_folder / "adaptive_scheduler")
         if returns == "run_manager":  # pragma: no cover
             return details.run_manager(kwargs)
@@ -151,7 +152,7 @@ class LearnersDict(LearnersDictType):
 def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    run_folder: str | Path,
+    run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     storage: str = "file_array",
@@ -222,7 +223,6 @@ def create_learners(
         ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
-    run_folder = Path(run_folder)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -231,7 +231,6 @@ def create_learners(
         storage=storage,
         cleanup=cleanup,
     )
-    run_info.dump(run_folder)
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(

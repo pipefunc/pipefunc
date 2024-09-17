@@ -82,6 +82,7 @@ def slurm_run_setup(
     assert isinstance(default_resources, Resources) or default_resources is None
     tracker = _ResourcesContainer(default_resources)
     assert learners_dict.run_info is not None
+    assert learners_dict.run_info.run_folder is not None
     run_folder = Path(learners_dict.run_info.run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []

@@ -13,7 +13,7 @@ from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
-from pipefunc.map._storage_base import storage_registry
+from pipefunc.map._storage_base import StorageBase, storage_registry
 from pipefunc.map.xarray import xarray_dataset_from_results
 from pipefunc.typing import Array  # noqa: TCH001
 
@@ -70,13 +70,14 @@ def test_simple(storage, tmp_path: Path) -> None:
         assert ds["sum"] == 12
 
     run_info = RunInfo.load(tmp_path)
-    run_info.dump(tmp_path)
+    run_info.dump()
     run_info2 = RunInfo.load(tmp_path)
     assert run_info2 == run_info
 
     with pytest.raises(ValueError, match="Pipeline is fully connected"):
         pipeline.split_disconnected()
     assert results["y"].store is not None
+    assert isinstance(results["y"].store, StorageBase)
     assert isinstance(results["y"].store.parallelizable, bool)
     assert results["y"].store.has_index(0)
 
@@ -528,7 +529,8 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
     assert _reduced_axes(pipeline) == {"charge": {"b", "a"}}
 
 
-def test_pipeline_with_defaults(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_pipeline_with_defaults(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="z")
     def f(x: int, y: int = 1) -> int:
         return x + y
@@ -540,22 +542,29 @@ def test_pipeline_with_defaults(tmp_path: Path) -> None:
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g])
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path if storage == "file_array" else None,
+        parallel=False,
+        storage=storage,
+    )
     assert results["sum"].output == 10
     assert results["sum"].output_name == "sum"
     shapes, masks = map_shapes(pipeline, inputs)
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "z": (4,)}
-    sum_result = load_outputs("sum", run_folder=tmp_path)
-    assert sum_result == 1 + 2 + 3 + 4
-    sum_result = load_outputs("z", run_folder=tmp_path)
-    assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
+    if storage == "file_array":
+        sum_result = load_outputs("sum", run_folder=tmp_path)
+        assert sum_result == 1 + 2 + 3 + 4
+        sum_result = load_outputs("z", run_folder=tmp_path)
+        assert sum_result.tolist() == [1, 2, 3, 4]  # type: ignore[union-attr]
 
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output == 2 + 3 + 4 + 5
-    load_xarray_dataset(run_folder=tmp_path)
-    xarray_dataset_from_results(inputs, results, pipeline)
+    if storage == "file_array":
+        load_xarray_dataset(run_folder=tmp_path)
+        xarray_dataset_from_results(inputs, results, pipeline)
 
 
 def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
@@ -827,6 +836,7 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     )
     assert results["c"].output.shape == (2, 2)
     assert results["c"].store is not None
+    assert isinstance(results["c"].store, StorageBase)
     assert isinstance(results["c"].store.parallelizable, bool)
     assert results["c"].output.tolist() == [[2, 0], [3, -1]]
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
@@ -1107,6 +1117,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
     results = pipeline.map(inputs, tmp_path, fixed_indices={"i": slice(1, None)}, parallel=False)
     assert results["z"].output.tolist() == [None, 7, 9]
     assert results["z"].store is not None
+    assert isinstance(results["z"].store, StorageBase)
     assert results["z"].store.mask.mask.tolist() == [True, False, False]
 
     @pipefunc(output_name="z", mapspec="x[i], y[i, j] -> z[i, j]")
@@ -1360,7 +1371,8 @@ def test_defaults_with_bound_exception():
     assert g.defaults == {}
 
 
-def test_internal_shapes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_internal_shapes(storage: str, tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
     def f(x):
         return x
@@ -1376,8 +1388,9 @@ def test_internal_shapes(tmp_path: Path) -> None:
     internal_shapes = {"r": (5,)}
     results = pipeline.map(
         inputs,
-        tmp_path,
+        tmp_path if storage == "file_array" else None,
         internal_shapes,  # type: ignore[arg-type]
+        storage=storage,
         parallel=False,
     )
     assert results["r"].output.shape == (2, 4, 5)

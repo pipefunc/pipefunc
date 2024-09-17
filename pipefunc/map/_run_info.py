@@ -3,6 +3,8 @@ from __future__ import annotations
 import functools
 import json
 import shutil
+import tempfile
+import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
@@ -95,8 +97,8 @@ class RunInfo:
         storage: str,
         cleanup: bool = True,
     ) -> RunInfo:
+        run_folder = _maybe_run_folder(run_folder, storage)
         if run_folder is not None:
-            run_folder = Path(run_folder)
             if cleanup:
                 _cleanup_run_folder(run_folder)
             else:
@@ -105,7 +107,7 @@ class RunInfo:
         _check_inputs(pipeline, inputs)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
-        return cls(
+        run_info = cls(
             inputs=inputs,
             defaults=pipeline.defaults,
             all_output_names=pipeline.all_output_names,
@@ -116,6 +118,9 @@ class RunInfo:
             run_folder=run_folder,
             storage=storage,
         )
+        if run_info.run_folder is not None:
+            run_info.dump()
+        return run_info
 
     @property
     def storage_class(self) -> type[StorageBase]:
@@ -148,19 +153,14 @@ class RunInfo:
         return _default_path(self.run_folder)
 
     @functools.cached_property
-    def load_inputs(self) -> dict[str, Any]:
-        return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
-
-    @functools.cached_property
-    def load_defaults(self) -> Any:
-        return load(self.defaults_path, cache=False)
-
-    @functools.cached_property
     def mapspecs(self) -> list[MapSpec]:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
-    def dump(self, run_folder: str | Path) -> None:
-        path = self.path(run_folder)
+    def dump(self) -> None:
+        if self.run_folder is None:
+            msg = "Cannot dump `RunInfo` without `run_folder`."
+            raise ValueError(msg)
+        path = self.path(self.run_folder)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
         del data["inputs"]
@@ -196,6 +196,14 @@ class RunInfo:
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+
+def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
+    if run_folder is None and _get_storage_class(storage).requires_disk:
+        run_folder = tempfile.mkdtemp()
+        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
+        warnings.warn(msg, stacklevel=2)
+    return Path(run_folder) if run_folder is not None else None
 
 
 def _construct_internal_shapes(

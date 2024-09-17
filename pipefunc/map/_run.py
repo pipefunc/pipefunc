@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-import tempfile
 import time
-import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -29,7 +27,6 @@ from pipefunc.map._run_info import (
 )
 from pipefunc.map._storage_base import (
     StorageBase,
-    _get_storage_class,
     _iterate_shape_indices,
     _select_by_mask,
 )
@@ -117,7 +114,6 @@ def run(
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     if _cannot_be_parallelized(pipeline):
         parallel = False
-    run_folder = _maybe_run_folder(run_folder, storage)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -126,8 +122,6 @@ def run(
         storage=storage,
         cleanup=cleanup,
     )
-    if run_folder is not None:
-        run_info.dump(run_folder)
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
     _check_parallel(parallel, store)
@@ -200,14 +194,6 @@ def load_xarray_dataset(
         output_names=output_name,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
-
-
-def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
-    if run_folder is None and _get_storage_class(storage).requires_disk:
-        run_folder = tempfile.mkdtemp()
-        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
-        warnings.warn(msg, stacklevel=2)
-    return Path(run_folder) if run_folder is not None else None
 
 
 def _dump_output(
