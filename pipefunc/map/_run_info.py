@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage_base import StorageBase, storage_registry
+from pipefunc.map._storage_base import StorageBase, _get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -18,12 +18,17 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-class DirectValue:
-    __slots__ = ["value", "exists"]
+class _Missing: ...
 
-    def __init__(self, value: Any | None = None) -> None:
+
+class DirectValue:
+    __slots__ = ["value"]
+
+    def __init__(self, value: Any | None = _Missing) -> None:
         self.value = value
-        self.exists = False
+
+    def exists(self) -> bool:
+        return self.value is not _Missing
 
 
 class Shapes(NamedTuple):
@@ -68,13 +73,13 @@ def map_shapes(
 
 @dataclass(frozen=True, eq=True)
 class RunInfo:
-    input_paths: dict[str, Path]
-    defaults_path: Path
+    inputs: dict[str, Any]
+    defaults: dict[str, Any]
     all_output_names: set[str]
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
-    run_folder: Path
+    run_folder: Path | None
     mapspecs_as_strings: list[str]
     storage: str
     pipefunc_version: str = __version__
@@ -82,7 +87,7 @@ class RunInfo:
     @classmethod
     def create(
         cls: type[RunInfo],
-        run_folder: str | Path,
+        run_folder: str | Path | None,
         pipeline: Pipeline,
         inputs: dict[str, Any],
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
@@ -90,21 +95,19 @@ class RunInfo:
         storage: str,
         cleanup: bool = True,
     ) -> RunInfo:
-        run_folder = Path(run_folder)
-        if cleanup:
-            _cleanup_run_folder(run_folder)
-        else:
-            _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
+        if run_folder is not None:
+            run_folder = Path(run_folder)
+            if cleanup:
+                _cleanup_run_folder(run_folder)
+            else:
+                _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
+
         _check_inputs(pipeline, inputs)
-        # TODO: keep inputs in store too!
-        input_paths = _dump_inputs(inputs, run_folder)
-        # TODO: keep defaults in defaults store
-        defaults_path = _dump_defaults(pipeline.defaults, run_folder)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         return cls(
-            input_paths=input_paths,
-            defaults_path=defaults_path,
+            inputs=inputs,
+            defaults=pipeline.defaults,
             all_output_names=pipeline.all_output_names,
             shapes=shapes,
             internal_shapes=internal_shapes,
@@ -116,11 +119,7 @@ class RunInfo:
 
     @property
     def storage_class(self) -> type[StorageBase]:
-        if self.storage not in storage_registry:
-            available = ", ".join(storage_registry.keys())
-            msg = f"Storage class `{self.storage}` not found, only `{available}` available."
-            raise ValueError(msg)
-        return storage_registry[self.storage]
+        return _get_storage_class(self.storage)
 
     def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
         return _init_storage(
@@ -129,15 +128,31 @@ class RunInfo:
             self.storage_class,
             self.shapes,
             self.shape_masks,
+            self.inputs,
+            self.defaults,
             self.run_folder,
         )
 
+    @property
+    def input_paths(self) -> dict[str, Path]:
+        if self.run_folder is None:
+            msg = "Cannot get `input_paths` without `run_folder`."
+            raise ValueError(msg)
+        return {k: _input_path(k, self.run_folder) for k in self.inputs}
+
+    @property
+    def defaults_path(self) -> Path:
+        if self.run_folder is None:
+            msg = "Cannot get `defaults_path` without `run_folder`."
+            raise ValueError(msg)
+        return _default_path(self.run_folder)
+
     @functools.cached_property
-    def inputs(self) -> dict[str, Any]:
+    def load_inputs(self) -> dict[str, Any]:
         return {k: _load_input(k, self.input_paths, cache=False) for k in self.input_paths}
 
     @functools.cached_property
-    def defaults(self) -> Any:
+    def load_defaults(self) -> Any:
         return load(self.defaults_path, cache=False)
 
     @functools.cached_property
@@ -146,13 +161,16 @@ class RunInfo:
 
     def dump(self, run_folder: str | Path) -> None:
         path = self.path(run_folder)
+        path.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
-        data["input_paths"] = {k: str(v) for k, v in data["input_paths"].items()}
+        del data["inputs"]
+        del data["defaults"]
+        data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
         for key in ["shapes", "shape_masks"]:
             data[key] = {",".join(at_least_tuple(k)): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
-        data["defaults_path"] = str(data["defaults_path"])
+        data["defaults_path"] = str(self.defaults_path)
         with path.open("w") as f:
             json.dump(data, f, indent=4)
 
@@ -171,7 +189,8 @@ class RunInfo:
                 for k, v in data["internal_shapes"].items()
             }
         data["run_folder"] = Path(data["run_folder"])
-        data["defaults_path"] = Path(data["defaults_path"])
+        data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
+        data["defaults"] = load(Path(data.pop("defaults_path")))
         return cls(**data)
 
     @staticmethod
@@ -262,28 +281,6 @@ def _maybe_tuple(x: str) -> tuple[str, ...] | str:
     return x
 
 
-def _dump_inputs(
-    inputs: dict[str, Any],
-    run_folder: Path,
-) -> dict[str, Path]:
-    folder = run_folder / "inputs"
-    folder.mkdir(parents=True, exist_ok=True)
-    paths = {}
-    for k, v in inputs.items():
-        path = folder / f"{k}.cloudpickle"
-        dump(v, path)
-        paths[k] = path
-    return paths
-
-
-def _dump_defaults(defaults: dict[str, Any], run_folder: Path) -> Path:
-    folder = run_folder / "defaults"
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / "defaults.cloudpickle"
-    dump(defaults, path)
-    return path
-
-
 def _load_input(name: str, input_paths: dict[str, Path], *, cache: bool = True) -> Any:
     path = input_paths[name]
     return load(path, cache=cache)
@@ -293,15 +290,30 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
     return run_folder / "outputs" / f"{output_name}.cloudpickle"
 
 
+def _input_path(input_name: str, run_folder: Path) -> Path:
+    return run_folder / "inputs" / f"{input_name}.cloudpickle"
+
+
+def _default_path(run_folder: Path) -> Path:
+    return run_folder / "defaults" / "defaults.cloudpickle"
+
+
+# Use a non Python identifier for the key to avoid conflicts with user-defined inputs
+_DEFAULTS_KEY = "#defaults"
+
+
 def _init_storage(
     all_output_names: set[str],
     mapspecs: list[MapSpec],
     storage_class: type[StorageBase],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    run_folder: Path,
+    inputs: dict[str, Any],
+    defaults: dict[str, Any],
+    run_folder: Path | None,
 ) -> dict[str, StorageBase | Path | DirectValue]:
     store: dict[str, StorageBase | Path | DirectValue] = {}
+    # Initialize StorageBase instances for each output of each mapspec
     for mapspec in mapspecs:
         if not mapspec.inputs:
             continue
@@ -311,9 +323,27 @@ def _init_storage(
         arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
         for output_name, arr in zip(output_names, arrays):
             store[output_name] = arr  # noqa: PERF403
+    # Create paths or DirectValue instances for inputs, defaults, and single outputs
     for output_name in all_output_names:
-        if output_name not in store:
+        if output_name in store:
+            continue
+        if isinstance(run_folder, Path):
             store[output_name] = _output_path(output_name, run_folder)
+        else:
+            store[output_name] = DirectValue()
+    for input_name, value in inputs.items():
+        if isinstance(run_folder, Path):
+            input_path = _input_path(input_name, run_folder)
+            dump(value, input_path)
+            store[input_name] = input_path
+        else:
+            store[input_name] = DirectValue(value)
+    if isinstance(run_folder, Path):
+        defaults_path = _default_path(run_folder)
+        dump(defaults, defaults_path)
+        store[_DEFAULTS_KEY] = defaults_path
+    else:
+        store[_DEFAULTS_KEY] = DirectValue(defaults)
     return store
 
 
@@ -322,16 +352,18 @@ def _init_file_arrays(
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
-    run_folder: Path,
+    run_folder: Path | None,
 ) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     output_names = at_least_tuple(output_name)
-    paths = [_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    paths = [_maybe_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
     return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
-def _file_array_path(output_name: str, run_folder: Path) -> Path:
+def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | None:
+    if run_folder is None:
+        return None
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
 

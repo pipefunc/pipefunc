@@ -4,6 +4,7 @@ import functools
 import itertools
 import tempfile
 import time
+import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -25,9 +26,13 @@ from pipefunc.map._run_info import (
     RunInfo,
     _external_shape,
     _internal_shape,
-    _load_input,
 )
-from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage_base import (
+    StorageBase,
+    _get_storage_class,
+    _iterate_shape_indices,
+    _select_by_mask,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -110,7 +115,13 @@ def run(
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    run_folder = _ensure_run_folder(run_folder)
+    if _cannot_be_parallelized(pipeline):
+        parallel = False
+    if run_folder is None and _get_storage_class(storage).requires_disk:
+        run_folder = tempfile.mkdtemp()
+        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
+        warnings.warn(msg, stacklevel=2)
+    run_folder = Path(run_folder) if run_folder is not None else None
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -119,11 +130,10 @@ def run(
         storage=storage,
         cleanup=cleanup,
     )
-    run_info.dump(run_folder)
+    if run_folder is not None:
+        run_info.dump(run_folder)
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    if _cannot_be_parallelized(pipeline):
-        parallel = False
     _check_parallel(parallel, store)
 
     with _maybe_executor(executor, parallel) as ex:
@@ -158,10 +168,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
-    outputs = [
-        _load_parameter(output_name, run_info, run_info.init_store())
-        for output_name in output_names
-    ]
+    outputs = [_load_parameter(output_name, run_info.init_store()) for output_name in output_names]
     outputs = [_maybe_load_file_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
@@ -228,25 +235,11 @@ def _dump_single_output(
     else:
         assert isinstance(storage, DirectValue)
         storage.value = output
-        storage.exists = True
 
 
-def _load_output(output_name: str, store: dict[str, StorageBase | Path | DirectValue]) -> Any:
-    path = store[output_name]
-    assert isinstance(path, Path)
-    return load(path)
-
-
-def _load_parameter(
-    parameter: str,
-    run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
-) -> Any:
-    if parameter in run_info.input_paths:
-        return _load_input(parameter, run_info.input_paths)
-    if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
-        return _load_output(parameter, store)
-    return store[parameter]
+def _load_parameter(parameter: str, store: dict[str, StorageBase | Path | DirectValue]) -> Any:
+    r, _ = _load_from_store(parameter, store)
+    return r
 
 
 def _func_kwargs(
@@ -258,8 +251,8 @@ def _func_kwargs(
     for p in func.parameters:
         if p in func._bound:
             kwargs[p] = func._bound[p]
-        elif p in run_info.input_paths or p in run_info.all_output_names:
-            kwargs[p] = _load_parameter(p, run_info, store)
+        elif p in run_info.inputs or p in run_info.all_output_names:
+            kwargs[p] = _load_parameter(p, store)
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
@@ -536,7 +529,7 @@ def _load_from_store(  # noqa: PLR0912
         if isinstance(storage, StorageBase):
             exists.append(True)
             if return_output:
-                outputs.append(storage.to_array())
+                outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
                 exists.append(True)
@@ -546,7 +539,7 @@ def _load_from_store(  # noqa: PLR0912
                 exists.append(False)
                 outputs.append(None)
         elif isinstance(storage, DirectValue):
-            if storage.exists:
+            if storage.exists():
                 exists.append(True)
                 if return_output:
                     outputs.append(storage.value)
@@ -596,13 +589,6 @@ def _maybe_load_file_array(x: Any) -> Any:
 def _load_file_array(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
         kwargs[k] = _maybe_load_file_array(v)
-
-
-def _ensure_run_folder(run_folder: str | Path | None) -> Path:
-    if run_folder is None:
-        tmp_dir = tempfile.mkdtemp()
-        run_folder = Path(tmp_dir)
-    return Path(run_folder)
 
 
 class _KwargsTask(NamedTuple):

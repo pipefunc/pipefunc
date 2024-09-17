@@ -50,11 +50,12 @@ class StorageBase(abc.ABC):
     internal_shape: tuple[int, ...]
     shape_mask: tuple[bool, ...]
     storage_id: str
+    requires_disk: bool
 
     @abc.abstractmethod
     def __init__(
         self,
-        folder: str | Path,
+        folder: str | Path | None,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
@@ -174,3 +175,11 @@ def _normalize_key(
             normalized_key.append(normalized_k)
 
     return tuple(normalized_key)
+
+
+def _get_storage_class(storage: str) -> type[StorageBase]:
+    if storage not in storage_registry:
+        available = ", ".join(storage_registry.keys())
+        msg = f"Storage class `{storage}` not found, only `{available}` available."
+        raise ValueError(msg)
+    return storage_registry[storage]

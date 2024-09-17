@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pickle
 import re
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -781,5 +780,4 @@ def test_unpicklable_run():
             pass
 
     register_storage(LocalDictArray, "local-dict")
-    ex = ThreadPoolExecutor()
-    pipeline.map({}, storage="local-dict", parallel=True, executor=ex)
+    pipeline.map({"a": 1}, storage="local-dict", parallel=False)
