@@ -494,7 +494,7 @@ class _StoredValue(NamedTuple):
     exists: bool
 
 
-def _load_from_store(  # noqa: PLR0912
+def _load_from_store(
     output_name: _OUTPUT_TYPE,
     store: dict[str, StorageBase | Path | DirectValue],
     *,
@@ -528,10 +528,8 @@ def _load_from_store(  # noqa: PLR0912
             msg = f"Unknown storage type: {storage}"
             raise TypeError(msg)
     all_exist = all(exists)
-    if return_output:
-        output = outputs if isinstance(output_name, tuple) else outputs[0]
-        return _StoredValue(output, all_exist)
-    return _StoredValue(None, all_exist)
+    output = (outputs if isinstance(output_name, tuple) else outputs[0]) if return_output else None
+    return _StoredValue(output, all_exist)
 
 
 def _submit_single(
