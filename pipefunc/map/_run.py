@@ -657,7 +657,7 @@ def _process_task(
             output_name=output_name,
             output=_output,
             store=store[output_name],
-            run_folder=run_folder,
+            run_folder=run_folder,  # TODO: remove run_folder from Result?
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
