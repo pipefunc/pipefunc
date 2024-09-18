@@ -127,16 +127,45 @@ class RunInfo:
         return _get_storage_class(self.storage)
 
     def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
-        return _init_storage(
-            self.all_output_names,
-            self.mapspecs,
-            self.storage_class,
-            self.shapes,
-            self.shape_masks,
-            self.inputs,
-            self.defaults,
-            self.run_folder,
-        )
+        store: dict[str, StorageBase | Path | DirectValue] = {}
+        # Initialize StorageBase instances for each output of each mapspec
+        for mapspec in self.mapspecs:
+            if not mapspec.inputs:
+                continue
+            output_names = mapspec.output_names
+            shape = self.shapes[output_names[0]]
+            mask = self.shape_masks[output_names[0]]
+            arrays = _init_file_arrays(
+                output_names,
+                shape,
+                mask,
+                self.storage_class,
+                self.run_folder,
+            )
+            for output_name, arr in zip(output_names, arrays):
+                store[output_name] = arr  # noqa: PERF403
+        # Create paths or DirectValue instances for inputs, defaults, and single outputs
+        for output_name in self.all_output_names:
+            if output_name in store:
+                continue
+            if isinstance(self.run_folder, Path):
+                store[output_name] = _output_path(output_name, self.run_folder)
+            else:
+                store[output_name] = DirectValue()
+        for input_name, value in self.inputs.items():
+            if isinstance(self.run_folder, Path):
+                input_path = _input_path(input_name, self.run_folder)
+                dump(value, input_path)
+                store[input_name] = input_path
+            else:
+                store[input_name] = DirectValue(value)
+        if isinstance(self.run_folder, Path):
+            defaults_path = _default_path(self.run_folder)
+            dump(self.defaults, defaults_path)
+            store[_DEFAULTS_KEY] = defaults_path
+        else:
+            store[_DEFAULTS_KEY] = DirectValue(self.defaults)
+        return store
 
     @property
     def input_paths(self) -> dict[str, Path]:
@@ -196,6 +225,10 @@ class RunInfo:
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+
+# Use a non Python identifier for the key to avoid conflicts with user-defined inputs
+_DEFAULTS_KEY = "#defaults"
 
 
 def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
@@ -299,55 +332,6 @@ def _input_path(input_name: str, run_folder: Path) -> Path:
 
 def _default_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
-
-
-# Use a non Python identifier for the key to avoid conflicts with user-defined inputs
-_DEFAULTS_KEY = "#defaults"
-
-
-def _init_storage(
-    all_output_names: set[str],
-    mapspecs: list[MapSpec],
-    storage_class: type[StorageBase],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]],
-    inputs: dict[str, Any],
-    defaults: dict[str, Any],
-    run_folder: Path | None,
-) -> dict[str, StorageBase | Path | DirectValue]:
-    store: dict[str, StorageBase | Path | DirectValue] = {}
-    # Initialize StorageBase instances for each output of each mapspec
-    for mapspec in mapspecs:
-        if not mapspec.inputs:
-            continue
-        output_names = mapspec.output_names
-        shape = shapes[output_names[0]]
-        mask = shape_masks[output_names[0]]
-        arrays = _init_file_arrays(output_names, shape, mask, storage_class, run_folder)
-        for output_name, arr in zip(output_names, arrays):
-            store[output_name] = arr  # noqa: PERF403
-    # Create paths or DirectValue instances for inputs, defaults, and single outputs
-    for output_name in all_output_names:
-        if output_name in store:
-            continue
-        if isinstance(run_folder, Path):
-            store[output_name] = _output_path(output_name, run_folder)
-        else:
-            store[output_name] = DirectValue()
-    for input_name, value in inputs.items():
-        if isinstance(run_folder, Path):
-            input_path = _input_path(input_name, run_folder)
-            dump(value, input_path)
-            store[input_name] = input_path
-        else:
-            store[input_name] = DirectValue(value)
-    if isinstance(run_folder, Path):
-        defaults_path = _default_path(run_folder)
-        dump(defaults, defaults_path)
-        store[_DEFAULTS_KEY] = defaults_path
-    else:
-        store[_DEFAULTS_KEY] = DirectValue(defaults)
-    return store
 
 
 def _init_file_arrays(
