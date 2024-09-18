@@ -224,7 +224,9 @@ def _func_kwargs(
     for p in func.parameters:
         if p in func._bound:
             kwargs[p] = func._bound[p]
-        elif p in run_info.inputs or p in run_info.all_output_names:
+        elif p in run_info.inputs:
+            kwargs[p] = run_info.inputs[p]
+        elif p in run_info.all_output_names:
             kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]

@@ -165,10 +165,6 @@ class RunInfo:
         if isinstance(self.run_folder, Path):
             defaults_path = _defaults_path(self.run_folder)
             dump(self.defaults, defaults_path)
-            store[_DEFAULTS_KEY] = defaults_path
-        else:
-            store[_DEFAULTS_KEY] = DirectValue(self.defaults)
-
         return store
 
     @property
@@ -229,10 +225,6 @@ class RunInfo:
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
-
-
-# Use a non Python identifier for the key to avoid conflicts with user-defined inputs
-_DEFAULTS_KEY = "#defaults"
 
 
 def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
