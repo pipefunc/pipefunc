@@ -501,7 +501,7 @@ def _maybe_parallel_map(
         return executor.map(func, seq)
     if use_ray:
         remote_func = _make_remote(func)
-        return [remote_func(*args) for args in seq]
+        return [remote_func(args) for args in seq]
     return map(func, seq)
 
 
