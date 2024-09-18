@@ -128,30 +128,31 @@ class RunInfo:
 
     def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
         store: dict[str, StorageBase | Path | DirectValue] = {}
-        # Initialize StorageBase instances for each output of each mapspec
+
+        # Initialize StorageBase instances for each map spec output
         for mapspec in self.mapspecs:
-            if not mapspec.inputs:
-                continue
-            output_names = mapspec.output_names
-            shape = self.shapes[output_names[0]]
-            mask = self.shape_masks[output_names[0]]
-            arrays = _init_file_arrays(
-                output_names,
-                shape,
-                mask,
-                self.storage_class,
-                self.run_folder,
-            )
-            for output_name, arr in zip(output_names, arrays):
-                store[output_name] = arr  # noqa: PERF403
-        # Create paths or DirectValue instances for inputs, defaults, and single outputs
+            if mapspec.inputs:
+                shape = self.shapes[mapspec.output_names[0]]
+                mask = self.shape_masks[mapspec.output_names[0]]
+                arrays = _init_file_arrays(
+                    mapspec.output_names,
+                    shape,
+                    mask,
+                    self.storage_class,
+                    self.run_folder,
+                )
+                store.update(zip(mapspec.output_names, arrays))
+
+        # Set up paths or DirectValue for outputs not initialized as StorageBase
         for output_name in self.all_output_names:
-            if output_name in store:
-                continue
-            if isinstance(self.run_folder, Path):
-                store[output_name] = _output_path(output_name, self.run_folder)
-            else:
-                store[output_name] = DirectValue()
+            if output_name not in store:
+                store[output_name] = (
+                    _output_path(output_name, self.run_folder)
+                    if isinstance(self.run_folder, Path)
+                    else DirectValue()
+                )
+
+        # Set up paths or DirectValue for inputs
         for input_name, value in self.inputs.items():
             if isinstance(self.run_folder, Path):
                 input_path = _input_path(input_name, self.run_folder)
@@ -159,12 +160,15 @@ class RunInfo:
                 store[input_name] = input_path
             else:
                 store[input_name] = DirectValue(value)
+
+        # Set up defaults key with paths or DirectValue
         if isinstance(self.run_folder, Path):
             defaults_path = _default_path(self.run_folder)
             dump(self.defaults, defaults_path)
             store[_DEFAULTS_KEY] = defaults_path
         else:
             store[_DEFAULTS_KEY] = DirectValue(self.defaults)
+
         return store
 
     @property
