@@ -659,7 +659,7 @@ class Pipeline:
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
-            Whether to run the functions in parallel.
+            Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.

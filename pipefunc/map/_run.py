@@ -72,7 +72,7 @@ def run(
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
-        Whether to run the functions in parallel.
+        Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
@@ -656,15 +656,22 @@ def _check_parallel(
         return
     for storage in store.values():
         if isinstance(storage, StorageBase) and not storage.parallelizable:
-            recommendation = "Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+            recommendation = (
+                "Consider using a file-based storage or `shared_memory` / `zarr_shared_memory`"
+                " for parallel execution or disable parallel execution."
+            )
+            default = f"The chosen storage type `{storage.storage_id}` does not support process-based parallel execution."
             if executor is None:
-                # PipeFunc will use a ProcessPoolExecutor by default
-                msg = f"Parallel execution is not supported with `{storage.storage_id}` storage. {recommendation}"
+                msg = (
+                    f"{default}"
+                    f" PipeFunc defaults to using a `ProcessPoolExecutor`, which requires a parallelizable storage."
+                    f" {recommendation}"
+                )
                 raise ValueError(msg)
             msg = (
-                f"The chosen storage `{storage.storage_id}` does not support process based parallel"
-                f" execution. If the `executor` (`{type(executor).__name__}`) is processed based,"
-                f" it won't work. {recommendation}"
+                f"{default}"
+                f" If the current executor of type `{type(executor).__name__}` is process-based, it is incompatible."
+                f" {recommendation}"
             )
             warnings.warn(msg, stacklevel=2)
 
