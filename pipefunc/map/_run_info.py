@@ -163,7 +163,7 @@ class RunInfo:
 
         # Set up defaults key with paths or DirectValue
         if isinstance(self.run_folder, Path):
-            defaults_path = _default_path(self.run_folder)
+            defaults_path = _defaults_path(self.run_folder)
             dump(self.defaults, defaults_path)
             store[_DEFAULTS_KEY] = defaults_path
         else:
@@ -183,7 +183,7 @@ class RunInfo:
         if self.run_folder is None:  # pragma: no cover
             msg = "Cannot get `defaults_path` without `run_folder`."
             raise ValueError(msg)
-        return _default_path(self.run_folder)
+        return _defaults_path(self.run_folder)
 
     @functools.cached_property
     def mapspecs(self) -> list[MapSpec]:
@@ -196,8 +196,8 @@ class RunInfo:
         path = self.path(self.run_folder)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
-        del data["inputs"]
-        del data["defaults"]
+        del data["inputs"]  # Cannot serialize inputs
+        del data["defaults"]  # or defaults
         data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
         for key in ["shapes", "shape_masks"]:
@@ -334,7 +334,7 @@ def _input_path(input_name: str, run_folder: Path) -> Path:
     return run_folder / "inputs" / f"{input_name}.cloudpickle"
 
 
-def _default_path(run_folder: Path) -> Path:
+def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
