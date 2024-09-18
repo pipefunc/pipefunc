@@ -112,7 +112,6 @@ def run(
     store = run_info.init_store()
     if _cannot_be_parallelized(pipeline):
         parallel = False
-
     _check_parallel(parallel, store, executor)
 
     with _maybe_executor(executor, parallel) as ex:
