@@ -86,6 +86,16 @@ class RunInfo:
     storage: str
     pipefunc_version: str = __version__
 
+    def __post_init__(self) -> None:
+        if self.run_folder is None:
+            return
+        self.dump()
+        for input_name, value in self.inputs.items():
+            input_path = _input_path(input_name, self.run_folder)
+            dump(value, input_path)
+        defaults_path = _defaults_path(self.run_folder)
+        dump(self.defaults, defaults_path)
+
     @classmethod
     def create(
         cls: type[RunInfo],
@@ -103,11 +113,10 @@ class RunInfo:
                 _cleanup_run_folder(run_folder)
             else:
                 _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
-
         _check_inputs(pipeline, inputs)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
-        run_info = cls(
+        return cls(
             inputs=inputs,
             defaults=pipeline.defaults,
             all_output_names=pipeline.all_output_names,
@@ -118,9 +127,6 @@ class RunInfo:
             run_folder=run_folder,
             storage=storage,
         )
-        if run_info.run_folder is not None:
-            run_info.dump()
-        return run_info
 
     @property
     def storage_class(self) -> type[StorageBase]:
@@ -151,20 +157,6 @@ class RunInfo:
                     if isinstance(self.run_folder, Path)
                     else DirectValue()
                 )
-
-        # Set up paths or DirectValue for inputs
-        for input_name, value in self.inputs.items():
-            if isinstance(self.run_folder, Path):
-                input_path = _input_path(input_name, self.run_folder)
-                dump(value, input_path)
-                store[input_name] = input_path
-            else:
-                store[input_name] = DirectValue(value)
-
-        # Set up defaults key with paths or DirectValue
-        if isinstance(self.run_folder, Path):
-            defaults_path = _defaults_path(self.run_folder)
-            dump(self.defaults, defaults_path)
         return store
 
     @property
