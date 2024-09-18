@@ -9,7 +9,7 @@ import tomllib
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PIP_ONLY_DEPS: set[str] = {"myst-nb"}
+PIP_ONLY_DEPS: set[str] = {"myst-nb", "ray"}
 REPLACE_DEPS: dict[str, str] = {
     "myst-nb": "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
     "graphviz": "python-graphviz",

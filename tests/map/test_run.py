@@ -1080,7 +1080,8 @@ def test_independent_axes_2():
     assert pipeline.independent_axes_in_mapspecs("r") == {"k"}
 
 
-def test_parallel():
+@pytest.mark.parametrize("use_ray", [True, False])
+def test_parallel(use_ray: bool) -> None:  # noqa: FBT001
     @pipefunc(output_name="double", mapspec="x[i] -> double[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -1096,12 +1097,13 @@ def test_parallel():
     pipeline = Pipeline([double_it, half_it, take_sum])
     inputs = {"x": [0, 1, 2, 3]}
     run_folder = "my_run_folder"
-    executor = ProcessPoolExecutor(max_workers=2)  # Use 2 processes
+    executor = ProcessPoolExecutor(max_workers=2) if not use_ray else None
     results = pipeline.map(
         inputs,
         run_folder=run_folder,
         parallel=True,
         executor=executor,
+        use_ray=use_ray,
         storage="shared_memory_dict",
     )
     assert results["sum"].output == 14
