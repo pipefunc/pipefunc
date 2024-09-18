@@ -300,7 +300,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
     """Array interface to a shared memory Zarr store."""
 
     storage_id = "zarr_shared_memory"
-    requires_serialization = False
+    requires_serialization = True
 
     def __init__(
         self,
