@@ -650,7 +650,7 @@ class Pipeline:
             or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
         run_folder
             The folder to store the run information. If ``None``, either a temporary folder
-            is created or no folder is used, depending on the storage class.
+            is created or no folder is used, depending on whether the storage class requires serialization.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
