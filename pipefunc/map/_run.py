@@ -500,36 +500,32 @@ def _load_from_store(
     *,
     return_output: bool = True,
 ) -> _StoredValue:
-    storages = [store[name] for name in at_least_tuple(output_name)]
     outputs: list[Any] = []
-    exists: list[bool] = []
-    for storage in storages:
+    all_exist = True
+
+    for name in at_least_tuple(output_name):
+        storage = store[name]
         if isinstance(storage, StorageBase):
-            exists.append(True)
-            if return_output:
-                outputs.append(storage)
+            outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
-                exists.append(True)
-                if return_output:
-                    outputs.append(load(storage))
+                outputs.append(load(storage) if return_output else None)
             else:
-                exists.append(False)
+                all_exist = False
                 outputs.append(None)
         elif isinstance(storage, DirectValue):
             if storage.exists():
-                exists.append(True)
-                if return_output:
-                    outputs.append(storage.value)
+                outputs.append(storage.value)
             else:
-                exists.append(False)
+                all_exist = False
                 outputs.append(None)
-        else:  # pragma: no cover
-            msg = f"Unknown storage type: {storage}"
-            raise TypeError(msg)
-    all_exist = all(exists)
-    output = (outputs if isinstance(output_name, tuple) else outputs[0]) if return_output else None
-    return _StoredValue(output, all_exist)
+
+    if not return_output:
+        outputs = None  # type: ignore[assignment]
+    elif len(outputs) == 1:
+        outputs = outputs[0]
+
+    return _StoredValue(outputs, all_exist)
 
 
 def _submit_single(
