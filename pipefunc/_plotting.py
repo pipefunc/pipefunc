@@ -291,11 +291,11 @@ def visualize_graphviz(  # noqa: PLR0912
         ),
         "PipeFunc": (
             nodes.func,
-            {"fillcolor": blue, "shape": "box", "style": "filled"},
+            {"fillcolor": blue, "shape": "box", "style": "filled,rounded"},
         ),
         "NestedPipeFunction": (
             nodes.nested_func,
-            {"fillcolor": blue, "shape": "box", "style": "filled", "color": _COLORS["red"]},
+            {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
         ),
         "Bound": (
             nodes.bound,
