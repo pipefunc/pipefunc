@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pickle
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -781,3 +783,19 @@ def test_unpicklable_run(tmp_path: Path) -> None:
     r = pipeline.map({"a": 1}, storage="dict", parallel=False)
     assert isinstance(r["y"].output, Unpicklable)
     assert r["z"].output == 1
+
+
+def test_unpicklable_run_with_mapspec():
+    @pipefunc(output_name="y", mapspec="a[i] -> y[i]")
+    def f(a):
+        return Unpicklable(a)
+
+    @pipefunc(output_name="z", mapspec="a[i] -> z[i]")
+    def g(a):
+        return a
+
+    pipeline = Pipeline([f, g])
+    inputs = {"a": [1, 2, 3, 4]}
+    r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
+    assert isinstance(r["y"].output, np.ndarray)
+    assert r["z"].output.tolist() == [1, 2, 3, 4]

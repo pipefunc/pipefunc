@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import itertools
 import time
+import warnings
 from collections import OrderedDict, defaultdict
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
@@ -111,7 +112,8 @@ def run(
     store = run_info.init_store()
     if _cannot_be_parallelized(pipeline):
         parallel = False
-    _check_parallel(parallel, store)
+
+    _check_parallel(parallel, store, executor)
 
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
@@ -647,16 +649,24 @@ def _process_task(
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
+    executor: Executor | None,
 ) -> None:
+    if isinstance(executor, ThreadPoolExecutor):
+        return
     if not parallel or not store:
         return
     for storage in store.values():
         if isinstance(storage, StorageBase) and not storage.parallelizable:
+            recommendation = "Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+            if executor is None:
+                msg = f"Parallel execution is not supported with `{storage.storage_id}` storage. {recommendation}"
+                raise ValueError(msg)
             msg = (
-                f"Parallel execution is not supported with `{storage.storage_id}` storage."
-                " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+                f"The chosen storage `{storage.storage_id}` does not support process based parallel"
+                f" execution. If the `executor` (`{type(executor).__name__}`) is processed based,"
+                f" it won't work. {recommendation}"
             )
-            raise ValueError(msg)
+            warnings.warn(msg, stacklevel=2)
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
