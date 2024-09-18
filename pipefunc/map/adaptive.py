@@ -383,7 +383,7 @@ class _MapWrapper:
     Copies the Pipeline and removes the cache to avoid issues with the parallel execution.
     """
 
-    mock_pipeline: Pipeline
+    pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
     internal_shapes: dict[str, int | tuple[int, ...]] | None
@@ -393,7 +393,7 @@ class _MapWrapper:
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
         run(
-            self.mock_pipeline,  # type: ignore[arg-type]
+            self.pipeline,  # type: ignore[arg-type]
             self.inputs,
             self.run_folder,
             self.internal_shapes,
