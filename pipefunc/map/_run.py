@@ -78,7 +78,7 @@ def run(
         is used. Only relevant if ``parallel=True``.
     use_ray
         Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
-        If ``True``, `executor` is ignored.
+        If ``True``, ``executor`` and ``parallel`` is ignored.
     storage
         The storage class to use for the file arrays.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
