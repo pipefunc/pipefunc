@@ -45,6 +45,7 @@ def run(
     output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | None = None,
+    use_ray: bool = False,
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -75,6 +76,9 @@ def run(
     executor
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
+    use_ray
+        Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
+        If ``True``, `executor` is ignored.
     storage
         The storage class to use for the file arrays.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
@@ -113,17 +117,28 @@ def run(
         parallel = False
     _check_parallel(parallel, store)
 
-    with _maybe_executor(executor, parallel) as ex:
+    with _maybe_executor(executor, parallel, use_ray) as ex:
         for gen in pipeline.topological_generations.function_lists:
-            _run_and_process_generation(
-                generation=gen,
-                run_info=run_info,
-                store=store,
-                outputs=outputs,
-                fixed_indices=fixed_indices,
-                executor=ex,
-                cache=pipeline.cache,
-            )
+            if use_ray:
+                # Assuming you've created a Ray version of '_run_and_process_generation'
+                _run_and_process_generation_ray(
+                    generation=gen,
+                    run_info=run_info,
+                    store=store,
+                    outputs=outputs,
+                    fixed_indices=fixed_indices,
+                    cache=pipeline.cache,
+                )
+            else:
+                _run_and_process_generation(
+                    generation=gen,
+                    run_info=run_info,
+                    store=store,
+                    outputs=outputs,
+                    fixed_indices=fixed_indices,
+                    executor=ex,
+                    cache=pipeline.cache,
+                )
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -418,8 +433,15 @@ def _existing_and_missing_indices(
 def _maybe_executor(
     executor: Executor | None,
     parallel: bool,  # noqa: FBT001
+    use_ray: bool,  # noqa: FBT001
 ) -> Generator[Executor | None, None, None]:
-    if executor is None and parallel:
+    if use_ray:
+        import ray
+
+        if not ray.is_initialized():
+            ray.init(ignore_reinit_error=True)
+        yield None
+    elif executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
     else:
@@ -748,3 +770,67 @@ def _get_partially_reduced_axes(
     assert func.mapspec is not None
     spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
     return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
+
+
+def _run_single_task(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    store: dict[str, StorageBase | Path | DirectValue],
+    cache: _CacheBase | None,
+) -> dict[str, Result]:
+    """Run a single pipeline function and store the result."""
+    output = _submit_single(func, kwargs, store, cache)
+    return {
+        output_name: Result(
+            function=func.__name__,
+            kwargs=kwargs,
+            output_name=output_name,
+            output=_output,
+            store=store[output_name],
+        )
+        for output_name, _output in zip(
+            at_least_tuple(func.output_name),
+            _dump_single_output(func, output, store),
+        )
+    }
+
+
+def _make_remote(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Dynamically decorate a function with @ray.remote if Ray is available."""
+    try:
+        import ray
+
+        return ray.remote(func)
+    except ImportError:
+        return func  # return the function unchanged if Ray is not available
+
+
+def _run_and_process_generation_ray(
+    generation: list[PipeFunc],
+    run_info: RunInfo,
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+    fixed_indices: dict[str, int | slice] | None,
+    cache: _CacheBase | None = None,
+) -> None:
+    import ray
+
+    run_task = _make_remote(_run_single_task)
+
+    tasks = {}
+    for func in generation:
+        kwargs = _func_kwargs(func, run_info, store)
+        if func.mapspec and func.mapspec.inputs:
+            args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+            tasks[func] = [run_task.remote(func, kwargs, store, cache) for _ in args.missing]
+        else:
+            tasks[func] = run_task.remote(func, kwargs, store, cache)
+
+    for task_refs in tasks.values():
+        if isinstance(task_refs, list):
+            task_results = ray.get(task_refs)
+            for result_dict in task_results:
+                outputs.update(result_dict)
+        else:
+            result_dict = ray.get(task_refs)
+            outputs.update(result_dict)

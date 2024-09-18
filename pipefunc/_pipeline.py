@@ -633,6 +633,7 @@ class Pipeline:
         output_names: set[_OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | None = None,
+        use_ray: bool = False,
         storage: str = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -663,6 +664,9 @@ class Pipeline:
         executor
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.
+        use_ray
+            Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
+            If ``True``, `executor` is ignored.
         storage
             The storage class to use for the file arrays.
             Can use any registered storage class. See `pipefunc.map.storage_registry`.
@@ -689,6 +693,7 @@ class Pipeline:
             output_names=output_names,
             parallel=parallel,
             executor=executor,
+            use_ray=use_ray,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
