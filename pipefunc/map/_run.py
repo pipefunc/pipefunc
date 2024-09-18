@@ -184,7 +184,7 @@ def load_xarray_dataset(
     )
 
 
-def _dump_output(
+def _dump_single_output(
     func: PipeFunc,
     output: Any,
     store: dict[str, StorageBase | Path | DirectValue],
@@ -195,13 +195,13 @@ def _dump_output(
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            _dump_single_output(_output, output_name, store)
+            _single_dump_single_output(_output, output_name, store)
         return tuple(new_output)
-    _dump_single_output(output, func.output_name, store)
+    _single_dump_single_output(output, func.output_name, store)
     return (output,)
 
 
-def _dump_single_output(
+def _single_dump_single_output(
     output: Any,
     output_name: str,
     store: dict[str, StorageBase | Path | DirectValue],
@@ -625,7 +625,7 @@ def _process_task(
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
         r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_output(func, r, store)
+        output = _dump_single_output(func, r, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
