@@ -658,6 +658,7 @@ def _check_parallel(
         if isinstance(storage, StorageBase) and not storage.parallelizable:
             recommendation = "Use a file based storage or `shared_memory` / `zarr_shared_memory`."
             if executor is None:
+                # PipeFunc will use a ProcessPoolExecutor by default
                 msg = f"Parallel execution is not supported with `{storage.storage_id}` storage. {recommendation}"
                 raise ValueError(msg)
             msg = (
