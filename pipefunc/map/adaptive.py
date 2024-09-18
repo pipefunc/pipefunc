@@ -393,7 +393,7 @@ class _MapWrapper:
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
         run(
-            self.pipeline,  # type: ignore[arg-type]
+            self.pipeline,
             self.inputs,
             self.run_folder,
             self.internal_shapes,
