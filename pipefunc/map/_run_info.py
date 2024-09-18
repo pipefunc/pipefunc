@@ -26,7 +26,7 @@ class _Missing: ...
 class DirectValue:
     __slots__ = ["value"]
 
-    def __init__(self, value: Any | None = _Missing) -> None:
+    def __init__(self, value: Any | type[_Missing] = _Missing) -> None:
         self.value = value
 
     def exists(self) -> bool:
