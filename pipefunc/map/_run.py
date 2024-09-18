@@ -119,26 +119,16 @@ def run(
 
     with _maybe_executor(executor, parallel, use_ray) as ex:
         for gen in pipeline.topological_generations.function_lists:
-            if use_ray:
-                # Assuming you've created a Ray version of '_run_and_process_generation'
-                _run_and_process_generation_ray(
-                    generation=gen,
-                    run_info=run_info,
-                    store=store,
-                    outputs=outputs,
-                    fixed_indices=fixed_indices,
-                    cache=pipeline.cache,
-                )
-            else:
-                _run_and_process_generation(
-                    generation=gen,
-                    run_info=run_info,
-                    store=store,
-                    outputs=outputs,
-                    fixed_indices=fixed_indices,
-                    executor=ex,
-                    cache=pipeline.cache,
-                )
+            _run_and_process_generation(
+                generation=gen,
+                run_info=run_info,
+                store=store,
+                outputs=outputs,
+                fixed_indices=fixed_indices,
+                executor=ex,
+                use_ray=use_ray,
+                cache=pipeline.cache,
+            )
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -501,15 +491,31 @@ def _mask_fixed_axes(
     return select.flat
 
 
-def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
+def _maybe_parallel_map(
+    func: Callable[..., Any],
+    seq: Sequence,
+    executor: Executor | None,
+    use_ray: bool,  # noqa: FBT001
+) -> Any:
     if executor is not None:
         return executor.map(func, seq)
+    if use_ray:
+        remote_func = _make_remote(func)
+        return [remote_func(*args) for args in seq]
     return map(func, seq)
 
 
-def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
+def _maybe_submit(
+    func: Callable[..., Any],
+    executor: Executor | None,
+    *args: Any,
+    use_ray: bool,
+) -> Any:
     if executor:
         return executor.submit(func, *args)
+    if use_ray:
+        remote_func = _make_remote(func)
+        return remote_func(*args)
     return func(*args)
 
 
@@ -595,19 +601,21 @@ class _KwargsTask(NamedTuple):
 
 
 def _run_and_process_generation(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    use_ray: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks: dict[PipeFunc, _KwargsTask] = {}
     for func in generation:
-        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, use_ray, cache)
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store, executor)
+        _outputs = _process_task(func, tasks[func], store, executor, use_ray=use_ray)
         outputs.update(_outputs)
 
 
@@ -617,16 +625,33 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    use_ray: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, use_ray)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache, use_ray=use_ray)
     return _KwargsTask(kwargs, task)
+
+
+def _results(map_result: Generator[Any], use_ray: bool) -> list[Any]:  # noqa: FBT001
+    if use_ray:
+        import ray
+
+        return ray.get(map_result)  # type: ignore[arg-type]
+    return list(map_result)
+
+
+def _result(task: Any, executor: Executor | None, use_ray: bool) -> Any:  # noqa: FBT001
+    if use_ray:
+        import ray
+
+        return ray.get(task)  # type: ignore[arg-type]
+    return task.result() if executor else task
 
 
 def _process_task(
@@ -634,12 +659,13 @@ def _process_task(
     kwargs_task: _KwargsTask,
     store: dict[str, StorageBase | Path | DirectValue],
     executor: Executor | None = None,
+    *,
+    use_ray: bool = False,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = list(r)
-
+        outputs_list = _results(r, use_ray)
         for index, outputs in zip(args.missing, outputs_list):
             _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
@@ -649,7 +675,7 @@ def _process_task(
 
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
-        r = task.result() if executor else task  # type: ignore[union-attr]
+        r = _result(task, executor, use_ray)
         output = _dump_single_output(func, r, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
@@ -772,65 +798,16 @@ def _get_partially_reduced_axes(
     return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
 
 
-def _run_single_task(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    store: dict[str, StorageBase | Path | DirectValue],
-    cache: _CacheBase | None,
-) -> dict[str, Result]:
-    """Run a single pipeline function and store the result."""
-    output = _submit_single(func, kwargs, store, cache)
-    return {
-        output_name: Result(
-            function=func.__name__,
-            kwargs=kwargs,
-            output_name=output_name,
-            output=_output,
-            store=store[output_name],
-        )
-        for output_name, _output in zip(
-            at_least_tuple(func.output_name),
-            _dump_single_output(func, output, store),
-        )
-    }
-
-
+@functools.cache
 def _make_remote(func: Callable[..., Any]) -> Callable[..., Any]:
     """Dynamically decorate a function with @ray.remote if Ray is available."""
     try:
         import ray
 
-        return ray.remote(func)
+        if isinstance(func, functools.partial):
+            original_func = func.func
+            remote_func = ray.remote(original_func)
+            return functools.partial(remote_func.remote, *func.args, **func.keywords)
+        return ray.remote(func).remote
     except ImportError:
         return func  # return the function unchanged if Ray is not available
-
-
-def _run_and_process_generation_ray(
-    generation: list[PipeFunc],
-    run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
-    outputs: dict[str, Result],
-    fixed_indices: dict[str, int | slice] | None,
-    cache: _CacheBase | None = None,
-) -> None:
-    import ray
-
-    run_task = _make_remote(_run_single_task)
-
-    tasks = {}
-    for func in generation:
-        kwargs = _func_kwargs(func, run_info, store)
-        if func.mapspec and func.mapspec.inputs:
-            args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-            tasks[func] = [run_task.remote(func, kwargs, store, cache) for _ in args.missing]
-        else:
-            tasks[func] = run_task.remote(func, kwargs, store, cache)
-
-    for task_refs in tasks.values():
-        if isinstance(task_refs, list):
-            task_results = ray.get(task_refs)
-            for result_dict in task_results:
-                outputs.update(result_dict)
-        else:
-            result_dict = ray.get(task_refs)
-            outputs.update(result_dict)
