@@ -657,8 +657,8 @@ def _check_parallel(
     for storage in store.values():
         if isinstance(storage, StorageBase) and not storage.parallelizable:
             recommendation = (
-                "Consider using a file-based storage or `shared_memory` / `zarr_shared_memory`"
-                " for parallel execution or disable parallel execution."
+                "Consider\n - using a file-based storage or `shared_memory` / `zarr_shared_memory`"
+                " for parallel execution,\n - disable parallel execution,\n - or use a different executor.\n"
             )
             default = f"The chosen storage type `{storage.storage_id}` does not support process-based parallel execution."
             if executor is None:
@@ -668,6 +668,7 @@ def _check_parallel(
                     f" {recommendation}"
                 )
                 raise ValueError(msg)
+            assert executor is not None
             msg = (
                 f"{default}"
                 f" If the current executor of type `{type(executor).__name__}` is process-based, it is incompatible."
