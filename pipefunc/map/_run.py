@@ -515,7 +515,8 @@ def _load_from_store(
             else:
                 all_exist = False
                 outputs.append(None)
-        elif isinstance(storage, DirectValue):
+        else:
+            assert isinstance(storage, DirectValue)
             if storage.exists():
                 outputs.append(storage.value)
             else:
