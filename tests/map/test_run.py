@@ -1029,7 +1029,7 @@ def test_storage_options():
     inputs = {"x": [1, 2, 3]}
     with pytest.raises(
         ValueError,
-        match="Parallel execution is not supported with `zarr_memory` storage",
+        match="The chosen storage type `zarr_memory` does not support process-based parallel execution.",
     ):
         pipeline.map(inputs, storage="zarr_memory", parallel=True)
 
@@ -1454,3 +1454,32 @@ def test_internal_shape_in_pipefunc():
     r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False)
     assert r2["y"].output == [1, 1, 1]
     assert r2["z"].output.tolist() == [1, 1, 1]
+
+
+def test_parallel_warning_and_error():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x - 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="w", mapspec="y[i], z[i] -> w[i]")
+    def h(y, z):
+        return y + z
+
+    @pipefunc(output_name="r")
+    def i(w):
+        return sum(w)
+
+    pipeline = Pipeline([f, g, h, i])
+    inputs = {"x": [1, 2, 3]}
+    with pytest.warns(
+        UserWarning,
+        match="The chosen storage type `zarr_memory` does not support process-based parallel execution",
+    ):
+        pipeline.map(inputs, storage="zarr_memory", parallel=True, executor=ProcessPoolExecutor())
+
+    with pytest.raises(ValueError, match="The chosen storage type `zarr_memory` does not support"):
+        pipeline.map(inputs, storage="zarr_memory", parallel=True)
