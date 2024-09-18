@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import itertools
-import tempfile
 import time
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ProcessPoolExecutor
@@ -15,12 +14,8 @@ import numpy.typing as npt
 
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.cache import HybridCache, to_hashable
-from pipefunc.map._mapspec import (
-    MapSpec,
-    _shape_to_key,
-    validate_consistent_axes,
-)
-from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
+from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
+from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
@@ -68,8 +63,8 @@ def run(
         corresponding input data, these are either single values for functions without ``mapspec``
         or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
     run_folder
-        The folder to store the run information. If ``None``, a temporary folder
-        is created.
+        The folder to store the run information. If ``None``, either a temporary folder
+        is created or no folder is used, depending on whether the storage class requires serialization.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
@@ -104,7 +99,6 @@ def run(
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    run_folder = _ensure_run_folder(run_folder)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -113,7 +107,6 @@ def run(
         storage=storage,
         cleanup=cleanup,
     )
-    run_info.dump(run_folder)
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
     if _cannot_be_parallelized(pipeline):
@@ -134,7 +127,8 @@ def run(
 
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
-            arr.persist()
+            if isinstance(arr, StorageBase):
+                arr.persist()
 
     return outputs
 
@@ -144,19 +138,16 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | None
-    run_folder: Path
+    store: StorageBase | Path | DirectValue
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run."""
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
-    outputs = [
-        _load_parameter(output_name, run_info, run_info.init_store())
-        for output_name in output_names
-    ]
-    outputs = [_maybe_load_file_array(o) for o in outputs]
+    store = run_info.init_store()
+    outputs = [_load_from_store(output_name, store).value for output_name in output_names]
+    outputs = [_maybe_load_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
 
@@ -193,52 +184,50 @@ def load_xarray_dataset(
     )
 
 
-def _output_path(output_name: str, run_folder: Path) -> Path:
-    return run_folder / "outputs" / f"{output_name}.cloudpickle"
-
-
-def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> tuple[Any, ...]:
-    folder = run_folder / "outputs"
-    folder.mkdir(parents=True, exist_ok=True)
-
+def _dump_single_output(
+    func: PipeFunc,
+    output: Any,
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, run_folder)
-            dump(_output, path)
+            _single_dump_single_output(_output, output_name, store)
         return tuple(new_output)
-    path = _output_path(func.output_name, run_folder)
-    dump(output, path)
+    _single_dump_single_output(output, func.output_name, store)
     return (output,)
 
 
-def _load_output(output_name: str, run_folder: Path) -> Any:
-    path = _output_path(output_name, run_folder)
-    return load(path)
-
-
-def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageBase]) -> Any:
-    if parameter in run_info.input_paths:
-        return _load_input(parameter, run_info.input_paths)
-    if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
-        return _load_output(parameter, run_info.run_folder)
-    return store[parameter]
+def _single_dump_single_output(
+    output: Any,
+    output_name: str,
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> None:
+    storage = store[output_name]
+    assert not isinstance(storage, StorageBase)
+    if isinstance(storage, Path):
+        dump(output, path=storage)
+    else:
+        assert isinstance(storage, DirectValue)
+        storage.value = output
 
 
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
             kwargs[p] = func._bound[p]
-        elif p in run_info.input_paths or p in run_info.all_output_names:
-            kwargs[p] = _load_parameter(p, run_info, store)
+        elif p in run_info.inputs:
+            kwargs[p] = run_info.inputs[p]
+        elif p in run_info.all_output_names:
+            kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
@@ -261,7 +250,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_file_array(selected)
+    _load_file_arrays(selected)
     return selected
 
 
@@ -451,14 +440,14 @@ def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
+    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
@@ -502,40 +491,59 @@ def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: An
     return func(*args)
 
 
-def _maybe_load_single_output(
-    func: PipeFunc,
-    run_folder: Path,
+class _StoredValue(NamedTuple):
+    value: Any
+    exists: bool
+
+
+def _load_from_store(
+    output_name: _OUTPUT_TYPE,
+    store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = True,
-) -> tuple[Any, bool]:
-    """Load the output if it exists.
+) -> _StoredValue:
+    outputs: list[Any] = []
+    all_exist = True
 
-    Returns the output and a boolean indicating whether the output exists.
-    """
-    output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
-    if all(p.is_file() for p in output_paths):
-        if not return_output:
-            return None, True
-        outputs = [load(p) for p in output_paths]
-        if isinstance(func.output_name, tuple):
-            return outputs, True
-        return outputs[0], True
-    return None, False
+    for name in at_least_tuple(output_name):
+        storage = store[name]
+        if isinstance(storage, StorageBase):
+            outputs.append(storage)
+        elif isinstance(storage, Path):
+            if storage.is_file():
+                outputs.append(load(storage) if return_output else None)
+            else:
+                all_exist = False
+                outputs.append(None)
+        else:
+            assert isinstance(storage, DirectValue)
+            if storage.exists():
+                outputs.append(storage.value)
+            else:
+                all_exist = False
+                outputs.append(None)
+
+    if not return_output:
+        outputs = None  # type: ignore[assignment]
+    elif len(outputs) == 1:
+        outputs = outputs[0]
+
+    return _StoredValue(outputs, all_exist)
 
 
 def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    run_folder: Path,
+    store: dict[str, StorageBase | Path | DirectValue],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
-    output, exists = _maybe_load_single_output(func, run_folder)
+    output, exists = _load_from_store(func.output_name, store, return_output=True)
     if exists:
         return output
 
     # Otherwise, run the function
-    _load_file_array(kwargs)
+    _load_file_arrays(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -548,22 +556,15 @@ def _submit_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_file_array(x: Any) -> Any:
+def _maybe_load_array(x: Any) -> Any:
     if isinstance(x, StorageBase):
         return x.to_array()
     return x
 
 
-def _load_file_array(kwargs: dict[str, Any]) -> None:
+def _load_file_arrays(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_file_array(v)
-
-
-def _ensure_run_folder(run_folder: str | Path | None) -> Path:
-    if run_folder is None:
-        tmp_dir = tempfile.mkdtemp()
-        run_folder = Path(tmp_dir)
-    return Path(run_folder)
+        kwargs[k] = _maybe_load_array(v)
 
 
 class _KwargsTask(NamedTuple):
@@ -574,7 +575,7 @@ class _KwargsTask(NamedTuple):
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
@@ -584,14 +585,14 @@ def _run_and_process_generation(
     for func in generation:
         tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
     for func in generation:
-        _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
+        _outputs = _process_task(func, tasks[func], store, executor)
         outputs.update(_outputs)
 
 
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
     cache: _CacheBase | None = None,
@@ -602,15 +603,14 @@ def _submit_func(
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder, cache)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    run_folder: Path,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     executor: Executor | None = None,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
@@ -628,7 +628,7 @@ def _process_task(
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
         r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_output(func, r, run_folder)
+        output = _dump_single_output(func, r, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
@@ -638,24 +638,25 @@ def _process_task(
             kwargs=kwargs,
             output_name=output_name,
             output=_output,
-            store=store.get(output_name),
-            run_folder=run_folder,
+            store=store[output_name],
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
 
 
-def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
+def _check_parallel(
+    parallel: bool,  # noqa: FBT001
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> None:
     if not parallel or not store:
         return
-    # Assumes all storage classes are the same! Might change in the future.
-    storage = next(iter(store.values()))
-    if not storage.parallelizable:
-        msg = (
-            f"Parallel execution is not supported with `{storage.storage_id}` storage."
-            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
-        )
-        raise ValueError(msg)
+    for storage in store.values():
+        if isinstance(storage, StorageBase) and not storage.parallelizable:
+            msg = (
+                f"Parallel execution is not supported with `{storage.storage_id}` storage."
+                " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+            )
+            raise ValueError(msg)
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:

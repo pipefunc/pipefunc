@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._run import _func_kwargs, _load_file_array, _select_kwargs
+from pipefunc.map._run import _func_kwargs, _load_file_arrays, _select_kwargs
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -82,6 +82,7 @@ def slurm_run_setup(
     assert isinstance(default_resources, Resources) or default_resources is None
     tracker = _ResourcesContainer(default_resources)
     assert learners_dict.run_info is not None
+    assert learners_dict.run_info.run_folder is not None
     run_folder = Path(learners_dict.run_info.run_folder)
     learners: list[SequenceLearner] = []
     fnames: list[Path] = []
@@ -198,7 +199,7 @@ def _eval_resources(
     run_info: RunInfo,
 ) -> Resources:
     kwargs = _func_kwargs(func, run_info, run_info.init_store())
-    _load_file_array(kwargs)
+    _load_file_arrays(kwargs)
     if index is not None:
         shape = run_info.shapes[func.output_name]
         shape_mask = run_info.shape_masks[func.output_name]

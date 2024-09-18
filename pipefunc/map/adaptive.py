@@ -15,8 +15,8 @@ from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     _func_kwargs,
+    _load_from_store,
     _mask_fixed_axes,
-    _maybe_load_single_output,
     _process_task,
     _reduced_axes,
     _run_iteration_and_process,
@@ -24,7 +24,7 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import RunInfo, _external_shape, map_shapes
+from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -139,6 +139,7 @@ class LearnersDict(LearnersDictType):
         kwargs = details.kwargs()
         if slurm_run_kwargs:
             kwargs.update(slurm_run_kwargs)
+        assert self.run_info.run_folder is not None
         kwargs.setdefault("folder", self.run_info.run_folder / "adaptive_scheduler")
         if returns == "run_manager":  # pragma: no cover
             return details.run_manager(kwargs)
@@ -151,7 +152,7 @@ class LearnersDict(LearnersDictType):
 def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    run_folder: str | Path,
+    run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     storage: str = "file_array",
@@ -222,7 +223,6 @@ def create_learners(
         ``split_independent_axes`` is ``False``, then the only key is ``None``.
 
     """
-    run_folder = Path(run_folder)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
@@ -231,7 +231,6 @@ def create_learners(
         storage=storage,
         cleanup=cleanup,
     )
-    run_info.dump(run_folder)
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(
@@ -273,7 +272,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -328,7 +327,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -336,15 +335,11 @@ def _execute_iteration_in_single(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    output, exists = _maybe_load_single_output(
-        func,
-        run_info.run_folder,
-        return_output=return_output,
-    )
+    output, exists = _load_from_store(func.output_name, store, return_output=return_output)
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, run_info.run_folder, store)
+    result = _process_task(func, kwargs_task, store)
     if not return_output:
         return None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
@@ -355,7 +350,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StorageBase | Path | DirectValue],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -364,7 +359,7 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
+    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     # Load the data if it exists
     if all(arr.has_index(index) for arr in file_arrays):
         if not return_output:
@@ -388,7 +383,7 @@ class _MapWrapper:
     Copies the Pipeline and removes the cache to avoid issues with the parallel execution.
     """
 
-    mock_pipeline: Pipeline
+    pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
     internal_shapes: dict[str, int | tuple[int, ...]] | None
@@ -398,7 +393,7 @@ class _MapWrapper:
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
         run(
-            self.mock_pipeline,  # type: ignore[arg-type]
+            self.pipeline,
             self.inputs,
             self.run_folder,
             self.internal_shapes,

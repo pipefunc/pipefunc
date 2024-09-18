@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import pickle
 import re
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -752,3 +756,28 @@ def test_invalid_type_hints():
         match="Inconsistent type annotations for",
     ):
         Pipeline([f, g])
+
+
+class Unpicklable:
+    def __init__(self, a) -> None:
+        self.a = a
+
+    def __getstate__(self):
+        msg = "Unpicklable object"
+        raise RuntimeError(msg)
+
+
+def test_unpicklable_run(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return Unpicklable(a)
+
+    @pipefunc(output_name="z")
+    def g(y):
+        return 1
+
+    pipeline = Pipeline([f, g])
+
+    r = pipeline.map({"a": 1}, storage="dict", parallel=False)
+    assert isinstance(r["y"].output, Unpicklable)
+    assert r["z"].output == 1
