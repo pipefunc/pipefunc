@@ -39,6 +39,7 @@ def load(path: Path, *, cache: bool = False) -> Any:
 
 def dump(obj: Any, path: Path) -> None:
     """Dump an object to a path using cloudpickle."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as f:
         cloudpickle.dump(obj, f)
 
