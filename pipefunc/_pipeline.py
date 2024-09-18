@@ -1161,7 +1161,11 @@ class Pipeline:
             elif is_installed("holoviews"):
                 backend = "holoviews"
             else:
-                msg = "No plotting backends are installed."
+                msg = (
+                    "No plotting backends are installed."
+                    " Install 'graphviz', 'matplotlib', or 'holoviews' to visualize the pipeline."
+                    " To install all backends, run `pip install 'pipefunc[plotting]'`."
+                )
                 raise ImportError(msg)
         if backend == "graphviz":
             return self.visualize_graphviz(**kwargs)
