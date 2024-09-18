@@ -625,7 +625,7 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    use_ray: bool,  # noqa: FBT001
+    use_ray: bool = False,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
