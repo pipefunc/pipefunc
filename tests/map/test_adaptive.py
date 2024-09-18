@@ -24,7 +24,8 @@ if TYPE_CHECKING:
 # Tests with create_learners
 
 
-def test_basic(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_basic(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="z")
     def add(x: int, y: int) -> int:
         assert isinstance(x, int)
@@ -43,7 +44,8 @@ def test_basic(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        run_folder=tmp_path,
+        storage=storage,
+        run_folder=tmp_path if storage == "file_array" else None,
         return_output=True,
     )
     learners.simple_run()
@@ -54,7 +56,8 @@ def test_basic(tmp_path: Path) -> None:
     assert flat_learners["prod"][0].data == {0: 172800}
 
 
-def test_simple_from_step(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_simple_from_step(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="x")
     def generate_seeds(n: int) -> list[int]:
         return list(range(n))
@@ -79,7 +82,8 @@ def test_simple_from_step(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        run_folder=tmp_path,
+        run_folder=tmp_path if storage == "file_array" else None,
+        storage=storage,
         internal_shapes={"x": 4},  # 4 should become (4,)
         return_output=True,
     )
@@ -280,7 +284,8 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     ]
 
 
-def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_create_learners_split_axes_with_reduction(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="y")
     def double_it(x: int) -> int:
         return 2 * x
@@ -303,7 +308,8 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        tmp_path,
+        tmp_path if storage == "file_array" else None,
+        storage=storage,
         return_output=True,
         split_independent_axes=True,
     )
