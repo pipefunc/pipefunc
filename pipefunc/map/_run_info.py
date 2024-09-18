@@ -173,14 +173,14 @@ class RunInfo:
 
     @property
     def input_paths(self) -> dict[str, Path]:
-        if self.run_folder is None:
+        if self.run_folder is None:  # pragma: no cover
             msg = "Cannot get `input_paths` without `run_folder`."
             raise ValueError(msg)
         return {k: _input_path(k, self.run_folder) for k in self.inputs}
 
     @property
     def defaults_path(self) -> Path:
-        if self.run_folder is None:
+        if self.run_folder is None:  # pragma: no cover
             msg = "Cannot get `defaults_path` without `run_folder`."
             raise ValueError(msg)
         return _default_path(self.run_folder)
@@ -190,7 +190,7 @@ class RunInfo:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self) -> None:
-        if self.run_folder is None:
+        if self.run_folder is None:  # pragma: no cover
             msg = "Cannot dump `RunInfo` without `run_folder`."
             raise ValueError(msg)
         path = self.path(self.run_folder)
