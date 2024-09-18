@@ -224,7 +224,7 @@ class SharedMemoryDictArray(DictArray):
     """Array interface to a shared memory dict store."""
 
     storage_id = "shared_memory_dict"
-    requires_serialization = False
+    requires_serialization = True
 
     def __init__(
         self,
