@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import itertools
 import time
+import warnings
 from collections import OrderedDict, defaultdict
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
@@ -72,7 +73,7 @@ def run(
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
-        Whether to run the functions in parallel.
+        Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
@@ -115,7 +116,7 @@ def run(
     store = run_info.init_store()
     if _cannot_be_parallelized(pipeline):
         parallel = False
-    _check_parallel(parallel, store)
+    _check_parallel(parallel, store, executor)
 
     with _maybe_executor(executor, parallel, use_ray) as ex:
         for gen in pipeline.topological_generations.function_lists:
@@ -695,16 +696,33 @@ def _process_task(
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
+    executor: Executor | None,
 ) -> None:
+    if isinstance(executor, ThreadPoolExecutor):
+        return
     if not parallel or not store:
         return
     for storage in store.values():
         if isinstance(storage, StorageBase) and not storage.parallelizable:
-            msg = (
-                f"Parallel execution is not supported with `{storage.storage_id}` storage."
-                " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
+            recommendation = (
+                "Consider\n - using a file-based storage or `shared_memory` / `zarr_shared_memory`"
+                " for parallel execution,\n - disable parallel execution,\n - or use a different executor.\n"
             )
-            raise ValueError(msg)
+            default = f"The chosen storage type `{storage.storage_id}` does not support process-based parallel execution."
+            if executor is None:
+                msg = (
+                    f"{default}"
+                    f" PipeFunc defaults to using a `ProcessPoolExecutor`, which requires a parallelizable storage."
+                    f" {recommendation}"
+                )
+                raise ValueError(msg)
+            assert executor is not None
+            msg = (
+                f"{default}"
+                f" If the current executor of type `{type(executor).__name__}` is process-based, it is incompatible."
+                f" {recommendation}"
+            )
+            warnings.warn(msg, stacklevel=2)
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:

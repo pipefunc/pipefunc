@@ -660,7 +660,7 @@ class Pipeline:
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
-            Whether to run the functions in parallel.
+            Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.
@@ -1166,7 +1166,11 @@ class Pipeline:
             elif is_installed("holoviews"):
                 backend = "holoviews"
             else:
-                msg = "No plotting backends are installed."
+                msg = (
+                    "No plotting backends are installed."
+                    " Install 'graphviz', 'matplotlib', or 'holoviews' to visualize the pipeline."
+                    " To install all backends, run `pip install 'pipefunc[plotting]'`."
+                )
                 raise ImportError(msg)
         if backend == "graphviz":
             return self.visualize_graphviz(**kwargs)
