@@ -501,8 +501,7 @@ def _maybe_parallel_map(
     if executor is not None:
         return executor.map(func, seq)
     if use_ray:
-        remote_func = _make_remote(func)
-        return [remote_func(args) for args in seq]
+        func = _ray_remote(func)
     return map(func, seq)
 
 
@@ -515,7 +514,7 @@ def _maybe_submit(
     if executor:
         return executor.submit(func, *args)
     if use_ray:
-        remote_func = _make_remote(func)
+        remote_func = _ray_remote(func)
         return remote_func(*args)
     return func(*args)
 
@@ -643,7 +642,7 @@ def _results(map_result: Generator[Any], use_ray: bool) -> list[Any]:  # noqa: F
     if use_ray:
         import ray
 
-        return ray.get(map_result)  # type: ignore[arg-type]
+        return ray.get(list(map_result))  # type: ignore[arg-type]
     return list(map_result)
 
 
@@ -817,15 +816,11 @@ def _get_partially_reduced_axes(
 
 
 @functools.cache
-def _make_remote(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Dynamically decorate a function with @ray.remote if Ray is available."""
-    try:
-        import ray
+def _ray_remote(func: Callable[..., Any]) -> Callable[..., Any]:
+    import ray
 
-        if isinstance(func, functools.partial):
-            original_func = func.func
-            remote_func = ray.remote(original_func)
-            return functools.partial(remote_func.remote, *func.args, **func.keywords)
-        return ray.remote(func).remote
-    except ImportError:
-        return func  # return the function unchanged if Ray is not available
+    if isinstance(func, functools.partial):
+        original_func = func.func
+        remote_func = ray.remote(original_func)
+        return functools.partial(remote_func.remote, *func.args, **func.keywords)
+    return ray.remote(func).remote
