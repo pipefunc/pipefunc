@@ -1104,7 +1104,7 @@ def test_parallel(use_ray: bool) -> None:  # noqa: FBT001
         parallel=True,
         executor=executor,
         use_ray=use_ray,
-        storage="shared_memory_dict",
+        storage="file_array",
     )
     assert results["sum"].output == 14
 
