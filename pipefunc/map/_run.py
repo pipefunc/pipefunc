@@ -5,7 +5,7 @@ import itertools
 import time
 import warnings
 from collections import OrderedDict, defaultdict
-from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
@@ -35,6 +35,48 @@ def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
     return all(f.mapspec is None for f in pipeline.functions) and all(
         len(fs) == 1 for fs in pipeline.topological_generations.function_lists
     )
+
+
+def _prepare_run(
+    *,
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path | None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    output_names: set[_OUTPUT_TYPE] | None,
+    parallel: bool,
+    executor: Executor | None,
+    storage: str,
+    cleanup: bool,
+    fixed_indices: dict[str, int | slice] | None,
+    auto_subpipeline: bool,
+) -> tuple[
+    Pipeline,
+    RunInfo,
+    dict[str, StorageBase | Path | DirectValue],
+    OrderedDict[str, Result],
+    bool,
+]:
+    inputs = pipeline._flatten_scopes(inputs)
+    if auto_subpipeline or output_names is not None:
+        pipeline = pipeline.subpipeline(set(inputs), output_names)
+    _validate_complete_inputs(pipeline, inputs)
+    validate_consistent_axes(pipeline.mapspecs(ordered=False))
+    _validate_fixed_indices(fixed_indices, inputs, pipeline)
+    run_info = RunInfo.create(
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
+    )
+    outputs: OrderedDict[str, Result] = OrderedDict()
+    store = run_info.init_store()
+    if executor is None and _cannot_be_parallelized(pipeline):
+        parallel = False
+    _check_parallel(parallel, store, executor)
+    return pipeline, run_info, store, outputs, parallel
 
 
 def run(
@@ -94,25 +136,19 @@ def run(
         and an exception is raised if any are missing.
 
     """
-    inputs = pipeline._flatten_scopes(inputs)
-    if auto_subpipeline or output_names is not None:
-        pipeline = pipeline.subpipeline(set(inputs), output_names)
-    _validate_complete_inputs(pipeline, inputs)
-    validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    run_info = RunInfo.create(
-        run_folder,
-        pipeline,
-        inputs,
-        internal_shapes,
+    pipeline, run_info, store, outputs, parallel = _prepare_run(
+        pipeline=pipeline,
+        inputs=inputs,
+        run_folder=run_folder,
+        internal_shapes=internal_shapes,
+        output_names=output_names,
+        parallel=parallel,
+        executor=executor,
         storage=storage,
         cleanup=cleanup,
+        fixed_indices=fixed_indices,
+        auto_subpipeline=auto_subpipeline,
     )
-    outputs: OrderedDict[str, Result] = OrderedDict()
-    store = run_info.init_store()
-    if _cannot_be_parallelized(pipeline):
-        parallel = False
-    _check_parallel(parallel, store, executor)
 
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
@@ -126,12 +162,19 @@ def run(
                 cache=pipeline.cache,
             )
 
+    _maybe_persist_memory(store, persist_memory)
+
+    return outputs
+
+
+def _maybe_persist_memory(
+    store: dict[str, StorageBase | Path | DirectValue],
+    persist_memory: bool,  # noqa: FBT001
+) -> None:
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
             if isinstance(arr, StorageBase):
                 arr.persist()
-
-    return outputs
 
 
 class Result(NamedTuple):
@@ -480,10 +523,14 @@ def _mask_fixed_axes(
     return select.flat
 
 
-def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
+def _maybe_parallel_map(
+    func: Callable[..., Any],
+    seq: Sequence,
+    executor: Executor | None,
+) -> list[Any]:
     if executor is not None:
-        return executor.map(func, seq)
-    return map(func, seq)
+        return [executor.submit(func, x) for x in seq]
+    return [func(x) for x in seq]
 
 
 def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
@@ -582,11 +629,21 @@ def _run_and_process_generation(
     executor: Executor | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks: dict[PipeFunc, _KwargsTask] = {}
+    tasks = {
+        func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        for func in generation
+    }
+    _process_generation(generation, tasks, store, outputs)
+
+
+def _process_generation(
+    generation: list[PipeFunc],
+    tasks: dict[PipeFunc, _KwargsTask],
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+) -> None:
     for func in generation:
-        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
-    for func in generation:
-        _outputs = _process_task(func, tasks[func], store, executor)
+        _outputs = _process_task(func, tasks[func], store)
         outputs.update(_outputs)
 
 
@@ -608,29 +665,30 @@ def _submit_func(
     return _KwargsTask(kwargs, task)
 
 
-def _process_task(
+def _output_from_mapspec_task(
+    args: _MapSpecArgs,
+    outputs_list: list[list[Any]],
+) -> tuple[np.ndarray, ...]:
+    for index, outputs in zip(args.missing, outputs_list):
+        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+
+    for index in args.existing:
+        outputs = [file_array.get_from_index(index) for file_array in args.file_arrays]
+        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+
+    return tuple(x.reshape(args.shape) for x in args.result_arrays)
+
+
+def _result(x: Any | Future) -> Any:
+    return x.result() if isinstance(x, Future) else x
+
+
+def _to_result_dict(
     func: PipeFunc,
-    kwargs_task: _KwargsTask,
+    kwargs: dict[str, Any],
+    output: Any,
     store: dict[str, StorageBase | Path | DirectValue],
-    executor: Executor | None = None,
 ) -> dict[str, Result]:
-    kwargs, task = kwargs_task
-    if func.mapspec and func.mapspec.inputs:
-        r, args = task
-        outputs_list = list(r)
-
-        for index, outputs in zip(args.missing, outputs_list):
-            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-
-        for index in args.existing:
-            outputs = [file_array.get_from_index(index) for file_array in args.file_arrays]
-            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-
-        output = tuple(x.reshape(args.shape) for x in args.result_arrays)
-    else:
-        r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_single_output(func, r, store)
-
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
     return {
@@ -643,6 +701,23 @@ def _process_task(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
+
+
+def _process_task(
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> dict[str, Result]:
+    kwargs, task = kwargs_task
+    if func.mapspec and func.mapspec.inputs:
+        r, args = task
+        outputs_list = [_result(x) for x in r]
+        output = _output_from_mapspec_task(args, outputs_list)
+    else:
+        r = _result(task)
+        output = _dump_single_output(func, r, store)
+
+    return _to_result_dict(func, kwargs, output, store)
 
 
 def _check_parallel(
