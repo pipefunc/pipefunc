@@ -745,7 +745,7 @@ except Exception:
 ## What is the overhead / efficiency / performance of `pipefunc`?
 
 ```{note}
-**tl;dr**: About 25 µs per iteration on a MacBook Pro M2 for a simple pipeline with three functions.
+**tl;dr**: About 15 µs per iteration on a MacBook Pro M2 for a simple pipeline with three functions.
 ```
 
 To benchmark the performance of `pipefunc`, you can measure the execution time of a pipeline using different input sizes.
@@ -786,7 +786,7 @@ print(f"Time: {t / iterations * 1e6:.2f} µs per iteration")
 This code sets up a simple pipeline with three functions, each utilizing a `mapspec` to handle multi-dimensional inputs.
 The performance is measured by the time it takes to process `N**3` iterations through the pipeline, where `N` is the size of each input list.
 
-For the provided example, you might expect an output similar to `Time: 24.47 µs per iteration` on a MacBook Pro M2.
+For the provided example, you might expect an output similar to `Time: 14.93 µs per iteration` on a MacBook Pro M2.
 The number reported above might be lower because it is running on ReadTheDocs' hosted hardware.
 It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc`.
 Results can vary depending on your hardware and current system load.
