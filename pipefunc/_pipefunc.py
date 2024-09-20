@@ -592,6 +592,13 @@ class PipeFunc(Generic[T]):
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
+    @functools.cached_property
+    def _evaluate_lazy(self) -> bool:
+        """Return whether the function should evaluate lazy arguments."""
+        # This is a cached property because it is slow and otherwise called multiple times.
+        # We assume that once it is set, it does not change during the lifetime of the object.
+        return any(p.lazy for p in self._pipelines)
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
 
@@ -614,8 +621,9 @@ class PipeFunc(Generic[T]):
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
-            args = evaluate_lazy(args)
-            kwargs = evaluate_lazy(kwargs)
+            if self._evaluate_lazy:
+                args = evaluate_lazy(args)
+                kwargs = evaluate_lazy(kwargs)
             _maybe_update_kwargs_with_resources(
                 kwargs,
                 self.resources_variable,
