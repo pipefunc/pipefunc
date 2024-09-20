@@ -7,6 +7,7 @@ from collections import defaultdict
 from functools import partial
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -146,7 +147,7 @@ def _xarray_dataset(
     ds = xr.merge(to_merge, compat="override")
     for name in single_output_names:
         array = data_loader(name)
-        ds[name] = array
+        ds[name] = array if isinstance(array, np.ndarray) else ((), array)
     return ds
 
 
