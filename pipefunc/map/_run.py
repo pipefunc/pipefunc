@@ -168,6 +168,50 @@ def run(
     return outputs
 
 
+async def run_async(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    output_names: set[_OUTPUT_TYPE] | None = None,
+    executor: Executor | None = None,
+    storage: str = "file_array",
+    persist_memory: bool = True,
+    cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
+    auto_subpipeline: bool = False,
+) -> OrderedDict[str, Result]:
+    pipeline, run_info, store, outputs, _ = _prepare_run(
+        pipeline=pipeline,
+        inputs=inputs,
+        run_folder=run_folder,
+        internal_shapes=internal_shapes,
+        output_names=output_names,
+        parallel=True,
+        executor=executor,
+        storage=storage,
+        cleanup=cleanup,
+        fixed_indices=fixed_indices,
+        auto_subpipeline=auto_subpipeline,
+    )
+    with _maybe_executor(executor, parallel=True) as ex:
+        assert ex is not None
+        for gen in pipeline.topological_generations.function_lists:
+            await _run_and_process_generation_async(
+                gen,
+                run_info,
+                store,
+                outputs,
+                fixed_indices,
+                ex,
+                pipeline.cache,
+            )
+
+    _maybe_persist_memory(store, persist_memory)
+    return outputs
+
+
 def _maybe_persist_memory(
     store: dict[str, StorageBase | Path | DirectValue],
     persist_memory: bool,  # noqa: FBT001
@@ -637,6 +681,22 @@ def _run_and_process_generation(
     _process_generation(generation, tasks, store, outputs)
 
 
+async def _run_and_process_generation_async(
+    generation: list[PipeFunc],
+    run_info: RunInfo,
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor,
+    cache: _CacheBase | None = None,
+) -> None:
+    tasks = {
+        func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        for func in generation
+    }
+    await _process_generation_async(generation, tasks, store, outputs)
+
+
 def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
@@ -645,6 +705,17 @@ def _process_generation(
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
+        outputs.update(_outputs)
+
+
+async def _process_generation_async(
+    generation: list[PipeFunc],
+    tasks: dict[PipeFunc, _KwargsTask],
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+) -> None:
+    for func in generation:
+        _outputs = await _process_task_async(func, tasks[func], store)
         outputs.update(_outputs)
 
 
@@ -722,6 +793,25 @@ def _process_task(
         r = _result(task)
         output = _dump_single_output(func, r, store)
 
+    return _to_result_dict(func, kwargs, output, store)
+
+
+async def _process_task_async(
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> dict[str, Result]:
+    kwargs, task = kwargs_task
+    loop = asyncio.get_event_loop()
+    if func.mapspec and func.mapspec.inputs:
+        r, args = task
+        futs = [_result_async(x, loop) for x in r]
+        outputs_list = await asyncio.gather(*futs)
+        output = _output_from_mapspec_task(args, outputs_list)
+    else:
+        assert isinstance(task, Future)
+        r = await _result_async(task, loop)
+        output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
 
 
