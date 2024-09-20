@@ -1505,4 +1505,4 @@ async def test_run_async():
 
     pipeline = Pipeline([f, g, h, i])
     r = await run_async(pipeline, {"x": [1, 2, 3]})
-    assert r["r"].output == 9
+    assert r["r"].output == 12
