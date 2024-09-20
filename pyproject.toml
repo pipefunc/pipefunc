@@ -31,14 +31,15 @@ zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
-    "coverage",
+    "pytest-asyncio",
+    "pytest-codspeed",
     "pytest-cov",
+    "coverage",
     "pandas",
     "adaptive",
     "xarray",
     "zarr",
     "versioningit",
-    "pytest-codspeed",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
