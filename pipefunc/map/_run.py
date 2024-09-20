@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import functools
 import itertools
 import time
@@ -682,10 +681,6 @@ def _output_from_mapspec_task(
 
 def _result(x: Any | Future) -> Any:
     return x.result() if isinstance(x, Future) else x
-
-
-def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
-    return asyncio.wrap_future(task, loop=loop)
 
 
 def _to_result_dict(
