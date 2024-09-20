@@ -46,6 +46,7 @@ def run(
     output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | None = None,
+    use_ray: bool = False,
     storage: str = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -76,6 +77,10 @@ def run(
     executor
         The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
         is used. Only relevant if ``parallel=True``.
+    use_ray
+        Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
+        If ``True``, ``executor`` and ``parallel`` is ignored. Ray is not compatible with shared memory
+        based ``storage`` classes.
     storage
         The storage class to use for the file arrays.
         Can use any registered storage class. See `pipefunc.map.storage_registry`.
@@ -114,7 +119,7 @@ def run(
         parallel = False
     _check_parallel(parallel, store, executor)
 
-    with _maybe_executor(executor, parallel) as ex:
+    with _maybe_executor(executor, parallel, use_ray) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
@@ -123,6 +128,7 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                use_ray=use_ray,
                 cache=pipeline.cache,
             )
 
@@ -419,8 +425,15 @@ def _existing_and_missing_indices(
 def _maybe_executor(
     executor: Executor | None,
     parallel: bool,  # noqa: FBT001
+    use_ray: bool,  # noqa: FBT001
 ) -> Generator[Executor | None, None, None]:
-    if executor is None and parallel:
+    if use_ray:
+        import ray
+
+        if not ray.is_initialized():
+            ray.init(ignore_reinit_error=True)
+        yield None
+    elif executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
     else:
@@ -480,15 +493,29 @@ def _mask_fixed_axes(
     return select.flat
 
 
-def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
+def _maybe_parallel_map(
+    func: Callable[..., Any],
+    seq: Sequence,
+    executor: Executor | None,
+    use_ray: bool,  # noqa: FBT001
+) -> Any:
     if executor is not None:
         return executor.map(func, seq)
+    if use_ray:
+        func = _ray_remote(func)
     return map(func, seq)
 
 
-def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
+def _maybe_submit(
+    func: Callable[..., Any],
+    executor: Executor | None,
+    *args: Any,
+    use_ray: bool,
+) -> Any:
     if executor:
         return executor.submit(func, *args)
+    if use_ray:
+        func = _ray_remote(func)
     return func(*args)
 
 
@@ -574,19 +601,21 @@ class _KwargsTask(NamedTuple):
 
 
 def _run_and_process_generation(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    use_ray: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks: dict[PipeFunc, _KwargsTask] = {}
     for func in generation:
-        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, use_ray, cache)
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store, executor)
+        _outputs = _process_task(func, tasks[func], store, executor, use_ray=use_ray)
         outputs.update(_outputs)
 
 
@@ -596,16 +625,33 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    use_ray: bool = False,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, use_ray)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache, use_ray=use_ray)
     return _KwargsTask(kwargs, task)
+
+
+def _results(map_result: Generator[Any], use_ray: bool) -> list[Any]:  # noqa: FBT001
+    if use_ray:
+        import ray
+
+        return ray.get(list(map_result))  # type: ignore[arg-type]
+    return list(map_result)
+
+
+def _result(task: Any, executor: Executor | None, use_ray: bool) -> Any:  # noqa: FBT001
+    if use_ray:
+        import ray
+
+        return ray.get(task)  # type: ignore[arg-type]
+    return task.result() if executor else task
 
 
 def _process_task(
@@ -613,12 +659,13 @@ def _process_task(
     kwargs_task: _KwargsTask,
     store: dict[str, StorageBase | Path | DirectValue],
     executor: Executor | None = None,
+    *,
+    use_ray: bool = False,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = list(r)
-
+        outputs_list = _results(r, use_ray)
         for index, outputs in zip(args.missing, outputs_list):
             _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
@@ -628,7 +675,7 @@ def _process_task(
 
         output = tuple(x.reshape(args.shape) for x in args.result_arrays)
     else:
-        r = task.result() if executor else task  # type: ignore[union-attr]
+        r = _result(task, executor, use_ray)
         output = _dump_single_output(func, r, store)
 
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
@@ -766,3 +813,14 @@ def _get_partially_reduced_axes(
     assert func.mapspec is not None
     spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
     return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
+
+
+@functools.cache
+def _ray_remote(func: Callable[..., Any]) -> Callable[..., Any]:
+    import ray
+
+    if isinstance(func, functools.partial):
+        original_func = func.func
+        remote_func = ray.remote(original_func)
+        return functools.partial(remote_func.remote, *func.args, **func.keywords)
+    return ray.remote(func).remote
