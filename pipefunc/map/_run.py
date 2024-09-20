@@ -204,7 +204,6 @@ async def run_async(
                 ex,
                 pipeline.cache,
             )
-
     _maybe_persist_memory(store, persist_memory)
     return outputs
 
@@ -665,6 +664,7 @@ class _KwargsTask(NamedTuple):
     task: tuple[Any, _MapSpecArgs] | Any
 
 
+# NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
@@ -697,6 +697,7 @@ async def _run_and_process_generation_async(
     await _process_generation_async(generation, tasks, store, outputs)
 
 
+# NOTE: A similar async version of this function is provided below.
 def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
@@ -779,6 +780,7 @@ def _to_result_dict(
     }
 
 
+# NOTE: A similar async version of this function is provided below.
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
