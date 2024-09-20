@@ -150,7 +150,6 @@ def run(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
     )
-
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -162,9 +161,7 @@ def run(
                 executor=ex,
                 cache=pipeline.cache,
             )
-
     _maybe_persist_memory(store, persist_memory)
-
     return outputs
 
 
