@@ -27,11 +27,12 @@ dependencies:
   - python-graphviz
   # optional-dependencies: test
   - pytest
-  - coverage
+  - pytest-asyncio
+  - pytest-codspeed
   - pytest-cov
+  - coverage
   - pandas
   - adaptive
   - xarray
   - zarr
   - versioningit
-  - pytest-codspeed
