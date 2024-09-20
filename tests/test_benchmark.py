@@ -68,3 +68,32 @@ def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
         parallel=False,
         storage="dict",
     )
+
+
+@pytest.fixture
+def pipeline_nd() -> Pipeline:
+    @pipefunc(output_name="c", mapspec="a[k], b[k] -> c[k]")
+    def f(a, b):
+        return 1
+
+    @pipefunc(output_name="d", mapspec="c[k], x[i], y[j] -> d[i, j, k]")
+    def g(b, c, x, y):
+        return 1
+
+    @pipefunc(output_name="e", mapspec="d[i, j, :] -> e[i, j]")
+    def h(d):
+        return 1
+
+    return Pipeline([f, g, h])
+
+
+@pytest.mark.benchmark
+def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
+    """Example from the FAQ."""
+    n = 50
+    lst = list(range(n))
+    pipeline_nd.map(
+        inputs={"a": lst, "b": lst, "x": lst, "y": lst},
+        storage="dict",
+        parallel=False,
+    )
