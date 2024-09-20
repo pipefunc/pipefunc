@@ -1504,4 +1504,5 @@ async def test_run_async():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    await run_async(pipeline, {"x": [1, 2, 3]})
+    r = await run_async(pipeline, {"x": [1, 2, 3]})
+    assert r["r"].output == 9
