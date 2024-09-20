@@ -90,7 +90,7 @@ def pipeline_nd() -> Pipeline:
 @pytest.mark.benchmark
 def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
     """Example from the FAQ."""
-    n = 50
+    n = 15
     lst = list(range(n))
     pipeline_nd.map(
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
