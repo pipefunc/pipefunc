@@ -17,6 +17,7 @@ import numpy.typing as npt
 from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
+from pipefunc.map._progress import ProgressTracker, Status
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
@@ -51,12 +52,14 @@ def _prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
+    progress: bool,
 ) -> tuple[
     Pipeline,
     RunInfo,
     dict[str, StorageBase | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
+    ProgressTracker | None,
 ]:
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
@@ -77,7 +80,10 @@ def _prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel
+    progress_tracker = (
+        ProgressTracker(run_info.all_output_names, run_info.shapes) if progress else None
+    )
+    return pipeline, run_info, store, outputs, parallel, progress_tracker
 
 
 def run(
@@ -94,6 +100,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    progress: bool = False,
 ) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -137,7 +144,7 @@ def run(
         and an exception is raised if any are missing.
 
     """
-    pipeline, run_info, store, outputs, parallel = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, tracker = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -149,6 +156,7 @@ def run(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
+        progress=progress,
     )
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
@@ -159,6 +167,7 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                tracker=tracker,
                 cache=pipeline.cache,
             )
     _maybe_persist_memory(store, persist_memory)
@@ -178,8 +187,9 @@ async def run_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    progress: bool = False,
 ) -> OrderedDict[str, Result]:
-    pipeline, run_info, store, outputs, _ = _prepare_run(
+    pipeline, run_info, store, outputs, _, tracker = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -191,6 +201,7 @@ async def run_async(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
+        progress=progress,
     )
     with _maybe_executor(executor, parallel=True) as ex:
         assert ex is not None
@@ -202,6 +213,7 @@ async def run_async(
                 outputs,
                 fixed_indices,
                 ex,
+                tracker,
                 pipeline.cache,
             )
     _maybe_persist_memory(store, persist_memory)
@@ -672,13 +684,14 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
         func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
         for func in generation
     }
-    _process_generation(generation, tasks, store, outputs)
+    _process_generation(generation, tasks, store, outputs, tracker)
 
 
 async def _run_and_process_generation_async(
@@ -688,13 +701,14 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor,
+    tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
         func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
         for func in generation
     }
-    await _process_generation_async(generation, tasks, store, outputs)
+    await _process_generation_async(generation, tasks, store, outputs, tracker)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -703,9 +717,10 @@ def _process_generation(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
+    tracker: ProgressTracker | None,
 ) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store)
+        _outputs = _process_task(func, tasks[func], store, tracker)
         outputs.update(_outputs)
 
 
@@ -714,9 +729,10 @@ async def _process_generation_async(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
+    tracker: ProgressTracker | None,
 ) -> None:
     for func in generation:
-        _outputs = await _process_task_async(func, tasks[func], store)
+        _outputs = await _process_task_async(func, tasks[func], store, tracker)
         outputs.update(_outputs)
 
 
@@ -752,12 +768,30 @@ def _output_from_mapspec_task(
     return tuple(x.reshape(args.shape) for x in args.result_arrays)
 
 
-def _result(x: Any | Future) -> Any:
-    return x.result() if isinstance(x, Future) else x
+def _result(x: Any | Future, tracker: Status | None) -> Any:
+    if not isinstance(x, Future):
+        return x
+    r = x.result()
+    if tracker is not None:
+        tracker.increment()
+    return r
 
 
-def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
-    return asyncio.wrap_future(task, loop=loop)
+def _result_async(
+    task: Future,
+    tracker: Status | None,
+    loop: asyncio.AbstractEventLoop,
+) -> asyncio.Future:
+    async_future = asyncio.wrap_future(task, loop=loop)
+
+    if tracker is not None:
+
+        def callback(_) -> None:
+            tracker.increment()
+
+        async_future.add_done_callback(callback)
+
+    return async_future
 
 
 def _to_result_dict(
@@ -785,14 +819,16 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StorageBase | Path | DirectValue],
+    tracker: ProgressTracker | None,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
+    status = tracker.data.get(func.output_name, None) if tracker else None
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = [_result(x) for x in r]
+        outputs_list = [_result(x, status) for x in r]
         output = _output_from_mapspec_task(args, outputs_list)
     else:
-        r = _result(task)
+        r = _result(task, status)
         output = _dump_single_output(func, r, store)
 
     return _to_result_dict(func, kwargs, output, store)
@@ -802,17 +838,19 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StorageBase | Path | DirectValue],
+    tracker: ProgressTracker | None,
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
+    status = tracker.data.get(func.output_name, None) if tracker else None
     loop = asyncio.get_event_loop()
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        futs = [_result_async(x, loop) for x in r]
+        futs = [_result_async(x, status, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)
         output = _output_from_mapspec_task(args, outputs_list)
     else:
         assert isinstance(task, Future)
-        r = await _result_async(task, loop)
+        r = await _result_async(task, status, loop)
         output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
 
