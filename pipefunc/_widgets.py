@@ -1,6 +1,7 @@
 import asyncio
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 import ipywidgets as widgets
 from IPython.display import HTML, display
@@ -9,14 +10,19 @@ from pipefunc._utils import prod
 from pipefunc.map import StorageBase
 
 
-def progress(r: Path | StorageBase) -> float:
+class Status(NamedTuple):
+    done: bool
+    total: int
+    percentage: float
+
+
+def progress(r: Path | StorageBase) -> Status:
     if isinstance(r, Path):
-        r = r.exists()
-        return 1.0
+        return Status(done=r.exists(), total=1, percentage=1.0)
     mask = r.mask
     left = mask.data.sum()
     total = prod(mask.shape)
-    return 1 - left / total
+    return Status(done=left == 0, total=total, percentage=1 - left / total)
 
 
 class ProgressTracker:
@@ -25,7 +31,7 @@ class ProgressTracker:
     def __init__(self, resource_manager):
         self.resource_manager = resource_manager
         self.progress_dict: dict[str, float] = {
-            name: self._calculate_progress(store)
+            name: self._calculate_progress(store).percentage
             for name, store in self.resource_manager.store.items()
         }
         self.start_times: dict[str, float | None] = {name: None for name in self.progress_dict}
@@ -37,7 +43,7 @@ class ProgressTracker:
         self._setup_widgets()
         self._display_widgets()
 
-    def _calculate_progress(self, resource) -> float:
+    def _calculate_progress(self, resource) -> Status:
         """Calculate the progress for a given resource."""
         return progress(resource)
 
@@ -54,46 +60,53 @@ class ProgressTracker:
 
         for i, name in enumerate(self.progress_dict):
             color_class = "row-even" if i % 2 == 0 else "row-odd"
+            progress = self.progress_dict[name]
             self.progress_bars[name] = widgets.FloatProgress(
-                value=self.progress_dict[name],
+                value=progress,
                 max=1.0,
-                description=name,
+                layout={"width": "600px"},
+                bar_style="info" if progress < 1 else "success",
             )
             self.percentage_labels[name] = widgets.HTML(
-                value=f'<span class="percent-label">{self.progress_dict[name] * 100:.1f}%</span>',
+                value=f'<span class="percent-label">{progress * 100:.1f}%</span>',
             )
             self.estimated_time_labels[name] = widgets.HTML(
                 value='<span class="estimate-label">Estimated time left: calculating...</span>',
             )
 
-            self.progress_bars[name].layout.class_ = f"progress-container {color_class}"
+            self.progress_bars[name].add_class(color_class)  # Use add_class method
 
         self.update_button.on_click(self.update_progress)
         self.toggle_auto_update_button.on_click(self.toggle_auto_update)
 
     def update_progress(self, _):
         """Update the progress values and labels."""
-        self.progress_dict = {
-            name: self._calculate_progress(store)
-            for name, store in self.resource_manager.store.items()
-        }
+        for name, store in self.resource_manager.store.items():
+            status = self._calculate_progress(store)
+            current_progress = status.percentage
+            self.progress_dict[name] = current_progress
 
-        current_time = time.time()
-
-        for name, progress_bar in self.progress_bars.items():
-            current_progress = self.progress_dict[name]
+            current_time = time.time()
 
             if self.start_times[name] is None and current_progress > 0:
                 self.start_times[name] = current_time
 
+            progress_bar = self.progress_bars[name]
             progress_bar.value = current_progress
             self.percentage_labels[
                 name
             ].value = f'<span class="percent-label">{current_progress * 100:.1f}%</span>'
+            iterations_done = int(status.total * current_progress)
+            iterations_left = status.total - iterations_done
+            iterations_left_label = f"✅ {iterations_done} | ⏰ {iterations_left}"
 
             if self.start_times[name] is not None:
                 elapsed_time = current_time - self.start_times[name]
-                estimated_time_left = (1.0 - current_progress) * (elapsed_time / current_progress)
+                estimated_time_left = (
+                    (1.0 - current_progress) * (elapsed_time / current_progress)
+                    if current_progress > 0
+                    else float("inf")
+                )
                 self.estimated_time_labels[
                     name
                 ].value = f'<span class="estimate-label">Estimated time left: {estimated_time_left:.2f} sec</span>'
@@ -102,6 +115,9 @@ class ProgressTracker:
                     name
                 ].value = '<span class="estimate-label">Estimated time left: calculating...</span>'
 
+            # Update description without accumulating previous content
+            progress_bar.description = f"{name} {iterations_left_label}"
+
     def toggle_auto_update(self, _):
         """Toggle the auto-update feature on or off."""
         self.auto_update = not self.auto_update
@@ -109,7 +125,7 @@ class ProgressTracker:
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
         if self.auto_update:
-            asyncio.create_task(self._auto_update_progress(interval=2.0))
+            asyncio.create_task(self._auto_update_progress(interval=1.0))
 
     def _display_widgets(self):
         """Display the progress widgets with styles."""
