@@ -1504,5 +1504,7 @@ async def test_run_async():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    r = await run_async(pipeline, {"x": [1, 2, 3]})
-    assert r["r"].output == 12
+    async_run_info = run_async(pipeline, {"x": [1, 2, 3]})
+    await async_run_info.task
+    result = async_run_info.result()
+    assert result["r"].output == 12

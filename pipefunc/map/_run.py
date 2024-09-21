@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
+from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
@@ -165,7 +165,24 @@ def run(
     return outputs
 
 
-async def run_async(
+class AsyncRunner(NamedTuple):
+    task: asyncio.Task[OrderedDict[str, Result]]
+    run_info: RunInfo
+    store: dict[str, StorageBase | Path | DirectValue]
+
+    def result(self) -> OrderedDict[str, Result]:
+        if is_running_in_ipynb():
+            msg = (
+                "Cannot block the event loop when running in a Jupyter notebook."
+                " Use `await runner.task` instead."
+            )
+            raise RuntimeError(msg)
+
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.task)
+
+
+def run_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
@@ -178,7 +195,7 @@ async def run_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-) -> OrderedDict[str, Result]:
+) -> AsyncRunner:
     pipeline, run_info, store, outputs, _ = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
@@ -192,20 +209,25 @@ async def run_async(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
     )
-    with _maybe_executor(executor, parallel=True) as ex:
-        assert ex is not None
-        for gen in pipeline.topological_generations.function_lists:
-            await _run_and_process_generation_async(
-                gen,
-                run_info,
-                store,
-                outputs,
-                fixed_indices,
-                ex,
-                pipeline.cache,
-            )
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+
+    async def _run_pipeline() -> OrderedDict[str, Result]:
+        with _maybe_executor(executor, parallel=True) as ex:
+            assert ex is not None
+            for gen in pipeline.topological_generations.function_lists:
+                await _run_and_process_generation_async(
+                    gen,
+                    run_info,
+                    store,
+                    outputs,
+                    fixed_indices,
+                    ex,
+                    pipeline.cache,
+                )
+        _maybe_persist_memory(store, persist_memory)
+        return outputs
+
+    task = asyncio.create_task(_run_pipeline())
+    return AsyncRunner(task, run_info, store)
 
 
 run_async.__doc__ = run.__doc__
