@@ -196,6 +196,12 @@ class ProgressTracker:
                 self.last_update_times[name] = current_time
                 self.last_progress[name] = self.progress_dict[name]
 
+            # Check if all tasks are completed
+            if all(progress >= 1.0 for progress in self.progress_dict.values()):
+                self.toggle_auto_update(None)
+                self.auto_update_interval_label.value = "Auto-update every: N/A"
+                break
+
             await asyncio.sleep(new_interval)
 
     def toggle_auto_update(self, _: Any) -> None:
@@ -206,8 +212,7 @@ class ProgressTracker:
         )
         if self.auto_update:
             self.auto_update_task = asyncio.create_task(self._auto_update_progress())
-        else:
-            assert self.auto_update_task is not None
+        elif self.auto_update_task is not None:
             self.auto_update_task.cancel()
             self.auto_update_task = None
 
