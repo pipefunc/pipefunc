@@ -165,7 +165,7 @@ def run(
     return outputs
 
 
-class AsyncRunner(NamedTuple):
+class AsyncRun(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     store: dict[str, StorageBase | Path | DirectValue]
@@ -195,7 +195,7 @@ def run_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-) -> AsyncRunner:
+) -> AsyncRun:
     pipeline, run_info, store, outputs, _ = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
@@ -227,7 +227,7 @@ def run_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    return AsyncRunner(task, run_info, store)
+    return AsyncRun(task, run_info, store)
 
 
 run_async.__doc__ = run.__doc__
