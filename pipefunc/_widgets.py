@@ -37,10 +37,7 @@ class ProgressTracker:
     ) -> None:
         self.resource_manager: Any = resource_manager
         self.target_progress_change: float = target_progress_change
-        self.progress_dict: dict[str, float] = {
-            name: self._calculate_progress(store).percentage
-            for name, store in self.resource_manager.store.items()
-        }
+        self.progress_dict: dict[str, float] = {name: 0.0 for name in self.resource_manager.store}
         self.start_times: dict[str, float | None] = {name: None for name in self.progress_dict}
         self.done_times: dict[str, float | None] = {name: None for name in self.progress_dict}
         self.auto_update: bool = False
@@ -53,14 +50,14 @@ class ProgressTracker:
         self.update_button: widgets.Button
         self.toggle_auto_update_button: widgets.Button
         self.auto_update_task: asyncio.Task | None = None
-
-        self._setup_widgets()
-        self._display_widgets()
-
         self.last_update_times: dict[str, float | None] = {
             name: None for name in self.progress_dict
         }
         self.last_progress: dict[str, float] = {name: 0.0 for name in self.progress_dict}
+
+        self._setup_widgets()
+        self._display_widgets()
+
         if auto_update:
             self.toggle_auto_update(None)
 
