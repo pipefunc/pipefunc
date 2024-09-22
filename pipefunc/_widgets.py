@@ -50,6 +50,7 @@ class ProgressTracker:
         )
         self.update_button: widgets.Button
         self.toggle_auto_update_button: widgets.Button
+        self.cancel_button: widgets.Button
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
 
@@ -65,10 +66,20 @@ class ProgressTracker:
 
     def _setup_widgets(self) -> None:
         """Initialize widgets for progress tracking."""
-        self.update_button = widgets.Button(description="Update Progress", button_style="info")
+        self.update_button = widgets.Button(
+            description="Update Progress",
+            button_style="info",
+            icon="refresh",
+        )
         self.toggle_auto_update_button = widgets.Button(
             description="Start Auto-Update",
             button_style="success",
+            icon="refresh",
+        )
+        self.cancel_button = widgets.Button(
+            description="Cancel Calculation",
+            button_style="danger",
+            icon="stop",
         )
 
         for name in self.progress_dict:
@@ -96,6 +107,7 @@ class ProgressTracker:
         )
         self.update_button.on_click(self.update_progress)
         self.toggle_auto_update_button.on_click(self.toggle_auto_update)
+        self.cancel_button.on_click(self.cancel_calculation)
 
     def update_progress(self, _: Any) -> None:
         """Update the progress values and labels."""
@@ -232,6 +244,14 @@ class ProgressTracker:
             self.auto_update_task.cancel()
             self.auto_update_task = None
 
+    def cancel_calculation(self, _: Any) -> None:
+        """Cancel the ongoing calculation."""
+        if self.resource_manager.task is not None:
+            self.resource_manager.task.cancel()
+            print("Calculation cancelled.")
+        else:
+            print("No ongoing calculation to cancel.")
+
     def _display_widgets(self) -> None:
         """Display the progress widgets with styles."""
         style = """
@@ -287,6 +307,7 @@ class ProgressTracker:
             .widget-label {
                 margin-bottom: 5px;
                 color: #333;
+                font-family: monospace;
             }
             .widget-button {
                 margin-top: 10px;
@@ -320,8 +341,8 @@ class ProgressTracker:
             [
                 *progress_containers,
                 widgets.HBox(
-                    [self.update_button, self.toggle_auto_update_button],
-                    layout=widgets.Layout(class_="widget-button"),
+                    [self.update_button, self.toggle_auto_update_button, self.cancel_button],
+                    layout=widgets.Layout(class_="widget-button", justify_content="center"),
                 ),
                 self.auto_update_interval_label,
             ],
