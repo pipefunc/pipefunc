@@ -77,7 +77,7 @@ class ProgressTracker:
                 value=progress,
                 max=1.0,
                 layout={"width": "95%"},
-                bar_style="info" if progress < 1 else "success",
+                bar_style="info",
                 style={"description_width": "150px"},
             )
             self.percentage_labels[name] = widgets.HTML(
@@ -90,7 +90,7 @@ class ProgressTracker:
                 value='<span class="speed-label">Speed: calculating...</span>',
             )
 
-            self.progress_bars[name].add_class("row")
+            self.progress_bars[name].add_class("animated-progress")
         self.auto_update_interval_label = widgets.HTML(
             value='<span class="interval-label">Auto-update every: N/A</span>',
         )
@@ -115,6 +115,15 @@ class ProgressTracker:
             # Update the progress bar
             progress_bar = self.progress_bars[name]
             progress_bar.value = current_progress
+
+            # Update animation class based on progress
+            if current_progress >= 1.0:
+                progress_bar.bar_style = "success"
+                progress_bar.remove_class("animated-progress")
+                progress_bar.add_class("completed-progress")
+            else:
+                progress_bar.remove_class("completed-progress")
+                progress_bar.add_class("animated-progress")
 
             # Update percentage label
             iterations_done = int(status.total * current_progress)
@@ -225,17 +234,36 @@ class ProgressTracker:
         """Display the progress widgets with styles."""
         style = """
         <style>
-            .progress-container {
-                margin-bottom: 15px;
-                padding: 10px;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                background-color: #f9f9f9;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .row {
-                background-color: #e8f0fe;
+            .progress {
                 border-radius: 5px;
+            }
+            .animated-progress .progress-bar {
+                background-image: linear-gradient(
+                    -45deg,
+                    rgba(255, 255, 255, 0.15) 25%,
+                    transparent 25%,
+                    transparent 50%,
+                    rgba(255, 255, 255, 0.15) 50%,
+                    rgba(255, 255, 255, 0.15) 75%,
+                    transparent 75%,
+                    transparent
+                );
+                background-size: 40px 40px;
+                animation: stripes 1s linear infinite;
+                border-radius: 5px;
+            }
+            .completed-progress .progress-bar {
+                background-image: none;
+                animation: none;
+                border-radius: 5px;
+            }
+            @keyframes stripes {
+                0% {
+                    background-position: 0 0;
+                }
+                100% {
+                    background-position: 40px 0;
+                }
             }
             .percent-label {
                 margin-left: 10px;
@@ -280,7 +308,7 @@ class ProgressTracker:
             # Create a vertical box for the progress bar and labels
             container = widgets.VBox(
                 [progress_bar, labels_box],
-                layout=widgets.Layout(class_="progress-container"),
+                layout=widgets.Layout(class_="progress"),
             )
 
             progress_containers.append(container)
