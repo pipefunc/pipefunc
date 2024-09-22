@@ -103,6 +103,8 @@ class ProgressTracker:
 
         for name, store in self.resource_manager.store.items():
             t = time.time()
+            if self.done_times[name] is not None:
+                continue
             status = self._calculate_progress(store)
             print(f"Calculated progress for {name} in {(time.time() - t)*1e6:.2f} μs")
             current_progress = status.percentage
