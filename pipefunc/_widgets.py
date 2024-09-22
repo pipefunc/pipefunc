@@ -67,8 +67,7 @@ class ProgressTracker:
         self.update_button = widgets.Button(description="Update Progress")
         self.toggle_auto_update_button = widgets.Button(description="Start Auto-Update")
 
-        for i, name in enumerate(self.progress_dict):
-            color_class = "row-even" if i % 2 == 0 else "row-odd"
+        for name in self.progress_dict:
             progress = self.progress_dict[name]
             self.progress_bars[name] = widgets.FloatProgress(
                 value=progress,
@@ -84,7 +83,7 @@ class ProgressTracker:
                 value='<span class="estimate-label">Estimated time left: calculating...</span>',
             )
 
-            self.progress_bars[name].add_class(color_class)  # Use add_class method
+            self.progress_bars[name].add_class("row")  # Use add_class method
         self.auto_update_interval_label = widgets.HTML(
             value='<span class="interval-label">Auto-update every: N/A</span>',
         )
@@ -217,11 +216,8 @@ class ProgressTracker:
                 border: 1px solid lightgray;
                 border-radius: 5px;
             }
-            .row-even {
+            .row {
                 background-color: #f8f8f8;
-            }
-            .row-odd {
-                background-color: #ffffff;
             }
             .percent-label {
                 margin-left: 10px;
