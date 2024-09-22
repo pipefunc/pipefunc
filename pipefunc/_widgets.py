@@ -50,10 +50,7 @@ class ProgressTracker:
         self.update_button: widgets.Button
         self.toggle_auto_update_button: widgets.Button
         self.auto_update_task: asyncio.Task | None = None
-        self.last_update_times: dict[str, float | None] = {
-            name: None for name in self.progress_dict
-        }
-        self.last_progress: dict[str, float] = {name: 0.0 for name in self.progress_dict}
+        self.first_update: bool = True
 
         self._setup_widgets()
         self._display_widgets()
@@ -78,7 +75,7 @@ class ProgressTracker:
                 max=1.0,
                 layout={"width": "600px"},
                 bar_style="info" if progress < 1 else "success",
-                style={"description_width": "140px"},
+                style={"description_width": "150px"},
             )
             self.percentage_labels[name] = widgets.HTML(
                 value=f'<span class="percent-label">{progress * 100:.1f}%</span>',
@@ -114,12 +111,11 @@ class ProgressTracker:
             progress_bar.value = current_progress
 
             # Update percentage label
-            label = f'<span class="percent-label">{current_progress * 100:.1f}%</span>'
-            self.percentage_labels[name].value = label
-
             iterations_done = int(status.total * current_progress)
             iterations_left = status.total - iterations_done
             iterations_label = f"✅ {iterations_done} | ⏰ {iterations_left}"
+            label = f'<span class="percent-label">{current_progress * 100:.1f}% | {iterations_label}</span>'
+            self.percentage_labels[name].value = label
 
             # Update elapsed time and estimate
             start_time = self.start_times[name]
@@ -139,12 +135,9 @@ class ProgressTracker:
             else:
                 label = '<span class="estimate-label">Elapsed time: 0.00 sec | Estimated time left: calculating...</span>'
             self.estimated_time_labels[name].value = label
-            # Update last known progress and times after calculations
-            self.last_update_times[name] = current_time
-            self.last_progress[name] = current_progress
 
             # Update description accurately
-            progress_bar.description = f"{name}: {iterations_label}"
+            progress_bar.description = f"{name}"
 
         print(f"Updated progress at {current_time}")
 
@@ -183,26 +176,22 @@ class ProgressTracker:
         """Periodically update the progress."""
         while self.auto_update:
             self.update_progress(None)
-
-            # Calculate interval based on the previous state
-            new_interval = self._calculate_adaptive_interval_with_previous()
+            if self.first_update:
+                new_interval = 1.0
+                self.first_update = False
+            else:
+                new_interval = self._calculate_adaptive_interval_with_previous()
 
             # Update interval display
-            self.auto_update_interval_label.value = f"Auto-update every: {new_interval:.2f} sec"
-            print(f"Auto-update interval: {new_interval:.2f} sec")
-
-            # Update last known progress and times after calculations
-            current_time = time.time()
-            for name in self.progress_dict:
-                self.last_update_times[name] = current_time
-                self.last_progress[name] = self.progress_dict[name]
+            if not self.first_update:
+                self.auto_update_interval_label.value = f"Auto-update every: {new_interval:.2f} sec"
+                print(f"Auto-update interval: {new_interval:.2f} sec")
 
             # Check if all tasks are completed
             if all(progress >= 1.0 for progress in self.progress_dict.values()):
                 self.toggle_auto_update(None)
                 self.auto_update_interval_label.value = "Auto-update every: N/A"
                 break
-
             await asyncio.sleep(new_interval)
 
     def toggle_auto_update(self, _: Any) -> None:
@@ -212,6 +201,7 @@ class ProgressTracker:
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
         if self.auto_update:
+            self.first_update = True
             self.auto_update_task = asyncio.create_task(self._auto_update_progress())
         elif self.auto_update_task is not None:
             self.auto_update_task.cancel()
