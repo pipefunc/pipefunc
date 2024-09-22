@@ -128,7 +128,7 @@ class ProgressTracker:
             # Update percentage label
             iterations_done = int(status.total * current_progress)
             iterations_left = status.total - iterations_done
-            iterations_label = f"✅ {iterations_done:,} | ⏰ {iterations_left:,}"
+            iterations_label = f"✓ {iterations_done:,} | ⏳ {iterations_left:,}"
             label = f'<span class="percent-label">{current_progress * 100:.1f}% | {iterations_label}</span>'
             self.percentage_labels[name].value = label
 
@@ -150,7 +150,7 @@ class ProgressTracker:
 
                 # Calculate and update speed
                 speed = iterations_done / elapsed_time if elapsed_time > 0 else 0
-                speed_label = f'<span class="speed-label">Speed: {speed:.2f} iterations/sec</span>'
+                speed_label = f'<span class="speed-label">Speed: {speed:,.2f} iterations/sec</span>'
                 self.speed_labels[name].value = speed_label
             else:
                 label = (
@@ -237,7 +237,7 @@ class ProgressTracker:
             .progress {
                 border-radius: 5px;
             }
-            .animated-progress .progress-bar {
+            .animated-progress .progress-bar, .completed-progress .progress-bar {
                 background-image: linear-gradient(
                     -45deg,
                     rgba(255, 255, 255, 0.15) 25%,
@@ -249,13 +249,13 @@ class ProgressTracker:
                     transparent
                 );
                 background-size: 40px 40px;
-                animation: stripes 1s linear infinite;
                 border-radius: 5px;
             }
+            .animated-progress .progress-bar {
+                animation: stripes 1s linear infinite;
+            }
             .completed-progress .progress-bar {
-                background-image: none;
                 animation: none;
-                border-radius: 5px;
             }
             @keyframes stripes {
                 0% {
