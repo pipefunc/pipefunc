@@ -78,6 +78,7 @@ class ProgressTracker:
                 max=1.0,
                 layout={"width": "600px"},
                 bar_style="info" if progress < 1 else "success",
+                style={"description_width": "140px"},
             )
             self.percentage_labels[name] = widgets.HTML(
                 value=f'<span class="percent-label">{progress * 100:.1f}%</span>',
@@ -143,7 +144,7 @@ class ProgressTracker:
             self.last_progress[name] = current_progress
 
             # Update description accurately
-            progress_bar.description = f"{name} {iterations_label}"
+            progress_bar.description = f"{name}: {iterations_label}"
 
         print(f"Updated progress at {current_time}")
 
