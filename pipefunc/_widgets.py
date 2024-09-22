@@ -149,7 +149,7 @@ class ProgressTracker:
                     label = f'<span class="estimate-label">Elapsed: {elapsed_time:.2f} sec | ETA: {estimated_time_left:.2f} sec</span>'
 
                 # Calculate and update speed
-                speed = iterations_done / elapsed_time if elapsed_time > 0 else 0
+                speed = iterations_done / elapsed_time if elapsed_time > 0 else float("inf")
                 speed_label = f'<span class="speed-label">Speed: {speed:,.2f} iterations/sec</span>'
                 self.speed_labels[name].value = speed_label
             else:
