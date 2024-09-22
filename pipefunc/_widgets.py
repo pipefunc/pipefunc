@@ -249,6 +249,27 @@ class ProgressTracker:
         if self.resource_manager.task is not None:
             self.resource_manager.task.cancel()
             print("Calculation cancelled.")
+
+            # Update progress one last time
+            self.update_progress(None)
+
+            # Disable auto-update
+            if self.auto_update:
+                self.toggle_auto_update(None)
+
+            # Disable all buttons
+            self.update_button.disabled = True
+            self.toggle_auto_update_button.disabled = True
+            self.cancel_button.disabled = True
+
+            # Stop animation and set bar style to danger for in-progress bars
+            for progress_bar in self.progress_bars.values():
+                if progress_bar.value < 1.0:
+                    progress_bar.bar_style = "danger"
+                    progress_bar.remove_class("animated-progress")
+                    progress_bar.add_class("completed-progress")
+
+            self.auto_update_interval_label.value = "Calculation cancelled"
         else:
             print("No ongoing calculation to cancel.")
 
