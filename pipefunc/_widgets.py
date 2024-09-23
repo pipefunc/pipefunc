@@ -134,32 +134,21 @@ class ProgressTracker:
                 continue
             status = progress(store)
             current_progress = status.percentage
-            self._update_times(name, current_time, current_progress)
+            if self.start_times[name] is None and current_progress > 0:
+                self.start_times[name] = current_time
+            if self.done_times[name] is None and current_progress >= 1.0:
+                self.done_times[name] = current_time
             self.progress[name] = current_progress
-            self._update_progress_bar(name, current_progress)
+            progress_bar = self.progress_bars[name]
+            progress_bar.value = current_progress
+            if current_progress >= 1.0:
+                progress_bar.bar_style = "success"
+                progress_bar.remove_class("animated-progress")
+                progress_bar.add_class("completed-progress")
+            else:
+                progress_bar.remove_class("completed-progress")
+                progress_bar.add_class("animated-progress")
             self._update_labels(name, current_time, status)
-
-    def _update_progress_bar(self, name: str, current_progress: float) -> None:
-        progress_bar = self.progress_bars[name]
-        progress_bar.value = current_progress
-        if current_progress >= 1.0:
-            progress_bar.bar_style = "success"
-            progress_bar.remove_class("animated-progress")
-            progress_bar.add_class("completed-progress")
-        else:
-            progress_bar.remove_class("completed-progress")
-            progress_bar.add_class("animated-progress")
-
-    def _update_times(
-        self,
-        name: str,
-        current_time: float,
-        current_progress: float,
-    ) -> None:
-        if self.start_times[name] is None and current_progress > 0:
-            self.start_times[name] = current_time
-        if self.done_times[name] is None and current_progress >= 1.0:
-            self.done_times[name] = current_time
 
     def _update_labels(
         self,
@@ -167,8 +156,9 @@ class ProgressTracker:
         current_time: float,
         status: Status,
     ) -> None:
+        label_dict = self.labels[name]
         iterations_label = f"✓ {status.done:,} | ⏳ {status.left:,}"
-        self.labels[name]["percentage"].value = span(
+        label_dict["percentage"].value = span(
             "percent-label",
             f"{status.percentage * 100:.1f}% | {iterations_label}",
         )
@@ -183,8 +173,8 @@ class ProgressTracker:
             estimated_time_left = (1.0 - status.percentage) * (elapsed_time / status.percentage)
             eta = f"ETA: {estimated_time_left:.2f} sec"
         speed = f"{status.done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-        self.labels[name]["speed"].value = span("speed-label", f"Speed: {speed} iterations/sec")
-        self.labels[name]["estimated_time"].value = span(
+        label_dict["speed"].value = span("speed-label", f"Speed: {speed} iterations/sec")
+        label_dict["estimated_time"].value = span(
             "estimate-label",
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
@@ -231,9 +221,8 @@ class ProgressTracker:
                     "interval-label",
                     "Auto-update every: N/A",
                 )
-                self.buttons["update"].disabled = True
-                self.buttons["toggle_auto_update"].disabled = True
-                self.buttons["cancel"].disabled = True
+                for button in self.buttons.values():
+                    button.disabled = True
                 break
             await asyncio.sleep(new_interval)
 
@@ -266,9 +255,8 @@ class ProgressTracker:
                 self.toggle_auto_update(None)
 
             # Disable all buttons
-            self.buttons["update"].disabled = True
-            self.buttons["toggle_auto_update"].disabled = True
-            self.buttons["cancel"].disabled = True
+            for button in self.buttons.values():
+                button.disabled = True
 
             # Stop animation and set bar style to danger for in-progress bars
             for progress_bar in self.progress_bars.values():
