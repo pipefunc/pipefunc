@@ -228,7 +228,7 @@ class ProgressTracker:
                 "Calculation cancelled ❌",
             )
 
-    def widgets(self) -> widgets.VBox:
+    def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
         # Create individual progress containers for each item in progress
         progress_containers = []
@@ -321,4 +321,4 @@ class ProgressTracker:
         </style>
         """
         display(HTML(style))
-        display(self.widgets())
+        display(self._widgets())
