@@ -126,7 +126,7 @@ class ProgressTracker:
             )
             self.estimated_time_labels[name] = create_html_label(
                 "estimate-label",
-                "Estimated time left: calculating...",
+                "Elapsed: 0.00 sec | ETA: calculating...",
             )
             self.speed_labels[name] = create_html_label(
                 "speed-label",
@@ -200,34 +200,19 @@ class ProgressTracker:
         self.percentage_labels[name].value = percent_label
 
         start_time = self.start_times[name]
+        if not start_time:
+            return
         end_time = self.done_times[name]
-
-        if start_time is not None:
-            elapsed_time = (end_time or current_time) - start_time
-            if end_time is not None:
-                estimate_label = span(
-                    "estimate-label",
-                    f"Elapsed time: {elapsed_time:.2f} sec | Completed",
-                )
-            else:
-                estimated_time_left = (
-                    (1.0 - current_progress) * (elapsed_time / current_progress)
-                    if current_progress > 0
-                    else float("inf")
-                )
-                estimate_label = span(
-                    "estimate-label",
-                    f"Elapsed: {elapsed_time:.2f} sec | ETA: {estimated_time_left:.2f} sec",
-                )
-
-            speed = f"{iterations_done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-            speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
-            self.speed_labels[name].value = speed_label
+        elapsed_time = (end_time or current_time) - start_time
+        if end_time is not None:
+            eta = "Completed"
         else:
-            estimate_label = span(
-                "estimate-label",
-                "Elapsed: 0.00 sec | ETA: calculating...",
-            )
+            estimated_time_left = (1.0 - current_progress) * (elapsed_time / current_progress)
+            eta = f"ETA: {estimated_time_left:.2f} sec"
+        estimate_label = span("estimate-label", f"Elapsed: {elapsed_time:.2f} sec | {eta}")
+        speed = f"{iterations_done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+        speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
+        self.speed_labels[name].value = speed_label
         self.estimated_time_labels[name].value = estimate_label
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
