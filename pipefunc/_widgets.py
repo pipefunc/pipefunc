@@ -91,7 +91,7 @@ class ProgressTracker:
         if display:
             self.display()
 
-        if auto_update:
+        if auto_update and task is not None:
             self.toggle_auto_update(None)
 
     def update_progress(self, _: Any) -> None:
@@ -252,10 +252,12 @@ class ProgressTracker:
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
             layout=widgets.Layout(class_="widget-button", justify_content="center"),
         )
-        return widgets.VBox(
-            [*progress_containers, button_box, self.auto_update_interval_label],
-            layout=widgets.Layout(max_width="600px"),
+        parts = (
+            [*progress_containers, button_box, self.auto_update_interval_label]
+            if self.task
+            else progress_containers
         )
+        return widgets.VBox(parts, layout=widgets.Layout(max_width="600px"))
 
     def display(self) -> None:
         style = """
