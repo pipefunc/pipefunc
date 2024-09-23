@@ -114,16 +114,14 @@ class ProgressTracker:
         current_time = time.time()
 
         for name, store in self.resource_manager.store.items():
-            t = time.time()
             if self.done_times[name] is not None:
                 continue
             status = self._calculate_progress(store)
-            print(f"Calculated progress for {name} in {(time.time() - t)*1e6:.2f} μs")
             current_progress = status.percentage
             if self.start_times[name] is None and current_progress > 0:
-                self.start_times[name] = time.time()
+                self.start_times[name] = current_time
             if self.done_times[name] is None and current_progress >= 1.0:
-                self.done_times[name] = time.time()
+                self.done_times[name] = current_time
             self.progress_dict[name] = current_progress
 
             # Update the progress bar
@@ -165,7 +163,7 @@ class ProgressTracker:
                 # Calculate and update speed
                 speed = iterations_done / elapsed_time if elapsed_time > 0 else float("inf")
                 speed_label = f'<span class="speed-label">Speed: {speed:,.2f} iterations/sec</span>'
-                self.speed_labels[name].value = speed_label
+                self.speed_labels[name].value = speed_label.replace("inf", "∞")
             else:
                 label = (
                     '<span class="estimate-label">Elapsed: 0.00 sec | ETA: calculating...</span>'
@@ -175,16 +173,12 @@ class ProgressTracker:
             # Update description accurately
             progress_bar.description = f"{name}"
 
-        print(f"Updated progress at {current_time}")
-
     def _calculate_adaptive_interval_with_previous(self) -> float:
         """Calculate a dynamic interval based on progress changes for all resources."""
         min_interval = 0.1  # minimum interval to avoid extremely rapid updates
         max_interval = 10.0  # maximum interval to prevent excessively slow updates
         shortest_interval = max_interval
-
         current_time = time.time()
-        print(f"Current progress dict: {self.progress_dict}")
         for name, current_progress in self.progress_dict.items():
             if current_progress <= 0 or current_progress >= 1:
                 continue
@@ -193,20 +187,9 @@ class ProgressTracker:
             elapsed_time = current_time - start_time
             progress_rate = current_progress / elapsed_time
             estimated_time_for_target = self.target_progress_change / progress_rate
-
-            print(
-                f"Resource: {name}, Current Progress: {current_progress:.4f}, "
-                f"Elapsed Time: {elapsed_time:.4f}, "
-                f"Progress Rate: {progress_rate:.4f} per second, "
-                f"Estimated Time for Target: {estimated_time_for_target:.2f} seconds",
-            )
-
             # Estimate time for target progress change
             shortest_interval = min(shortest_interval, estimated_time_for_target)
-
-        calculated_interval = min(max(shortest_interval, min_interval), max_interval)
-        print(f"Calculated Interval: {calculated_interval:.2f}")
-        return calculated_interval
+        return min(max(shortest_interval, min_interval), max_interval)
 
     async def _auto_update_progress(self) -> None:
         """Periodically update the progress."""
@@ -221,7 +204,6 @@ class ProgressTracker:
             # Update interval display
             if not self.first_update:
                 self.auto_update_interval_label.value = f"Auto-update every: {new_interval:.2f} sec"
-                print(f"Auto-update interval: {new_interval:.2f} sec")
 
             # Check if all tasks are completed
             if all(progress >= 1.0 for progress in self.progress_dict.values()):
@@ -248,7 +230,6 @@ class ProgressTracker:
         """Cancel the ongoing calculation."""
         if self.resource_manager.task is not None:
             self.resource_manager.task.cancel()
-            print("Calculation cancelled.")
 
             # Update progress one last time
             self.update_progress(None)
@@ -270,8 +251,6 @@ class ProgressTracker:
                     progress_bar.add_class("completed-progress")
 
             self.auto_update_interval_label.value = "Calculation cancelled"
-        else:
-            print("No ongoing calculation to cancel.")
 
     def _display_widgets(self) -> None:
         """Display the progress widgets with styles."""
@@ -362,8 +341,15 @@ class ProgressTracker:
             [
                 *progress_containers,
                 widgets.HBox(
-                    [self.update_button, self.toggle_auto_update_button, self.cancel_button],
-                    layout=widgets.Layout(class_="widget-button", justify_content="center"),
+                    [
+                        self.update_button,
+                        self.toggle_auto_update_button,
+                        self.cancel_button,
+                    ],
+                    layout=widgets.Layout(
+                        class_="widget-button",
+                        justify_content="center",
+                    ),
                 ),
                 self.auto_update_interval_label,
             ],
