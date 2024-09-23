@@ -681,7 +681,7 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         with_progress
-            Whether to display a progress bar.
+            Whether to display a progress bar. Only works if ``parallel=True``.
 
         """
         return run(

@@ -58,6 +58,8 @@ class ProgressTracker:
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
         self.in_asyncio: bool = in_asyncio
+        self.last_update_time: float = time.monotonic()
+        self.sync_interval: float = 0.1
 
         # Initialize widgets for progress tracking
         self.progress_bars: dict[_OUTPUT_TYPE, widgets.FloatProgress] = {}
@@ -106,6 +108,12 @@ class ProgressTracker:
 
     def update_progress(self, _: Any = None) -> None:
         """Update the progress values and labels."""
+        if not self.in_asyncio:
+            now = time.monotonic()
+            if now - self.last_update_time < self.sync_interval:
+                return
+            self.last_update_time = time.monotonic()
+
         for name, status in self.progress_dict.items():
             if status.progress == 0:
                 continue
@@ -270,7 +278,7 @@ class ProgressTracker:
             if self.task
             else progress_containers
         )
-        return widgets.VBox(parts, layout=widgets.Layout(max_width="600px"))
+        return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
         style = """

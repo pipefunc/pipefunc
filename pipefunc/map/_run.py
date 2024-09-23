@@ -180,6 +180,8 @@ def run(
                 tracker=tracker,
                 cache=pipeline.cache,
             )
+    if tracker is not None:  # final update
+        tracker.update_progress()
     _maybe_persist_memory(store, persist_memory)
     return outputs
 
