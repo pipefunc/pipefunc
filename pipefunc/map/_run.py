@@ -794,10 +794,7 @@ def _run_and_process_generation(
     tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
-        for func in generation
-    }
+    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
     _process_generation(generation, tasks, store, outputs)
 
 
@@ -811,10 +808,7 @@ async def _run_and_process_generation_async(
     tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
-        for func in generation
-    }
+    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
     await _process_generation_async(generation, tasks, store, outputs)
 
 
@@ -859,6 +853,21 @@ def _submit_func(
     else:
         task = _maybe_submit(_submit_single, executor, status, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _submit_generation(
+    run_info: RunInfo,
+    generation: list[PipeFunc],
+    store: dict[str, StorageBase | Path | DirectValue],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor | None,
+    tracker: ProgressTracker | None,
+    cache: _CacheBase | None = None,
+) -> dict[PipeFunc, _KwargsTask]:
+    return {
+        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
+        for func in generation
+    }
 
 
 def _output_from_mapspec_task(
