@@ -845,7 +845,7 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    status = progress[at_least_tuple(func.output_name)[0]] if progress is not None else None
+    status = progress[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(args.process_index, args.missing, executor, status)

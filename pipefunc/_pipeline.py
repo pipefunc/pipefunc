@@ -41,7 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import AsyncRun, run, run_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -631,7 +631,6 @@ class Pipeline:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
-        parallel: bool = True,
         executor: Executor | None = None,
         storage: str = "file_array",
         persist_memory: bool = True,
@@ -690,7 +689,36 @@ class Pipeline:
             run_folder,
             internal_shapes=internal_shapes,
             output_names=output_names,
-            parallel=parallel,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            with_progress=with_progress,
+        )
+
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        executor: Executor | None = None,
+        storage: str = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        with_progress: bool = False,
+    ) -> AsyncRun:
+        return run_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
             executor=executor,
             storage=storage,
             persist_memory=persist_memory,
