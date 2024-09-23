@@ -37,10 +37,11 @@ def create_button(description: str, button_style: str, icon: str) -> widgets.But
     )
 
 
-def create_progress_bar(progress: float) -> widgets.FloatProgress:
+def create_progress_bar(name: str, progress: float) -> widgets.FloatProgress:
     return widgets.FloatProgress(
         value=progress,
         max=1.0,
+        description=name,
         layout={"width": "95%"},
         bar_style="info",
         style={"description_width": "150px"},
@@ -49,20 +50,6 @@ def create_progress_bar(progress: float) -> widgets.FloatProgress:
 
 def create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=span(class_name, initial_value))
-
-
-def update_progress_bar(
-    progress_bar: widgets.FloatProgress,
-    current_progress: float,
-) -> None:
-    progress_bar.value = current_progress
-    if current_progress >= 1.0:
-        progress_bar.bar_style = "success"
-        progress_bar.remove_class("animated-progress")
-        progress_bar.add_class("completed-progress")
-    else:
-        progress_bar.remove_class("completed-progress")
-        progress_bar.add_class("animated-progress")
 
 
 class ProgressTracker:
@@ -119,7 +106,7 @@ class ProgressTracker:
 
     def _create_progress_widgets(self) -> None:
         for name, progress in self.progress_dict.items():
-            self.progress_bars[name] = create_progress_bar(progress)
+            self.progress_bars[name] = create_progress_bar(name, progress)
             self.percentage_labels[name] = create_html_label(
                 "percent-label",
                 f"{progress * 100:.1f}%",
@@ -148,19 +135,14 @@ class ProgressTracker:
     def update_progress(self, _: Any) -> None:
         """Update the progress values and labels."""
         current_time = time.time()
-
         for name, store in self.resource_manager.store.items():
             if self.done_times[name] is not None:
                 continue
-
             status = progress(store)
             current_progress = status.percentage
             self._update_times(name, current_time, current_progress)
             self.progress_dict[name] = current_progress
-
-            progress_bar = self.progress_bars[name]
-            update_progress_bar(progress_bar, current_progress)
-
+            self._update_progress_bar(name, current_progress)
             iterations_done = int(status.total * current_progress)
             iterations_left = status.total - iterations_done
             self._update_labels(
@@ -171,7 +153,16 @@ class ProgressTracker:
                 iterations_left,
             )
 
-            progress_bar.description = f"{name}"
+    def _update_progress_bar(self, name: str, current_progress: float) -> None:
+        progress_bar = self.progress_bars[name]
+        progress_bar.value = current_progress
+        if current_progress >= 1.0:
+            progress_bar.bar_style = "success"
+            progress_bar.remove_class("animated-progress")
+            progress_bar.add_class("completed-progress")
+        else:
+            progress_bar.remove_class("completed-progress")
+            progress_bar.add_class("animated-progress")
 
     def _update_times(
         self,
@@ -209,7 +200,10 @@ class ProgressTracker:
         else:
             estimated_time_left = (1.0 - current_progress) * (elapsed_time / current_progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
-        estimate_label = span("estimate-label", f"Elapsed: {elapsed_time:.2f} sec | {eta}")
+        estimate_label = span(
+            "estimate-label",
+            f"Elapsed: {elapsed_time:.2f} sec | {eta}",
+        )
         speed = f"{iterations_done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
         self.speed_labels[name].value = speed_label
