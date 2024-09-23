@@ -219,15 +219,15 @@ class ProgressTracker:
                     "estimate-label",
                     f"Elapsed: {elapsed_time:.2f} sec | ETA: {estimated_time_left:.2f} sec",
                 )
-            speed = iterations_done / elapsed_time if elapsed_time > 0 else float("inf")
-            speed_label = span("speed-label", f"Speed: {speed:,.2f} iterations/sec")
+
+            speed = f"{iterations_done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+            speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
             self.speed_labels[name].value = speed_label
         else:
             estimate_label = span(
                 "estimate-label",
                 "Elapsed: 0.00 sec | ETA: calculating...",
             )
-
         self.estimated_time_labels[name].value = estimate_label
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
