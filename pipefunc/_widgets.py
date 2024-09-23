@@ -42,7 +42,7 @@ def create_progress_bar(name: str, progress: float) -> widgets.FloatProgress:
         value=progress,
         max=1.0,
         description=name,
-        layout={"width": "95%"},
+        layout={"width": "95%", "class_": "animated-progress"},
         bar_style="info",
         style={"description_width": "150px"},
     )
@@ -68,43 +68,24 @@ class ProgressTracker:
         self.start_times: dict[str, float | None] = {name: None for name in self.progress_dict}
         self.done_times: dict[str, float | None] = {name: None for name in self.progress_dict}
         self.auto_update: bool = False
+        self.auto_update_task: asyncio.Task | None = None
+        self.first_update: bool = True
+
+        # Initialize widgets for progress tracking
         self.progress_bars: dict[str, widgets.FloatProgress] = {}
         self.estimated_time_labels: dict[str, widgets.HTML] = {}
         self.percentage_labels: dict[str, widgets.HTML] = {}
         self.speed_labels: dict[str, widgets.HTML] = {}
-        self.auto_update_interval_label: widgets.HTML = create_html_label(
-            "interval-label",
-            "Auto-update every: Calculating...",
-        )
-        self.update_button: widgets.Button
-        self.toggle_auto_update_button: widgets.Button
-        self.cancel_button: widgets.Button
-        self.auto_update_task: asyncio.Task | None = None
-        self.first_update: bool = True
 
-        self._setup_widgets()
-        self._display_widgets()
-
-        if auto_update:
-            self.toggle_auto_update(None)
-
-    def _setup_widgets(self) -> None:
-        """Initialize widgets for progress tracking."""
-        self._create_control_buttons()
-        self._create_progress_widgets()
-        self._create_auto_update_label()
-        self._setup_button_callbacks()
-
-    def _create_control_buttons(self) -> None:
+        # Create control buttons
         self.update_button = create_button("Update Progress", "info", "refresh")
-        self.toggle_auto_update_button = create_button(
-            "Start Auto-Update",
-            "success",
-            "refresh",
-        )
+        self.update_button.on_click(self.update_progress)
+        self.toggle_auto_update_button = create_button("Start Auto-Update", "success", "refresh")
+        self.toggle_auto_update_button.on_click(self.toggle_auto_update)
         self.cancel_button = create_button("Cancel Calculation", "danger", "stop")
+        self.cancel_button.on_click(self.cancel_calculation)
 
-    def _create_progress_widgets(self) -> None:
+        # Create progress widgets
         for name, progress in self.progress_dict.items():
             self.progress_bars[name] = create_progress_bar(name, progress)
             self.percentage_labels[name] = create_html_label(
@@ -115,22 +96,18 @@ class ProgressTracker:
                 "estimate-label",
                 "Elapsed: 0.00 sec | ETA: calculating...",
             )
-            self.speed_labels[name] = create_html_label(
-                "speed-label",
-                "Speed: calculating...",
-            )
-            self.progress_bars[name].add_class("animated-progress")
+            self.speed_labels[name] = create_html_label("speed-label", "Speed: calculating...")
 
-    def _create_auto_update_label(self) -> None:
+        # Create auto-update label
         self.auto_update_interval_label = create_html_label(
             "interval-label",
             "Auto-update every: N/A",
         )
 
-    def _setup_button_callbacks(self) -> None:
-        self.update_button.on_click(self.update_progress)
-        self.toggle_auto_update_button.on_click(self.toggle_auto_update)
-        self.cancel_button.on_click(self.cancel_calculation)
+        self._display_widgets()
+
+        if auto_update:
+            self.toggle_auto_update(None)
 
     def update_progress(self, _: Any) -> None:
         """Update the progress values and labels."""
