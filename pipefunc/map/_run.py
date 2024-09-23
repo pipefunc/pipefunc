@@ -419,7 +419,6 @@ def _run_iteration(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
-    status: _Status | None,
     cache: _CacheBase | None,
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
@@ -427,18 +426,12 @@ def _run_iteration(
     def compute_fn() -> Any:
         if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
             selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
-        if status is not None:
-            status.in_progress()
         try:
-            result = func(**selected)
+            return func(**selected)
         except Exception as e:
             handle_error(e, func, selected)
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
-        else:
-            if status is not None:
-                status.completed()
-            return result
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -450,10 +443,9 @@ def _run_iteration_and_process(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     file_arrays: Sequence[StorageBase],
-    status: _Status | None,
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    output = _run_iteration(func, kwargs, shape, shape_mask, index, status, cache)
+    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
@@ -573,7 +565,6 @@ def _prepare_submit_map_spec(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    status: _Status | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -588,7 +579,6 @@ def _prepare_submit_map_spec(
         shape=shape,
         shape_mask=mask,
         file_arrays=file_arrays,
-        status=status,
         cache=cache,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -612,18 +602,40 @@ def _mask_fixed_axes(
     return select.flat
 
 
+def _status_submit(
+    func: Callable[..., Any],
+    executor: Executor,
+    status: _Status,
+    *args: Any,
+) -> Future:
+    status.in_progress()
+    fut = executor.submit(func, *args)
+    fut.add_done_callback(status.completed)
+    return fut
+
+
 def _maybe_parallel_map(
     func: Callable[..., Any],
     seq: Sequence,
     executor: Executor | None,
+    status: _Status | None,
 ) -> list[Any]:
     if executor is not None:
+        if status is not None:
+            return [_status_submit(func, executor, status, x) for x in seq]
         return [executor.submit(func, x) for x in seq]
     return [func(x) for x in seq]
 
 
-def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
+def _maybe_submit(
+    func: Callable[..., Any],
+    executor: Executor | None,
+    status: _Status | None,
+    *args: Any,
+) -> Any:
     if executor:
+        if status is not None:
+            return _status_submit(func, executor, status, *args)
         return executor.submit(func, *args)
     return func(*args)
 
@@ -672,32 +684,23 @@ def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StorageBase | Path | DirectValue],
-    status: _Status | None,
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
     output, exists = _load_from_store(func.output_name, store, return_output=True)
     if exists:
-        if status is not None:
-            status.completed()
         return output
 
     # Otherwise, run the function
     _load_file_arrays(kwargs)
 
     def compute_fn() -> Any:
-        if status is not None:
-            status.in_progress()
         try:
-            result = func(**kwargs)
+            return func(**kwargs)
         except Exception as e:
             handle_error(e, func, kwargs)
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
-        else:
-            if status is not None:
-                status.completed()
-            return result
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
@@ -736,7 +739,7 @@ class _Status:
             self.start_time = time.monotonic()
         self.n_in_progress += 1
 
-    def completed(self) -> None:
+    def completed(self, _: Any) -> None:
         self.n_in_progress -= 1
         self.n_completed += 1
         if self.n_completed == self.n_total:
@@ -745,6 +748,12 @@ class _Status:
     @property
     def progress(self) -> float:
         return self.n_completed / self.n_total
+
+    def elapsed_time(self) -> float:
+        assert self.start_time is not None
+        if self.end_time is None:
+            return time.monotonic() - self.start_time
+        return self.end_time - self.start_time
 
 
 def _init_progress(
@@ -833,11 +842,11 @@ def _submit_func(
     kwargs = _func_kwargs(func, run_info, store)
     status = progress[at_least_tuple(func.output_name)[0]] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, status)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, store, status, cache)
+        task = _maybe_submit(_submit_single, executor, status, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 

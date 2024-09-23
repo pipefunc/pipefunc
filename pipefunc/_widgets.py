@@ -16,11 +16,7 @@ def span(class_name: str, value: str) -> str:
 
 
 def create_button(description: str, button_style: str, icon: str) -> widgets.Button:
-    return widgets.Button(
-        description=description,
-        button_style=button_style,
-        icon=icon,
-    )
+    return widgets.Button(description=description, button_style=button_style, icon=icon)
 
 
 def create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
@@ -99,14 +95,9 @@ class ProgressTracker:
 
     def update_progress(self, _: Any) -> None:
         """Update the progress values and labels."""
-        current_time = time.time()
         for name, status in self.progress_dict.items():
-            if status.end_time is not None:
+            if status.progress == 0:
                 continue
-            if status.start_time is None and status.progress > 0:
-                status.start_time = current_time
-            if status.end_time is None and status.progress >= 1.0:
-                status.end_time = current_time
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
@@ -116,14 +107,16 @@ class ProgressTracker:
             else:
                 progress_bar.remove_class("completed-progress")
                 progress_bar.add_class("animated-progress")
-            self._update_labels(name, current_time, status)
+            self._update_labels(name, status)
+        if self.all_completed():
+            self.mark_completed()
 
     def _update_labels(
         self,
         name: _OUTPUT_TYPE,
-        current_time: float,
         status: _Status,
     ) -> None:
+        assert status.progress > 0
         label_dict = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
         label_dict["percentage"].value = span(
@@ -133,10 +126,11 @@ class ProgressTracker:
         start_time = status.start_time
         if start_time is None:
             return
-        end_time = status.end_time
-        elapsed_time = (end_time or current_time) - start_time
-        if end_time is not None:
+        elapsed_time = status.elapsed_time()
+        if status.end_time is not None:
             eta = "Completed"
+        elif status.progress == 0:
+            eta = "Calculating..."
         else:
             estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
@@ -152,7 +146,7 @@ class ProgressTracker:
         min_interval = 0.1  # minimum interval to avoid extremely rapid updates
         max_interval = 10.0  # maximum interval to prevent excessively slow updates
         shortest_interval = max_interval
-        current_time = time.time()
+        current_time = time.monotonic()
         for status in self.progress_dict.values():
             if status.progress <= 0 or status.progress >= 1:
                 continue
@@ -174,6 +168,10 @@ class ProgressTracker:
             else:
                 new_interval = self._calculate_adaptive_interval_with_previous()
 
+            # Check if all tasks are completed
+            if self.all_completed():
+                break
+
             # Update interval display
             if not self.first_update:
                 self.auto_update_interval_label.value = span(
@@ -181,17 +179,20 @@ class ProgressTracker:
                     f"Auto-update every: {new_interval:.2f} sec",
                 )
 
-            # Check if all tasks are completed
-            if all(status.progress >= 1.0 for status in self.progress_dict.values()):
-                self.toggle_auto_update(None)
-                self.auto_update_interval_label.value = span(
-                    "interval-label",
-                    "Auto-update every: N/A",
-                )
-                for button in self.buttons.values():
-                    button.disabled = True
-                break
             await asyncio.sleep(new_interval)
+
+    def all_completed(self) -> bool:
+        return all(status.progress >= 1.0 for status in self.progress_dict.values())
+
+    def mark_completed(self) -> None:
+        if self.auto_update:
+            self.toggle_auto_update(None)
+        self.auto_update_interval_label.value = span(
+            "interval-label",
+            "Completed all tasks 🎉",
+        )
+        for button in self.buttons.values():
+            button.disabled = True
 
     def toggle_auto_update(self, _: Any) -> None:
         """Toggle the auto-update feature on or off."""
