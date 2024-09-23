@@ -63,6 +63,11 @@ def _prepare_run(
     bool,
     ProgressTracker | None,
 ]:
+    if not parallel and not executor and with_progress:
+        msg = "Cannot use `with_progress=True` with `parallel=False`."
+        raise ValueError(msg)
+    if not parallel and executor:
+        msg = "Cannot use an executor without `parallel=True`."
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
