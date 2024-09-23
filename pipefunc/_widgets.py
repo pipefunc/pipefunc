@@ -40,12 +40,13 @@ class ProgressTracker:
     def __init__(
         self,
         progress_dict: dict[_OUTPUT_TYPE, _Status],
-        map_task: asyncio.Task[None] | None = None,
+        task: asyncio.Task[None] | None = None,
         *,
         target_progress_change: float = 0.1,
         auto_update: bool = True,
+        display: bool = True,
     ) -> None:
-        self.map_task: asyncio.Task[None] | None = map_task
+        self.task: asyncio.Task[None] | None = task
         self.progress_dict: dict[_OUTPUT_TYPE, _Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = False
@@ -87,8 +88,8 @@ class ProgressTracker:
             "interval-label",
             "Auto-update every: N/A",
         )
-
-        self._display_widgets()
+        if display:
+            self.display()
 
         if auto_update:
             self.toggle_auto_update(None)
@@ -187,10 +188,7 @@ class ProgressTracker:
     def mark_completed(self) -> None:
         if self.auto_update:
             self.toggle_auto_update(None)
-        self.auto_update_interval_label.value = span(
-            "interval-label",
-            "Completed all tasks 🎉",
-        )
+        self.auto_update_interval_label.value = span("interval-label", "Completed all tasks 🎉")
         for button in self.buttons.values():
             button.disabled = True
 
@@ -212,34 +210,54 @@ class ProgressTracker:
 
     def cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
-        if self.map_task is not None:
-            self.map_task.cancel()
-
-            # Update progress one last time
-            self.update_progress(None)
-
-            # Disable auto-update
+        if self.task is not None:
+            self.task.cancel()
+            self.update_progress(None)  # Update progress one last time
             if self.auto_update:
                 self.toggle_auto_update(None)
-
-            # Disable all buttons
             for button in self.buttons.values():
                 button.disabled = True
-
             # Stop animation and set bar style to danger for in-progress bars
             for progress_bar in self.progress_bars.values():
                 if progress_bar.value < 1.0:
                     progress_bar.bar_style = "danger"
                     progress_bar.remove_class("animated-progress")
                     progress_bar.add_class("completed-progress")
-
             self.auto_update_interval_label.value = span(
                 "interval-label",
-                "Calculation cancelled",
+                "Calculation cancelled ❌",
             )
 
-    def _display_widgets(self) -> None:
+    def widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
+        # Create individual progress containers for each item in progress
+        progress_containers = []
+        for name in self.progress_dict:
+            # Create a horizontal box for labels
+            labels = self.labels[name]
+            labels_box = widgets.HBox(
+                [labels["percentage"], labels["estimated_time"], labels["speed"]],
+                layout=widgets.Layout(justify_content="space-between"),
+            )
+            # Create a vertical box for the progress bar and labels
+            container = widgets.VBox(
+                [self.progress_bars[name], labels_box],
+                layout=widgets.Layout(class_="progress"),
+            )
+            progress_containers.append(container)
+
+        # Create the main vertical box layout
+        buttons = self.buttons
+        button_box = widgets.HBox(
+            [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
+            layout=widgets.Layout(class_="widget-button", justify_content="center"),
+        )
+        return widgets.VBox(
+            [*progress_containers, button_box, self.auto_update_interval_label],
+            layout=widgets.Layout(max_width="600px"),
+        )
+
+    def display(self) -> None:
         style = """
         <style>
             .progress {
@@ -300,32 +318,5 @@ class ProgressTracker:
             }
         </style>
         """
-        # Create individual progress containers for each item in progress
-        progress_containers = []
-        for name in self.progress_dict:
-            # Create a horizontal box for labels
-            labels = self.labels[name]
-            labels_box = widgets.HBox(
-                [labels["percentage"], labels["estimated_time"], labels["speed"]],
-                layout=widgets.Layout(justify_content="space-between"),
-            )
-            # Create a vertical box for the progress bar and labels
-            container = widgets.VBox(
-                [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(class_="progress"),
-            )
-            progress_containers.append(container)
-
-        # Create the main vertical box layout
-        buttons = self.buttons
-        button_box = widgets.HBox(
-            [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
-            layout=widgets.Layout(class_="widget-button", justify_content="center"),
-        )
-        progress_layout = widgets.VBox(
-            [*progress_containers, button_box, self.auto_update_interval_label],
-            layout=widgets.Layout(max_width="600px"),
-        )
-
         display(HTML(style))
-        display(progress_layout)
+        display(self.widgets())

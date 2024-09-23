@@ -181,7 +181,7 @@ class AsyncRun(NamedTuple):
     progress: dict[_OUTPUT_TYPE, _Status] | None
 
     def result(self) -> OrderedDict[str, Result]:
-        if is_running_in_ipynb():
+        if is_running_in_ipynb():  # pragma: no cover
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
                 " Use `await runner.task` instead."
