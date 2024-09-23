@@ -11,22 +11,26 @@ from pipefunc.map import StorageBase
 
 
 class Status(NamedTuple):
-    done: bool
+    left: int
     total: int
     percentage: float
 
     @property
-    def left(self) -> int:
-        return self.total - self.done
+    def done(self) -> int:
+        return self.total - self.left
+
+    @property
+    def is_done(self) -> int:
+        return self.total - self.left
 
 
 def progress(r: Path | StorageBase) -> Status:
     if isinstance(r, Path):
-        return Status(done=r.exists(), total=1, percentage=1.0)
+        return Status(left=0 if r.exists() else 1, total=1, percentage=1.0)
     mask = r.mask
     left = mask.data.sum()
     total = prod(mask.shape)
-    return Status(done=left == 0, total=total, percentage=1 - left / total)
+    return Status(left=left, total=total, percentage=1 - left / total)
 
 
 def span(class_name: str, value: str) -> str:
@@ -68,9 +72,9 @@ class ProgressTracker:
     ) -> None:
         self.resource_manager: Any = resource_manager
         self.target_progress_change: float = target_progress_change
-        self.progress_dict: dict[str, float] = {name: 0.0 for name in self.resource_manager.store}
-        self.start_times: dict[str, float | None] = {name: None for name in self.progress_dict}
-        self.done_times: dict[str, float | None] = {name: None for name in self.progress_dict}
+        self.progress: dict[str, float] = {name: 0.0 for name in self.resource_manager.store}
+        self.start_times: dict[str, float | None] = {name: None for name in self.progress}
+        self.done_times: dict[str, float | None] = {name: None for name in self.progress}
         self.auto_update: bool = False
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
@@ -82,19 +86,21 @@ class ProgressTracker:
         self.speed_labels: dict[str, widgets.HTML] = {}
 
         # Create control buttons
-        self.update_button = create_button("Update Progress", "info", "refresh")
-        self.update_button.on_click(self.update_progress)
-        self.toggle_auto_update_button = create_button(
-            "Start Auto-Update",
-            "success",
-            "refresh",
-        )
-        self.toggle_auto_update_button.on_click(self.toggle_auto_update)
-        self.cancel_button = create_button("Cancel Calculation", "danger", "stop")
-        self.cancel_button.on_click(self.cancel_calculation)
+        self.buttons: dict[str, widgets.Button] = {
+            "update": create_button("Update Progress", "info", "refresh"),
+            "toggle_auto_update": create_button(
+                "Start Auto-Update",
+                "success",
+                "refresh",
+            ),
+            "cancel": create_button("Cancel Calculation", "danger", "stop"),
+        }
+        self.buttons["update"].on_click(self.update_progress)
+        self.buttons["toggle_auto_update"].on_click(self.toggle_auto_update)
+        self.buttons["cancel"].on_click(self.cancel_calculation)
 
         # Create progress widgets
-        for name, progress in self.progress_dict.items():
+        for name, progress in self.progress.items():
             self.progress_bars[name] = create_progress_bar(name, progress)
             self.percentage_labels[name] = create_html_label(
                 "percent-label",
@@ -129,7 +135,7 @@ class ProgressTracker:
             status = progress(store)
             current_progress = status.percentage
             self._update_times(name, current_time, current_progress)
-            self.progress_dict[name] = current_progress
+            self.progress[name] = current_progress
             self._update_progress_bar(name, current_progress)
             self._update_labels(name, current_time, status)
 
@@ -190,7 +196,7 @@ class ProgressTracker:
         max_interval = 10.0  # maximum interval to prevent excessively slow updates
         shortest_interval = max_interval
         current_time = time.time()
-        for name, current_progress in self.progress_dict.items():
+        for name, current_progress in self.progress.items():
             if current_progress <= 0 or current_progress >= 1:
                 continue
             start_time = self.start_times[name]
@@ -220,25 +226,27 @@ class ProgressTracker:
                 )
 
             # Check if all tasks are completed
-            if all(progress >= 1.0 for progress in self.progress_dict.values()):
+            if all(progress >= 1.0 for progress in self.progress.values()):
                 self.toggle_auto_update(None)
                 self.auto_update_interval_label.value = span(
                     "interval-label",
                     "Auto-update every: N/A",
                 )
-                self.update_button.disabled = True
-                self.toggle_auto_update_button.disabled = True
-                self.cancel_button.disabled = True
+                self.buttons["update"].disabled = True
+                self.buttons["toggle_auto_update"].disabled = True
+                self.buttons["cancel"].disabled = True
                 break
             await asyncio.sleep(new_interval)
 
     def toggle_auto_update(self, _: Any) -> None:
         """Toggle the auto-update feature on or off."""
         self.auto_update = not self.auto_update
-        self.toggle_auto_update_button.description = (
+        self.buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
-        self.toggle_auto_update_button.button_style = "danger" if self.auto_update else "success"
+        self.buttons["toggle_auto_update"].button_style = (
+            "danger" if self.auto_update else "success"
+        )
         if self.auto_update:
             self.first_update = True
             self.auto_update_task = asyncio.create_task(self._auto_update_progress())
@@ -259,9 +267,9 @@ class ProgressTracker:
                 self.toggle_auto_update(None)
 
             # Disable all buttons
-            self.update_button.disabled = True
-            self.toggle_auto_update_button.disabled = True
-            self.cancel_button.disabled = True
+            self.buttons["update"].disabled = True
+            self.buttons["toggle_auto_update"].disabled = True
+            self.buttons["cancel"].disabled = True
 
             # Stop animation and set bar style to danger for in-progress bars
             for progress_bar in self.progress_bars.values():
@@ -337,9 +345,9 @@ class ProgressTracker:
             }
         </style>
         """
-        # Create individual progress containers for each item in progress_dict
+        # Create individual progress containers for each item in progress
         progress_containers = []
-        for name in self.progress_dict:
+        for name in self.progress:
             progress_bar = self.progress_bars[name]
             percentage_label = self.percentage_labels[name]
             estimated_time_label = self.estimated_time_labels[name]
@@ -365,9 +373,9 @@ class ProgressTracker:
                 *progress_containers,
                 widgets.HBox(
                     [
-                        self.update_button,
-                        self.toggle_auto_update_button,
-                        self.cancel_button,
+                        self.buttons["update"],
+                        self.buttons["toggle_auto_update"],
+                        self.buttons["cancel"],
                     ],
                     layout=widgets.Layout(
                         class_="widget-button",
