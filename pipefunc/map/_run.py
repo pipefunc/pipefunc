@@ -178,6 +178,7 @@ class AsyncRun(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     store: dict[str, StorageBase | Path | DirectValue]
+    progress: dict[_OUTPUT_TYPE, _Status] | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():
@@ -239,7 +240,7 @@ def run_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    return AsyncRun(task, run_info, store)
+    return AsyncRun(task, run_info, store, progress)
 
 
 run_async.__doc__ = run.__doc__
@@ -731,11 +732,15 @@ class _Status:
         return self.n_total - self.n_completed - self.n_failed
 
     def in_progress(self) -> None:
+        if self.start_time is None:
+            self.start_time = time.monotonic()
         self.n_in_progress += 1
 
     def completed(self) -> None:
         self.n_in_progress -= 1
         self.n_completed += 1
+        if self.n_completed == self.n_total:
+            self.end_time = time.monotonic()
 
     @property
     def progress(self) -> float:
