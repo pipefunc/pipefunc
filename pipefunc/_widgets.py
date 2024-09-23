@@ -81,9 +81,7 @@ class ProgressTracker:
 
         # Initialize widgets for progress tracking
         self.progress_bars: dict[str, widgets.FloatProgress] = {}
-        self.estimated_time_labels: dict[str, widgets.HTML] = {}
-        self.percentage_labels: dict[str, widgets.HTML] = {}
-        self.speed_labels: dict[str, widgets.HTML] = {}
+        self.labels: dict[str, dict[str, widgets.HTML]] = {}
 
         # Create control buttons
         self.buttons: dict[str, widgets.Button] = {
@@ -102,18 +100,20 @@ class ProgressTracker:
         # Create progress widgets
         for name, progress in self.progress.items():
             self.progress_bars[name] = create_progress_bar(name, progress)
-            self.percentage_labels[name] = create_html_label(
-                "percent-label",
-                f"{progress * 100:.1f}%",
-            )
-            self.estimated_time_labels[name] = create_html_label(
-                "estimate-label",
-                "Elapsed: 0.00 sec | ETA: calculating...",
-            )
-            self.speed_labels[name] = create_html_label(
-                "speed-label",
-                "Speed: calculating...",
-            )
+            self.labels[name] = {
+                "percentage": create_html_label(
+                    "percent-label",
+                    f"{progress * 100:.1f}%",
+                ),
+                "estimated_time": create_html_label(
+                    "estimate-label",
+                    "Elapsed: 0.00 sec | ETA: calculating...",
+                ),
+                "speed": create_html_label(
+                    "speed-label",
+                    "Speed: calculating...",
+                ),
+            }
 
         # Create auto-update label
         self.auto_update_interval_label = create_html_label(
@@ -168,7 +168,7 @@ class ProgressTracker:
         status: Status,
     ) -> None:
         iterations_label = f"✓ {status.done:,} | ⏳ {status.left:,}"
-        self.percentage_labels[name].value = span(
+        self.labels[name]["percentage"].value = span(
             "percent-label",
             f"{status.percentage * 100:.1f}% | {iterations_label}",
         )
@@ -183,9 +183,8 @@ class ProgressTracker:
             estimated_time_left = (1.0 - status.percentage) * (elapsed_time / status.percentage)
             eta = f"ETA: {estimated_time_left:.2f} sec"
         speed = f"{status.done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-        speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
-        self.speed_labels[name].value = speed_label
-        self.estimated_time_labels[name].value = span(
+        self.labels[name]["speed"].value = span("speed-label", f"Speed: {speed} iterations/sec")
+        self.labels[name]["estimated_time"].value = span(
             "estimate-label",
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
@@ -348,42 +347,27 @@ class ProgressTracker:
         # Create individual progress containers for each item in progress
         progress_containers = []
         for name in self.progress:
-            progress_bar = self.progress_bars[name]
-            percentage_label = self.percentage_labels[name]
-            estimated_time_label = self.estimated_time_labels[name]
-            speed_label = self.speed_labels[name]
-
             # Create a horizontal box for labels
+            labels = self.labels[name]
             labels_box = widgets.HBox(
-                [percentage_label, estimated_time_label, speed_label],
+                [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
             )
-
             # Create a vertical box for the progress bar and labels
             container = widgets.VBox(
-                [progress_bar, labels_box],
+                [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(class_="progress"),
             )
-
             progress_containers.append(container)
 
         # Create the main vertical box layout
+        buttons = self.buttons
+        button_box = widgets.HBox(
+            [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
+            layout=widgets.Layout(class_="widget-button", justify_content="center"),
+        )
         progress_layout = widgets.VBox(
-            [
-                *progress_containers,
-                widgets.HBox(
-                    [
-                        self.buttons["update"],
-                        self.buttons["toggle_auto_update"],
-                        self.buttons["cancel"],
-                    ],
-                    layout=widgets.Layout(
-                        class_="widget-button",
-                        justify_content="center",
-                    ),
-                ),
-                self.auto_update_interval_label,
-            ],
+            [*progress_containers, button_box, self.auto_update_interval_label],
             layout=widgets.Layout(max_width="600px"),
         )
 
