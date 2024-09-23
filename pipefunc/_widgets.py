@@ -40,7 +40,7 @@ class ProgressTracker:
     def __init__(
         self,
         progress_dict: dict[_OUTPUT_TYPE, _Status],
-        task: asyncio.Task[None] | None = None,
+        task: asyncio.Task[Any] | None = None,
         *,
         target_progress_change: float = 0.1,
         auto_update: bool = True,
@@ -179,7 +179,6 @@ class ProgressTracker:
                     "interval-label",
                     f"Auto-update every: {new_interval:.2f} sec",
                 )
-
             await asyncio.sleep(new_interval)
 
     def _all_completed(self) -> bool:

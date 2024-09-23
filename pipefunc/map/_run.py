@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
 
@@ -178,7 +179,7 @@ class AsyncRun(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     store: dict[str, StorageBase | Path | DirectValue]
-    progress: dict[_OUTPUT_TYPE, _Status] | None
+    progress: ProgressTracker | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():  # pragma: no cover
@@ -207,6 +208,8 @@ def run_async(
     auto_subpipeline: bool = False,
     with_progress: bool = False,
 ) -> AsyncRun:
+    if with_progress:  # Optional dependency
+        from pipefunc._widgets import ProgressTracker
     pipeline, run_info, store, outputs, _, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
@@ -240,7 +243,7 @@ def run_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    return AsyncRun(task, run_info, store, progress)
+    return AsyncRun(task, run_info, store, ProgressTracker(progress, task) if progress else None)
 
 
 run_async.__doc__ = run.__doc__
@@ -741,7 +744,7 @@ class _Status:
             self.start_time = time.monotonic()
         self.n_in_progress += 1
 
-    def mark_complete(self, _: Any) -> None:
+    def mark_complete(self, _: Any) -> None:  # needs arg to be used as callback
         self.n_in_progress -= 1
         self.n_completed += 1
         if self.n_completed == self.n_total:
