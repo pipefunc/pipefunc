@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import time
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import ipywidgets as widgets
 from IPython.display import HTML, display
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._run import _Status
+
+if TYPE_CHECKING:
+    from pipefunc.map._run import _Status
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
