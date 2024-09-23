@@ -11,15 +11,15 @@ from pipefunc.map._run import _Status
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-def span(class_name: str, value: str) -> str:
+def _span(class_name: str, value: str) -> str:
     return f'<span class="{class_name}">{value}</span>'
 
 
-def create_button(description: str, button_style: str, icon: str) -> widgets.Button:
+def _create_button(description: str, button_style: str, icon: str) -> widgets.Button:
     return widgets.Button(description=description, button_style=button_style, icon=icon)
 
 
-def create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
+def _create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
     return widgets.FloatProgress(
         value=progress,
         max=1.0,
@@ -30,8 +30,8 @@ def create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatPro
     )
 
 
-def create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
-    return widgets.HTML(value=span(class_name, initial_value))
+def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
+    return widgets.HTML(value=_span(class_name, initial_value))
 
 
 class ProgressTracker:
@@ -59,32 +59,32 @@ class ProgressTracker:
 
         # Create control buttons
         self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
-            "update": create_button("Update Progress", "info", "refresh"),
-            "toggle_auto_update": create_button(
+            "update": _create_button("Update Progress", "info", "refresh"),
+            "toggle_auto_update": _create_button(
                 "Start Auto-Update",
                 "success",
                 "refresh",
             ),
-            "cancel": create_button("Cancel Calculation", "danger", "stop"),
+            "cancel": _create_button("Cancel Calculation", "danger", "stop"),
         }
         self.buttons["update"].on_click(self.update_progress)
-        self.buttons["toggle_auto_update"].on_click(self.toggle_auto_update)
-        self.buttons["cancel"].on_click(self.cancel_calculation)
+        self.buttons["toggle_auto_update"].on_click(self._toggle_auto_update)
+        self.buttons["cancel"].on_click(self._cancel_calculation)
 
         # Create progress widgets
         for name, status in self.progress_dict.items():
-            self.progress_bars[name] = create_progress_bar(name, status.progress)
+            self.progress_bars[name] = _create_progress_bar(name, status.progress)
             self.labels[name] = {
-                "percentage": create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
-                "estimated_time": create_html_label(
+                "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
+                "estimated_time": _create_html_label(
                     "estimate-label",
                     "Elapsed: 0.00 sec | ETA: calculating...",
                 ),
-                "speed": create_html_label("speed-label", "Speed: calculating..."),
+                "speed": _create_html_label("speed-label", "Speed: calculating..."),
             }
 
         # Create auto-update label
-        self.auto_update_interval_label = create_html_label(
+        self.auto_update_interval_label = _create_html_label(
             "interval-label",
             "Auto-update every: N/A",
         )
@@ -92,9 +92,9 @@ class ProgressTracker:
             self.display()
 
         if auto_update and task is not None:
-            self.toggle_auto_update(None)
+            self._toggle_auto_update()
 
-    def update_progress(self, _: Any) -> None:
+    def update_progress(self, _: Any = None) -> None:
         """Update the progress values and labels."""
         for name, status in self.progress_dict.items():
             if status.progress == 0:
@@ -109,8 +109,8 @@ class ProgressTracker:
                 progress_bar.remove_class("completed-progress")
                 progress_bar.add_class("animated-progress")
             self._update_labels(name, status)
-        if self.all_completed():
-            self.mark_completed()
+        if self._all_completed():
+            self._mark_completed()
 
     def _update_labels(
         self,
@@ -120,7 +120,7 @@ class ProgressTracker:
         assert status.progress > 0
         label_dict = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
-        label_dict["percentage"].value = span(
+        label_dict["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
@@ -136,8 +136,8 @@ class ProgressTracker:
             estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
         speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-        label_dict["speed"].value = span("speed-label", f"Speed: {speed} iterations/sec")
-        label_dict["estimated_time"].value = span(
+        label_dict["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
+        label_dict["estimated_time"].value = _span(
             "estimate-label",
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
@@ -162,7 +162,7 @@ class ProgressTracker:
     async def _auto_update_progress(self) -> None:
         """Periodically update the progress."""
         while self.auto_update:
-            self.update_progress(None)
+            self.update_progress()
             if self.first_update:
                 new_interval = 1.0
                 self.first_update = False
@@ -170,29 +170,29 @@ class ProgressTracker:
                 new_interval = self._calculate_adaptive_interval_with_previous()
 
             # Check if all tasks are completed
-            if self.all_completed():
+            if self._all_completed():
                 break
 
             # Update interval display
             if not self.first_update:
-                self.auto_update_interval_label.value = span(
+                self.auto_update_interval_label.value = _span(
                     "interval-label",
                     f"Auto-update every: {new_interval:.2f} sec",
                 )
 
             await asyncio.sleep(new_interval)
 
-    def all_completed(self) -> bool:
+    def _all_completed(self) -> bool:
         return all(status.progress >= 1.0 for status in self.progress_dict.values())
 
-    def mark_completed(self) -> None:
+    def _mark_completed(self) -> None:
         if self.auto_update:
-            self.toggle_auto_update(None)
-        self.auto_update_interval_label.value = span("interval-label", "Completed all tasks 🎉")
+            self._toggle_auto_update()
+        self.auto_update_interval_label.value = _span("interval-label", "Completed all tasks 🎉")
         for button in self.buttons.values():
             button.disabled = True
 
-    def toggle_auto_update(self, _: Any) -> None:
+    def _toggle_auto_update(self, _: Any = None) -> None:
         """Toggle the auto-update feature on or off."""
         self.auto_update = not self.auto_update
         self.buttons["toggle_auto_update"].description = (
@@ -208,13 +208,13 @@ class ProgressTracker:
             self.auto_update_task.cancel()
             self.auto_update_task = None
 
-    def cancel_calculation(self, _: Any) -> None:
+    def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
         if self.task is not None:
             self.task.cancel()
-            self.update_progress(None)  # Update progress one last time
+            self.update_progress()  # Update progress one last time
             if self.auto_update:
-                self.toggle_auto_update(None)
+                self._toggle_auto_update()
             for button in self.buttons.values():
                 button.disabled = True
             # Stop animation and set bar style to danger for in-progress bars
@@ -223,7 +223,7 @@ class ProgressTracker:
                     progress_bar.bar_style = "danger"
                     progress_bar.remove_class("animated-progress")
                     progress_bar.add_class("completed-progress")
-            self.auto_update_interval_label.value = span(
+            self.auto_update_interval_label.value = _span(
                 "interval-label",
                 "Calculation cancelled ❌",
             )
