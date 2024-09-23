@@ -78,7 +78,7 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    progress = _init_progress(store, pipeline.functions, with_progress)
+    progress = _init_progress(store, pipeline.sorted_functions, with_progress)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
