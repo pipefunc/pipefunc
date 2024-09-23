@@ -54,6 +54,7 @@ def _prepare_run(
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
     with_progress: bool,
+    in_asyncio: bool,
 ) -> tuple[
     Pipeline,
     RunInfo,
@@ -78,7 +79,7 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress)
+    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress, in_asyncio)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
@@ -158,6 +159,7 @@ def run(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         with_progress=with_progress,
+        in_asyncio=False,
     )
     if tracker is not None:
         tracker.display()
@@ -224,6 +226,7 @@ def run_async(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         with_progress=with_progress,
+        in_asyncio=True,
     )
 
     async def _run_pipeline() -> OrderedDict[str, Result]:
@@ -613,11 +616,14 @@ def _status_submit(
     func: Callable[..., Any],
     executor: Executor,
     status: _Status,
+    tracker: ProgressTracker,
     *args: Any,
 ) -> Future:
     status.mark_in_progress()
     fut = executor.submit(func, *args)
     fut.add_done_callback(status.mark_complete)
+    if not tracker.in_asyncio:
+        fut.add_done_callback(tracker.update_progress)
     return fut
 
 
@@ -626,10 +632,12 @@ def _maybe_parallel_map(
     seq: Sequence,
     executor: Executor | None,
     status: _Status | None,
+    tracker: ProgressTracker | None,
 ) -> list[Any]:
     if executor is not None:
         if status is not None:
-            return [_status_submit(func, executor, status, x) for x in seq]
+            assert tracker is not None
+            return [_status_submit(func, executor, status, tracker, x) for x in seq]
         return [executor.submit(func, x) for x in seq]
     return [func(x) for x in seq]
 
@@ -638,11 +646,13 @@ def _maybe_submit(
     func: Callable[..., Any],
     executor: Executor | None,
     status: _Status | None,
+    tracker: ProgressTracker | None,
     *args: Any,
 ) -> Any:
     if executor:
         if status is not None:
-            return _status_submit(func, executor, status, *args)
+            assert tracker is not None
+            return _status_submit(func, executor, status, tracker, *args)
         return executor.submit(func, *args)
     return func(*args)
 
@@ -769,6 +779,7 @@ def _init_tracker(
     store: dict[str, StorageBase | Path | DirectValue],
     functions: list[PipeFunc],
     with_progress: bool,  # noqa: FBT001
+    in_asyncio: bool,  # noqa: FBT001
 ) -> ProgressTracker | None:
     if not with_progress:
         return None
@@ -780,7 +791,7 @@ def _init_tracker(
         s = store[name]
         size = s.size if isinstance(s, StorageBase) else 1
         progress[func.output_name] = _Status(n_total=size)
-    return ProgressTracker(progress, None, display=False)
+    return ProgressTracker(progress, None, display=False, in_asyncio=in_asyncio)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -848,10 +859,10 @@ def _submit_func(
     status = tracker.progress_dict[func.output_name] if tracker is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor, status)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, tracker)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, status, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, status, tracker, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
@@ -926,7 +937,6 @@ def _process_task(
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
-
     return _to_result_dict(func, kwargs, output, store)
 
 

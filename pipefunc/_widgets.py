@@ -49,6 +49,7 @@ class ProgressTracker:
         target_progress_change: float = 0.1,
         auto_update: bool = True,
         display: bool = True,
+        in_asyncio: bool = True,
     ) -> None:
         self.task: asyncio.Task[None] | None = task
         self.progress_dict: dict[_OUTPUT_TYPE, _Status] = progress_dict
@@ -56,6 +57,7 @@ class ProgressTracker:
         self.auto_update: bool = auto_update
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
+        self.in_asyncio: bool = in_asyncio
 
         # Initialize widgets for progress tracking
         self.progress_bars: dict[_OUTPUT_TYPE, widgets.FloatProgress] = {}
