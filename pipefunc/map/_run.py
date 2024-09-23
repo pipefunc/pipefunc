@@ -8,6 +8,7 @@ import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
@@ -51,12 +52,14 @@ def _prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
+    with_progress: bool,
 ) -> tuple[
     Pipeline,
     RunInfo,
     dict[str, StorageBase | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
+    dict[_OUTPUT_TYPE, _Status] | None,
 ]:
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
@@ -74,10 +77,11 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
+    progress = _init_progress(store, pipeline.functions, with_progress)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel
+    return pipeline, run_info, store, outputs, parallel, progress
 
 
 def run(
@@ -94,6 +98,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    with_progress: bool = False,
 ) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -135,9 +140,11 @@ def run(
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
+    with_progress
+        Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, parallel = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -149,6 +156,7 @@ def run(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
+        with_progress=with_progress,
     )
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
@@ -159,6 +167,7 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                progress=progress,
                 cache=pipeline.cache,
             )
     _maybe_persist_memory(store, persist_memory)
@@ -195,8 +204,9 @@ def run_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    with_progress: bool = False,
 ) -> AsyncRun:
-    pipeline, run_info, store, outputs, _ = _prepare_run(
+    pipeline, run_info, store, outputs, _, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -208,6 +218,7 @@ def run_async(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
+        with_progress=with_progress,
     )
 
     async def _run_pipeline() -> OrderedDict[str, Result]:
@@ -215,13 +226,14 @@ def run_async(
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
-                    gen,
-                    run_info,
-                    store,
-                    outputs,
-                    fixed_indices,
-                    ex,
-                    pipeline.cache,
+                    generation=gen,
+                    run_info=run_info,
+                    store=store,
+                    outputs=outputs,
+                    fixed_indices=fixed_indices,
+                    executor=ex,
+                    progress=progress,
+                    cache=pipeline.cache,
                 )
         _maybe_persist_memory(store, persist_memory)
         return outputs
@@ -406,6 +418,7 @@ def _run_iteration(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
+    status: _Status | None,
     cache: _CacheBase | None,
 ) -> Any:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
@@ -413,12 +426,18 @@ def _run_iteration(
     def compute_fn() -> Any:
         if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
             selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
+        if status is not None:
+            status.in_progress()
         try:
-            return func(**selected)
+            result = func(**selected)
         except Exception as e:
             handle_error(e, func, selected)
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
+        else:
+            if status is not None:
+                status.completed()
+            return result
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -430,9 +449,10 @@ def _run_iteration_and_process(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     file_arrays: Sequence[StorageBase],
+    status: _Status | None,
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
+    output = _run_iteration(func, kwargs, shape, shape_mask, index, status, cache)
     outputs = _pick_output(func, output)
     _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
     return outputs
@@ -552,6 +572,7 @@ def _prepare_submit_map_spec(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
+    status: _Status | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -566,6 +587,7 @@ def _prepare_submit_map_spec(
         shape=shape,
         shape_mask=mask,
         file_arrays=file_arrays,
+        status=status,
         cache=cache,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -649,23 +671,32 @@ def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StorageBase | Path | DirectValue],
+    status: _Status | None,
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
     output, exists = _load_from_store(func.output_name, store, return_output=True)
     if exists:
+        if status is not None:
+            status.completed()
         return output
 
     # Otherwise, run the function
     _load_file_arrays(kwargs)
 
     def compute_fn() -> Any:
+        if status is not None:
+            status.in_progress()
         try:
-            return func(**kwargs)
+            result = func(**kwargs)
         except Exception as e:
             handle_error(e, func, kwargs)
             # handle_error raises but mypy doesn't know that
             raise  # pragma: no cover
+        else:
+            if status is not None:
+                status.completed()
+            return result
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
@@ -686,6 +717,47 @@ class _KwargsTask(NamedTuple):
     task: tuple[Any, _MapSpecArgs] | Any
 
 
+@dataclass
+class _Status:
+    n_total: int
+    n_in_progress: int = 0
+    n_completed: int = 0
+    n_failed: int = 0
+    start_time: float | None = None
+    end_time: float | None = None
+
+    @property
+    def n_left(self) -> int:
+        return self.n_total - self.n_completed - self.n_failed
+
+    def in_progress(self) -> None:
+        self.n_in_progress += 1
+
+    def completed(self) -> None:
+        self.n_in_progress -= 1
+        self.n_completed += 1
+
+    @property
+    def progress(self) -> float:
+        return self.n_completed / self.n_total
+
+
+def _init_progress(
+    store: dict[str, StorageBase | Path | DirectValue],
+    functions: list[PipeFunc],
+    with_progress: bool,  # noqa: FBT001
+) -> dict[_OUTPUT_TYPE, _Status] | None:
+    if not with_progress:
+        return None
+    progress = {}
+    for func in functions:
+        name, *_ = at_least_tuple(func.output_name)  # if multiple, they have same progress
+        s = store[name]
+        size = s.size if isinstance(s, StorageBase) else 1
+        progress[func.output_name] = _Status(n_total=size)
+    return progress
+
+
 # NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
     generation: list[PipeFunc],
@@ -694,10 +766,11 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    progress: dict[_OUTPUT_TYPE, _Status] | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
         for func in generation
     }
     _process_generation(generation, tasks, store, outputs)
@@ -710,10 +783,11 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor,
+    progress: dict[_OUTPUT_TYPE, _Status] | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
         for func in generation
     }
     await _process_generation_async(generation, tasks, store, outputs)
@@ -748,15 +822,17 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    progress: dict[_OUTPUT_TYPE, _Status] | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    status = progress[at_least_tuple(func.output_name)[0]] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
         r = _maybe_parallel_map(args.process_index, args.missing, executor)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, func, kwargs, store, status, cache)
     return _KwargsTask(kwargs, task)
 
 

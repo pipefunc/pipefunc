@@ -1,36 +1,13 @@
 import asyncio
 import time
-from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, TypeAlias
 
 import ipywidgets as widgets
 from IPython.display import HTML, display
 
-from pipefunc._utils import prod
-from pipefunc.map import StorageBase
+from pipefunc.map._run import _Status
 
-
-class Status(NamedTuple):
-    left: int
-    total: int
-    percentage: float
-
-    @property
-    def done(self) -> int:
-        return self.total - self.left
-
-    @property
-    def is_done(self) -> int:
-        return self.total - self.left
-
-
-def progress(r: Path | StorageBase) -> Status:
-    if isinstance(r, Path):
-        return Status(left=0 if r.exists() else 1, total=1, percentage=1.0)
-    mask = r.mask
-    left = mask.data.sum()
-    total = prod(mask.shape)
-    return Status(left=left, total=total, percentage=1 - left / total)
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def span(class_name: str, value: str) -> str:
@@ -65,14 +42,14 @@ class ProgressTracker:
 
     def __init__(
         self,
-        resource_manager: Any,
+        progress_dict: dict[_OUTPUT_TYPE, _Status],
         *,
         target_progress_change: float = 0.1,
         auto_update: bool = True,
     ) -> None:
-        self.resource_manager: Any = resource_manager
+        self.progress_dict: Any = progress_dict
         self.target_progress_change: float = target_progress_change
-        self.progress: dict[str, float] = {name: 0.0 for name in self.resource_manager.store}
+        self.progress: dict[str, float] = {name: 0.0 for name in self.progress_dict.store}
         self.start_times: dict[str, float | None] = {name: None for name in self.progress}
         self.done_times: dict[str, float | None] = {name: None for name in self.progress}
         self.auto_update: bool = False
@@ -101,18 +78,12 @@ class ProgressTracker:
         for name, progress in self.progress.items():
             self.progress_bars[name] = create_progress_bar(name, progress)
             self.labels[name] = {
-                "percentage": create_html_label(
-                    "percent-label",
-                    f"{progress * 100:.1f}%",
-                ),
+                "percentage": create_html_label("percent-label", f"{progress * 100:.1f}%"),
                 "estimated_time": create_html_label(
                     "estimate-label",
                     "Elapsed: 0.00 sec | ETA: calculating...",
                 ),
-                "speed": create_html_label(
-                    "speed-label",
-                    "Speed: calculating...",
-                ),
+                "speed": create_html_label("speed-label", "Speed: calculating..."),
             }
 
         # Create auto-update label
@@ -129,10 +100,9 @@ class ProgressTracker:
     def update_progress(self, _: Any) -> None:
         """Update the progress values and labels."""
         current_time = time.time()
-        for name, store in self.resource_manager.store.items():
+        for name, status in self.progress_dict.items():
             if self.done_times[name] is not None:
                 continue
-            status = progress(store)
             current_progress = status.percentage
             if self.start_times[name] is None and current_progress > 0:
                 self.start_times[name] = current_time
@@ -154,13 +124,13 @@ class ProgressTracker:
         self,
         name: str,
         current_time: float,
-        status: Status,
+        status: _Status,
     ) -> None:
         label_dict = self.labels[name]
-        iterations_label = f"✓ {status.done:,} | ⏳ {status.left:,}"
+        iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
         label_dict["percentage"].value = span(
             "percent-label",
-            f"{status.percentage * 100:.1f}% | {iterations_label}",
+            f"{status.progress * 100:.1f}% | {iterations_label}",
         )
         start_time = self.start_times[name]
         if start_time is None:
@@ -170,9 +140,9 @@ class ProgressTracker:
         if end_time is not None:
             eta = "Completed"
         else:
-            estimated_time_left = (1.0 - status.percentage) * (elapsed_time / status.percentage)
+            estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
-        speed = f"{status.done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+        speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         label_dict["speed"].value = span("speed-label", f"Speed: {speed} iterations/sec")
         label_dict["estimated_time"].value = span(
             "estimate-label",
@@ -244,8 +214,8 @@ class ProgressTracker:
 
     def cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
-        if self.resource_manager.task is not None:
-            self.resource_manager.task.cancel()
+        if self.progress_dict.task is not None:
+            self.progress_dict.task.cancel()
 
             # Update progress one last time
             self.update_progress(None)

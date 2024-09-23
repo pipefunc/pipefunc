@@ -638,6 +638,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
+        with_progress: bool = False,
     ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -679,6 +680,8 @@ class Pipeline:
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
+        with_progress
+            Whether to display a progress bar.
 
         """
         return run(
@@ -694,6 +697,7 @@ class Pipeline:
             cleanup=cleanup,
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
+            with_progress=with_progress,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
