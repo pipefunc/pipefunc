@@ -608,9 +608,9 @@ def _status_submit(
     status: _Status,
     *args: Any,
 ) -> Future:
-    status.in_progress()
+    status.mark_in_progress()
     fut = executor.submit(func, *args)
-    fut.add_done_callback(status.completed)
+    fut.add_done_callback(status.mark_complete)
     return fut
 
 
@@ -723,6 +723,8 @@ class _KwargsTask(NamedTuple):
 
 @dataclass
 class _Status:
+    """A class to keep track of the progress of a function."""
+
     n_total: int
     n_in_progress: int = 0
     n_completed: int = 0
@@ -734,12 +736,12 @@ class _Status:
     def n_left(self) -> int:
         return self.n_total - self.n_completed - self.n_failed
 
-    def in_progress(self) -> None:
+    def mark_in_progress(self) -> None:
         if self.start_time is None:
             self.start_time = time.monotonic()
         self.n_in_progress += 1
 
-    def completed(self, _: Any) -> None:
+    def mark_complete(self, _: Any) -> None:
         self.n_in_progress -= 1
         self.n_completed += 1
         if self.n_completed == self.n_total:
