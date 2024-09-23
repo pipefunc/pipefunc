@@ -181,7 +181,7 @@ def run(
                 cache=pipeline.cache,
             )
     if tracker is not None:  # final update
-        tracker.update_progress()
+        tracker.update_progress(force=True)
     _maybe_persist_memory(store, persist_memory)
     return outputs
 

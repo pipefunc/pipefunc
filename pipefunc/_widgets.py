@@ -106,9 +106,11 @@ class ProgressTracker:
         self.task = task
         self._set_auto_update(self.auto_update)
 
-    def update_progress(self, _: Any = None) -> None:
+    def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
-        if not self.in_asyncio:
+        if not self.in_asyncio and not force:
+            # If not in asyncio, `update_progress` is called after each iteration
+            # So, we need to throttle the updates to avoid excessive updates.
             now = time.monotonic()
             if now - self.last_update_time < self.sync_interval:
                 return
