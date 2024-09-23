@@ -60,7 +60,7 @@ def _prepare_run(
     dict[str, StorageBase | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
-    dict[_OUTPUT_TYPE, _Status] | None,
+    ProgressTracker | None,
 ]:
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
@@ -78,11 +78,11 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    progress = _init_progress(store, pipeline.sorted_functions, with_progress)
+    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel, progress
+    return pipeline, run_info, store, outputs, parallel, tracker
 
 
 def run(
@@ -145,7 +145,7 @@ def run(
         Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, parallel, progress = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, tracker = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -159,6 +159,8 @@ def run(
         auto_subpipeline=auto_subpipeline,
         with_progress=with_progress,
     )
+    if tracker is not None:
+        tracker.display()
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -168,7 +170,7 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
-                progress=progress,
+                tracker=tracker,
                 cache=pipeline.cache,
             )
     _maybe_persist_memory(store, persist_memory)
@@ -178,11 +180,12 @@ def run(
 class AsyncRun(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
-    store: dict[str, StorageBase | Path | DirectValue]
-    progress: ProgressTracker | None
+    tracker: ProgressTracker | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():  # pragma: no cover
+            if self.task.done():
+                return self.task.result()
             msg = (
                 "Cannot block the event loop when running in a Jupyter notebook."
                 " Use `await runner.task` instead."
@@ -208,9 +211,7 @@ def run_async(
     auto_subpipeline: bool = False,
     with_progress: bool = False,
 ) -> AsyncRun:
-    if with_progress:  # Optional dependency
-        from pipefunc._widgets import ProgressTracker
-    pipeline, run_info, store, outputs, _, progress = _prepare_run(
+    pipeline, run_info, store, outputs, _, tracker = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -236,14 +237,17 @@ def run_async(
                     outputs=outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
-                    progress=progress,
+                    tracker=tracker,
                     cache=pipeline.cache,
                 )
         _maybe_persist_memory(store, persist_memory)
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    return AsyncRun(task, run_info, store, ProgressTracker(progress, task) if progress else None)
+    if tracker is not None:
+        tracker.attach_task(task)
+        tracker.display()
+    return AsyncRun(task, run_info, tracker)
 
 
 run_async.__doc__ = run.__doc__
@@ -761,20 +765,22 @@ class _Status:
         return self.end_time - self.start_time
 
 
-def _init_progress(
+def _init_tracker(
     store: dict[str, StorageBase | Path | DirectValue],
     functions: list[PipeFunc],
     with_progress: bool,  # noqa: FBT001
-) -> dict[_OUTPUT_TYPE, _Status] | None:
+) -> ProgressTracker | None:
     if not with_progress:
         return None
+    from pipefunc._widgets import ProgressTracker
+
     progress = {}
     for func in functions:
         name, *_ = at_least_tuple(func.output_name)  # if multiple, they have same progress
         s = store[name]
         size = s.size if isinstance(s, StorageBase) else 1
         progress[func.output_name] = _Status(n_total=size)
-    return progress
+    return ProgressTracker(progress, None, display=False)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -785,11 +791,11 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    progress: dict[_OUTPUT_TYPE, _Status] | None,
+    tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
         for func in generation
     }
     _process_generation(generation, tasks, store, outputs)
@@ -802,11 +808,11 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor,
-    progress: dict[_OUTPUT_TYPE, _Status] | None,
+    tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
         for func in generation
     }
     await _process_generation_async(generation, tasks, store, outputs)
@@ -841,11 +847,11 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    progress: dict[_OUTPUT_TYPE, _Status] | None = None,
+    tracker: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    status = progress[func.output_name] if progress is not None else None
+    status = tracker.progress_dict[func.output_name] if tracker is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(args.process_index, args.missing, executor, status)

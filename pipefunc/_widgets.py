@@ -53,7 +53,7 @@ class ProgressTracker:
         self.task: asyncio.Task[None] | None = task
         self.progress_dict: dict[_OUTPUT_TYPE, _Status] = progress_dict
         self.target_progress_change: float = target_progress_change
-        self.auto_update: bool = False
+        self.auto_update: bool = auto_update
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
 
@@ -94,9 +94,13 @@ class ProgressTracker:
         )
         if display:
             self.display()
+        if self.task is not None:
+            self._set_auto_update(auto_update)
 
-        if auto_update and task is not None:
-            self._toggle_auto_update()
+    def attach_task(self, task: asyncio.Task[Any]) -> None:
+        """Attach a new task to the progress tracker."""
+        self.task = task
+        self._set_auto_update(self.auto_update)
 
     def update_progress(self, _: Any = None) -> None:
         """Update the progress values and labels."""
@@ -197,7 +201,11 @@ class ProgressTracker:
 
     def _toggle_auto_update(self, _: Any = None) -> None:
         """Toggle the auto-update feature on or off."""
-        self.auto_update = not self.auto_update
+        self._set_auto_update(not self.auto_update)
+
+    def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
+        """Set the auto-update feature to the given value."""
+        self.auto_update = value
         self.buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
