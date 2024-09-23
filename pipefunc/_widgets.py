@@ -15,6 +15,10 @@ class Status(NamedTuple):
     total: int
     percentage: float
 
+    @property
+    def left(self) -> int:
+        return self.total - self.done
+
 
 def progress(r: Path | StorageBase) -> Status:
     if isinstance(r, Path):
@@ -80,7 +84,11 @@ class ProgressTracker:
         # Create control buttons
         self.update_button = create_button("Update Progress", "info", "refresh")
         self.update_button.on_click(self.update_progress)
-        self.toggle_auto_update_button = create_button("Start Auto-Update", "success", "refresh")
+        self.toggle_auto_update_button = create_button(
+            "Start Auto-Update",
+            "success",
+            "refresh",
+        )
         self.toggle_auto_update_button.on_click(self.toggle_auto_update)
         self.cancel_button = create_button("Cancel Calculation", "danger", "stop")
         self.cancel_button.on_click(self.cancel_calculation)
@@ -96,7 +104,10 @@ class ProgressTracker:
                 "estimate-label",
                 "Elapsed: 0.00 sec | ETA: calculating...",
             )
-            self.speed_labels[name] = create_html_label("speed-label", "Speed: calculating...")
+            self.speed_labels[name] = create_html_label(
+                "speed-label",
+                "Speed: calculating...",
+            )
 
         # Create auto-update label
         self.auto_update_interval_label = create_html_label(
@@ -120,15 +131,7 @@ class ProgressTracker:
             self._update_times(name, current_time, current_progress)
             self.progress_dict[name] = current_progress
             self._update_progress_bar(name, current_progress)
-            iterations_done = int(status.total * current_progress)
-            iterations_left = status.total - iterations_done
-            self._update_labels(
-                name,
-                current_time,
-                current_progress,
-                iterations_done,
-                iterations_left,
-            )
+            self._update_labels(name, current_time, status)
 
     def _update_progress_bar(self, name: str, current_progress: float) -> None:
         progress_bar = self.progress_bars[name]
@@ -156,35 +159,30 @@ class ProgressTracker:
         self,
         name: str,
         current_time: float,
-        current_progress: float,
-        iterations_done: int,
-        iterations_left: int,
+        status: Status,
     ) -> None:
-        iterations_label = f"✓ {iterations_done:,} | ⏳ {iterations_left:,}"
-        percent_label = span(
+        iterations_label = f"✓ {status.done:,} | ⏳ {status.left:,}"
+        self.percentage_labels[name].value = span(
             "percent-label",
-            f"{current_progress * 100:.1f}% | {iterations_label}",
+            f"{status.percentage * 100:.1f}% | {iterations_label}",
         )
-        self.percentage_labels[name].value = percent_label
-
         start_time = self.start_times[name]
-        if not start_time:
+        if start_time is None:
             return
         end_time = self.done_times[name]
         elapsed_time = (end_time or current_time) - start_time
         if end_time is not None:
             eta = "Completed"
         else:
-            estimated_time_left = (1.0 - current_progress) * (elapsed_time / current_progress)
+            estimated_time_left = (1.0 - status.percentage) * (elapsed_time / status.percentage)
             eta = f"ETA: {estimated_time_left:.2f} sec"
-        estimate_label = span(
+        speed = f"{status.done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+        speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
+        self.speed_labels[name].value = speed_label
+        self.estimated_time_labels[name].value = span(
             "estimate-label",
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
-        speed = f"{iterations_done / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-        speed_label = span("speed-label", f"Speed: {speed} iterations/sec")
-        self.speed_labels[name].value = speed_label
-        self.estimated_time_labels[name].value = estimate_label
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
         """Calculate a dynamic interval based on progress changes for all resources."""
@@ -228,6 +226,9 @@ class ProgressTracker:
                     "interval-label",
                     "Auto-update every: N/A",
                 )
+                self.update_button.disabled = True
+                self.toggle_auto_update_button.disabled = True
+                self.cancel_button.disabled = True
                 break
             await asyncio.sleep(new_interval)
 
