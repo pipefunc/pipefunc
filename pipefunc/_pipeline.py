@@ -725,7 +725,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool = False,
     ) -> AsyncRun:
-        """Run a pipeline with `MapSpec` functions for given ``inputs``.
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
 
