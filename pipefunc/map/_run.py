@@ -212,8 +212,8 @@ class AsyncRun(NamedTuple):
             )
             raise RuntimeError(msg)
 
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.task)
+        loop = asyncio.get_event_loop()  # pragma: no cover
+        return loop.run_until_complete(self.task)  # pragma: no cover
 
 
 def run_async(
