@@ -412,7 +412,7 @@ def visualize_matplotlib(
     filename
         The filename to save the figure to.
     func_node_colors
-        The color of the nodes.
+        The color of the function nodes.
 
     Returns
     -------

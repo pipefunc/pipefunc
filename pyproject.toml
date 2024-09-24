@@ -27,18 +27,20 @@ dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
+widgets = ["ipywidgets"]
 zarr = ["zarr"]
 pandas = ["pandas"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
-    "coverage",
+    "pytest-asyncio",
+    "pytest-codspeed",
     "pytest-cov",
+    "coverage",
     "adaptive",
     "xarray",
     "zarr",
     "versioningit",
-    "pytest-codspeed",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
@@ -59,7 +61,7 @@ docs = [
     "nltk",
     "scikit-image",
 ]
-all = ["pipefunc[adaptive,xarray,zarr,plotting,pandas]"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "pre-commit",
@@ -105,6 +107,7 @@ build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "module"
 addopts = """
     -vvv
     --cov=pipefunc
@@ -112,6 +115,7 @@ addopts = """
     --cov-report html
     --cov-report xml
     --cov-fail-under=35
+    --asyncio-mode=strict
 """
 
 [tool.coverage.report]

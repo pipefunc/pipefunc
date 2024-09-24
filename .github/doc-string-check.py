@@ -36,8 +36,9 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
         stripped_line = line.strip()
         if stripped_line == "Parameters":
             in_params_section = True
-        elif stripped_line in ("Returns", "Raises"):
-            break  # Stop processing when we hit Returns or Raises section
+        elif stripped_line == "" and in_params_section:
+            # Stop processing after the first empty line after the Parameters section
+            break
         elif in_params_section:
             if stripped_line.startswith("---"):
                 continue
@@ -150,6 +151,18 @@ if __name__ == "__main__":
         pipefunc.Pipeline.map,
         pipefunc.map._run.run,
         allow_missing=["pipeline"],
+    )
+    compare_param_descriptions(
+        pipefunc.Pipeline.map_async,
+        pipefunc.map._run.run_async,
+        allow_missing=["parallel", "pipeline"],
+        allow_discrepancy=["show_progress"],
+    )
+    compare_param_descriptions(
+        pipefunc.Pipeline.map,
+        pipefunc.Pipeline.map_async,
+        allow_missing=["parallel"],
+        allow_discrepancy=["show_progress"],
     )
 
     # plotting

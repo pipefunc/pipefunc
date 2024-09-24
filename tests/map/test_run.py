@@ -1483,3 +1483,32 @@ def test_parallel_warning_and_error():
 
     with pytest.raises(ValueError, match="The chosen storage type `zarr_memory` does not support"):
         pipeline.map(inputs, storage="zarr_memory", parallel=True)
+
+
+@pytest.mark.asyncio
+async def test_run_async():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x - 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="w", mapspec="y[i], z[i] -> w[i]")
+    def h(y, z):
+        return y + z
+
+    @pipefunc(output_name="r")
+    def i(w):
+        return sum(w)
+
+    pipeline = Pipeline([f, g, h, i])
+    async_run_info = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
+    # Test that the progress tracket is working
+    async_run_info.progress.update_progress()
+    async_run_info.progress._first_auto_update_interval = 0.0
+    async_run_info.progress._toggle_auto_update()  # Turn off auto update
+    async_run_info.progress._toggle_auto_update()  # Turn on auto update
+    result = await async_run_info.task
+    assert result["r"].output == 12

@@ -41,7 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import AsyncRun, run, run_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -638,6 +638,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
+        show_progress: bool = False,
     ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -679,6 +680,18 @@ class Pipeline:
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar. Only works if ``parallel=True``.
+
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
 
         """
         return run(
@@ -694,6 +707,91 @@ class Pipeline:
             cleanup=cleanup,
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        executor: Executor | None = None,
+        storage: str = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> AsyncRun:
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+            is used. Only relevant if ``parallel=True``.
+        storage
+            The storage class to use for the file arrays.
+            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
+
+        """
+        return run_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1253,9 +1351,9 @@ class Pipeline:
         color_combinable
             Whether to color combinable nodes differently.
         conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
         output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
 
         """
         from pipefunc._plotting import visualize_matplotlib
