@@ -715,6 +715,48 @@ class Pipeline:
         auto_subpipeline: bool = False,
         with_progress: bool = False,
     ) -> AsyncRun:
+        """Run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+            is used. Only relevant if ``parallel=True``.
+        storage
+            The storage class to use for the file arrays.
+            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        with_progress
+            Whether to display a progress bar.
+
+        """
         return run_async(
             self,
             inputs,
