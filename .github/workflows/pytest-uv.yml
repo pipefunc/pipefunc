@@ -1,0 +1,36 @@
+name: pytest
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test-uv:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install pipefunc
+        shell: bash -l {0}
+        run: |
+          uv pip install -e ".[test,all]"
+
+      # Linux and macOS
+      - name: Run Python
+        shell: bash -l {0}
+        run: |
+          python -c "import pipefunc; print(pipefunc.__version__)"
+          pytest
