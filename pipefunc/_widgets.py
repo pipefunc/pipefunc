@@ -28,7 +28,7 @@ def _create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatPr
         value=progress,
         max=1.0,
         description=", ".join(at_least_tuple(name)),
-        layout={"width": "95%", "class_": "animated-progress"},
+        layout={"width": "95%", "class_": "progress-bar"},
         bar_style="info",
         style={"description_width": "150px"},
     )
@@ -267,9 +267,8 @@ class ProgressTracker:
                 [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(
                     border="1px solid #ddd",
-                    padding="5px",
-                    margin="5px 0",
-                    border_radius="5px",
+                    margin="2px 0",
+                    class_="container",
                 ),
             )
             progress_containers.append(container)
@@ -290,10 +289,11 @@ class ProgressTracker:
     def display(self) -> None:
         style = """
         <style>
-            .progress-bar {
+            .progress {
                 border-radius: 5px;
             }
-            .animated-progress .progress-bar {
+            .progress-bar {
+                border-radius: 5px;
                 background-image: linear-gradient(
                     -45deg,
                     rgba(255, 255, 255, 0.15) 25%,
@@ -305,6 +305,8 @@ class ProgressTracker:
                     transparent
                 );
                 background-size: 40px 40px;
+            }
+            .animated-progress .progress-bar {
                 animation: stripes 1s linear infinite;
             }
             .completed-progress .progress-bar {
