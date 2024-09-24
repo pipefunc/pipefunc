@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+env:
+  UV_SYSTEM_PYTHON: 1
+
 jobs:
   docstring-check:
     runs-on: ubuntu-latest
@@ -17,7 +20,7 @@ jobs:
         uses: astral-sh/setup-uv@v2
 
       - name: Set up Python
-        run: uv python install
+        uses: actions/setup-python@v5
 
       - name: Install pipefunc
         shell: bash -l {0}
