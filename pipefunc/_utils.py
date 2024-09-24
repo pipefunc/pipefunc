@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import importlib.util
 import inspect
 import math
 import operator
@@ -218,3 +219,23 @@ def is_running_in_ipynb() -> bool:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
     except NameError:
         return False  # Probably standard Python interpreter
+
+
+def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
+    """Check if a package is installed, raise an ImportError if not."""
+    conda_name_mapping = {"graphviz": "python-graphviz"}
+
+    for package in packages:
+        if importlib.util.find_spec(package):
+            continue
+        conda_package = conda_name_mapping.get(package, package)
+        error_message = f"The '{package}' package is required"
+        if reason:
+            error_message += f" for {reason}"
+        error_message += ".\n"
+        error_message += "Please install it using one of the following methods:\n"
+        if extras:
+            error_message += f'- pip install "pipefunc[{extras}]"\n'
+        error_message += f"- pip install {package}\n"
+        error_message += f"- conda install -c conda-forge {conda_package}"
+        raise ImportError(error_message)
