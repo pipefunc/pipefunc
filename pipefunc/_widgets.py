@@ -46,7 +46,7 @@ class ProgressTracker:
         progress_dict: dict[_OUTPUT_TYPE, _Status],
         task: asyncio.Task[Any] | None = None,
         *,
-        target_progress_change: float = 0.1,
+        target_progress_change: float = 0.05,
         auto_update: bool = True,
         display: bool = True,
         in_asyncio: bool = True,
