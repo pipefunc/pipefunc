@@ -350,3 +350,13 @@ def test_validation_parallel():
         match="Cannot use `with_progress=True` with `parallel=False`",
     ):
         pipeline.map({}, parallel=False, with_progress=True)
+
+
+def test_with_progress() -> None:
+    @pipefunc(output_name="out", mapspec="a[i] -> out[i]")
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, with_progress=True)
+    assert r_map["out"].output.tolist() == [1, 2, 3]
