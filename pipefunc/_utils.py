@@ -237,5 +237,5 @@ def requires(*packages: str, reason: str = "", extras: str | None = None) -> Non
         if extras:
             error_message += f'- pip install "pipefunc[{extras}]"\n'
         error_message += f"- pip install {package}\n"
-        error_message += f"- conda install {conda_package}"
+        error_message += f"- conda install -c conda-forge {conda_package}"
         raise ImportError(error_message)
