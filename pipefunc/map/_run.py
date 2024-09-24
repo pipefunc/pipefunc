@@ -54,7 +54,7 @@ def _prepare_run(
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
     with_progress: bool,
-    in_asyncio: bool,
+    in_async: bool,
 ) -> tuple[
     Pipeline,
     RunInfo,
@@ -85,7 +85,7 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress, in_asyncio)
+    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
@@ -167,7 +167,7 @@ def run(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         with_progress=with_progress,
-        in_asyncio=False,
+        in_async=False,
     )
     if tracker is not None:
         tracker.display()
@@ -280,7 +280,7 @@ def run_async(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         with_progress=with_progress,
-        in_asyncio=True,
+        in_async=True,
     )
 
     async def _run_pipeline() -> OrderedDict[str, Result]:
@@ -673,7 +673,7 @@ def _status_submit(
     status.mark_in_progress()
     fut = executor.submit(func, *args)
     fut.add_done_callback(status.mark_complete)
-    if not tracker.in_asyncio:
+    if not tracker.in_async:
         fut.add_done_callback(tracker.update_progress)
     return fut
 
@@ -830,7 +830,7 @@ def _init_tracker(
     store: dict[str, StorageBase | Path | DirectValue],
     functions: list[PipeFunc],
     with_progress: bool,  # noqa: FBT001
-    in_asyncio: bool,  # noqa: FBT001
+    in_async: bool,  # noqa: FBT001
 ) -> ProgressTracker | None:
     if not with_progress:
         return None
@@ -842,7 +842,7 @@ def _init_tracker(
         s = store[name]
         size = s.size if isinstance(s, StorageBase) else 1
         progress[func.output_name] = _Status(n_total=size)
-    return ProgressTracker(progress, None, display=False, in_asyncio=in_asyncio)
+    return ProgressTracker(progress, None, display=False, in_async=in_async)
 
 
 # NOTE: A similar async version of this function is provided below.
