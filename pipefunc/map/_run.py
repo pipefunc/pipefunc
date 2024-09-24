@@ -264,7 +264,7 @@ def run_async(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     with_progress
-        Whether to display a progress bar. Only works if ``parallel=True``.
+        Whether to display a progress bar.
 
     """
     pipeline, run_info, store, outputs, _, tracker = _prepare_run(
@@ -838,7 +838,7 @@ def _init_tracker(
 
     progress = {}
     for func in functions:
-        name, *_ = at_least_tuple(func.output_name)  # if multiple, they have same progress
+        name, *_ = at_least_tuple(func.output_name)  # if multiple, the have equal size
         s = store[name]
         size = s.size if isinstance(s, StorageBase) else 1
         progress[func.output_name] = _Status(n_total=size)
