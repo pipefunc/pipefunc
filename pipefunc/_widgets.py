@@ -4,8 +4,8 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, TypeAlias
 
+import IPython.display
 import ipywidgets as widgets
-from IPython.display import HTML, display
 
 from pipefunc._utils import at_least_tuple
 
@@ -97,6 +97,7 @@ class ProgressTracker:
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         if not self.in_async and not force:
+            assert self.task is None
             # If not in asyncio, `update_progress` is called after each iteration,
             # so, we throttle the updates to avoid excessive updates.
             now = time.monotonic()
@@ -215,8 +216,7 @@ class ProgressTracker:
 
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
-        if self.task is None:
-            return
+        assert self.task is not None
         self.task.cancel()
         self.update_progress()  # Update progress one last time
         if self.auto_update:
@@ -328,5 +328,5 @@ class ProgressTracker:
             }
         </style>
         """
-        display(HTML(style))
-        display(self._widgets())
+        IPython.display.display(IPython.display.HTML(style))
+        IPython.display.display(self._widgets())
