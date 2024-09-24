@@ -261,7 +261,7 @@ def visualize_graphviz(  # noqa: PLR0912
         The resulting Graphviz Digraph object.
 
     """
-    import graphviz
+    import pygraphviz as pgv
 
     if graphviz_kwargs is None:
         graphviz_kwargs = {}
@@ -272,10 +272,13 @@ def visualize_graphviz(  # noqa: PLR0912
             f"{figsize[0]},{figsize[1]}" if isinstance(figsize, tuple) else f" {figsize},{figsize}"
         )
         graph_attr["ratio"] = "fill"
-    # Graphviz Setup
-    digraph = graphviz.Digraph(
+
+    # PyGraphviz Setup
+    digraph = pgv.AGraph(
+        strict=False,
+        directed=True,
         comment="Graph Visualization",
-        graph_attr=graph_attr,
+        rankdir=orient,
         node_attr={"shape": "rectangle"},
         **graphviz_kwargs,
     )
@@ -322,7 +325,7 @@ def visualize_graphviz(  # noqa: PLR0912
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(node, hints, defaults)
             attribs = dict(node_defaults, label=f"<{label}>", **config)
-            digraph.node(str(node), **attribs)
+            digraph.add_node(str(node), **attribs)
 
     # Add edges and labels with function outputs
     labels = _Labels.from_graph(graph)
@@ -336,8 +339,7 @@ def visualize_graphviz(  # noqa: PLR0912
         (labels.resources, _COLORS["orange"]),
     ]:
         for edge, label in _labels.items():
-            # Labels are transparent and become visible on hover in widget
-            digraph.edge(
+            digraph.add_edge(
                 str(edge[0]),
                 str(edge[1]),
                 color=color,
@@ -349,10 +351,9 @@ def visualize_graphviz(  # noqa: PLR0912
             )
 
     if show_legend and legend_items:
-        legend_subgraph = graphviz.Digraph(
-            name="cluster_legend",
-            graph_attr={
-                "label": "Legend",
+        legend_subgraph = digraph.add_subgraph(name="cluster_legend", label="Legend")
+        legend_subgraph.graph_attr.update(
+            {
                 "rankdir": orient,
                 "fontsize": "20",
                 "fontcolor": "black",
@@ -365,15 +366,13 @@ def visualize_graphviz(  # noqa: PLR0912
             node_name = f"legend_{i}"
             attribs = {**node_defaults, "label": name, **config}
             del attribs["margin"]  # Remove margin for legend nodes, to make them more compact
-            legend_subgraph.node(node_name, **attribs)
+            legend_subgraph.add_node(node_name, **attribs)
             if i > 0:
-                legend_subgraph.edge(f"legend_{i-1}", node_name, style="invis")
-
-        digraph.subgraph(legend_subgraph)
+                legend_subgraph.add_edge(f"legend_{i-1}", node_name, style="invis")
 
     if filename is not None:
         name, extension = str(filename).rsplit(".", 1)
-        digraph.render(name, format=extension, cleanup=True)
+        digraph.draw(name, format=extension, prog="dot")
 
     if return_type is None and is_running_in_ipynb():  # pragma: no cover
         return_type = "html"
@@ -381,7 +380,7 @@ def visualize_graphviz(  # noqa: PLR0912
     if return_type == "html":
         from IPython.display import HTML
 
-        svg_content = digraph._repr_image_svg_xml()
+        svg_content = digraph.draw(format="svg", prog="dot")
         html_content = (
             f'<div id="svg-container" style="max-width: 100%;">{svg_content}</div>'
             "<style>#svg-container svg {max-width: 100%; height: auto;}</style>"
