@@ -843,6 +843,7 @@ def _init_tracker(
 ) -> ProgressTracker | None:
     if not with_progress:
         return None
+    requires("ipywidgets", reason="with_progress", extras="ipywidgets")
     from pipefunc._widgets import ProgressTracker
 
     progress = {}
