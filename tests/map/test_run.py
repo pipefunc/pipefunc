@@ -1504,7 +1504,7 @@ async def test_run_async():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_run_info = pipeline.map_async({"x": [1, 2, 3]}, with_progress=True)
+    async_run_info = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
     # Test that the progress tracker is working
     async_run_info.tracker.update_progress()
     async_run_info.tracker._first_auto_update_interval = 0.0

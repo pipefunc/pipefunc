@@ -61,7 +61,7 @@ def _prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
-    with_progress: bool,
+    show_progress: bool,
     in_async: bool,
 ) -> tuple[
     Pipeline,
@@ -71,8 +71,8 @@ def _prepare_run(
     bool,
     ProgressTracker | None,
 ]:
-    if not parallel and with_progress:
-        msg = "Cannot use `with_progress=True` with `parallel=False`."
+    if not parallel and show_progress:
+        msg = "Cannot use `show_progress=True` with `parallel=False`."
         raise ValueError(msg)
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
@@ -93,7 +93,7 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress, in_async)
+    tracker = _init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
@@ -114,7 +114,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    with_progress: bool = False,
+    show_progress: bool = False,
 ) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -158,7 +158,7 @@ def run(
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
-    with_progress
+    show_progress
         Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
@@ -174,7 +174,7 @@ def run(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
-        with_progress=with_progress,
+        show_progress=show_progress,
         in_async=False,
     )
     if tracker is not None:
@@ -229,7 +229,7 @@ def run_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    with_progress: bool = False,
+    show_progress: bool = False,
 ) -> AsyncRun:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -271,7 +271,7 @@ def run_async(
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
-    with_progress
+    show_progress
         Whether to display a progress bar.
 
     """
@@ -287,7 +287,7 @@ def run_async(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
-        with_progress=with_progress,
+        show_progress=show_progress,
         in_async=True,
     )
 
@@ -838,12 +838,12 @@ class _Status:
 def _init_tracker(
     store: dict[str, StorageBase | Path | DirectValue],
     functions: list[PipeFunc],
-    with_progress: bool,  # noqa: FBT001
+    show_progress: bool,  # noqa: FBT001
     in_async: bool,  # noqa: FBT001
 ) -> ProgressTracker | None:
-    if not with_progress:
+    if not show_progress:
         return None
-    requires("ipywidgets", reason="with_progress", extras="ipywidgets")
+    requires("ipywidgets", reason="show_progress", extras="ipywidgets")
     from pipefunc._widgets import ProgressTracker
 
     progress = {}
