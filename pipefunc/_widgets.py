@@ -265,7 +265,12 @@ class ProgressTracker:
             # Create a vertical box for the progress bar and labels
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(class_="progress"),
+                layout=widgets.Layout(
+                    border="1px solid #ddd",
+                    padding="5px",
+                    margin="5px 0",
+                    border_radius="5px",
+                ),
             )
             progress_containers.append(container)
 
@@ -285,10 +290,10 @@ class ProgressTracker:
     def display(self) -> None:
         style = """
         <style>
-            .progress {
+            .progress-bar {
                 border-radius: 5px;
             }
-            .animated-progress .progress-bar, .completed-progress .progress-bar {
+            .animated-progress .progress-bar {
                 background-image: linear-gradient(
                     -45deg,
                     rgba(255, 255, 255, 0.15) 25%,
@@ -300,9 +305,6 @@ class ProgressTracker:
                     transparent
                 );
                 background-size: 40px 40px;
-                border-radius: 5px;
-            }
-            .animated-progress .progress-bar {
                 animation: stripes 1s linear infinite;
             }
             .completed-progress .progress-bar {
