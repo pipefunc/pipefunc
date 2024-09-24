@@ -58,8 +58,11 @@ class ProgressTracker:
         self.auto_update_task: asyncio.Task | None = None
         self.first_update: bool = True
         self.in_async: bool = in_async
-        self.last_update_time: float = time.monotonic()
-        self.sync_interval: float = 0.1
+        self.last_update_time: float = 0.0
+        self._min_auto_update_interval: float = 0.1
+        self._max_auto_update_interval: float = 10.0
+        self._first_auto_update_interval: float = 1.0
+        self._sync_update_interval: float = 0.1
         self.progress_bars: dict[_OUTPUT_TYPE, widgets.FloatProgress] = {}
         self.labels: dict[_OUTPUT_TYPE, dict[_OUTPUT_TYPE, widgets.HTML]] = {}
         self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
@@ -101,7 +104,7 @@ class ProgressTracker:
             # If not in asyncio, `update_progress` is called after each iteration,
             # so, we throttle the updates to avoid excessive updates.
             now = time.monotonic()
-            if now - self.last_update_time < self.sync_interval:
+            if now - self.last_update_time < self._sync_update_interval:
                 return
             self.last_update_time = time.monotonic()
 
@@ -133,9 +136,6 @@ class ProgressTracker:
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
-        start_time = status.start_time
-        if start_time is None:
-            return
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
             eta = "Completed"
@@ -151,8 +151,8 @@ class ProgressTracker:
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
         """Calculate a dynamic interval based on progress changes for all resources."""
-        min_interval = 0.1  # minimum interval to avoid extremely rapid updates
-        max_interval = 10.0  # maximum interval to prevent excessively slow updates
+        min_interval = self._min_auto_update_interval
+        max_interval = self._max_auto_update_interval
         shortest_interval = max_interval
         current_time = time.monotonic()
         for status in self.progress_dict.values():
@@ -171,7 +171,7 @@ class ProgressTracker:
         while self.auto_update:
             self.update_progress()
             if self.first_update:
-                new_interval = 1.0
+                new_interval = self._first_auto_update_interval
                 self.first_update = False
             else:
                 new_interval = self._calculate_adaptive_interval_with_previous()
