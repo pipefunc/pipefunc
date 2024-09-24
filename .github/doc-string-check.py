@@ -140,8 +140,10 @@ def compare_param_descriptions(
 
 if __name__ == "__main__":
     import pipefunc
+    import pipefunc._plotting
     import pipefunc.map._run
 
+    # map vs map_async
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         pipefunc.map._run.run,
@@ -158,4 +160,27 @@ if __name__ == "__main__":
         pipefunc.Pipeline.map_async,
         allow_missing=["parallel"],
         allow_discrepancy=["with_progress"],
+    )
+
+    # plotting
+    compare_param_descriptions(
+        pipefunc._plotting.visualize_graphviz,
+        pipefunc.Pipeline.visualize_graphviz,
+        allow_missing=["defaults", "graph"],
+    )
+    compare_param_descriptions(
+        pipefunc._plotting.visualize_holoviews,
+        pipefunc.Pipeline.visualize_holoviews,
+        allow_missing=["graph"],
+    )
+    compare_param_descriptions(
+        pipefunc._plotting.visualize_matplotlib,
+        pipefunc.Pipeline.visualize_matplotlib,
+        allow_missing=[
+            "output_name",
+            "color_combinable",
+            "conservatively_combine",
+            "graph",
+            "func_node_colors",
+        ],
     )

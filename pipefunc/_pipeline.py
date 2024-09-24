@@ -1329,9 +1329,9 @@ class Pipeline:
         color_combinable
             Whether to color combinable nodes differently.
         conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
         output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
 
         """
         from pipefunc._plotting import visualize_matplotlib
