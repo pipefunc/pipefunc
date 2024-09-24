@@ -35,7 +35,6 @@ dependencies:
   - pytest-codspeed
   - pytest-cov
   - coverage
-  - pandas
   - adaptive
   - xarray
   - zarr
