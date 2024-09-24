@@ -68,6 +68,7 @@ def _prepare_run(
         raise ValueError(msg)
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
+        raise ValueError(msg)
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
