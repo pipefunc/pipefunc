@@ -142,6 +142,10 @@ if __name__ == "__main__":
     import pipefunc
     import pipefunc.map._run
 
-    compare_param_descriptions(pipefunc.Pipeline.map, pipefunc.map._run.run)
+    compare_param_descriptions(
+        pipefunc.Pipeline.map,
+        pipefunc.map._run.run,
+        allow_missing=["pipeline"],
+    )
     compare_param_descriptions(pipefunc.Pipeline.map_async, pipefunc.map._run.run_async)
     compare_param_descriptions(pipefunc.Pipeline.map, pipefunc.Pipeline.map_async)
