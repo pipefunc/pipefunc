@@ -17,6 +17,8 @@ dependencies:
   - adaptive-scheduler>=2.12.0
   # optional-dependencies: xarray
   - xarray
+  # optional-dependencies: widgets
+  - ipywidgets
   # optional-dependencies: zarr
   - zarr
   # optional-dependencies: plotting

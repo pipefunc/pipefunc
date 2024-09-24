@@ -27,6 +27,7 @@ dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
+widgets = ["ipywidgets"]
 zarr = ["zarr"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
@@ -60,7 +61,7 @@ docs = [
     "nltk",
     "scikit-image",
 ]
-all = ["pipefunc[adaptive,xarray,zarr,plotting]"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "pre-commit",
