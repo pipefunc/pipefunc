@@ -1504,6 +1504,7 @@ async def test_run_async():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_run_info = run_async(pipeline, {"x": [1, 2, 3]})
+    async_run_info = run_async(pipeline, {"x": [1, 2, 3]}, with_progress_bar=True)
+    async_run_info.tracker.update_progress()
     result = await async_run_info.task
     assert result["r"].output == 12
