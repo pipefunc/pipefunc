@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import itertools
 import time
@@ -7,13 +8,22 @@ import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod, requires
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
+    requires,
+)
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
@@ -25,6 +35,7 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
 
@@ -50,13 +61,22 @@ def _prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
+    with_progress: bool,
+    in_async: bool,
 ) -> tuple[
     Pipeline,
     RunInfo,
     dict[str, StorageBase | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
+    ProgressTracker | None,
 ]:
+    if not parallel and not executor and with_progress:
+        msg = "Cannot use `with_progress=True` with `parallel=False`."
+        raise ValueError(msg)
+    if not parallel and executor:
+        msg = "Cannot use an executor without `parallel=True`."
+        raise ValueError(msg)
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
@@ -73,10 +93,11 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
+    tracker = _init_tracker(store, pipeline.sorted_functions, with_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel
+    return pipeline, run_info, store, outputs, parallel, tracker
 
 
 def run(
@@ -93,6 +114,7 @@ def run(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
+    with_progress: bool = False,
 ) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -136,9 +158,11 @@ def run(
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
+    with_progress
+        Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
-    pipeline, run_info, store, outputs, parallel = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, tracker = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -150,8 +174,11 @@ def run(
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
+        with_progress=with_progress,
+        in_async=False,
     )
-
+    if tracker is not None:
+        tracker.display()
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -161,12 +188,131 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                tracker=tracker,
                 cache=pipeline.cache,
             )
-
+    if tracker is not None:  # final update
+        tracker.update_progress(force=True)
     _maybe_persist_memory(store, persist_memory)
-
     return outputs
+
+
+class AsyncRun(NamedTuple):
+    task: asyncio.Task[OrderedDict[str, Result]]
+    run_info: RunInfo
+    tracker: ProgressTracker | None
+
+    def result(self) -> OrderedDict[str, Result]:
+        if is_running_in_ipynb():  # pragma: no cover
+            if self.task.done():
+                return self.task.result()
+            msg = (
+                "Cannot block the event loop when running in a Jupyter notebook."
+                " Use `await runner.task` instead."
+            )
+            raise RuntimeError(msg)
+
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.task)
+
+
+def run_async(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    *,
+    output_names: set[_OUTPUT_TYPE] | None = None,
+    executor: Executor | None = None,
+    storage: str = "file_array",
+    persist_memory: bool = True,
+    cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
+    auto_subpipeline: bool = False,
+    with_progress: bool = False,
+) -> AsyncRun:
+    """Run a pipeline with `MapSpec` functions for given ``inputs``.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline to run.
+    inputs
+        The inputs to the pipeline. The keys should be the names of the input
+        parameters of the pipeline functions and the values should be the
+        corresponding input data, these are either single values for functions without ``mapspec``
+        or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+    run_folder
+        The folder to store the run information. If ``None``, either a temporary folder
+        is created or no folder is used, depending on whether the storage class requires serialization.
+    internal_shapes
+        The shapes for intermediary outputs that cannot be inferred from the inputs.
+        You will receive an exception if the shapes cannot be inferred and need to be provided.
+        The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+        If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+    output_names
+        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+    executor
+        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+        is used. Only relevant if ``parallel=True``.
+    storage
+        The storage class to use for the file arrays.
+        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
+    cleanup
+        Whether to clean up the ``run_folder`` before running the pipeline.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
+    auto_subpipeline
+        If ``True``, a subpipeline is created with the specified ``inputs``, using
+        `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+        of providing the root arguments. If ``False``, all root arguments must be provided,
+        and an exception is raised if any are missing.
+    with_progress
+        Whether to display a progress bar.
+
+    """
+    pipeline, run_info, store, outputs, _, tracker = _prepare_run(
+        pipeline=pipeline,
+        inputs=inputs,
+        run_folder=run_folder,
+        internal_shapes=internal_shapes,
+        output_names=output_names,
+        parallel=True,
+        executor=executor,
+        storage=storage,
+        cleanup=cleanup,
+        fixed_indices=fixed_indices,
+        auto_subpipeline=auto_subpipeline,
+        with_progress=with_progress,
+        in_async=True,
+    )
+
+    async def _run_pipeline() -> OrderedDict[str, Result]:
+        with _maybe_executor(executor, parallel=True) as ex:
+            assert ex is not None
+            for gen in pipeline.topological_generations.function_lists:
+                await _run_and_process_generation_async(
+                    generation=gen,
+                    run_info=run_info,
+                    store=store,
+                    outputs=outputs,
+                    fixed_indices=fixed_indices,
+                    executor=ex,
+                    tracker=tracker,
+                    cache=pipeline.cache,
+                )
+        _maybe_persist_memory(store, persist_memory)
+        return outputs
+
+    task = asyncio.create_task(_run_pipeline())
+    if tracker is not None:
+        tracker.attach_task(task)
+        tracker.display()
+    return AsyncRun(task, run_info, tracker)
 
 
 def _maybe_persist_memory(
@@ -526,18 +672,47 @@ def _mask_fixed_axes(
     return select.flat
 
 
+def _status_submit(
+    func: Callable[..., Any],
+    executor: Executor,
+    status: _Status,
+    tracker: ProgressTracker,
+    *args: Any,
+) -> Future:
+    status.mark_in_progress()
+    fut = executor.submit(func, *args)
+    fut.add_done_callback(status.mark_complete)
+    if not tracker.in_async:
+        fut.add_done_callback(tracker.update_progress)
+    return fut
+
+
 def _maybe_parallel_map(
     func: Callable[..., Any],
     seq: Sequence,
     executor: Executor | None,
+    status: _Status | None,
+    tracker: ProgressTracker | None,
 ) -> list[Any]:
     if executor is not None:
+        if status is not None:
+            assert tracker is not None
+            return [_status_submit(func, executor, status, tracker, x) for x in seq]
         return [executor.submit(func, x) for x in seq]
     return [func(x) for x in seq]
 
 
-def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
+def _maybe_submit(
+    func: Callable[..., Any],
+    executor: Executor | None,
+    status: _Status | None,
+    tracker: ProgressTracker | None,
+    *args: Any,
+) -> Any:
     if executor:
+        if status is not None:
+            assert tracker is not None
+            return _status_submit(func, executor, status, tracker, *args)
         return executor.submit(func, *args)
     return func(*args)
 
@@ -623,6 +798,63 @@ class _KwargsTask(NamedTuple):
     task: tuple[Any, _MapSpecArgs] | Any
 
 
+@dataclass
+class _Status:
+    """A class to keep track of the progress of a function."""
+
+    n_total: int
+    n_in_progress: int = 0
+    n_completed: int = 0
+    n_failed: int = 0
+    start_time: float | None = None
+    end_time: float | None = None
+
+    @property
+    def n_left(self) -> int:
+        return self.n_total - self.n_completed - self.n_failed
+
+    def mark_in_progress(self) -> None:
+        if self.start_time is None:
+            self.start_time = time.monotonic()
+        self.n_in_progress += 1
+
+    def mark_complete(self, _: Any) -> None:  # needs arg to be used as callback
+        self.n_in_progress -= 1
+        self.n_completed += 1
+        if self.n_completed == self.n_total:
+            self.end_time = time.monotonic()
+
+    @property
+    def progress(self) -> float:
+        return self.n_completed / self.n_total
+
+    def elapsed_time(self) -> float:
+        assert self.start_time is not None
+        if self.end_time is None:
+            return time.monotonic() - self.start_time
+        return self.end_time - self.start_time
+
+
+def _init_tracker(
+    store: dict[str, StorageBase | Path | DirectValue],
+    functions: list[PipeFunc],
+    with_progress: bool,  # noqa: FBT001
+    in_async: bool,  # noqa: FBT001
+) -> ProgressTracker | None:
+    if not with_progress:
+        return None
+    from pipefunc._widgets import ProgressTracker
+
+    progress = {}
+    for func in functions:
+        name, *_ = at_least_tuple(func.output_name)  # if multiple, the have equal size
+        s = store[name]
+        size = s.size if isinstance(s, StorageBase) else 1
+        progress[func.output_name] = _Status(n_total=size)
+    return ProgressTracker(progress, None, display=False, in_async=in_async)
+
+
+# NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
@@ -630,15 +862,28 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    tracker: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks = {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, cache)
-        for func in generation
-    }
+    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
     _process_generation(generation, tasks, store, outputs)
 
 
+async def _run_and_process_generation_async(
+    generation: list[PipeFunc],
+    run_info: RunInfo,
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor,
+    tracker: ProgressTracker | None,
+    cache: _CacheBase | None = None,
+) -> None:
+    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
+    await _process_generation_async(generation, tasks, store, outputs)
+
+
+# NOTE: A similar async version of this function is provided below.
 def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
@@ -650,22 +895,50 @@ def _process_generation(
         outputs.update(_outputs)
 
 
+async def _process_generation_async(
+    generation: list[PipeFunc],
+    tasks: dict[PipeFunc, _KwargsTask],
+    store: dict[str, StorageBase | Path | DirectValue],
+    outputs: dict[str, Result],
+) -> None:
+    for func in generation:
+        _outputs = await _process_task_async(func, tasks[func], store)
+        outputs.update(_outputs)
+
+
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
+    tracker: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    status = tracker.progress_dict[func.output_name] if tracker is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, tracker)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, status, tracker, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _submit_generation(
+    run_info: RunInfo,
+    generation: list[PipeFunc],
+    store: dict[str, StorageBase | Path | DirectValue],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: Executor | None,
+    tracker: ProgressTracker | None,
+    cache: _CacheBase | None = None,
+) -> dict[PipeFunc, _KwargsTask]:
+    return {
+        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
+        for func in generation
+    }
 
 
 def _output_from_mapspec_task(
@@ -684,6 +957,10 @@ def _output_from_mapspec_task(
 
 def _result(x: Any | Future) -> Any:
     return x.result() if isinstance(x, Future) else x
+
+
+def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
+    return asyncio.wrap_future(task, loop=loop)
 
 
 def _to_result_dict(
@@ -706,6 +983,7 @@ def _to_result_dict(
     }
 
 
+# NOTE: A similar async version of this function is provided below.
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
@@ -719,7 +997,25 @@ def _process_task(
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
+    return _to_result_dict(func, kwargs, output, store)
 
+
+async def _process_task_async(
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StorageBase | Path | DirectValue],
+) -> dict[str, Result]:
+    kwargs, task = kwargs_task
+    loop = asyncio.get_event_loop()
+    if func.mapspec and func.mapspec.inputs:
+        r, args = task
+        futs = [_result_async(x, loop) for x in r]
+        outputs_list = await asyncio.gather(*futs)
+        output = _output_from_mapspec_task(args, outputs_list)
+    else:
+        assert isinstance(task, Future)
+        r = await _result_async(task, loop)
+        output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
 
 

@@ -11,7 +11,7 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
+from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run, run_async
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import StorageBase, storage_registry
 from pipefunc.map.xarray import xarray_dataset_from_results
@@ -1483,3 +1483,28 @@ def test_parallel_warning_and_error():
 
     with pytest.raises(ValueError, match="The chosen storage type `zarr_memory` does not support"):
         pipeline.map(inputs, storage="zarr_memory", parallel=True)
+
+
+@pytest.mark.asyncio
+async def test_run_async():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x - 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="w", mapspec="y[i], z[i] -> w[i]")
+    def h(y, z):
+        return y + z
+
+    @pipefunc(output_name="r")
+    def i(w):
+        return sum(w)
+
+    pipeline = Pipeline([f, g, h, i])
+    async_run_info = run_async(pipeline, {"x": [1, 2, 3]}, with_progress=True)
+    async_run_info.tracker.update_progress()
+    result = await async_run_info.task
+    assert result["r"].output == 12
