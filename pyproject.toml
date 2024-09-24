@@ -107,6 +107,7 @@ build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "module"
 addopts = """
     -vvv
     --cov=pipefunc
@@ -114,6 +115,7 @@ addopts = """
     --cov-report html
     --cov-report xml
     --cov-fail-under=35
+    --asyncio-mode=strict
 """
 
 [tool.coverage.report]

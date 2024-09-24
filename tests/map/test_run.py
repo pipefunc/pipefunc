@@ -11,7 +11,7 @@ import pytest
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run, run_async
+from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import StorageBase, storage_registry
 from pipefunc.map.xarray import xarray_dataset_from_results
@@ -1504,7 +1504,7 @@ async def test_run_async():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_run_info = run_async(pipeline, {"x": [1, 2, 3]}, with_progress=True)
+    async_run_info = pipeline.map_async({"x": [1, 2, 3]}, with_progress=True)
     async_run_info.tracker.update_progress()
     result = await async_run_info.task
     assert result["r"].output == 12
