@@ -80,9 +80,9 @@ class ProgressTracker:
                 "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
                 "estimated_time": _create_html_label(
                     "estimate-label",
-                    "Elapsed: 0.00 sec | ETA: calculating...",
+                    "Elapsed: 0.00 sec | ETA: Calculating...",
                 ),
-                "speed": _create_html_label("speed-label", "Speed: calculating..."),
+                "speed": _create_html_label("speed-label", "Speed: Calculating..."),
             }
         self.auto_update_interval_label = _create_html_label(
             "interval-label",
@@ -130,9 +130,9 @@ class ProgressTracker:
         status: _Status,
     ) -> None:
         assert status.progress > 0
-        label_dict = self.labels[name]
+        labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
-        label_dict["percentage"].value = _span(
+        labels["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
@@ -142,14 +142,12 @@ class ProgressTracker:
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
             eta = "Completed"
-        elif status.progress == 0:
-            eta = "Calculating..."
         else:
             estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
         speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
-        label_dict["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
-        label_dict["estimated_time"].value = _span(
+        labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
+        labels["estimated_time"].value = _span(
             "estimate-label",
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
@@ -221,22 +219,23 @@ class ProgressTracker:
 
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
-        if self.task is not None:
-            self.task.cancel()
-            self.update_progress()  # Update progress one last time
-            if self.auto_update:
-                self._toggle_auto_update()
-            for button in self.buttons.values():
-                button.disabled = True
-            for progress_bar in self.progress_bars.values():
-                if progress_bar.value < 1.0:
-                    progress_bar.bar_style = "danger"
-                    progress_bar.remove_class("animated-progress")
-                    progress_bar.add_class("completed-progress")
-            self.auto_update_interval_label.value = _span(
-                "interval-label",
-                "Calculation cancelled ❌",
-            )
+        if self.task is None:
+            return
+        self.task.cancel()
+        self.update_progress()  # Update progress one last time
+        if self.auto_update:
+            self._toggle_auto_update()
+        for button in self.buttons.values():
+            button.disabled = True
+        for progress_bar in self.progress_bars.values():
+            if progress_bar.value < 1.0:
+                progress_bar.bar_style = "danger"
+                progress_bar.remove_class("animated-progress")
+                progress_bar.add_class("completed-progress")
+        self.auto_update_interval_label.value = _span(
+            "interval-label",
+            "Calculation cancelled ❌",
+        )
 
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
@@ -249,11 +248,7 @@ class ProgressTracker:
             )
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(
-                    border="1px solid #999999",
-                    margin="2px 0",
-                    padding="2px",
-                ),
+                layout=widgets.Layout(border="1px solid #999999", margin="2px 0", padding="2px"),
             )
             container.add_class("container")
             progress_containers.append(container)
