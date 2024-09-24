@@ -727,6 +727,8 @@ class Pipeline:
     ) -> AsyncRun:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
         Parameters
         ----------
         inputs
