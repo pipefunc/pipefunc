@@ -683,6 +683,16 @@ class Pipeline:
         show_progress
             Whether to display a progress bar. Only works if ``parallel=True``.
 
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
+
         """
         return run(
             self,
@@ -755,6 +765,16 @@ class Pipeline:
             and an exception is raised if any are missing.
         show_progress
             Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``tracker`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
 
         """
         return run_async(
