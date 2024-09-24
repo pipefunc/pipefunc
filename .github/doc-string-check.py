@@ -36,6 +36,8 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
         stripped_line = line.strip()
         if stripped_line == "Parameters":
             in_params_section = True
+        elif stripped_line in ("Returns", "Raises"):
+            break  # Stop processing when we hit Returns or Raises section
         elif in_params_section:
             if stripped_line.startswith("---"):
                 continue

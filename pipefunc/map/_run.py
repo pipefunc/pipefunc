@@ -307,9 +307,6 @@ def run_async(
     return AsyncRun(task, run_info, tracker)
 
 
-run_async.__doc__ = run.__doc__
-
-
 def _maybe_persist_memory(
     store: dict[str, StorageBase | Path | DirectValue],
     persist_memory: bool,  # noqa: FBT001
