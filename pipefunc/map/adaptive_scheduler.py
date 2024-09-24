@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, requires
 from pipefunc.map._run import _func_kwargs, _load_file_arrays, _select_kwargs
 from pipefunc.resources import Resources
 
@@ -52,6 +52,7 @@ class AdaptiveSchedulerDetails(NamedTuple):
 
     def run_manager(self, kwargs: Any | None) -> adaptive_scheduler.RunManager:  # pragma: no cover
         """Get a `RunManager` for the adaptive scheduler."""
+        requires("adaptive_scheduler", reason="adaptive_scheduler", extras="adaptive")
         import adaptive_scheduler
 
         return adaptive_scheduler.slurm_run(**(kwargs or self.kwargs()))

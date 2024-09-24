@@ -15,7 +15,15 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
+    requires,
+)
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
@@ -356,6 +364,7 @@ def load_xarray_dataset(
         An `xarray.Dataset` containing the outputs of the pipeline run.
 
     """
+    requires("xarray", reason="load_xarray_dataset", extras="xarray")
     from pipefunc.map.xarray import load_xarray_dataset
 
     run_info = RunInfo.load(run_folder)

@@ -29,6 +29,7 @@ adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]
+pandas = ["pandas"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
@@ -36,7 +37,6 @@ test = [
     "pytest-codspeed",
     "pytest-cov",
     "coverage",
-    "pandas",
     "adaptive",
     "xarray",
     "zarr",

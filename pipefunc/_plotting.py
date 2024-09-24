@@ -8,11 +8,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
+import numpy as np
 from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
-from pipefunc._utils import at_least_tuple, is_running_in_ipynb
+from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
@@ -261,6 +262,7 @@ def visualize_graphviz(  # noqa: PLR0912
         The resulting Graphviz Digraph object.
 
     """
+    requires("graphviz", reason="visualize_graphviz", extras="plotting")
     import graphviz
 
     if graphviz_kwargs is None:
@@ -417,6 +419,7 @@ def visualize_matplotlib(
         The resulting Matplotlib figure.
 
     """
+    requires("matplotlib", reason="visualize_matplotlib", extras="plotting")
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
@@ -505,9 +508,9 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         If ``False`` the `holoviews.Graph` object is returned.
 
     """
+    requires("holoviews", "bokeh", reason="visualize_holoviews", extras="plotting")
     import bokeh.plotting
     import holoviews as hv
-    import numpy as np
 
     hv.extension("bokeh")
     pos = _get_graph_layout(graph)

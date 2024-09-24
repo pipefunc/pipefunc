@@ -21,6 +21,8 @@ dependencies:
   - ipywidgets
   # optional-dependencies: zarr
   - zarr
+  # optional-dependencies: pandas
+  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
