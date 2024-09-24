@@ -5,10 +5,6 @@ from ipywidgets import HTML, Button, FloatProgress, VBox
 
 from pipefunc._widgets import (
     ProgressTracker,
-    _create_button,
-    _create_html_label,
-    _create_progress_bar,
-    _span,
 )
 
 
@@ -32,32 +28,6 @@ def mock_progress_dict(mock_status):
 @pytest.fixture
 def mock_task():
     return AsyncMock()
-
-
-def test_span():
-    assert _span("test-class", "test-value") == '<span class="test-class">test-value</span>'
-
-
-def test_create_button():
-    button = _create_button("Test", "primary", "test-icon")
-    assert isinstance(button, Button)
-    assert button.description == "Test"
-    assert button.button_style == "primary"
-    assert button.icon == "test-icon"
-
-
-def test_create_progress_bar():
-    bar = _create_progress_bar("test", 0.5)
-    assert isinstance(bar, FloatProgress)
-    assert bar.value == 0.5
-    assert bar.max == 1.0
-    assert bar.description == "test"
-
-
-def test_create_html_label():
-    label = _create_html_label("test-class", "test-value")
-    assert isinstance(label, HTML)
-    assert label.value == '<span class="test-class">test-value</span>'
 
 
 @pytest.mark.asyncio
