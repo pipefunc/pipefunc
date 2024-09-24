@@ -29,7 +29,6 @@ dependencies:
   - pytest
   - coverage
   - pytest-cov
-  - pandas
   - adaptive
   - xarray
   - zarr
