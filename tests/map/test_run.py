@@ -1505,10 +1505,10 @@ async def test_run_async():
 
     pipeline = Pipeline([f, g, h, i])
     async_run_info = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
-    # Test that the progress tracker is working
-    async_run_info.tracker.update_progress()
-    async_run_info.tracker._first_auto_update_interval = 0.0
-    async_run_info.tracker._toggle_auto_update()  # Turn off auto update
-    async_run_info.tracker._toggle_auto_update()  # Turn on auto update
+    # Test that the progress tracket is working
+    async_run_info.progress.update_progress()
+    async_run_info.progress._first_auto_update_interval = 0.0
+    async_run_info.progress._toggle_auto_update()  # Turn off auto update
+    async_run_info.progress._toggle_auto_update()  # Turn on auto update
     result = await async_run_info.task
     assert result["r"].output == 12

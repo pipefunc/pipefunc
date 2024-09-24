@@ -773,7 +773,7 @@ class Pipeline:
 
         Returns
         -------
-            An `AsyncRun` instance that contains ``run_info``, ``tracker`` and ``task``.
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
             The ``task`` can be awaited to get the final result of the pipeline.
 
         """

@@ -93,11 +93,11 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    tracker = _init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    progress = _init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel, tracker
+    return pipeline, run_info, store, outputs, parallel, progress
 
 
 def run(
@@ -162,7 +162,7 @@ def run(
         Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
-    pipeline, run_info, store, outputs, parallel, tracker = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -177,8 +177,8 @@ def run(
         show_progress=show_progress,
         in_async=False,
     )
-    if tracker is not None:
-        tracker.display()
+    if progress is not None:
+        progress.display()
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -188,11 +188,11 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
-                tracker=tracker,
+                progress=progress,
                 cache=pipeline.cache,
             )
-    if tracker is not None:  # final update
-        tracker.update_progress(force=True)
+    if progress is not None:  # final update
+        progress.update_progress(force=True)
     _maybe_persist_memory(store, persist_memory)
     return outputs
 
@@ -200,7 +200,7 @@ def run(
 class AsyncRun(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
-    tracker: ProgressTracker | None
+    progress: ProgressTracker | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():  # pragma: no cover
@@ -275,7 +275,7 @@ def run_async(
         Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, _, tracker = _prepare_run(
+    pipeline, run_info, store, outputs, _, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -302,17 +302,17 @@ def run_async(
                     outputs=outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
-                    tracker=tracker,
+                    progress=progress,
                     cache=pipeline.cache,
                 )
         _maybe_persist_memory(store, persist_memory)
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if tracker is not None:
-        tracker.attach_task(task)
-        tracker.display()
-    return AsyncRun(task, run_info, tracker)
+    if progress is not None:
+        progress.attach_task(task)
+        progress.display()
+    return AsyncRun(task, run_info, progress)
 
 
 def _maybe_persist_memory(
@@ -676,14 +676,14 @@ def _status_submit(
     func: Callable[..., Any],
     executor: Executor,
     status: _Status,
-    tracker: ProgressTracker,
+    progress: ProgressTracker,
     *args: Any,
 ) -> Future:
     status.mark_in_progress()
     fut = executor.submit(func, *args)
     fut.add_done_callback(status.mark_complete)
-    if not tracker.in_async:
-        fut.add_done_callback(tracker.update_progress)
+    if not progress.in_async:
+        fut.add_done_callback(progress.update_progress)
     return fut
 
 
@@ -692,12 +692,12 @@ def _maybe_parallel_map(
     seq: Sequence,
     executor: Executor | None,
     status: _Status | None,
-    tracker: ProgressTracker | None,
+    progress: ProgressTracker | None,
 ) -> list[Any]:
     if executor is not None:
         if status is not None:
-            assert tracker is not None
-            return [_status_submit(func, executor, status, tracker, x) for x in seq]
+            assert progress is not None
+            return [_status_submit(func, executor, status, progress, x) for x in seq]
         return [executor.submit(func, x) for x in seq]
     return [func(x) for x in seq]
 
@@ -706,13 +706,13 @@ def _maybe_submit(
     func: Callable[..., Any],
     executor: Executor | None,
     status: _Status | None,
-    tracker: ProgressTracker | None,
+    progress: ProgressTracker | None,
     *args: Any,
 ) -> Any:
     if executor:
         if status is not None:
-            assert tracker is not None
-            return _status_submit(func, executor, status, tracker, *args)
+            assert progress is not None
+            return _status_submit(func, executor, status, progress, *args)
         return executor.submit(func, *args)
     return func(*args)
 
@@ -863,10 +863,18 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    tracker: ProgressTracker | None,
+    progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
+    tasks = _submit_generation(
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
+    )
     _process_generation(generation, tasks, store, outputs)
 
 
@@ -877,10 +885,18 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor,
-    tracker: ProgressTracker | None,
+    progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks = _submit_generation(run_info, generation, store, fixed_indices, executor, tracker, cache)
+    tasks = _submit_generation(
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
+    )
     await _process_generation_async(generation, tasks, store, outputs)
 
 
@@ -913,17 +929,17 @@ def _submit_func(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    tracker: ProgressTracker | None = None,
+    progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    status = tracker.progress_dict[func.output_name] if tracker is not None else None
+    status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, tracker)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, status, tracker, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
@@ -933,11 +949,11 @@ def _submit_generation(
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | None,
-    tracker: ProgressTracker | None,
+    progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, tracker, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
         for func in generation
     }
 
