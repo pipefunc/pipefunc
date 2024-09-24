@@ -60,12 +60,8 @@ class ProgressTracker:
         self.in_asyncio: bool = in_asyncio
         self.last_update_time: float = time.monotonic()
         self.sync_interval: float = 0.1
-
-        # Initialize widgets for progress tracking
         self.progress_bars: dict[_OUTPUT_TYPE, widgets.FloatProgress] = {}
         self.labels: dict[_OUTPUT_TYPE, dict[_OUTPUT_TYPE, widgets.HTML]] = {}
-
-        # Create control buttons
         self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button("Update Progress", "info", "refresh"),
             "toggle_auto_update": _create_button(
@@ -78,8 +74,6 @@ class ProgressTracker:
         self.buttons["update"].on_click(self.update_progress)
         self.buttons["toggle_auto_update"].on_click(self._toggle_auto_update)
         self.buttons["cancel"].on_click(self._cancel_calculation)
-
-        # Create progress widgets
         for name, status in self.progress_dict.items():
             self.progress_bars[name] = _create_progress_bar(name, status.progress)
             self.labels[name] = {
@@ -90,8 +84,6 @@ class ProgressTracker:
                 ),
                 "speed": _create_html_label("speed-label", "Speed: calculating..."),
             }
-
-        # Create auto-update label
         self.auto_update_interval_label = _create_html_label(
             "interval-label",
             "Auto-update every: N/A",
@@ -188,12 +180,8 @@ class ProgressTracker:
                 self.first_update = False
             else:
                 new_interval = self._calculate_adaptive_interval_with_previous()
-
-            # Check if all tasks are completed
             if self._all_completed():
                 break
-
-            # Update interval display
             if not self.first_update:
                 self.auto_update_interval_label.value = _span(
                     "interval-label",
@@ -240,7 +228,6 @@ class ProgressTracker:
                 self._toggle_auto_update()
             for button in self.buttons.values():
                 button.disabled = True
-            # Stop animation and set bar style to danger for in-progress bars
             for progress_bar in self.progress_bars.values():
                 if progress_bar.value < 1.0:
                     progress_bar.bar_style = "danger"
@@ -253,27 +240,24 @@ class ProgressTracker:
 
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
-        # Create individual progress containers for each item in progress
         progress_containers = []
         for name in self.progress_dict:
-            # Create a horizontal box for labels
             labels = self.labels[name]
             labels_box = widgets.HBox(
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
             )
-            # Create a vertical box for the progress bar and labels
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(
                     border="1px solid #999999",
                     margin="2px 0",
+                    padding="2px",
                 ),
             )
             container.add_class("container")
             progress_containers.append(container)
 
-        # Create the main vertical box layout
         buttons = self.buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
@@ -291,9 +275,11 @@ class ProgressTracker:
         <style>
             .progress {
                 border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             }
             .progress-bar {
                 border-radius: 5px;
+                transition: width 0.4s ease;
                 background-image: linear-gradient(
                     -45deg,
                     rgba(255, 255, 255, 0.15) 25%,
@@ -322,6 +308,7 @@ class ProgressTracker:
             }
             .container {
                 border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             }
             .percent-label {
                 margin-left: 10px;
@@ -346,7 +333,7 @@ class ProgressTracker:
                 font-family: monospace;
             }
             .widget-button {
-                margin-top: 10px;
+                margin-top: 5px;
             }
         </style>
         """
