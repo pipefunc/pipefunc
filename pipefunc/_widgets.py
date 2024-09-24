@@ -28,7 +28,7 @@ def _create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatPr
         value=progress,
         max=1.0,
         description=", ".join(at_least_tuple(name)),
-        layout={"width": "95%", "class_": "progress-bar"},
+        layout={"width": "95%"},
         bar_style="info",
         style={"description_width": "150px"},
     )
@@ -266,18 +266,18 @@ class ProgressTracker:
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(
-                    border="1px solid #ddd",
+                    border="1px solid #999999",
                     margin="2px 0",
-                    class_="container",
                 ),
             )
+            container.add_class("container")
             progress_containers.append(container)
 
         # Create the main vertical box layout
         buttons = self.buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
-            layout=widgets.Layout(class_="widget-button", justify_content="center"),
+            layout=widgets.Layout(justify_content="center"),
         )
         parts = (
             [*progress_containers, button_box, self.auto_update_interval_label]
@@ -319,6 +319,9 @@ class ProgressTracker:
                 100% {
                     background-position: 40px 0;
                 }
+            }
+            .container {
+                border-radius: 10px;
             }
             .percent-label {
                 margin-left: 10px;
