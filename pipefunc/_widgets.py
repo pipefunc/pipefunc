@@ -64,11 +64,7 @@ class ProgressTracker:
         self.labels: dict[_OUTPUT_TYPE, dict[_OUTPUT_TYPE, widgets.HTML]] = {}
         self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button("Update Progress", "info", "refresh"),
-            "toggle_auto_update": _create_button(
-                "Start Auto-Update",
-                "success",
-                "refresh",
-            ),
+            "toggle_auto_update": _create_button("Start Auto-Update", "success", "refresh"),
             "cancel": _create_button("Cancel Calculation", "danger", "stop"),
         }
         self.buttons["update"].on_click(self.update_progress)
@@ -101,8 +97,8 @@ class ProgressTracker:
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         if not self.in_asyncio and not force:
-            # If not in asyncio, `update_progress` is called after each iteration
-            # So, we need to throttle the updates to avoid excessive updates.
+            # If not in asyncio, `update_progress` is called after each iteration,
+            # so, we throttle the updates to avoid excessive updates.
             now = time.monotonic()
             if now - self.last_update_time < self.sync_interval:
                 return
