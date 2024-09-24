@@ -71,7 +71,7 @@ def _prepare_run(
     bool,
     ProgressTracker | None,
 ]:
-    if not parallel and not executor and with_progress:
+    if not parallel and with_progress:
         msg = "Cannot use `with_progress=True` with `parallel=False`."
         raise ValueError(msg)
     if not parallel and executor:
