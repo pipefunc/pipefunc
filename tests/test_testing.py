@@ -1,6 +1,8 @@
 import random
 from typing import Any
 
+import pytest
+
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.testing import patch
 
@@ -41,10 +43,14 @@ def test_multiple():
     # Patch a single function
     with patch(pipeline, "my_second") as mock:
         mock.return_value = 5
-        print(pipeline())
+        pipeline()
 
     # Patch multiple functions
     with patch(pipeline, "random.randint") as mock1, patch(pipeline, "my_second") as mock2:
         mock1.return_value = 3
         mock2.return_value = 5
-        print(pipeline())
+        assert pipeline() == 5
+
+    with pytest.raises(ValueError, match="No function named 'my_third' found in the pipeline."):  # noqa: SIM117
+        with patch(pipeline, "my_third"):
+            pass
