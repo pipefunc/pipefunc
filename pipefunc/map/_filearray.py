@@ -76,7 +76,11 @@ class FileArray(StorageBase):
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
         return _normalize_key(
-            key, self.shape, self.internal_shape, self.shape_mask, for_dump=for_dump
+            key,
+            self.shape,
+            self.internal_shape,
+            self.shape_mask,
+            for_dump=for_dump,
         )
 
     def _index_to_file(self, index: int) -> Path:

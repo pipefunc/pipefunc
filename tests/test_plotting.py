@@ -127,7 +127,9 @@ def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Pa
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
         everything_pipeline.visualize_graphviz(
-            filename=tmp_path / "graphviz.svg", figsize=10, include_full_mapspec=True
+            filename=tmp_path / "graphviz.svg",
+            figsize=10,
+            include_full_mapspec=True,
         )
 
 
