@@ -144,9 +144,7 @@ class DictArray(StorageBase):
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
             full_index = _select_by_mask(
-                self.shape_mask,
-                external_index,
-                (slice(None),) * len(self.internal_shape),
+                self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
             )
             data[full_index] = value
             mask[full_index] = False

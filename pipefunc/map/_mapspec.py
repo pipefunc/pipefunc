@@ -278,10 +278,7 @@ class MapSpec:
         def _rename(spec: ArraySpec) -> ArraySpec:
             return ArraySpec(renames.get(spec.name, spec.name), spec.axes)
 
-        return MapSpec(
-            tuple(map(_rename, self.inputs)),
-            tuple(map(_rename, self.outputs)),
-        )
+        return MapSpec(tuple(map(_rename, self.inputs)), tuple(map(_rename, self.outputs)))
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:

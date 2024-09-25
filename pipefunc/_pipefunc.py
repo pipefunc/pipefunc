@@ -625,10 +625,7 @@ class PipeFunc(Generic[T]):
                 args = evaluate_lazy(args)
                 kwargs = evaluate_lazy(kwargs)
             _maybe_update_kwargs_with_resources(
-                kwargs,
-                self.resources_variable,
-                evaluated_resources,
-                self.resources,
+                kwargs, self.resources_variable, evaluated_resources, self.resources
             )
             try:
                 result = self.func(*args, **kwargs)
@@ -1205,9 +1202,7 @@ class ErrorSnapshot:
 
     def __post_init__(self) -> None:
         tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__,
+            type(self.exception), self.exception, self.exception.__traceback__
         )
         self.traceback = "".join(tb)
 

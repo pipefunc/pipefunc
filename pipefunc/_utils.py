@@ -189,9 +189,7 @@ def clear_cached_properties(obj: object, until_type: type | None = None) -> None
 
 
 def assert_complete_kwargs(
-    kwargs: dict[str, Any],
-    function: Callable[..., Any],
-    skip: set[str] | None = None,
+    kwargs: dict[str, Any], function: Callable[..., Any], skip: set[str] | None = None
 ) -> None:
     """Validate that the kwargs contain all kwargs for a function."""
     valid_kwargs = set(inspect.signature(function).parameters.keys())

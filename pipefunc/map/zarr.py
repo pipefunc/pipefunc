@@ -180,9 +180,7 @@ class ZarrFileArray(StorageBase):
                     value = np.asarray(value)  # in case it's a list
                     assert value.shape == self.internal_shape
                     full_index = _select_by_mask(
-                        self.shape_mask,
-                        external_index,
-                        (slice(None),) * len(self.internal_shape),
+                        self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
                     )
                     self.array[full_index] = value
                 else:

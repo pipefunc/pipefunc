@@ -162,9 +162,7 @@ def _generate_node_label(
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
     def _format_type_and_default(
-        name: str,
-        type_string: str | None,
-        default_value: Any = _empty,
+        name: str, type_string: str | None, default_value: Any = _empty
     ) -> str:
         """Formats the part of the label with type and default value."""
         parts = [f"<b>{html.escape(name)}</b>"]
@@ -302,10 +300,7 @@ def visualize_graphviz(  # noqa: PLR0912
             nodes.arg,
             {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
-        "PipeFunc": (
-            nodes.func,
-            {"fillcolor": blue, "shape": "box", "style": "filled,rounded"},
-        ),
+        "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
         "NestedPipeFunction": (
             nodes.nested_func,
             {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
@@ -472,12 +467,7 @@ def visualize_matplotlib(
         {node: func_with_mapspec(node) for node in nodes.func + nodes.nested_func},
         {node: node.name for node in nodes.bound + nodes.resources},
     ]:
-        nx.draw_networkx_labels(
-            graph,
-            pos,
-            labels,
-            font_size=12,
-        )
+        nx.draw_networkx_labels(graph, pos, labels, font_size=12)
 
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
@@ -492,11 +482,7 @@ def visualize_matplotlib(
         (labels.bound, "red"),
     ]:
         nx.draw_networkx_edge_labels(
-            graph,
-            pos,
-            edge_labels=_labels,
-            font_size=12,
-            font_color=color,
+            graph, pos, edge_labels=_labels, font_size=12, font_color=color
         )
 
     plt.axis("off")
@@ -536,15 +522,10 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
     node_index_dict = {node: index for index, node in enumerate(graph.nodes)}
 
     # Extract edge info using the lookup dictionary
-    edges = np.array(
-        [(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges],
-    )
+    edges = np.array([(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges])
 
     # Create Nodes and Graph
-    nodes = hv.Nodes(
-        (x, y, node_indices, node_labels, node_types),
-        vdims=["label", "type"],
-    )
+    nodes = hv.Nodes((x, y, node_indices, node_labels, node_types), vdims=["label", "type"])
     graph = hv.Graph((edges, nodes))
 
     plot_opts = {
@@ -553,10 +534,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         "padding": 0.1,
         "xaxis": None,
         "yaxis": None,
-        "node_color": hv.dim("type").categorize(
-            {"str": "lightgreen", "func": "skyblue"},
-            "gray",
-        ),
+        "node_color": hv.dim("type").categorize({"str": "lightgreen", "func": "skyblue"}, "gray"),
         "edge_color": "black",
     }
 
@@ -564,11 +542,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    plot = graph * labels.opts(
-        text_font_size="8pt",
-        text_color="black",
-        bgcolor="white",
-    )
+    plot = graph * labels.opts(text_font_size="8pt", text_color="black", bgcolor="white")
     if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None

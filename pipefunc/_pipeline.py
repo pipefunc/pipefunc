@@ -545,11 +545,7 @@ class Pipeline:
                 return all_results[output_name]
 
         func_args = self._get_func_args(
-            func,
-            flat_scope_kwargs,
-            all_results,
-            full_output,
-            used_parameters,
+            func, flat_scope_kwargs, all_results, full_output, used_parameters
         )
 
         if result_from_cache:
@@ -1364,16 +1360,12 @@ class Pipeline:
 
         if color_combinable:
             func_node_colors = self._func_node_colors(
-                conservatively_combine=conservatively_combine,
-                output_name=output_name,
+                conservatively_combine=conservatively_combine, output_name=output_name
             )
         else:
             func_node_colors = None
         visualize_matplotlib(
-            self.graph,
-            figsize=figsize,
-            filename=filename,
-            func_node_colors=func_node_colors,
+            self.graph, figsize=figsize, filename=filename, func_node_colors=func_node_colors
         )
 
     def visualize_holoviews(self, *, show: bool = False) -> hv.Graph | None:
@@ -1785,10 +1777,7 @@ class _PipelineAsFunc:
     __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
 
     def __init__(
-        self,
-        pipeline: Pipeline,
-        output_name: _OUTPUT_TYPE,
-        root_args: tuple[str, ...],
+        self, pipeline: Pipeline, output_name: _OUTPUT_TYPE, root_args: tuple[str, ...]
     ) -> None:
         """Initialize the function wrapper."""
         self.pipeline = pipeline
@@ -1861,8 +1850,7 @@ class _PipelineAsFunc:
         self._call_with_root_args = None
 
     def _create_call_with_parameters_method(
-        self,
-        parameters: tuple[str, ...],
+        self, parameters: tuple[str, ...]
     ) -> Callable[..., Any]:
         sig = inspect.signature(self.__call__)
         new_params = [
@@ -1940,8 +1928,7 @@ def _get_result_from_cache(
 
 
 def _check_consistent_defaults(
-    functions: list[PipeFunc],
-    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+    functions: list[PipeFunc], output_to_func: dict[_OUTPUT_TYPE, PipeFunc]
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = {}
@@ -2135,8 +2122,7 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
 
 
 def _find_non_root_axes(
-    mapspecs: list[MapSpec],
-    root_args: list[str],
+    mapspecs: list[MapSpec], root_args: list[str]
 ) -> dict[str, list[str | None]]:
     non_root_inputs: dict[str, list[str | None]] = {}
     for mapspec in mapspecs:

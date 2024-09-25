@@ -78,14 +78,12 @@ class ProgressTracker:
             self.labels[name] = {
                 "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
                 "estimated_time": _create_html_label(
-                    "estimate-label",
-                    "Elapsed: 0.00 sec | ETA: Calculating...",
+                    "estimate-label", "Elapsed: 0.00 sec | ETA: Calculating..."
                 ),
                 "speed": _create_html_label("speed-label", "Speed: Calculating..."),
             }
         self.auto_update_interval_label = _create_html_label(
-            "interval-label",
-            "Auto-update every: N/A",
+            "interval-label", "Auto-update every: N/A"
         )
         if display:
             self.display()
@@ -124,17 +122,12 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
-    def _update_labels(
-        self,
-        name: _OUTPUT_TYPE,
-        status: _Status,
-    ) -> None:
+    def _update_labels(self, name: _OUTPUT_TYPE, status: _Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
         labels["percentage"].value = _span(
-            "percent-label",
-            f"{status.progress * 100:.1f}% | {iterations_label}",
+            "percent-label", f"{status.progress * 100:.1f}% | {iterations_label}"
         )
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
@@ -145,8 +138,7 @@ class ProgressTracker:
         speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
         labels["estimated_time"].value = _span(
-            "estimate-label",
-            f"Elapsed: {elapsed_time:.2f} sec | {eta}",
+            "estimate-label", f"Elapsed: {elapsed_time:.2f} sec | {eta}"
         )
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
@@ -179,8 +171,7 @@ class ProgressTracker:
                 break
             if not self.first_update:
                 self.auto_update_interval_label.value = _span(
-                    "interval-label",
-                    f"Auto-update every: {new_interval:.2f} sec",
+                    "interval-label", f"Auto-update every: {new_interval:.2f} sec"
                 )
             await asyncio.sleep(new_interval)
 
@@ -228,10 +219,7 @@ class ProgressTracker:
                 progress_bar.bar_style = "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
-        self.auto_update_interval_label.value = _span(
-            "interval-label",
-            "Calculation cancelled ❌",
-        )
+        self.auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""

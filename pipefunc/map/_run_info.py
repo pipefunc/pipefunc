@@ -141,11 +141,7 @@ class RunInfo:
                 shape = self.shapes[mapspec.output_names[0]]
                 mask = self.shape_masks[mapspec.output_names[0]]
                 arrays = _init_file_arrays(
-                    mapspec.output_names,
-                    shape,
-                    mask,
-                    self.storage_class,
-                    self.run_folder,
+                    mapspec.output_names, shape, mask, self.storage_class, self.run_folder
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
