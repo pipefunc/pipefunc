@@ -258,7 +258,7 @@ def visualize_graphviz(  # noqa: PLR0912
     show_legend
         Whether to show the legend in the graph visualization.
     include_full_mapspec
-        Whether to include the full mapspec in the node labels.
+        Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
     return_type
         The format to return the visualization in.
         If ``'html'``, the visualization is returned as a `IPython.display.html`,
