@@ -54,7 +54,9 @@ def patch(pipeline: Pipeline, func_name: str) -> Generator[unittest.mock.MagicMo
     """
     target_func = None
     for f in pipeline.functions:
-        full_name = f"{f.__module__}.{f.__name__}"
+        if isinstance(f.func, unittest.mock.MagicMock):
+            continue
+        full_name = f"{f.func.__module__}.{f.func.__name__}"
         # Check for full match if there's a dot in func_name, otherwise just use func_name
         if ("." in func_name and full_name == func_name) or f.__name__ == func_name:
             target_func = f

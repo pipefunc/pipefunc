@@ -1,6 +1,7 @@
+import random
 from typing import Any
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.testing import patch
 
 
@@ -25,3 +26,25 @@ def test_pipeline_patch():
 
         # Ensure the mock was called
         mock.assert_called_once()
+
+
+def test_multiple():
+    my_first = PipeFunc(random.randint, output_name="rnd", defaults={"a": 0, "b": 10})
+
+    @pipefunc(output_name="result")
+    def my_second(rnd):
+        msg = "This function should be mocked"
+        raise RuntimeError(msg)
+
+    pipeline = Pipeline([my_first, my_second])
+
+    # Patch a single function
+    with patch(pipeline, "my_second") as mock:
+        mock.return_value = 5
+        print(pipeline())
+
+    # Patch multiple functions
+    with patch(pipeline, "random.randint") as mock1, patch(pipeline, "my_second") as mock2:
+        mock1.return_value = 3
+        mock2.return_value = 5
+        print(pipeline())
