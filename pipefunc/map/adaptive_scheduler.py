@@ -263,7 +263,8 @@ def _executor_type(
 
 
 def _or(
-    value_1: int | Callable[[], int | None] | None, value_2: int | Callable[[], int | None] | None
+    value_1: int | Callable[[], int | None] | None,
+    value_2: int | Callable[[], int | None] | None,
 ) -> int | Callable[[], int | None] | None:
     if value_1 is None:
         return value_2

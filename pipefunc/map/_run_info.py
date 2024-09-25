@@ -141,7 +141,11 @@ class RunInfo:
                 shape = self.shapes[mapspec.output_names[0]]
                 mask = self.shape_masks[mapspec.output_names[0]]
                 arrays = _init_file_arrays(
-                    mapspec.output_names, shape, mask, self.storage_class, self.run_folder
+                    mapspec.output_names,
+                    shape,
+                    mask,
+                    self.storage_class,
+                    self.run_folder,
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
@@ -224,7 +228,8 @@ def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | Non
 
 
 def _construct_internal_shapes(
-    internal_shapes: dict[str, int | tuple[int, ...]] | None, pipeline: Pipeline
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    pipeline: Pipeline,
 ) -> dict[str, int | tuple[int, ...]] | None:
     if internal_shapes is None:
         internal_shapes = {}
@@ -273,7 +278,7 @@ def _compare_to_previous_run_info(
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best."
+            " Proceeding *without* `cleanup`, hoping for the best.",
         )
         return
     if not equal_inputs:
@@ -283,7 +288,7 @@ def _compare_to_previous_run_info(
     if equal_defaults is None:
         print(
             "Could not compare new `defaults` to `defaults` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best."
+            " Proceeding *without* `cleanup`, hoping for the best.",
         )
         return
     if not equal_defaults:

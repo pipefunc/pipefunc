@@ -49,7 +49,10 @@ def simplified_pipeline(
     func = node_mapping[output_name]
     assert isinstance(func, PipeFunc)
     combinable_nodes = _identify_combinable_nodes(
-        func, graph, all_root_args, conservatively_combine=conservatively_combine
+        func,
+        graph,
+        all_root_args,
+        conservatively_combine=conservatively_combine,
     )
     if not combinable_nodes:
         msg = "No combinable nodes found, the pipeline cannot be simplified."
@@ -232,7 +235,8 @@ def _combine_nodes(
 
 
 def _func_node_colors(
-    functions: list[PipeFunc], combinable_nodes: dict[PipeFunc, set[PipeFunc]]
+    functions: list[PipeFunc],
+    combinable_nodes: dict[PipeFunc, set[PipeFunc]],
 ) -> list[str]:
     combinable_nodes = _combine_nodes(combinable_nodes)
     func_node_colors = []

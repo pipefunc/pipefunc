@@ -26,7 +26,10 @@ if TYPE_CHECKING:
 
 
 def _data_loader(
-    output_name: str, *, run_folder: Path | None = None, data: dict[str, Result] | None = None
+    output_name: str,
+    *,
+    run_folder: Path | None = None,
+    data: dict[str, Result] | None = None,
 ) -> Any:
     if data is not None:
         assert data is not None
@@ -67,7 +70,7 @@ def _xarray(
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
     coord_mapping: dict[tuple[str, ...], dict[str, list[str]]] = defaultdict(
-        lambda: defaultdict(list)
+        lambda: defaultdict(list),
     )
     dims: set[str] = set()
     for name, axes in target_dependencies.items():

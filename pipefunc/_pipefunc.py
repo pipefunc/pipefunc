@@ -354,7 +354,7 @@ class PipeFunc(Generic[T]):
         allowed_parameters = tuple(
             self.parameters + at_least_tuple(self.output_name)
             if update_from == "current"
-            else tuple(self.original_parameters) + at_least_tuple(self._output_name)
+            else tuple(self.original_parameters) + at_least_tuple(self._output_name),
         )
         self._validate_update(renames, "renames", allowed_parameters)
         if update_from == "current":
@@ -490,7 +490,10 @@ class PipeFunc(Generic[T]):
             pipeline._clear_internal_cache()
 
     def _validate_update(
-        self, update: dict[str, Any], name: str, parameters: tuple[str, ...]
+        self,
+        update: dict[str, Any],
+        name: str,
+        parameters: tuple[str, ...],
     ) -> None:
         if extra := set(update) - set(parameters):
             msg = (
@@ -613,14 +616,17 @@ class PipeFunc(Generic[T]):
                 args = evaluate_lazy(args)
                 kwargs = evaluate_lazy(kwargs)
             _maybe_update_kwargs_with_resources(
-                kwargs, self.resources_variable, evaluated_resources, self.resources
+                kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
             )
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
                 print(
                     f"An error occurred while calling the function `{self.__name__}`"
-                    f" with the arguments `{args=}` and `{kwargs=}`."
+                    f" with the arguments `{args=}` and `{kwargs=}`.",
                 )
                 self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
                 raise
@@ -1134,7 +1140,8 @@ class NestedPipeFunc(PipeFunc):
 
 
 def _maybe_max_resources(
-    resources: dict | Resources | None, pipefuncs: list[PipeFunc]
+    resources: dict | Resources | None,
+    pipefuncs: list[PipeFunc],
 ) -> Resources | None:
     if isinstance(resources, Resources) or callable(resources):
         return resources
@@ -1189,7 +1196,9 @@ class ErrorSnapshot:
 
     def __post_init__(self) -> None:
         tb = traceback.format_exception(
-            type(self.exception), self.exception, self.exception.__traceback__
+            type(self.exception),
+            self.exception,
+            self.exception.__traceback__,
         )
         self.traceback = "".join(tb)
 
@@ -1252,7 +1261,8 @@ def _validate_identifier(name: str, value: Any) -> None:
 
 
 def _validate_nested_pipefunc(
-    pipefuncs: Sequence[PipeFunc], resources: dict | Resources | None
+    pipefuncs: Sequence[PipeFunc],
+    resources: dict | Resources | None,
 ) -> None:
     if not all(isinstance(f, PipeFunc) for f in pipefuncs):
         msg = "All elements in `pipefuncs` should be instances of `PipeFunc`."
@@ -1318,7 +1328,8 @@ def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) ->
 
 
 def _rename_output_name(
-    original_output_name: _OUTPUT_TYPE, renames: dict[str, str]
+    original_output_name: _OUTPUT_TYPE,
+    renames: dict[str, str],
 ) -> _OUTPUT_TYPE:
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)

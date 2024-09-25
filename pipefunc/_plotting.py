@@ -35,7 +35,9 @@ def _get_graph_layout(graph: nx.DiGraph) -> dict:
         return graphviz_layout(graph, prog="dot")
     except ImportError:  # pragma: no cover
         warnings.warn(
-            "Graphviz is not installed. Using spring layout instead.", ImportWarning, stacklevel=2
+            "Graphviz is not installed. Using spring layout instead.",
+            ImportWarning,
+            stacklevel=2,
         )
         return nx.spring_layout(graph)
 
@@ -160,7 +162,9 @@ def _generate_node_label(
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
     def _format_type_and_default(
-        name: str, type_string: str | None, default_value: Any = _empty
+        name: str,
+        type_string: str | None,
+        default_value: Any = _empty,
     ) -> str:
         """Formats the part of the label with type and default value."""
         parts = [f"<b>{html.escape(name)}</b>"]
@@ -327,7 +331,11 @@ def visualize_graphviz(  # noqa: PLR0912
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(
-                node, hints, defaults, labels.arg_mapspec, include_full_mapspec
+                node,
+                hints,
+                defaults,
+                labels.arg_mapspec,
+                include_full_mapspec,
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
@@ -480,7 +488,11 @@ def visualize_matplotlib(
         (labels.bound, "red"),
     ]:
         nx.draw_networkx_edge_labels(
-            graph, pos, edge_labels=_labels, font_size=12, font_color=color
+            graph,
+            pos,
+            edge_labels=_labels,
+            font_size=12,
+            font_color=color,
         )
 
     plt.axis("off")

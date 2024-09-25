@@ -70,10 +70,17 @@ class FileArray(StorageBase):
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
     def _normalize_key(
-        self, key: tuple[int | slice, ...], *, for_dump: bool = False
+        self,
+        key: tuple[int | slice, ...],
+        *,
+        for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
         return _normalize_key(
-            key, self.shape, self.internal_shape, self.shape_mask, for_dump=for_dump
+            key,
+            self.shape,
+            self.internal_shape,
+            self.shape_mask,
+            for_dump=for_dump,
         )
 
     def _index_to_file(self, index: int) -> Path:
@@ -98,7 +105,10 @@ class FileArray(StorageBase):
         return (self._key_to_file(x) for x in _iterate_shape_indices(self.shape))
 
     def _slice_indices(
-        self, key: tuple[int | slice, ...], *, for_dump: bool = False
+        self,
+        key: tuple[int | slice, ...],
+        *,
+        for_dump: bool = False,
     ) -> list[range]:
         slice_indices = []
         shape_index = 0

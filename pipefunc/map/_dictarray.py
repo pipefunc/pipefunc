@@ -79,7 +79,7 @@ class DictArray(StorageBase):
             )
             data: np.ndarray = np.empty(shape, dtype=object)
             for i, index in enumerate(
-                itertools.product(*self._slice_indices(key, self.full_shape))
+                itertools.product(*self._slice_indices(key, self.full_shape)),
             ):
                 external_key = tuple(x for x, m in zip(index, self.shape_mask) if m)
                 if self.internal_shape:
@@ -144,7 +144,9 @@ class DictArray(StorageBase):
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
             full_index = _select_by_mask(
-                self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
+                self.shape_mask,
+                external_index,
+                (slice(None),) * len(self.internal_shape),
             )
             data[full_index] = value
             mask[full_index] = False

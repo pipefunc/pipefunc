@@ -268,7 +268,11 @@ class LRUCache(_CacheBase):
     """
 
     def __init__(
-        self, *, max_size: int = 128, allow_cloudpickle: bool = True, shared: bool = True
+        self,
+        *,
+        max_size: int = 128,
+        allow_cloudpickle: bool = True,
+        shared: bool = True,
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
@@ -413,7 +417,9 @@ class DiskCache(_CacheBase):
 
         if self.with_lru_cache:
             self.lru_cache = LRUCache(
-                max_size=lru_cache_size, allow_cloudpickle=use_cloudpickle, shared=lru_shared
+                max_size=lru_cache_size,
+                allow_cloudpickle=use_cloudpickle,
+                shared=lru_shared,
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
@@ -550,7 +556,10 @@ def memoize(
 
 
 def _hashable_iterable(
-    iterable: Iterable, *, fallback_to_str: bool = True, sort: bool = False
+    iterable: Iterable,
+    *,
+    fallback_to_str: bool = True,
+    sort: bool = False,
 ) -> tuple:
     items = sorted(iterable) if sort else iterable
     return tuple(to_hashable(item, fallback_to_str) for item in items)

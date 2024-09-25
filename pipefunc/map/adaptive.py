@@ -65,7 +65,9 @@ class LearnersDict(LearnersDictType):
     """A dictionary of adaptive learners for a pipeline as returned by `create_learners`."""
 
     def __init__(
-        self, learners_dict: LearnersDictType | None = None, run_info: RunInfo | None = None
+        self,
+        learners_dict: LearnersDictType | None = None,
+        run_info: RunInfo | None = None,
     ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
@@ -125,7 +127,9 @@ class LearnersDict(LearnersDictType):
             raise ValueError(msg)
 
         details: AdaptiveSchedulerDetails = slurm_run_setup(
-            self, default_resources, ignore_resources=ignore_resources
+            self,
+            default_resources,
+            ignore_resources=ignore_resources,
         )
         if returns == "namedtuple":
             if slurm_run_kwargs:
@@ -220,12 +224,21 @@ def create_learners(
 
     """
     run_info = RunInfo.create(
-        run_folder, pipeline, inputs, internal_shapes, storage=storage, cleanup=cleanup
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
     )
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
     iterator = _maybe_iterate_axes(
-        pipeline, inputs, fixed_indices, split_independent_axes, internal_shapes
+        pipeline,
+        inputs,
+        fixed_indices,
+        split_independent_axes,
+        internal_shapes,
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
@@ -527,7 +540,9 @@ def _adaptive_wrapper(
 
 
 def _validate_adaptive(
-    pipeline: Pipeline, inputs: dict[str, Any], adaptive_dimensions: dict[str, tuple[float, float]]
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    adaptive_dimensions: dict[str, tuple[float, float]],
 ) -> None:
     if invalid := set(adaptive_dimensions) & set(inputs):
         msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"

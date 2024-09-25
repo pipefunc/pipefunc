@@ -42,7 +42,8 @@ class Array(Generic[T], np.ndarray[Any, np.dtype[np.object_]]):
     def __class_getitem__(cls, item: T) -> Any:
         """Return an annotated numpy array with the provided element type."""
         return Annotated[
-            np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[item]  # type: ignore[valid-type]
+            np.ndarray[Any, np.dtype[np.object_]],
+            ArrayElementType[item],  # type: ignore[valid-type]
         ]
 
 
@@ -81,7 +82,8 @@ def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) 
     for t in (incoming_type, required_type):
         if isinstance(t, Unresolvable):
             warnings.warn(
-                f"⚠️ Unresolvable type hint: `{t.type_str}`. Skipping type comparison.", stacklevel=3
+                f"⚠️ Unresolvable type hint: `{t.type_str}`. Skipping type comparison.",
+                stacklevel=3,
             )
             return True
     return (
@@ -93,7 +95,9 @@ def _check_identical_or_any(incoming_type: type[Any], required_type: type[Any]) 
 
 
 def _all_types_compatible(
-    incoming_args: tuple[Any, ...], required_args: tuple[Any, ...], memo: TypeCheckMemo
+    incoming_args: tuple[Any, ...],
+    required_args: tuple[Any, ...],
+    memo: TypeCheckMemo,
 ) -> bool:
     """Helper function to check if all incoming types are compatible with any required type."""
     return all(
@@ -102,7 +106,9 @@ def _all_types_compatible(
 
 
 def _handle_union_types(
-    incoming_type: type[Any], required_type: type[Any], memo: TypeCheckMemo
+    incoming_type: type[Any],
+    required_type: type[Any],
+    memo: TypeCheckMemo,
 ) -> bool | None:
     """Handle compatibility logic for Union types with directional consideration."""
     if (isinstance(incoming_type, UnionType) or get_origin(incoming_type) is Union) and (
@@ -127,7 +133,9 @@ def _extract_array_element_type(metadata: Iterable[Any]) -> Any | None:
 
 
 def _compare_annotated_types(
-    incoming_type: type[Any], required_type: type[Any], memo: TypeCheckMemo
+    incoming_type: type[Any],
+    required_type: type[Any],
+    memo: TypeCheckMemo,
 ) -> bool:
     """Compare Annotated types including metadata."""
     incoming_primary, *incoming_metadata = get_args(incoming_type)
@@ -146,7 +154,9 @@ def _compare_annotated_types(
 
 
 def _compare_single_annotated_type(
-    annotated_type: type[Any], other_type: type[Any], memo: TypeCheckMemo
+    annotated_type: type[Any],
+    other_type: type[Any],
+    memo: TypeCheckMemo,
 ) -> bool:
     """Handle cases where only one of the types is Annotated."""
     primary_type, *_ = get_args(annotated_type)
@@ -161,7 +171,9 @@ def _compare_generic_type_origins(incoming_origin: type[Any], required_origin: t
 
 
 def _compare_generic_type_args(
-    incoming_args: tuple[Any, ...], required_args: tuple[Any, ...], memo: TypeCheckMemo
+    incoming_args: tuple[Any, ...],
+    required_args: tuple[Any, ...],
+    memo: TypeCheckMemo,
 ) -> bool:
     """Compare the arguments of generic types for compatibility."""
     if not required_args or not incoming_args:
@@ -170,7 +182,9 @@ def _compare_generic_type_args(
 
 
 def _handle_generic_types(
-    incoming_type: type[Any], required_type: type[Any], memo: TypeCheckMemo
+    incoming_type: type[Any],
+    required_type: type[Any],
+    memo: TypeCheckMemo,
 ) -> bool | None:
     incoming_origin = get_origin(incoming_type) or incoming_type
     required_origin = get_origin(required_type) or required_type
@@ -195,7 +209,9 @@ def _handle_generic_types(
 
 
 def is_type_compatible(
-    incoming_type: Any, required_type: Any, memo: TypeCheckMemo | None = None
+    incoming_type: Any,
+    required_type: Any,
+    memo: TypeCheckMemo | None = None,
 ) -> bool:
     """Check if the incoming type is compatible with the required type, resolving forward references."""
     if memo is None:  # for testing purposes
@@ -221,7 +237,9 @@ def is_type_compatible(
 
 
 def _is_typevar_compatible(
-    incoming_type: Any, required_type: Any, memo: TypeCheckMemo
+    incoming_type: Any,
+    required_type: Any,
+    memo: TypeCheckMemo,
 ) -> bool | None:
     """Check if the required type is a TypeVar and is compatible with incoming type."""
     if not isinstance(required_type, TypeVar):
@@ -233,7 +251,9 @@ def _is_typevar_compatible(
     ):
         return True
     return required_type.__bound__ and is_type_compatible(
-        incoming_type, required_type.__bound__, memo
+        incoming_type,
+        required_type.__bound__,
+        memo,
     )
 
 

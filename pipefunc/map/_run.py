@@ -84,7 +84,12 @@ def _prepare_run(
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_info = RunInfo.create(
-        run_folder, pipeline, inputs, internal_shapes, storage=storage, cleanup=cleanup
+        run_folder,
+        pipeline,
+        inputs,
+        internal_shapes,
+        storage=storage,
+        cleanup=cleanup,
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
@@ -341,7 +346,9 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
 
 
 def load_xarray_dataset(
-    *output_name: str, run_folder: str | Path, load_intermediate: bool = True
+    *output_name: str,
+    run_folder: str | Path,
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
 
@@ -373,7 +380,9 @@ def load_xarray_dataset(
 
 
 def _dump_single_output(
-    func: PipeFunc, output: Any, store: dict[str, StorageBase | Path | DirectValue]
+    func: PipeFunc,
+    output: Any,
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
@@ -388,7 +397,9 @@ def _dump_single_output(
 
 
 def _single_dump_single_output(
-    output: Any, output_name: str, store: dict[str, StorageBase | Path | DirectValue]
+    output: Any,
+    output_name: str,
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
@@ -400,7 +411,9 @@ def _single_dump_single_output(
 
 
 def _func_kwargs(
-    func: PipeFunc, run_info: RunInfo, store: dict[str, StorageBase | Path | DirectValue]
+    func: PipeFunc,
+    run_info: RunInfo,
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
@@ -448,7 +461,10 @@ def _pick_output(func: PipeFunc, output: Any) -> tuple[Any, ...]:
 
 
 def _get_or_set_cache(
-    func: PipeFunc, kwargs: dict[str, Any], cache: _CacheBase | None, compute_fn: Callable[[], Any]
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    cache: _CacheBase | None,
+    compute_fn: Callable[[], Any],
 ) -> Any:
     if cache is None:
         return compute_fn()
@@ -547,7 +563,11 @@ def _set_output(
     assert np.shape(output) == internal_shape
     for internal_index in _iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
-            external_shape, internal_shape, shape_mask, external_index, internal_index
+            external_shape,
+            internal_shape,
+            shape_mask,
+            external_index,
+            internal_index,
         )
         arr[flat_index] = output[internal_index]
 
@@ -568,7 +588,8 @@ def _update_result_array(
 
 
 def _existing_and_missing_indices(
-    file_arrays: list[StorageBase], fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None
+    file_arrays: list[StorageBase],
+    fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
 ) -> tuple[list[int], list[int]]:
     # TODO: when `fixed_indices` are used we could be more efficient by not
     # computing the full mask.
@@ -848,7 +869,13 @@ def _run_and_process_generation(
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
-        run_info, generation, store, fixed_indices, executor, progress, cache
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
     )
     _process_generation(generation, tasks, store, outputs)
 
@@ -864,7 +891,13 @@ async def _run_and_process_generation_async(
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
-        run_info, generation, store, fixed_indices, executor, progress, cache
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
     )
     await _process_generation_async(generation, tasks, store, outputs)
 
@@ -928,7 +961,8 @@ def _submit_generation(
 
 
 def _output_from_mapspec_task(
-    args: _MapSpecArgs, outputs_list: list[list[Any]]
+    args: _MapSpecArgs,
+    outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
@@ -970,7 +1004,9 @@ def _to_result_dict(
 
 # NOTE: A similar async version of this function is provided below.
 def _process_task(
-    func: PipeFunc, kwargs_task: _KwargsTask, store: dict[str, StorageBase | Path | DirectValue]
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
@@ -984,7 +1020,9 @@ def _process_task(
 
 
 async def _process_task_async(
-    func: PipeFunc, kwargs_task: _KwargsTask, store: dict[str, StorageBase | Path | DirectValue]
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StorageBase | Path | DirectValue],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
@@ -1052,7 +1090,9 @@ def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> Non
 
 
 def _validate_fixed_indices(
-    fixed_indices: dict[str, int | slice] | None, inputs: dict[str, Any], pipeline: Pipeline
+    fixed_indices: dict[str, int | slice] | None,
+    inputs: dict[str, Any],
+    pipeline: Pipeline,
 ) -> None:
     if fixed_indices is None:
         return
@@ -1112,7 +1152,9 @@ def _is_parameter_partially_reduced_by_function(func: PipeFunc, name: str) -> bo
 
 
 def _get_partially_reduced_axes(
-    func: PipeFunc, name: str, axes: dict[str, tuple[str, ...]]
+    func: PipeFunc,
+    name: str,
+    axes: dict[str, tuple[str, ...]],
 ) -> tuple[str, ...]:
     assert func.mapspec is not None
     spec = next(spec for spec in func.mapspec.inputs if spec.name == name)

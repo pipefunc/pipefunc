@@ -27,7 +27,9 @@ def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
 
 
 def _select_by_mask(
-    mask: tuple[bool, ...], tuple1: tuple[Any, ...], tuple2: tuple[Any, ...]
+    mask: tuple[bool, ...],
+    tuple1: tuple[Any, ...],
+    tuple2: tuple[Any, ...],
 ) -> tuple[Any, ...]:
     result = []
     index1, index2 = 0, 0

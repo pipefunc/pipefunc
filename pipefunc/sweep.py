@@ -198,7 +198,11 @@ class Sweep:
                         else:
                             dims.append(_dims)
         return Sweep(
-            self.items, dims=dims, exclude=self.exclude, constants=self.constants, derivers=None
+            self.items,
+            dims=dims,
+            exclude=self.exclude,
+            constants=self.constants,
+            derivers=None,
         )
 
     def __len__(self) -> int:

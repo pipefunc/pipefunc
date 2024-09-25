@@ -87,7 +87,9 @@ class ZarrFileArray(StorageBase):
         """Return the data associated with the given linear index."""
         np_index = np.unravel_index(index, self.shape)
         full_index = _select_by_mask(
-            self.shape_mask, np_index, (slice(None),) * len(self.internal_shape)
+            self.shape_mask,
+            np_index,
+            (slice(None),) * len(self.internal_shape),
         )
         return self.array[full_index]
 
@@ -174,7 +176,9 @@ class ZarrFileArray(StorageBase):
                     value = np.asarray(value)  # in case it's a list
                     assert value.shape == self.internal_shape
                     full_index = _select_by_mask(
-                        self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
+                        self.shape_mask,
+                        external_index,
+                        (slice(None),) * len(self.internal_shape),
                     )
                     self.array[full_index] = value
                 else:
@@ -187,7 +191,9 @@ class ZarrFileArray(StorageBase):
             assert value.shape == self.internal_shape
             assert len(key) == len(self.shape)
             full_index = _select_by_mask(
-                self.shape_mask, key, (slice(None),) * len(self.internal_shape)
+                self.shape_mask,
+                key,
+                (slice(None),) * len(self.internal_shape),
             )
             self.array[full_index] = value
         else:
