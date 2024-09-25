@@ -164,7 +164,7 @@ def table(rows: list[Any], headers: list[str]) -> str:
     table_rows = [
         _format_table_row(separator_line, column_widths, seperator="-+-"),
         _format_table_row(headers, column_widths),
-        _format_table_row(["-" * width for width in column_widths], column_widths)
+        _format_table_row(["-" * width for width in column_widths], column_widths),
     ]
     for row in rows:
         table_rows.append(_format_table_row(row, column_widths))  # noqa: PERF401
@@ -189,9 +189,7 @@ def clear_cached_properties(obj: object, until_type: type | None = None) -> None
 
 
 def assert_complete_kwargs(
-    kwargs: dict[str, Any],
-    function: Callable[..., Any],
-    skip: set[str] | None = None
+    kwargs: dict[str, Any], function: Callable[..., Any], skip: set[str] | None = None
 ) -> None:
     """Validate that the kwargs contain all kwargs for a function."""
     valid_kwargs = set(inspect.signature(function).parameters.keys())

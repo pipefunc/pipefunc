@@ -84,7 +84,7 @@ class HybridCache(_CacheBase):
         duration_weight: float = 0.5,
         *,
         allow_cloudpickle: bool = True,
-        shared: bool = True
+        shared: bool = True,
     ) -> None:
         """Initialize the HybridCache instance."""
         if shared:
@@ -268,11 +268,7 @@ class LRUCache(_CacheBase):
     """
 
     def __init__(
-        self,
-        *,
-        max_size: int = 128,
-        allow_cloudpickle: bool = True,
-        shared: bool = True
+        self, *, max_size: int = 128, allow_cloudpickle: bool = True, shared: bool = True
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
@@ -407,7 +403,7 @@ class DiskCache(_CacheBase):
         use_cloudpickle: bool = True,
         with_lru_cache: bool = True,
         lru_cache_size: int = 128,
-        lru_shared: bool = True
+        lru_shared: bool = True,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
@@ -417,9 +413,7 @@ class DiskCache(_CacheBase):
 
         if self.with_lru_cache:
             self.lru_cache = LRUCache(
-                max_size=lru_cache_size,
-                allow_cloudpickle=use_cloudpickle,
-                shared=lru_shared
+                max_size=lru_cache_size, allow_cloudpickle=use_cloudpickle, shared=lru_shared
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
@@ -501,7 +495,7 @@ class DiskCache(_CacheBase):
 
 def memoize(
     cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
-    key_func: Callable[..., Hashable] | None = None
+    key_func: Callable[..., Hashable] | None = None,
 ) -> Callable:
     """A flexible memoization decorator that works with different cache types.
 
@@ -556,21 +550,13 @@ def memoize(
 
 
 def _hashable_iterable(
-    iterable: Iterable,
-    *,
-    fallback_to_str: bool = True,
-    sort: bool = False
+    iterable: Iterable, *, fallback_to_str: bool = True, sort: bool = False
 ) -> tuple:
     items = sorted(iterable) if sort else iterable
     return tuple(to_hashable(item, fallback_to_str) for item in items)
 
 
-def _hashable_mapping(
-    mapping: dict,
-    *,
-    fallback_to_str: bool = True,
-    sort: bool = False
-) -> tuple:
+def _hashable_mapping(mapping: dict, *, fallback_to_str: bool = True, sort: bool = False) -> tuple:
     items = sorted(mapping.items()) if sort else mapping.items()
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
@@ -625,7 +611,7 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
     if isinstance(obj, collections.defaultdict):
         data = (
             to_hashable(obj.default_factory, fallback_to_str),
-            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str)
+            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
         )
         return (m, tp, data)
     if isinstance(obj, collections.Counter):

@@ -26,7 +26,7 @@ def simplified_pipeline(
     node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
     output_name: _OUTPUT_TYPE,
     *,
-    conservatively_combine: bool = False
+    conservatively_combine: bool = False,
 ) -> Pipeline:
     """Simplify pipeline with combined function nodes.
 
@@ -49,10 +49,7 @@ def simplified_pipeline(
     func = node_mapping[output_name]
     assert isinstance(func, PipeFunc)
     combinable_nodes = _identify_combinable_nodes(
-        func,
-        graph,
-        all_root_args,
-        conservatively_combine=conservatively_combine
+        func, graph, all_root_args, conservatively_combine=conservatively_combine
     )
     if not combinable_nodes:
         msg = "No combinable nodes found, the pipeline cannot be simplified."
@@ -103,7 +100,7 @@ def _identify_combinable_nodes(
     graph: nx.DiGraph,
     all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
     *,
-    conservatively_combine: bool = False
+    conservatively_combine: bool = False,
 ) -> dict[PipeFunc, set[PipeFunc]]:
     """Identify which function nodes can be combined into a single function.
 
@@ -183,7 +180,7 @@ def _identify_combinable_nodes(
 
 
 def _combine_nodes(
-    combinable_nodes: dict[PipeFunc, set[PipeFunc]]
+    combinable_nodes: dict[PipeFunc, set[PipeFunc]],
 ) -> dict[PipeFunc, set[PipeFunc]]:
     """Reduce the dictionary of combinable nodes to a minimal set.
 
@@ -235,8 +232,7 @@ def _combine_nodes(
 
 
 def _func_node_colors(
-    functions: list[PipeFunc],
-    combinable_nodes: dict[PipeFunc, set[PipeFunc]]
+    functions: list[PipeFunc], combinable_nodes: dict[PipeFunc, set[PipeFunc]]
 ) -> list[str]:
     combinable_nodes = _combine_nodes(combinable_nodes)
     func_node_colors = []

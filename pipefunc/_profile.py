@@ -84,13 +84,7 @@ class ResourceProfiler:
 
     """
 
-    def __init__(
-        self,
-        pid: int,
-        stats: ProfilingStats,
-        *,
-        interval: float = 10
-    ) -> None:
+    def __init__(self, pid: int, stats: ProfilingStats, *, interval: float = 10) -> None:
         """Initialize the ResourceProfiler instance."""
         self.pid = pid
         self.stats = stats
@@ -118,7 +112,7 @@ class ResourceProfiler:
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: TracebackType | None
+        traceback: TracebackType | None,
     ) -> None:
         """Exit the context manager and stop the measurement thread.
 
@@ -165,7 +159,7 @@ def print_profiling_stats(profiling_stats: dict[str, ProfilingStats]) -> None:
         "Max Memory Usage (MB)",
         "Avg Time (s)",
         "Total Time (%)",
-        "Number of Calls"
+        "Number of Calls",
     ]
     rows = []
     for func_name, stats in profiling_stats.items():
@@ -175,7 +169,7 @@ def print_profiling_stats(profiling_stats: dict[str, ProfilingStats]) -> None:
             f"{stats.memory.max / (1024 * 1024):.2f}",
             f"{stats.time.average:.2e}",
             stats.time.average * stats.time.num_executions,
-            stats.time.num_executions
+            stats.time.num_executions,
         ]
         rows.append(row)
 

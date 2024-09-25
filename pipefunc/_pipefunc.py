@@ -21,16 +21,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    TypeAlias,
-    TypeVar,
-    get_args,
-    get_origin
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -40,7 +31,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
-    get_local_ip
+    get_local_ip,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -188,7 +179,7 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
-        scope: str | None = None
+        scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
@@ -335,7 +326,7 @@ class PipeFunc(Generic[T]):
         renames: dict[str, str],
         *,
         update_from: Literal["current", "original"] = "current",
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> None:
         """Update renames to function arguments and ``output_name`` for the wrapped function.
 
@@ -407,7 +398,7 @@ class PipeFunc(Generic[T]):
         scope: str | None,
         inputs: set[str] | Literal["*"] | None = None,
         outputs: set[str] | Literal["*"] | None = None,
-        exclude: set[str] | None = None
+        exclude: set[str] | None = None,
     ) -> None:
         """Update the scope for the `PipeFunc` by adding (or removing) a prefix to the input and output names.
 
@@ -499,10 +490,7 @@ class PipeFunc(Generic[T]):
             pipeline._clear_internal_cache()
 
     def _validate_update(
-        self,
-        update: dict[str, Any],
-        name: str,
-        parameters: tuple[str, ...]
+        self, update: dict[str, Any], name: str, parameters: tuple[str, ...]
     ) -> None:
         if extra := set(update) - set(parameters):
             msg = (
@@ -563,7 +551,7 @@ class PipeFunc(Generic[T]):
         self._validate_update(
             self._renames,
             "renames",
-            tuple(self.original_parameters) + at_least_tuple(self._output_name)  # type: ignore[arg-type]
+            tuple(self.original_parameters) + at_least_tuple(self._output_name),  # type: ignore[arg-type]
         )
         self._validate_update(self._defaults, "defaults", self.parameters)
         self._validate_update(self._bound, "bound", self.parameters)
@@ -586,7 +574,7 @@ class PipeFunc(Generic[T]):
             "internal_shape": self.internal_shape,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
-            "resources_scope": self.resources_scope
+            "resources_scope": self.resources_scope,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -625,10 +613,7 @@ class PipeFunc(Generic[T]):
                 args = evaluate_lazy(args)
                 kwargs = evaluate_lazy(kwargs)
             _maybe_update_kwargs_with_resources(
-                kwargs,
-                self.resources_variable,
-                evaluated_resources,
-                self.resources
+                kwargs, self.resources_variable, evaluated_resources, self.resources
             )
             try:
                 result = self.func(*args, **kwargs)
@@ -875,7 +860,7 @@ def pipefunc(
     | None = None,
     resources_variable: str | None = None,
     resources_scope: Literal["map", "element"] = "map",
-    scope: str | None = None
+    scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -1008,7 +993,7 @@ def pipefunc(
             resources=resources,
             resources_variable=resources_variable,
             resources_scope=resources_scope,
-            scope=scope
+            scope=scope,
         )
 
     return decorator
@@ -1055,7 +1040,7 @@ class NestedPipeFunc(PipeFunc):
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
-        resources: dict | Resources | None = None
+        resources: dict | Resources | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -1091,7 +1076,7 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "renames": self._renames,
             "mapspec": self.mapspec,
-            "resources": self.resources
+            "resources": self.resources,
         }
         kwargs.update(update)
         return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
@@ -1105,7 +1090,7 @@ class NestedPipeFunc(PipeFunc):
         return MapSpec(
             tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
-            _is_generated=True
+            _is_generated=True,
         )
 
     @functools.cached_property
@@ -1149,8 +1134,7 @@ class NestedPipeFunc(PipeFunc):
 
 
 def _maybe_max_resources(
-    resources: dict | Resources | None,
-    pipefuncs: list[PipeFunc]
+    resources: dict | Resources | None, pipefuncs: list[PipeFunc]
 ) -> Resources | None:
     if isinstance(resources, Resources) or callable(resources):
         return resources
@@ -1205,9 +1189,7 @@ class ErrorSnapshot:
 
     def __post_init__(self) -> None:
         tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__
+            type(self.exception), self.exception, self.exception.__traceback__
         )
         self.traceback = "".join(tb)
 
@@ -1270,8 +1252,7 @@ def _validate_identifier(name: str, value: Any) -> None:
 
 
 def _validate_nested_pipefunc(
-    pipefuncs: Sequence[PipeFunc],
-    resources: dict | Resources | None
+    pipefuncs: Sequence[PipeFunc], resources: dict | Resources | None
 ) -> None:
     if not all(isinstance(f, PipeFunc) for f in pipefuncs):
         msg = "All elements in `pipefuncs` should be instances of `PipeFunc`."
@@ -1331,18 +1312,13 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(
-    output: Any,
-    name: str,
-    output_name: _OUTPUT_TYPE
-) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 
 
 def _rename_output_name(
-    original_output_name: _OUTPUT_TYPE,
-    renames: dict[str, str]
+    original_output_name: _OUTPUT_TYPE, renames: dict[str, str]
 ) -> _OUTPUT_TYPE:
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
@@ -1358,7 +1334,7 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
         old_scope, name = name.split(".", 1)
         warnings.warn(
             f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
-            stacklevel=3
+            stacklevel=3,
         )
     return f"{scope}.{name}"
 
@@ -1372,7 +1348,7 @@ def _maybe_update_kwargs_with_resources(
     kwargs: dict[str, Any],
     resources_variable: str | None,
     evaluated_resources: Resources | None,
-    resources: Resources | Callable[[dict[str, Any]], Resources] | None
+    resources: Resources | Callable[[dict[str, Any]], Resources] | None,
 ) -> None:
     if resources_variable:
         if evaluated_resources is not None:

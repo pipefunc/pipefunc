@@ -32,7 +32,7 @@ class ZarrFileArray(StorageBase):
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | str | Path | None = None,
-        object_codec: Any = None
+        object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrFileArray."""
         if internal_shape and shape_mask is None:
@@ -60,7 +60,7 @@ class ZarrFileArray(StorageBase):
             shape=self.full_shape,
             dtype=object,
             object_codec=object_codec,
-            chunks=chunks
+            chunks=chunks,
         )
         self._mask = zarr.open(
             self.store,
@@ -70,7 +70,7 @@ class ZarrFileArray(StorageBase):
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
-            chunks=1
+            chunks=1,
         )
 
     @property
@@ -87,9 +87,7 @@ class ZarrFileArray(StorageBase):
         """Return the data associated with the given linear index."""
         np_index = np.unravel_index(index, self.shape)
         full_index = _select_by_mask(
-            self.shape_mask,
-            np_index,
-            (slice(None),) * len(self.internal_shape)
+            self.shape_mask, np_index, (slice(None),) * len(self.internal_shape)
         )
         return self.array[full_index]
 
@@ -144,13 +142,9 @@ class ZarrFileArray(StorageBase):
         slc = _select_by_mask(
             self.shape_mask,
             (slice(None),) * len(self.shape),
-            (None,) * len(self.internal_shape)  # Adds axes with size 1
+            (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
-        tile_shape = _select_by_mask(
-            self.shape_mask,
-            (1,) * len(self.shape),
-            self.internal_shape
-        )
+        tile_shape = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         mask = np.tile(mask[slc], tile_shape)
 
         return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
@@ -180,9 +174,7 @@ class ZarrFileArray(StorageBase):
                     value = np.asarray(value)  # in case it's a list
                     assert value.shape == self.internal_shape
                     full_index = _select_by_mask(
-                        self.shape_mask,
-                        external_index,
-                        (slice(None),) * len(self.internal_shape)
+                        self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
                     )
                     self.array[full_index] = value
                 else:
@@ -195,9 +187,7 @@ class ZarrFileArray(StorageBase):
             assert value.shape == self.internal_shape
             assert len(key) == len(self.shape)
             full_index = _select_by_mask(
-                self.shape_mask,
-                key,
-                (slice(None),) * len(self.internal_shape)
+                self.shape_mask, key, (slice(None),) * len(self.internal_shape)
             )
             self.array[full_index] = value
         else:
@@ -222,10 +212,7 @@ class ZarrFileArray(StorageBase):
 class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
-    def __init__(
-        self,
-        shared_dict: multiprocessing.managers.DictProxy | None = None
-    ) -> None:
+    def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
         """Initialize the _SharedDictStore.
 
         Parameters
@@ -254,7 +241,7 @@ class ZarrMemoryArray(ZarrFileArray):
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | None = None,
-        object_codec: Any = None
+        object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrMemoryArray."""
         if store is None:
@@ -265,7 +252,7 @@ class ZarrMemoryArray(ZarrFileArray):
             internal_shape=internal_shape,
             shape_mask=shape_mask,
             store=store,
-            object_codec=object_codec
+            object_codec=object_codec,
         )
         self.load()
 
@@ -310,7 +297,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | None = None,
-        object_codec: Any = None
+        object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrSharedMemoryArray."""
         if store is None:
@@ -321,7 +308,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
             internal_shape=internal_shape,
             shape_mask=shape_mask,
             store=store,
-            object_codec=object_codec
+            object_codec=object_codec,
         )
 
     @property
@@ -353,10 +340,7 @@ class CloudPickleCodec(Codec):
 
     codec_id = "cloudpickle"
 
-    def __init__(
-        self,
-        protocol: int = cloudpickle.DEFAULT_PROTOCOL
-    ) -> None:
+    def __init__(self, protocol: int = cloudpickle.DEFAULT_PROTOCOL) -> None:
         """Initialize the CloudPickleCodec codec.
 
         Parameters
@@ -413,10 +397,7 @@ class CloudPickleCodec(Codec):
             The configuration of the codec.
 
         """
-        return {
-            "id": self.codec_id,
-            "protocol": self.protocol
-        }
+        return {"id": self.codec_id, "protocol": self.protocol}
 
     def __repr__(self) -> str:
         """Return a string representation of the codec."""

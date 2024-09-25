@@ -14,7 +14,7 @@ from pipefunc.map._storage_base import (
     StorageBase,
     _normalize_key,
     _select_by_mask,
-    register_storage
+    register_storage,
 )
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class DictArray(StorageBase):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        mapping: MutableMapping[tuple[int, ...], Any] | None = None
+        mapping: MutableMapping[tuple[int, ...], Any] | None = None,
     ) -> None:
         """Create a `numpy.ndarray` backed by a `dict`."""
         if internal_shape and shape_mask is None:
@@ -144,9 +144,7 @@ class DictArray(StorageBase):
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
             full_index = _select_by_mask(
-                self.shape_mask,
-                external_index,
-                (slice(None),) * len(self.internal_shape)
+                self.shape_mask, external_index, (slice(None),) * len(self.internal_shape)
             )
             data[full_index] = value
             mask[full_index] = False
@@ -233,7 +231,7 @@ class SharedMemoryDictArray(DictArray):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        mapping: DictProxy[tuple[int, ...], Any] | None = None
+        mapping: DictProxy[tuple[int, ...], Any] | None = None,
     ) -> None:
         """Initialize the SharedMemoryDictArray."""
         if mapping is None:
@@ -244,7 +242,7 @@ class SharedMemoryDictArray(DictArray):
             shape=shape,
             internal_shape=internal_shape,
             shape_mask=shape_mask,
-            mapping=mapping
+            mapping=mapping,
         )
 
     @property

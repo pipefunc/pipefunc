@@ -26,10 +26,7 @@ if TYPE_CHECKING:
 
 
 def _data_loader(
-    output_name: str,
-    *,
-    run_folder: Path | None = None,
-    data: dict[str, Result] | None = None
+    output_name: str, *, run_folder: Path | None = None, data: dict[str, Result] | None = None
 ) -> Any:
     if data is not None:
         assert data is not None
@@ -44,7 +41,7 @@ def load_xarray(
     inputs: dict[str, Any],
     run_folder: str | Path,
     *,
-    load_intermediate: bool = True
+    load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
     return _xarray(
@@ -52,7 +49,7 @@ def load_xarray(
         mapspecs,
         inputs,
         data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
-        load_intermediate=load_intermediate
+        load_intermediate=load_intermediate,
     )
 
 
@@ -62,7 +59,7 @@ def _xarray(
     inputs: dict[str, Any],
     data_loader: Callable[[str], Any],
     *,
-    load_intermediate: bool = True
+    load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
     data = data_loader(output_name)
@@ -105,7 +102,7 @@ def load_xarray_dataset(
     *,
     run_folder: str | Path,
     output_names: list[str] | None = None,
-    load_intermediate: bool = True
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
     if not output_names:
@@ -116,7 +113,7 @@ def load_xarray_dataset(
         inputs,
         data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
         output_names=output_names,
-        load_intermediate=load_intermediate
+        load_intermediate=load_intermediate,
     )
 
 
@@ -126,19 +123,13 @@ def _xarray_dataset(
     *,
     data_loader: Callable[[str], Any],
     output_names: list[str],
-    load_intermediate: bool = True
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset."""
     mapspec_output_names = [n for ms in mapspecs for n in ms.output_names if n in output_names]
     single_output_names = [n for n in output_names if n not in mapspec_output_names]
     data_arrays = {
-        name: _xarray(
-            name,
-            mapspecs,
-            inputs,
-            data_loader,
-            load_intermediate=load_intermediate
-        )
+        name: _xarray(name, mapspecs, inputs, data_loader, load_intermediate=load_intermediate)
         for name in mapspec_output_names
     }
     all_coords = {coord for data in data_arrays.values() for coord in data.coords}
@@ -156,7 +147,7 @@ def xarray_dataset_from_results(
     results: OrderedDict[str, Result],
     pipeline: Pipeline,
     *,
-    load_intermediate: bool = True
+    load_intermediate: bool = True,
 ) -> xr.Dataset:
     """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
     mapspecs = pipeline.mapspecs()
@@ -166,5 +157,5 @@ def xarray_dataset_from_results(
         inputs,
         data_loader=partial(_data_loader, data=results),
         output_names=output_names,
-        load_intermediate=load_intermediate
+        load_intermediate=load_intermediate,
     )

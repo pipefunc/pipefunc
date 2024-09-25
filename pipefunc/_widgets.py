@@ -30,7 +30,7 @@ def _create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatPr
         description=", ".join(at_least_tuple(name)),
         layout={"width": "95%"},
         bar_style="info",
-        style={"description_width": "150px"}
+        style={"description_width": "150px"},
     )
 
 
@@ -49,7 +49,7 @@ class ProgressTracker:
         target_progress_change: float = 0.05,
         auto_update: bool = True,
         display: bool = True,
-        in_async: bool = True
+        in_async: bool = True,
     ) -> None:
         self.task: asyncio.Task[None] | None = task
         self.progress_dict: dict[_OUTPUT_TYPE, _Status] = progress_dict
@@ -68,7 +68,7 @@ class ProgressTracker:
         self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button("Update Progress", "info", "refresh"),
             "toggle_auto_update": _create_button("Start Auto-Update", "success", "refresh"),
-            "cancel": _create_button("Cancel Calculation", "danger", "stop")
+            "cancel": _create_button("Cancel Calculation", "danger", "stop"),
         }
         self.buttons["update"].on_click(self.update_progress)
         self.buttons["toggle_auto_update"].on_click(self._toggle_auto_update)
@@ -78,14 +78,12 @@ class ProgressTracker:
             self.labels[name] = {
                 "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
                 "estimated_time": _create_html_label(
-                    "estimate-label",
-                    "Elapsed: 0.00 sec | ETA: Calculating..."
+                    "estimate-label", "Elapsed: 0.00 sec | ETA: Calculating..."
                 ),
-                "speed": _create_html_label("speed-label", "Speed: Calculating...")
+                "speed": _create_html_label("speed-label", "Speed: Calculating..."),
             }
         self.auto_update_interval_label = _create_html_label(
-            "interval-label",
-            "Auto-update every: N/A"
+            "interval-label", "Auto-update every: N/A"
         )
         if display:
             self.display()
@@ -129,8 +127,7 @@ class ProgressTracker:
         labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
         labels["percentage"].value = _span(
-            "percent-label",
-            f"{status.progress * 100:.1f}% | {iterations_label}"
+            "percent-label", f"{status.progress * 100:.1f}% | {iterations_label}"
         )
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
@@ -141,8 +138,7 @@ class ProgressTracker:
         speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
         labels["estimated_time"].value = _span(
-            "estimate-label",
-            f"Elapsed: {elapsed_time:.2f} sec | {eta}"
+            "estimate-label", f"Elapsed: {elapsed_time:.2f} sec | {eta}"
         )
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
@@ -175,8 +171,7 @@ class ProgressTracker:
                 break
             if not self.first_update:
                 self.auto_update_interval_label.value = _span(
-                    "interval-label",
-                    f"Auto-update every: {new_interval:.2f} sec"
+                    "interval-label", f"Auto-update every: {new_interval:.2f} sec"
                 )
             await asyncio.sleep(new_interval)
 
@@ -233,11 +228,11 @@ class ProgressTracker:
             labels = self.labels[name]
             labels_box = widgets.HBox(
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
-                layout=widgets.Layout(justify_content="space-between")
+                layout=widgets.Layout(justify_content="space-between"),
             )
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(border="1px solid #999999", margin="2px 0", padding="2px")
+                layout=widgets.Layout(border="1px solid #999999", margin="2px 0", padding="2px"),
             )
             container.add_class("container")
             progress_containers.append(container)
@@ -245,7 +240,7 @@ class ProgressTracker:
         buttons = self.buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
-            layout=widgets.Layout(justify_content="center")
+            layout=widgets.Layout(justify_content="center"),
         )
         parts = (
             [*progress_containers, button_box, self.auto_update_interval_label]

@@ -18,14 +18,7 @@ if TYPE_CHECKING:
 class _LazyFunction:
     """Lazy function wrapper for deferred evaluation of a function."""
 
-    __slots__ = [
-        "func",
-        "args",
-        "kwargs",
-        "_result",
-        "_evaluated",
-        "_id"
-    ]
+    __slots__ = ["func", "args", "kwargs", "_result", "_evaluated", "_id"]
 
     _counter = 0
 
@@ -33,7 +26,7 @@ class _LazyFunction:
         self,
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
-        kwargs: dict[str, Any] | None = None
+        kwargs: dict[str, Any] | None = None,
     ) -> None:
         self.func = func
         self.args = args

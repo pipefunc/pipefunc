@@ -35,9 +35,7 @@ def _get_graph_layout(graph: nx.DiGraph) -> dict:
         return graphviz_layout(graph, prog="dot")
     except ImportError:  # pragma: no cover
         warnings.warn(
-            "Graphviz is not installed. Using spring layout instead.",
-            ImportWarning,
-            stacklevel=2
+            "Graphviz is not installed. Using spring layout instead.", ImportWarning, stacklevel=2
         )
         return nx.spring_layout(graph)
 
@@ -157,14 +155,12 @@ def _generate_node_label(
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
-    include_full_mapspec: bool  # noqa: FBT001
+    include_full_mapspec: bool,  # noqa: FBT001
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
     def _format_type_and_default(
-        name: str,
-        type_string: str | None,
-        default_value: Any = _empty
+        name: str, type_string: str | None, default_value: Any = _empty
     ) -> str:
         """Formats the part of the label with type and default value."""
         parts = [f"<b>{html.escape(name)}</b>"]
@@ -218,7 +214,7 @@ _COLORS = {
     "lightgreen": "#90EE90",
     "darkgreen": "#006400",
     "red": "#FF0000",
-    "orange": "#FFA500"
+    "orange": "#FFA500",
 }
 
 
@@ -233,7 +229,7 @@ def visualize_graphviz(  # noqa: PLR0912
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
     include_full_mapspec: bool = False,
-    return_type: Literal["graphviz", "html"] | None = None
+    return_type: Literal["graphviz", "html"] | None = None,
 ) -> graphviz.Digraph | IPython.display.HTML:
     """Visualize the pipeline as a directed graph using Graphviz.
 
@@ -289,7 +285,7 @@ def visualize_graphviz(  # noqa: PLR0912
         comment="Graph Visualization",
         graph_attr=graph_attr,
         node_attr={"shape": "rectangle"},
-        **graphviz_kwargs
+        **graphviz_kwargs,
     )
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(graph)
@@ -300,21 +296,21 @@ def visualize_graphviz(  # noqa: PLR0912
     node_types: dict[str, tuple[list, dict]] = {
         "Argument": (
             nodes.arg,
-            {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"}
+            {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
         "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
         "NestedPipeFunction": (
             nodes.nested_func,
-            {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]}
+            {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
         ),
         "Bound": (
             nodes.bound,
-            {"fillcolor": _COLORS["red"], "shape": "hexagon", "style": "filled"}
+            {"fillcolor": _COLORS["red"], "shape": "hexagon", "style": "filled"},
         ),
         "Resources": (
             nodes.resources,
-            {"fillcolor": _COLORS["orange"], "shape": "hexagon", "style": "filled"}
-        )
+            {"fillcolor": _COLORS["orange"], "shape": "hexagon", "style": "filled"},
+        ),
     }
     node_defaults = {
         "width": "0.75",
@@ -322,7 +318,7 @@ def visualize_graphviz(  # noqa: PLR0912
         "margin": "0.05",
         "fontname": "Helvetica",
         "penwidth": "1",
-        "color": "black"  # Border color
+        "color": "black",  # Border color
     }
     # Add nodes to visual graph
     legend_items: dict[str, dict[str, Any]] = {}
@@ -331,11 +327,7 @@ def visualize_graphviz(  # noqa: PLR0912
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
             label = _generate_node_label(
-                node,
-                hints,
-                defaults,
-                labels.arg_mapspec,
-                include_full_mapspec
+                node, hints, defaults, labels.arg_mapspec, include_full_mapspec
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
@@ -347,7 +339,7 @@ def visualize_graphviz(  # noqa: PLR0912
         (labels.inputs, _COLORS["lightgreen"]),
         (labels.inputs_mapspec, _COLORS["darkgreen"]),
         (labels.bound, _COLORS["red"]),
-        (labels.resources, _COLORS["orange"])
+        (labels.resources, _COLORS["orange"]),
     ]:
         for edge, label in _labels.items():
             # Labels are transparent and become visible on hover in widget
@@ -359,7 +351,7 @@ def visualize_graphviz(  # noqa: PLR0912
                 tooltip=f"<<b>{html.escape(label)}</b>>",
                 penwidth="1.01",
                 fontcolor="transparent",
-                fontname="Helvetica"
+                fontname="Helvetica",
             )
 
     if show_legend and legend_items:
@@ -372,8 +364,8 @@ def visualize_graphviz(  # noqa: PLR0912
                 "fontcolor": "black",
                 "color": "black",
                 "style": "filled",
-                "fillcolor": "lightgrey"
-            }
+                "fillcolor": "lightgrey",
+            },
         )
         for i, (name, config) in enumerate(legend_items.items()):
             node_name = f"legend_{i}"
@@ -410,7 +402,7 @@ def visualize_matplotlib(
     graph: nx.DiGraph,
     figsize: tuple[int, int] | int = (10, 10),
     filename: str | Path | None = None,
-    func_node_colors: str | list[str] | None = None
+    func_node_colors: str | list[str] | None = None,
 ) -> plt.Figure:
     """Visualize the pipeline as a directed graph.
 
@@ -445,7 +437,7 @@ def visualize_matplotlib(
         (nodes.func, func_node_colors or "skyblue", "o", None),
         (nodes.nested_func, func_node_colors or "skyblue", "o", "red"),
         (nodes.bound, "red", "h", None),
-        (nodes.resources, "C1", "p", None)
+        (nodes.resources, "C1", "p", None),
     ]
     for _nodes, color, shape, edgecolor in colors_shapes_edgecolors:
         nx.draw_networkx_nodes(
@@ -455,7 +447,7 @@ def visualize_matplotlib(
             node_size=4000,
             node_color=color,
             node_shape=shape,
-            edgecolors=edgecolor
+            edgecolors=edgecolor,
         )
 
     def func_with_mapspec(func: PipeFunc) -> str:
@@ -471,7 +463,7 @@ def visualize_matplotlib(
     for labels in [
         {node: node for node in nodes.arg},
         {node: func_with_mapspec(node) for node in nodes.func + nodes.nested_func},
-        {node: node.name for node in nodes.bound + nodes.resources}
+        {node: node.name for node in nodes.bound + nodes.resources},
     ]:
         nx.draw_networkx_labels(graph, pos, labels, font_size=12)
 
@@ -485,14 +477,10 @@ def visualize_matplotlib(
         (labels.outputs_mapspec, "blue"),
         (labels.inputs, "lightgreen"),
         (labels.inputs_mapspec, "green"),
-        (labels.bound, "red")
+        (labels.bound, "red"),
     ]:
         nx.draw_networkx_edge_labels(
-            graph,
-            pos,
-            edge_labels=_labels,
-            font_size=12,
-            font_color=color
+            graph, pos, edge_labels=_labels, font_size=12, font_color=color
         )
 
     plt.axis("off")
@@ -545,7 +533,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         "xaxis": None,
         "yaxis": None,
         "node_color": hv.dim("type").categorize({"str": "lightgreen", "func": "skyblue"}, "gray"),
-        "edge_color": "black"
+        "edge_color": "black",
     }
 
     graph = graph.opts(**plot_opts)
