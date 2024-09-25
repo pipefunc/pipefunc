@@ -149,7 +149,7 @@ class PipeFunc(Generic[T]):
     >>> add_one_func = PipeFunc(
     ...     add_one,
     ...     output_name="c",
-    ...     renames={"a": "x", "b": "y"}
+    ...     renames={"a": "x", "b": "y"},
     ... )
     >>> add_one_func(x=1, y=2)
     (2, 3)
