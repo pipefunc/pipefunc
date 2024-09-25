@@ -1777,7 +1777,10 @@ class _PipelineAsFunc:
     __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
 
     def __init__(
-        self, pipeline: Pipeline, output_name: _OUTPUT_TYPE, root_args: tuple[str, ...]
+        self,
+        pipeline: Pipeline,
+        output_name: _OUTPUT_TYPE,
+        root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
         self.pipeline = pipeline
@@ -1928,7 +1931,8 @@ def _get_result_from_cache(
 
 
 def _check_consistent_defaults(
-    functions: list[PipeFunc], output_to_func: dict[_OUTPUT_TYPE, PipeFunc]
+    functions: list[PipeFunc],
+    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = {}
@@ -2122,7 +2126,8 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
 
 
 def _find_non_root_axes(
-    mapspecs: list[MapSpec], root_args: list[str]
+    mapspecs: list[MapSpec],
+    root_args: list[str],
 ) -> dict[str, list[str | None]]:
     non_root_inputs: dict[str, list[str | None]] = {}
     for mapspec in mapspecs:
