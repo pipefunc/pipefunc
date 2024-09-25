@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def _combined_exclude(
-    *func: Callable[[Mapping[str, Any]], bool] | None,
+    *func: Callable[[Mapping[str, Any]], bool] | None
 ) -> Callable[[Mapping[str, Any]], bool] | None:
     """Combine multiple exclude functions into one."""
     funcs = [f for f in func if f is not None]
@@ -95,7 +95,7 @@ class Sweep:
         dims: list[str | tuple[str, ...]] | None = None,
         exclude: Callable[[Mapping[str, Any]], bool] | None = None,
         constants: Mapping[str, Any] | None = None,
-        derivers: dict[str, Callable[[dict[str, Any]], Any]] | None = None,
+        derivers: dict[str, Callable[[dict[str, Any]], Any]] | None = None
     ) -> None:
         self.items = items
         self.dims = dims
@@ -175,7 +175,7 @@ class Sweep:
                     new_items.setdefault(k, []).append(v)
             return Sweep(
                 items=new_items,  # type: ignore[arg-type]
-                dims=[tuple(keys)],
+                dims=[tuple(keys)]
             )
 
         if not any(k in self.items for k in keys):
@@ -202,7 +202,7 @@ class Sweep:
             dims=dims,
             exclude=self.exclude,
             constants=self.constants,
-            derivers=None,
+            derivers=None
         )
 
     def __len__(self) -> int:
@@ -277,7 +277,7 @@ class Sweep:
             dims=dims,
             exclude=_combined_exclude(self.exclude, other.exclude),
             constants=_combine_dicts(self.constants, other.constants),  # type: ignore[arg-type]
-            derivers=_combine_dicts(self.derivers, other.derivers),  # type: ignore[arg-type]
+            derivers=_combine_dicts(self.derivers, other.derivers)  # type: ignore[arg-type]
         )
 
     def add_derivers(self, **derivers: Callable[[dict[str, Any]], Any]) -> Sweep:
@@ -309,7 +309,7 @@ class Sweep:
             dims=self.dims,
             exclude=self.exclude,
             constants=self.constants,
-            derivers=derivers,
+            derivers=derivers
         )
 
 
@@ -393,7 +393,7 @@ def generate_sweep(
     dims: list[str | tuple[str, ...]] | None = None,
     exclude: Callable[[Mapping[str, Any]], bool] | None = None,
     constants: Mapping[str, Any] | None = None,
-    derivers: dict[str, Callable[[dict[str, Any]], Any]] | None = None,
+    derivers: dict[str, Callable[[dict[str, Any]], Any]] | None = None
 ) -> list[dict[str, Any]]:
     """Create a sweep of a pipeline.
 
@@ -453,7 +453,7 @@ def count_sweep(
     sweep: list[dict[str, Any]] | Sweep,
     pipeline: Pipeline,
     *,
-    use_pandas: bool = False,
+    use_pandas: bool = False
 ) -> dict[str | tuple[str, ...], dict[tuple[Any, ...], int]]:
     """Count the number of times each argument combination is used.
 
@@ -511,7 +511,7 @@ def set_cache_for_sweep(
     sweep: list[dict[str, Any]],
     min_executions: int = 2,
     *,
-    verbose: bool = False,
+    verbose: bool = False
 ) -> None:
     """Set the cache for a sweep of a pipeline."""
     # Disable for the output node

@@ -22,7 +22,7 @@ from pipefunc.map._run import (
     _run_iteration_and_process,
     _submit_func,
     _validate_fixed_indices,
-    run,
+    run
 )
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage_base import _iterate_shape_indices
@@ -67,7 +67,7 @@ class LearnersDict(LearnersDictType):
     def __init__(
         self,
         learners_dict: LearnersDictType | None = None,
-        run_info: RunInfo | None = None,
+        run_info: RunInfo | None = None
     ) -> None:
         """Create a dictionary of adaptive learners for a pipeline."""
         super().__init__(learners_dict or {})
@@ -95,7 +95,7 @@ class LearnersDict(LearnersDictType):
         *,
         ignore_resources: bool = False,
         returns: Literal["run_manager", "kwargs", "namedtuple"] = "kwargs",
-        **slurm_run_kwargs: Any,
+        **slurm_run_kwargs: Any
     ) -> dict[str, Any] | adaptive_scheduler.RunManager | AdaptiveSchedulerDetails:
         """Helper for `adaptive_scheduler.slurm_run` which returns a `adaptive_scheduler.RunManager`.
 
@@ -129,7 +129,7 @@ class LearnersDict(LearnersDictType):
         details: AdaptiveSchedulerDetails = slurm_run_setup(
             self,
             default_resources,
-            ignore_resources=ignore_resources,
+            ignore_resources=ignore_resources
         )
         if returns == "namedtuple":
             if slurm_run_kwargs:
@@ -159,7 +159,7 @@ def create_learners(
     return_output: bool = False,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
-    split_independent_axes: bool = False,
+    split_independent_axes: bool = False
 ) -> LearnersDict:
     """Create adaptive learners for a single `Pipeline.map` call.
 
@@ -229,7 +229,7 @@ def create_learners(
         inputs,
         internal_shapes,
         storage=storage,
-        cleanup=cleanup,
+        cleanup=cleanup
     )
     store = run_info.init_store()
     learners: LearnersDict = LearnersDict(run_info=run_info)
@@ -238,7 +238,7 @@ def create_learners(
         inputs,
         fixed_indices,
         split_independent_axes,
-        internal_shapes,
+        internal_shapes
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
@@ -251,7 +251,7 @@ def create_learners(
                     store=store,
                     fixed_indices=_fixed_indices,  # might be None
                     cache=pipeline.cache,
-                    return_output=return_output,
+                    return_output=return_output
                 )
                 if func.resources_scope == "element":
                     for lrn in _split_sequence_learner(learner):
@@ -276,7 +276,7 @@ def _learner(
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
-    return_output: bool,
+    return_output: bool
 ) -> SequenceLearner:
     if func.mapspec and func.mapspec.inputs:
         f = functools.partial(
@@ -285,7 +285,7 @@ def _learner(
             run_info=run_info,
             store=store,
             return_output=return_output,
-            cache=cache,
+            cache=cache
         )
         shape = run_info.shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
@@ -296,7 +296,7 @@ def _learner(
             func=func,
             run_info=run_info,
             store=store,
-            return_output=return_output,
+            return_output=return_output
         )
         sequence = [None]  # type: ignore[list-item,assignment]
     return SequenceLearner(f, sequence)
@@ -313,7 +313,7 @@ def _sequence(
     fixed_indices: dict[str, int | slice] | None,
     mapspec: MapSpec,
     shape: tuple[int, ...],
-    mask: tuple[bool, ...],
+    mask: tuple[bool, ...]
 ) -> npt.NDArray[np.int_] | range:
     if fixed_indices is None:
         return range(prod(shape))
@@ -329,7 +329,7 @@ def _execute_iteration_in_single(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     *,
-    return_output: bool = False,
+    return_output: bool = False
 ) -> Any | None:
     """Execute a single iteration of a single function.
 
@@ -353,7 +353,7 @@ def _execute_iteration_in_map_spec(
     store: dict[str, StorageBase | Path | DirectValue],
     cache: _CacheBase | None,
     *,
-    return_output: bool = False,
+    return_output: bool = False
 ) -> tuple[Any, ...] | None:
     """Execute a single iteration of a map spec.
 
@@ -398,7 +398,7 @@ class _MapWrapper:
             self.run_folder,
             self.internal_shapes,
             parallel=self.parallel,
-            cleanup=self.cleanup,
+            cleanup=self.cleanup
         )
 
 
@@ -409,7 +409,7 @@ def create_learners_from_sweep(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     parallel: bool = True,
-    cleanup: bool = True,
+    cleanup: bool = True
 ) -> tuple[list[SequenceLearner], list[Path]]:
     """Create adaptive learners for a sweep.
 
@@ -483,7 +483,7 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
 ) -> Generator[dict[str, Any], None, None]:
     shape: list[int] = []
     for axis in independent_axes:
@@ -503,7 +503,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
@@ -528,7 +528,7 @@ def _adaptive_wrapper(
     adaptive_dimensions: tuple[str, ...],
     adaptive_output: str,
     run_folder_template: str,
-    map_kwargs: dict[str, Any],
+    map_kwargs: dict[str, Any]
 ) -> float:
     run_folder = run_folder_template.format(_adaptive_value)
     values: tuple[float, ...] = at_least_tuple(_adaptive_value)
@@ -542,7 +542,7 @@ def _adaptive_wrapper(
 def _validate_adaptive(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    adaptive_dimensions: dict[str, tuple[float, float]],
+    adaptive_dimensions: dict[str, tuple[float, float]]
 ) -> None:
     if invalid := set(adaptive_dimensions) & set(inputs):
         msg = f"Adaptive dimensions `{invalid}` cannot be in inputs"
@@ -562,7 +562,7 @@ def to_adaptive_learner(
     adaptive_output: str,
     run_folder_template: str = "run_folder_{}",
     map_kwargs: dict[str, Any] | None = None,
-    loss_function: Callable[..., Any] | None = None,
+    loss_function: Callable[..., Any] | None = None
 ) -> Learner1D | Learner2D | LearnerND:
     """Create an adaptive learner in 1D, 2D, or ND from a pipeline.map.
 
@@ -607,7 +607,7 @@ def to_adaptive_learner(
         adaptive_dimensions=dims,
         adaptive_output=adaptive_output,
         run_folder_template=run_folder_template,
-        map_kwargs=map_kwargs or {},
+        map_kwargs=map_kwargs or {}
     )
     n = len(adaptive_dimensions)
     if n == 1:

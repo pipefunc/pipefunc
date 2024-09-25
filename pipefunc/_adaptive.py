@@ -23,7 +23,7 @@ def _adaptive_wrapper(
     adaptive_dimensions: tuple[str, ...],
     adaptive_output: str,
     output_name: str,
-    full_output: bool = False,
+    full_output: bool = False
 ) -> float | dict[str, Any]:
     values: tuple[float, ...] = at_least_tuple(_adaptive_value)
     kwargs_ = kwargs.copy()
@@ -41,7 +41,7 @@ def to_adaptive_learner(
     adaptive_output: str | None = None,
     loss_function: Callable[..., Any] | None = None,
     *,
-    full_output: bool = False,
+    full_output: bool = False
 ) -> Learner1D | Learner2D | LearnerND:
     """Create an adaptive learner in 1D, 2D, or ND from a ``pipeline.run`.
 
@@ -92,7 +92,7 @@ def to_adaptive_learner(
         adaptive_dimensions=dims,
         adaptive_output=adaptive_output,
         output_name=output_name,
-        full_output=full_output,
+        full_output=full_output
     )
     n = len(adaptive_dimensions)
     if n == 1:

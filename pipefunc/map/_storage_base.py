@@ -29,7 +29,7 @@ def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
 def _select_by_mask(
     mask: tuple[bool, ...],
     tuple1: tuple[Any, ...],
-    tuple2: tuple[Any, ...],
+    tuple2: tuple[Any, ...]
 ) -> tuple[Any, ...]:
     result = []
     index1, index2 = 0, 0
@@ -58,7 +58,7 @@ class StorageBase(abc.ABC):
         folder: str | Path | None,
         shape: tuple[int, ...],
         internal_shape: tuple[int, ...] | None = None,
-        shape_mask: tuple[bool, ...] | None = None,
+        shape_mask: tuple[bool, ...] | None = None
     ) -> None: ...
 
     @abc.abstractmethod
@@ -139,7 +139,7 @@ def _normalize_key(
     internal_shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     *,
-    for_dump: bool = False,
+    for_dump: bool = False
 ) -> tuple[int | slice, ...]:
     if not isinstance(key, tuple):
         key = (key,)

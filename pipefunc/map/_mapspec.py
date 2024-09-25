@@ -152,7 +152,7 @@ class MapSpec:
     def shape(
         self,
         input_shapes: dict[str, tuple[int, ...]],
-        internal_shapes: dict[str, tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, tuple[int, ...]] | None = None
     ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
@@ -212,7 +212,7 @@ class MapSpec:
     def input_keys(
         self,
         shape: tuple[int, ...],
-        linear_index: int,
+        linear_index: int
     ) -> dict[str, tuple[slice | int, ...]]:
         """Return keys for indexing inputs of this map.
 
@@ -267,7 +267,7 @@ class MapSpec:
         """Return a new MapSpec with additional axes."""
         return MapSpec(
             tuple(x.add_axes(*axis) for x in self.inputs),
-            tuple(x.add_axes(*axis) for x in self.outputs),
+            tuple(x.add_axes(*axis) for x in self.outputs)
         )
 
     def rename(self, renames: dict[str, str]) -> MapSpec:
@@ -432,7 +432,7 @@ def _validate_shapes(
     input_shapes: dict[str, tuple[int, ...]],
     inputs: tuple[ArraySpec, ...],
     internal_shapes: dict[str, tuple[int, ...]] | None,
-    output_names: tuple[str, ...],
+    output_names: tuple[str, ...]
 ) -> None:
     if extra_names := input_shapes.keys() - input_names:
         msg = f"Got extra array {extra_names} that are not accepted by this map."
@@ -452,7 +452,7 @@ def _validate_shapes(
 def _get_common_dim(
     arrays: list[ArraySpec],
     index: str,
-    input_shapes: dict[str, tuple[int, ...]],
+    input_shapes: dict[str, tuple[int, ...]]
 ) -> int:
     def _get_dim(array: ArraySpec, index: str) -> int:
         axis = array.axes.index(index)
@@ -469,7 +469,7 @@ def _get_common_dim(
 def _get_output_dim(
     output: ArraySpec,
     internal_shapes: dict[str, tuple[int, ...]],
-    internal_shape_index: int,
+    internal_shape_index: int
 ) -> int:
     if output.name not in internal_shapes:
         msg = f"Internal shape for '{output.name}' is missing."
@@ -486,7 +486,7 @@ def _get_output_dim(
 
 def _trace_dependencies(
     output_name: str,
-    mapspec_mapping: dict[str, MapSpec],
+    mapspec_mapping: dict[str, MapSpec]
 ) -> dict[str, tuple[str, ...]]:
     dependencies: defaultdict[str, set[str]] = defaultdict(set)
     mapspec = mapspec_mapping[output_name]

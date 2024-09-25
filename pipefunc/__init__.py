@@ -16,5 +16,5 @@ __all__ = [
     "lazy",
     "map",
     "resources",
-    "sweep",
+    "sweep"
 ]

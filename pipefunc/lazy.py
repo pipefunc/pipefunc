@@ -24,7 +24,7 @@ class _LazyFunction:
         "kwargs",
         "_result",
         "_evaluated",
-        "_id",
+        "_id"
     ]
 
     _counter = 0
@@ -33,7 +33,7 @@ class _LazyFunction:
         self,
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
-        kwargs: dict[str, Any] | None = None,
+        kwargs: dict[str, Any] | None = None
     ) -> None:
         self.func = func
         self.args = args

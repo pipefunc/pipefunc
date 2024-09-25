@@ -20,7 +20,7 @@ from pipefunc.map._storage_base import (
     _iterate_shape_indices,
     _normalize_key,
     _select_by_mask,
-    register_storage,
+    register_storage
 )
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ class FileArray(StorageBase):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        filename_template: str = FILENAME_TEMPLATE,
+        filename_template: str = FILENAME_TEMPLATE
     ) -> None:
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
@@ -73,14 +73,14 @@ class FileArray(StorageBase):
         self,
         key: tuple[int | slice, ...],
         *,
-        for_dump: bool = False,
+        for_dump: bool = False
     ) -> tuple[int | slice, ...]:
         return _normalize_key(
             key,
             self.shape,
             self.internal_shape,
             self.shape_mask,
-            for_dump=for_dump,
+            for_dump=for_dump
         )
 
     def _index_to_file(self, index: int) -> Path:
@@ -108,7 +108,7 @@ class FileArray(StorageBase):
         self,
         key: tuple[int | slice, ...],
         *,
-        for_dump: bool = False,
+        for_dump: bool = False
     ) -> list[range]:
         slice_indices = []
         shape_index = 0

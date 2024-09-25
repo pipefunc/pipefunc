@@ -137,7 +137,7 @@ class Resources:
         resources: dict[str, Any]
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
-        | None,
+        | None
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Create a Resources instance from a dictionary, if not already an instance and not None."""
         if resources is None:
@@ -248,7 +248,7 @@ class Resources:
             "memory": None,
             "time": None,
             "partition": None,
-            "extra_args": {},
+            "extra_args": {}
         }
 
         for resources in resources_list:
@@ -290,7 +290,7 @@ class Resources:
 
     def with_defaults(
         self,
-        default_resources: Resources | None,
+        default_resources: Resources | None
     ) -> Resources:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
@@ -300,7 +300,7 @@ class Resources:
     @staticmethod
     def maybe_with_defaults(
         resources: Resources | None | Callable[[dict[str, Any]], Resources],
-        default_resources: Resources | None,
+        default_resources: Resources | None
     ) -> Resources | Callable[[dict[str, Any]], Resources] | None:
         """Combine the Resources instance with default resources, if provided."""
         if resources is None and default_resources is None:
@@ -313,7 +313,7 @@ class Resources:
             return functools.partial(
                 _delayed_resources_with_defaults,
                 _resources=resources,
-                _default_resources=default_resources,
+                _default_resources=default_resources
             )
         return resources.with_defaults(default_resources)
 
@@ -333,7 +333,7 @@ def _delayed_resources_with_defaults(
     kwargs: dict[str, Any],
     *,
     _resources: Callable[[dict[str, Any]], Resources],
-    _default_resources: Resources,
+    _default_resources: Resources
 ) -> Resources:
     resources = _resources(kwargs)
     return resources.with_defaults(_default_resources)
@@ -342,7 +342,7 @@ def _delayed_resources_with_defaults(
 def _ensure_resources(
     kwargs: dict[str, Any],
     *,
-    resources_callable: Callable[[dict[str, Any]], Resources | dict[str, Any]],
+    resources_callable: Callable[[dict[str, Any]], Resources | dict[str, Any]]
 ) -> Resources:
     resources_instance = resources_callable(kwargs)
     if isinstance(resources_instance, dict):

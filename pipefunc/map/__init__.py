@@ -20,7 +20,7 @@ __all__ = [
     "RunInfo",
     "SharedMemoryDictArray",
     "storage_registry",
-    "StorageBase",
+    "StorageBase"
 ]
 
 with _suppress(ImportError):

@@ -41,7 +41,7 @@ class Shapes(NamedTuple):
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}
@@ -105,7 +105,7 @@ class RunInfo:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         storage: str,
-        cleanup: bool = True,
+        cleanup: bool = True
     ) -> RunInfo:
         run_folder = _maybe_run_folder(run_folder, storage)
         if run_folder is not None:
@@ -125,7 +125,7 @@ class RunInfo:
             shape_masks=masks,
             mapspecs_as_strings=pipeline.mapspecs_as_strings,
             run_folder=run_folder,
-            storage=storage,
+            storage=storage
         )
 
     @property
@@ -145,7 +145,7 @@ class RunInfo:
                     shape,
                     mask,
                     self.storage_class,
-                    self.run_folder,
+                    self.run_folder
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
@@ -229,7 +229,7 @@ def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | Non
 
 def _construct_internal_shapes(
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-    pipeline: Pipeline,
+    pipeline: Pipeline
 ) -> dict[str, int | tuple[int, ...]] | None:
     if internal_shapes is None:
         internal_shapes = {}
@@ -255,7 +255,7 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]] | None = None
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
@@ -278,7 +278,7 @@ def _compare_to_previous_run_info(
     if equal_inputs is None:
         print(
             "Could not compare new `inputs` to `inputs` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best.",
+            " Proceeding *without* `cleanup`, hoping for the best."
         )
         return
     if not equal_inputs:
@@ -288,7 +288,7 @@ def _compare_to_previous_run_info(
     if equal_defaults is None:
         print(
             "Could not compare new `defaults` to `defaults` from previous run."
-            " Proceeding *without* `cleanup`, hoping for the best.",
+            " Proceeding *without* `cleanup`, hoping for the best."
         )
         return
     if not equal_defaults:
@@ -327,7 +327,7 @@ def _init_file_arrays(
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
-    run_folder: Path | None,
+    run_folder: Path | None
 ) -> list[StorageBase]:
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)

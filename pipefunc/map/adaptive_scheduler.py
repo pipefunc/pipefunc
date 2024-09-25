@@ -75,7 +75,7 @@ def slurm_run_setup(
     learners_dict: LearnersDict,
     default_resources: dict | Resources | None = None,
     *,
-    ignore_resources: bool = False,
+    ignore_resources: bool = False
 ) -> AdaptiveSchedulerDetails:
     """Set up the arguments for `adaptive_scheduler.slurm_run`."""
     assert learners_dict.run_info is not None
@@ -102,7 +102,7 @@ def slurm_run_setup(
                     resources=learner.pipefunc.resources if not ignore_resources else None,
                     func=learner.pipefunc,
                     learner=learner.learner,
-                    run_info=learners_dict.run_info,
+                    run_info=learners_dict.run_info
                 )
             prev_indices = indices
 
@@ -126,7 +126,7 @@ def slurm_run_setup(
         cores_per_node=cores_per_node,
         extra_scheduler=tracker.get("extra_scheduler"),
         partition=tracker.get("partition"),
-        executor_type=tracker.get("executor_type"),
+        executor_type=tracker.get("executor_type")
     )
 
 
@@ -148,7 +148,7 @@ class _ResourcesContainer:
         resources: Resources | Callable[[dict[str, Any]], Resources] | None,
         func: PipeFunc,
         learner: SequenceLearner,
-        run_info: RunInfo,
+        run_info: RunInfo
     ) -> None:
         if resources is None and self.default_resources is None:
             msg = "Either all `PipeFunc`s must have resources or `default_resources` must be provided."
@@ -175,7 +175,7 @@ class _ResourcesContainer:
                     index=index,
                     resources=r,
                     func=func,
-                    run_info=run_info,
+                    run_info=run_info
                 )
             else:
                 value = getattr(r, name)
@@ -197,7 +197,7 @@ def _eval_resources(
     index: int | None,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
-    run_info: RunInfo,
+    run_info: RunInfo
 ) -> Resources:
     kwargs = _func_kwargs(func, run_info, run_info.init_store())
     _load_file_arrays(kwargs)
@@ -214,7 +214,7 @@ def _getattr_from_resources(
     index: int | None,
     resources: Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
-    run_info: RunInfo,
+    run_info: RunInfo
 ) -> Any | None:
     resources_instance = _eval_resources(index, resources, func, run_info)
     return getattr(resources_instance, name)
@@ -224,7 +224,7 @@ def _extra_scheduler(
     index: int | None,
     resources: Resources | Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
-    run_info: RunInfo,
+    run_info: RunInfo
 ) -> list[str] | Callable[[], list[str]]:
     if callable(resources):
 
@@ -250,7 +250,7 @@ def _executor_type(
     index: int | None,
     resources: Resources | Callable[[dict[str, Any]], Resources],
     func: PipeFunc,
-    run_info: RunInfo,
+    run_info: RunInfo
 ) -> EXECUTOR_TYPES | Callable[[], EXECUTOR_TYPES]:
     if callable(resources):
 
@@ -264,7 +264,7 @@ def _executor_type(
 
 def _or(
     value_1: int | Callable[[], int | None] | None,
-    value_2: int | Callable[[], int | None] | None,
+    value_2: int | Callable[[], int | None] | None
 ) -> int | Callable[[], int | None] | None:
     if value_1 is None:
         return value_2
