@@ -502,6 +502,8 @@ class DiskCache(_CacheBase):
 def memoize(
     cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
     key_func: Callable[..., Hashable] | None = None,
+    *,
+    fallback_to_str: bool = True,
 ) -> Callable:
     """A flexible memoization decorator that works with different cache types.
 
@@ -512,6 +514,10 @@ def memoize(
     key_func
         A function to generate cache keys. If None, the default key generation which
         attempts to make all arguments hashable.
+    fallback_to_str
+        If True, unhashable objects will be converted to strings as a last resort.
+        If False, an exception will be raised for unhashable objects.
+        Only used if ``key_func`` is None.
 
     Returns
     -------
@@ -530,10 +536,10 @@ def memoize(
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if key_func:  # noqa: SIM108
+            if key_func:
                 key = key_func(*args, **kwargs)
             else:
-                key = _generate_cache_key(args, kwargs)
+                key = _generate_cache_key(args, kwargs, fallback_to_str=fallback_to_str)
 
             if key in cache:
                 return cache.get(key)
@@ -557,15 +563,20 @@ def memoize(
 
 def _hashable_iterable(
     iterable: Iterable,
+    fallback_to_str: bool,  # noqa: FBT001
     *,
-    fallback_to_str: bool = True,
     sort: bool = False,
 ) -> tuple:
     items = sorted(iterable) if sort else iterable
     return tuple(to_hashable(item, fallback_to_str) for item in items)
 
 
-def _hashable_mapping(mapping: dict, *, fallback_to_str: bool = True, sort: bool = False) -> tuple:
+def _hashable_mapping(
+    mapping: dict,
+    fallback_to_str: bool,  # noqa: FBT001
+    *,
+    sort: bool = False,
+) -> tuple:
     items = sorted(mapping.items()) if sort else mapping.items()
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 
@@ -574,7 +585,10 @@ def _hashable_mapping(mapping: dict, *, fallback_to_str: bool = True, sort: bool
 _HASH_MARKER = "__CONVERTED__"
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001, FBT002, PLR0911, PLR0912
+def to_hashable(  # noqa: PLR0911, PLR0912
+    obj: Any,
+    fallback_to_str: bool = False,  # noqa: FBT001, FBT002
+) -> Any:
     """Convert any object to a hashable representation if not hashable yet.
 
     Parameters
@@ -616,23 +630,23 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
 
     m = _HASH_MARKER
     if isinstance(obj, collections.OrderedDict):
-        return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, fallback_to_str))
     if isinstance(obj, collections.defaultdict):
         data = (
             to_hashable(obj.default_factory, fallback_to_str),
-            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
+            _hashable_mapping(obj, fallback_to_str, sort=True),
         )
         return (m, tp, data)
     if isinstance(obj, collections.Counter):
         return (m, tp, tuple(sorted(obj.items())))
     if isinstance(obj, dict):
-        return (m, tp, _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, fallback_to_str, sort=True))
     if isinstance(obj, set | frozenset):
-        return (m, tp, _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, fallback_to_str, sort=True))
     if isinstance(obj, list | tuple):
-        return (m, tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, fallback_to_str))
     if isinstance(obj, collections.deque):
-        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
+        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str)))
     if isinstance(obj, bytearray):
         return (m, tp, tuple(obj))
     if isinstance(obj, array.array):
