@@ -126,7 +126,9 @@ def everything_pipeline() -> Pipeline:
 def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Path) -> None:
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
-        everything_pipeline.visualize_graphviz(filename=tmp_path / "graphviz.svg", figsize=10)
+        everything_pipeline.visualize_graphviz(
+            filename=tmp_path / "graphviz.svg", figsize=10, include_full_mapspec=True
+        )
 
 
 def test_visualize_graphviz_with_typing():
@@ -139,4 +141,4 @@ def test_visualize_graphviz_with_typing():
         return b + c + x
 
     pipeline = Pipeline([f, g])
-    pipeline.visualize_graphviz(return_type="html", include_full_mapspec=True)
+    pipeline.visualize_graphviz(return_type="html")
