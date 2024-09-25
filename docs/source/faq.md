@@ -800,7 +800,7 @@ This will provide insights into resource usage, including CPU and memory consump
 When mocking a function within a `Pipeline` for testing purposes, you can use the `pipefunc.testing.patch` utility.
 This is particularly useful for replacing the implementation of a function with a mock during tests, allowing you to control outputs and side effects.
 
-> ![NOTE]
+> [!NOTE]
 > The plain use of `unittest.mock.patch` is insufficient for `Pipeline` objects due to internal management of functions.
 > **Wrapped Functions**: A `Pipeline` contains `PipeFunc` instances that store a reference to the original function in a `func` attribute.
 > This structure means the function isn't directly accessible by name for patching, as `unittest.mock.patch` would typically require.
