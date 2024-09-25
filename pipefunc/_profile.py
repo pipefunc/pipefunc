@@ -84,13 +84,7 @@ class ResourceProfiler:
 
     """
 
-    def __init__(
-        self,
-        pid: int,
-        stats: ProfilingStats,
-        *,
-        interval: float = 10,
-    ) -> None:
+    def __init__(self, pid: int, stats: ProfilingStats, *, interval: float = 10) -> None:
         """Initialize the ResourceProfiler instance."""
         self.pid = pid
         self.stats = stats

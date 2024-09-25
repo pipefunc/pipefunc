@@ -517,6 +517,12 @@ def memoize(
     -------
     Decorated function with memoization.
 
+    Notes
+    -----
+    This function creates a hashable representation of both positional and keyword
+    arguments, allowing for effective caching of function calls with various
+    argument types.
+
     """
     if cache is None:
         cache = SimpleCache()
@@ -559,12 +565,7 @@ def _hashable_iterable(
     return tuple(to_hashable(item, fallback_to_str) for item in items)
 
 
-def _hashable_mapping(
-    mapping: dict,
-    *,
-    fallback_to_str: bool = True,
-    sort: bool = False,
-) -> tuple:
+def _hashable_mapping(mapping: dict, *, fallback_to_str: bool = True, sort: bool = False) -> tuple:
     items = sorted(mapping.items()) if sort else mapping.items()
     return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
 

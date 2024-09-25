@@ -21,16 +21,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    TypeAlias,
-    TypeVar,
-    get_args,
-    get_origin,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -1331,11 +1322,7 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(
-    output: Any,
-    name: str,
-    output_name: _OUTPUT_TYPE,
-) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 

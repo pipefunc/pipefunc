@@ -124,11 +124,7 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
-    def _update_labels(
-        self,
-        name: _OUTPUT_TYPE,
-        status: _Status,
-    ) -> None:
+    def _update_labels(self, name: _OUTPUT_TYPE, status: _Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
@@ -228,10 +224,7 @@ class ProgressTracker:
                 progress_bar.bar_style = "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
-        self.auto_update_interval_label.value = _span(
-            "interval-label",
-            "Calculation cancelled ❌",
-        )
+        self.auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""

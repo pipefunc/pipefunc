@@ -207,11 +207,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Always creates a copy of the `PipeFunc` instance to avoid side effects.
@@ -1108,7 +1104,7 @@ class Pipeline:
         if len(leaf_nodes) != 1:  # pragma: no cover
             msg = (
                 "The pipeline has multiple leaf nodes. Please specify the output_name"
-                " argument to disambiguate.",
+                " argument to disambiguate."
             )
             raise ValueError(msg)
         return leaf_nodes[0]
