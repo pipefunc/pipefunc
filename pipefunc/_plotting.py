@@ -120,7 +120,9 @@ class _Labels(NamedTuple):
                 default_value = b.defaults.get(a, _empty)
                 if b.mapspec and a in b.mapspec.input_names:
                     spec = next(i for i in b.mapspec.inputs if i.name == a)
+                    # Keep track for both edge and node
                     inputs_mapspec[edge] = str(spec)
+                    inputs_mapspec[a] = str(spec)
                 elif default_value is not _empty:
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
@@ -153,6 +155,7 @@ def _generate_node_label(
     node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
+    inputs_mapspec: dict[str | tuple[str, str], str],
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -160,9 +163,10 @@ def _generate_node_label(
         name: str,
         type_string: str | None,
         default_value: Any = _empty,
+        mapspec: str | None = None,
     ) -> str:
         """Formats the part of the label with type and default value."""
-        parts = [f"<b>{html.escape(name)}</b>"]
+        parts = [f"<b>{html.escape(mapspec or name)}</b>"]
 
         if type_string:
             type_string = html.escape(_trim(type_string))
@@ -180,7 +184,8 @@ def _generate_node_label(
     if isinstance(node, str):
         type_string = type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
-        label = _format_type_and_default(node, type_string, default_value)
+        mapspec = inputs_mapspec.get(node)
+        label = _format_type_and_default(node, type_string, default_value, mapspec)
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
@@ -283,6 +288,7 @@ def visualize_graphviz(  # noqa: PLR0912
     )
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(graph)
+    labels = _Labels.from_graph(graph)
 
     # Define a mapping for node configurations
     blue = func_node_colors or _COLORS["skyblue"]
@@ -322,13 +328,11 @@ def visualize_graphviz(  # noqa: PLR0912
         if nodelist:  # Only add legend entry if nodes of this type exist
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
-            label = _generate_node_label(node, hints, defaults)
+            label = _generate_node_label(node, hints, defaults, labels.inputs_mapspec)
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    labels = _Labels.from_graph(graph)
-
     for _labels, color in [
         (labels.outputs, _COLORS["skyblue"]),
         (labels.outputs_mapspec, _COLORS["blue"]),
