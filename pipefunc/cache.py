@@ -10,10 +10,11 @@ import hashlib
 import pickle
 import sys
 import time
+import warnings
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 
@@ -503,7 +504,8 @@ def memoize(
     cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
     key_func: Callable[..., Hashable] | None = None,
     *,
-    fallback_to_str: bool = True,
+    fallback_to_str: bool = False,
+    unhashable_action: Literal["error", "warning", "ignore"] = "error",
 ) -> Callable:
     """A flexible memoization decorator that works with different cache types.
 
@@ -517,6 +519,12 @@ def memoize(
     fallback_to_str
         If True, unhashable objects will be converted to strings as a last resort.
         If False, an exception will be raised for unhashable objects.
+        Only used if ``key_func`` is None.
+    unhashable_action
+        Determines the behavior when encountering unhashable objects:
+        - "error": Raise an UnhashableError (default).
+        - "warning": Log a warning and skip caching for that call.
+        - "ignore": Silently skip caching for that call.
         Only used if ``key_func`` is None.
 
     Returns
@@ -539,7 +547,18 @@ def memoize(
             if key_func:
                 key = key_func(*args, **kwargs)
             else:
-                key = _generate_cache_key(args, kwargs, fallback_to_str=fallback_to_str)
+                try:
+                    key = _generate_cache_key(args, kwargs, fallback_to_str=fallback_to_str)
+                except UnhashableError:
+                    if unhashable_action == "error":
+                        raise
+                    if unhashable_action == "warning":
+                        warnings.warn(
+                            f"Unhashable arguments in {func.__name__}. Skipping cache.",
+                            UserWarning,
+                            stacklevel=3,
+                        )
+                    return func(*args, **kwargs)
 
             if key in cache:
                 return cache.get(key)
@@ -605,7 +624,7 @@ def to_hashable(  # noqa: PLR0911, PLR0912
 
     Raises
     ------
-    TypeError
+    UnhashableError
         If the object cannot be made hashable and fallback_to_str is False.
 
     Notes
@@ -665,8 +684,18 @@ def to_hashable(  # noqa: PLR0911, PLR0912
 
     if fallback_to_str:
         return (m, tp, str(obj))
-    msg = f"Object of type {type(obj)} cannot be hashed"
-    raise TypeError(msg)
+    raise UnhashableError(obj)
+
+
+class UnhashableError(TypeError):
+    """Exception raised for objects that cannot be made hashable."""
+
+    def __init__(self, obj: Any) -> None:
+        self.obj = obj
+        self.message = (
+            f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
+        )
+        super().__init__(self.message)
 
 
 def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:

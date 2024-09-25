@@ -81,7 +81,7 @@ def test_to_hashable_unhashable_object() -> None:
             raise TypeError(msg)
 
     obj = Unhashable()
-    result = to_hashable(obj)
+    result = to_hashable(obj, fallback_to_str=True)
     assert result == (M, Unhashable, str(obj))
 
 
@@ -157,7 +157,7 @@ def test_unhashable_type():
     with pytest.raises(NotImplementedError, match="Not implemented"):
         hash(Unhashable())
     x = Unhashable()
-    assert to_hashable(x) == (_HASH_MARKER, "Unhashable", str(x))
+    assert to_hashable(x, fallback_to_str=True) == (_HASH_MARKER, "Unhashable", str(x))
 
     class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
         def __hash__(self) -> int:
