@@ -157,6 +157,7 @@ def _generate_node_label(
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
+    include_full_mapspec: bool,  # noqa: FBT001
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -164,10 +165,9 @@ def _generate_node_label(
         name: str,
         type_string: str | None,
         default_value: Any = _empty,
-        mapspec: str | None = None,
     ) -> str:
         """Formats the part of the label with type and default value."""
-        parts = [f"<b>{html.escape(mapspec or name)}</b>"]
+        parts = [f"<b>{html.escape(name)}</b>"]
 
         if type_string:
             type_string = html.escape(_trim(type_string))
@@ -186,19 +186,20 @@ def _generate_node_label(
         type_string = type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
         mapspec = arg_mapspec.get(node)
-        label = _format_type_and_default(node, type_string, default_value, mapspec)
+        label = _format_type_and_default(mapspec or node, type_string, default_value)
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
         label = f'<TABLE BORDER="0"><TR><TD><B>{html.escape(name)}</B></TD></TR><HR/>'
 
-        for output in at_least_tuple(node.output_name):
+        for i, output in enumerate(at_least_tuple(node.output_name)):
+            name = str(node.mapspec.outputs[i]) if node.mapspec else output
             h = node.output_annotation.get(output)
             type_string = type_as_string(h) if h is not NoAnnotation else None
             default_value = defaults.get(output, _empty) if defaults else _empty
-            formatted_label = _format_type_and_default(output, type_string, default_value)
+            formatted_label = _format_type_and_default(name, type_string, default_value)
             label += f"<TR><TD>{formatted_label}</TD></TR>"
-        if node.mapspec:
+        if include_full_mapspec and node.mapspec:
             s = html.escape(str(node.mapspec))
             label += f'<HR/><TR><TD><FONT FACE="Courier New">{s}</FONT></TD></TR>'
 
@@ -231,6 +232,7 @@ def visualize_graphviz(  # noqa: PLR0912
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
+    include_full_mapspec: bool = False,
     return_type: Literal["graphviz", "html"] | None = None,
 ) -> graphviz.Digraph | IPython.display.HTML:
     """Visualize the pipeline as a directed graph using Graphviz.
@@ -255,6 +257,8 @@ def visualize_graphviz(  # noqa: PLR0912
         Graphviz-specific keyword arguments for customizing the graph's appearance.
     show_legend
         Whether to show the legend in the graph visualization.
+    include_full_mapspec
+        Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
     return_type
         The format to return the visualization in.
         If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -329,7 +333,9 @@ def visualize_graphviz(  # noqa: PLR0912
         if nodelist:  # Only add legend entry if nodes of this type exist
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
-            label = _generate_node_label(node, hints, defaults, labels.arg_mapspec)
+            label = _generate_node_label(
+                node, hints, defaults, labels.arg_mapspec, include_full_mapspec
+            )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
