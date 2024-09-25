@@ -171,7 +171,7 @@ def _generate_node_label(
 
         if type_string:
             type_string = html.escape(_trim(type_string))
-            parts.append(f": <i>{type_string}</i>")
+            parts.append(f" : <i>{type_string}</i>")
 
         if default_value is not _empty:
             default_value = html.escape(_trim(default_value))
