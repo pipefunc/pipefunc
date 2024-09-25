@@ -102,6 +102,7 @@ class _Labels(NamedTuple):
     inputs_mapspec: dict
     bound: dict
     resources: dict
+    arg_mapspec: dict
 
     @classmethod
     def from_graph(cls, graph: nx.DiGraph) -> _Labels:  # noqa: PLR0912
@@ -112,6 +113,7 @@ class _Labels(NamedTuple):
         outputs_mapspec = {}
         inputs_mapspec = {}
         resources = {}
+        arg_mapspec = {}
 
         for edge, attrs in graph.edges.items():
             a, b = edge
@@ -120,9 +122,8 @@ class _Labels(NamedTuple):
                 default_value = b.defaults.get(a, _empty)
                 if b.mapspec and a in b.mapspec.input_names:
                     spec = next(i for i in b.mapspec.inputs if i.name == a)
-                    # Keep track for both edge and node
                     inputs_mapspec[edge] = str(spec)
-                    inputs_mapspec[a] = str(spec)
+                    arg_mapspec[a] = str(spec)
                 elif default_value is not _empty:
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
@@ -148,14 +149,14 @@ class _Labels(NamedTuple):
                 assert isinstance(a, _Resources)
                 resources[edge] = a.name
 
-        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources)
+        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
 def _generate_node_label(
     node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
-    inputs_mapspec: dict[str | tuple[str, str], str],
+    arg_mapspec: dict[str, str],
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -184,7 +185,7 @@ def _generate_node_label(
     if isinstance(node, str):
         type_string = type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
-        mapspec = inputs_mapspec.get(node)
+        mapspec = arg_mapspec.get(node)
         label = _format_type_and_default(node, type_string, default_value, mapspec)
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
@@ -328,7 +329,7 @@ def visualize_graphviz(  # noqa: PLR0912
         if nodelist:  # Only add legend entry if nodes of this type exist
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
-            label = _generate_node_label(node, hints, defaults, labels.inputs_mapspec)
+            label = _generate_node_label(node, hints, defaults, labels.arg_mapspec)
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
