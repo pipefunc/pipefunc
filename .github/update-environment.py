@@ -101,7 +101,7 @@ if __name__ == "__main__":
     with open("pyproject.toml") as f:  # noqa: PTH123
         data = tomllib.loads(f.read())
 
-    sections = ("adaptive", "plotting", "xarray", "zarr", "widgets")
+    sections = ("adaptive", "plotting", "xarray", "zarr", "pandas", "widgets")
     # Generate environment.yml
     generate_environment_yml(
         data,
