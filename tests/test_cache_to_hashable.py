@@ -157,6 +157,7 @@ def test_unhashable_type():
         hash(Unhashable)
     with pytest.raises(NotImplementedError, match="Not implemented"):
         hash(Unhashable())
+
     x = Unhashable()
     with pytest.raises(NotImplementedError, match="Not implemented"):
         to_hashable(x, fallback_to_pickle=True)

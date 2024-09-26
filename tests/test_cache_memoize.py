@@ -1,6 +1,13 @@
 import pytest
 
-from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, UnhashableError, memoize
+from pipefunc.cache import (
+    DiskCache,
+    HybridCache,
+    LRUCache,
+    SimpleCache,
+    UnhashableError,
+    memoize,
+)
 
 
 @pytest.mark.parametrize("cache_type", [SimpleCache, LRUCache, HybridCache])
@@ -131,21 +138,39 @@ def test_memoize_clear_cache():
     assert calls["count"] == 2  # Should increase after cache clear
 
 
-class TrulyUnhashable:
+class UnhashableMeta(type):
+    def __hash__(cls):
+        msg = "Not implemented"
+        raise NotImplementedError(msg)
+
+
+class TrulyUnhashable(metaclass=UnhashableMeta):
     def __init__(self, value):
         self.value = value
+
+    def __hash__(self):
+        msg = "I am truly unhashable!"
+        raise TypeError(msg)
 
     def __eq__(self, other):
         if isinstance(other, TrulyUnhashable):
             return self.value == other.value
         return False
 
+    def __str__(self):
+        return f"TrulyUnhashable({self.value})"
+
+
+class Unhashable:
+    def __init__(self, value):
+        self.value = value
+
     def __hash__(self):
         msg = "I am truly unhashable!"
         raise TypeError(msg)
 
     def __str__(self):
-        return f"TrulyUnhashable({self.value})"
+        return f"Unhashable({self.value})"
 
 
 def test_memoize_with_unhashable_arguments_fallback_to_str():
@@ -158,19 +183,19 @@ def test_memoize_with_unhashable_arguments_fallback_to_str():
         return str(obj)
 
     # Using a truly unhashable object
-    unhashable = TrulyUnhashable(42)
+    unhashable = Unhashable(42)
     result1 = process_unhashable(unhashable)
-    assert result1 == "TrulyUnhashable(42)"
+    assert result1 == "Unhashable(42)"
     assert calls["count"] == 1
 
     # Call again with the same unhashable object
     result2 = process_unhashable(unhashable)
-    assert result2 == "TrulyUnhashable(42)"
+    assert result2 == "Unhashable(42)"
     assert calls["count"] == 1  # Should not increase, result from cache
 
     # Call with a different unhashable object
-    result3 = process_unhashable(TrulyUnhashable(43))
-    assert result3 == "TrulyUnhashable(43)"
+    result3 = process_unhashable(Unhashable(43))
+    assert result3 == "Unhashable(43)"
     assert calls["count"] == 2  # New arguments, should increase
 
 
@@ -181,9 +206,10 @@ def test_memoize_unhashable_action_error():
     def process_unhashable(obj):
         return str(obj)
 
+    obj = TrulyUnhashable(42)
     # Using a truly unhashable object should raise an UnhashableError
     with pytest.raises(UnhashableError):
-        process_unhashable(TrulyUnhashable(42))
+        process_unhashable(obj)
 
 
 def test_memoize_unhashable_action_warning():

@@ -611,7 +611,7 @@ def try_to_hashable(
         Determines the behavior when encountering unhashable objects:
         - ``"error"``: Raise an `UnhashableError` (default).
         - ``"warning"``: Log a warning and skip caching for that call.
-        - ``"ignore"``: Silently skip caching for that call.
+        - ``"ignore"``: Silently skip caching for that call. Returns `UnhashableError`.
     where
         The location where the unhashable object was encountered.
         Used for warning or error messages.
@@ -670,7 +670,7 @@ def _hashable_mapping(
 _HASH_MARKER = "__CONVERTED__"
 
 
-def to_hashable(  # noqa: PLR0911, PLR0912
+def to_hashable(  # noqa: C901, PLR0911, PLR0912
     obj: Any,
     fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
 ) -> Any:
@@ -749,7 +749,10 @@ def to_hashable(  # noqa: PLR0911, PLR0912
             return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_pickle))
 
     if fallback_to_pickle:
-        return (m, tp, cloudpickle.dumps(obj))
+        try:
+            return (m, tp, cloudpickle.dumps(obj))
+        except Exception as e:
+            raise UnhashableError(obj) from e
     raise UnhashableError(obj)
 
 
@@ -758,5 +761,7 @@ class UnhashableError(TypeError):
 
     def __init__(self, obj: Any) -> None:
         self.obj = obj
-        self.message = f"Object of type {type(obj)} {obj=} cannot be hashed using `pipefunc.cache.to_hashable`."
+        self.message = (
+            f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
+        )
         super().__init__(self.message)
