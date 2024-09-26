@@ -32,7 +32,7 @@ def mock_task():
 
 @pytest.mark.asyncio
 async def test_progress_tracker_init(mock_progress_dict, mock_task):
-    with patch("pipefunc._widgets.IPython.display.display"):
+    with patch("pipefunc._widgets.progress.IPython.display.display"):
         progress = ProgressTracker(mock_progress_dict, mock_task)
 
     assert progress.task == mock_task
@@ -142,7 +142,7 @@ async def test_progress_tracker_widgets(mock_progress_dict, mock_task):
 
 @pytest.mark.asyncio
 async def test_progress_tracker_display(mock_progress_dict, mock_task):
-    with patch("pipefunc._widgets.IPython.display.display") as mock_display:
+    with patch("pipefunc._widgets.progress.IPython.display.display") as mock_display:
         progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
         progress.display()
         assert mock_display.call_count == 2  # display on HTML and VBox

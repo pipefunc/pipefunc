@@ -49,8 +49,8 @@ class PipelineWidget:
             "Click to visualize the pipeline",
         )
         self.visualize_type = widgets.Dropdown(
-            options=["matplotlib", "holoviews"],
-            value="matplotlib",
+            options=["graphviz", "matplotlib", "holoviews"],
+            value="graphviz",
             description="Type:",
         )
         self.fig_width = widgets.IntSlider(value=10, min=1, max=50, step=1, description="Width:")
@@ -187,6 +187,9 @@ class PipelineWidget:
             figsize = (self.fig_width.value, self.fig_height.value)
             display(widgets.HTML("<h3>Pipeline Visualization (Matplotlib)</h3>"))
             self.pipeline.visualize(figsize=figsize)
+        elif self.visualize_type.value == "graphviz":
+            display(widgets.HTML("<h3>Pipeline Visualization (Graphviz)</h3>"))
+            self.pipeline.visualize_graphviz(return_type="html")
         else:
             import panel as pn
 
