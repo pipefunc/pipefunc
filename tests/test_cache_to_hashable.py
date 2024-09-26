@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipefunc.cache import _HASH_MARKER, _cloudpickle_key, to_hashable
+from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
 
 M = _HASH_MARKER
 
@@ -158,7 +158,7 @@ def test_unhashable_type():
         hash(Unhashable())
 
     x = Unhashable()
-    with pytest.raises(NotImplementedError, match="Not implemented"):
+    with pytest.raises(UnhashableError, match="Not implemented"):
         to_hashable(x, fallback_to_pickle=True)
 
     class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
