@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     import graphviz
     import holoviews as hv
     import IPython.display
+    import matplotlib.pyplot as plt
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
@@ -1339,7 +1340,7 @@ class Pipeline:
         color_combinable: bool = False,
         conservatively_combine: bool = False,
         output_name: _OUTPUT_TYPE | None = None,
-    ) -> None:
+    ) -> plt.Figure:
         """Visualize the pipeline as a directed graph.
 
         Parameters
@@ -1366,7 +1367,7 @@ class Pipeline:
             )
         else:
             func_node_colors = None
-        visualize_matplotlib(
+        return visualize_matplotlib(
             self.graph,
             figsize=figsize,
             filename=filename,

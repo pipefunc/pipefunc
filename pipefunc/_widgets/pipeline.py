@@ -7,8 +7,8 @@ from typing import Any
 import ipywidgets as widgets
 from IPython.display import display
 
-import pipefunc
 from pipefunc import PipeFunc, Pipeline
+from pipefunc import __file__ as package_root
 
 DEPENDENCIES = [
     "networkx",
@@ -55,6 +55,8 @@ class PipelineWidget:
         )
         self.fig_width = widgets.IntSlider(value=10, min=1, max=50, step=1, description="Width:")
         self.fig_height = widgets.IntSlider(value=10, min=1, max=50, step=1, description="Height:")
+        # Because graphviz is default, hide the sliders
+        self.fig_width.layout.display = self.fig_height.layout.display = "none"
         self.info_output_display = widgets.Output()
         self.visualize_output_display = widgets.Output()
         self.package_output_display = widgets.Output()
@@ -186,10 +188,10 @@ class PipelineWidget:
         if self.visualize_type.value == "matplotlib":
             figsize = (self.fig_width.value, self.fig_height.value)
             display(widgets.HTML("<h3>Pipeline Visualization (Matplotlib)</h3>"))
-            self.pipeline.visualize(figsize=figsize)
+            display(self.pipeline.visualize_matplotlib(figsize=figsize))
         elif self.visualize_type.value == "graphviz":
             display(widgets.HTML("<h3>Pipeline Visualization (Graphviz)</h3>"))
-            self.pipeline.visualize_graphviz(return_type="html")
+            display(self.pipeline.visualize_graphviz(return_type="html"))
         else:
             import panel as pn
 
@@ -213,7 +215,7 @@ class PipelineWidget:
 
     def _package_info_html(self) -> str:
         pipefunc_version = _get_installed_version("pipefunc") or "Unknown"
-        location: str = pipefunc.__file__
+        location: str = package_root
         user = getpass.getuser()
         info_table = self._create_package_info_table(pipefunc_version, location, user)
         dependencies_table = self._create_dependencies_table()
