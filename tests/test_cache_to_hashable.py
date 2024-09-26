@@ -158,7 +158,10 @@ def test_unhashable_type():
         hash(Unhashable())
 
     x = Unhashable()
-    with pytest.raises(UnhashableError, match="Not implemented"):
+    with pytest.raises(
+        UnhashableError,
+        match="cannot be hashed using `pipefunc.cache.to_hashable`",
+    ):
         to_hashable(x, fallback_to_pickle=True)
 
     class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
