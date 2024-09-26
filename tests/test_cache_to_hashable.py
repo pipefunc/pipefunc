@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipefunc.cache import _HASH_MARKER, to_hashable
+from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
 
 M = _HASH_MARKER
 
@@ -81,8 +81,8 @@ def test_to_hashable_unhashable_object() -> None:
             raise TypeError(msg)
 
     obj = Unhashable()
-    result = to_hashable(obj, fallback_to_str=True)
-    assert result == (M, Unhashable, str(obj))
+    result = to_hashable(obj, fallback_to_pickle=True)
+    assert result == (M, Unhashable, _cloudpickle_key(obj))
 
 
 def test_to_hashable_unhashable_object_no_fallback() -> None:
@@ -93,7 +93,7 @@ def test_to_hashable_unhashable_object_no_fallback() -> None:
 
     obj = Unhashable()
     with pytest.raises(TypeError):
-        to_hashable(obj, fallback_to_str=False)
+        to_hashable(obj, fallback_to_pickle=False)
 
 
 def test_to_hashable_custom_hashable_object() -> None:
@@ -156,8 +156,13 @@ def test_unhashable_type():
         hash(Unhashable)
     with pytest.raises(NotImplementedError, match="Not implemented"):
         hash(Unhashable())
+
     x = Unhashable()
-    assert to_hashable(x, fallback_to_str=True) == (_HASH_MARKER, "Unhashable", str(x))
+    with pytest.raises(
+        UnhashableError,
+        match="cannot be hashed using `pipefunc.cache.to_hashable`",
+    ):
+        to_hashable(x, fallback_to_pickle=True)
 
     class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
         def __hash__(self) -> int:
