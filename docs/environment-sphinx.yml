@@ -21,14 +21,13 @@ dependencies:
   - ipywidgets
   # optional-dependencies: zarr
   - zarr
-  # optional-dependencies: pandas
-  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
   - python-graphviz
+  - jupyter_bokeh
   # optional-dependencies: docs
   - sphinx
   - sphinx-book-theme

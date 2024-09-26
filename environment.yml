@@ -21,17 +21,13 @@ dependencies:
   - ipywidgets
   # optional-dependencies: zarr
   - zarr
-  # optional-dependencies: widgets
-  - ipywidgets
-  # optional-dependencies: pandas
-  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
-  - jupyter_bokeh
   - python-graphviz
+  - jupyter_bokeh
   # optional-dependencies: test
   - pytest
   - pytest-asyncio
