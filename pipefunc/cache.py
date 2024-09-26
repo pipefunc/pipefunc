@@ -424,8 +424,7 @@ class DiskCache(_CacheBase):
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
-        data = pickle.dumps(key, protocol=pickle.HIGHEST_PROTOCOL)
-        key_hash = hashlib.md5(data).hexdigest()  # noqa: S324
+        key_hash = _pickle_key(key)
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
@@ -500,6 +499,18 @@ class DiskCache(_CacheBase):
         return self.lru_cache.shared
 
 
+def _pickle_key(obj: Any) -> str:
+    # Based on the implementation of `diskcache` although that also
+    # does pickle_tools.optimize which we don't need here
+    data = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+    return hashlib.md5(data).hexdigest()  # noqa: S324
+
+
+def _cloudpickle_key(obj: Any) -> str:
+    data = cloudpickle.dumps(obj)
+    return hashlib.md5(data).hexdigest()  # noqa: S324
+
+
 def memoize(
     cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
     key_func: Callable[..., Hashable] | None = None,
@@ -517,7 +528,7 @@ def memoize(
         A function to generate cache keys. If None, the default key generation which
         attempts to make all arguments hashable.
     fallback_to_pickle
-        If ``True``, unhashable objects will be converted to bytes as a last resort.
+        If ``True``, unhashable objects will be pickled to bytes using `cloudpickle` as a last resort.
         If ``False``, an exception will be raised for unhashable objects.
         Only used if ``key_func`` is None.
     unhashable_action
@@ -750,7 +761,7 @@ def to_hashable(  # noqa: C901, PLR0911, PLR0912
 
     if fallback_to_pickle:
         try:
-            return (m, tp, cloudpickle.dumps(obj))
+            return (m, tp, _cloudpickle_key(obj))
         except Exception as e:
             raise UnhashableError(obj) from e
     raise UnhashableError(obj)

@@ -2,12 +2,11 @@ import array
 from collections import Counter, OrderedDict, defaultdict, deque
 from typing import Any
 
-import cloudpickle
 import numpy as np
 import pandas as pd
 import pytest
 
-from pipefunc.cache import _HASH_MARKER, to_hashable
+from pipefunc.cache import _HASH_MARKER, _cloudpickle_key, to_hashable
 
 M = _HASH_MARKER
 
@@ -83,7 +82,7 @@ def test_to_hashable_unhashable_object() -> None:
 
     obj = Unhashable()
     result = to_hashable(obj, fallback_to_pickle=True)
-    assert result == (M, Unhashable, cloudpickle.dumps(obj))
+    assert result == (M, Unhashable, _cloudpickle_key(obj))
 
 
 def test_to_hashable_unhashable_object_no_fallback() -> None:
