@@ -14,7 +14,7 @@ import warnings
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 
@@ -590,14 +590,6 @@ def memoize(
         return wrapper
 
     return decorator
-
-
-class CacheUnhashableOptions(NamedTuple):
-    """Options for handling unhashable objects in the cache."""
-
-    fallback_to_pickle: bool = True
-    action: Literal["error", "warning", "ignore"] = "error"
-    where: str = "function"
 
 
 def try_to_hashable(
