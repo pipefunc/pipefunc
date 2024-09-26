@@ -1248,9 +1248,12 @@ class ErrorSnapshot:
         include: set[str] | None = None,
         exclude: set[str] | None = None,
     ) -> dict[str, str]:
-        from IPython.display import HTML
-
-        return HTML(f"<pre>{self}</pre>")._repr_mimebundle_(include, exclude)
+        mime_bundle = {"text/html": f"<pre>{self}</pre>", "text/plain": str(self)}
+        if include is not None:
+            mime_bundle = {k: v for k, v in mime_bundle.items() if k in include}
+        if exclude is not None:
+            mime_bundle = {k: v for k, v in mime_bundle.items() if k not in exclude}
+        return mime_bundle
 
 
 def _validate_identifier(name: str, value: Any) -> None:
