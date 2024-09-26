@@ -1748,15 +1748,19 @@ class Pipeline:
 
         return pipeline
 
-    def _ipython_display_(self) -> None:
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:
         """Display the pipeline widget."""
         if is_running_in_ipynb():
             from ._widgets.pipeline import PipelineWidget
 
-            widget = PipelineWidget(self)
-            widget.display()
-        else:
-            print(repr(self))
+            widget = PipelineWidget(self).tab
+            return widget._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
 
 
 class Generations(NamedTuple):
