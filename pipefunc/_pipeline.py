@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import tempfile
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -21,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
 
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
@@ -29,7 +30,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
-    is_notebook,
+    is_running_in_ipynb,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
@@ -41,7 +42,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import AsyncRun, run, run_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -52,11 +53,14 @@ from pipefunc.typing import (
 )
 
 if TYPE_CHECKING:
+    from collections import OrderedDict
     from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
 
+    import graphviz
     import holoviews as hv
+    import IPython.display
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
@@ -204,11 +208,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Always creates a copy of the `PipeFunc` instance to avoid side effects.
@@ -635,7 +635,8 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-    ) -> dict[str, Result]:
+        show_progress: bool = False,
+    ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters
@@ -646,8 +647,8 @@ class Pipeline:
             corresponding input data, these are either single values for functions without ``mapspec``
             or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
         run_folder
-            The folder to store the run information. If ``None``, a temporary folder
-            is created.
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
@@ -656,7 +657,7 @@ class Pipeline:
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
-            Whether to run the functions in parallel.
+            Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.
@@ -676,6 +677,18 @@ class Pipeline:
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar. Only works if ``parallel=True``.
+
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
 
         """
         return run(
@@ -691,6 +704,91 @@ class Pipeline:
             cleanup=cleanup,
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        executor: Executor | None = None,
+        storage: str = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> AsyncRun:
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
+            is used. Only relevant if ``parallel=True``.
+        storage
+            The storage class to use for the file arrays.
+            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
+
+        """
+        return run_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1007,7 +1105,7 @@ class Pipeline:
         if len(leaf_nodes) != 1:  # pragma: no cover
             msg = (
                 "The pipeline has multiple leaf nodes. Please specify the output_name"
-                " argument to disambiguate.",
+                " argument to disambiguate."
             )
             raise ValueError(msg)
         return leaf_nodes[0]
@@ -1113,7 +1211,129 @@ class Pipeline:
 
     def visualize(
         self,
-        figsize: tuple[int, int] = (10, 10),
+        *,
+        backend: Literal["matplotlib", "graphviz", "graphviz_widget", "holoviews"] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Visualize the pipeline as a directed graph.
+
+        Parameters
+        ----------
+        backend
+            The plotting backend to use. If ``None``, the best backend available
+            will be used in the following order: Graphviz,
+            Matplotlib, and HoloViews.
+        kwargs
+            Additional keyword arguments passed to the plotting function.
+
+        Returns
+        -------
+            The output of the plotting function.
+
+        See Also
+        --------
+        visualize_graphviz
+            Create a directed graph using Graphviz (``backend="graphviz"``).
+        visualize_matplotlib
+            Create a directed graph using Matplotlib (``backend="matplotlib"``).
+        visualize_holoviews
+            Create a directed graph using HoloViews (``backend="holoviews"``).
+
+        """
+
+        def is_installed(name: str) -> bool:
+            try:
+                __import__(name)
+                return True  # noqa: TRY300
+            except ImportError:  # pragma: no cover
+                return False
+
+        if backend is None:  # pragma: no cover
+            if is_installed("graphviz"):
+                backend = "graphviz"
+            elif is_installed("matplotlib"):
+                backend = "matplotlib"
+            elif is_installed("holoviews"):
+                backend = "holoviews"
+            else:
+                msg = (
+                    "No plotting backends are installed."
+                    " Install 'graphviz', 'matplotlib', or 'holoviews' to visualize the pipeline."
+                    " To install all backends, run `pip install 'pipefunc[plotting]'`."
+                )
+                raise ImportError(msg)
+        if backend == "graphviz":
+            return self.visualize_graphviz(**kwargs)
+        if backend == "matplotlib":
+            return self.visualize_matplotlib(**kwargs)
+        if backend == "holoviews":
+            return self.visualize_holoviews(**kwargs)
+        msg = f"Invalid backend: {backend}. Must be 'graphviz_widget', 'graphviz', 'matplotlib', or 'holoviews'."  # pragma: no cover
+        raise ValueError(msg)  # pragma: no cover
+
+    def visualize_graphviz(
+        self,
+        *,
+        figsize: tuple[int, int] | int | None = None,
+        filename: str | Path | None = None,
+        func_node_colors: str | list[str] | None = None,
+        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        graphviz_kwargs: dict[str, Any] | None = None,
+        show_legend: bool = True,
+        include_full_mapspec: bool = False,
+        return_type: Literal["graphviz", "html"] | None = None,
+    ) -> graphviz.Digraph | IPython.display.HTML:
+        """Visualize the pipeline as a directed graph using Graphviz.
+
+        Parameters
+        ----------
+        figsize
+            The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
+            If ``None``, the size will be determined automatically.
+        filename
+            The filename to save the figure to, if provided.
+        func_node_colors
+            The colors for function nodes.
+        orient
+            Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+        graphviz_kwargs
+            Graphviz-specific keyword arguments for customizing the graph's appearance.
+        show_legend
+            Whether to show the legend in the graph visualization.
+        include_full_mapspec
+            Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
+        return_type
+            The format to return the visualization in.
+            If ``'html'``, the visualization is returned as a `IPython.display.html`,
+            if ``'graphviz'``, the `graphviz.Digraph` object is returned.
+            If ``None``, the format is ``'html'`` if running in a Jupyter notebook,
+            otherwise ``'graphviz'``.
+
+        Returns
+        -------
+        graphviz.Digraph
+            The resulting Graphviz Digraph object.
+
+        """
+        from pipefunc._plotting import visualize_graphviz
+
+        return visualize_graphviz(
+            self.graph,
+            self.defaults,
+            figsize=figsize,
+            filename=filename,
+            func_node_colors=func_node_colors,
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            show_legend=show_legend,
+            include_full_mapspec=include_full_mapspec,
+            return_type=return_type,
+        )
+
+    def visualize_matplotlib(
+        self,
+        figsize: tuple[int, int] | int = (10, 10),
         filename: str | Path | None = None,
         *,
         color_combinable: bool = False,
@@ -1126,17 +1346,18 @@ class Pipeline:
         ----------
         figsize
             The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
         filename
             The filename to save the figure to.
         color_combinable
             Whether to color combinable nodes differently.
         conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
         output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
 
         """
-        from pipefunc._plotting import visualize
+        from pipefunc._plotting import visualize_matplotlib
 
         if color_combinable:
             func_node_colors = self._func_node_colors(
@@ -1145,7 +1366,7 @@ class Pipeline:
             )
         else:
             func_node_colors = None
-        visualize(
+        visualize_matplotlib(
             self.graph,
             figsize=figsize,
             filename=filename,
@@ -1268,6 +1489,18 @@ class Pipeline:
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    @property
+    def error_snapshot(self) -> ErrorSnapshot | None:
+        """Return an error snapshot for the pipeline.
+
+        This value is `None` if no errors have occurred during
+        the pipeline execution.
+        """
+        for f in self.functions:
+            if f.error_snapshot:
+                return f.error_snapshot
+        return None
 
     def nest_funcs(
         self,
@@ -1516,8 +1749,8 @@ class Pipeline:
 
     def _ipython_display_(self) -> None:
         """Display the pipeline widget."""
-        if is_notebook():
-            from ._widgets import PipelineWidget
+        if is_running_in_ipynb():
+            from ._widgets.pipeline import PipelineWidget
 
             widget = PipelineWidget(self)
             widget.display()
@@ -1758,6 +1991,7 @@ def _create_cache(
         return HybridCache(**cache_kwargs)
     if cache_type == "disk":
         cache_kwargs.setdefault("lru_shared", not lazy)
+        cache_kwargs.setdefault("cache_dir", tempfile.gettempdir())
         return DiskCache(**cache_kwargs)
     if cache_type == "simple":
         return SimpleCache()

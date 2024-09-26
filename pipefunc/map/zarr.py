@@ -22,6 +22,7 @@ class ZarrFileArray(StorageBase):
     """Array interface to a Zarr store."""
 
     storage_id = "zarr_file_array"
+    requires_serialization = True
 
     def __init__(
         self,
@@ -145,11 +146,7 @@ class ZarrFileArray(StorageBase):
             (slice(None),) * len(self.shape),
             (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
-        tile_shape = _select_by_mask(
-            self.shape_mask,
-            (1,) * len(self.shape),
-            self.internal_shape,
-        )
+        tile_shape = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         mask = np.tile(mask[slc], tile_shape)
 
         return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
@@ -221,10 +218,7 @@ class ZarrFileArray(StorageBase):
 class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
-    def __init__(
-        self,
-        shared_dict: multiprocessing.managers.DictProxy | None = None,
-    ) -> None:
+    def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
         """Initialize the _SharedDictStore.
 
         Parameters
@@ -243,6 +237,7 @@ class ZarrMemoryArray(ZarrFileArray):
     """Array interface to an in-memory Zarr store."""
 
     storage_id = "zarr_memory"
+    requires_serialization = False
 
     def __init__(
         self,
@@ -298,6 +293,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
     """Array interface to a shared memory Zarr store."""
 
     storage_id = "zarr_shared_memory"
+    requires_serialization = True
 
     def __init__(
         self,
@@ -350,10 +346,7 @@ class CloudPickleCodec(Codec):
 
     codec_id = "cloudpickle"
 
-    def __init__(
-        self,
-        protocol: int = cloudpickle.DEFAULT_PROTOCOL,
-    ) -> None:
+    def __init__(self, protocol: int = cloudpickle.DEFAULT_PROTOCOL) -> None:
         """Initialize the CloudPickleCodec codec.
 
         Parameters
@@ -410,10 +403,7 @@ class CloudPickleCodec(Codec):
             The configuration of the codec.
 
         """
-        return {
-            "id": self.codec_id,
-            "protocol": self.protocol,
-        }
+        return {"id": self.codec_id, "protocol": self.protocol}
 
     def __repr__(self) -> str:
         """Return a string representation of the codec."""

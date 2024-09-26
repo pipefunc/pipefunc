@@ -10,10 +10,11 @@ import hashlib
 import pickle
 import sys
 import time
+import warnings
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 
@@ -423,7 +424,7 @@ class DiskCache(_CacheBase):
             )
 
     def _get_file_path(self, key: Hashable) -> Path:
-        key_hash = hashlib.md5(str(key).encode()).hexdigest()  # noqa: S324
+        key_hash = _pickle_key(key)
         return self.cache_dir / f"{key_hash}.pkl"
 
     def get(self, key: Hashable) -> Any:
@@ -498,9 +499,24 @@ class DiskCache(_CacheBase):
         return self.lru_cache.shared
 
 
+def _pickle_key(obj: Any) -> str:
+    # Based on the implementation of `diskcache` although that also
+    # does pickle_tools.optimize which we don't need here
+    data = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+    return hashlib.md5(data).hexdigest()  # noqa: S324
+
+
+def _cloudpickle_key(obj: Any) -> str:
+    data = cloudpickle.dumps(obj)
+    return hashlib.md5(data).hexdigest()  # noqa: S324
+
+
 def memoize(
     cache: HybridCache | LRUCache | SimpleCache | DiskCache | None = None,
     key_func: Callable[..., Hashable] | None = None,
+    *,
+    fallback_to_pickle: bool = True,
+    unhashable_action: Literal["error", "warning", "ignore"] = "error",
 ) -> Callable:
     """A flexible memoization decorator that works with different cache types.
 
@@ -511,10 +527,31 @@ def memoize(
     key_func
         A function to generate cache keys. If None, the default key generation which
         attempts to make all arguments hashable.
+    fallback_to_pickle
+        If ``True``, unhashable objects will be pickled to bytes using `cloudpickle` as a last resort.
+        If ``False``, an exception will be raised for unhashable objects.
+        Only used if ``key_func`` is None.
+    unhashable_action
+        Determines the behavior when encountering unhashable objects:
+        - "error": Raise an UnhashableError (default).
+        - "warning": Log a warning and skip caching for that call.
+        - "ignore": Silently skip caching for that call.
+        Only used if ``key_func`` is None.
 
     Returns
     -------
     Decorated function with memoization.
+
+    Raises
+    ------
+    UnhashableError
+        If the object cannot be made hashable and ``fallback_to_pickle`` is ``False``.
+
+    Notes
+    -----
+    This function creates a hashable representation of both positional and keyword
+    arguments, allowing for effective caching of function calls with various
+    argument types.
 
     """
     if cache is None:
@@ -523,10 +560,17 @@ def memoize(
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if key_func:  # noqa: SIM108
+            if key_func:
                 key = key_func(*args, **kwargs)
             else:
-                key = _generate_cache_key(args, kwargs)
+                key = try_to_hashable(  # type: ignore[assignment]
+                    (args, kwargs),
+                    fallback_to_pickle,
+                    unhashable_action,
+                    func.__name__,
+                )
+                if key is UnhashableError:
+                    return func(*args, **kwargs)
 
             if key in cache:
                 return cache.get(key)
@@ -548,40 +592,100 @@ def memoize(
     return decorator
 
 
+def try_to_hashable(
+    obj: Any,
+    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+    unhashable_action: Literal["error", "warning", "ignore"] = "error",
+    where: str = "function",
+) -> Hashable | type[UnhashableError]:
+    """Try to convert an object to a hashable representation.
+
+    Wrapper around ``to_hashable`` that allows for different actions when encountering
+    unhashable objects.
+
+    Parameters
+    ----------
+    obj
+        The object to convert.
+    fallback_to_pickle
+        If ``True``, unhashable objects will be pickled to bytes using `cloudpickle` as a last resort.
+        If ``False``, an exception will be raised for unhashable objects.
+    unhashable_action
+        Determines the behavior when encountering unhashable objects:
+        - ``"error"``: Raise an `UnhashableError` (default).
+        - ``"warning"``: Log a warning and skip caching for that call.
+        - ``"ignore"``: Silently skip caching for that call. Returns `UnhashableError`.
+    where
+        The location where the unhashable object was encountered.
+        Used for warning or error messages.
+
+    Returns
+    -------
+        A hashable representation of the input object.
+
+    Raises
+    ------
+    UnhashableError
+        If the object cannot be made hashable and ``fallback_to_pickle`` is ``False``.
+
+    Notes
+    -----
+    This function attempts to create a hashable representation of any input object.
+    It handles most built-in Python types and some common third-party types like
+    numpy arrays and pandas Series/DataFrames.
+
+    """
+    try:
+        return to_hashable(obj, fallback_to_pickle=fallback_to_pickle)
+    except UnhashableError:
+        if unhashable_action == "error":
+            raise
+        if unhashable_action == "warning":
+            warnings.warn(
+                f"Unhashable arguments in '{where}'. Skipping cache.",
+                UserWarning,
+                stacklevel=3,
+            )
+        return UnhashableError
+
+
 def _hashable_iterable(
     iterable: Iterable,
+    fallback_to_pickle: bool,  # noqa: FBT001
     *,
-    fallback_to_str: bool = True,
     sort: bool = False,
 ) -> tuple:
     items = sorted(iterable) if sort else iterable
-    return tuple(to_hashable(item, fallback_to_str) for item in items)
+    return tuple(to_hashable(item, fallback_to_pickle) for item in items)
 
 
 def _hashable_mapping(
     mapping: dict,
+    fallback_to_pickle: bool,  # noqa: FBT001
     *,
-    fallback_to_str: bool = True,
     sort: bool = False,
 ) -> tuple:
     items = sorted(mapping.items()) if sort else mapping.items()
-    return tuple((k, to_hashable(v, fallback_to_str)) for k, v in items)
+    return tuple((k, to_hashable(v, fallback_to_pickle)) for k, v in items)
 
 
 # Unique string added to hashable representations to avoid hash collisions
 _HASH_MARKER = "__CONVERTED__"
 
 
-def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001, FBT002, PLR0911, PLR0912
+def to_hashable(  # noqa: C901, PLR0911, PLR0912
+    obj: Any,
+    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+) -> Any:
     """Convert any object to a hashable representation if not hashable yet.
 
     Parameters
     ----------
     obj
         The object to convert.
-    fallback_to_str
-        If True, unhashable objects will be converted to strings as a last resort.
-        If False, an exception will be raised for unhashable objects.
+    fallback_to_pickle
+        If ``True``, unhashable objects will be pickled to bytes using `cloudpickle` as a last resort.
+        If ``False``, an exception will be raised for unhashable objects.
 
     Returns
     -------
@@ -589,8 +693,8 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
 
     Raises
     ------
-    TypeError
-        If the object cannot be made hashable and fallback_to_str is False.
+    UnhashableError
+        If the object cannot be made hashable and fallback_to_pickle is False.
 
     Notes
     -----
@@ -614,23 +718,23 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
 
     m = _HASH_MARKER
     if isinstance(obj, collections.OrderedDict):
-        return (m, tp, _hashable_mapping(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, fallback_to_pickle))
     if isinstance(obj, collections.defaultdict):
         data = (
-            to_hashable(obj.default_factory, fallback_to_str),
-            _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str),
+            to_hashable(obj.default_factory, fallback_to_pickle),
+            _hashable_mapping(obj, fallback_to_pickle, sort=True),
         )
         return (m, tp, data)
     if isinstance(obj, collections.Counter):
         return (m, tp, tuple(sorted(obj.items())))
     if isinstance(obj, dict):
-        return (m, tp, _hashable_mapping(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_mapping(obj, fallback_to_pickle, sort=True))
     if isinstance(obj, set | frozenset):
-        return (m, tp, _hashable_iterable(obj, sort=True, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, fallback_to_pickle, sort=True))
     if isinstance(obj, list | tuple):
-        return (m, tp, _hashable_iterable(obj, fallback_to_str=fallback_to_str))
+        return (m, tp, _hashable_iterable(obj, fallback_to_pickle))
     if isinstance(obj, collections.deque):
-        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_str=fallback_to_str)))
+        return (m, tp, (obj.maxlen, _hashable_iterable(obj, fallback_to_pickle)))
     if isinstance(obj, bytearray):
         return (m, tp, tuple(obj))
     if isinstance(obj, array.array):
@@ -643,38 +747,24 @@ def to_hashable(obj: Any, fallback_to_str: bool = True) -> Any:  # noqa: FBT001,
     # Handle pandas Series and DataFrames
     if "pandas" in sys.modules:
         if isinstance(obj, sys.modules["pandas"].Series):
-            return (m, tp, (obj.name, to_hashable(obj.to_dict(), fallback_to_str)))
+            return (m, tp, (obj.name, to_hashable(obj.to_dict(), fallback_to_pickle)))
         if isinstance(obj, sys.modules["pandas"].DataFrame):
-            return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_str))
+            return (m, tp, to_hashable(obj.to_dict("list"), fallback_to_pickle))
 
-    if fallback_to_str:
-        return (m, tp, str(obj))
-    msg = f"Object of type {type(obj)} cannot be hashed"
-    raise TypeError(msg)
+    if fallback_to_pickle:
+        try:
+            return (m, tp, _cloudpickle_key(obj))
+        except Exception as e:
+            raise UnhashableError(obj) from e
+    raise UnhashableError(obj)
 
 
-def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:
-    """Generate a hashable key from function arguments.
+class UnhashableError(TypeError):
+    """Exception raised for objects that cannot be made hashable."""
 
-    Parameters
-    ----------
-    args
-        Positional arguments to be included in the key.
-    kwargs
-        Keyword arguments to be included in the key.
-    fallback_to_str
-        If True, unhashable objects will be converted to strings as a last resort.
-        If False, an exception will be raised for unhashable objects.
-
-    Returns
-    -------
-    A hash value that can be used as a cache key.
-
-    Notes
-    -----
-    This function creates a hashable representation of both positional and keyword
-    arguments, allowing for effective caching of function calls with various
-    argument types.
-
-    """
-    return to_hashable((args, kwargs), fallback_to_str)
+    def __init__(self, obj: Any) -> None:
+        self.obj = obj
+        self.message = (
+            f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
+        )
+        super().__init__(self.message)

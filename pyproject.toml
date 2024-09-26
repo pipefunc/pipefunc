@@ -27,19 +27,27 @@ dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
-zarr = ["zarr"]
 widgets = ["ipywidgets"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "jupyter_bokeh"]
+zarr = ["zarr"]
+pandas = ["pandas"]
+plotting = [
+    "matplotlib",
+    "pygraphviz",
+    "holoviews",
+    "bokeh",
+    "graphviz",
+    "jupyter_bokeh",
+]
 test = [
     "pytest",
-    "coverage",
+    "pytest-asyncio",
+    "pytest-codspeed",
     "pytest-cov",
-    "pandas",
+    "coverage",
     "adaptive",
     "xarray",
     "zarr",
     "versioningit",
-    "pytest-codspeed",
 ]
 docs = [
     # TODO: unpin myst-nb in .github/update-environment.py
@@ -55,9 +63,13 @@ docs = [
     "versioningit",
     "sphinx-togglebutton",
     "sphinx-copybutton",
+    # Used for the example notebook
+    "seaborn",
+    "nltk",
+    "scikit-image",
 ]
 all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
-dev = [  # all + dev deps
+dev = [ # all + dev deps
     "black[jupyter]",
     "pre-commit",
     "ruff",
@@ -102,6 +114,7 @@ build-file = "pipefunc/_version.py"
 source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "module"
 addopts = """
     -vvv
     --cov=pipefunc
@@ -109,6 +122,7 @@ addopts = """
     --cov-report html
     --cov-report xml
     --cov-fail-under=35
+    --asyncio-mode=strict
 """
 
 [tool.coverage.report]
@@ -153,7 +167,17 @@ ignore = [
 "tests/*" = ["SLF001", "ANN", "D", "PLR2004", "ARG001"]
 "tests/test_examples.py" = ["E501"]
 ".github/*" = ["INP001"]
-"example.ipynb" = ["D101", "D103", "DTZ005", "PLR2004", "ARG001", "ANN001", "ANN201"]
+"example.ipynb" = [
+    "D101",
+    "D103",
+    "DTZ005",
+    "PLR2004",
+    "ARG001",
+    "ANN001",
+    "ANN201",
+    "NPY002",
+    "RET504",
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

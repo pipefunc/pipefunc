@@ -243,10 +243,7 @@ def _func_node_colors(
     node_sets = [{k, *v} for k, v in combinable_nodes.items()]
     color_index = len(node_sets)  # for non-combinable nodes
     for node in functions:
-        i = next(
-            (i for i, nodes in enumerate(node_sets) if node in nodes),
-            None,
-        )
+        i = next((i for i, nodes in enumerate(node_sets) if node in nodes), None)
         if i is not None:
             func_node_colors.append(f"C{i}")
         else:

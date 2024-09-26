@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import itertools
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -44,6 +45,7 @@ class FileArray(StorageBase):
     """
 
     storage_id = "file_array"
+    requires_serialization = True
 
     def __init__(
         self,
@@ -232,7 +234,10 @@ class FileArray(StorageBase):
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return [not self._index_to_file(i).is_file() for i in range(self.size)]
+        # We use os.listdir to check if a file exists instead of checking with
+        # self._index_to_file(i).is_file() because this is more efficient.
+        existing_files = set(os.listdir(self.folder))
+        return [self.filename_template.format(i) not in existing_files for i in range(self.size)]
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:

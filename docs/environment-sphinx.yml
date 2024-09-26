@@ -17,16 +17,18 @@ dependencies:
   - adaptive-scheduler>=2.12.0
   # optional-dependencies: xarray
   - xarray
-  # optional-dependencies: zarr
-  - zarr
   # optional-dependencies: widgets
   - ipywidgets
+  # optional-dependencies: zarr
+  - zarr
+  # optional-dependencies: pandas
+  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
-  - jupyter_bokeh
+  - python-graphviz
   # optional-dependencies: docs
   - sphinx
   - sphinx-book-theme
@@ -38,5 +40,8 @@ dependencies:
   - versioningit
   - sphinx-togglebutton
   - sphinx-copybutton
+  - seaborn
+  - nltk
+  - scikit-image
   - pip:
     - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip

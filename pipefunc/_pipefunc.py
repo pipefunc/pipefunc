@@ -11,22 +11,17 @@ from __future__ import annotations
 import contextlib
 import datetime
 import functools
+import getpass
 import inspect
 import os
+import platform
+import traceback
 import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    TypeAlias,
-    TypeVar,
-    get_args,
-    get_origin,
-)
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -36,6 +31,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
+    get_local_ip,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -44,6 +40,8 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipefunc import Pipeline
 
 
@@ -138,6 +136,12 @@ class PipeFunc(Generic[T]):
     -------
         A `PipeFunc` instance that wraps the original function with the specified return identifier.
 
+    Attributes
+    ----------
+    error_snapshot
+        If an error occurs while calling the function, this attribute will contain
+        an `ErrorSnapshot` instance with information about the error.
+
     Examples
     --------
     >>> def add_one(a, b):
@@ -198,6 +202,7 @@ class PipeFunc(Generic[T]):
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
         self._validate()
+        self.error_snapshot: ErrorSnapshot | None = None
 
     @property
     def renames(self) -> dict[str, str]:
@@ -578,6 +583,13 @@ class PipeFunc(Generic[T]):
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
+    @functools.cached_property
+    def _evaluate_lazy(self) -> bool:
+        """Return whether the function should evaluate lazy arguments."""
+        # This is a cached property because it is slow and otherwise called multiple times.
+        # We assume that once it is set, it does not change during the lifetime of the object.
+        return any(p.lazy for p in self._pipelines)
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
 
@@ -600,15 +612,24 @@ class PipeFunc(Generic[T]):
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
-            args = evaluate_lazy(args)
-            kwargs = evaluate_lazy(kwargs)
+            if self._evaluate_lazy:
+                args = evaluate_lazy(args)
+                kwargs = evaluate_lazy(kwargs)
             _maybe_update_kwargs_with_resources(
                 kwargs,
                 self.resources_variable,
                 evaluated_resources,
                 self.resources,
             )
-            result = self.func(*args, **kwargs)
+            try:
+                result = self.func(*args, **kwargs)
+            except Exception as e:
+                print(
+                    f"An error occurred while calling the function `{self.__name__}`"
+                    f" with the arguments `{args=}` and `{kwargs=}`.",
+                )
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                raise
 
         if self.debug:
             func_str = format_function_call(self.__name__, (), kwargs)
@@ -1154,6 +1175,80 @@ class _NestedFuncWrapper:
         return tuple(result_dict[name] for name in self.output_name)
 
 
+def _timestamp() -> str:
+    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+
+
+@dataclass
+class ErrorSnapshot:
+    """A snapshot that represents an error in a function call."""
+
+    function: Callable[..., Any]
+    exception: Exception
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+    traceback: str = field(init=False)
+    timestamp: str = field(default_factory=_timestamp)
+    user: str = field(default_factory=getpass.getuser)
+    machine: str = field(default_factory=platform.node)
+    ip_address: str = field(default_factory=get_local_ip)
+    current_directory: str = field(default_factory=os.getcwd)
+
+    def __post_init__(self) -> None:
+        tb = traceback.format_exception(
+            type(self.exception),
+            self.exception,
+            self.exception.__traceback__,
+        )
+        self.traceback = "".join(tb)
+
+    def __str__(self) -> str:
+        args_repr = ", ".join(repr(a) for a in self.args)
+        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
+
+        return (
+            "ErrorSnapshot:\n"
+            "--------------\n"
+            f"- 🛠 Function: {func_name}\n"
+            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
+            f"- 💥 Exception message: {self.exception}\n"
+            f"- 📋 Args: ({args_repr})\n"
+            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
+            f"- 🕒 Timestamp: {self.timestamp}\n"
+            f"- 👤 User: {self.user}\n"
+            f"- 💻 Machine: {self.machine}\n"
+            f"- 📡 IP Address: {self.ip_address}\n"
+            f"- 📂 Current Directory: {self.current_directory}\n"
+            "\n"
+            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
+            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
+            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
+            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
+            " and load it using `ErrorSnapshot.load_from_file(filename)`."
+        )
+
+    def reproduce(self) -> Any | None:
+        """Attempt to recreate the error by calling the function with stored arguments."""
+        return self.function(*self.args, **self.kwargs)
+
+    def save_to_file(self, filename: str | Path) -> None:
+        """Save the error snapshot to a file using cloudpickle."""
+        with open(filename, "wb") as f:  # noqa: PTH123
+            cloudpickle.dump(self, f)
+
+    @classmethod
+    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
+        """Load an error snapshot from a file using cloudpickle."""
+        with open(filename, "rb") as f:  # noqa: PTH123
+            return cloudpickle.load(f)
+
+    def _ipython_display_(self) -> None:  # pragma: no cover
+        from IPython.display import HTML, display
+
+        display(HTML(f"<pre>{self}</pre>"))
+
+
 def _validate_identifier(name: str, value: Any) -> None:
     if "." in value:
         scope, value = value.split(".", 1)
@@ -1227,11 +1322,7 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(
-    output: Any,
-    name: str,
-    output_name: _OUTPUT_TYPE,
-) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 
