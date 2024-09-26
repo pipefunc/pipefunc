@@ -3,9 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from ipywidgets import HTML, Button, FloatProgress, VBox
 
-from pipefunc._widgets.progress import (
-    ProgressTracker,
-)
+from pipefunc._widgets.progress import ProgressTracker
 
 
 @pytest.fixture
