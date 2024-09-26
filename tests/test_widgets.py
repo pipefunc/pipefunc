@@ -6,7 +6,7 @@ import ipywidgets as widgets
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._widgets import PipelineWidget
+from pipefunc._widgets.pipeline import PipelineWidget
 
 
 @pytest.fixture
