@@ -30,6 +30,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_installed,
     is_running_in_ipynb,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
@@ -1754,7 +1755,7 @@ class Pipeline:
         exclude: set[str] | None = None,
     ) -> dict[str, str]:
         """Display the pipeline widget."""
-        if is_running_in_ipynb():
+        if is_running_in_ipynb() and is_installed("ipywidgets"):
             from ._widgets.pipeline import PipelineWidget
 
             widget = PipelineWidget(self).tab
