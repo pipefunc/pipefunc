@@ -198,7 +198,7 @@ def test_memoize_unhashable_action_warning():
     # Using a truly unhashable object should issue a warning and not cache
     with pytest.warns(
         UserWarning,
-        match="Unhashable arguments in process_unhashable. Skipping cache.",
+        match="Unhashable arguments in 'process_unhashable'. Skipping cache.",
     ):
         result1 = process_unhashable(TrulyUnhashable(42))
 
@@ -208,7 +208,7 @@ def test_memoize_unhashable_action_warning():
     # Call again with the same unhashable object
     with pytest.warns(
         UserWarning,
-        match="Unhashable arguments in process_unhashable. Skipping cache.",
+        match="Unhashable arguments in 'process_unhashable'. Skipping cache.",
     ):
         result2 = process_unhashable(TrulyUnhashable(42))
 

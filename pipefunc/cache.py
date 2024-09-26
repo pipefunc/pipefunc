@@ -531,6 +531,11 @@ def memoize(
     -------
     Decorated function with memoization.
 
+    Raises
+    ------
+    UnhashableError
+        If the object cannot be made hashable and ``fallback_to_str`` is ``False``.
+
     Notes
     -----
     This function creates a hashable representation of both positional and keyword
@@ -547,17 +552,13 @@ def memoize(
             if key_func:
                 key = key_func(*args, **kwargs)
             else:
-                try:
-                    key = _generate_cache_key(args, kwargs, fallback_to_str=fallback_to_str)
-                except UnhashableError:
-                    if unhashable_action == "error":
-                        raise
-                    if unhashable_action == "warning":
-                        warnings.warn(
-                            f"Unhashable arguments in {func.__name__}. Skipping cache.",
-                            UserWarning,
-                            stacklevel=3,
-                        )
+                key = try_to_hashable(
+                    (args, kwargs),
+                    fallback_to_str,
+                    unhashable_action,
+                    func.__name__,
+                )
+                if key is None:
                     return func(*args, **kwargs)
 
             if key in cache:
@@ -578,6 +579,63 @@ def memoize(
         return wrapper
 
     return decorator
+
+
+def try_to_hashable(
+    obj: Any,
+    fallback_to_str: bool,  # noqa: FBT001
+    unhashable_action: Literal["error", "warning", "ignore"],
+    where: str = "function",
+) -> Hashable | None:
+    """Try to convert an object to a hashable representation.
+
+    Wrapper around ``to_hashable`` that allows for different actions when encountering
+    unhashable objects.
+
+    Parameters
+    ----------
+    obj
+        The object to convert.
+    fallback_to_str
+        If ``True``, unhashable objects will be converted to strings as a last resort.
+        If ``False``, an exception will be raised for unhashable objects.
+    unhashable_action
+        Determines the behavior when encountering unhashable objects:
+        - ``"error"``: Raise an `UnhashableError` (default).
+        - ``"warning"``: Log a warning and skip caching for that call.
+        - ``"ignore"``: Silently skip caching for that call.
+    where
+        The location where the unhashable object was encountered.
+        Used for warning or error messages.
+
+    Returns
+    -------
+        A hashable representation of the input object.
+
+    Raises
+    ------
+    UnhashableError
+        If the object cannot be made hashable and ``fallback_to_str`` is ``False``.
+
+    Notes
+    -----
+    This function attempts to create a hashable representation of any input object.
+    It handles most built-in Python types and some common third-party types like
+    numpy arrays and pandas Series/DataFrames.
+
+    """
+    try:
+        return to_hashable(obj, fallback_to_str=fallback_to_str)
+    except UnhashableError:
+        if unhashable_action == "error":
+            raise
+        if unhashable_action == "warning":
+            warnings.warn(
+                f"Unhashable arguments in '{where}'. Skipping cache.",
+                UserWarning,
+                stacklevel=3,
+            )
+        return None
 
 
 def _hashable_iterable(
@@ -696,30 +754,3 @@ class UnhashableError(TypeError):
             f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
         )
         super().__init__(self.message)
-
-
-def _generate_cache_key(args: tuple, kwargs: dict, *, fallback_to_str: bool = True) -> Hashable:
-    """Generate a hashable key from function arguments.
-
-    Parameters
-    ----------
-    args
-        Positional arguments to be included in the key.
-    kwargs
-        Keyword arguments to be included in the key.
-    fallback_to_str
-        If True, unhashable objects will be converted to strings as a last resort.
-        If False, an exception will be raised for unhashable objects.
-
-    Returns
-    -------
-    A hash value that can be used as a cache key.
-
-    Notes
-    -----
-    This function creates a hashable representation of both positional and keyword
-    arguments, allowing for effective caching of function calls with various
-    argument types.
-
-    """
-    return to_hashable((args, kwargs), fallback_to_str)
