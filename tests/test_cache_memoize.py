@@ -152,7 +152,7 @@ def test_memoize_with_unhashable_arguments_fallback_to_str():
     cache = SimpleCache()
     calls = {"count": 0}
 
-    @memoize(cache=cache, fallback_to_str=True)
+    @memoize(cache=cache, fallback_to_pickle=True)
     def process_unhashable(obj):
         calls["count"] += 1
         return str(obj)
