@@ -56,7 +56,7 @@ def _prepare_run(
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
     output_names: set[_OUTPUT_TYPE] | None,
     parallel: bool,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     storage: str | dict[_OUTPUT_TYPE, str],
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
@@ -108,7 +108,7 @@ def run(
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
-    executor: Executor | None = None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
     storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -234,7 +234,7 @@ def run_async(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
-    executor: Executor | None = None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
     storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -632,7 +632,7 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     parallel: bool,  # noqa: FBT001
 ) -> Generator[Executor | None, None, None]:
     if executor is None and parallel:
@@ -713,7 +713,7 @@ def _status_submit(
 def _maybe_parallel_map(
     func: Callable[..., Any],
     seq: Sequence,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     status: _Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -727,7 +727,7 @@ def _maybe_parallel_map(
 
 def _maybe_submit(
     func: Callable[..., Any],
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     status: _Status | None,
     progress: ProgressTracker | None,
     *args: Any,
@@ -885,7 +885,7 @@ def _run_and_process_generation(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -951,7 +951,7 @@ def _submit_func(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -971,7 +971,7 @@ def _submit_generation(
     generation: list[PipeFunc],
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
@@ -1062,8 +1062,15 @@ async def _process_task_async(
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
 ) -> None:
+    if isinstance(executor, dict):
+        for output_name, ex in executor.items():
+            name = at_least_tuple(output_name)[
+                0
+            ]  # Need to only check one name since all are the same
+            _check_parallel(parallel, store[name], ex)
+        return
     if isinstance(executor, ThreadPoolExecutor):
         return
     if not parallel or not store:
