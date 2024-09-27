@@ -155,7 +155,7 @@ def create_learners(
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    storage: str = "file_array",
+    storage: str | dict[_OUTPUT_TYPE | None, str] = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -196,8 +196,14 @@ def create_learners(
     internal_shapes
         The internal shapes to use for the run.
     storage
-        The storage class to use for the file arrays.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        The storage class to use for storing intermediate and final results.
+        Can be specified as:
+        1. A string: Use a single storage class for all outputs.
+        2. A dictionary: Specify different storage classes for different outputs.
+            - Use output names as keys and storage class names as values.
+            - Use ``None`` as a key to set a default storage class.
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Common options include "memory", "file_array", and "zarr".
     return_output
         Whether to return the output of the function in the learner.
     cleanup

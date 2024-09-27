@@ -629,7 +629,7 @@ class Pipeline:
         output_names: set[_OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | None = None,
-        storage: str = "file_array",
+        storage: str | dict[_OUTPUT_TYPE | None, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -661,8 +661,14 @@ class Pipeline:
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+               - Use output names as keys and storage class names as values.
+               - Use ``None`` as a key to set a default storage class.
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include "memory", "file_array", and "zarr".
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -714,7 +720,7 @@ class Pipeline:
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
         executor: Executor | None = None,
-        storage: str = "file_array",
+        storage: str | dict[_OUTPUT_TYPE | None, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -746,8 +752,14 @@ class Pipeline:
             The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
             is used. Only relevant if ``parallel=True``.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+               - Use output names as keys and storage class names as values.
+               - Use ``None`` as a key to set a default storage class.
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include "memory", "file_array", and "zarr".
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
