@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -1558,4 +1558,59 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
             run_folder=tmp_path,
             parallel=False,
             storage={("y1", "y2"): "file_array"},
+        )
+
+
+def test_pipeline_with_heterogeneous_executor() -> None:
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        import threading
+
+        return threading.current_thread().name, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        import multiprocessing
+
+        return multiprocessing.current_process().name
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    executor: dict[str | tuple[str, ...], Executor] = {
+        ("y1", "y2"): ThreadPoolExecutor(max_workers=2),
+        "": ProcessPoolExecutor(max_workers=2),
+    }
+    results = pipeline.map(inputs, executor=executor, parallel=True)
+
+    # Check if ThreadPoolExecutor was used for f
+    thread_names = results["y1"].output.tolist()
+    assert len(thread_names) > 1
+    assert all("ThreadPool" in name for name in thread_names)
+
+    # Check if ProcessPoolExecutor was used for g
+    process_names = results["z"].output.tolist()
+    assert len(process_names) > 1
+    assert all("Process-" in name for name in process_names)
+
+    # Check the actual computation results
+    assert results["y2"].output.tolist() == [2, 3, 4]
+
+    # Test missing executor
+    with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
+        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
+
+    # Test incompatible storage with executor
+    with pytest.warns(
+        UserWarning,
+        match=re.escape(
+            "The chosen storage type `dict` does not support process-based parallel execution.",
+        ),
+    ):
+        pipeline.map(
+            inputs,
+            executor={
+                "z": ProcessPoolExecutor(max_workers=2),
+                "": ThreadPoolExecutor(max_workers=2),
+            },
+            storage={"": "dict"},
         )
