@@ -664,8 +664,8 @@ class Pipeline:
             2. A `concurrent.futures.Executor` instance: Used for all outputs.
             3. A dictionary: Specify different executors for different outputs.
 
-                - Use output names as keys and `~concurrent.futures.Executor` instances as values.
-                - Use an empty string ``""`` as a key to set a default executor.
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
 
             If parallel is ``False``, this argument is ignored.
         storage
@@ -766,8 +766,8 @@ class Pipeline:
             2. A `concurrent.futures.Executor` instance: Used for all outputs.
             3. A dictionary: Specify different executors for different outputs.
 
-                - Use output names as keys and `~concurrent.futures.Executor` instances as values.
-                - Use an empty string ``""`` as a key to set a default executor.
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
         storage
             The storage class to use for storing intermediate and final results.
             Can be specified as:
