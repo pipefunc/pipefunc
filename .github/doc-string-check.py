@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Check for discrepancies in parameter descriptions between functions."""
 
 from __future__ import annotations
@@ -36,18 +37,17 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
         stripped_line = line.strip()
         if stripped_line == "Parameters":
             in_params_section = True
-        elif stripped_line == "" and in_params_section:
-            # Stop processing after the first empty line after the Parameters section
+        elif in_params_section and (
+            stripped_line in ("See Also", "Returns", "Raises", "Notes", "Examples")
+        ):
             break
         elif in_params_section:
             if stripped_line.startswith("---"):
                 continue
             if stripped_line == "":
-                if current_param:
-                    param_dict[current_param] = " ".join(current_description).strip()
-                    current_param = None
-                    current_description = []
-            elif not line.startswith("    "):  # Parameter names are not indented
+                # Empty line inside of a parameter description, e.g., for lists
+                continue
+            if not line.startswith("    "):  # Parameter names are not indented
                 if current_param:
                     param_dict[current_param] = " ".join(current_description).strip()
                 current_param = stripped_line
@@ -67,6 +67,45 @@ class ParameterDiscrepancyError(Exception):
 
 class MissingParameterError(Exception):
     """Exception raised for parameters missing in one of the functions."""
+
+
+def test_module() -> None:
+    """Tests whether this module works as intended."""
+
+    def starts_ends_with(s: str, start: str, end: str) -> bool:
+        return s.startswith(start) and s.endswith(end)
+
+    p = extract_param_descriptions(extract_param_descriptions)
+    assert p.keys() == {"func"}
+    assert starts_ends_with(p["func"], "The function", "descriptions from.")
+    p = extract_param_descriptions(compare_param_descriptions)
+    assert p.keys() == {"func1", "func2", "allow_missing", "allow_discrepancy"}
+    assert p["func1"] == "The first function to compare."
+    assert p["func2"] == "The second function to compare."
+    assert starts_ends_with(p["allow_missing"], "If True, allow any", "missing parameters.")
+    assert starts_ends_with(p["allow_discrepancy"], "If True, allow any", "discrepancies.")
+
+    def func_with_spacing() -> None:
+        """Example
+
+        Parameters
+        ----------
+        param1
+            The first parameter.
+
+            - First line
+            - Second line
+
+            Yo end of list.
+        param2
+            The second parameter.
+
+        """
+
+    p = extract_param_descriptions(func_with_spacing)
+    assert p.keys() == {"param1", "param2"}
+    assert starts_ends_with(p["param1"], "The first parameter.", "Yo end of list.")
+    assert p["param2"] == "The second parameter."
 
 
 def compare_param_descriptions(
@@ -142,6 +181,8 @@ def compare_param_descriptions(
 
 
 if __name__ == "__main__":
+    test_module()
+
     import pipefunc
     import pipefunc._plotting
     import pipefunc.map._run
