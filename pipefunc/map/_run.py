@@ -1085,11 +1085,12 @@ def _check_parallel(
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
 ) -> None:
     if isinstance(executor, dict):
+        uses_default_executor: set[str] = set(store.keys()) - {
+            n for name in executor for n in at_least_tuple(name)
+        }
         for output_name, ex in executor.items():
-            name = at_least_tuple(output_name)[
-                0
-            ]  # Need to only check one name since all are the same
-            _check_parallel(parallel, store[name], ex)
+            names = uses_default_executor if output_name == "" else at_least_tuple(output_name)
+            _check_parallel(parallel, {n: store[n] for n in names}, ex)
         return
     if isinstance(executor, ThreadPoolExecutor):
         return

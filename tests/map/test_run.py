@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -1559,3 +1559,24 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
             parallel=False,
             storage={("y1", "y2"): "file_array"},
         )
+
+
+def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        return x - 1, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    executor: dict[str | tuple[str, ...], Executor] = {
+        ("y1", "y2"): ThreadPoolExecutor(),
+        "": ProcessPoolExecutor(),
+    }
+    results = pipeline.map(inputs, executor=executor, parallel=False)
+    assert results["y1"].output.tolist() == [0, 1, 2]
+    assert results["y2"].output.tolist() == [2, 3, 4]
+    assert results["z"].output.tolist() == [2, 3, 4]
