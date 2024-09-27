@@ -140,8 +140,13 @@ def run(
     parallel
         Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
+        The executor to use for parallel execution. Can be specified as:
+        1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. An `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+            - Use an empty string ``""`` as a key to set a default executor.
+        If parallel is ``False``, this argument is ignored.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -261,8 +266,12 @@ def run_async(
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
+        The executor to use for parallel execution. Can be specified as:
+        1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. An `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+            - Use an empty string ``""`` as a key to set a default executor.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
