@@ -203,7 +203,7 @@ def create_learners(
             - Use output names as keys and storage class names as values.
             - Use ``None`` as a key to set a default storage class.
         Available storage classes are registered in `pipefunc.map.storage_registry`.
-        Common options include ``"file_array"``, ``"dict"``, and ``"zarr"``.
+        Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     return_output
         Whether to return the output of the function in the learner.
     cleanup

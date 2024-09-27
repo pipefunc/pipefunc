@@ -668,7 +668,7 @@ class Pipeline:
                - Use output names as keys and storage class names as values.
                - Use ``None`` as a key to set a default storage class.
             Available storage classes are registered in `pipefunc.map.storage_registry`.
-            Common options include ``"file_array"``, ``"dict"``, and ``"zarr"``.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -759,7 +759,7 @@ class Pipeline:
                - Use output names as keys and storage class names as values.
                - Use ``None`` as a key to set a default storage class.
             Available storage classes are registered in `pipefunc.map.storage_registry`.
-            Common options include ``"file_array"``, ``"dict"``, and ``"zarr"``.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
