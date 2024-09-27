@@ -834,3 +834,67 @@ with patch(pipeline, "random.randint") as mock1, patch(pipeline, "my_second") as
     mock2.return_value = 5
     print(pipeline())
 ```
+
+## Mixing executors and storage backends for I/O-bound and CPU-bound work
+
+You can mix different executors and storage backends in a pipeline.
+
+Imagine that some `PipeFunc`s are trivial to execute, some are CPU-bound and some are I/O-bound.
+You can mix different executors and storage backends in a pipeline.
+
+Let's consider an example where we have two `PipeFunc`s, `f` and `g`.
+`f` is I/O-bound and `g` is CPU-bound.
+We can use a `ThreadPoolExecutor` for `f` and a `ProcessPoolExecutor` for `g`.
+We will store the results of `f` in memory and store the results of `g` in a file.
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import numpy as np
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def f(x):
+    import threading
+    time.sleep(1)  # Simulate I/O-bound work
+    return threading.current_thread().name
+
+@pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+def g(x):
+    import multiprocessing
+    np.linalg.eig(np.random.rand(1000, 1000))  # CPU-bound work
+    return multiprocessing.current_process().name
+
+pipeline = Pipeline([f, g])
+inputs = {"x": [1, 2, 3]}
+
+executor = {
+    "y": ThreadPoolExecutor(max_workers=2),
+    "": ProcessPoolExecutor(max_workers=2),  # empty string means default executor
+}
+storage = {
+    "z": "file_array",
+    "": "dict",  # empty string means default storage
+}
+results = pipeline.map(inputs, executor=executor, storage=storage)
+
+# Get the results to check the thread and process names
+thread_names = results["y"].output.tolist()
+process_names = results["z"].output.tolist()
+print(f"thread_names: {thread_names}")
+print(f"process_names: {process_names}")
+```
+
+In both `executor` and `storage` you can use the special key `""` to apply the default executor or storage.
+
+```{note}
+The `executor` supports any executor that is compliant with the `concurrent.futures.Executor` interface.
+That includes:
+
+- `concurrent.futures.ProcessPoolExecutor`
+- `concurrent.futures.ThreadPoolExecutor`
+- `ipyparallel.Client().executor()`
+- `dask.distributed.Client().get_executor()`
+- `mpi4py.futures.MPIPoolExecutor()`
+- `loky.get_reusable_executor()`
+
+```
