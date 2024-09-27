@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage_base import StorageBase, _get_storage_class
+from pipefunc.map._storage_base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -83,7 +83,7 @@ class RunInfo:
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
-    storage: str
+    storage: str | dict[_OUTPUT_TYPE, str]
     pipefunc_version: str = __version__
 
     def __post_init__(self) -> None:
@@ -104,7 +104,7 @@ class RunInfo:
         inputs: dict[str, Any],
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        storage: str,
+        storage: str | dict[_OUTPUT_TYPE, str],
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = _maybe_run_folder(run_folder, storage)
@@ -128,23 +128,35 @@ class RunInfo:
             storage=storage,
         )
 
-    @property
-    def storage_class(self) -> type[StorageBase]:
-        return _get_storage_class(self.storage)
+    def storage_class(self, output_name: _OUTPUT_TYPE) -> type[StorageBase]:
+        if isinstance(self.storage, str):
+            return get_storage_class(self.storage)
+        default: str | None = self.storage.get("")
+        storage: str | None = self.storage.get(output_name, default)
+        if storage is None:
+            msg = (
+                f"Cannot find storage class for `{output_name}`."
+                f" Either add `storage[{output_name}] = ...` or"
+                ' use a default by setting `storage[""] = ...`.'
+            )
+            raise ValueError(msg)
+        return get_storage_class(storage)
 
     def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
         store: dict[str, StorageBase | Path | DirectValue] = {}
-
+        name_mapping = {at_least_tuple(name): name for name in self.shapes}
         # Initialize StorageBase instances for each map spec output
         for mapspec in self.mapspecs:
+            # `mapspec.output_names` is always tuple, even for single output
+            output_name: _OUTPUT_TYPE = name_mapping[mapspec.output_names]
             if mapspec.inputs:
-                shape = self.shapes[mapspec.output_names[0]]
-                mask = self.shape_masks[mapspec.output_names[0]]
+                shape = self.shapes[output_name]
+                mask = self.shape_masks[output_name]
                 arrays = _init_file_arrays(
-                    mapspec.output_names,
+                    output_name,
                     shape,
                     mask,
-                    self.storage_class,
+                    self.storage_class(output_name),
                     self.run_folder,
                 )
                 store.update(zip(mapspec.output_names, arrays))
@@ -188,8 +200,11 @@ class RunInfo:
         del data["defaults"]  # or defaults
         data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
-        for key in ["shapes", "shape_masks"]:
-            data[key] = {",".join(at_least_tuple(k)): v for k, v in data[key].items()}
+        dicts_with_tuples = ["shapes", "shape_masks"]
+        if isinstance(self.storage, dict):
+            dicts_with_tuples.append("storage")
+        for key in dicts_with_tuples:
+            data[key] = {_maybe_tuple_to_str(k): v for k, v in data[key].items()}
         data["run_folder"] = str(data["run_folder"])
         data["defaults_path"] = str(self.defaults_path)
         with path.open("w") as f:
@@ -202,8 +217,10 @@ class RunInfo:
             data = json.load(f)
         data["input_paths"] = {k: Path(v) for k, v in data["input_paths"].items()}
         data["all_output_names"] = set(data["all_output_names"])
+        if isinstance(data["storage"], dict):
+            data["storage"] = {_maybe_str_to_tuple(k): v for k, v in data["storage"].items()}
         for key in ["shapes", "shape_masks"]:
-            data[key] = {_maybe_tuple(k): tuple(v) for k, v in data[key].items()}
+            data[key] = {_maybe_str_to_tuple(k): tuple(v) for k, v in data[key].items()}
         if data["internal_shapes"] is not None:
             data["internal_shapes"] = {
                 k: tuple(v) if isinstance(v, list) else v
@@ -219,8 +236,17 @@ class RunInfo:
         return Path(run_folder) / "run_info.json"
 
 
-def _maybe_run_folder(run_folder: str | Path | None, storage: str) -> Path | None:
-    if run_folder is None and _get_storage_class(storage).requires_serialization:
+def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
+    if isinstance(storage, str):
+        return get_storage_class(storage).requires_serialization
+    return any(get_storage_class(s).requires_serialization for s in storage.values())
+
+
+def _maybe_run_folder(
+    run_folder: str | Path | None,
+    storage: str | dict[_OUTPUT_TYPE, str],
+) -> Path | None:
+    if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
         msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
         warnings.warn(msg, stacklevel=2)
@@ -304,9 +330,15 @@ def _check_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
-def _maybe_tuple(x: str) -> tuple[str, ...] | str:
+def _maybe_str_to_tuple(x: str) -> tuple[str, ...] | str:
     if "," in x:
         return tuple(x.split(","))
+    return x
+
+
+def _maybe_tuple_to_str(x: tuple[str, ...] | str) -> str:
+    if isinstance(x, tuple):
+        return ",".join(x)
     return x
 
 

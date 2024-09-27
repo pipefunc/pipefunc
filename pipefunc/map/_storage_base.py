@@ -177,7 +177,26 @@ def _normalize_key(
     return tuple(normalized_key)
 
 
-def _get_storage_class(storage: str) -> type[StorageBase]:
+def get_storage_class(storage: str) -> type[StorageBase]:
+    """Get the storage class by its identifier.
+
+    See `pipefunc.map.storage_registry` for available storage classes.
+
+    Parameters
+    ----------
+    storage
+        The storage class identifier.
+
+    Returns
+    -------
+    The storage class.
+
+    Raises
+    ------
+    ValueError
+        If the storage class is not found.
+
+    """
     if storage not in storage_registry:
         available = ", ".join(storage_registry.keys())
         msg = f"Storage class `{storage}` not found, only `{available}` available."
