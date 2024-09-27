@@ -45,7 +45,7 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
             if stripped_line.startswith("---"):
                 continue
             if stripped_line == "":
-                current_description.append(line)
+                # Empty line inside of a parameter description, e.g., for lists
                 continue
             if not line.startswith("    "):  # Parameter names are not indented
                 if current_param:
