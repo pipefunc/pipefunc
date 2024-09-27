@@ -12,6 +12,11 @@ dependencies:
   - psutil
   - cloudpickle
   - numpy
+  # extras from `.github/update-environment.py`
+  - luigi
+  - airflow
+  - dask
+  - kedro
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.12.0
@@ -45,3 +50,4 @@ dependencies:
   - scikit-image
   - pip:
     - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip
+    - pydra
