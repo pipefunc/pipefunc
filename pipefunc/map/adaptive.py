@@ -202,8 +202,8 @@ def create_learners(
         1. A string: Use a single storage class for all outputs.
         2. A dictionary: Specify different storage classes for different outputs.
 
-            - Use output names as keys and storage class names as values.
-            - Use an empty string ``""`` as a key to set a default storage class.
+          - Use output names as keys and storage class names as values.
+          - Use an empty string ``""`` as a key to set a default storage class.
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
