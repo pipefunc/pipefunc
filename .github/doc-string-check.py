@@ -162,7 +162,7 @@ if __name__ == "__main__":
         pipefunc.Pipeline.map,
         pipefunc.Pipeline.map_async,
         allow_missing=["parallel"],
-        allow_discrepancy=["show_progress"],
+        allow_discrepancy=["show_progress", "executor"],
     )
 
     # plotting
