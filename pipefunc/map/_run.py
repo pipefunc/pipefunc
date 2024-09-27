@@ -143,7 +143,7 @@ def run(
         The executor to use for parallel execution. Can be specified as:
 
         1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
-        2. An `concurrent.futures.Executor` instance: Used for all outputs.
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
         3. A dictionary: Specify different executors for different outputs.
 
             * Use output names as keys and `~concurrent.futures.Executor` instances as values.
@@ -275,7 +275,7 @@ def run_async(
         The executor to use for parallel execution. Can be specified as:
 
         1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
-        2. An `concurrent.futures.Executor` instance: Used for all outputs.
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
         3. A dictionary: Specify different executors for different outputs.
 
             * Use output names as keys and `~concurrent.futures.Executor` instances as values.
