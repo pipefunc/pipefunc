@@ -632,9 +632,9 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
-) -> Generator[Executor | None, None, None]:
+) -> Generator[Executor | dict[_OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
@@ -713,7 +713,7 @@ def _status_submit(
 def _maybe_parallel_map(
     func: Callable[..., Any],
     seq: Sequence,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | None,
     status: _Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -727,7 +727,7 @@ def _maybe_parallel_map(
 
 def _maybe_submit(
     func: Callable[..., Any],
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | None,
     status: _Status | None,
     progress: ProgressTracker | None,
     *args: Any,
@@ -951,19 +951,39 @@ def _submit_func(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(args.process_index, args.missing, ex, status, progress)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, ex, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _executor_for_func(
+    func: PipeFunc,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+) -> Executor | None:
+    if isinstance(executor, dict):
+        if func.output_name in executor:
+            return executor[func.output_name]
+        if "" in executor:
+            return executor[""]
+        msg = (
+            f"No executor found for output '{func.output_name}'."
+            f" Please either specify an executor for this output using"
+            f" `executor['{func.output_name}'] = ...`, or provide a default executor"
+            f' using `executor[""] = ...`.'
+        )
+        raise ValueError(msg)
+    return executor
 
 
 def _submit_generation(
@@ -1062,7 +1082,7 @@ async def _process_task_async(
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
 ) -> None:
     if isinstance(executor, dict):
         for output_name, ex in executor.items():
