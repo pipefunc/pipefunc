@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Check for discrepancies in parameter descriptions between functions."""
 
 from __future__ import annotations
@@ -36,14 +37,15 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
         stripped_line = line.strip()
         if stripped_line == "Parameters":
             in_params_section = True
-        elif in_params_section and any(
-            stripped_line.startswith(x)
-            for x in ("See Also", "Returns", "Raises", "Notes", "Examples")
+        elif in_params_section and (
+            stripped_line in ("See Also", "Returns", "Raises", "Notes", "Examples")
         ):
-            # Stop processing after the first empty line after the Parameters section
             break
         elif in_params_section:
             if stripped_line.startswith("---"):
+                continue
+            if stripped_line == "":
+                current_description.append(line)
                 continue
             if not line.startswith("    "):  # Parameter names are not indented
                 if current_param:
