@@ -1515,7 +1515,7 @@ async def test_run_async():
     assert result["r"].output == 12
 
 
-def test_pipeline_with_heterogeneous_storage():
+def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
@@ -1530,11 +1530,20 @@ def test_pipeline_with_heterogeneous_storage():
         inputs,
         parallel=False,
         storage={"y": "file_array", None: "shared_memory_dict"},
+        run_folder=tmp_path,
     )
     assert results["y"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
     assert isinstance(results["y"].store, FileArray)
     assert isinstance(results["z"].store, SharedMemoryDictArray)
 
-    with pytest.raises(ValueError, match="Storage class `foo` not found"):
-        results = pipeline.map(inputs, parallel=False, storage={"y": "file_array"})
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Cannot find storage class for `z`. Either add `storage[z] = ...`"),
+    ):
+        results = pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            parallel=False,
+            storage={"y": "file_array"},
+        )
