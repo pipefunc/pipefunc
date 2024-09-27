@@ -885,7 +885,7 @@ def _run_and_process_generation(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -907,7 +907,7 @@ async def _run_and_process_generation_async(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -991,7 +991,7 @@ def _submit_generation(
     generation: list[PipeFunc],
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
