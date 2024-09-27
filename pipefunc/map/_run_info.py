@@ -136,7 +136,7 @@ class RunInfo:
         if storage is None:
             msg = (
                 f"Cannot find storage class for `{output_name}`."
-                " Either add `storage[{output_name}] = ...` or"
+                f" Either add `storage[{output_name}] = ...` or"
                 " use a default by setting `storage[None] = ...`."
             )
             raise ValueError(msg)
