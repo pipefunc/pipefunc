@@ -43,8 +43,6 @@ test = [
     "versioningit",
 ]
 docs = [
-    # TODO: unpin myst-nb in .github/update-environment.py
-    # when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
     "myst-nb",
     "sphinx",
     "sphinx-book-theme",

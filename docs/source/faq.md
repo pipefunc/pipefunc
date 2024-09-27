@@ -787,7 +787,7 @@ This code sets up a simple pipeline with three functions, each utilizing a `maps
 The performance is measured by the time it takes to process `N**3` iterations through the pipeline, where `N` is the size of each input list.
 
 For the provided example, you might expect an output similar to `Time: 14.93 µs per iteration` on a MacBook Pro M2.
-The number reported above might be lower because it is running on ReadTheDocs' hosted hardware.
+The number reported above might be slower because it is running on ReadTheDocs' hosted hardware.
 It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc`.
 Results can vary depending on your hardware and current system load.
 

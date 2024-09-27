@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 PIP_ONLY_DEPS: set[str] = {"myst-nb"}
 REPLACE_DEPS: dict[str, str] = {
-    "myst-nb": "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
     "graphviz": "python-graphviz",
 }
 SKIP_DEPS: set[str] = {"pipefunc"}
