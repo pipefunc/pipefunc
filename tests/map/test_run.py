@@ -1516,9 +1516,9 @@ async def test_run_async():
 
 
 def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
-        return x - 1
+        return x - 1, x + 1
 
     @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
     def g(x):
@@ -1526,17 +1526,24 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
+    storage: dict[str | tuple[str, ...], str] = {
+        ("y1", "y2"): "file_array",
+        "": "shared_memory_dict",
+    }
     results = pipeline.map(
         inputs,
         parallel=False,
-        storage={"y": "file_array", None: "shared_memory_dict"},
+        storage=storage,
         run_folder=tmp_path,
     )
-    assert results["y"].output.tolist() == [0, 1, 2]
+    assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
-    assert isinstance(results["y"].store, FileArray)
+    assert isinstance(results["y1"].store, FileArray)
+    assert isinstance(results["y2"].store, FileArray)
     assert isinstance(results["z"].store, SharedMemoryDictArray)
 
+    run_info = RunInfo.load(tmp_path)
+    assert run_info.storage == storage
     with pytest.raises(
         ValueError,
         match=re.escape("Cannot find storage class for `z`. Either add `storage[z] = ...`"),
@@ -1545,5 +1552,5 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
             inputs,
             run_folder=tmp_path,
             parallel=False,
-            storage={"y": "file_array"},
+            storage={("y1", "y2"): "file_array"},
         )

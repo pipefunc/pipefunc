@@ -629,7 +629,7 @@ class Pipeline:
         output_names: set[_OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | None = None,
-        storage: str | dict[_OUTPUT_TYPE | None, str] = "file_array",
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -666,7 +666,7 @@ class Pipeline:
             1. A string: Use a single storage class for all outputs.
             2. A dictionary: Specify different storage classes for different outputs.
                - Use output names as keys and storage class names as values.
-               - Use ``None`` as a key to set a default storage class.
+               - Use an empty string``""`` as a key to set a default storage class.
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
@@ -720,7 +720,7 @@ class Pipeline:
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
         executor: Executor | None = None,
-        storage: str | dict[_OUTPUT_TYPE | None, str] = "file_array",
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -757,7 +757,7 @@ class Pipeline:
             1. A string: Use a single storage class for all outputs.
             2. A dictionary: Specify different storage classes for different outputs.
                - Use output names as keys and storage class names as values.
-               - Use ``None`` as a key to set a default storage class.
+               - Use an empty string``""`` as a key to set a default storage class.
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
