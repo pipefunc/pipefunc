@@ -146,8 +146,8 @@ def run(
         2. An `concurrent.futures.Executor` instance: Used for all outputs.
         3. A dictionary: Specify different executors for different outputs.
 
-          - Use output names as keys and `~concurrent.futures.Executor` instances as values.
-          - Use an empty string ``""`` as a key to set a default executor.
+            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+            - Use an empty string ``""`` as a key to set a default executor.
 
         If parallel is ``False``, this argument is ignored.
     storage
@@ -157,8 +157,8 @@ def run(
         1. A string: Use a single storage class for all outputs.
         2. A dictionary: Specify different storage classes for different outputs.
 
-          - Use output names as keys and storage class names as values.
-          - Use an empty string ``""`` as a key to set a default storage class.
+            - Use output names as keys and storage class names as values.
+            - Use an empty string ``""`` as a key to set a default storage class.
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
@@ -278,8 +278,8 @@ def run_async(
         2. An `concurrent.futures.Executor` instance: Used for all outputs.
         3. A dictionary: Specify different executors for different outputs.
 
-          - Use output names as keys and `~concurrent.futures.Executor` instances as values.
-          - Use an empty string ``""`` as a key to set a default executor.
+            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+            - Use an empty string ``""`` as a key to set a default executor.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -287,8 +287,8 @@ def run_async(
         1. A string: Use a single storage class for all outputs.
         2. A dictionary: Specify different storage classes for different outputs.
 
-          - Use output names as keys and storage class names as values.
-          - Use an empty string ``""`` as a key to set a default storage class.
+            - Use output names as keys and storage class names as values.
+            - Use an empty string ``""`` as a key to set a default storage class.
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
