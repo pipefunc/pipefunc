@@ -848,20 +848,21 @@ We can use a `ThreadPoolExecutor` for `f` and a `ProcessPoolExecutor` for `g`.
 We will store the results of `f` in memory and store the results of `g` in a file.
 
 ```{code-cell} ipython3
-from pipefunc import Pipeline, pipefunc
+import time
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
+from pipefunc import Pipeline, pipefunc
+import threading
+import multiprocessing
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def f(x):
-    import threading
     time.sleep(1)  # Simulate I/O-bound work
     return threading.current_thread().name
 
 @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
 def g(x):
-    import multiprocessing
-    np.linalg.eig(np.random.rand(1000, 1000))  # CPU-bound work
+    np.linalg.eig(np.random.rand(10, 10))  # CPU-bound work
     return multiprocessing.current_process().name
 
 pipeline = Pipeline([f, g])
@@ -875,7 +876,7 @@ storage = {
     "z": "file_array",
     "": "dict",  # empty string means default storage
 }
-results = pipeline.map(inputs, executor=executor, storage=storage)
+results = pipeline.map(inputs, run_folder="run_folder", executor=executor, storage=storage)
 
 # Get the results to check the thread and process names
 thread_names = results["y"].output.tolist()
