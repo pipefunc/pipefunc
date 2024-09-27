@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage_base import StorageBase, _get_storage_class
+from pipefunc.map._storage_base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
@@ -130,7 +130,7 @@ class RunInfo:
 
     def storage_class(self, output_name: _OUTPUT_TYPE) -> type[StorageBase]:
         if isinstance(self.storage, str):
-            return _get_storage_class(self.storage)
+            return get_storage_class(self.storage)
         default = self.storage.get(None)
         storage = self.storage.get(output_name, default)
         if storage is None:
@@ -140,7 +140,7 @@ class RunInfo:
                 " use a default by setting `storage[None] = ...`."
             )
             raise ValueError(msg)
-        return _get_storage_class(storage)
+        return get_storage_class(storage)
 
     def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
         store: dict[str, StorageBase | Path | DirectValue] = {}
@@ -233,8 +233,8 @@ class RunInfo:
 
 def _requires_serialization(storage: str | dict[_OUTPUT_TYPE | None, str]) -> bool:
     if isinstance(storage, str):
-        return _get_storage_class(storage).requires_serialization
-    return any(_get_storage_class(s).requires_serialization for s in storage.values())
+        return get_storage_class(storage).requires_serialization
+    return any(get_storage_class(s).requires_serialization for s in storage.values())
 
 
 def _maybe_run_folder(
