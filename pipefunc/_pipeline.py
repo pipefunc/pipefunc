@@ -652,7 +652,7 @@ class Pipeline:
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
             The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
@@ -660,7 +660,7 @@ class Pipeline:
         executor
             The executor to use for parallel execution. Can be specified as:
 
-            1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
             2. A `concurrent.futures.Executor` instance: Used for all outputs.
             3. A dictionary: Specify different executors for different outputs.
 
@@ -756,13 +756,13 @@ class Pipeline:
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
             The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         executor
             The executor to use for parallel execution. Can be specified as:
 
-            1. None: A `ProcessPoolExecutor` is used (only if ``parallel=True``).
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
             2. A `concurrent.futures.Executor` instance: Used for all outputs.
             3. A dictionary: Specify different executors for different outputs.
 
