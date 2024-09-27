@@ -44,4 +44,4 @@ dependencies:
   - nltk
   - scikit-image
   - pip:
-    - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip
+    - myst-nb
