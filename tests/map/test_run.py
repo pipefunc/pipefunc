@@ -1544,11 +1544,16 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
 
     run_info = RunInfo.load(tmp_path)
     assert run_info.storage == storage
+
+    # Test that run_folder is set
+    with pytest.warns(UserWarning, match="Using temporary folder"):
+        pipeline.map(inputs, parallel=False, storage=storage)
+
     with pytest.raises(
         ValueError,
         match=re.escape("Cannot find storage class for `z`. Either add `storage[z] = ...`"),
     ):
-        results = pipeline.map(
+        pipeline.map(
             inputs,
             run_folder=tmp_path,
             parallel=False,
