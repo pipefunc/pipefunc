@@ -1564,19 +1564,33 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
 def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
-        return x - 1, x + 1
+        import threading
+
+        return threading.current_thread().name, x + 1
 
     @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
     def g(x):
-        return x + 1
+        import multiprocessing
+
+        return multiprocessing.current_process().name
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
     executor: dict[str | tuple[str, ...], Executor] = {
-        ("y1", "y2"): ThreadPoolExecutor(),
-        "": ProcessPoolExecutor(),
+        ("y1", "y2"): ThreadPoolExecutor(max_workers=2),
+        "": ProcessPoolExecutor(max_workers=2),
     }
     results = pipeline.map(inputs, executor=executor, parallel=True)
-    assert results["y1"].output.tolist() == [0, 1, 2]
+
+    # Check if ThreadPoolExecutor was used for f
+    thread_names = results["y1"].output.tolist()
+    assert len(thread_names) > 1
+    assert all("ThreadPool" in name for name in thread_names)
+
+    # Check if ProcessPoolExecutor was used for g
+    process_names = results["z"].output.tolist()
+    assert len(process_names) > 1
+    assert all("Process-" in name for name in process_names)
+
+    # Check the actual computation results
     assert results["y2"].output.tolist() == [2, 3, 4]
-    assert results["z"].output.tolist() == [2, 3, 4]
