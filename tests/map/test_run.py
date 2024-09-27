@@ -1594,3 +1594,7 @@ def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
 
     # Check the actual computation results
     assert results["y2"].output.tolist() == [2, 3, 4]
+
+    # Test missing executor
+    with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
+        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})

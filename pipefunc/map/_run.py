@@ -977,7 +977,7 @@ def _executor_for_func(
         if "" in executor:
             return executor[""]
         msg = (
-            f"No executor found for output '{func.output_name}'."
+            f"No executor found for output `{func.output_name}`."
             f" Please either specify an executor for this output using"
             f" `executor['{func.output_name}'] = ...`, or provide a default executor"
             f' using `executor[""] = ...`.'
