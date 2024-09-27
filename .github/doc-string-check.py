@@ -36,7 +36,10 @@ def extract_param_descriptions(func: Callable[..., Any]) -> dict[str, str]:
         stripped_line = line.strip()
         if stripped_line == "Parameters":
             in_params_section = True
-        elif stripped_line == "" and in_params_section:
+        elif in_params_section and any(
+            stripped_line.startswith(x)
+            for x in ("See Also", "Returns", "Raises", "Notes", "Examples")
+        ):
             # Stop processing after the first empty line after the Parameters section
             break
         elif in_params_section:
