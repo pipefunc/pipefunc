@@ -1576,7 +1576,7 @@ def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
         ("y1", "y2"): ThreadPoolExecutor(),
         "": ProcessPoolExecutor(),
     }
-    results = pipeline.map(inputs, executor=executor, parallel=False)
+    results = pipeline.map(inputs, executor=executor, parallel=True)
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["y2"].output.tolist() == [2, 3, 4]
     assert results["z"].output.tolist() == [2, 3, 4]
