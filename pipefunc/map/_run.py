@@ -133,7 +133,7 @@ def run(
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
-        The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
         If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
@@ -267,7 +267,7 @@ def run_async(
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
-        The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
         If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
