@@ -1561,7 +1561,7 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
         )
 
 
-def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
+def test_pipeline_with_heterogeneous_executor() -> None:
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
         import threading
@@ -1598,3 +1598,19 @@ def test_pipeline_with_heterogeneous_executor(tmp_path: Path) -> None:
     # Test missing executor
     with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
         pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
+
+    # Test incompatible storage with executor
+    with pytest.warns(
+        UserWarning,
+        match=re.escape(
+            "The chosen storage type `dict` does not support process-based parallel execution.",
+        ),
+    ):
+        pipeline.map(
+            inputs,
+            executor={
+                "z": ProcessPoolExecutor(max_workers=2),
+                "": ThreadPoolExecutor(max_workers=2),
+            },
+            storage={"": "dict"},
+        )
