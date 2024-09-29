@@ -1,6 +1,6 @@
-# pipefunc: function composition magic for Python
+# 🛠️ Pipefunc: Structure, Automate, and Simplify Your Computational Workflows 🕸️
 
-> Lightweight function pipeline creation: 📚 Less Bookkeeping, 🎯 More Doing
+> 🚫 Stop micromanaging execution. 🧠 Focus on the science. 🔗 Capture your workflow's essence with function pipelines, represent computations as DAGs 🕸️, and automate parallel sweeps 🔄.
 
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
