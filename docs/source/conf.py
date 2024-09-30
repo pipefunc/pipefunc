@@ -41,6 +41,7 @@ extensions = [
     "myst_nb",
     "sphinx_togglebutton",
     "sphinx_copybutton",
+    "notfound.extension",
 ]
 
 templates_path = ["_templates"]

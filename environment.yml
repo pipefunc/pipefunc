@@ -34,6 +34,7 @@ dependencies:
   - pytest-asyncio
   - pytest-codspeed
   - pytest-cov
+  - pytest-xdist
   - coverage
   - adaptive
   - xarray

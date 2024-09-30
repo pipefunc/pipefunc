@@ -31,15 +31,15 @@ dependencies:
   - python-graphviz
   # optional-dependencies: docs
   - sphinx
+  - sphinx-autodoc-typehints
   - sphinx-book-theme
-  - myst-parser
+  - sphinx-copybutton
+  - sphinx-notfound-page
+  - sphinx-togglebutton
   - emoji
   - jupytext
-  - sphinx-autodoc-typehints
-  - pytest-xdist
+  - myst-parser
   - versioningit
-  - sphinx-togglebutton
-  - sphinx-copybutton
   - seaborn
   - nltk
   - scikit-image
