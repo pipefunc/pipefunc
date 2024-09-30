@@ -402,7 +402,7 @@ class DiskCache(_CacheBase):
 
     def __init__(
         self,
-        cache_dir: str,
+        cache_dir: str | Path,
         max_size: int | None = None,
         *,
         use_cloudpickle: bool = True,
@@ -496,7 +496,7 @@ class DiskCache(_CacheBase):
     @property
     def shared(self) -> bool:
         """Return whether the cache is shared."""
-        return self.lru_cache.shared
+        return self.lru_cache.shared if self.with_lru_cache else True
 
 
 def _pickle_key(obj: Any) -> str:
