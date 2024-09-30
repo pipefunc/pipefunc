@@ -1614,3 +1614,17 @@ def test_pipeline_with_heterogeneous_executor() -> None:
             },
             storage={"": "dict"},
         )
+
+
+def test_run_range():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {"x": range(3)}
+    r = pipeline.map(inputs, parallel=False)
+    assert r["y"].output.tolist() == [0, 1, 2]
+    ds = xarray_dataset_from_results(inputs, r, pipeline)
+    assert ds.coords["x"].to_numpy().tolist() == [0, 1, 2]
+    assert not r["y"].store.mask.all()
