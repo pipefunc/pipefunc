@@ -339,7 +339,7 @@ def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
     """
     if hasattr(x, "mask"):
         return x.mask
-    if isinstance(x, list):
+    if isinstance(x, list | range):
         return np.full((len(x),), fill_value=False)
     if isinstance(x, np.ndarray):
         return np.full(x.shape, fill_value=False)
@@ -370,7 +370,7 @@ def array_shape(x: npt.NDArray | list, key: str = "?") -> tuple[int, ...]:
     """
     if hasattr(x, "shape"):
         return tuple(map(int, x.shape))
-    if isinstance(x, list):
+    if isinstance(x, list | range):
         return (len(x),)
     msg = f"No array shape defined for `{key}` of type {type(x)}"
     raise TypeError(msg)
