@@ -310,6 +310,7 @@ def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
     )
 
 
+# NOTE: This function is not used in the current implementation!
 def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
     """Return the mask applied to 'x', depending on its type.
 
