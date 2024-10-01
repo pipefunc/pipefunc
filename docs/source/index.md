@@ -16,6 +16,7 @@ start-after: <!-- toc-end -->
 
 ```{toctree}
 :hidden:
+:maxdepth: 3
 
 🏠 Home <self>
 🚀 Usage tutorial <tutorial>

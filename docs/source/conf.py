@@ -81,7 +81,22 @@ myst_enable_extensions = [
     "html_admonition",
     "colon_fence",
 ]
-html_theme_options = {"show_toc_level": 2}
+html_theme_options = {
+    "show_toc_level": 2,
+    "repository_url": "https://github.com/pipefunc/pipefunc",
+    "repository_branch": "main",
+    "home_page_in_toc": False,
+    "path_to_docs": "docs",
+    "show_navbar_depth": 1,
+    "use_edit_page_button": True,
+    "use_repository_button": True,
+    "use_download_button": True,
+    # "launch_buttons": {
+    #     "binderhub_url": "https://mybinder.org",
+    #     "notebook_interface": "classic",
+    # },
+    "navigation_with_keys": False,
+}
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
