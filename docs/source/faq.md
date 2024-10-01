@@ -198,15 +198,15 @@ When specifying renames, you can choose to update from the original argument nam
 :::{admonition} We can also update the <code>output_name</code>
 :class: note, dropdown
 
-```{code-cell} ipython3
-@pipefunc(output_name=("i", "j"))
-def f(a, b):
-    return a, b
+   ```{code-cell} ipython3
+   @pipefunc(output_name=("i", "j"))
+   def f(a, b):
+       return a, b
 
-# renames must be in terms of individual output strings
-f.update_renames({"i": "ii"}, update_from="current")
-assert f.output_name == ("ii", "j")
-```
+   # renames must be in terms of individual output strings
+   f.update_renames({"i": "ii"}, update_from="current")
+   assert f.output_name == ("ii", "j")
+   ```
 
 :::
 
@@ -689,9 +689,79 @@ Additionally, by using the `resources_variable` argument, you can pass the dynam
 
 ## How to use `adaptive` with `pipefunc`?
 
+```{note}
+We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages in this section.
+```
+
 There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive sweeps over parameter spaces.
 Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
 See [this tutorial](adaptive.md) for a detailed example of how to use `adaptive` with `pipefunc`.
+
+## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
+
+PipeFunc can also be used with the `adaptive_scheduler` package to run the pipeline on a cluster.
+This allows you to run the pipeline on a cluster (e.g., with SLURM) without having to worry about the details of submitting jobs and managing resources.
+
+Here's an example of how to use `pipefunc` with `adaptive_scheduler`:
+
+```{code-cell} ipython3
+from concurrent.futures import ProcessPoolExecutor
+
+import numpy as np
+
+from pipefunc import Pipeline, pipefunc
+from pipefunc.map.adaptive import create_learners
+from pipefunc.resources import Resources
+
+
+# Pass in a `Resources` object that specifies the resources needed for each function
+@pipefunc(output_name="double", mapspec="x[i] -> double[i]", resources=Resources(cpus=5))
+def double_it(x: int) -> int:
+    return 2 * x
+
+
+# Or specify the resources as a dictionary
+@pipefunc(output_name="half", mapspec="x[i] -> half[i]", resources={"memory": "8GB"})
+def half_it(x: int) -> int:
+    return x // 2
+
+
+# Specify delayed resources that are used inside the function; "internal" parallelization
+@pipefunc(
+    output_name="sum",
+    resources=lambda kw: {"cpus": len(kw["half"]), "parallelization_mode": "internal"},
+    resources_variable="resources",
+)
+def take_sum(half: np.ndarray, double: np.ndarray, resources: Resources) -> int:
+    with ProcessPoolExecutor(resources.cpus) as executor:
+        # Do some printing in parallel (not smart, but just to show the parallelization)
+        list(executor.map(print, range(resources.cpus)))
+    return sum(half + double)
+
+
+pipeline_adapt = Pipeline([double_it, half_it, take_sum])
+```
+
+We now have a pipeline with three functions, each with different resource requirements.
+So far nothing is Adaptive-Scheduler specific.
+We could call `pipeline_adapt.map(...)` to run this pipeline in parallel on your local machine.However, to run it on a cluster, we need to use `adaptive_scheduler`.
+We can convert the pipeline to a dictionary of `adaptive.SequenceLearner`s objects using `create_learners` and then submit these to the cluster using `adaptive_scheduler`.
+
+```{code-cell} ipython3
+inputs = {"x": [0, 1, 2, 3]}
+run_folder = "my_run_folder"
+learners_dict = create_learners(
+    pipeline_adapt,
+    inputs,
+    run_folder=run_folder,
+    split_independent_axes=True,  # Split up into as many independent jobs as possible
+)
+kwargs = learners_dict.to_slurm_run(
+    returns="kwargs",  # or "run_manager" to return a `adaptive_scheduler.RunManager` object
+    default_resources={"cpus": 2, "memory": "8GB"},
+)
+# kwargs can be passed to `adaptive_scheduler.slurm_run(**kwargs)`
+```
 
 ## What is the `ErrorSnapshot` feature in `pipefunc`?
 
@@ -898,4 +968,113 @@ That includes:
 - `mpi4py.futures.MPIPoolExecutor()`
 - `loky.get_reusable_executor()`
 
+```
+
+## Get a function handle for a specific pipeline output (`pipeline.func`)
+
+We can get a handle for each function using the `func` method on the pipeline, passing the output name of the function we want.
+
+```{code-cell} ipython3
+
+@pipefunc(output_name="c")
+def f(a, b):
+    return a + b
+
+
+@pipefunc(output_name="d")
+def g(b, c, x=1):
+    return b * c * x
+
+
+@pipefunc(output_name="e")
+def h(c, d, x=1):
+    return c * d * x
+
+pipeline = Pipeline([f, g, h])
+func_d = pipeline.func("d")
+func_e = pipeline.func("e")
+```
+
+We can now use these handles as if they were the original functions.
+The pipeline will automatically ensure that the functions are called in the correct order, passing the output of one function as the input to the next.
+
+```{code-cell} ipython3
+c = f(a=2, b=3)  # call the wrapped function directly
+assert c == 5
+```
+
+```{code-cell} ipython3
+assert (
+    g(b=3, c=5)
+    == func_d(a=2, b=3)  # We can call func_d with different arguments
+    == func_d(b=3, c=5)
+    == 15
+)
+assert func_e(c=c, d=15, x=1) == func_e(a=2, b=3, x=1) == func_e(a=2, b=3, d=15, x=1) == 75
+```
+
+The functions returned by `pipeline.func` have several additional methods
+
+**Using the call_full_output Method**
+
+The `call_full_output()` method can be used to call the function and get all the outputs from the pipeline as a dictionary.
+
+```{code-cell} ipython3
+func_e = pipeline.func("e")
+func_e.call_full_output(a=2, b=3, x=1)
+```
+
+**Direct Calling with Root Arguments (as positional arguments)**
+
+You can directly call the functions in the pipeline with the root arguments using the `call_with_root_args()` method. It automatically executes all the dependencies of the function in the pipeline with the given root arguments.
+
+```{code-cell} ipython3
+func_e = pipeline.func("e")
+func_e.call_with_root_args(1, 2, 1)  # note these are now positional args
+```
+
+This executes the function `g` with the root arguments `a=1, b=2, x=1`.
+
+For more information about this method, you can use the Python built-in `help` function or the `?` command.
+
+```{code-cell} ipython3
+help(func_e.call_with_root_args)
+```
+
+This shows the signature and the doc-string of the `call_with_root_args` method.
+
+## Parameter Sweeps
+
+The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
+It was developed before `pipeline.map` which can perform sweep operations in parallel.
+However, by itself {class}`pipefunc.sweep.Sweep` might still be useful for cases where you have a pipeline that has no `mapspec`.
+
+```{code-cell} ipython3
+from pipefunc.sweep import Sweep
+
+combos = {
+    "a": [0, 1, 2],
+    "b": [0, 1, 2],
+    "c": [0, 1, 2],
+}
+# This means a Cartesian product of all the values in the lists
+# while zipping ("a", "b").
+sweep = Sweep(combos, dims=[("a", "b"), "c"])
+sweep.list()[:10]  # show the first 10 combinations
+```
+
+The function `set_cache_for_sweep` then enables caching for nodes in the pipeline that are expected to be executed two or more times during the parameter sweep.
+
+```python
+from pipefunc.sweep import set_cache_for_sweep
+
+set_cache_for_sweep(output_name, pipeline, sweep, min_executions=2, verbose=True)
+```
+
+We can now run the sweep using e.g.,
+
+```python
+results = [
+    pipeline.run(output_name, kwargs=combo, full_output=True) for combo in sweep.list()
+]
 ```
