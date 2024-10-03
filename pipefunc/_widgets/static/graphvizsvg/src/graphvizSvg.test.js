@@ -63,7 +63,7 @@ describe("GraphvizSvg", () => {
       svg: svgContent,
       ready() {
         const nodeA = this._nodesByName["A"];
-        const linkedNodes = this.linkedTo(nodeA, false);
+        const linkedNodes = this.linkedFrom(nodeA, false);
         expect(linkedNodes.length).toBe(1);
         expect($(linkedNodes[0]).attr("data-name")).toBe("B");
         done();
