@@ -19,6 +19,7 @@ dependencies:
   - xarray
   # optional-dependencies: widgets
   - ipywidgets
+  - anywidget
   # optional-dependencies: zarr
   - zarr
   # optional-dependencies: pandas
@@ -29,6 +30,7 @@ dependencies:
   - holoviews
   - bokeh
   - python-graphviz
+  - anywidget
   # optional-dependencies: docs
   - sphinx
   - sphinx-autodoc-typehints
