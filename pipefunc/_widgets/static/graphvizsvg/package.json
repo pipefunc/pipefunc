@@ -1,0 +1,25 @@
+{
+  "name": "static",
+  "version": "1.0.0",
+  "main": "GraphVizSvg.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@babel/preset-env": "^7.25.7",
+    "babel-jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "dependencies": {
+    "bootstrap": "5.3.3",
+    "d3-graphviz": "^4.4.0",
+    "jquery": "^3.6.1",
+    "jquery-color": "^2.2.0",
+    "jquery-mousewheel": "^3.1.13",
+    "util": "^0.12.5"
+  }
+}
