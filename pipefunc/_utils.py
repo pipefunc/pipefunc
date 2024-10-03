@@ -221,12 +221,17 @@ def is_running_in_ipynb() -> bool:
         return False  # Probably standard Python interpreter
 
 
+def is_installed(package: str) -> bool:
+    """Check if a package is installed."""
+    return importlib.util.find_spec(package) is not None
+
+
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
     conda_name_mapping = {"graphviz": "python-graphviz"}
 
     for package in packages:
-        if importlib.util.find_spec(package):
+        if is_installed(package):
             continue
         conda_package = conda_name_mapping.get(package, package)
         error_message = f"The '{package}' package is required"
