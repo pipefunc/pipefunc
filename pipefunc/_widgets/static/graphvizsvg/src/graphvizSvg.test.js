@@ -210,6 +210,7 @@ describe("GraphvizSvg", () => {
 
     container.graphviz(options);
   });
+
   test("should highlight specified nodes and dim others", (done) => {
     const svgContent = `<svg width="100pt" height="100pt">
       <g>
