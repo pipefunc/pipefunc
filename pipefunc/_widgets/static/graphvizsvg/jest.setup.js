@@ -12,4 +12,5 @@ const $ = require("jquery");
 // Mock the tooltip method
 $.fn.tooltip = jest.fn().mockReturnValue({
   on: jest.fn(),
+  tooltip: jest.fn(),
 });

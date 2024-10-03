@@ -275,6 +275,9 @@ describe("GraphvizSvg", () => {
         // Tooltip should be hidden
         expect(tooltip.hasClass("show")).toBe(false);
 
+        // Check if the tooltip function was called
+        expect($.fn.tooltip).toHaveBeenCalled();
+
         done();
       },
     };
