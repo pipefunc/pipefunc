@@ -1,28 +1,19 @@
 // graphvizSvg.test.js
-import $ from 'jquery';
-import GraphvizSvg from './GraphvizSvg';
-import 'jquery-mousewheel';
-import 'jquery-color';
-import 'bootstrap';
-import { JSDOM } from 'jsdom';
+import $ from "jquery";
+import GraphvizSvg from "./GraphvizSvg";
+import "jquery-mousewheel";
+import "jquery-color";
+import "bootstrap";
 
-describe('GraphvizSvg', () => {
-  let dom;
+describe("GraphvizSvg", () => {
   let container;
 
   beforeEach(() => {
-    dom = new JSDOM('<!DOCTYPE html><html><body><div id="graph"></div></body></html>');
-    global.window = dom.window;
-    global.document = dom.window.document;
-    global.$ = $(dom.window);
-    container = $('#graph');
+    document.body.innerHTML = '<div id="graph"></div>';
+    container = $("#graph");
   });
 
-  afterEach(() => {
-    dom.window.close();
-  });
-
-  test('should initialize with SVG content', (done) => {
+  test("should initialize with SVG content", (done) => {
     const svgContent = `<svg width="100pt" height="100pt">
       <g>
         <polygon points="0,0 0,100 100,100 100,0" fill="#ffffff"/>
@@ -40,7 +31,7 @@ describe('GraphvizSvg', () => {
     const options = {
       svg: svgContent,
       ready() {
-        expect(this.$element.find('svg').length).toBe(1);
+        expect(this.$element.find("svg").length).toBe(1);
         expect(this.$nodes.length).toBe(1);
         expect(this.$edges.length).toBe(1);
         done();
@@ -50,7 +41,7 @@ describe('GraphvizSvg', () => {
     container.graphviz(options);
   });
 
-  test('should correctly find linked nodes', (done) => {
+  test("should correctly find linked nodes", (done) => {
     const svgContent = `<svg width="100pt" height="100pt">
       <g>
         <g class="node">
@@ -71,10 +62,10 @@ describe('GraphvizSvg', () => {
     const options = {
       svg: svgContent,
       ready() {
-        const nodeA = this._nodesByName['A'];
+        const nodeA = this._nodesByName["A"];
         const linkedNodes = this.linkedTo(nodeA, false);
         expect(linkedNodes.length).toBe(1);
-        expect($(linkedNodes[0]).attr('data-name')).toBe('B');
+        expect($(linkedNodes[0]).attr("data-name")).toBe("B");
         done();
       },
     };

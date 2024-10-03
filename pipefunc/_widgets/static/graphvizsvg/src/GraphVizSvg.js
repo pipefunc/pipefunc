@@ -4,7 +4,7 @@ import 'jquery-mousewheel';
 import 'jquery-color';
 import 'bootstrap';
 
-class GraphzizSvg {
+class GraphvizSvg {
   static VERSION = '1.0.1';
   static GVPT_2_PX = 32.5;
 
@@ -86,7 +86,7 @@ class GraphzizSvg {
   }
 
   getDefaults() {
-    return GraphzizSvg.DEFAULTS;
+    return GraphvizSvg.DEFAULTS;
   }
 
   getOptions(options) {
@@ -282,7 +282,7 @@ class GraphzizSvg {
         end -= 2;
       } else if (val.endsWith('pt')) {
         end -= 2;
-        factor = GraphzizSvg.GVPT_2_PX;
+        factor = GraphvizSvg.GVPT_2_PX;
       }
       retval = parseFloat(val.substring(0, end)) * factor;
     }
@@ -466,7 +466,7 @@ function Plugin(option) {
     const options = typeof option === 'object' && option;
 
     if (!data && /destroy/.test(option)) return;
-    if (!data) $this.data('graphviz.svg', (data = new GraphzizSvg(this, options)));
+    if (!data) $this.data('graphviz.svg', (data = new GraphvizSvg(this, options)));
     if (typeof option === 'string') data[option]();
   });
 }
@@ -474,7 +474,7 @@ function Plugin(option) {
 const old = $.fn.graphviz;
 
 $.fn.graphviz = Plugin;
-$.fn.graphviz.Constructor = GraphzizSvg;
+$.fn.graphviz.Constructor = GraphvizSvg;
 
 // No conflict
 $.fn.graphviz.noConflict = function () {
@@ -482,4 +482,4 @@ $.fn.graphviz.noConflict = function () {
   return this;
 };
 
-export default GraphzizSvg;
+export default GraphvizSvg;
