@@ -56,8 +56,8 @@ def _prepare_run(
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
     output_names: set[_OUTPUT_TYPE] | None,
     parallel: bool,
-    executor: Executor | None,
-    storage: str,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    storage: str | dict[_OUTPUT_TYPE, str],
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
@@ -108,8 +108,8 @@ def run(
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
-    executor: Executor | None = None,
-    storage: str = "file_array",
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -133,18 +133,35 @@ def run(
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
-        The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-        If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+        If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
         Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
+        The executor to use for parallel execution. Can be specified as:
+
+        1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+
+           - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+           - Use an empty string ``""`` as a key to set a default executor.
+
+        If parallel is ``False``, this argument is ignored.
     storage
-        The storage class to use for the file arrays.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        The storage class to use for storing intermediate and final results.
+        Can be specified as:
+
+        1. A string: Use a single storage class for all outputs.
+        2. A dictionary: Specify different storage classes for different outputs.
+
+           - Use output names as keys and storage class names as values.
+           - Use an empty string ``""`` as a key to set a default storage class.
+
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -223,8 +240,8 @@ def run_async(
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
-    executor: Executor | None = None,
-    storage: str = "file_array",
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -250,16 +267,31 @@ def run_async(
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
-        The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-        If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+        If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
+        The executor to use for parallel execution. Can be specified as:
+
+        1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+
+           - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+           - Use an empty string ``""`` as a key to set a default executor.
     storage
-        The storage class to use for the file arrays.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        The storage class to use for storing intermediate and final results.
+        Can be specified as:
+
+        1. A string: Use a single storage class for all outputs.
+        2. A dictionary: Specify different storage classes for different outputs.
+
+           - Use output names as keys and storage class names as values.
+           - Use an empty string ``""`` as a key to set a default storage class.
+
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -611,9 +643,9 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
-) -> Generator[Executor | None, None, None]:
+) -> Generator[Executor | dict[_OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
@@ -864,7 +896,7 @@ def _run_and_process_generation(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -886,7 +918,7 @@ async def _run_and_process_generation_async(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -930,19 +962,39 @@ def _submit_func(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(args.process_index, args.missing, ex, status, progress)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_submit(_submit_single, ex, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _executor_for_func(
+    func: PipeFunc,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+) -> Executor | None:
+    if isinstance(executor, dict):
+        if func.output_name in executor:
+            return executor[func.output_name]
+        if "" in executor:
+            return executor[""]
+        msg = (
+            f"No executor found for output `{func.output_name}`."
+            f" Please either specify an executor for this output using"
+            f" `executor['{func.output_name}'] = ...`, or provide a default executor"
+            f' using `executor[""] = ...`.'
+        )
+        raise ValueError(msg)
+    return executor
 
 
 def _submit_generation(
@@ -950,7 +1002,7 @@ def _submit_generation(
     generation: list[PipeFunc],
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
@@ -1041,8 +1093,16 @@ async def _process_task_async(
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
-    executor: Executor | None,
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
 ) -> None:
+    if isinstance(executor, dict):
+        uses_default_executor: set[str] = set(store.keys()) - {
+            n for name in executor for n in at_least_tuple(name)
+        }
+        for output_name, ex in executor.items():
+            names = uses_default_executor if output_name == "" else at_least_tuple(output_name)
+            _check_parallel(parallel, {n: store[n] for n in names}, ex)
+        return
     if isinstance(executor, ThreadPoolExecutor):
         return
     if not parallel or not store:

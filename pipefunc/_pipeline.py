@@ -631,8 +631,8 @@ class Pipeline:
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
         parallel: bool = True,
-        executor: Executor | None = None,
-        storage: str = "file_array",
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -654,18 +654,35 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
-            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
             Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
-            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-            is used. Only relevant if ``parallel=True``.
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+
+            If parallel is ``False``, this argument is ignored.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -716,8 +733,8 @@ class Pipeline:
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
-        executor: Executor | None = None,
-        storage: str = "file_array",
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -741,16 +758,31 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
-            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         executor
-            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-            is used. Only relevant if ``parallel=True``.
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.

@@ -43,6 +43,7 @@ test = [
     "pytest-asyncio",
     "pytest-codspeed",
     "pytest-cov",
+    "pytest-xdist",
     "coverage",
     "adaptive",
     "xarray",
@@ -50,19 +51,17 @@ test = [
     "versioningit",
 ]
 docs = [
-    # TODO: unpin myst-nb in .github/update-environment.py
-    # when https://github.com/pipefunc/pipefunc/pull/125 is merged and released
-    "myst-nb",
     "sphinx",
+    "sphinx-autodoc-typehints",
     "sphinx-book-theme",
-    "myst-parser",
+    "sphinx-copybutton",
+    "sphinx-notfound-page",
+    "sphinx-togglebutton",
     "emoji",
     "jupytext",
-    "sphinx-autodoc-typehints",
-    "pytest-xdist",
+    "myst-nb",
+    "myst-parser",
     "versioningit",
-    "sphinx-togglebutton",
-    "sphinx-copybutton",
     # Used for the example notebook
     "seaborn",
     "nltk",

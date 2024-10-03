@@ -1,10 +1,10 @@
-# pipefunc: function composition magic for Python
+# PipeFunc: Structure, Automate, and Simplify Your Computational Workflows 🕸
 
-> Lightweight function pipeline creation: 📚 Less Bookkeeping, 🎯 More Doing
+> ***Stop*** micromanaging execution. Focus on the **science**. Capture your workflow's essence with **function pipelines**, represent **computations as DAGs**, and **automate parallel sweeps**.
 
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
@@ -35,7 +35,9 @@
 
 [![asciicast](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod.svg)](https://asciinema.org/a/q5S3ffIxrAGmoLMOc0hOb3aod)
 
-`pipefunc` is a Python library for creating and running function pipelines. By annotating functions and specifying their outputs, it forms a pipeline that automatically organizes the execution order to satisfy dependencies. Just specify the names of the outputs you want to compute, and `pipefunc` will handle the rest by leveraging the parameter names of the annotated functions.
+**`pipefunc`** is a Python library designed for creating and executing **function pipelines**.
+By simply annotating functions and specifying their outputs, it builds a pipeline that **automatically manages the execution order** based on dependencies.
+Visualize the pipeline as a directed graph, execute the pipeline for all (or specific) outputs, add multidimensional sweeps, automatically parallelize the pipeline, and get nicely structured data back.
 
 > [!NOTE]
 > A *_pipeline_* is a sequence of interconnected functions, structured as a [Directed Acyclic Graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG), where outputs from one or more functions serve as inputs to subsequent ones.
@@ -46,17 +48,16 @@ Whether you're working with data processing, scientific computations, machine le
 ## :rocket: Key Features
 
 1. 🚀 **Function Composition and Pipelining**: Create pipelines by using the `@pipefunc` decorator; execution order is automatically handled.
-2. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
-3. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
-4. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
-5. ➡️ **Pipeline Simplification**: Merge nodes in complex pipelines to run multiple functions in a single step.
-6. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
-7. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
-8. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
-9. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
-10. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
-11. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
-12. 🤓 **Nerd stats**: >600 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
+1. 📊 **Pipeline Visualization**: Generate visual graphs of your pipelines to better understand the flow of data.
+1. 👥 **Multiple Outputs**: Handle functions that return multiple results, allowing each result to be used as input to other functions.
+1. 🔁 **Map-Reduce Support**: Perform "map" operations to apply functions over data and "reduce" operations to aggregate results, allowing n-dimensional mappings.
+1. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
+1. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
+1. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
+1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
+1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
+1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
+1. 🤓 **Nerd stats**: >600 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
 
 ## :test_tube: How does it work?
 

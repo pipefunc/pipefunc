@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +10,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
+from pipefunc.map import FileArray, SharedMemoryDictArray
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
@@ -1512,3 +1513,118 @@ async def test_run_async():
     async_run_info.progress._toggle_auto_update()  # Turn on auto update
     result = await async_run_info.task
     assert result["r"].output == 12
+
+
+def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        return x - 1, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    storage: dict[str | tuple[str, ...], str] = {
+        ("y1", "y2"): "file_array",
+        "": "shared_memory_dict",
+    }
+    results = pipeline.map(
+        inputs,
+        parallel=False,
+        storage=storage,
+        run_folder=tmp_path,
+    )
+    assert results["y1"].output.tolist() == [0, 1, 2]
+    assert results["z"].output.tolist() == [2, 3, 4]
+    assert isinstance(results["y1"].store, FileArray)
+    assert isinstance(results["y2"].store, FileArray)
+    assert isinstance(results["z"].store, SharedMemoryDictArray)
+
+    run_info = RunInfo.load(tmp_path)
+    assert run_info.storage == storage
+
+    # Test that run_folder is set
+    with pytest.warns(UserWarning, match="Using temporary folder"):
+        pipeline.map(inputs, parallel=False, storage=storage)
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Cannot find storage class for `z`. Either add `storage[z] = ...`"),
+    ):
+        pipeline.map(
+            inputs,
+            run_folder=tmp_path,
+            parallel=False,
+            storage={("y1", "y2"): "file_array"},
+        )
+
+
+def test_pipeline_with_heterogeneous_executor() -> None:
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        import threading
+
+        return threading.current_thread().name, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        import multiprocessing
+
+        return multiprocessing.current_process().name
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3]}
+    executor: dict[str | tuple[str, ...], Executor] = {
+        ("y1", "y2"): ThreadPoolExecutor(max_workers=2),
+        "": ProcessPoolExecutor(max_workers=2),
+    }
+    results = pipeline.map(inputs, executor=executor, parallel=True)
+
+    # Check if ThreadPoolExecutor was used for f
+    thread_names = results["y1"].output.tolist()
+    assert len(thread_names) > 1
+    assert all("ThreadPool" in name for name in thread_names)
+
+    # Check if ProcessPoolExecutor was used for g
+    process_names = results["z"].output.tolist()
+    assert len(process_names) > 1
+    assert all("Process-" in name for name in process_names)
+
+    # Check the actual computation results
+    assert results["y2"].output.tolist() == [2, 3, 4]
+
+    # Test missing executor
+    with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
+        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
+
+    # Test incompatible storage with executor
+    with pytest.warns(
+        UserWarning,
+        match=re.escape(
+            "The chosen storage type `dict` does not support process-based parallel execution.",
+        ),
+    ):
+        pipeline.map(
+            inputs,
+            executor={
+                "z": ProcessPoolExecutor(max_workers=2),
+                "": ThreadPoolExecutor(max_workers=2),
+            },
+            storage={"": "dict"},
+        )
+
+
+def test_run_range():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x
+
+    pipeline = Pipeline([f])
+    inputs = {"x": range(3)}
+    r = pipeline.map(inputs, parallel=False)
+    assert r["y"].output.tolist() == [0, 1, 2]
+    ds = xarray_dataset_from_results(inputs, r, pipeline)
+    assert ds.coords["x"].to_numpy().tolist() == [0, 1, 2]
+    assert not r["y"].store.mask.all()
