@@ -1,7 +1,7 @@
 {
   "name": "static",
   "version": "1.0.0",
-  "main": "GraphVizSvg.js",
+  "main": "GraphvizSvg.js",
   "scripts": {
     "test": "jest"
   },
@@ -10,8 +10,10 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@babel/core": "^7.25.7",
     "@babel/preset-env": "^7.25.7",
     "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
   },
   "dependencies": {

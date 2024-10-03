@@ -1,6 +1,6 @@
 // graphvizSvg.test.js
 import $ from 'jquery';
-import GraphvizSvg from './GraphVizSvg';
+import GraphvizSvg from './GraphvizSvg';
 import 'jquery-mousewheel';
 import 'jquery-color';
 import 'bootstrap';

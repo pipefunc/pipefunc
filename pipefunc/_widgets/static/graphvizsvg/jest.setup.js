@@ -1,8 +1,8 @@
-import $ from 'jquery';
-import 'jquery-mousewheel';
-import 'jquery-color';
+// jest.setup.js
+const $ = require('jquery');
+require('jquery-mousewheel');
+require('jquery-color');
 
-// Make jQuery and its plugins globally available in the test environment
 global.$ = $;
 global.jQuery = $;
 
