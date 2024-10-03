@@ -1,8 +1,8 @@
-// graphvizSvg.js
-import $ from 'jquery';
-import 'jquery-mousewheel';
-import 'jquery-color';
-import 'bootstrap';
+// // graphvizSvg.js
+// import $ from 'jquery';
+// import 'jquery-mousewheel';
+// import 'jquery-color';
+// import 'bootstrap';
 
 class GraphvizSvg {
   static VERSION = '1.0.1';
