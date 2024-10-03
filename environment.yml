@@ -17,8 +17,12 @@ dependencies:
   - adaptive-scheduler>=2.12.0
   # optional-dependencies: xarray
   - xarray
+  # optional-dependencies: widgets
+  - ipywidgets
   # optional-dependencies: zarr
   - zarr
+  # optional-dependencies: pandas
+  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -28,11 +32,12 @@ dependencies:
   - anywidget
   # optional-dependencies: test
   - pytest
-  - coverage
+  - pytest-asyncio
+  - pytest-codspeed
   - pytest-cov
-  - pandas
+  - pytest-xdist
+  - coverage
   - adaptive
   - xarray
   - zarr
   - versioningit
-  - pytest-codspeed

@@ -8,11 +8,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
+import numpy as np
 from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline import _Bound, _Resources
-from pipefunc._utils import at_least_tuple, is_running_in_ipynb
+from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
@@ -101,6 +102,7 @@ class _Labels(NamedTuple):
     inputs_mapspec: dict
     bound: dict
     resources: dict
+    arg_mapspec: dict
 
     @classmethod
     def from_graph(cls, graph: nx.DiGraph) -> _Labels:  # noqa: PLR0912
@@ -111,6 +113,7 @@ class _Labels(NamedTuple):
         outputs_mapspec = {}
         inputs_mapspec = {}
         resources = {}
+        arg_mapspec = {}
 
         for edge, attrs in graph.edges.items():
             a, b = edge
@@ -120,6 +123,7 @@ class _Labels(NamedTuple):
                 if b.mapspec and a in b.mapspec.input_names:
                     spec = next(i for i in b.mapspec.inputs if i.name == a)
                     inputs_mapspec[edge] = str(spec)
+                    arg_mapspec[a] = str(spec)
                 elif default_value is not _empty:
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
@@ -145,13 +149,15 @@ class _Labels(NamedTuple):
                 assert isinstance(a, _Resources)
                 resources[edge] = a.name
 
-        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources)
+        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
 def _generate_node_label(
     node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
+    arg_mapspec: dict[str, str],
+    include_full_mapspec: bool,  # noqa: FBT001
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -165,7 +171,7 @@ def _generate_node_label(
 
         if type_string:
             type_string = html.escape(_trim(type_string))
-            parts.append(f": <i>{type_string}</i>")
+            parts.append(f" : <i>{type_string}</i>")
 
         if default_value is not _empty:
             default_value = html.escape(_trim(default_value))
@@ -179,19 +185,21 @@ def _generate_node_label(
     if isinstance(node, str):
         type_string = type_as_string(hints[node]) if node in hints else None
         default_value = defaults.get(node, _empty) if defaults else _empty
-        label = _format_type_and_default(node, type_string, default_value)
+        mapspec = arg_mapspec.get(node)
+        label = _format_type_and_default(mapspec or node, type_string, default_value)
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
         label = f'<TABLE BORDER="0"><TR><TD><B>{html.escape(name)}</B></TD></TR><HR/>'
 
-        for output in at_least_tuple(node.output_name):
+        for i, output in enumerate(at_least_tuple(node.output_name)):
+            name = str(node.mapspec.outputs[i]) if node.mapspec else output
             h = node.output_annotation.get(output)
             type_string = type_as_string(h) if h is not NoAnnotation else None
             default_value = defaults.get(output, _empty) if defaults else _empty
-            formatted_label = _format_type_and_default(output, type_string, default_value)
+            formatted_label = _format_type_and_default(name, type_string, default_value)
             label += f"<TR><TD>{formatted_label}</TD></TR>"
-        if node.mapspec:
+        if include_full_mapspec and node.mapspec:
             s = html.escape(str(node.mapspec))
             label += f'<HR/><TR><TD><FONT FACE="Courier New">{s}</FONT></TD></TR>'
 
@@ -224,6 +232,7 @@ def visualize_graphviz(  # noqa: PLR0912
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
+    include_full_mapspec: bool = False,
     return_type: Literal["graphviz", "html"] | None = None,
 ) -> graphviz.Digraph | IPython.display.HTML:
     """Visualize the pipeline as a directed graph using Graphviz.
@@ -248,6 +257,8 @@ def visualize_graphviz(  # noqa: PLR0912
         Graphviz-specific keyword arguments for customizing the graph's appearance.
     show_legend
         Whether to show the legend in the graph visualization.
+    include_full_mapspec
+        Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
     return_type
         The format to return the visualization in.
         If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -261,6 +272,7 @@ def visualize_graphviz(  # noqa: PLR0912
         The resulting Graphviz Digraph object.
 
     """
+    requires("graphviz", reason="visualize_graphviz", extras="plotting")
     import graphviz
 
     if graphviz_kwargs is None:
@@ -281,6 +293,7 @@ def visualize_graphviz(  # noqa: PLR0912
     )
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(graph)
+    labels = _Labels.from_graph(graph)
 
     # Define a mapping for node configurations
     blue = func_node_colors or _COLORS["skyblue"]
@@ -289,10 +302,7 @@ def visualize_graphviz(  # noqa: PLR0912
             nodes.arg,
             {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
-        "PipeFunc": (
-            nodes.func,
-            {"fillcolor": blue, "shape": "box", "style": "filled,rounded"},
-        ),
+        "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
         "NestedPipeFunction": (
             nodes.nested_func,
             {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
@@ -320,13 +330,17 @@ def visualize_graphviz(  # noqa: PLR0912
         if nodelist:  # Only add legend entry if nodes of this type exist
             legend_items[legend_label] = config
         for node in nodelist:  # type: ignore[attr-defined]
-            label = _generate_node_label(node, hints, defaults)
+            label = _generate_node_label(
+                node,
+                hints,
+                defaults,
+                labels.arg_mapspec,
+                include_full_mapspec,
+            )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    labels = _Labels.from_graph(graph)
-
     for _labels, color in [
         (labels.outputs, _COLORS["skyblue"]),
         (labels.outputs_mapspec, _COLORS["blue"]),
@@ -410,13 +424,14 @@ def visualize_matplotlib(
     filename
         The filename to save the figure to.
     func_node_colors
-        The color of the nodes.
+        The color of the function nodes.
 
     Returns
     -------
         The resulting Matplotlib figure.
 
     """
+    requires("matplotlib", reason="visualize_matplotlib", extras="plotting")
     import matplotlib.pyplot as plt
 
     pos = _get_graph_layout(graph)
@@ -458,12 +473,7 @@ def visualize_matplotlib(
         {node: func_with_mapspec(node) for node in nodes.func + nodes.nested_func},
         {node: node.name for node in nodes.bound + nodes.resources},
     ]:
-        nx.draw_networkx_labels(
-            graph,
-            pos,
-            labels,
-            font_size=12,
-        )
+        nx.draw_networkx_labels(graph, pos, labels, font_size=12)
 
     nx.draw_networkx_edges(graph, pos, arrows=True, node_size=4000)
 
@@ -505,9 +515,9 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         If ``False`` the `holoviews.Graph` object is returned.
 
     """
+    requires("holoviews", "bokeh", reason="visualize_holoviews", extras="plotting")
     import bokeh.plotting
     import holoviews as hv
-    import numpy as np
 
     hv.extension("bokeh")
     pos = _get_graph_layout(graph)
@@ -522,15 +532,10 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
     node_index_dict = {node: index for index, node in enumerate(graph.nodes)}
 
     # Extract edge info using the lookup dictionary
-    edges = np.array(
-        [(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges],
-    )
+    edges = np.array([(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges])
 
     # Create Nodes and Graph
-    nodes = hv.Nodes(
-        (x, y, node_indices, node_labels, node_types),
-        vdims=["label", "type"],
-    )
+    nodes = hv.Nodes((x, y, node_indices, node_labels, node_types), vdims=["label", "type"])
     graph = hv.Graph((edges, nodes))
 
     plot_opts = {
@@ -539,10 +544,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         "padding": 0.1,
         "xaxis": None,
         "yaxis": None,
-        "node_color": hv.dim("type").categorize(
-            {"str": "lightgreen", "func": "skyblue"},
-            "gray",
-        ),
+        "node_color": hv.dim("type").categorize({"str": "lightgreen", "func": "skyblue"}, "gray"),
         "edge_color": "black",
     }
 
@@ -550,11 +552,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    plot = graph * labels.opts(
-        text_font_size="8pt",
-        text_color="black",
-        bgcolor="white",
-    )
+    plot = graph * labels.opts(text_font_size="8pt", text_color="black", bgcolor="white")
     if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None

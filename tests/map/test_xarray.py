@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+import numpy.typing as npt
+
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
-from pipefunc.map.xarray import load_xarray
+from pipefunc.map.xarray import load_xarray, xarray_dataset_from_results
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -130,3 +133,22 @@ def test_to_xarray_from_step(tmp_path: Path):
     expected_dims = ["i"]
     assert list(da.dims) == expected_dims
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
+
+
+def test_xarray_from_result():
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    def returns_array(a: int) -> npt.NDArray[np.int64]:
+        return np.arange(a)
+
+    def returns_custom_object(a: int) -> dict:
+        return {"a": a}
+
+    pipeline = Pipeline([double_it, returns_array, returns_custom_object])
+    inputs = {"x": [1, 2, 3], "a": 10}
+    results = pipeline.map(inputs, run_folder="tmp_path", parallel=False)
+    ds = xarray_dataset_from_results(inputs, results, pipeline)
+    assert "returns_array" in ds.coords
+    assert "returns_custom_object" in ds.data_vars

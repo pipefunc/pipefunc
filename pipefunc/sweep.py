@@ -6,7 +6,7 @@ from collections.abc import Hashable, Iterable
 from itertools import product
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, requires
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
@@ -490,6 +490,7 @@ def count_sweep(
         arg_combination = pipeline.root_args(_output_name)
         assert isinstance(arg_combination, tuple)
         if use_pandas:
+            requires("pandas", reason="count_sweep", extras="pandas")
             import pandas as pd
 
             df = pd.DataFrame(list(sweep))

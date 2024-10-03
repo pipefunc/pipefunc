@@ -7,6 +7,7 @@ from collections import defaultdict
 from functools import partial
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -131,13 +132,7 @@ def _xarray_dataset(
     mapspec_output_names = [n for ms in mapspecs for n in ms.output_names if n in output_names]
     single_output_names = [n for n in output_names if n not in mapspec_output_names]
     data_arrays = {
-        name: _xarray(
-            name,
-            mapspecs,
-            inputs,
-            data_loader,
-            load_intermediate=load_intermediate,
-        )
+        name: _xarray(name, mapspecs, inputs, data_loader, load_intermediate=load_intermediate)
         for name in mapspec_output_names
     }
     all_coords = {coord for data in data_arrays.values() for coord in data.coords}
@@ -146,7 +141,7 @@ def _xarray_dataset(
     ds = xr.merge(to_merge, compat="override")
     for name in single_output_names:
         array = data_loader(name)
-        ds[name] = array
+        ds[name] = array if isinstance(array, np.ndarray) else ((), array)
     return ds
 
 

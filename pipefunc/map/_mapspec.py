@@ -278,10 +278,7 @@ class MapSpec:
         def _rename(spec: ArraySpec) -> ArraySpec:
             return ArraySpec(renames.get(spec.name, spec.name), spec.axes)
 
-        return MapSpec(
-            tuple(map(_rename, self.inputs)),
-            tuple(map(_rename, self.outputs)),
-        )
+        return MapSpec(tuple(map(_rename, self.inputs)), tuple(map(_rename, self.outputs)))
 
 
 def _shape_to_key(shape: tuple[int, ...], linear_index: int) -> tuple[int, ...]:
@@ -313,6 +310,7 @@ def _parse_indexed_arrays(expr: str) -> tuple[ArraySpec, ...]:
     )
 
 
+# NOTE: This function is not used in the current implementation!
 def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
     """Return the mask applied to 'x', depending on its type.
 
@@ -342,7 +340,7 @@ def array_mask(x: npt.NDArray | list) -> npt.NDArray[np.bool_]:
     """
     if hasattr(x, "mask"):
         return x.mask
-    if isinstance(x, list):
+    if isinstance(x, list | range):
         return np.full((len(x),), fill_value=False)
     if isinstance(x, np.ndarray):
         return np.full(x.shape, fill_value=False)
@@ -373,7 +371,7 @@ def array_shape(x: npt.NDArray | list, key: str = "?") -> tuple[int, ...]:
     """
     if hasattr(x, "shape"):
         return tuple(map(int, x.shape))
-    if isinstance(x, list):
+    if isinstance(x, list | range):
         return (len(x),)
     msg = f"No array shape defined for `{key}` of type {type(x)}"
     raise TypeError(msg)

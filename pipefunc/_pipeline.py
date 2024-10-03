@@ -43,7 +43,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import AsyncRun, run, run_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -210,11 +210,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Always creates a copy of the `PipeFunc` instance to avoid side effects.
@@ -635,12 +631,13 @@ class Pipeline:
         *,
         output_names: set[_OUTPUT_TYPE] | None = None,
         parallel: bool = True,
-        executor: Executor | None = None,
-        storage: str = "file_array",
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
+        show_progress: bool = False,
     ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -657,18 +654,35 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
-            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
-            Whether to run the functions in parallel.
+            Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
-            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-            is used. Only relevant if ``parallel=True``.
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+
+            If parallel is ``False``, this argument is ignored.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -682,6 +696,18 @@ class Pipeline:
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar. Only works if ``parallel=True``.
+
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
 
         """
         return run(
@@ -697,6 +723,106 @@ class Pipeline:
             cleanup=cleanup,
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> AsyncRun:
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+        storage
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
+
+        """
+        return run_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
         )
 
     def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1013,7 +1139,7 @@ class Pipeline:
         if len(leaf_nodes) != 1:  # pragma: no cover
             msg = (
                 "The pipeline has multiple leaf nodes. Please specify the output_name"
-                " argument to disambiguate.",
+                " argument to disambiguate."
             )
             raise ValueError(msg)
         return leaf_nodes[0]
@@ -1173,7 +1299,11 @@ class Pipeline:
             elif is_installed("holoviews"):
                 backend = "holoviews"
             else:
-                msg = "No plotting backends are installed."
+                msg = (
+                    "No plotting backends are installed."
+                    " Install 'graphviz', 'matplotlib', or 'holoviews' to visualize the pipeline."
+                    " To install all backends, run `pip install 'pipefunc[plotting]'`."
+                )
                 raise ImportError(msg)
         if backend == "graphviz":
             return self.visualize_graphviz(**kwargs)
@@ -1195,6 +1325,7 @@ class Pipeline:
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
+        include_full_mapspec: bool = False,
         return_type: Literal["graphviz", "html"] | None = None,
     ) -> graphviz.Digraph | IPython.display.HTML:
         """Visualize the pipeline as a directed graph using Graphviz.
@@ -1215,6 +1346,8 @@ class Pipeline:
             Graphviz-specific keyword arguments for customizing the graph's appearance.
         show_legend
             Whether to show the legend in the graph visualization.
+        include_full_mapspec
+            Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
         return_type
             The format to return the visualization in.
             If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -1239,6 +1372,7 @@ class Pipeline:
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,
+            include_full_mapspec=include_full_mapspec,
             return_type=return_type,
         )
 
@@ -1297,9 +1431,9 @@ class Pipeline:
         color_combinable
             Whether to color combinable nodes differently.
         conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
         output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
 
         """
         from pipefunc._plotting import visualize_matplotlib

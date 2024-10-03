@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import Executor
+
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -334,3 +336,27 @@ def test_calling_add_with_autogen_mapspec():
         internal_shapes={"foo_out": (3,)},
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
+
+
+def test_validation_parallel():
+    pipeline = Pipeline([])
+    with pytest.raises(
+        ValueError,
+        match="Cannot use an executor without `parallel=True`",
+    ):
+        pipeline.map({}, parallel=False, executor=Executor())
+    with pytest.raises(
+        ValueError,
+        match="Cannot use `show_progress=True` with `parallel=False`",
+    ):
+        pipeline.map({}, parallel=False, show_progress=True)
+
+
+def test_with_progress() -> None:
+    @pipefunc(output_name="out", mapspec="a[i] -> out[i]")
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
+    assert r_map["out"].output.tolist() == [1, 2, 3]

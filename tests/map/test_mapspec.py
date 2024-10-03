@@ -222,6 +222,10 @@ def test_array_mask():
     arr = [1, 2, 3]
     assert np.array_equal(array_mask(arr), [False, False, False])
 
+    # Test with range
+    arr = range(1, 4)
+    assert np.array_equal(array_mask(arr), [False, False, False])
+
     # Test with unsupported type
     with pytest.raises(TypeError, match="No array mask defined for type"):
         array_mask(42)
