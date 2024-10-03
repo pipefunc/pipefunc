@@ -133,6 +133,19 @@ def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Pa
         )
 
 
+def test_plotting_widget(everything_pipeline: Pipeline) -> None:
+    # Note: Not sure how to test this properly, just make sure it runs
+    widget = everything_pipeline.visualize(backend="graphviz_widget")
+    first, second, widget = widget.children
+    reset_button, direction_selector = first.children
+    search_input, search_type_selector, case_toggle = second.children
+    reset_button.click()
+    direction_selector.value = "downstream"
+    search_input.value = "c"
+    search_type_selector.value = "included"
+    case_toggle.value = True
+
+
 def test_visualize_graphviz_with_typing():
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> UnresolvableTypeHere:  # type: ignore[name-defined]  # noqa: F821
