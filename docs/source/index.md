@@ -14,13 +14,11 @@ start-after: <!-- toc-end -->
 ---
 ```
 
-```{toctree}
-:hidden:
-
-🏠 Home <self>
-🚀 Usage tutorial <tutorial>
-❓ FAQ <faq>
+```{expand_headers_toc}
+tutorial
 ```
+
+
 
 ```{toctree}
 :hidden:
