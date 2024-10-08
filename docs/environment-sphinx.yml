@@ -32,10 +32,10 @@ dependencies:
   # optional-dependencies: docs
   - sphinx
   - sphinx-autodoc-typehints
-  - sphinx-book-theme
   - sphinx-copybutton
   - sphinx-notfound-page
   - sphinx-togglebutton
+  - pydata-sphinx-theme
   - emoji
   - jupytext
   - myst-parser
