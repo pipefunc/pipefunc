@@ -41,7 +41,7 @@ class Shapes(NamedTuple):
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}
@@ -102,7 +102,7 @@ class RunInfo:
         run_folder: str | Path | None,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
         *,
         storage: str | dict[_OUTPUT_TYPE, str],
         cleanup: bool = True,
@@ -281,7 +281,7 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
