@@ -38,14 +38,13 @@ class Shapes(NamedTuple):
     masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
 
 
-def map_shapes(
+def _input_shapes_and_masks(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+    internal_shapes: dict[str, int | tuple[int, ...]],
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}
-    internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
 
     input_parameters = set(pipeline.topological_generations.root_args)
 
@@ -56,6 +55,20 @@ def map_shapes(
         if p in pipeline.mapspec_names
     }
     masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
+
+    return Shapes(shapes, masks)
+
+
+def map_shapes(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+) -> Shapes:
+    if internal_shapes is None:
+        internal_shapes = {}
+    internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
+    shapes, masks = _input_shapes_and_masks(pipeline, inputs, internal_shapes)
+
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
         assert func.mapspec is not None  # mypy
