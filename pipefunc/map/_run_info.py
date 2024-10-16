@@ -7,7 +7,7 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -45,7 +45,8 @@ def _input_shapes_and_masks(
 ) -> Shapes:
     input_parameters = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = pipeline.defaults | inputs
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {  # In this function, we only use ints
+    # The type of the shapes is `int | str` but we only use ints in this function
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
         if p in pipeline.mapspec_names
@@ -96,6 +97,12 @@ def _shape_and_mask(
 
 @dataclass(frozen=True, eq=True)
 class RunInfo:
+    """Information about a ``pipeline.map()`` run.
+
+    The data in this class is immutable, except for ``resolved_shapes`` which
+    is updated as new shapes are resolved.
+    """
+
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
@@ -267,26 +274,32 @@ class RunInfo:
         if output_name not in self.resolved_shapes:
             return False
         shape = self.resolved_shapes[output_name]
-        if any(isinstance(i, str) for i in shape):
-            new_shape = _resolve_shape(shape, kwargs)
-            self.resolved_shapes[output_name] = new_shape
+        if not _is_resolved(shape):
+            resolved_shape = _resolve_shape(shape, kwargs)
+            self.resolved_shapes[output_name] = resolved_shape
             for name in at_least_tuple(output_name):
-                self.resolved_shapes[name] = new_shape
+                self.resolved_shapes[name] = resolved_shape
         else:
             return False
 
         # Now that new shape is known, update downstream shapes
-        internal = {
+        internal: dict[str, tuple[int | str, ...]] = {
             name: _internal_shape(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
+            if not isinstance(name, tuple)
         }
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         for name, shape in self.resolved_shapes.items():
-            if any(isinstance(i, str) for i in shape):
+            if not _is_resolved(shape):
                 new_shape, _ = _shape_and_mask(mapspecs[name], self.resolved_shapes, internal)
                 self.resolved_shapes[name] = new_shape
-                internal[name] = _internal_shape(shape, self.shape_masks[name])
+                if not isinstance(name, tuple):
+                    internal[name] = _internal_shape(new_shape, self.shape_masks[name])
         return True
+
+
+def _is_resolved(shape: tuple[int | str, ...]) -> TypeGuard[tuple[int, ...]]:
+    return all(isinstance(i, int) for i in shape)
 
 
 @dataclass
@@ -299,11 +312,8 @@ class LazyStorage:
     storage_class: type[StorageBase]
     run_folder: Path | None
 
-    def _can_evaluate(self) -> bool:
-        return all(isinstance(i, int) for i in self.shape)
-
     def evaluate(self) -> StorageBase:
-        if not self._can_evaluate():
+        if not _is_resolved(self.shape):
             msg = "Cannot evaluate lazy store with unresolved shape."
             raise ValueError(msg)
         path = _maybe_file_array_path(self.output_name, self.run_folder)
@@ -312,7 +322,7 @@ class LazyStorage:
         return self.storage_class(path, external_shape, internal_shape, self.shape_mask)
 
     def maybe_evaluate(self) -> StorageBase | LazyStorage:
-        if self._can_evaluate():
+        if _is_resolved(self.shape):
             return self.evaluate()
         return self
 
@@ -473,7 +483,7 @@ def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | 
     return run_folder / "outputs" / output_name
 
 
-S = TypeVar("S", str, int)
+S = TypeVar("S")
 
 
 def _internal_shape(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:

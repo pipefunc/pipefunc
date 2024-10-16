@@ -32,6 +32,7 @@ from pipefunc.map._run_info import (
     RunInfo,
     _external_shape,
     _internal_shape,
+    _is_resolved,
 )
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
@@ -679,6 +680,7 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
+    assert _is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
