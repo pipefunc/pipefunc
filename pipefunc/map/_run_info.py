@@ -264,7 +264,7 @@ class LazyStore:
     storage_class: type[StorageBase]
     run_folder: Path | None
 
-    def to_store(self, kwargs: dict[str, Any] | None = None) -> StorageBase:
+    def evaluate(self, kwargs: dict[str, Any] | None = None) -> StorageBase:
         if kwargs is None:
             kwargs = {}
         shape: tuple[int, ...] = _resolve_shape(self.shape, kwargs)
@@ -420,7 +420,7 @@ def _init_lazy_stores(
     for name in at_least_tuple(output_name):
         store = LazyStore(name, shape, mask, storage_class, run_folder)
         if all(isinstance(i, int) for i in store.shape):
-            stores.append(store.to_store())
+            stores.append(store.evaluate())
         else:
             stores.append(store)
     return stores

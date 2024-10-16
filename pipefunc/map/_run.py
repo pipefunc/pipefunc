@@ -783,6 +783,7 @@ def _load_from_store(
 
     for name in at_least_tuple(output_name):
         storage = store[name]
+        assert not isinstance(storage, LazyStore)  # should be evaluated by now
         if isinstance(storage, StorageBase):
             outputs.append(storage)
         elif isinstance(storage, Path):
@@ -973,6 +974,23 @@ async def _process_generation_async(
         outputs.update(_outputs)
 
 
+def _eval_lazy_store(
+    store: dict[str, StorageBase | LazyStore | Path | DirectValue],
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+) -> Any:
+    for name in at_least_tuple(func.output_name):
+        storage = store[name]
+        if isinstance(storage, LazyStore):
+            try:
+                store[name] = storage.evaluate(kwargs)
+            except Exception as e:
+                msg = f"Error evaluating lazy store for `{name}`. "
+                msg += f"The error was: `{e}`. "
+                msg += f"kwargs: {kwargs}"
+                raise RuntimeError(msg) from e
+
+
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
@@ -983,6 +1001,7 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    _eval_lazy_store(store, func, kwargs)
     ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
