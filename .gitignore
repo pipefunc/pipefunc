@@ -110,6 +110,3 @@ venv.bak/
 *.sbatch
 *.out
 *.batch
-
-# pipefunc
-build/

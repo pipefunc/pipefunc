@@ -984,6 +984,7 @@ def _eval_lazy_store(
         if isinstance(storage, LazyStore):
             try:
                 store[name] = storage.evaluate(kwargs)
+                # At this point, any downstream lazy stores might also be evaluated.
             except Exception as e:
                 msg = f"Error evaluating lazy store for `{name}`. "
                 msg += f"The error was: `{e}`. "
