@@ -160,8 +160,8 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, LazyStore | StorageBase | Path | DirectValue]:
-        store: dict[str, LazyStore | StorageBase | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, LazyStorage | StorageBase | Path | DirectValue]:
+        store: dict[str, LazyStorage | StorageBase | Path | DirectValue] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
         # Initialize LazyStore instances for each map spec output
         for mapspec in self.mapspecs:
@@ -170,7 +170,7 @@ class RunInfo:
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
-                lazy_stores = _init_lazy_stores(
+                lazy_stores = _init_storages(
                     output_name,
                     shape,
                     mask,
@@ -255,7 +255,7 @@ class RunInfo:
 
 
 @dataclass
-class LazyStore:
+class LazyStorage:
     """Object that can generate a StorageBase instance on demand."""
 
     output_name: str
@@ -409,16 +409,16 @@ def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
-def _init_lazy_stores(
+def _init_storages(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int | str, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
-) -> list[StorageBase | LazyStore]:
-    stores: list[StorageBase | LazyStore] = []
+) -> list[StorageBase | LazyStorage]:
+    stores: list[StorageBase | LazyStorage] = []
     for name in at_least_tuple(output_name):
-        store = LazyStore(name, shape, mask, storage_class, run_folder)
+        store = LazyStorage(name, shape, mask, storage_class, run_folder)
         if all(isinstance(i, int) for i in store.shape):
             stores.append(store.evaluate())
         else:
