@@ -24,7 +24,14 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
+from pipefunc.map._run_info import (
+    DirectValue,
+    LazyStorage,
+    RunInfo,
+    _external_shape,
+    _is_resolved,
+    map_shapes,
+)
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -133,7 +140,7 @@ class LearnersDict(LearnersDictType):
         )
         if returns == "namedtuple":
             if slurm_run_kwargs:
-                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                msg = "Cannot pass `slurm_run_kwargs` when `returns='namedtuple'`."
                 raise ValueError(msg)
             return details
         kwargs = details.kwargs()
@@ -281,7 +288,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -296,8 +303,9 @@ def _learner(
             return_output=return_output,
             cache=cache,
         )
-        shape = run_info.shapes[func.output_name]
+        shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
+        assert _is_resolved(shape)
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
     else:
         f = functools.partial(
@@ -336,7 +344,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -359,7 +367,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -377,7 +385,8 @@ def _execute_iteration_in_map_spec(
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
+    assert _is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays, cache)
     if not return_output:
@@ -395,7 +404,7 @@ class _MapWrapper:
     pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
     parallel: bool
     cleanup: bool
 
@@ -512,7 +521,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
