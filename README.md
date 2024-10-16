@@ -89,23 +89,10 @@ pipeline = Pipeline([f_c, f_d, f_e], profile=True)  # `profile=True` enables res
 
 # Call the pipeline directly for different outputs:
 assert pipeline("d", a=2, b=3) == 15
-assert pipeline("e", a=2, b=3, x=1) == 75
-
-# Or create a new function for a specific output
-h_d = pipeline.func("d")
-assert h_d(a=2, b=3) == 15
-
-h_e = pipeline.func("e")
-assert h_e(a=2, b=3, x=1) == 75
-# Instead of providing the root arguments, you can also provide the intermediate results directly
-assert h_e(c=5, d=15, x=1) == 75
+assert pipeline("e", a=2, b=3) == 75
 
 # Visualize the pipeline
 pipeline.visualize()
-
-# Get all possible argument mappings for each function
-all_args = pipeline.all_arg_combinations
-print(all_args)
 
 # Show resource reporting (only works if profile=True)
 pipeline.print_profiling_stats()
