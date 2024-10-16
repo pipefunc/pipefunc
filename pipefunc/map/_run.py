@@ -32,8 +32,6 @@ from pipefunc.map._run_info import (
     RunInfo,
     _external_shape,
     _internal_shape,
-    _resolve_shape,
-    _shape_and_mask,
 )
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
@@ -680,31 +678,22 @@ def _prepare_submit_map_spec(
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    shape = run_info.shapes[func.output_name]
-    shape_resolved = _resolve_shape(shape, kwargs)
+    shape = run_info.resolved_shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays = _init_result_arrays(func.output_name, shape_resolved)
+    result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
-        shape=shape_resolved,
+        shape=shape,
         shape_mask=mask,
         file_arrays=file_arrays,
         cache=cache,
     )
-    fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape_resolved, mask)
+    fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
-    return _MapSpecArgs(
-        process_index,
-        existing,
-        missing,
-        result_arrays,
-        shape_resolved,
-        mask,
-        file_arrays,
-    )
+    return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
 
 
 def _mask_fixed_axes(
@@ -975,33 +964,14 @@ async def _process_generation_async(
         outputs.update(_outputs)
 
 
-def _eval_lazy_store(
+def _maybe_evaluate_lazy_store(
     store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
-    func: PipeFunc,
-    kwargs: dict[str, Any],
     run_info: RunInfo,
 ) -> None:
-    for name in at_least_tuple(func.output_name):
-        storage = store[name]
+    for name, storage in store.items():
         if isinstance(storage, LazyStorage):
-            store[name] = storage.try_evaluate(kwargs)
-
-    # Now that new shape is known, update downstream lazy stores
-    shapes = {}
-    internal = {}
-    for name, storage in store.items():
-        if isinstance(storage, StorageBase | LazyStorage):
-            shapes[name] = storage.shape
-            internal[name] = _internal_shape(storage.shape, storage.shape_mask)
-
-    mapspecs = {name: mapspec for mapspec in run_info.mapspecs for name in mapspec.output_names}
-    for name, storage in store.items():
-        if not isinstance(storage, LazyStorage):
-            continue
-        shape, _ = _shape_and_mask(mapspecs[name], shapes, internal)
-        shapes[name] = storage.shape = shape
-        internal[name] = _internal_shape(shape, storage.shape_mask)
-        store[name] = storage.maybe_evaluate()
+            storage.shape = run_info.resolved_shapes[name]
+            store[name] = storage.maybe_evaluate()
 
 
 def _submit_func(
@@ -1014,8 +984,8 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    run_info.resolve_shapes(func.output_name, kwargs)
-    _eval_lazy_store(store, func, kwargs, run_info)
+    if run_info.resolve_shapes(func.output_name, kwargs):
+        _maybe_evaluate_lazy_store(store, run_info)
     ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:

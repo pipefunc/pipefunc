@@ -262,10 +262,10 @@ class RunInfo:
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
 
-    def resolve_shapes(self, output_name: _OUTPUT_TYPE, kwargs: dict[str, Any]) -> None:
+    def resolve_shapes(self, output_name: _OUTPUT_TYPE, kwargs: dict[str, Any]) -> bool:
         """Resolve shapes that depend on kwargs."""
         if output_name not in self.resolved_shapes:
-            return
+            return False
         shape = self.resolved_shapes[output_name]
         if any(isinstance(i, str) for i in shape):
             new_shape = _resolve_shape(shape, kwargs)
@@ -273,20 +273,20 @@ class RunInfo:
             for name in at_least_tuple(output_name):
                 self.resolved_shapes[name] = new_shape
         else:
-            return
+            return False
 
         # Now that new shape is known, update downstream shapes
         internal = {
             name: _internal_shape(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
         }
-
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         for name, shape in self.resolved_shapes.items():
             if any(isinstance(i, str) for i in shape):
                 new_shape, _ = _shape_and_mask(mapspecs[name], self.resolved_shapes, internal)
                 self.resolved_shapes[name] = new_shape
                 internal[name] = _internal_shape(shape, self.shape_masks[name])
+        return True
 
 
 @dataclass
