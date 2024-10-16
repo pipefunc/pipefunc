@@ -12,57 +12,1791 @@ the resource usage of the pipeline functions.
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import inspect
-import sys
+import tempfile
 import time
 import warnings
-from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Literal,
-    Tuple,
-    Union,
-)
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
 import networkx as nx
-from tabulate import tabulate
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc._lazy import _LazyFunction, task_graph
-from pipefunc._pipefunc import PipeFunc
-from pipefunc._plotting import visualize, visualize_holoviews
-from pipefunc._simplify import _combine_nodes, _get_signature, _wrap_dict_to_tuple
-from pipefunc._utils import at_least_tuple, generate_filename_from_dict, handle_error
+from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._profile import print_profiling_stats
+from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
+from pipefunc._utils import (
+    assert_complete_kwargs,
+    at_least_tuple,
+    clear_cached_properties,
+    handle_error,
+)
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.map._mapspec import ArraySpec, MapSpec, validate_consistent_axes
-
-if sys.version_info < (3, 10):  # pragma: no cover
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
+from pipefunc.lazy import _LazyFunction, task_graph
+from pipefunc.map._mapspec import (
+    ArraySpec,
+    MapSpec,
+    mapspec_axes,
+    mapspec_dimensions,
+    validate_consistent_axes,
+)
+from pipefunc.map._run import AsyncRun, run, run_async
+from pipefunc.resources import Resources
+from pipefunc.typing import (
+    Array,
+    NoAnnotation,
+    Unresolvable,
+    is_object_array_type,
+    is_type_compatible,
+)
 
 if TYPE_CHECKING:
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
-
+    from collections import OrderedDict
+    from collections.abc import Callable, Iterable
+    from concurrent.futures import Executor
     from pathlib import Path
 
+    import graphviz
     import holoviews as hv
+    import IPython.display
 
-    from pipefunc._perf import ProfilingStats
+    from pipefunc._profile import ProfilingStats
     from pipefunc.map._run import Result
 
-_OUTPUT_TYPE: TypeAlias = Union[str, Tuple[str, ...]]
-_CACHE_KEY_TYPE: TypeAlias = Tuple[_OUTPUT_TYPE, Tuple[Tuple[str, Any], ...]]
+
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
-class _Function:
+class Pipeline:
+    """Pipeline class for managing and executing a sequence of functions.
+
+    Parameters
+    ----------
+    functions
+        A list of functions that form the pipeline. Note that the functions
+        are copied when added to the pipeline using `PipeFunc.copy`.
+    lazy
+        Flag indicating whether the pipeline should be lazy.
+    debug
+        Flag indicating whether debug information should be printed.
+        If ``None``, the value of each PipeFunc's debug attribute is used.
+    profile
+        Flag indicating whether profiling information should be collected.
+        If ``None``, the value of each PipeFunc's profile attribute is used.
+    cache_type
+        The type of cache to use. See the notes below for more *important* information.
+    cache_kwargs
+        Keyword arguments passed to the cache constructor.
+    validate_type_annotations
+        Flag indicating whether type validation should be performed. If ``True``,
+        the type annotations of the functions are validated during the pipeline
+        initialization. If ``False``, the type annotations are not validated.
+    scope
+        If provided, *all* parameter names and output names of the pipeline functions will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `Pipeline.update_scope` method.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    default_resources
+        Default resources to use for the pipeline functions. If ``None``,
+        the resources are not set. Either a dict or a `pipefunc.resources.Resources`
+        instance can be provided. If provided, the resources in the `PipeFunc`
+        instances are updated with the default resources.
+
+    Notes
+    -----
+    Important note about caching: The caching behavior differs between ``pipeline.map`` and
+    ``pipeline.run`` / ``pipeline(...)``.
+
+    1. For ``pipeline.run`` and ``pipeline(...)`` ("calling the pipeline as a function"):
+
+    - The cache key is computed based solely on the root arguments provided to the pipeline.
+    - Only the root arguments need to be hashable.
+    - The root arguments uniquely determine the output across the entire pipeline, allowing
+      caching to be simple and effective when computing the final result.
+
+    2. For ``pipeline.map``:
+
+    - The cache key is computed based on the input values of each `PipeFunc`.
+    - So a `PipeFunc` with ``cache=True`` must have hashable input values.
+    - When using ``pipeline.map(..., parallel=True)``, the cache itself will be serialized,
+      so one must use a cache that supports shared memory, such as `~pipefunc.cache.LRUCache`
+      with ``shared=True`` or uses a disk cache like `~pipefunc.cache.DiskCache`.
+
+    For both methods:
+
+    - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
+      which is a requirement for storing results in a cache.
+    - This function works for many common types but is not guaranteed to work for all types.
+    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
+    - Caution ⛔️: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
+
+    The key difference is that ``pipeline.run``'s output is uniquely determined by the root arguments,
+    while ``pipeline.map`` is not because it may contain reduction operations as described by `~pipefunc.map.MapSpec`.
+
+    """
+
+    def __init__(
+        self,
+        functions: list[PipeFunc | tuple[PipeFunc, str | MapSpec]],
+        *,
+        lazy: bool = False,
+        debug: bool | None = None,
+        profile: bool | None = None,
+        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
+        cache_kwargs: dict[str, Any] | None = None,
+        validate_type_annotations: bool = True,
+        scope: str | None = None,
+        default_resources: dict[str, Any] | Resources | None = None,
+    ) -> None:
+        """Pipeline class for managing and executing a sequence of functions."""
+        self.functions: list[PipeFunc] = []
+        self.lazy = lazy
+        self._debug = debug
+        self._profile = profile
+        self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
+        self.validate_type_annotations = validate_type_annotations
+        for f in functions:
+            if isinstance(f, tuple):
+                f, mapspec = f  # noqa: PLW2901
+            else:
+                mapspec = None
+            self.add(f, mapspec=mapspec)
+        self._cache_type = cache_type
+        self._cache_kwargs = cache_kwargs
+        if cache_type is None and any(f.cache for f in self.functions):
+            cache_type = "lru"
+        self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        if scope is not None:
+            self.update_scope(scope, "*", "*")
+
+    @property
+    def profile(self) -> bool | None:
+        """Flag indicating whether profiling information should be collected."""
+        return self._profile
+
+    @profile.setter
+    def profile(self, value: bool | None) -> None:
+        """Set the profiling flag for the pipeline and all functions."""
+        self._profile = value
+        if value is not None:
+            for f in self.functions:
+                f.profile = value
+
+    @property
+    def debug(self) -> bool | None:
+        """Flag indicating whether debug information should be printed."""
+        return self._debug
+
+    @debug.setter
+    def debug(self, value: bool | None) -> None:
+        """Set the debug flag for the pipeline and all functions."""
+        self._debug = value
+        if value is not None:
+            for f in self.functions:
+                f.debug = value
+
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
+        """Add a function to the pipeline.
+
+        Always creates a copy of the `PipeFunc` instance to avoid side effects.
+
+        Parameters
+        ----------
+        f
+            The function to add to the pipeline.
+        profile
+            Flag indicating whether profiling information should be collected.
+        mapspec
+            This is a specification for mapping that dictates how input values should
+            be merged together. If ``None``, the default behavior is that the input directly
+            maps to the output.
+
+        """
+        if isinstance(f, PipeFunc):
+            resources = Resources.maybe_with_defaults(f.resources, self._default_resources)
+            f: PipeFunc = f.copy(  # type: ignore[no-redef]
+                resources=resources,
+                mapspec=f.mapspec if mapspec is None else _maybe_mapspec(mapspec),
+            )
+        elif callable(f):
+            f = PipeFunc(
+                f,
+                output_name=f.__name__,
+                mapspec=mapspec,
+                resources=self._default_resources,
+            )
+        else:
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
+
+        self.functions.append(f)
+        f._pipelines.add(self)
+
+        if self.profile is not None:
+            f.profile = self.profile
+
+        if self.debug is not None:
+            f.debug = self.debug
+
+        self._clear_internal_cache()  # reset cache
+        self._validate()
+        return f
+
+    def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
+        """Drop a function from the pipeline.
+
+        Parameters
+        ----------
+        f
+            The function to drop from the pipeline.
+        output_name
+            The name of the output to drop from the pipeline.
+
+        """
+        if (f is not None and output_name is not None) or (f is None and output_name is None):
+            msg = "Either `f` or `output_name` should be provided."
+            raise ValueError(msg)
+        if f is not None:
+            if f not in self.functions:
+                msg = (
+                    f"The function `{f}` is not in the pipeline."
+                    " Remember that the `PipeFunc` instances are copied on `Pipeline` initialization."
+                )
+                if f.output_name in self.output_to_func:
+                    msg += (
+                        f" However, the function with the same output name `{f.output_name!r}` exists in the"
+                        f" pipeline, you can access that function via `pipeline[{f.output_name!r}]`."
+                    )
+                raise ValueError(msg)
+            self.functions.remove(f)
+        elif output_name is not None:
+            f = self.output_to_func[output_name]
+            self.drop(f=f)
+        self._clear_internal_cache()
+        self._validate()
+
+    def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
+        """Replace a function in the pipeline with another function.
+
+        Parameters
+        ----------
+        new
+            The function to add to the pipeline.
+        old
+            The function to replace in the pipeline. If None, ``old`` is
+            assumed to be the function with the same output name as ``new``.
+
+        """
+        if old is None:
+            self.drop(output_name=new.output_name)
+        else:
+            self.drop(f=old)
+        self.add(new)
+        self._clear_internal_cache()
+        self._validate()
+
+    @functools.cached_property
+    def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+        """Return a mapping from output names to functions.
+
+        The mapping includes functions with multiple outputs both as individual
+        outputs and as tuples of outputs. For example, if a function has the
+        output name ``("a", "b")``, the mapping will include both ``"a"``,
+        ``"b"``, and ``("a", "b")`` as keys.
+
+        See Also
+        --------
+        __getitem__
+            Shortcut for accessing the function corresponding to a specific output name.
+
+        """
+        output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
+        for f in self.functions:
+            output_to_func[f.output_name] = f
+            if isinstance(f.output_name, tuple):
+                for name in f.output_name:
+                    output_to_func[name] = f
+        return output_to_func
+
+    def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
+        """Return the function corresponding to a specific output name.
+
+        See Also
+        --------
+        output_to_func
+            The mapping from output names to functions.
+
+        """
+        if output_name not in self.output_to_func:
+            available = list(self.output_to_func.keys())
+            msg = f"No function with output name `{output_name!r}` in the pipeline, only `{available}`."
+            raise KeyError(msg)
+        return self.output_to_func[output_name]
+
+    def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
+        """Check if the pipeline contains a function with a specific output name."""
+        return output_name in self.output_to_func
+
+    @functools.cached_property
+    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
+        """Return a mapping from node names to nodes.
+
+        Returns
+        -------
+            A mapping from node names to nodes.
+
+        """
+        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
+        for node in self.graph.nodes:
+            if isinstance(node, PipeFunc):
+                if isinstance(node.output_name, tuple):
+                    for name in node.output_name:
+                        mapping[name] = node
+                mapping[node.output_name] = node
+            elif isinstance(node, str):
+                mapping[node] = node
+            else:
+                assert isinstance(node, _Bound | _Resources)
+        return mapping
+
+    @functools.cached_property
+    def graph(self) -> nx.DiGraph:
+        """Create a directed graph representing the pipeline.
+
+        Returns
+        -------
+            A directed graph with nodes representing functions and edges
+            representing dependencies between functions.
+
+        """
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        g = nx.DiGraph()
+        for f in self.functions:
+            g.add_node(f)
+            assert f.parameters is not None
+            for arg in f.parameters:
+                if arg in self.output_to_func:  # is function output
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name)
+                        g.add_edge(bound, f)
+                    else:
+                        edge = (self.output_to_func[arg], f)
+                        if edge not in g.edges:
+                            g.add_edge(*edge, arg=arg)
+                        else:
+                            # edge already exists because of multiple outputs
+                            assert isinstance(edge[0].output_name, tuple)
+                            current = g.edges[edge]["arg"]
+                            g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
+                else:  # noqa: PLR5501
+                    if arg in f._bound:
+                        bound = _Bound(arg, f.output_name)
+                        g.add_edge(bound, f)
+                    else:
+                        if arg not in g:
+                            # Add the node only if it doesn't exist
+                            g.add_node(arg)
+                        g.add_edge(arg, f, arg=arg)
+            if f.resources_variable is not None:
+                g.add_edge(_Resources(f.resources_variable, f.output_name), f)
+        return g
+
+    def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
+        """Create a composed function that can be called with keyword arguments.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the composed function.
+
+        Returns
+        -------
+            The composed function that can be called with keyword arguments.
+
+        """
+        if f := self._internal_cache.func.get(output_name):
+            return f
+        root_args = self.root_args(output_name)
+        assert isinstance(root_args, tuple)
+        f = _PipelineAsFunc(self, output_name, root_args=root_args)
+        self._internal_cache.func[output_name] = f
+        return f
+
+    @functools.cached_property
+    def _internal_cache(self) -> _PipelineInternalCache:
+        return _PipelineInternalCache()
+
+    def _clear_internal_cache(self) -> None:
+        clear_cached_properties(self)
+
+    def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
+        """Call the pipeline for a specific return value.
+
+        Parameters
+        ----------
+        __output_name__
+            The identifier for the return value of the pipeline.
+            Is None by default, in which case the unique leaf node is used.
+            This parameter is positional-only and the strange name is used
+            to avoid conflicts with the ``output_name`` argument that might be
+            passed via ``kwargs``.
+        kwargs
+            Keyword arguments to be passed to the pipeline functions.
+
+        Returns
+        -------
+            The return value of the pipeline.
+
+        """
+        if __output_name__ is None:
+            __output_name__ = self.unique_leaf_node.output_name
+        return self.run(__output_name__, kwargs=kwargs)
+
+    def _get_func_args(
+        self,
+        func: PipeFunc,
+        flat_scope_kwargs: dict[str, Any],
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,  # noqa: FBT001
+        used_parameters: set[str | None],
+    ) -> dict[str, Any]:
+        # Used in _run
+        func_args = {}
+        for arg in func.parameters:
+            if arg in func._bound:
+                value = func._bound[arg]
+            elif arg in flat_scope_kwargs:
+                value = flat_scope_kwargs[arg]
+            elif arg in self.output_to_func:
+                value = self._run(
+                    output_name=arg,
+                    flat_scope_kwargs=flat_scope_kwargs,
+                    all_results=all_results,
+                    full_output=full_output,
+                    used_parameters=used_parameters,
+                )
+            elif arg in self.defaults:
+                value = self.defaults[arg]
+            else:
+                msg = f"Missing value for argument `{arg}` in `{func}`."
+                raise ValueError(msg)
+            func_args[arg] = value
+            used_parameters.add(arg)
+        return func_args
+
+    def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
+        """Return the cache used by the pipeline."""
+        if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
+            return tg.cache
+        return self.cache
+
+    def _run(
+        self,
+        *,
+        output_name: _OUTPUT_TYPE,
+        flat_scope_kwargs: dict[str, Any],
+        all_results: dict[_OUTPUT_TYPE, Any],
+        full_output: bool,
+        used_parameters: set[str | None],
+    ) -> Any:
+        if output_name in all_results:
+            return all_results[output_name]
+        func = self.output_to_func[output_name]
+        assert func.parameters is not None
+
+        cache = self._current_cache()
+        use_cache = (func.cache and cache is not None) or task_graph() is not None
+        root_args = self.root_args(output_name)
+        result_from_cache = False
+        if use_cache:
+            assert cache is not None
+            cache_key = _compute_cache_key(
+                func.output_name,
+                self._func_defaults(func) | flat_scope_kwargs | func._bound,
+                root_args,
+            )
+            return_now, result_from_cache = _get_result_from_cache(
+                func,
+                cache,
+                cache_key,
+                output_name,
+                all_results,
+                full_output,
+                used_parameters,
+                self.lazy,
+            )
+            if return_now:
+                return all_results[output_name]
+
+        func_args = self._get_func_args(
+            func,
+            flat_scope_kwargs,
+            all_results,
+            full_output,
+            used_parameters,
+        )
+
+        if result_from_cache:
+            assert full_output
+            return all_results[output_name]
+
+        start_time = time.perf_counter()
+        r = _execute_func(func, func_args, self.lazy)
+        if use_cache and cache_key is not None:
+            assert cache is not None
+            _update_cache(cache, cache_key, r, start_time)
+        _update_all_results(func, r, output_name, all_results, self.lazy)
+        return all_results[output_name]
+
+    def run(
+        self,
+        output_name: _OUTPUT_TYPE,
+        *,
+        full_output: bool = False,
+        kwargs: dict[str, Any],
+    ) -> Any:
+        """Execute the pipeline for a specific return value.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline.
+        full_output
+            Whether to return the outputs of all function executions
+            as a dictionary mapping function names to their return values.
+        kwargs
+            Keyword arguments to be passed to the pipeline functions.
+
+        Returns
+        -------
+            The return value of the pipeline or a dictionary mapping function
+            names to their return values if ``full_output`` is ``True``.
+
+        """
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
+            msg = (
+                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
+                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
+            )
+            raise RuntimeError(msg)
+
+        if output_name in kwargs:
+            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
+            raise ValueError(msg)
+
+        flat_scope_kwargs = self._flatten_scopes(kwargs)
+
+        all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        used_parameters: set[str | None] = set()
+
+        self._run(
+            output_name=output_name,
+            flat_scope_kwargs=flat_scope_kwargs,
+            all_results=all_results,
+            full_output=full_output,
+            used_parameters=used_parameters,
+        )
+
+        # if has None, result was from cache, so we don't know which parameters were used
+        if None not in used_parameters and (
+            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        ):
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
+            raise UnusedParametersError(msg)
+
+        return all_results if full_output else all_results[output_name]
+
+    def map(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        parallel: bool = True,
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> OrderedDict[str, Result]:
+        """Run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        parallel
+            Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
+        executor
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+
+            If parallel is ``False``, this argument is ignored.
+        storage
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar. Only works if ``parallel=True``.
+
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
+
+        """
+        return run(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            parallel=parallel,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        *,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> AsyncRun:
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+        storage
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
+
+        """
+        return run_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
+        """Return the arguments required to compute a specific output.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline.
+
+        Returns
+        -------
+            A set of tuples containing possible argument combinations.
+            The tuples are sorted in lexicographical order.
+
+        """
+        if r := self._internal_cache.arg_combinations.get(output_name):
+            return r
+        head = self.node_mapping[output_name]
+        arg_set: set[tuple[str, ...]] = set()
+        _compute_arg_mapping(self.graph, head, head, [], [], arg_set)  # type: ignore[arg-type]
+        self._internal_cache.arg_combinations[output_name] = arg_set
+        return arg_set
+
+    def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
+        """Return the root arguments required to compute a specific output."""
+        if r := self._internal_cache.root_args.get(output_name):
+            return r
+        arg_combos = self.arg_combinations(output_name)
+        root_args = next(
+            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
+        )
+        self._internal_cache.root_args[output_name] = root_args
+        return root_args
+
+    def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+        """Return the functions required to compute a specific output.
+
+        See Also
+        --------
+        func_dependents
+
+        """
+        return _traverse_graph(output_name, "predecessors", self.graph, self.node_mapping)
+
+    def func_dependents(self, name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+        """Return the functions that depend on a specific input/output.
+
+        See Also
+        --------
+        func_dependencies
+
+        """
+        return _traverse_graph(name, "successors", self.graph, self.node_mapping)
+
+    @functools.cached_property
+    def defaults(self) -> dict[str, Any]:
+        return {
+            arg: value
+            for func in self.functions
+            for arg, value in func.defaults.items()
+            if arg not in func._bound and arg not in self.output_to_func
+        }
+
+    def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
+        """Retrieve defaults for a function, including those set by other functions."""
+        if r := self._internal_cache.func_defaults.get(func.output_name):
+            return r
+        defaults = func.defaults.copy()
+        for arg in func.parameters:
+            if arg in self.defaults:
+                pipeline_default = self.defaults[arg]
+                if arg in defaults:
+                    assert defaults[arg] == pipeline_default
+                    continue
+                defaults[arg] = self.defaults[arg]
+        self._internal_cache.func_defaults[func.output_name] = defaults
+        return defaults
+
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Automatically traverses the pipeline graph to find all functions that
+        that the defaults can be applied to.
+
+        If `overwrite` is `False`, the new defaults will be added to the existing
+        defaults. If `overwrite` is `True`, the existing defaults will be replaced
+        with the new defaults.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If ``False``, the new
+            defaults will be added to the existing defaults.
+
+        """
+        unused = set(defaults.keys())
+        for f in self.functions:
+            update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
+            unused -= set(update.keys())
+            if overwrite or update:
+                f.update_defaults(update, overwrite=overwrite)
+        self._clear_internal_cache()
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
+            raise ValueError(msg)
+        self._validate()
+
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"] = "current",
+        overwrite: bool = False,
+    ) -> None:
+        """Update the renames for the pipeline.
+
+        Automatically traverses the pipeline graph to find all functions that
+        the renames can be applied to.
+
+        Parameters
+        ----------
+        renames
+            A dictionary mapping old parameter names to new parameter and output names.
+        update_from
+            Whether to update the renames from the current parameter names (`PipeFunc.parameters`)
+            or from the original parameter names (`PipeFunc.original_parameters`).
+        overwrite
+            Whether to overwrite the existing renames. If ``False``, the new
+            renames will be added to the existing renames.
+
+        """
+        unused = set(renames.keys())
+        for f in self.functions:
+            parameters = tuple(
+                f.parameters + at_least_tuple(f.output_name)
+                if update_from == "current"
+                else tuple(f.original_parameters) + at_least_tuple(f._output_name),
+            )
+            update = {k: v for k, v in renames.items() if k in parameters}
+            unused -= set(update.keys())
+            f.update_renames(update, overwrite=overwrite, update_from=update_from)
+        self._clear_internal_cache()
+        if unused:
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
+            raise ValueError(msg)
+        self._validate()
+
+    def update_scope(
+        self,
+        scope: str | None,
+        inputs: set[str] | Literal["*"] | None = None,
+        outputs: set[str] | Literal["*"] | None = None,
+        exclude: set[str] | None = None,
+    ) -> None:
+        """Update the scope for the pipeline by adding (or removing) a prefix to the input and output names.
+
+        This method updates the names of the specified inputs and outputs by adding the provided
+        scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
+        If an input or output name already starts with the scope prefix, it remains unchanged.
+        If their is an existing scope, it is replaced with the new scope.
+
+        ``inputs`` are the root arguments of the pipeline. Inputs to functions
+        which are outputs of other functions are considered to be outputs.
+
+        Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+
+        Parameters
+        ----------
+        scope
+            The scope to set for the inputs and outputs. If ``None``, the scope of inputs and outputs is removed.
+        inputs
+            Specific input names to include, or ``"*"`` to include all inputs.
+            The inputs are *only* the root arguments of the pipeline.
+            If ``None``, no inputs are included.
+        outputs
+            Specific output names to include, or ``"*"`` to include all outputs.
+            If ``None``, no outputs are included.
+        exclude
+            Names to exclude from the scope. Both inputs and outputs can be excluded.
+            Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
+
+        Examples
+        --------
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
+        >>> pipeline.update_scope("my_scope", "*", "*", exclude={"output1"}) # Add to all except "output1"
+        >>> pipeline.update_scope("my_scope", inputs="*", outputs={"output2"})  # Add scope to all inputs and "output2"
+        >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
+
+        """
+        _validate_scopes(self.functions, scope)
+        all_inputs = set(self.topological_generations.root_args)
+        all_outputs = self.all_output_names
+        if inputs == "*":
+            inputs = all_inputs
+        if outputs == "*":
+            outputs = all_outputs
+        if exclude is None:
+            exclude = set()
+
+        for f in self.functions:
+            parameters = set(f.parameters)
+            f_inputs = (
+                (set(inputs) & parameters & all_inputs) - exclude
+                if isinstance(inputs, set)
+                else inputs
+            )
+            all_names = set(at_least_tuple(f.output_name)) | parameters
+            f_outputs = (
+                (set(outputs) & all_names & all_outputs) - exclude
+                if isinstance(outputs, set)
+                else outputs
+            )
+            if f_inputs or f_outputs:
+                f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        self._clear_internal_cache()
+        self._validate()
+
+    def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        flat_scope_kwargs = kwargs
+        for f in self.functions:
+            flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
+        return flat_scope_kwargs
+
+    @functools.cached_property
+    def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
+        """Compute all possible argument mappings for the pipeline.
+
+        Returns
+        -------
+            A dictionary mapping function names to sets of tuples containing
+            possible argument combinations.
+
+        """
+        return {
+            node.output_name: self.arg_combinations(node.output_name)
+            for node in self.graph.nodes
+            if isinstance(node, PipeFunc)
+        }
+
+    @functools.cached_property
+    def all_root_args(self) -> dict[_OUTPUT_TYPE, tuple[str, ...]]:
+        """Return the root arguments required to compute all outputs."""
+        return {
+            node.output_name: self.root_args(node.output_name)
+            for node in self.graph.nodes
+            if isinstance(node, PipeFunc)
+        }
+
+    @functools.cached_property
+    def mapspec_names(self) -> set[str]:
+        return {
+            name
+            for mapspec in self.mapspecs()
+            for name in mapspec.input_names + mapspec.output_names
+        }
+
+    def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
+        """Return the MapSpecs for all functions in the pipeline."""
+        functions = self.sorted_functions if ordered else self.functions
+        return [f.mapspec for f in functions if f.mapspec]
+
+    @functools.cached_property
+    def mapspecs_as_strings(self) -> list[str]:
+        """Return the MapSpecs for all functions in the pipeline as strings."""
+        return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
+
+    @functools.cached_property
+    def mapspec_dimensions(self: Pipeline) -> dict[str, int]:
+        """Return the number of dimensions for each array parameter in the pipeline."""
+        return mapspec_dimensions(self.mapspecs())
+
+    @functools.cached_property
+    def mapspec_axes(self: Pipeline) -> dict[str, tuple[str, ...]]:
+        """Return the axes for each array parameter in the pipeline."""
+        return mapspec_axes(self.mapspecs())
+
+    def _validate(self) -> None:
+        """Validate the pipeline."""
+        _validate_scopes(self.functions)
+        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        self._validate_mapspec()
+        if self.validate_type_annotations:
+            _check_consistent_type_annotations(self.graph)
+
+    def _validate_mapspec(self) -> None:
+        """Validate the MapSpecs for all functions in the pipeline."""
+        for f in self.functions:
+            if f.mapspec and at_least_tuple(f.output_name) != f.mapspec.output_names:
+                msg = (
+                    f"The output_name of the function `{f}` does not match the output_names"
+                    f" in the MapSpec: `{f.output_name}` != `{f.mapspec.output_names}`."
+                )
+                raise ValueError(msg)
+        validate_consistent_axes(self.mapspecs(ordered=False))
+        self._autogen_mapspec_axes()
+
+    @functools.cached_property
+    def unique_leaf_node(self) -> PipeFunc:
+        """Return the unique leaf node of the pipeline graph."""
+        leaf_nodes = self.leaf_nodes
+        if len(leaf_nodes) != 1:  # pragma: no cover
+            msg = (
+                "The pipeline has multiple leaf nodes. Please specify the output_name"
+                " argument to disambiguate."
+            )
+            raise ValueError(msg)
+        return leaf_nodes[0]
+
+    @functools.cached_property
+    def topological_generations(self) -> Generations:
+        """Return the functions in the pipeline grouped by topological generation.
+
+        This method uses `networkx.topological_generations` on the pipeline graph to group
+        functions by their dependency order. The result includes:
+
+        - Root arguments: Initial inputs to the pipeline.
+        - Function generations: Subsequent groups of functions in topological order.
+
+        Nullary functions (those without parameters) are handled specially to ensure
+        they're included in the generations rather than treated as root arguments.
+        """
+        nullary_functions = [f for f in self.functions if not f.parameters]
+        if nullary_functions:
+            # Handle nullary functions by adding placeholder edges.
+            # This ensures they're included in the generations rather than as root arguments.
+            graph = self.graph.copy()
+            for i, f in enumerate(nullary_functions):
+                graph.add_edge(i, f)
+        else:
+            graph = self.graph
+
+        generations = list(nx.topological_generations(graph))
+        if not generations:
+            return Generations([], [])
+
+        root_args: list[str] = []
+        function_lists: list[list[PipeFunc]] = []
+        for i, generation in enumerate(generations):
+            generation_functions: list[PipeFunc] = []
+            for x in generation:
+                if i == 0 and isinstance(x, str):
+                    root_args.append(x)
+                elif i == 0 and isinstance(x, _Bound | _Resources | int):
+                    # Skip special first-generation nodes that aren't root arguments
+                    pass
+                else:
+                    assert isinstance(x, PipeFunc)
+                    generation_functions.append(x)
+            if generation_functions:
+                function_lists.append(generation_functions)
+
+        return Generations(root_args, function_lists)
+
+    @functools.cached_property
+    def sorted_functions(self) -> list[PipeFunc]:
+        """Return the functions in the pipeline in topological order."""
+        return [f for gen in self.topological_generations.function_lists for f in gen]
+
+    @functools.cached_property
+    def all_output_names(self) -> set[str]:
+        return {name for f in self.functions for name in at_least_tuple(f.output_name)}
+
+    def _autogen_mapspec_axes(self) -> set[PipeFunc]:
+        """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
+        root_args = self.topological_generations.root_args
+        mapspecs = self.mapspecs(ordered=False)
+        non_root_inputs = _find_non_root_axes(mapspecs, root_args)
+        output_names = {at_least_tuple(f.output_name) for f in self.functions}
+        multi_output_mapping = {n: names for names in output_names for n in names if len(names) > 1}
+        _replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
+        return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
+
+    def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
+        """Add a new axis to ``parameter``'s `MapSpec`.
+
+        Parameters
+        ----------
+        parameter
+            The parameter to add an axis to.
+        axis
+            The axis to add to the `MapSpec` of all functions that depends on
+            ``parameter``. Provide a new axis name to add a new axis or an
+            existing axis name to zip the parameter with the existing axis.
+
+        """
+        self._autogen_mapspec_axes()
+        for p in parameter:
+            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
+        self._clear_internal_cache()
+        self._validate()
+
+    def _func_node_colors(
+        self,
+        *,
+        conservatively_combine: bool = False,
+        output_name: _OUTPUT_TYPE | None = None,
+    ) -> list[str]:
+        if output_name is None:
+            output_name = self.unique_leaf_node.output_name
+        combinable_nodes = _identify_combinable_nodes(
+            self.output_to_func[output_name],
+            self.graph,
+            self.all_root_args,
+            conservatively_combine=conservatively_combine,
+        )
+        return _func_node_colors(self.functions, combinable_nodes)
+
+    def visualize(
+        self,
+        *,
+        backend: Literal["matplotlib", "graphviz", "graphviz_widget", "holoviews"] | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Visualize the pipeline as a directed graph.
+
+        Parameters
+        ----------
+        backend
+            The plotting backend to use. If ``None``, the best backend available
+            will be used in the following order: Graphviz,
+            Matplotlib, and HoloViews.
+        kwargs
+            Additional keyword arguments passed to the plotting function.
+
+        Returns
+        -------
+            The output of the plotting function.
+
+        See Also
+        --------
+        visualize_graphviz
+            Create a directed graph using Graphviz (``backend="graphviz"``).
+        visualize_matplotlib
+            Create a directed graph using Matplotlib (``backend="matplotlib"``).
+        visualize_holoviews
+            Create a directed graph using HoloViews (``backend="holoviews"``).
+
+        """
+
+        def is_installed(name: str) -> bool:
+            try:
+                __import__(name)
+                return True  # noqa: TRY300
+            except ImportError:  # pragma: no cover
+                return False
+
+        if backend is None:  # pragma: no cover
+            if is_installed("graphviz"):
+                backend = "graphviz"
+            elif is_installed("matplotlib"):
+                backend = "matplotlib"
+            elif is_installed("holoviews"):
+                backend = "holoviews"
+            else:
+                msg = (
+                    "No plotting backends are installed."
+                    " Install 'graphviz', 'matplotlib', or 'holoviews' to visualize the pipeline."
+                    " To install all backends, run `pip install 'pipefunc[plotting]'`."
+                )
+                raise ImportError(msg)
+        if backend == "graphviz":
+            return self.visualize_graphviz(**kwargs)
+        if backend == "matplotlib":
+            return self.visualize_matplotlib(**kwargs)
+        if backend == "holoviews":
+            return self.visualize_holoviews(**kwargs)
+        msg = f"Invalid backend: {backend}. Must be 'graphviz_widget', 'graphviz', 'matplotlib', or 'holoviews'."  # pragma: no cover
+        raise ValueError(msg)  # pragma: no cover
+
+    def visualize_graphviz(
+        self,
+        *,
+        figsize: tuple[int, int] | int | None = None,
+        filename: str | Path | None = None,
+        func_node_colors: str | list[str] | None = None,
+        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        graphviz_kwargs: dict[str, Any] | None = None,
+        show_legend: bool = True,
+        include_full_mapspec: bool = False,
+        return_type: Literal["graphviz", "html"] | None = None,
+    ) -> graphviz.Digraph | IPython.display.HTML:
+        """Visualize the pipeline as a directed graph using Graphviz.
+
+        Parameters
+        ----------
+        figsize
+            The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
+            If ``None``, the size will be determined automatically.
+        filename
+            The filename to save the figure to, if provided.
+        func_node_colors
+            The colors for function nodes.
+        orient
+            Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+        graphviz_kwargs
+            Graphviz-specific keyword arguments for customizing the graph's appearance.
+        show_legend
+            Whether to show the legend in the graph visualization.
+        include_full_mapspec
+            Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
+        return_type
+            The format to return the visualization in.
+            If ``'html'``, the visualization is returned as a `IPython.display.html`,
+            if ``'graphviz'``, the `graphviz.Digraph` object is returned.
+            If ``None``, the format is ``'html'`` if running in a Jupyter notebook,
+            otherwise ``'graphviz'``.
+
+        Returns
+        -------
+        graphviz.Digraph
+            The resulting Graphviz Digraph object.
+
+        """
+        from pipefunc._plotting import visualize_graphviz
+
+        return visualize_graphviz(
+            self.graph,
+            self.defaults,
+            figsize=figsize,
+            filename=filename,
+            func_node_colors=func_node_colors,
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            show_legend=show_legend,
+            include_full_mapspec=include_full_mapspec,
+            return_type=return_type,
+        )
+
+    def visualize_matplotlib(
+        self,
+        figsize: tuple[int, int] | int = (10, 10),
+        filename: str | Path | None = None,
+        *,
+        color_combinable: bool = False,
+        conservatively_combine: bool = False,
+        output_name: _OUTPUT_TYPE | None = None,
+    ) -> None:
+        """Visualize the pipeline as a directed graph.
+
+        Parameters
+        ----------
+        figsize
+            The width and height of the figure in inches.
+            If a single integer is provided, the figure will be a square.
+        filename
+            The filename to save the figure to.
+        color_combinable
+            Whether to color combinable nodes differently.
+        conservatively_combine
+            Argument as passed to `Pipeline.simplify_pipeline`.
+        output_name
+            Argument as passed to `Pipeline.simplify_pipeline`.
+
+        """
+        from pipefunc._plotting import visualize_matplotlib
+
+        if color_combinable:
+            func_node_colors = self._func_node_colors(
+                conservatively_combine=conservatively_combine,
+                output_name=output_name,
+            )
+        else:
+            func_node_colors = None
+        visualize_matplotlib(
+            self.graph,
+            figsize=figsize,
+            filename=filename,
+            func_node_colors=func_node_colors,
+        )
+
+    def visualize_holoviews(self, *, show: bool = False) -> hv.Graph | None:
+        """Visualize the pipeline as a directed graph using HoloViews.
+
+        Parameters
+        ----------
+        show
+            Whether to show the plot. Uses `bokeh.plotting.show(holoviews.render(plot))`.
+            If ``False`` the `holoviews.Graph` object is returned.
+
+        """
+        from pipefunc._plotting import visualize_holoviews
+
+        return visualize_holoviews(self.graph, show=show)
+
+    def print_profiling_stats(self) -> None:
+        """Display the resource usage report for each function in the pipeline."""
+        if not self.profiling_stats:
+            msg = "Profiling is not enabled."
+            raise ValueError(msg)
+        print_profiling_stats(self.profiling_stats)
+
+    def simplified_pipeline(
+        self,
+        output_name: _OUTPUT_TYPE | None = None,
+        *,
+        conservatively_combine: bool = False,
+    ) -> Pipeline:
+        """Simplify pipeline with combined function nodes.
+
+        Generate a simplified version of the pipeline where combinable function
+        nodes have been merged into single function nodes.
+
+        This method identifies combinable nodes in the pipeline's execution
+        graph (i.e., functions that share the same root arguments) and merges
+        them into single function nodes. This results in a simplified pipeline
+        where each key function only depends on nodes that cannot be further
+        combined.
+
+        Parameters
+        ----------
+        output_name
+            The name of the output from the pipeline function we are starting
+            the simplification from. If ``None``, the unique tip of the pipeline
+            graph is used (if there is one).
+        conservatively_combine
+            If True, only combine a function node with its predecessors if all
+            of its predecessors have the same root arguments as the function
+            node itself. If False, combine a function node with its predecessors
+            if any of its predecessors have the same root arguments as the
+            function node.
+
+        Returns
+        -------
+            The simplified version of the pipeline.
+
+        """
+        if output_name is None:
+            output_name = self.unique_leaf_node.output_name
+        return simplified_pipeline(
+            functions=self.functions,
+            graph=self.graph,
+            all_root_args=self.all_root_args,
+            node_mapping=self.node_mapping,
+            output_name=output_name,
+            conservatively_combine=conservatively_combine,
+        )
+
+    @functools.cached_property
+    def leaf_nodes(self) -> list[PipeFunc]:
+        """Return the leaf nodes in the pipeline's execution graph."""
+        return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
+
+    @functools.cached_property
+    def root_nodes(self) -> list[PipeFunc]:
+        """Return the root nodes in the pipeline's execution graph."""
+        return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
+
+    @property
+    def profiling_stats(self) -> dict[str, ProfilingStats]:
+        """Return the profiling data for each function in the pipeline."""
+        return {f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats}
+
+    def __str__(self) -> str:
+        """Return a string representation of the pipeline."""
+        pipeline_str = "Pipeline:\n"
+        for node in self.graph.nodes:
+            if isinstance(node, PipeFunc):
+                fn = node
+                input_args = self.all_arg_combinations[fn.output_name]
+                pipeline_str += f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
+                pipeline_str += f"    Possible input arguments: {input_args}\n"
+        return pipeline_str
+
+    def copy(self, **update: Any) -> Pipeline:
+        """Return a copy of the pipeline.
+
+        Parameters
+        ----------
+        update
+            Keyword arguments passed to the `Pipeline` constructor instead of the
+            original values.
+
+        """
+        kwargs = {
+            "functions": self.functions,
+            "lazy": self.lazy,
+            "debug": self._debug,
+            "profile": self._profile,
+            "cache_type": self._cache_type,
+            "cache_kwargs": self._cache_kwargs,
+            "default_resources": self._default_resources,
+            "validate_type_annotations": self.validate_type_annotations,
+        }
+        assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
+        kwargs.update(update)
+        return Pipeline(**kwargs)  # type: ignore[arg-type]
+
+    @property
+    def error_snapshot(self) -> ErrorSnapshot | None:
+        """Return an error snapshot for the pipeline.
+
+        This value is `None` if no errors have occurred during
+        the pipeline execution.
+        """
+        for f in self.functions:
+            if f.error_snapshot:
+                return f.error_snapshot
+        return None
+
+    def nest_funcs(
+        self,
+        output_names: set[_OUTPUT_TYPE] | Literal["*"],
+        new_output_name: _OUTPUT_TYPE | None = None,
+    ) -> NestedPipeFunc:
+        """Replaces a set of output names with a single nested function inplace.
+
+        Parameters
+        ----------
+        output_names
+            The output names to nest in a `NestedPipeFunc`. Can also be ``"*"`` to nest all functions
+            in the pipeline into a single `NestedPipeFunc`.
+        new_output_name
+            The identifier for the output of the wrapped function. If ``None``, it is automatically
+            constructed from all the output names of the `PipeFunc` instances.
+
+        Returns
+        -------
+            The newly added `NestedPipeFunc` instance.
+
+        """
+        if output_names == "*":
+            funcs = self.functions.copy()
+        else:
+            funcs = [self.output_to_func[output_name] for output_name in output_names]
+
+        for f in funcs:
+            self.drop(f=f)
+        nested_func = NestedPipeFunc(funcs, output_name=new_output_name)
+        self.add(nested_func)
+        return nested_func
+
+    def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
+        """Join multiple pipelines into a single new pipeline.
+
+        The new pipeline has no `default_resources` set, instead, each function has a
+        `Resources` attribute that is created via
+        ``Resources.maybe_with_defaults(f.resources, pipeline.default_resources)``.
+
+        Parameters
+        ----------
+        pipelines
+            The pipelines to join. Can also be individual `PipeFunc` instances.
+
+        Returns
+        -------
+            A new pipeline containing all functions from the original pipelines.
+
+        """
+        functions = []
+        for pipeline in [self, *pipelines]:
+            if isinstance(pipeline, Pipeline):
+                for f in pipeline.functions:
+                    f_new = f.copy(resources=f.resources)
+                    functions.append(f_new)
+            elif isinstance(pipeline, PipeFunc):
+                functions.append(pipeline.copy())
+            else:
+                msg = "Only `Pipeline` or `PipeFunc` instances can be joined."
+                raise TypeError(msg)
+
+        return self.copy(functions=functions, default_resources=None)
+
+    def __or__(self, other: Pipeline | PipeFunc) -> Pipeline:
+        """Combine two pipelines using the ``|`` operator.
+
+        See Also
+        --------
+        join
+            The method that is called when using the ``|`` operator.
+
+        Examples
+        --------
+        >>> pipeline1 = Pipeline([f1, f2])
+        >>> pipeline2 = Pipeline([f3, f4])
+        >>> combined_pipeline = pipeline1 | pipeline2
+
+        """
+        return self.join(other)
+
+    def _connected_components(self) -> list[set[PipeFunc | str]]:
+        """Return the connected components of the pipeline graph."""
+        return list(nx.connected_components(self.graph.to_undirected()))
+
+    def split_disconnected(self: Pipeline, **pipeline_kwargs: Any) -> tuple[Pipeline, ...]:
+        """Split disconnected components of the pipeline into separate pipelines.
+
+        Parameters
+        ----------
+        pipeline_kwargs
+            Keyword arguments to pass to the `Pipeline` constructor.
+
+        Returns
+        -------
+            Tuple of fully connected `Pipeline` objects.
+
+        """
+        connected_components = self._connected_components()
+        pipefunc_lists = [
+            [x.copy() for x in xs if isinstance(x, PipeFunc)] for xs in connected_components
+        ]
+        if len(pipefunc_lists) == 1:
+            msg = "Pipeline is fully connected, no need to split."
+            raise ValueError(msg)
+        return tuple(Pipeline(pfs, **pipeline_kwargs) for pfs in pipefunc_lists)  # type: ignore[arg-type]
+
+    def _axis_in_root_arg(
+        self,
+        axis: str,
+        output_name: _OUTPUT_TYPE,
+        root_args: tuple[str, ...] | None = None,
+        visited: set[_OUTPUT_TYPE] | None = None,
+        result: set[bool] | None = None,
+    ) -> bool:
+        if root_args is None:
+            root_args = self.root_args(output_name)
+        if visited is None:
+            visited = set()
+        if result is None:
+            result = set()
+        if output_name in visited:
+            return None  # type: ignore[return-value]
+
+        visited.add(output_name)
+        visited.update(at_least_tuple(output_name))
+
+        func = self.output_to_func[output_name]
+        assert func.mapspec is not None
+        if axis not in func.mapspec.output_indices:  # pragma: no cover
+            msg = f"Axis `{axis}` not in output indices for `{output_name=}`"
+            raise ValueError(msg)
+
+        if axis not in func.mapspec.input_indices:
+            # Axis was in output but not in input
+            result.add(False)  # noqa: FBT003
+
+        axes = self.mapspec_axes
+        for name in func.mapspec.input_names:
+            if axis not in axes[name]:
+                continue
+            if name in root_args:
+                if axis in axes[name]:
+                    result.add(True)  # noqa: FBT003
+            else:
+                self._axis_in_root_arg(axis, name, root_args, visited, result)
+
+        return all(result)
+
+    def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+        """Return the axes that are both in the output and in the root arguments.
+
+        Identifies axes that are cross-products and can be computed independently.
+        """
+        func = self.output_to_func[output_name]
+        if func.mapspec is None:
+            return set()
+        return {
+            axis
+            for axis in func.mapspec.output_indices
+            if self._axis_in_root_arg(axis, output_name)
+        }
+
+    def subpipeline(
+        self,
+        inputs: set[str] | None = None,
+        output_names: set[_OUTPUT_TYPE] | None = None,
+    ) -> Pipeline:
+        """Create a new pipeline containing only the nodes between the specified inputs and outputs.
+
+        Parameters
+        ----------
+        inputs
+            Set of input names to include in the subpipeline. If ``None``, all root nodes of the
+            original pipeline will be used as inputs.
+        output_names
+            Set of output names to include in the subpipeline. If ``None``, all leaf nodes of the
+            original pipeline will be used as outputs.
+
+        Returns
+        -------
+            A new pipeline containing only the nodes and connections between the specified
+            inputs and outputs.
+
+        Notes
+        -----
+        The subpipeline is created by copying the original pipeline and then removing the nodes
+        that are not part of the path from the specified inputs to the specified outputs. The
+        resulting subpipeline will have the same behavior as the original pipeline for the
+        selected inputs and outputs.
+
+        If ``inputs`` is provided, the subpipeline will use those nodes as the new root nodes. If
+        ``output_names`` is provided, the subpipeline will use those nodes as the new leaf nodes.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+        ... def f(x: int) -> int:
+        ...     return x
+        ...
+        >>> @pipefunc(output_name="z")
+        ... def g(y: np.ndarray) -> int:
+        ...     return sum(y)
+        ...
+        >>> pipeline = Pipeline([f, g])
+        >>> inputs = {"x": [1, 2, 3]}
+        >>> results = pipeline.map(inputs, "tmp_path")
+        >>> partial = pipeline.subpipeline({"y"})
+        >>> r = partial.map({"y": results["y"].output}, "tmp_path")
+        >>> assert len(r) == 1
+        >>> assert r["z"].output == 6
+
+        """
+        if inputs is None and output_names is None:
+            msg = "At least one of `inputs` or `output_names` should be provided."
+            raise ValueError(msg)
+
+        pipeline = self.copy()
+
+        input_nodes: set[str | PipeFunc] = (
+            set(pipeline.topological_generations.root_args)
+            if inputs is None
+            else {pipeline.node_mapping[n] for n in inputs}
+        )
+        output_nodes: set[PipeFunc] = (
+            set(pipeline.leaf_nodes)
+            if output_names is None
+            else {pipeline.node_mapping[n] for n in output_names}  # type: ignore[misc]
+        )
+        between = _find_nodes_between(pipeline.graph, input_nodes, output_nodes)
+        drop = [f for f in pipeline.functions if f not in between]
+        for f in drop:
+            pipeline.drop(f=f)
+
+        if inputs is not None:
+            new_root_args = set(pipeline.topological_generations.root_args)
+            if not new_root_args.issubset(inputs):
+                outputs = {f.output_name for f in pipeline.functions}
+                msg = (
+                    f"Cannot construct a partial pipeline with `{outputs=}`"
+                    f" and `{inputs=}`, it would require `{new_root_args}`."
+                )
+                raise ValueError(msg)
+
+        return pipeline
+
+
+class Generations(NamedTuple):
+    root_args: list[str]
+    function_lists: list[list[PipeFunc]]
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class _Bound:
+    name: str
+    output_name: _OUTPUT_TYPE
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class _Resources:
+    name: str
+    output_name: _OUTPUT_TYPE
+
+
+class _PipelineAsFunc:
     """Wrapper class for a pipeline function.
 
     Parameters
@@ -106,7 +1840,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -122,7 +1855,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -138,7 +1870,6 @@ class _Function:
 
         Returns
         -------
-        Any
             The return value of the pipeline function.
 
         """
@@ -180,950 +1911,6 @@ class _Function:
         return self._create_call_with_parameters_method(self.root_args)
 
 
-class Pipeline:
-    """Pipeline class for managing and executing a sequence of functions.
-
-    Parameters
-    ----------
-    functions
-        A list of functions that form the pipeline.
-    lazy
-        Flag indicating whether the pipeline should be lazy.
-    debug
-        Flag indicating whether debug information should be printed.
-        If None, the value of each PipeFunc's debug attribute is used.
-    profile
-        Flag indicating whether profiling information should be collected.
-        If None, the value of each PipeFunc's profile attribute is used.
-    cache_type
-        The type of cache to use.
-    cache_kwargs
-        Keyword arguments passed to
-
-    """
-
-    def __init__(
-        self,
-        functions: list[PipeFunc | tuple[PipeFunc, str | MapSpec]],
-        *,
-        lazy: bool = False,
-        debug: bool | None = None,
-        profile: bool | None = None,
-        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = "lru",
-        cache_kwargs: dict[str, Any] | None = None,
-    ) -> None:
-        """Pipeline class for managing and executing a sequence of functions."""
-        self.functions: list[PipeFunc] = []
-        self.lazy = lazy
-        self._debug = debug
-        self._profile = profile
-        self.output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
-        for f in functions:
-            if isinstance(f, tuple):
-                f, mapspec = f  # noqa: PLW2901
-            else:
-                mapspec = None
-            self.add(f, mapspec=mapspec)
-        self._init_internal_cache()
-        self._cache_type = cache_type
-        self._cache_kwargs = cache_kwargs
-        self.cache = _create_cache(cache_type, lazy, cache_kwargs)
-        self._validate_mapspec()
-
-    def _init_internal_cache(self) -> None:
-        # Internal Pipeline cache
-        self._arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = {}
-        self._root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = {}
-        self._func: dict[_OUTPUT_TYPE, _Function] = {}
-        with contextlib.suppress(AttributeError):
-            del self.graph
-        with contextlib.suppress(AttributeError):
-            del self.root_nodes
-        with contextlib.suppress(AttributeError):
-            del self.leaf_nodes
-        with contextlib.suppress(AttributeError):
-            del self.unique_leaf_node
-        with contextlib.suppress(AttributeError):
-            del self.map_parameters
-        with contextlib.suppress(AttributeError):
-            del self.defaults
-        with contextlib.suppress(AttributeError):
-            del self.node_mapping
-        with contextlib.suppress(AttributeError):
-            del self.all_arg_combinations
-        with contextlib.suppress(AttributeError):
-            del self.all_root_args
-        with contextlib.suppress(AttributeError):
-            del self.topological_generations
-
-    def _validate_mapspec(self) -> None:
-        validate_consistent_axes(self.mapspecs(ordered=False))
-
-    def _current_cache(self) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
-        """Return the cache used by the pipeline."""
-        if not isinstance(self.cache, SimpleCache) and (tg := task_graph()) is not None:
-            return tg.cache
-        return self.cache
-
-    @property
-    def profile(self) -> bool | None:
-        """Flag indicating whether profiling information should be collected."""
-        return self._profile
-
-    @profile.setter
-    def profile(self, value: bool | None) -> None:
-        """Set the profiling flag for the pipeline and all functions."""
-        self._profile = value
-        if value is not None:
-            for f in self.functions:
-                f.profile = value
-
-    @property
-    def debug(self) -> bool | None:
-        """Flag indicating whether debug information should be printed."""
-        return self._debug
-
-    @debug.setter
-    def debug(self, value: bool | None) -> None:
-        """Set the debug flag for the pipeline and all functions."""
-        self._debug = value
-        if value is not None:
-            for f in self.functions:
-                f.debug = value
-
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
-        """Add a function to the pipeline.
-
-        Parameters
-        ----------
-        f
-            The function to add to the pipeline.
-        profile
-            Flag indicating whether profiling information should be collected.
-        mapspec
-            This is a specification for mapping that dictates how input values should
-            be merged together. If None, the default behavior is that the input directly
-            maps to the output.
-
-        """
-        if not isinstance(f, PipeFunc):
-            f = PipeFunc(f, output_name=f.__name__)
-        elif mapspec is not None:
-            msg = (
-                "Initializing the `Pipeline` using `MapSpec`s and"
-                " `PipeFunc`s modifies the `PipeFunc`s inplace."
-            )
-            warnings.warn(msg, UserWarning, stacklevel=3)
-
-        if mapspec is not None:
-            if isinstance(mapspec, str):
-                mapspec = MapSpec.from_string(mapspec)
-            f.mapspec = mapspec
-            f._validate_mapspec()
-
-        self.functions.append(f)
-
-        self.output_to_func[f.output_name] = f
-        if isinstance(f.output_name, tuple):
-            for name in f.output_name:
-                self.output_to_func[name] = f
-
-        if self.profile is not None:
-            f.set_profiling(enable=self.profile)
-
-        if self.debug is not None:
-            f.debug = self.debug
-
-        self._init_internal_cache()  # reset cache
-        return f
-
-    def drop(
-        self,
-        *,
-        f: PipeFunc | None = None,
-        output_name: _OUTPUT_TYPE | None = None,
-    ) -> None:
-        """Drop a function from the pipeline.
-
-        Parameters
-        ----------
-        f
-            The function to drop from the pipeline.
-        output_name
-            The name of the output to drop from the pipeline.
-
-        """
-        if (f is not None and output_name is not None) or (f is None and output_name is None):
-            msg = "One of `f` or `output_name` should be provided."
-            raise ValueError(msg)
-        if f is not None:
-            self.functions.remove(f)
-            if isinstance(f.output_name, tuple):
-                for name in f.output_name:
-                    del self.output_to_func[name]
-            else:
-                del self.output_to_func[f.output_name]
-        elif output_name is not None:
-            f = self.output_to_func[output_name]
-            self.drop(f=f)
-        self._init_internal_cache()
-
-    @functools.cached_property
-    def graph(self) -> nx.DiGraph:
-        """Create a directed graph representing the pipeline.
-
-        Returns
-        -------
-        nx.DiGraph
-            A directed graph with nodes representing functions and edges
-            representing dependencies between functions.
-
-        """
-        _check_consistent_defaults(self.functions)
-        g = nx.DiGraph()
-        for f in self.functions:
-            g.add_node(f)
-            assert f.parameters is not None
-            for arg in f.parameters:
-                if arg in self.output_to_func:  # is function output
-                    edge = (self.output_to_func[arg], f)
-                    if edge not in g.edges:
-                        g.add_edge(*edge, arg=arg)
-                    else:
-                        # tuple output of function, and the edge already exists
-                        assert isinstance(edge[0].output_name, tuple)
-                        current = g.edges[edge]["arg"]
-                        g.edges[edge]["arg"] = (*at_least_tuple(current), arg)
-
-                else:
-                    if arg not in g:  # Add the node only if it doesn't exist
-                        default_value = f.defaults.get(arg, inspect.Parameter.empty)
-                        g.add_node(arg, default_value=default_value)
-                    g.add_edge(arg, f, arg=arg)
-        return g
-
-    def func(self, output_name: _OUTPUT_TYPE) -> _Function:
-        """Create a composed function that can be called with keyword arguments.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the composed function.
-
-        Returns
-        -------
-        Callable[..., Any]
-            The composed function that can be called with keyword arguments.
-
-        """
-        if f := self._func.get(output_name):
-            return f
-        root_args = self.root_args(output_name)
-        assert isinstance(root_args, tuple)
-        f = _Function(self, output_name, root_args=root_args)
-        self._func[output_name] = f
-        return f
-
-    def __call__(
-        self,
-        __output_name__: _OUTPUT_TYPE | None = None,
-        /,
-        **kwargs: Any,
-    ) -> Any:
-        """Call the pipeline for a specific return value.
-
-        Parameters
-        ----------
-        __output_name__
-            The identifier for the return value of the pipeline.
-            Is None by default, in which case the unique leaf node is used.
-            This parameter is positional-only and the strange name is used
-            to avoid conflicts with the `output_name` argument that might be
-            passed via `kwargs`.
-        kwargs
-            Keyword arguments to be passed to the pipeline functions.
-
-        Returns
-        -------
-        Any
-            The return value of the pipeline.
-
-        """
-        if __output_name__ is None:
-            __output_name__ = self.unique_leaf_node.output_name
-        return self.func(__output_name__)(**kwargs)
-
-    def _get_func_args(
-        self,
-        func: PipeFunc,
-        kwargs: dict[str, Any],
-        all_results: dict[_OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
-        used_parameters: set[str | None],
-    ) -> dict[str, Any]:
-        # Used in _execute_pipeline
-        func_args = {}
-        for arg in func.parameters:
-            if arg in kwargs:
-                func_args[arg] = kwargs[arg]
-            elif arg in func.defaults:
-                func_args[arg] = func.defaults[arg]
-            else:
-                func_args[arg] = self._execute_pipeline(
-                    output_name=arg,
-                    kwargs=kwargs,
-                    all_results=all_results,
-                    full_output=full_output,
-                    used_parameters=used_parameters,
-                )
-        used_parameters.update(func_args)
-        return func_args
-
-    def _execute_pipeline(
-        self,
-        *,
-        output_name: _OUTPUT_TYPE,
-        kwargs: Any,
-        all_results: dict[_OUTPUT_TYPE, Any],
-        full_output: bool,
-        used_parameters: set[str | None],
-    ) -> Any:
-        func = self.output_to_func[output_name]
-        assert func.parameters is not None
-
-        cache = self._current_cache()
-        use_cache = (func.cache and cache is not None) or task_graph() is not None
-
-        root_args = self.root_args(output_name)
-        result_from_cache = False
-        if use_cache:
-            assert cache is not None
-            cache_key = _compute_cache_key(func.output_name, kwargs, root_args)
-            return_now, result_from_cache = _get_result_from_cache(
-                func,
-                cache,
-                cache_key,
-                output_name,
-                all_results,
-                full_output,
-                used_parameters,
-                self.lazy,
-            )
-            if return_now:
-                return all_results[output_name]
-
-        func_args = self._get_func_args(
-            func,
-            kwargs,
-            all_results,
-            full_output,
-            used_parameters,
-        )
-
-        if result_from_cache:
-            assert full_output
-            return all_results[output_name]
-
-        start_time = time.perf_counter()
-        r = _execute_func(func, func_args, self.lazy)
-        if use_cache and cache_key is not None:
-            assert cache is not None
-            _update_cache(cache, cache_key, r, start_time)
-        _update_all_results(func, r, output_name, all_results, self.lazy)
-        _save_results(func, r, output_name, all_results, root_args, self.lazy)
-        return all_results[output_name]
-
-    def run(
-        self,
-        output_name: _OUTPUT_TYPE,
-        *,
-        full_output: bool = False,
-        kwargs: dict[str, Any],
-    ) -> Any:
-        """Execute the pipeline for a specific return value.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the pipeline.
-        full_output
-            Whether to return the outputs of all function executions
-            as a dictionary mapping function names to their return values.
-        kwargs
-            Keyword arguments to be passed to the pipeline functions.
-
-        Returns
-        -------
-        Any
-            The return value of the pipeline or a dictionary mapping function
-            names to their return values if full_output is True.
-
-        """
-        if p := self.map_parameters & set(self.func_dependencies(output_name)):
-            inputs = self.map_parameters & set(self.root_args(output_name))
-            msg = (
-                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
-                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
-            )
-            raise RuntimeError(msg)
-
-        if output_name in kwargs:
-            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
-            raise ValueError(msg)
-
-        all_results: dict[_OUTPUT_TYPE, Any] = kwargs.copy()  # type: ignore[assignment]
-        used_parameters: set[str | None] = set()
-
-        self._execute_pipeline(
-            output_name=output_name,
-            kwargs=kwargs,
-            all_results=all_results,
-            full_output=full_output,
-            used_parameters=used_parameters,
-        )
-
-        # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (unused := set(kwargs) - set(used_parameters)):
-            unused_str = ", ".join(sorted(unused))
-            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
-            raise UnusedParametersError(msg)
-
-        return all_results if full_output else all_results[output_name]
-
-    def map(
-        self,
-        inputs: dict[str, Any],
-        run_folder: str | Path | None,
-        manual_shapes: dict[str, int | tuple[int, ...]] | None = None,
-        *,
-        parallel: bool = True,
-        cleanup: bool = True,
-    ) -> list[Result]:
-        """Run a pipeline with `MapSpec` functions for given `inputs`.
-
-        Parameters
-        ----------
-        inputs
-            The inputs to the pipeline. The keys should be the names of the input
-            parameters of the pipeline functions and the values should be the
-            corresponding input data, these are either single values for functions without `mapspec`
-            or lists of values or `numpy.ndarray`s for functions with `mapspec`.
-        run_folder
-            The folder to store the run information. If `None`, a temporary folder
-            is created.
-        manual_shapes
-            The shapes for intermediary outputs that cannot be inferred from the inputs.
-            You will receive an exception if the shapes cannot be inferred and need to be provided.
-        parallel
-            Whether to run the functions in parallel.
-        cleanup
-            Whether to clean up the `run_folder` before running the pipeline.
-
-        """
-        from pipefunc.map import run
-
-        return run(self, inputs, run_folder, manual_shapes, cleanup=cleanup, parallel=parallel)
-
-    @functools.cached_property
-    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
-        """Return a mapping from node names to nodes.
-
-        Returns
-        -------
-        Dict[_OUTPUT_TYPE, PipeFunc | str]
-            A mapping from node names to nodes.
-
-        """
-        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                if isinstance(node.output_name, tuple):
-                    for name in node.output_name:
-                        mapping[name] = node
-                mapping[node.output_name] = node
-            else:
-                assert isinstance(node, str)
-                mapping[node] = node
-        return mapping
-
-    def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
-        """Return the arguments required to compute a specific output.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the pipeline.
-
-        Returns
-        -------
-        Set[Tuple[str, ...]]
-            A set of tuples containing possible argument combinations.
-            The tuples are sorted in lexicographical order.
-
-        """
-        if r := self._arg_combinations.get(output_name):
-            return r
-        head = self.node_mapping[output_name]
-        arg_set: set[tuple[str, ...]] = set()
-        _compute_arg_mapping(self.graph, head, head, [], [], arg_set)  # type: ignore[arg-type]
-        self._arg_combinations[output_name] = arg_set
-        return arg_set
-
-    def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
-        """Return the root arguments required to compute a specific output."""
-        if r := self._root_args.get(output_name):
-            return r
-        arg_combos = self.arg_combinations(output_name)
-        root_args = next(
-            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
-        )
-        self._root_args[output_name] = root_args
-        return root_args
-
-    def func_dependencies(self, output_name: _OUTPUT_TYPE) -> list[_OUTPUT_TYPE]:
-        """Return the functions required to compute a specific output."""
-
-        def _predecessors(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
-            preds = set()
-            if isinstance(x, (str, tuple)):
-                x = self.node_mapping[x]
-            for pred in self.graph.predecessors(x):
-                if isinstance(pred, PipeFunc):
-                    preds.add(pred.output_name)
-                    for p in _predecessors(pred):
-                        preds.add(p)
-            return preds  # type: ignore[return-value]
-
-        return sorted(_predecessors(output_name), key=at_least_tuple)
-
-    @functools.cached_property
-    def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
-        """Compute all possible argument mappings for the pipeline.
-
-        Returns
-        -------
-        Dict[_OUTPUT_TYPE, Set[Tuple[str, ...]]]
-            A dictionary mapping function names to sets of tuples containing
-            possible argument combinations.
-
-        """
-        return {
-            node.output_name: self.arg_combinations(node.output_name)
-            for node in self.graph.nodes
-            if isinstance(node, PipeFunc)
-        }
-
-    @functools.cached_property
-    def all_root_args(self) -> dict[_OUTPUT_TYPE, tuple[str, ...]]:
-        """Return the root arguments required to compute all outputs."""
-        return {
-            node.output_name: self.root_args(node.output_name)
-            for node in self.graph.nodes
-            if isinstance(node, PipeFunc)
-        }
-
-    @functools.cached_property
-    def map_parameters(self) -> set[str]:
-        map_parameters: set[str] = set()
-        for func in self.functions:
-            if func.mapspec:
-                map_parameters.update(func.mapspec.parameters)
-                for output in func.mapspec.outputs:
-                    map_parameters.add(output.name)
-        return map_parameters
-
-    @functools.cached_property
-    def defaults(self) -> dict[str, Any]:
-        defaults = {}
-        for func in self.functions:
-            defaults.update(func.defaults)
-        return defaults
-
-    def mapspecs(self, *, ordered: bool = True) -> list[MapSpec]:
-        """Return the MapSpecs for all functions in the pipeline."""
-        functions = self.sorted_functions if ordered else self.functions
-        return [f.mapspec for f in functions if f.mapspec]
-
-    def mapspecs_as_strings(self) -> list[str]:
-        """Return the MapSpecs for all functions in the pipeline as strings."""
-        return [str(mapspec) for mapspec in self.mapspecs(ordered=True)]
-
-    @functools.cached_property
-    def unique_leaf_node(self) -> PipeFunc:
-        """Return the unique leaf node of the pipeline graph."""
-        leaf_nodes = self.leaf_nodes
-        if len(leaf_nodes) != 1:  # pragma: no cover
-            msg = (
-                "The pipeline has multiple leaf nodes. Please specify the output_name"
-                " argument to disambiguate.",
-            )
-            raise ValueError(msg)
-        return leaf_nodes[0]
-
-    @functools.cached_property
-    def topological_generations(self) -> tuple[list[str], list[list[PipeFunc]]]:
-        generations = list(nx.topological_generations(self.graph))
-        assert all(isinstance(x, str) for x in generations[0])
-        assert all(isinstance(x, PipeFunc) for gen in generations[1:] for x in gen)
-        return generations[0], generations[1:]
-
-    @property
-    def sorted_functions(self) -> list[PipeFunc]:
-        """Return the functions in the pipeline in topological order."""
-        return [f for gen in self.topological_generations[1] for f in gen]
-
-    def add_mapspec_axis(self, parameter: str, axis: str) -> None:
-        """Add a new axis to `parameter`'s MapSpec.
-
-        Parameters
-        ----------
-        parameter
-            The parameter to add an axis to.
-        axis
-            The axis to add to the `MapSpec` of all functions that depends on
-            `parameter`. Provide a new axis name to add a new axis or an
-            existing axis name to zip the parameter with the existing axis.
-
-        """
-        _add_mapspec_axis(parameter, dims={}, axis=axis, functions=self.sorted_functions)
-        self._init_internal_cache()  # reset cache because mapspecs have changed
-
-    def _func_node_colors(
-        self,
-        *,
-        conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
-    ) -> list[str]:
-        if output_name is None:
-            output_name = self.unique_leaf_node.output_name
-
-        func_node_colors = []
-        combinable_nodes = self._identify_combinable_nodes(
-            output_name=output_name,
-            conservatively_combine=conservatively_combine,
-        )
-        combinable_nodes = _combine_nodes(combinable_nodes)
-        node_sets = [{k, *v} for k, v in combinable_nodes.items()]
-        color_index = len(node_sets)  # for non-combinable nodes
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                i = next(
-                    (i for i, nodes in enumerate(node_sets) if node in nodes),
-                    None,
-                )
-                if i is not None:
-                    func_node_colors.append(f"C{i}")
-                else:
-                    func_node_colors.append(f"C{color_index}")
-                    color_index += 1
-        return func_node_colors
-
-    def visualize(
-        self,
-        figsize: tuple[int, int] = (10, 10),
-        filename: str | Path | None = None,
-        *,
-        color_combinable: bool = False,
-        conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
-    ) -> None:
-        """Visualize the pipeline as a directed graph.
-
-        Parameters
-        ----------
-        figsize
-            The width and height of the figure in inches.
-        filename
-            The filename to save the figure to.
-        color_combinable
-            Whether to color combinable nodes differently.
-        conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
-        output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
-
-        """
-        if color_combinable:
-            func_node_colors = self._func_node_colors(
-                conservatively_combine=conservatively_combine,
-                output_name=output_name,
-            )
-        else:
-            func_node_colors = None
-        visualize(
-            self.graph,
-            figsize=figsize,
-            filename=filename,
-            func_node_colors=func_node_colors,
-        )
-
-    def visualize_holoviews(self) -> hv.Graph:
-        """Visualize the pipeline as a directed graph using HoloViews."""
-        return visualize_holoviews(self.graph)
-
-    def resources_report(self) -> None:
-        """Display the resource usage report for each function in the pipeline."""
-        if not self.profiling_stats:
-            msg = "Profiling is not enabled."
-            raise ValueError(msg)
-
-        headers = [
-            "Function",
-            "Avg CPU Usage (%)",
-            "Max Memory Usage (MB)",
-            "Avg Time (s)",
-            "Total Time (%)",
-            "Number of Calls",
-        ]
-        table_data = []
-
-        for func_name, stats in self.profiling_stats.items():
-            row = [
-                func_name,
-                f"{stats.cpu.average:.2f}",
-                f"{stats.memory.max / (1024 * 1024):.2f}",
-                f"{stats.time.average:.2e}",
-                stats.time.average * stats.time.num_executions,
-                stats.time.num_executions,
-            ]
-            table_data.append(row)
-
-        total_time = sum(row[4] for row in table_data)  # type: ignore[misc]
-        if total_time > 0:
-            for row in table_data:
-                row[4] = f"{row[4] / total_time * 100:.2f}"  # type: ignore[operator]
-
-        print("Resource Usage Report:")
-        print(tabulate(table_data, headers, tablefmt="grid"))
-
-    def _identify_combinable_nodes(
-        self,
-        output_name: _OUTPUT_TYPE,
-        *,
-        conservatively_combine: bool = False,
-    ) -> dict[PipeFunc, set[PipeFunc]]:
-        """Identify which function nodes can be combined into a single function.
-
-        This method identifies the PipeFuncs in the execution graph that
-        can be combined into a single function. The criterion for combinability
-        is that the functions share the same root arguments.
-
-        Parameters
-        ----------
-        output_name
-            The name of the output from the pipeline function we are starting
-            the search from. It is used to get the starting function in the
-            pipeline.
-        conservatively_combine
-            If True, only combine a function node with its predecessors if all
-            of its predecessors have the same root arguments as the function
-            node itself. If False, combine a function node with its predecessors
-            if any of its predecessors have the same root arguments as the
-            function node.
-
-        Returns
-        -------
-        dict[PipeFunc, set[PipeFunc]]
-            A dictionary where each key is a PipeFunc that can be
-            combined with others. The value associated with each key is a set of
-            PipeFuncs that can be combined with the key function.
-
-        Notes
-        -----
-        This function works by performing a depth-first search through the
-        pipeline's execution graph. Starting from the PipeFunc
-        corresponding to the `output_name`, it goes through each predecessor in
-        the graph (functions that need to be executed before the current one).
-        For each predecessor function, it recursively checks if it can be
-        combined with others by comparing their root arguments.
-
-        If a function's root arguments are identical to the head function's root
-        arguments, it is considered combinable and added to the set of
-        combinable functions for the head. If `conservatively_combine=True` and
-        all predecessor functions are combinable, the head function and its set
-        of combinable functions are added to the `combinable_nodes` dictionary.
-        If `conservatively_combine=False` and any predecessor function is
-        combinable, the head function and its set of combinable functions are
-        added to the `combinable_nodes` dictionary.
-
-        The function 'head' in the nested function `_recurse` represents the
-        current function being checked in the execution graph.
-
-        """
-        # Nested function _recurse performs the depth-first search and updates the
-        # `combinable_nodes` dictionary.
-
-        def _recurse(head: PipeFunc) -> None:
-            head_args = self.root_args(head.output_name)
-            funcs = set()
-            i = 0
-            for node in self.graph.predecessors(head):
-                if isinstance(node, (tuple, str)):  # node is root_arg
-                    continue
-                i += 1
-                _recurse(node)
-                node_args = self.root_args(node.output_name)
-                if node_args == head_args:
-                    funcs.add(node)
-            if funcs and (not conservatively_combine or i == len(funcs)):
-                combinable_nodes[head] = funcs
-
-        combinable_nodes: dict[PipeFunc, set[PipeFunc]] = {}
-        func = self.node_mapping[output_name]
-        assert isinstance(func, PipeFunc)
-        _recurse(func)
-        return combinable_nodes
-
-    def simplified_pipeline(
-        self,
-        output_name: _OUTPUT_TYPE | None = None,
-        *,
-        conservatively_combine: bool = False,
-    ) -> Pipeline:
-        """Simplify pipeline with combined function nodes.
-
-        Generate a simplified version of the pipeline where combinable function
-        nodes have been merged into single function nodes.
-
-        This method identifies combinable nodes in the pipeline's execution
-        graph (i.e., functions that share the same root arguments) and merges
-        them into single function nodes. This results in a simplified pipeline
-        where each key function only depends on nodes that cannot be further
-        combined.
-
-        Parameters
-        ----------
-        output_name
-            The name of the output from the pipeline function we are starting
-            the simplification from. It is used to get the starting function in the
-            pipeline. If None, the unique tip of the pipeline graph is used (if
-            there is one).
-        conservatively_combine
-            If True, only combine a function node with its predecessors if all
-            of its predecessors have the same root arguments as the function
-            node itself. If False, combine a function node with its predecessors
-            if any of its predecessors have the same root arguments as the
-            function node.
-
-        Returns
-        -------
-        Pipeline
-            The simplified version of the pipeline.
-
-        Notes
-        -----
-        The pipeline simplification process works in the following way:
-
-        1.  Identify combinable function nodes in the execution graph by
-            checking if they share the same root arguments.
-        2.  Simplify the dictionary of combinable nodes by replacing any nodes
-            that can be combined with their dependencies.
-        3.  Generate the set of nodes to be skipped (those that will be merged).
-        4.  Get the input and output signatures for the combined nodes.
-        5.  Create new pipeline functions for the combined nodes, and add them
-            to the list of new functions.
-        6.  Add the remaining (non-combinable) functions to the list of new
-            functions.
-        7.  Generate a new pipeline with the new functions.
-
-        This process can significantly simplify complex pipelines, making them
-        easier to understand and potentially improving performance by simplifying
-        function calls.
-
-        """
-        if output_name is None:
-            output_name = self.unique_leaf_node.output_name
-        combinable_nodes = self._identify_combinable_nodes(
-            output_name,
-            conservatively_combine=conservatively_combine,
-        )
-        if not combinable_nodes:
-            warnings.warn(
-                "No combinable nodes found, the pipeline cannot be simplified.",
-                UserWarning,
-                stacklevel=2,
-            )
-        # Simplify the combinable_nodes dictionary by replacing any nodes that
-        # can be combined with their own dependencies, so that each key in the
-        # dictionary only depends on nodes that cannot be further combined.
-        combinable_nodes = _combine_nodes(combinable_nodes)
-        skip = set.union(*combinable_nodes.values()) if combinable_nodes else set()
-        in_sig, out_sig = _get_signature(combinable_nodes, self.graph)
-        m = self.node_mapping
-        predecessors = [m[o] for o in self.func_dependencies(output_name)]
-        head = self.node_mapping[output_name]
-        new_functions = []
-        for f in self.functions:
-            if f != head and f not in predecessors:
-                continue
-            if f in combinable_nodes:
-                inputs = tuple(sorted(in_sig[f]))
-                outputs = tuple(sorted(out_sig[f]))
-                if len(outputs) == 1:
-                    outputs = outputs[0]  # type: ignore[assignment]
-                funcs = [f, *combinable_nodes[f]]
-                mini_pipeline = Pipeline(funcs)  # type: ignore[arg-type]
-                func = mini_pipeline.func(f.output_name).call_full_output
-                f_combined = _wrap_dict_to_tuple(func, inputs, outputs)
-                f_combined.__name__ = f"combined_{f.__name__}"
-                f_pipefunc = PipeFunc(
-                    f_combined,
-                    outputs,
-                    profile=f.profile,
-                    cache=f.cache,
-                    save_function=f.save_function,
-                )
-                # Disable saving for all functions that are being combined
-                for f_ in funcs:
-                    f_.save_function = None
-                f_pipefunc.parameters = list(inputs)
-                new_functions.append(f_pipefunc)
-            elif f not in skip:
-                new_functions.append(f)
-        return Pipeline(new_functions)  # type: ignore[arg-type]
-
-    @functools.cached_property
-    def leaf_nodes(self) -> list[PipeFunc]:
-        """Return the leaf nodes in the pipeline's execution graph."""
-        return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
-
-    @functools.cached_property
-    def root_nodes(self) -> list[PipeFunc]:
-        """Return the root nodes in the pipeline's execution graph."""
-        return [node for node in self.graph.nodes() if self.graph.in_degree(node) == 0]
-
-    @property
-    def profiling_stats(self) -> dict[str, ProfilingStats]:
-        """Return the profiling data for each function in the pipeline."""
-        return {f.__name__: f.profiling_stats for f in self.functions if f.profiling_stats}
-
-    def __str__(self) -> str:
-        """Return a string representation of the pipeline."""
-        pipeline_str = "Pipeline:\n"
-        for node in self.graph.nodes:
-            if isinstance(node, PipeFunc):
-                fn = node
-                input_args = self.all_arg_combinations[fn.output_name]
-                pipeline_str += f"  {fn.output_name} = {fn.__name__}({', '.join(fn.parameters)})\n"
-                pipeline_str += f"    Possible input arguments: {input_args}\n"
-        return pipeline_str
-
-    def copy(self) -> Pipeline:
-        """Return a copy of the pipeline."""
-        return Pipeline(
-            self.functions,  # type: ignore[arg-type]
-            lazy=self.lazy,
-            debug=self._debug,
-            profile=self._profile,
-            cache_type=self._cache_type,
-            cache_kwargs=self._cache_kwargs,
-        )
-
-
 def _update_all_results(
     func: PipeFunc,
     r: Any,
@@ -1144,23 +1931,13 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _valid_key(key: Any) -> Any:
-    if isinstance(key, dict):
-        return tuple(sorted(key.items()))
-    if isinstance(key, list):
-        return tuple(key)
-    if isinstance(key, set):
-        return tuple(sorted(key))
-    return key
-
-
 def _update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
     r: Any,
     start_time: float,
 ) -> None:
-    # Used in _execute_pipeline
+    # Used in _run
     if isinstance(cache, HybridCache):
         duration = time.perf_counter() - start_time
         cache.put(cache_key, r, duration)
@@ -1178,7 +1955,7 @@ def _get_result_from_cache(
     used_parameters: set[str | None],
     lazy: bool = False,  # noqa: FBT002, FBT001
 ) -> tuple[bool, bool]:
-    # Used in _execute_pipeline
+    # Used in _run
     result_from_cache = False
     if cache_key is not None and cache_key in cache:
         r = cache.get(cache_key)
@@ -1190,17 +1967,23 @@ def _get_result_from_cache(
     return False, result_from_cache
 
 
-def _check_consistent_defaults(functions: list[PipeFunc]) -> None:
+def _check_consistent_defaults(
+    functions: list[PipeFunc],
+    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+) -> None:
     """Check that the default values for shared arguments are consistent."""
-    arg_defaults = defaultdict(set)
+    arg_defaults = {}
     for f in functions:
         for arg, default_value in f.defaults.items():
-            arg_defaults[arg].add(default_value)
-            if len(arg_defaults[arg]) > 1:
+            if arg in f._bound or arg in output_to_func:
+                continue
+            if arg not in arg_defaults:
+                arg_defaults[arg] = default_value
+            elif default_value != arg_defaults[arg]:
                 msg = (
                     f"Inconsistent default values for argument '{arg}' in"
                     " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function.",
+                    " the same default value or are set only for one function."
                 )
                 raise ValueError(msg)
 
@@ -1229,6 +2012,7 @@ def _create_cache(
         return HybridCache(**cache_kwargs)
     if cache_type == "disk":
         cache_kwargs.setdefault("lru_shared", not lazy)
+        cache_kwargs.setdefault("cache_dir", tempfile.gettempdir())
         return DiskCache(**cache_kwargs)
     if cache_type == "simple":
         return SimpleCache()
@@ -1244,7 +2028,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         return func(**func_args)
     except Exception as e:
         handle_error(e, func, func_args)
-        raise  # handle_error raises but mypy doesn't know that
+        # handle_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _compute_cache_key(
@@ -1275,7 +2060,6 @@ def _compute_cache_key(
 
     Returns
     -------
-    _CACHE_KEY_TYPE | None
         A tuple containing the output name and a tuple of root input keys
         and their corresponding values, or None if the cache key computation
         is skipped.
@@ -1288,32 +2072,10 @@ def _compute_cache_key(
             # i.e., the output of a function was directly provided as an input to
             # another function. In this case, we don't want to cache the result.
             return None
-        key = _valid_key(kwargs[k])
+        key = to_hashable(kwargs[k])
         cache_key_items.append((k, key))
 
     return output_name, tuple(cache_key_items)
-
-
-def _save_results(
-    func: PipeFunc,
-    r: Any,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
-    root_args: tuple[str, ...],
-    lazy: bool,  # noqa: FBT001
-) -> None:
-    # Used in _execute_pipeline
-    if func.save_function is None:
-        return
-    to_save = {k: all_results[k] for k in root_args}
-    filename = generate_filename_from_dict(to_save)  # type: ignore[arg-type]
-    filename = func.__name__ / filename
-    to_save[output_name] = all_results[output_name]  # type: ignore[index]
-    if lazy:
-        lazy_save = _LazyFunction(func.save_function, args=(filename, to_save), add_to_graph=False)
-        r.add_delayed_callback(lazy_save)
-    else:
-        func.save_function(filename, to_save)  # type: ignore[arg-type]
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
@@ -1335,15 +2097,11 @@ def _sort_key(node: PipeFunc | str) -> str:
     return node
 
 
-def _unique(
-    nodes: Iterable[PipeFunc | str],
-) -> tuple[PipeFunc | str, ...]:
+def _unique(nodes: Iterable[PipeFunc | str]) -> tuple[PipeFunc | str, ...]:
     return tuple(sorted(set(nodes), key=_sort_key))
 
 
-def _filter_funcs(
-    funcs: Iterable[PipeFunc | str],
-) -> list[PipeFunc]:
+def _filter_funcs(funcs: Iterable[PipeFunc | str]) -> list[PipeFunc]:
     return [f for f in funcs if isinstance(f, PipeFunc)]
 
 
@@ -1355,7 +2113,11 @@ def _compute_arg_mapping(
     replaced: list[PipeFunc | str],
     arg_set: set[tuple[str, ...]],
 ) -> None:
-    preds = [n for n in graph.predecessors(node) if n not in replaced]
+    preds = [
+        n
+        for n in graph.predecessors(node)
+        if n not in replaced and not isinstance(n, _Bound | _Resources)
+    ]
     deps = _unique(args + preds)
     deps_names = _names(deps)
     if deps_names in arg_set:
@@ -1373,15 +2135,16 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
 
 
 def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
+    # Modify the MapSpec of functions that depend on `p` to include the new axis
     for f in functions:
-        if p not in f.parameters:
+        if p not in f.parameters or p in f._bound:
             continue
         if f.mapspec is None:
             axes = _axes_from_dims(p, dims, axis)
             input_specs = [ArraySpec(p, axes)]
             output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
         else:
-            existing_inputs = {s.name for s in f.mapspec.inputs}
+            existing_inputs = set(f.mapspec.input_names)
             if p in existing_inputs:
                 input_specs = [
                     s.add_axes(axis) if s.name == p and axis not in s.axes else s
@@ -1393,7 +2156,206 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
             output_specs = [
                 s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
             ]
-        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs))
+        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs), _is_generated=True)
         for o in output_specs:
             dims[o.name] = len(o.axes)
             _add_mapspec_axis(o.name, dims, axis, functions)
+
+
+def _find_non_root_axes(
+    mapspecs: list[MapSpec],
+    root_args: list[str],
+) -> dict[str, list[str | None]]:
+    non_root_inputs: dict[str, list[str | None]] = {}
+    for mapspec in mapspecs:
+        for spec in mapspec.inputs:
+            if spec.name not in root_args:
+                if spec.name not in non_root_inputs:
+                    non_root_inputs[spec.name] = spec.rank * [None]  # type: ignore[assignment]
+                for i, axis in enumerate(spec.axes):
+                    if axis is not None:
+                        non_root_inputs[spec.name][i] = axis
+    return non_root_inputs
+
+
+def _replace_none_in_axes(
+    mapspecs: list[MapSpec],
+    non_root_inputs: dict[str, list[str]],
+    multi_output_mapping: dict[str, tuple[str, ...]],
+) -> None:
+    all_axes_names = {
+        axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
+    }
+
+    i = 0
+    axis_template = "unnamed_{}"
+    for name, axes in non_root_inputs.items():
+        for j, axis in enumerate(axes):
+            if axis is None:
+                while (new_axis := axis_template.format(i)) in all_axes_names:
+                    i += 1
+                non_root_inputs[name][j] = new_axis
+                all_axes_names.add(new_axis)
+                if name in multi_output_mapping:
+                    # If output is a tuple, update its axes with the new axis.
+                    for output_name in multi_output_mapping[name]:
+                        non_root_inputs[output_name][j] = new_axis
+    assert not any(None in axes for axes in non_root_inputs.values())
+
+
+def _create_missing_mapspecs(
+    functions: list[PipeFunc],
+    non_root_inputs: dict[str, set[str]],
+) -> set[PipeFunc]:
+    # Mapping from output_name to PipeFunc for functions without a MapSpec
+    outputs_without_mapspec: dict[str, PipeFunc] = {
+        name: func
+        for func in functions
+        if func.mapspec is None
+        for name in at_least_tuple(func.output_name)
+    }
+
+    missing: set[str] = non_root_inputs.keys() & outputs_without_mapspec.keys()
+    func_with_new_mapspecs = set()
+    for p in missing:
+        func = outputs_without_mapspec[p]
+        if func in func_with_new_mapspecs:
+            continue  # already added a MapSpec because of multiple outputs
+        axes = tuple(non_root_inputs[p])
+        outputs = tuple(ArraySpec(x, axes) for x in at_least_tuple(func.output_name))
+        func.mapspec = MapSpec(inputs=(), outputs=outputs, _is_generated=True)
+        func_with_new_mapspecs.add(func)
+        print(f"Autogenerated MapSpec for `{func}`: `{func.mapspec}`")
+    return func_with_new_mapspecs
+
+
+def _traverse_graph(
+    start: _OUTPUT_TYPE | PipeFunc,
+    direction: Literal["predecessors", "successors"],
+    graph: nx.DiGraph,
+    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
+) -> list[_OUTPUT_TYPE]:
+    visited = set()
+
+    def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+        results = set()
+        if isinstance(x, str | tuple):
+            x = node_mapping[x]
+        for neighbor in getattr(graph, direction)(x):
+            if isinstance(neighbor, PipeFunc):
+                output_name = neighbor.output_name
+                if output_name not in visited:
+                    visited.add(output_name)
+                    results.add(output_name)
+                    results.update(_traverse(neighbor))
+        return results  # type: ignore[return-value]
+
+    return sorted(_traverse(start), key=at_least_tuple)
+
+
+def _find_nodes_between(
+    graph: nx.DiGraph,
+    input_nodes: set[Any],
+    output_nodes: set[Any],
+) -> set[Any]:
+    reachable_from_inputs = set()
+    for input_node in input_nodes:
+        reachable_from_inputs.update(nx.descendants(graph, input_node))
+    reachable_to_outputs = set()
+    for output_node in output_nodes:
+        reachable_to_outputs.update(nx.ancestors(graph, output_node))
+    reachable_to_outputs.update(output_nodes)
+    return reachable_from_inputs & reachable_to_outputs
+
+
+def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
+    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
+    if new_scope is not None:
+        all_scopes.add(new_scope)
+    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
+    if overlap := all_scopes & all_parameters:
+        overlap_str = ", ".join(overlap)
+        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
+        raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class _PipelineInternalCache:
+    arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
+    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+
+
+def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
+    """Check that the type annotations for shared arguments are consistent."""
+    for node in graph.nodes:
+        if not isinstance(node, PipeFunc):
+            continue
+        deps = nx.descendants_at_distance(graph, node, 1)
+        output_types = node.output_annotation
+        for dep in deps:
+            assert isinstance(dep, PipeFunc)
+            for parameter_name, input_type in dep.parameter_annotations.items():
+                if parameter_name not in output_types:
+                    continue
+                if _mapspec_is_generated(node, dep):
+                    # NOTE: We cannot check the type-hints for auto-generated MapSpecs
+                    continue
+                if _mapspec_with_internal_shape(node, parameter_name):
+                    # NOTE: We cannot verify the type hints because the output
+                    # might be any iterable instead of an Array as returned by
+                    # a map operation.
+                    continue
+                output_type = output_types[parameter_name]
+                if (
+                    _axis_is_reduced(node, dep, parameter_name)
+                    and not is_object_array_type(output_type)
+                    and not isinstance(output_type, Unresolvable)
+                    and output_type is not NoAnnotation
+                ):
+                    output_type = Array[output_type]  # type: ignore[valid-type]
+                if not is_type_compatible(output_type, input_type):
+                    msg = (
+                        f"Inconsistent type annotations for:"
+                        f"\n  - Argument `{parameter_name}`"
+                        f"\n  - Function `{node.__name__}(...)` returns:\n      `{output_type}`."
+                        f"\n  - Function `{dep.__name__}(...)` expects:\n      `{input_type}`."
+                        "\nPlease make sure the shared input arguments have the same type."
+                        "\nNote that the output type displayed above might be wrapped in"
+                        " `pipefunc.typing.Array` if using `MapSpec`s."
+                        " Disable this check by setting `validate_type_annotations=False`."
+                    )
+                    raise TypeError(msg)
+
+
+def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was the result of a map, and the input takes the entire result."""
+    output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
+    input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
+    if f_in.mapspec:
+        input_spec_axes = next(
+            (s.axes for s in f_in.mapspec.inputs if s.name == parameter_name),
+            None,
+        )
+    else:
+        input_spec_axes = None
+    return parameter_name in output_mapspec_names and (
+        parameter_name not in input_mapspec_names
+        or (input_spec_axes is not None and None in input_spec_axes)
+    )
+
+
+def _mapspec_is_generated(f_out: PipeFunc, f_in: PipeFunc) -> bool:
+    if f_out.mapspec is None or f_in.mapspec is None:
+        return False
+    return f_out.mapspec._is_generated or f_in.mapspec._is_generated
+
+
+def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
+    """Whether the output was not from a map operation but returned an array with internal shape."""
+    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
+        return False
+    output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
+    all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
+    return not all_inputs_in_outputs

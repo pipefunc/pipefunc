@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import cloudpickle
 import numpy as np
 import pytest
@@ -10,6 +12,7 @@ from pipefunc._utils import (
     format_function_call,
     format_kwargs,
     load,
+    requires,
 )
 
 
@@ -227,3 +230,8 @@ def test_equal_dicts():
 
     with pytest.warns(Warning, match="Errors comparing keys"):
         assert equal_dicts({"a": A()}, {"a": A()}, verbose=True) is None
+
+
+def test_requires() -> None:
+    with pytest.raises(ImportError, match="package is required for"):
+        requires("package_name_missing_for_sure", reason="testing", extras="test")

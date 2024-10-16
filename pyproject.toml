@@ -5,7 +5,7 @@ requires = ["setuptools", "wheel", "versioningit"]
 [project]
 name = "pipefunc"
 description = "A Python library for defining, managing, and executing function pipelines."
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dynamic = ["version"]
 maintainers = [{ name = "Bas Nijholt", email = "bas@nijho.lt" }]
 license = { text = "MIT" }
@@ -17,8 +17,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -26,33 +24,56 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = [
-    "networkx",
-    "psutil",
-    "versioningit",
-    "typing_extensions; python_version <= '3.9'",
-    "cloudpickle",
-    "numpy",
-    "tabulate",
-]
+dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh"]
-test = ["pytest", "coverage", "pytest-cov", "pandas", "adaptive"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
+xarray = ["xarray"]
+widgets = ["ipywidgets"]
+zarr = ["zarr"]
+pandas = ["pandas"]
+plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-codspeed",
+    "pytest-cov",
+    "pytest-xdist",
+    "coverage",
+    "adaptive",
+    "xarray",
+    "zarr",
+    "versioningit",
+]
 docs = [
-    "myst-nb",
     "sphinx",
-    "furo",
-    "myst-parser",
+    "sphinx-autodoc-typehints",
+    "sphinx-book-theme",
+    "sphinx-copybutton",
+    "sphinx-notfound-page",
+    "sphinx-togglebutton",
     "emoji",
     "jupytext",
-    "pandas",                  # used in example.ipynb
+    "myst-nb",
+    "myst-parser",
+    "versioningit",
+    # Used for the example notebook
+    "seaborn",
+    "nltk",
+    "scikit-image",
 ]
-dev = ["black[jupyter]", "pre-commit", "ruff", "mypy"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
+dev = [ # all + dev deps
+    "black[jupyter]",
+    "pre-commit",
+    "ruff",
+    "mypy",
+    "versioningit",
+    "pipefunc[all,test,docs]",
+]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
-repository = "https://github.com/basnijholt/pipefunc"
+repository = "https://github.com/pipefunc/pipefunc"
 
 [project.readme]
 content-type = "text/markdown"
@@ -61,18 +82,32 @@ file = "README.md"
 [tool.versioningit]
 default-version = "0.0.0"
 
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
+[tool.versioningit.vcs]
+method = "git"
+match = ["v*"]
+default-tag = "0.0.0"
+
+[tool.setuptools.package-data]
+"pipefunc" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+include = ["pipefunc.*", "pipefunc"]
 
 [tool.setuptools.cmdclass]
 sdist = "versioningit.cmdclass.sdist"
 build_py = "versioningit.cmdclass.build_py"
 
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
+[tool.versioningit.format]
+dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
+distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
+distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
+
+[tool.versioningit.onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "module"
 addopts = """
     -vvv
     --cov=pipefunc
@@ -80,6 +115,7 @@ addopts = """
     --cov-report html
     --cov-report xml
     --cov-fail-under=35
+    --asyncio-mode=strict
 """
 
 [tool.coverage.report]
@@ -91,11 +127,11 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = ["pipefunc/_plotting.py"]
+omit = []
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -116,15 +152,28 @@ ignore = [
     "TD003",   # Missing issue link on the line following this TODO
     "FIX002",  # Line contains TODO"
     "E501",    # Line too long
+    "D107",    # Missing docstring in `__init__`
+    "B905",    # `zip()` without an explicit `strict=` parameter
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["SLF001", "ANN", "D", "PLR2004"]
+"tests/*" = ["SLF001", "ANN", "D", "PLR2004", "ARG001"]
 "tests/test_examples.py" = ["E501"]
 ".github/*" = ["INP001"]
+"example.ipynb" = [
+    "D101",
+    "D103",
+    "DTZ005",
+    "PLR2004",
+    "ARG001",
+    "ANN001",
+    "ANN201",
+    "NPY002",
+    "RET504",
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"

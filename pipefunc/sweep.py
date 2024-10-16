@@ -1,16 +1,17 @@
+"""Provides the `pipefunc.sweep` module, for creating and managing parameter sweeps."""
+
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Generator, Hashable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
-import networkx as nx
-
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, requires
 
 if TYPE_CHECKING:
-    from pipefunc._pipeline import _OUTPUT_TYPE, PipeFunc, Pipeline
+    from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+
+    from pipefunc._pipeline import _OUTPUT_TYPE, Pipeline
 
 
 def _combined_exclude(
@@ -25,9 +26,7 @@ def _combined_exclude(
     return lambda x: any(func(x) for func in funcs)
 
 
-def _combine_dicts(
-    *maybe_dict: dict[str, Any] | None,
-) -> dict[str, Any] | None:
+def _combine_dicts(*maybe_dict: dict[str, Any] | None) -> dict[str, Any] | None:
     """Combine multiple dictionaries into one."""
     dicts = [d for d in maybe_dict if d is not None]
     if len(dicts) == 0:
@@ -68,7 +67,6 @@ class Sweep:
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -106,6 +104,15 @@ class Sweep:
         self.derivers = derivers
 
     def generate(self) -> Generator[dict[str, Any], None, None]:  # noqa: PLR0912
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         if not self.items:
             return  # If there are no items, return an empty generator
 
@@ -237,7 +244,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object representing the Cartesian product of the sweeps.
 
         Examples
@@ -274,10 +280,7 @@ class Sweep:
             derivers=_combine_dicts(self.derivers, other.derivers),  # type: ignore[arg-type]
         )
 
-    def add_derivers(
-        self,
-        **derivers: Callable[[dict[str, Any]], Any],
-    ) -> Sweep:
+    def add_derivers(self, **derivers: Callable[[dict[str, Any]], Any]) -> Sweep:
         """Add derivers to the sweep, which are functions that modify the sweep items.
 
         Parameters
@@ -291,7 +294,6 @@ class Sweep:
 
         Returns
         -------
-        Sweep
             A new Sweep object with the added derivers.
 
         Examples
@@ -321,7 +323,6 @@ class MultiSweep(Sweep):
 
     Returns
     -------
-    MultiSweep
         A MultiSweep object containing the concatenated sweeps.
 
     Examples
@@ -337,10 +338,20 @@ class MultiSweep(Sweep):
         self.sweeps = list(sweeps)
 
     def generate(self) -> Generator[dict[str, Any], None, None]:
+        """Generate the sweep combinations.
+
+        Returns the same combinations as the `list` method, but as a generator.
+
+        Yields
+        ------
+            A dictionary representing a specific combination of dimension values.
+
+        """
         for sweep in self.sweeps:
             yield from sweep.generate()
 
     def __len__(self) -> int:
+        """Return the number of unique combinations in the sweep."""
         return sum(len(sweep) for sweep in self.sweeps)
 
     def list(self) -> list[dict[str, Any]]:
@@ -413,7 +424,6 @@ def generate_sweep(
 
     Returns
     -------
-    list
         A list of dictionaries, each representing a specific combination
         of dimension values.
 
@@ -465,7 +475,6 @@ def count_sweep(
 
     Returns
     -------
-    dict
         A dictionary where the keys are the names of the arguments and the
         values are dictionaries where the keys are the argument combinations
         and the values are the number of times that combination is used.
@@ -481,6 +490,7 @@ def count_sweep(
         arg_combination = pipeline.root_args(_output_name)
         assert isinstance(arg_combination, tuple)
         if use_pandas:
+            requires("pandas", reason="count_sweep", extras="pandas")
             import pandas as pd
 
             df = pd.DataFrame(list(sweep))
@@ -505,189 +515,12 @@ def set_cache_for_sweep(
 ) -> None:
     """Set the cache for a sweep of a pipeline."""
     # Disable for the output node
-    pipeline.node_mapping[output_name].cache = False  # type: ignore[union-attr]
+    pipeline[output_name].cache = False  # type: ignore[union-attr]
     cnt = count_sweep(output_name, sweep, pipeline)
     max_executions = {k: max(v.values()) for k, v in cnt.items()}
     for _output_name, n in max_executions.items():
         enable_cache = n >= min_executions
-        func = pipeline.node_mapping[_output_name]
+        func = pipeline[_output_name]
         if verbose:
             print(f"Setting cache for '{_output_name}' to {enable_cache} (n={n})")
         func.cache = enable_cache  # type: ignore[union-attr]
-
-
-def get_precalculation_order(
-    pipeline: Pipeline,
-    counts: dict[str | tuple[str, ...], dict[tuple[Any, ...], int]],
-    min_executions: int = 2,
-) -> list[PipeFunc]:
-    """Determine the order in which functions in a pipeline should be precalculated and cached.
-
-    The order is determined by the topological dependencies of the functions
-    and the count of their executions in the context of a parameter sweep.
-    Only functions that are executed multiple times (as specified by `min_executions`)
-    are included in the precalculation order.
-
-    Parameters
-    ----------
-    pipeline
-        The pipeline of functions.
-    counts
-        A dictionary mapping function output names to dictionaries of
-        parameter combinations and their counts in the pipeline.
-    min_executions
-        The minimum number of times a function must be used in the pipeline
-        for it to be included in the precalculation order. Defaults to 2.
-
-    Returns
-    -------
-    list[PipeFunc]
-        The ordered list of functions to be precalculated and cached.
-
-    """
-
-    def key_func(node: PipeFunc) -> int:
-        return -sum(counts[node.output_name].values())
-
-    m = pipeline.node_mapping
-    # Get nodes with counts ≥min_executions
-    nodes_with_counts = [
-        m[node]
-        for node, count_dict in counts.items()
-        if any(val >= min_executions for val in count_dict.values())
-    ]
-    # Create a subgraph with only the nodes with sufficient counts
-    subgraph = pipeline.graph.subgraph(nodes_with_counts)
-    # Return the ordered list of nodes
-    return list(nx.lexicographical_topological_sort(subgraph, key=key_func))
-
-
-def _get_nested_value(d: dict, keys: list) -> Any:
-    """Fetches a nested value from a dictionary given a list of keys.
-
-    Parameters
-    ----------
-    d
-        The dictionary from which to fetch the value.
-    keys
-        The list of keys that lead to the desired value. Each element in the
-        list is a key to a subsequent dictionary.
-
-    Returns
-    -------
-    Any
-        The value found at the nested location in the dictionary specified by
-        the list of keys.
-
-    Raises
-    ------
-    KeyError
-        If a key in the list does not exist in the dictionary.
-
-    Examples
-    --------
-    >>> d = {'a': {'b': {'c': 1}}}
-    >>> keys = ['a', 'b', 'c']
-    >>> _get_nested_value(d, keys)
-    1
-
-    """
-    for key in keys:
-        d = d[key]
-    return d
-
-
-def _nested_defaultdict(n: int, inner_default_factory: type = list) -> defaultdict:
-    """Create a nested defaultdict with n levels."""
-    if n <= 1:
-        return defaultdict(inner_default_factory)
-    return defaultdict(lambda: _nested_defaultdict(n - 1, inner_default_factory))
-
-
-def _count_nested_dict_items(d: dict) -> int:
-    """Count the number of items in a nested dict."""
-    total = 0
-    for v in d.values():
-        if isinstance(v, dict):
-            total += _count_nested_dict_items(v)
-        else:
-            total += len(v)
-    return total
-
-
-def _assert_valid_sweep_dict(
-    sweep_dict: dict,
-    left_overs: list[tuple[str, ...]],
-    keys: defaultdict[tuple[str, ...], set] | None = None,
-    level: int = 0,
-) -> defaultdict[tuple[str, ...], set]:
-    """Checks that the keys are unique and that the number of keys matches the number of left_overs."""
-    if keys is None:
-        keys = defaultdict(set)
-    for k, v in sweep_dict.items():
-        assert len(k) == len(left_overs[level])
-        assert k not in keys[tuple(left_overs[level])]
-        keys[left_overs[level]].add(k)
-        if isinstance(v, dict):
-            _assert_valid_sweep_dict(v, left_overs, keys, level + 1)
-    return keys
-
-
-def get_min_sweep_sets(
-    execution_order: list[PipeFunc],
-    pipeline: Pipeline,
-    sweep: Sweep,
-    output_name: str,
-) -> tuple[list[tuple[str, ...]], dict]:
-    """Create sweep combinations for each function in the execution order.
-
-    This function iterates through the execution order of the pipeline functions
-    and identifies the minimal set of argument combinations for each function to
-    satisfy the pipeline sweep requirements. It then creates a nested dictionary
-    structure that represents the sweep combinations.
-
-    Parameters
-    ----------
-    execution_order
-        The order in which pipeline functions are to be executed.
-    pipeline
-        The pipeline object containing the pipeline functions and related
-        methods.
-    sweep
-        The sweep object containing the sweep parameter values and combinations.
-    output_name
-        The name of the output from the pipeline function we are starting the
-        simplification from. It is used to get the starting function in the pipeline.
-
-    Returns
-    -------
-    Tuple[List[Any], dict]
-        A tuple where the first element is a list of the minimal set of argument
-        combinations for each function in the execution order and the second
-        element is a nested dictionary that represents the sweep combinations.
-
-    """
-    root_args = pipeline.root_args(output_name)
-    assert isinstance(root_args, tuple)
-    root_args_set = set(root_args)
-    left_over = root_args_set.copy()
-
-    left_overs: list[tuple[str, ...]] = []
-    for f in execution_order:
-        f_root_args = pipeline.root_args(f.output_name)
-        assert isinstance(f_root_args, tuple)
-        left_over = left_over - set(f_root_args)
-        if not left_over:
-            break
-        args = tuple(sorted(root_args_set - left_over))
-        if args not in left_overs:
-            left_overs.append(args)
-
-    sweep_dict = _nested_defaultdict(len(left_overs), inner_default_factory=list)
-    for combo in sweep.generate():
-        keys = [tuple(combo[k] for k in arg) for arg in left_overs]
-        _get_nested_value(sweep_dict, keys).append(combo)
-
-    assert _count_nested_dict_items(sweep_dict) == len(sweep)
-    _assert_valid_sweep_dict(sweep_dict, left_overs)
-    return left_overs, sweep_dict

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from pipefunc import Pipeline, Sweep, pipefunc
-from pipefunc.map._run import load_outputs, map_shapes
+from pipefunc import Pipeline, pipefunc
+from pipefunc.map._run import load_outputs
+from pipefunc.map._run_info import map_shapes
+from pipefunc.sweep import Sweep
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,7 +22,7 @@ def test_simple_sweep(tmp_path: Path) -> None:
         return x + y
 
     @pipefunc(output_name="sum")
-    def take_sum(z: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+    def take_sum(z: Array[int]) -> int:
         assert isinstance(z, np.ndarray)
         return sum(z)
 
@@ -27,10 +30,12 @@ def test_simple_sweep(tmp_path: Path) -> None:
 
     inputs = {"x": [1, 2, 3], "y": 2}
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
-    assert results[-1].output == 12
-    assert results[-1].output_name == "sum"
+    assert results["sum"].output == 12
+    assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
-    assert map_shapes(pipeline, inputs) == {"x": (3,), "z": (3,)}
+    shapes, masks = map_shapes(pipeline, inputs)
+    assert shapes == {"x": (3,), "z": (3,)}
+    assert all(all(mask) for mask in masks.values())
 
     sweep = Sweep({"y": [42, 69]}, constants={"x": [1, 2, 3]})
     for i, combo in enumerate(sweep.generate()):

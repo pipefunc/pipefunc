@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,6 +27,7 @@ def test_hybrid_cache_put_and_get(shared):
     assert cache.get("key1") == "value1"
     assert isinstance(cache.cache, dict)
     assert "key1" in cache
+    assert cache.get("not_exist") is None
 
 
 @pytest.mark.parametrize("shared", [True, False])
@@ -149,7 +150,7 @@ def test_cache_property(shared):
     assert cache_dict == {"test": "value"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache_dir(tmp_path):
     return tmp_path / "cache"
 
@@ -340,6 +341,14 @@ def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa
     assert len(cache) == 1
     assert len(cache.lru_cache) == 1
 
+    cache2 = DiskCache(
+        cache_dir=str(cache_dir),
+        with_lru_cache=True,
+        lru_shared=shared,
+    )
+    assert len(cache2) == 1
+    assert cache2.get("key3") == "value3"
+
 
 @pytest.mark.parametrize("cache_cls", [HybridCache, LRUCache, DiskCache])
 @pytest.mark.parametrize("shared", [True, False])
@@ -384,3 +393,14 @@ def test_simple_cache():
     assert "key2" not in cache
     assert cache.get("key1") == "value1"
     assert cache.get("key2") is None
+    assert isinstance(cache.cache, dict)
+    assert len(cache) == 1
+    cache.clear()
+    assert len(cache) == 0
+
+
+def test_disk_cache_pickling(tmp_path: Path) -> None:
+    cache = DiskCache(cache_dir=tmp_path, with_lru_cache=False)
+    cache.put("key1", "value1")
+    cache2 = pickle.loads(pickle.dumps(cache))  # noqa: S301
+    assert cache2.get("key1") == "value1"

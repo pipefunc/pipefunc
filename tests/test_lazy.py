@@ -1,20 +1,21 @@
+from __future__ import annotations
+
 from collections import defaultdict
 
 import networkx as nx
 
 import pipefunc
-import pipefunc._lazy
-from pipefunc._lazy import TaskGraph, _LazyFunction, construct_dag
+from pipefunc.lazy import TaskGraph, _LazyFunction, construct_dag
 
 
 def test_construct_dag():
-    assert pipefunc._lazy._TASK_GRAPH is None
+    assert pipefunc.lazy._TASK_GRAPH is None
     with construct_dag() as dag:
         assert isinstance(dag, TaskGraph)
         assert isinstance(dag.graph, nx.DiGraph)
         assert dag.mapping == {}
-        assert pipefunc._lazy._TASK_GRAPH is dag
-    assert pipefunc._lazy._TASK_GRAPH is None
+        assert pipefunc.lazy._TASK_GRAPH is dag
+    assert pipefunc.lazy._TASK_GRAPH is None
 
 
 def test_lazy_function_without_dag():
@@ -97,7 +98,7 @@ def test_lazy_pipeline():
     assert r2["c"].evaluate() == 3
     assert r2["d"].evaluate() == 6
     assert r2["e"].evaluate() == 18
-    assert pipefunc.evaluate_lazy(r2) == {"a": 1, "b": 2, "c": 3, "d": 6, "e": 18}
+    assert pipefunc.lazy.evaluate_lazy(r2) == {"a": 1, "b": 2, "c": 3, "d": 6, "e": 18}
     assert r3.evaluate() == 18
     assert str(r1) == "f3(c=f1(a=1, b=2), d=f2(b=2, c=f1(a=1, b=2), x=1), x=1)"
 
@@ -117,10 +118,10 @@ def test_running_dag_pipeline():
 
     pipeline = pipefunc.Pipeline([f1, f2, f3], lazy=True)
     f = pipeline.func("e")
-    assert not isinstance(pipeline._current_cache(), pipefunc._cache.SimpleCache)
+    assert not isinstance(pipeline._current_cache(), pipefunc.cache.SimpleCache)
     with construct_dag() as dag:
         cache = pipeline._current_cache()
-        assert isinstance(cache, pipefunc._cache.SimpleCache)
+        assert isinstance(cache, pipefunc.cache.SimpleCache)
         assert not cache.cache
         f(a=1, b=2)
         f(a=1, b=2)
@@ -128,7 +129,12 @@ def test_running_dag_pipeline():
         assert cache is dag.cache
 
     assert dag.mapping
-    assert dag.cache.cache.keys() == {("c", (("a", 1), ("b", 2)))}
+    expected = [
+        ("c", (("a", 1), ("b", 2))),
+        ("d", (("a", 1), ("b", 2), ("x", 1))),
+        ("e", (("a", 1), ("b", 2), ("x", 1))),
+    ]
+    assert list(dag.cache.cache) == expected
 
     # Test doing something with the graph. Note that is not a good way of using the graph!
     # I have yet to figure out how to best use the graph.
@@ -141,18 +147,23 @@ def test_running_dag_pipeline():
             lazy_func = dag.mapping[node]
             name = lazy_func.func.__name__
             r = lazy_func.evaluate()
-            kwargs = pipefunc.evaluate_lazy(lazy_func.kwargs)
+            kwargs = pipefunc.lazy.evaluate_lazy(lazy_func.kwargs)
             results[name].append((kwargs, r))
 
     assert results == {
         "f1": [({"a": 1, "b": 2}, 3)],
-        # Don't worry, the results "should" be from cache
-        "f2": [
-            ({"b": 2, "c": 3, "x": 1}, 6),
-            ({"b": 2, "c": 3, "x": 1}, 6),
-        ],
-        "f3": [
-            ({"c": 3, "d": 6, "x": 1}, 18),
-            ({"c": 3, "d": 6, "x": 1}, 18),
-        ],
+        "f2": [({"b": 2, "c": 3, "x": 1}, 6)],
+        "f3": [({"c": 3, "d": 6, "x": 1}, 18)],
     }
+
+
+def test_evaluate_lazy_set():
+    def func1(x):
+        return x + 1
+
+    def func2(z):
+        return sum(z)
+
+    lazy_func1 = _LazyFunction(func1, args=(1,))
+    lazy_func2 = _LazyFunction(func2, args=({lazy_func1, lazy_func1},))
+    assert lazy_func2.evaluate() == 2

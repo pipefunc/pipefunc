@@ -10,27 +10,38 @@ dependencies:
   # from pyproject.toml
   - networkx
   - psutil
-  - versioningit
-  - typing_extensions
   - cloudpickle
   - numpy
-  - tabulate
+  # optional-dependencies: adaptive
+  - adaptive
+  - adaptive-scheduler>=2.12.0
+  # optional-dependencies: xarray
+  - xarray
+  # optional-dependencies: widgets
+  - ipywidgets
+  # optional-dependencies: zarr
+  - zarr
+  # optional-dependencies: pandas
+  - pandas
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
-  # optional-dependencies: test
-  - pytest
-  - coverage
-  - pytest-cov
-  - pandas
-  - adaptive
+  - python-graphviz
   # optional-dependencies: docs
-  - myst-nb
   - sphinx
-  - furo
-  - myst-parser
+  - sphinx-autodoc-typehints
+  - sphinx-book-theme
+  - sphinx-copybutton
+  - sphinx-notfound-page
+  - sphinx-togglebutton
   - emoji
   - jupytext
-  - pandas
+  - myst-parser
+  - versioningit
+  - seaborn
+  - nltk
+  - scikit-image
+  - pip:
+    - myst-nb

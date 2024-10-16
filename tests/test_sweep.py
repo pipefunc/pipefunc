@@ -1,18 +1,14 @@
+from __future__ import annotations
+
 from itertools import product
 
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._sweep import (
-    MultiSweep,
-    Sweep,
-    count_sweep,
-    generate_sweep,
-    set_cache_for_sweep,
-)
+from pipefunc.sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline():
     @pipefunc(output_name="c")
     def f1(a, b):
@@ -85,6 +81,22 @@ def test_count_sweep(pipeline, use_pandas):
     expected_result = {"c": {(1, 2): 2, (2, 3): 1}, "d": {(1, 2, 3): 2, (2, 3, 4): 1}}
     assert count_sweep(output_name, sweep, pipeline, use_pandas=use_pandas) == expected_result
 
+    sweep = Sweep({"a": [1, 2], "b": [3, 4], "x": [5, 6]})
+    expected_result = {
+        "c": {(1, 3): 2, (1, 4): 2, (2, 3): 2, (2, 4): 2},
+        "d": {
+            (1, 3, 5): 1,
+            (1, 3, 6): 1,
+            (1, 4, 5): 1,
+            (1, 4, 6): 1,
+            (2, 3, 5): 1,
+            (2, 3, 6): 1,
+            (2, 4, 5): 1,
+            (2, 4, 6): 1,
+        },
+    }
+    assert count_sweep(output_name, sweep, pipeline, use_pandas=use_pandas) == expected_result
+
 
 def test_set_cache_for_sweep(pipeline):
     sweep = [
@@ -94,9 +106,9 @@ def test_set_cache_for_sweep(pipeline):
     ]
     output_name = "e"
     set_cache_for_sweep(output_name, pipeline, sweep, verbose=True)
-    assert pipeline.node_mapping["c"].cache is True
-    assert pipeline.node_mapping["d"].cache is True
-    assert pipeline.node_mapping["e"].cache is False
+    assert pipeline["c"].cache is True
+    assert pipeline["d"].cache is True
+    assert pipeline["e"].cache is False
 
 
 def test_sweep_with_exclude():
@@ -109,6 +121,7 @@ def test_sweep_with_exclude():
     dims = [("a", "b"), ("c",)]
     sweep = Sweep(items, dims, exclude)
     expected_result = [{"a": 2, "b": 4, "c": 5}, {"a": 2, "b": 4, "c": 6}]
+    assert len(sweep) == 2
     actual_result = sweep.list()
     assert actual_result == expected_result
 
@@ -124,6 +137,7 @@ def test_sweep_with_exclude():
     ]
     actual_result = sweep.list()
     assert actual_result == expected_result
+    assert len(sweep) == 6
 
 
 def test_filtered_sweep():
@@ -160,6 +174,8 @@ def test_multi_sweep():
     assert multi_sweep.list() == multi_sweep3.list() == expected_result
     assert len(multi_sweep) == len(multi_sweep2) == 8
     assert len(multi_sweep) == len(multi_sweep3) == 8
+    double = multi_sweep.combine(multi_sweep)
+    assert len(double) == 16
 
 
 def test_sweep_add():
@@ -341,10 +357,23 @@ def test_sweep_product() -> None:
         {"a": 2, "b": 4, "c": 6},
     ]
 
+    sweep2 = Sweep({"c": [5, 6], "d": [1]}, dims=[("c", "d")])
+    sweep3 = sweep1.product(sweep2)
+    assert sweep3.list() == [
+        {"a": 1, "b": 3, "c": 5, "d": 1},
+        {"a": 1, "b": 3, "c": 6, "d": 1},
+        {"a": 1, "b": 4, "c": 5, "d": 1},
+        {"a": 1, "b": 4, "c": 6, "d": 1},
+        {"a": 2, "b": 3, "c": 5, "d": 1},
+        {"a": 2, "b": 3, "c": 6, "d": 1},
+        {"a": 2, "b": 4, "c": 5, "d": 1},
+        {"a": 2, "b": 4, "c": 6, "d": 1},
+    ]
+
 
 def test_sweep_product_with_dims() -> None:
     sweep1 = Sweep({"a": [1, 2], "b": [3, 4]}, dims=[("a", "b")])
-    sweep2 = Sweep({"c": [5, 6]})
+    sweep2 = Sweep({"c": [5, 6]}, dims=[("c",)])
     sweep3 = sweep1.product(sweep2)
     assert sweep1.list() == [
         {"a": 1, "b": 3},
@@ -435,3 +464,12 @@ def test_empty_filtered_sweep() -> None:
     sweep = Sweep({"a": [1, 2], "b": [3, 4]})
     filtered_sweep = sweep.filtered_sweep(("x",))
     assert filtered_sweep.list() == []
+
+
+def test_exception_dims_length() -> None:
+    sweep = Sweep({"a": [1, 2], "b": [3], "c": [4]}, dims=[("a", "b"), ("c",)])
+    with pytest.raises(
+        ValueError,
+        match="Dimension 'b' has a different length than the other dimensions",
+    ):
+        sweep.list()

@@ -1,4 +1,6 @@
-from pipefunc._perf import ResourceStats
+from __future__ import annotations
+
+from pipefunc._profile import ResourceStats
 
 
 def test_resource_stats_initialization():

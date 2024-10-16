@@ -1,34 +1,24 @@
+"""Provides the `pipefunc.lazy` module, which contains functions for lazy evaluation."""
+
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, Any, Generator, Iterable, NamedTuple
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import networkx as nx
 
-from pipefunc._cache import SimpleCache
 from pipefunc._utils import format_function_call
+from pipefunc.cache import SimpleCache
 
 if TYPE_CHECKING:
-    import sys
-
-    if sys.version_info < (3, 9):  # pragma: no cover
-        from typing import Callable
-    else:
-        from collections.abc import Callable
+    from collections.abc import Callable, Generator
 
 
 class _LazyFunction:
     """Lazy function wrapper for deferred evaluation of a function."""
 
-    __slots__ = [
-        "func",
-        "args",
-        "kwargs",
-        "_result",
-        "_evaluated",
-        "_delayed_callbacks",
-        "_id",
-    ]
+    __slots__ = ["func", "args", "kwargs", "_result", "_evaluated", "_id"]
 
     _counter = 0
 
@@ -37,8 +27,6 @@ class _LazyFunction:
         func: Callable[..., Any],
         args: tuple[Any, ...] = (),
         kwargs: dict[str, Any] | None = None,
-        *,
-        add_to_graph: bool = True,
     ) -> None:
         self.func = func
         self.args = args
@@ -46,12 +34,11 @@ class _LazyFunction:
 
         self._result = None
         self._evaluated = False
-        self._delayed_callbacks: list[_LazyFunction] = []
 
         self._id = _LazyFunction._counter
         _LazyFunction._counter += 1
 
-        if add_to_graph and _TASK_GRAPH is not None:
+        if _TASK_GRAPH is not None:
             _TASK_GRAPH.graph.add_node(self._id, lazy_func=self)
             _TASK_GRAPH.mapping[self._id] = self
 
@@ -70,10 +57,6 @@ class _LazyFunction:
                 for arg in kwargs.values():
                     add_edge(arg)
 
-    def add_delayed_callback(self, cb: _LazyFunction) -> None:
-        """Add a delayed callback to the lazy function."""
-        self._delayed_callbacks.append(cb)
-
     def evaluate(self) -> Any:
         """Evaluate the lazy function and return the result."""
         if self._evaluated:
@@ -83,9 +66,6 @@ class _LazyFunction:
         result = self.func(*args, **kwargs)
         self._result = result
         self._evaluated = True
-        for cb in self._delayed_callbacks:
-            cb._result = result
-            evaluate_lazy(cb)
         return result
 
     def __repr__(self) -> str:

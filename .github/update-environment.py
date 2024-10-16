@@ -2,21 +2,35 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 import tomllib
 
-PIP_ONLY_DEPS: set[str] = set()
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+PIP_ONLY_DEPS: set[str] = {"myst-nb"}
+REPLACE_DEPS: dict[str, str] = {
+    "graphviz": "python-graphviz",
+}
+SKIP_DEPS: set[str] = {"pipefunc"}
 
 
 def clean_deps(deps: Iterable[str]) -> list[str]:
     """Remove version constraints from dependencies."""
-    return [dep.split(";", 1)[0] for dep in deps]
+    return [strip_extras(dep.split(";", 1)[0]) for dep in deps]
 
 
 def generate_pip_deps(deps: list[str]) -> list[str]:
     """Generate pip only dependencies from a list."""
-    return [dep for dep in deps if dep in PIP_ONLY_DEPS]
+    return [
+        REPLACE_DEPS.get(dep, dep) for dep in deps if dep in PIP_ONLY_DEPS and dep not in SKIP_DEPS
+    ]
+
+
+def strip_extras(dep: str) -> str:
+    """Strip extras from a dependency."""
+    return dep.split("[", 1)[0].strip()
 
 
 def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
@@ -33,13 +47,14 @@ def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
 def generate_environment_yml(
     data: dict,
     name: str,
-    sections: tuple[str, ...] = ("all", "test", "docs", "plotting"),
+    sections: tuple[str, ...] = ("test", "docs", "plotting"),
     default_packages: tuple[str, ...] = ("python", "pip"),
     filename: str | None = "environment.yml",
+    pip_deps: list[str] | None = None,
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
-    pip_deps = []
-
+    if pip_deps is None:
+        pip_deps = []
     dependencies = clean_deps(data["project"]["dependencies"])
     pip_deps += generate_pip_deps(dependencies)
 
@@ -53,7 +68,7 @@ def generate_environment_yml(
 
     # Required deps from pyproject.toml
     env_yaml += write_deps(
-        [dep for dep in dependencies if dep not in PIP_ONLY_DEPS],
+        [REPLACE_DEPS.get(dep, dep) for dep in dependencies if dep not in PIP_ONLY_DEPS],
         "from pyproject.toml",
     )
 
@@ -63,7 +78,7 @@ def generate_environment_yml(
             group_deps = clean_deps(data["project"]["optional-dependencies"][group])
             pip_deps += generate_pip_deps(group_deps)
             env_yaml += write_deps(
-                [dep for dep in group_deps if dep not in PIP_ONLY_DEPS],
+                [REPLACE_DEPS.get(dep, dep) for dep in group_deps if dep not in PIP_ONLY_DEPS],
                 f"optional-dependencies: {group}",
             )
 
@@ -85,11 +100,12 @@ if __name__ == "__main__":
     with open("pyproject.toml") as f:  # noqa: PTH123
         data = tomllib.loads(f.read())
 
+    sections = ("adaptive", "plotting", "xarray", "zarr", "pandas", "widgets")
     # Generate environment.yml
     generate_environment_yml(
         data,
         name="pipefunc",
-        sections=("test", "plotting"),
+        sections=("test", *sections),
         filename="environment.yml",
     )
 
@@ -97,6 +113,6 @@ if __name__ == "__main__":
     generate_environment_yml(
         data,
         name="pipefunc-sphinx",
-        sections=("test", "docs", "plotting"),
+        sections=("docs", *sections),
         filename="docs/environment-sphinx.yml",
     )
