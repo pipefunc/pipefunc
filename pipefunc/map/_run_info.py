@@ -291,7 +291,7 @@ class RunInfo:
 
 @dataclass
 class LazyStorage:
-    """Object that can generate a StorageBase instance on demand."""
+    """Object that can generate a StorageBase instance if its shape is resolved."""
 
     output_name: str
     shape: tuple[int | str, ...]
@@ -299,28 +299,20 @@ class LazyStorage:
     storage_class: type[StorageBase]
     run_folder: Path | None
 
-    def evaluate(self, kwargs: dict[str, Any] | None = None) -> StorageBase:
-        if kwargs is None:
-            kwargs = {}
-        shape: tuple[int, ...] = _resolve_shape(self.shape, kwargs)
+    def _can_evaluate(self) -> bool:
+        return all(isinstance(i, int) for i in self.shape)
+
+    def evaluate(self) -> StorageBase:
+        if not self._can_evaluate():
+            msg = "Cannot evaluate lazy store with unresolved shape."
+            raise ValueError(msg)
         path = _maybe_file_array_path(self.output_name, self.run_folder)
-        external_shape = _external_shape(shape, self.shape_mask)
-        internal_shape = _internal_shape(shape, self.shape_mask)
+        external_shape = _external_shape(self.shape, self.shape_mask)
+        internal_shape = _internal_shape(self.shape, self.shape_mask)
         return self.storage_class(path, external_shape, internal_shape, self.shape_mask)
 
-    def try_evaluate(self, kwargs: dict[str, Any]) -> StorageBase:
-        try:
-            return self.evaluate(kwargs)
-        except Exception as e:
-            msg = (
-                f"Error evaluating lazy store for `{self.output_name}`."
-                f" The error was: `{e}`."
-                f" kwargs: `{kwargs}`"
-            )
-            raise RuntimeError(msg) from e
-
     def maybe_evaluate(self) -> StorageBase | LazyStorage:
-        if all(isinstance(i, int) for i in self.shape):
+        if self._can_evaluate():
             return self.evaluate()
         return self
 
