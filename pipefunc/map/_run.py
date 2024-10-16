@@ -33,6 +33,7 @@ from pipefunc.map._run_info import (
     _external_shape,
     _internal_shape,
     _resolve_shape,
+    _shape_and_mask,
 )
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
@@ -978,20 +979,29 @@ def _eval_lazy_store(
     store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     func: PipeFunc,
     kwargs: dict[str, Any],
-) -> Any:
+    run_info: RunInfo,
+) -> None:
     for name in at_least_tuple(func.output_name):
         storage = store[name]
         if isinstance(storage, LazyStorage):
-            try:
-                store[name] = storage.evaluate(kwargs)
-                # At this point, some downstream lazy stores might be evaluated.
-            except Exception as e:
-                msg = (
-                    f"Error evaluating lazy store for `{name}`."
-                    f" The error was: `{e}`."
-                    f" kwargs: `{kwargs}`"
-                )
-                raise RuntimeError(msg) from e
+            store[name] = storage.try_evaluate(kwargs)
+
+    # Now that new shape is known, update downstream lazy stores
+    shapes = {}
+    internal = {}
+    for name, storage in store.items():
+        if isinstance(storage, StorageBase | LazyStorage):
+            shapes[name] = storage.shape
+            internal[name] = _internal_shape(storage.shape, storage.shape_mask)
+
+    mapspecs = {name: mapspec for mapspec in run_info.mapspecs for name in mapspec.output_names}
+    for name, storage in store.items():
+        if not isinstance(storage, LazyStorage):
+            continue
+        shape, _ = _shape_and_mask(mapspecs[name], shapes, internal)
+        shapes[name] = storage.shape = shape
+        internal[name] = _internal_shape(shape, storage.shape_mask)
+        store[name] = storage.maybe_evaluate()
 
 
 def _submit_func(
@@ -1004,7 +1014,7 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    _eval_lazy_store(store, func, kwargs)
+    _eval_lazy_store(store, func, kwargs, run_info)
     ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
