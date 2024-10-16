@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
 from pipefunc.map._run import _func_kwargs, _load_file_arrays, _select_kwargs
+from pipefunc.map._run_info import _is_resolved
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -204,6 +205,7 @@ def _eval_resources(
     if index is not None:
         shape = run_info.shapes[func.output_name]
         shape_mask = run_info.shape_masks[func.output_name]
+        assert _is_resolved(shape)
         kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
     return resources(kwargs)
 
