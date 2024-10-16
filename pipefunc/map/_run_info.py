@@ -100,6 +100,7 @@ class RunInfo:
     defaults: dict[str, Any]
     all_output_names: set[str]
     shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
+    resolved_shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
     internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
@@ -137,11 +138,13 @@ class RunInfo:
         _check_inputs(pipeline, inputs)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+        resolved_shapes = shapes.copy()
         return cls(
             inputs=inputs,
             defaults=pipeline.defaults,
             all_output_names=pipeline.all_output_names,
             shapes=shapes,
+            resolved_shapes=resolved_shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
             mapspecs_as_strings=pipeline.mapspecs_as_strings,
@@ -211,6 +214,7 @@ class RunInfo:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self) -> None:
+        """Dump the RunInfo to a file."""
         if self.run_folder is None:  # pragma: no cover
             msg = "Cannot dump `RunInfo` without `run_folder`."
             raise ValueError(msg)
@@ -219,6 +223,7 @@ class RunInfo:
         data = asdict(self)
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
+        del data["resolved_shapes"]
         data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
         dicts_with_tuples = ["shapes", "shape_masks"]
@@ -250,11 +255,38 @@ class RunInfo:
         data["run_folder"] = Path(data["run_folder"])
         data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
         data["defaults"] = load(Path(data.pop("defaults_path")))
+        data["resolved_shapes"] = data["shapes"]
         return cls(**data)
 
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+    def resolve_shapes(self, output_name: _OUTPUT_TYPE, kwargs: dict[str, Any]) -> None:
+        """Resolve shapes that depend on kwargs."""
+        if output_name not in self.resolved_shapes:
+            return
+        shape = self.resolved_shapes[output_name]
+        if any(isinstance(i, str) for i in shape):
+            new_shape = _resolve_shape(shape, kwargs)
+            self.resolved_shapes[output_name] = new_shape
+            for name in at_least_tuple(output_name):
+                self.resolved_shapes[name] = new_shape
+        else:
+            return
+
+        # Now that new shape is known, update downstream shapes
+        internal = {
+            name: _internal_shape(shape, self.shape_masks[name])
+            for name, shape in self.resolved_shapes.items()
+        }
+
+        mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
+        for name, shape in self.resolved_shapes.items():
+            if any(isinstance(i, str) for i in shape):
+                new_shape, _ = _shape_and_mask(mapspecs[name], self.resolved_shapes, internal)
+                self.resolved_shapes[name] = new_shape
+                internal[name] = _internal_shape(shape, self.shape_masks[name])
 
 
 @dataclass

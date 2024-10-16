@@ -1014,6 +1014,7 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    run_info.resolve_shapes(func.output_name, kwargs)
     _eval_lazy_store(store, func, kwargs, run_info)
     ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
