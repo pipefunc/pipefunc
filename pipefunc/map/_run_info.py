@@ -7,11 +7,12 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
+from pipefunc.map._safe_eval import evaluate_expression
 from pipefunc.map._storage_base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
@@ -34,14 +35,14 @@ class DirectValue:
 
 
 class Shapes(NamedTuple):
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
     masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
 
 
 def _input_shapes_and_masks(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]],
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]],
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}
@@ -49,7 +50,7 @@ def _input_shapes_and_masks(
     input_parameters = set(pipeline.topological_generations.root_args)
 
     inputs_with_defaults = pipeline.defaults | inputs
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {  # In this function, we only use ints
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
         if p in pipeline.mapspec_names
@@ -67,7 +68,11 @@ def map_shapes(
     if internal_shapes is None:
         internal_shapes = {}
     internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
-    shapes, masks = _input_shapes_and_masks(pipeline, inputs, internal_shapes)
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {}
+    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]] = {}
+    input_shapes, input_masks = _input_shapes_and_masks(pipeline, inputs, internal_shapes)
+    shapes.update(input_shapes)
+    masks.update(input_masks)
 
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
@@ -91,8 +96,8 @@ class RunInfo:
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
     shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
@@ -155,26 +160,26 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
-        store: dict[str, StorageBase | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, LazyStore | StorageBase | Path | DirectValue]:
+        store: dict[str, LazyStore | StorageBase | Path | DirectValue] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
-        # Initialize StorageBase instances for each map spec output
+        # Initialize LazyStore instances for each map spec output
         for mapspec in self.mapspecs:
             # `mapspec.output_names` is always tuple, even for single output
             output_name: _OUTPUT_TYPE = name_mapping[mapspec.output_names]
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
-                arrays = _init_file_arrays(
+                lazy_stores = _init_lazy_stores(
                     output_name,
                     shape,
                     mask,
                     self.storage_class(output_name),
                     self.run_folder,
                 )
-                store.update(zip(mapspec.output_names, arrays))
+                store.update(zip(mapspec.output_names, lazy_stores))
 
-        # Set up paths or DirectValue for outputs not initialized as StorageBase
+        # Set up paths or DirectValue for outputs not initialized as LazyStore
         for output_name in self.all_output_names:
             if output_name not in store:
                 store[output_name] = (
@@ -249,6 +254,43 @@ class RunInfo:
         return Path(run_folder) / "run_info.json"
 
 
+@dataclass
+class LazyStore:
+    """Object that can generate a StorageBase instance on demand."""
+
+    output_name: str
+    shape: tuple[int | str, ...]
+    mask: tuple[bool, ...]
+    storage_class: type[StorageBase]
+    run_folder: Path | None
+
+    def to_store(self, kwargs: dict[str, Any] | None = None) -> StorageBase:
+        if kwargs is None:
+            kwargs = {}
+        shape: tuple[int, ...] = _resolve_shape(self.shape, kwargs)
+        path = _maybe_file_array_path(self.output_name, self.run_folder)
+        external_shape = _external_shape(shape, self.mask)
+        internal_shape = _internal_shape(shape, self.mask)
+        return self.storage_class(path, external_shape, internal_shape, self.mask)
+
+
+def _resolve_shape(
+    shape: tuple[int | str, ...],
+    kwargs: dict[str, Any],
+) -> tuple[int, ...]:
+    resolved_shape: list[int] = []
+    for x in shape:
+        if isinstance(x, int):
+            resolved_shape.append(x)
+        else:
+            i = evaluate_expression(x, kwargs)
+            if not isinstance(i, int):
+                msg = f"Expression `{x}` must evaluate to an integer but it evaluated to `{i}`."
+                raise TypeError(msg)
+            resolved_shape.append(i)
+    return tuple(resolved_shape)
+
+
 def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
     if isinstance(storage, str):
         return get_storage_class(storage).requires_serialization
@@ -267,9 +309,9 @@ def _maybe_run_folder(
 
 
 def _construct_internal_shapes(
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
     pipeline: Pipeline,
-) -> dict[str, int | tuple[int, ...]] | None:
+) -> dict[str, int | str | tuple[int | str, ...]] | None:
     if internal_shapes is None:
         internal_shapes = {}
     for f in pipeline.functions:
@@ -367,18 +409,21 @@ def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
-def _init_file_arrays(
+def _init_lazy_stores(
     output_name: _OUTPUT_TYPE,
-    shape: tuple[int, ...],
+    shape: tuple[int | str, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
-) -> list[StorageBase]:
-    external_shape = _external_shape(shape, mask)
-    internal_shape = _internal_shape(shape, mask)
-    output_names = at_least_tuple(output_name)
-    paths = [_maybe_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
-    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
+) -> list[StorageBase | LazyStore]:
+    stores: list[StorageBase | LazyStore] = []
+    for name in at_least_tuple(output_name):
+        store = LazyStore(name, shape, mask, storage_class, run_folder)
+        if all(isinstance(i, int) for i in store.shape):
+            stores.append(store.to_store())
+        else:
+            stores.append(store)
+    return stores
 
 
 def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | None:
@@ -388,9 +433,12 @@ def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | 
     return run_folder / "outputs" / output_name
 
 
-def _internal_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+S = TypeVar("S", str, int)
+
+
+def _internal_shape(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
     return tuple(s for s, m in zip(shape, mask) if not m)
 
 
-def _external_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+def _external_shape(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
     return tuple(s for s, m in zip(shape, mask) if m)
