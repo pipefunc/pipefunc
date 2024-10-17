@@ -544,4 +544,5 @@ def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
     )
     info = learners_dict.to_slurm_run(default_resources=Resources(cpus=2), returns="namedtuple")
     assert isinstance(info, AdaptiveSchedulerDetails)
-    assert len(info.learners) == 2
+    assert len(info.learners) == 4
+    run(info)
