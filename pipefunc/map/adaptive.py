@@ -228,7 +228,7 @@ def create_learners(
     See Also
     --------
     LearnersDict.to_slurm_run
-        Convert the learners to variables that can be passed to `adaptive_scheduler.RunManager`.
+        Convert the learners to variables that can be passed to `adaptive_scheduler.slurm_run`.
 
     Returns
     -------
