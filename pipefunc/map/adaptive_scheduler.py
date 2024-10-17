@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._run import _func_kwargs, _load_file_arrays, _select_kwargs
+from pipefunc.map._run import (
+    _func_kwargs,
+    _load_file_arrays,
+    _maybe_evaluate_lazy_store,
+    _select_kwargs,
+)
 from pipefunc.map._run_info import _is_resolved
 from pipefunc.resources import Resources
 
@@ -200,12 +205,15 @@ def _eval_resources(
     func: PipeFunc,
     run_info: RunInfo,
 ) -> Resources:
-    kwargs = _func_kwargs(func, run_info, run_info.init_store())
+    store = run_info.init_store()
+    kwargs = _func_kwargs(func, run_info, store)
     _load_file_arrays(kwargs)
     if index is not None:
-        shape = run_info.shapes[func.output_name]
-        shape_mask = run_info.shape_masks[func.output_name]
+        if run_info.resolve_shapes(func.output_name, kwargs):
+            _maybe_evaluate_lazy_store(store, run_info)
+        shape = run_info.resolved_shapes[func.output_name]
         assert _is_resolved(shape)
+        shape_mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
     return resources(kwargs)
 

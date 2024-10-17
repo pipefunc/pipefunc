@@ -1,4 +1,4 @@
-from pipefunc._adaptive import LazySequence, LazySequenceLearner
+from pipefunc.map._adaptive_lazy_sequence_learner import LazySequence, LazySequenceLearner
 
 offset = 0.0123
 
