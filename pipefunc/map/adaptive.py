@@ -247,7 +247,7 @@ def create_learners(
         inputs,
         fixed_indices,
         split_independent_axes,
-        internal_shapes,
+        run_info.internal_shapes,
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
