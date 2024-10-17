@@ -501,7 +501,7 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]],
 ) -> Generator[dict[str, Any], None, None]:
     shape: list[int | str] = []
     for axis in independent_axes:
@@ -511,8 +511,10 @@ def _iterate_axes(
             if axis in axes and p in inputs
         )
         shape.append(shapes[parameter][dim])
-
-    for indices in _iterate_shape_indices(tuple(shape)):
+    new_shape = tuple(shape)
+    # We can assert this because the internal_shapes should never appear as independent axes
+    assert _is_resolved(new_shape)
+    for indices in _iterate_shape_indices(new_shape):
         yield dict(zip(independent_axes, indices))
 
 
