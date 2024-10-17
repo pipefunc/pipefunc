@@ -254,7 +254,7 @@ def create_learners(
         inputs,
         fixed_indices,
         split_independent_axes,
-        internal_shapes,
+        run_info.internal_shapes,
     )
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
@@ -503,7 +503,7 @@ def _iterate_axes(
     mapspec_axes: dict[str, tuple[str, ...]],
     shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
 ) -> Generator[dict[str, Any], None, None]:
-    shape: list[int] = []
+    shape: list[int | str] = []
     for axis in independent_axes:
         parameter, dim = next(
             (p, axes.index(axis))

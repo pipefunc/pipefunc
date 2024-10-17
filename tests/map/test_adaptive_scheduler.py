@@ -491,3 +491,36 @@ def test_slurm_run_delayed_resources_with_mapspec_scope_single_element(tmp_path:
     assert len(info.learners) == 2
     assert info.cores_per_node[0]() == 4  # type: ignore[operator,misc,index]
     run(info)
+
+
+def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
+    @pipefunc(output_name="n")
+    def f() -> int:
+        return 10
+
+    @pipefunc(output_name="y", internal_shape=("n",))
+    def g(n: int, a: float) -> list[float]:
+        return [a * i for i in range(n)]
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def h(y: float) -> float:
+        return y**2
+
+    @pipefunc(output_name="sum")
+    def i(z: Array[float]) -> float:
+        return sum(z)
+
+    pipeline = Pipeline([f, g, h, i])
+
+    inputs = {"a": 1}
+    learners_dict = create_learners(
+        pipeline,
+        inputs,
+        tmp_path,
+        split_independent_axes=True,
+        return_output=True,
+    )
+    info = learners_dict.to_slurm_run(default_resources=Resources(cpus=2))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    run(info)
