@@ -26,7 +26,14 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
+from pipefunc.map._run_info import (
+    DirectValue,
+    LazyStorage,
+    RunInfo,
+    _external_shape,
+    _internal_shape,
+    _is_resolved,
+)
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
@@ -53,7 +60,7 @@ def _prepare_run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
     output_names: set[_OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
@@ -66,7 +73,7 @@ def _prepare_run(
 ) -> tuple[
     Pipeline,
     RunInfo,
-    dict[str, StorageBase | Path | DirectValue],
+    dict[str, StorageBase | LazyStorage | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
     ProgressTracker | None,
@@ -104,7 +111,7 @@ def run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
     parallel: bool = True,
@@ -237,7 +244,7 @@ def run_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
     *,
     output_names: set[_OUTPUT_TYPE] | None = None,
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
@@ -350,7 +357,7 @@ def run_async(
 
 
 def _maybe_persist_memory(
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     persist_memory: bool,  # noqa: FBT001
 ) -> None:
     if persist_memory:  # Only relevant for memory based storage
@@ -364,7 +371,7 @@ class Result(NamedTuple):
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | Path | DirectValue
+    store: StorageBase | LazyStorage | Path | DirectValue
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -414,7 +421,7 @@ def load_xarray_dataset(
 def _dump_single_output(
     func: PipeFunc,
     output: Any,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
@@ -431,7 +438,7 @@ def _dump_single_output(
 def _single_dump_single_output(
     output: Any,
     output_name: str,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
@@ -445,7 +452,7 @@ def _single_dump_single_output(
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
@@ -667,12 +674,13 @@ def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
+    assert _is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -699,7 +707,7 @@ def _mask_fixed_axes(
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
-    external_key = _external_shape(key, shape_mask)  # type: ignore[arg-type]
+    external_key = _external_shape(key, shape_mask)  # type: ignore[type-var]
     external_shape = _external_shape(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[external_key] = True
@@ -758,7 +766,7 @@ class _StoredValue(NamedTuple):
 
 def _load_from_store(
     output_name: _OUTPUT_TYPE,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     *,
     return_output: bool = True,
 ) -> _StoredValue:
@@ -767,6 +775,7 @@ def _load_from_store(
 
     for name in at_least_tuple(output_name):
         storage = store[name]
+        assert not isinstance(storage, LazyStorage)  # should be evaluated by now
         if isinstance(storage, StorageBase):
             outputs.append(storage)
         elif isinstance(storage, Path):
@@ -794,7 +803,7 @@ def _load_from_store(
 def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
@@ -870,7 +879,7 @@ class _Status:
 
 
 def _init_tracker(
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, LazyStorage | StorageBase | Path | DirectValue],
     functions: list[PipeFunc],
     show_progress: bool,  # noqa: FBT001
     in_async: bool,  # noqa: FBT001
@@ -893,7 +902,7 @@ def _init_tracker(
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
@@ -915,7 +924,7 @@ def _run_and_process_generation(
 async def _run_and_process_generation_async(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[_OUTPUT_TYPE, Executor],
@@ -938,7 +947,7 @@ async def _run_and_process_generation_async(
 def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     outputs: dict[str, Result],
 ) -> None:
     for func in generation:
@@ -949,7 +958,7 @@ def _process_generation(
 async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     outputs: dict[str, Result],
 ) -> None:
     for func in generation:
@@ -957,16 +966,28 @@ async def _process_generation_async(
         outputs.update(_outputs)
 
 
+def _maybe_evaluate_lazy_store(
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    run_info: RunInfo,
+) -> None:
+    for name, storage in store.items():
+        if isinstance(storage, LazyStorage):
+            storage.shape = run_info.resolved_shapes[name]
+            store[name] = storage.maybe_evaluate()
+
+
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    if run_info.resolve_shapes(func.output_name, kwargs):
+        _maybe_evaluate_lazy_store(store, run_info)
     ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
@@ -1000,7 +1021,7 @@ def _executor_for_func(
 def _submit_generation(
     run_info: RunInfo,
     generation: list[PipeFunc],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
@@ -1038,7 +1059,7 @@ def _to_result_dict(
     func: PipeFunc,
     kwargs: dict[str, Any],
     output: Any,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> dict[str, Result]:
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
@@ -1058,7 +1079,7 @@ def _to_result_dict(
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
@@ -1074,7 +1095,7 @@ def _process_task(
 async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
@@ -1092,7 +1113,7 @@ async def _process_task_async(
 
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
 ) -> None:
     if isinstance(executor, dict):

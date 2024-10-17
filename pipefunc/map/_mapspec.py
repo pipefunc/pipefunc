@@ -76,7 +76,7 @@ class ArraySpec:
         """Return the rank of this array spec."""
         return len(self.axes)
 
-    def validate(self, shape: tuple[int, ...]) -> None:
+    def validate(self, shape: tuple[int | str, ...]) -> None:
         """Raise an exception if 'shape' is not compatible with this array spec."""
         if len(shape) != self.rank:
             msg = (
@@ -151,9 +151,9 @@ class MapSpec:
 
     def shape(
         self,
-        input_shapes: dict[str, tuple[int, ...]],
-        internal_shapes: dict[str, tuple[int, ...]] | None = None,
-    ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
+        input_shapes: dict[str, tuple[int | str, ...]],
+        internal_shapes: dict[str, tuple[int | str, ...]] | None = None,
+    ) -> tuple[tuple[int | str, ...], tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
         Parameters
@@ -430,9 +430,9 @@ def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
 
 def _validate_shapes(
     input_names: set[str],
-    input_shapes: dict[str, tuple[int, ...]],
+    input_shapes: dict[str, tuple[int | str, ...]],
     inputs: tuple[ArraySpec, ...],
-    internal_shapes: dict[str, tuple[int, ...]] | None,
+    internal_shapes: dict[str, tuple[int | str, ...]] | None,
     output_names: tuple[str, ...],
 ) -> None:
     if extra_names := input_shapes.keys() - input_names:
@@ -453,9 +453,9 @@ def _validate_shapes(
 def _get_common_dim(
     arrays: list[ArraySpec],
     index: str,
-    input_shapes: dict[str, tuple[int, ...]],
-) -> int:
-    def _get_dim(array: ArraySpec, index: str) -> int:
+    input_shapes: dict[str, tuple[int | str, ...]],
+) -> int | str:
+    def _get_dim(array: ArraySpec, index: str) -> int | str:
         axis = array.axes.index(index)
         return input_shapes[array.name][axis]
 
@@ -469,9 +469,9 @@ def _get_common_dim(
 
 def _get_output_dim(
     output: ArraySpec,
-    internal_shapes: dict[str, tuple[int, ...]],
+    internal_shapes: dict[str, tuple[int | str, ...]],
     internal_shape_index: int,
-) -> int:
+) -> int | str:
     if output.name not in internal_shapes:
         msg = f"Internal shape for '{output.name}' is missing."
         raise ValueError(msg)
@@ -479,8 +479,8 @@ def _get_output_dim(
         msg = f"Internal shape for '{output.name}' is too short."
         raise ValueError(msg)
     dim = internal_shapes[output.name][internal_shape_index]
-    if not isinstance(dim, int):
-        msg = f"Internal shape for '{output.name}' must be a tuple of integers."
+    if not isinstance(dim, int | str):
+        msg = f"Internal shape for '{output.name}' must be a tuple of integers or strings."
         raise TypeError(msg)
     return dim
 

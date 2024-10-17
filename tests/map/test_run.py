@@ -411,7 +411,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     assert results["sum"].output == 21.0
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
-    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"array": (1, 2, 3), "vector": (1,)}
     assert masks == {"array": (False, False, False), "vector": (True,)}
     load_xarray_dataset(run_folder=tmp_path)

@@ -12,6 +12,7 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
+from pipefunc.map._adaptive_lazy_sequence_learner import LazySequence, LazySequenceLearner
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run import (
     _func_kwargs,
@@ -24,7 +25,14 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
+from pipefunc.map._run_info import (
+    DirectValue,
+    LazyStorage,
+    RunInfo,
+    _external_shape,
+    _is_resolved,
+    map_shapes,
+)
 from pipefunc.map._storage_base import _iterate_shape_indices
 
 if TYPE_CHECKING:
@@ -133,7 +141,7 @@ class LearnersDict(LearnersDictType):
         )
         if returns == "namedtuple":
             if slurm_run_kwargs:
-                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                msg = "Cannot pass `slurm_run_kwargs` when `returns='namedtuple'`."
                 raise ValueError(msg)
             return details
         kwargs = details.kwargs()
@@ -153,7 +161,7 @@ def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
     *,
     storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
@@ -221,7 +229,7 @@ def create_learners(
     See Also
     --------
     LearnersDict.to_slurm_run
-        Convert the learners to variables that can be passed to `adaptive_scheduler.RunManager`.
+        Convert the learners to variables that can be passed to `adaptive_scheduler.slurm_run`.
 
     Returns
     -------
@@ -281,7 +289,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -296,19 +304,52 @@ def _learner(
             return_output=return_output,
             cache=cache,
         )
-        shape = run_info.shapes[func.output_name]
+        shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
+        if not _is_resolved(shape):
+            lazy_sequence = _lazy_sequence(fixed_indices, func, run_info, store, mask)
+            return LazySequenceLearner(func, lazy_sequence)
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
-    else:
-        f = functools.partial(
-            _execute_iteration_in_single,
-            func=func,
-            run_info=run_info,
-            store=store,
-            return_output=return_output,
-        )
-        sequence = [None]  # type: ignore[list-item,assignment]
+        return SequenceLearner(f, sequence)
+    f = functools.partial(
+        _execute_iteration_in_single,
+        func=func,
+        run_info=run_info,
+        store=store,
+        return_output=return_output,
+    )
+    sequence = [None]  # type: ignore[list-item,assignment]
     return SequenceLearner(f, sequence)
+
+
+@dataclass
+class _LazySequence:
+    """A lazy sequence that can be evaluated on demand."""
+
+    fixed_indices: dict[str, int | slice] | None
+    func: PipeFunc
+    run_info: RunInfo
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue]
+    mask: tuple[bool, ...]
+
+    def __call__(self) -> npt.NDArray[np.int_] | range:
+        kwargs = _func_kwargs(self.func, self.run_info, self.store)
+        self.run_info.resolve_shapes(self.func.output_name, kwargs)
+        shape = self.run_info.resolved_shapes[self.func.output_name]
+        assert _is_resolved(shape)
+        assert self.func.mapspec is not None
+        return _sequence(self.fixed_indices, self.func.mapspec, shape, self.mask)
+
+
+def _lazy_sequence(
+    fixed_indices: dict[str, int | slice] | None,
+    func: PipeFunc,
+    run_info: RunInfo,
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    mask: tuple[bool, ...],
+) -> LazySequence:
+    _callable = _LazySequence(fixed_indices, func, run_info, store, mask)
+    return LazySequence(callable=_callable)  # type: ignore[arg-type]
 
 
 def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
@@ -336,7 +377,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -359,7 +400,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -377,7 +418,8 @@ def _execute_iteration_in_map_spec(
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
+    assert _is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays, cache)
     if not return_output:
@@ -395,7 +437,7 @@ class _MapWrapper:
     pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
     parallel: bool
     cleanup: bool
 
@@ -415,7 +457,7 @@ def create_learners_from_sweep(
     pipeline: Pipeline,
     sweep: Sweep,
     run_folder: str | Path,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -492,9 +534,9 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]],
 ) -> Generator[dict[str, Any], None, None]:
-    shape: list[int] = []
+    shape: list[int | str] = []
     for axis in independent_axes:
         parameter, dim = next(
             (p, axes.index(axis))
@@ -502,8 +544,10 @@ def _iterate_axes(
             if axis in axes and p in inputs
         )
         shape.append(shapes[parameter][dim])
-
-    for indices in _iterate_shape_indices(tuple(shape)):
+    new_shape = tuple(shape)
+    # We can assert this because the internal_shapes should never appear as independent axes
+    assert _is_resolved(new_shape)
+    for indices in _iterate_shape_indices(new_shape):
         yield dict(zip(independent_axes, indices))
 
 
@@ -512,7 +556,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
