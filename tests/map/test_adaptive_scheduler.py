@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import adaptive
 import pytest
@@ -515,7 +515,15 @@ def test_independent_axes_2(tmp_path: Path) -> None:
     run(info)
 
 
-def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("split_independent_axes", "resources_scope"),
+    [(True, "element"), (True, "map"), (False, "element"), (False, "map")],
+)
+def test_adaptive_run_dynamic_internal_shape_create_learners(
+    tmp_path: Path,
+    split_independent_axes: bool,  # noqa: FBT001
+    resources_scope: Literal["element", "map"],
+):
     @pipefunc(output_name="n")
     def f() -> int:
         return 10
@@ -524,8 +532,14 @@ def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
     def g(n: int, a: float) -> list[float]:
         return [a * i for i in range(n)]
 
-    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
-    def h(y: float) -> float:
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kwarg: Resources(cpus=kwarg["y"].shape[0]),
+        resources_variable="resources",
+        resources_scope=resources_scope,
+    )
+    def h(y: float, resources: Resources) -> float:
         return y**2
 
     @pipefunc(output_name="sum")
@@ -539,7 +553,7 @@ def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
         pipeline,
         inputs,
         tmp_path,
-        split_independent_axes=True,
+        split_independent_axes=split_independent_axes,
         return_output=True,
     )
     info = learners_dict.to_slurm_run(default_resources=Resources(cpus=2), returns="namedtuple")
