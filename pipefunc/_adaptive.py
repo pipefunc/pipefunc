@@ -114,6 +114,8 @@ def to_adaptive_learner(
 
 @dataclass
 class LazySequence:
+    """A lazy sequence that can be evaluated on demand."""
+
     callable: Callable[[], Sequence[Any]]
     sequence: Sequence[Any] | None = None
 
