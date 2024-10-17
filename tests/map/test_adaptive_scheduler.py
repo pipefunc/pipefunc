@@ -493,6 +493,28 @@ def test_slurm_run_delayed_resources_with_mapspec_scope_single_element(tmp_path:
     run(info)
 
 
+def test_independent_axes_2(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(3,))
+    def f(x):
+        return x
+
+    @pipefunc(output_name="r", mapspec="z[i], y[i] -> r[i]")
+    def g(y, z):
+        return y + z
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
+    r = pipeline.map(inputs, parallel=False)
+    assert r["y"].output == [1, 2, 3]
+    assert r["r"].output.tolist() == [4, 6, 8]
+    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
+    info = slurm_run_setup(learners_dict, default_resources=Resources(cpus=1))
+    assert isinstance(info, AdaptiveSchedulerDetails)
+    assert len(info.learners) == 2
+    assert len(info.fnames) == 2
+    run(info)
+
+
 def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
     @pipefunc(output_name="n")
     def f() -> int:
@@ -523,25 +545,3 @@ def test_adaptive_run_dynamic_internal_shape_create_learners(tmp_path: Path):
     info = learners_dict.to_slurm_run(default_resources=Resources(cpus=2))
     assert isinstance(info, AdaptiveSchedulerDetails)
     assert len(info.learners) == 2
-
-
-def test_independent_axes_2(tmp_path: Path) -> None:
-    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(3,))
-    def f(x):
-        return x
-
-    @pipefunc(output_name="r", mapspec="z[i], y[i] -> r[i]")
-    def g(y, z):
-        return y + z
-
-    pipeline = Pipeline([f, g])
-    inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
-    r = pipeline.map(inputs, parallel=False)
-    assert r["y"].output == [1, 2, 3]
-    assert r["r"].output.tolist() == [4, 6, 8]
-    learners_dict = create_learners(pipeline, inputs, tmp_path, split_independent_axes=True)
-    info = slurm_run_setup(learners_dict, default_resources=Resources(cpus=1))
-    assert isinstance(info, AdaptiveSchedulerDetails)
-    assert len(info.learners) == 2
-    assert len(info.fnames) == 2
-    run(info)
