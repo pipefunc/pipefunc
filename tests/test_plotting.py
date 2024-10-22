@@ -24,9 +24,10 @@ holoviews_required = pytest.mark.skipif(not has_holoviews, reason="holoviews not
 graphviz_required = pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
 
 
-@pytest.fixture(autouse=True)
-@matplotlib_required
+@pytest.fixture
 def patched_show():
+    if not has_matplotlib:
+        pytest.skip("matplotlib not installed")
     import matplotlib.pyplot as plt
 
     with patch.object(plt, "show") as mock_show:
@@ -70,7 +71,7 @@ def test_plot_with_defaults(backend) -> None:
 
 
 @matplotlib_required
-def test_plot_with_defaults_and_bound() -> None:
+def test_plot_with_defaults_and_bound(patched_show) -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -108,7 +109,7 @@ def test_plot_with_mapspec(tmp_path: Path, backend) -> None:
 
 
 @matplotlib_required
-def test_plot_nested_func() -> None:
+def test_plot_nested_func(patched_show) -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -123,7 +124,7 @@ def test_plot_nested_func() -> None:
 
 
 @matplotlib_required
-def test_plotting_resources() -> None:
+def test_plotting_resources(patched_show) -> None:
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):
         return resources.gpus
@@ -156,7 +157,12 @@ def everything_pipeline() -> Pipeline:
 
 
 @pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
-def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Path) -> None:
+def test_visualize_graphviz(
+    backend,
+    patched_show,
+    everything_pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
     if backend == "matplotlib" and not has_matplotlib:
         pytest.skip("matplotlib not installed")
     elif backend == "holoviews" and not has_holoviews:
