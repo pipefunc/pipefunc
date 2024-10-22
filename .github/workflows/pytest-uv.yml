@@ -32,5 +32,6 @@ jobs:
       - name: Run Python
         shell: bash -l {0}
         run: |
+          source .venv/bin/activate
           python -c "import pipefunc; print(pipefunc.__version__)"
           pytest
