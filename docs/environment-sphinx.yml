@@ -9,7 +9,6 @@ dependencies:
   - pip
   # from pyproject.toml
   - networkx
-  - psutil
   - cloudpickle
   - numpy
   # optional-dependencies: adaptive
