@@ -533,10 +533,16 @@ def test_error_snapshot(tmp_path: Path) -> None:
 def test_class_name_in_pipefunc_name() -> None:
     class MyClass:
         @classmethod
-        def my_method(cls):
+        def my_cls_method(cls):
             return 1
 
-    pf = PipeFunc(MyClass.my_method, output_name="out")
+        def my_method(self):
+            return 1
+
+    pf = PipeFunc(MyClass.my_cls_method, output_name="out")
+    assert pf.__name__ == "MyClass.my_cls_method"
+
+    pf = PipeFunc(MyClass().my_method, output_name="out")
     assert pf.__name__ == "MyClass.my_method"
 
     def f():
