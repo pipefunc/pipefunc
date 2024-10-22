@@ -184,7 +184,7 @@ class PipeFunc(Generic[T]):
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
-        self.__name__ = func.__name__
+        self.__name__ = _get_name(func)
         self._output_name: _OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
@@ -1368,3 +1368,13 @@ def _maybe_update_kwargs_with_resources(
             kwargs[resources_variable] = resources(kwargs)
         else:
             kwargs[resources_variable] = resources
+
+
+def _get_name(func: Callable[..., Any]) -> str:
+    if inspect.ismethod(func):
+        class_name: str = func.__self__.__name__  # type: ignore[attr-defined]
+        method_name: str = func.__name__
+        return f"{class_name}.{method_name}"
+    if inspect.isfunction(func):
+        return func.__name__
+    return str(func)

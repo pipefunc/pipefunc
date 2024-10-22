@@ -528,3 +528,19 @@ def test_error_snapshot(tmp_path: Path) -> None:
     snap.save_to_file(tmp_path / "snap.pkl")
     snap2 = ErrorSnapshot.load_from_file(tmp_path / "snap.pkl")
     assert snap2.exception.args == snap.exception.args
+
+
+def test_class_name_in_pipefunc_name() -> None:
+    class MyClass:
+        @classmethod
+        def my_method(cls):
+            return 1
+
+    pf = PipeFunc(MyClass.my_method, output_name="out")
+    assert pf.__name__ == "MyClass.my_method"
+
+    def f():
+        return 1
+
+    pf = PipeFunc(f, output_name="out")
+    assert pf.__name__ == "f"
