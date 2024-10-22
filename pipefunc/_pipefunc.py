@@ -1371,14 +1371,12 @@ def _maybe_update_kwargs_with_resources(
 
 
 def _get_name(func: Callable[..., Any]) -> str:
+    if isinstance(func, PipeFunc):
+        return _get_name(func.func)
     if inspect.ismethod(func):
-        class_or_instance: object = func.__self__
-        if inspect.isclass(class_or_instance):
-            class_name = class_or_instance.__name__
-        else:
-            class_name = class_or_instance.__class__.__name__
-        method_name: str = func.__name__
-        return f"{class_name}.{method_name}"
-    if inspect.isfunction(func):
-        return func.__name__
-    return str(func)
+        qualname = func.__qualname__
+        if "." in qualname:
+            *_, class_name, method_name = qualname.split(".")
+            return f"{class_name}.{method_name}"
+        return qualname
+    return func.__name__
