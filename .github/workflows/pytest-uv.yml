@@ -21,7 +21,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Set up Python
-        run: uv python install ${{ matrix.python-version }}
+        run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install pipefunc
         shell: bash -l {0}
