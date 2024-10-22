@@ -1,12 +1,14 @@
 import array
+import importlib.metadata
 from collections import Counter, OrderedDict, defaultdict, deque
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
+
+has_pandas = importlib.metadata.version("pandas") is not None
 
 M = _HASH_MARKER
 
