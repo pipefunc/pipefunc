@@ -19,9 +19,6 @@ has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 has_holoviews = importlib.util.find_spec("holoviews") is not None
 has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
 
-if has_matplotlib:
-    import matplotlib.pyplot as plt
-
 matplotlib_required = pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
 holoviews_required = pytest.mark.skipif(not has_holoviews, reason="holoviews not installed")
 graphviz_required = pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
@@ -30,6 +27,8 @@ graphviz_required = pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz no
 @pytest.fixture(autouse=True)
 @matplotlib_required
 def patched_show():
+    import matplotlib.pyplot as plt
+
     with patch.object(plt, "show") as mock_show:
         yield mock_show
 
