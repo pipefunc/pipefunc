@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import matplotlib.pyplot as plt
 import pytest
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
@@ -13,13 +12,29 @@ from pipefunc import NestedPipeFunc, Pipeline, pipefunc
 if TYPE_CHECKING:
     from pathlib import Path
 
+# Check for required libraries
+import importlib
+
+has_matplotlib = importlib.util.find_spec("matplotlib") is not None
+has_holoviews = importlib.util.find_spec("holoviews") is not None
+has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
+
+if has_matplotlib:
+    import matplotlib.pyplot as plt
+
+matplotlib_required = pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
+holoviews_required = pytest.mark.skipif(not has_holoviews, reason="holoviews not installed")
+graphviz_required = pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
+
 
 @pytest.fixture(autouse=True)
+@matplotlib_required
 def patched_show():
     with patch.object(plt, "show") as mock_show:
         yield mock_show
 
 
+@graphviz_required
 def test_plot() -> None:
     @pipefunc("c")
     def a(b):
@@ -44,9 +59,18 @@ def test_plot_with_defaults(backend) -> None:
         return b, c, x
 
     pipeline = Pipeline([f, g])
+
+    if backend == "matplotlib" and not has_matplotlib:
+        pytest.skip("matplotlib not installed")
+    elif backend == "holoviews" and not has_holoviews:
+        pytest.skip("holoviews not installed")
+    elif backend == "graphviz" and not has_pygraphviz:
+        pytest.skip("pygraphviz not installed")
+
     pipeline.visualize(backend=backend)
 
 
+@matplotlib_required
 def test_plot_with_defaults_and_bound() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
@@ -60,7 +84,8 @@ def test_plot_with_defaults_and_bound() -> None:
     pipeline.visualize_matplotlib(color_combinable=True)
 
 
-def test_plot_with_mapspec(tmp_path: Path) -> None:
+@pytest.mark.parametrize("backend", ["matplotlib", "holoviews"])
+def test_plot_with_mapspec(tmp_path: Path, backend) -> None:
     @pipefunc("c", mapspec="a[i] -> c[i]")
     def f(a, b, x):
         return a, b, x
@@ -70,12 +95,20 @@ def test_plot_with_mapspec(tmp_path: Path) -> None:
         return b, c, x
 
     pipeline = Pipeline([f, g])
-    filename = tmp_path / "pipeline.png"
-    pipeline.visualize_matplotlib(filename=filename)
-    assert filename.exists()
-    pipeline.visualize_holoviews()
+
+    if backend == "matplotlib":
+        if not has_matplotlib:
+            pytest.skip("matplotlib not installed")
+        filename = tmp_path / "pipeline.png"
+        pipeline.visualize_matplotlib(filename=filename)
+        assert filename.exists()
+    elif backend == "holoviews":
+        if not has_holoviews:
+            pytest.skip("holoviews not installed")
+        pipeline.visualize_holoviews()
 
 
+@matplotlib_required
 def test_plot_nested_func() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
@@ -90,6 +123,7 @@ def test_plot_nested_func() -> None:
     pipeline.visualize(backend="matplotlib")
 
 
+@matplotlib_required
 def test_plotting_resources() -> None:
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):
@@ -124,6 +158,13 @@ def everything_pipeline() -> Pipeline:
 
 @pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
 def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Path) -> None:
+    if backend == "matplotlib" and not has_matplotlib:
+        pytest.skip("matplotlib not installed")
+    elif backend == "holoviews" and not has_holoviews:
+        pytest.skip("holoviews not installed")
+    elif backend == "graphviz" and not has_pygraphviz:
+        pytest.skip("pygraphviz not installed")
+
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
         everything_pipeline.visualize_graphviz(
@@ -133,6 +174,7 @@ def test_visualize_graphviz(backend, everything_pipeline: Pipeline, tmp_path: Pa
         )
 
 
+@graphviz_required
 def test_visualize_graphviz_with_typing():
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> UnresolvableTypeHere:  # type: ignore[name-defined]  # noqa: F821
