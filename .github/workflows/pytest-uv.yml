@@ -38,8 +38,13 @@ jobs:
       - name: Install more dependencies
         shell: bash -l {0}
         run: |
-          # Install all optional dependencies that work with 3.13t
-          uv pip install -e ".[xarray,widgets,pandas,test]"
+          if [[ ${{ matrix.python-version }} == "3.13t" ]]; then
+            # Install all optional dependencies that work with 3.13t
+            uv pip install -e ".[xarray,widgets,pandas,test]"
+          else
+            # Install all except plotting
+            uv pip install -e ".[adaptive,xarray,zarr,profiling,widgets,test]"
+          fi
 
       - name: Run Python with more dependencies
         shell: bash -l {0}
