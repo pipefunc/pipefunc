@@ -23,15 +23,26 @@ jobs:
       - name: Set up Python
         run: uv venv --python ${{ matrix.python-version }}
 
-      - name: Install pipefunc
+      - name: Install pipefunc minimal
         shell: bash -l {0}
         run: |
-          # Install all optional dependencies that work with 3.13t
-          uv pip install -e ".[xarray,widgets,pandas,test]"
+          # Install minimal dependencies for testing
+          uv pip install -e ".[test]"
 
       - name: Run Python
         shell: bash -l {0}
         run: |
           source .venv/bin/activate
-          python -c "import pipefunc; print(pipefunc.__version__)"
+          pytest
+
+      - name: Install more dependencies
+        shell: bash -l {0}
+        run: |
+          # Install all optional dependencies that work with 3.13t
+          uv pip install -e ".[xarray,widgets,pandas,test]"
+
+      - name: Run Python with more dependencies
+        shell: bash -l {0}
+        run: |
+          source .venv/bin/activate
           pytest

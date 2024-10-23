@@ -1,4 +1,4 @@
-name: pytest
+name: pytest-micromamba
 
 on:
   pull_request:
