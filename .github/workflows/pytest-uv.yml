@@ -28,7 +28,7 @@ jobs:
           # Install minimal dependencies for testing
           uv pip install -e ".[test]"
 
-      - name: Run Python
+      - name: Run pytest (minimal)
         run: |
           source .venv/bin/activate
           pytest
@@ -43,7 +43,7 @@ jobs:
             uv pip install -e ".[adaptive,xarray,zarr,profiling,widgets,test]"
           fi
 
-      - name: Run Python with more dependencies
+      - name: Run pytest (all dependencies)
         run: |
           source .venv/bin/activate
           pytest

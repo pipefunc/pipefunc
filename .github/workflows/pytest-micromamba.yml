@@ -34,7 +34,7 @@ jobs:
         run: |
           pip install -e ".[test,all]"
 
-      - name: Run Python
+      - name: Run pytest
         shell: bash -l {0}
         run: |
           python -c "import pipefunc; print(pipefunc.__version__)"
