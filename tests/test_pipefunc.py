@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import pickle
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -15,7 +16,10 @@ from pipefunc.resources import Resources
 if TYPE_CHECKING:
     from pathlib import Path
 
+has_psutil = importlib.util.find_spec("psutil") is not None
 
+
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_pipe_func_profile() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):

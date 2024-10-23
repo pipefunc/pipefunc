@@ -510,7 +510,10 @@ def test_with_internal_shape_list(array_type) -> None:
     assert arr[0, 0, 1] == 2
 
 
+@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
 def test_compare_equal(tmp_path: Path) -> None:
+    from pipefunc.map import ZarrFileArray
+
     external_shape = (2, 3)
     internal_shape = (4, 5)
     z_arr = ZarrFileArray(
