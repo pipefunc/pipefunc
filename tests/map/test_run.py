@@ -587,10 +587,9 @@ def test_pipeline_with_defaults(tmp_path: Path, storage: str) -> None:
     inputs = {"x": [0, 1, 2, 3], "y": 2}  # type: ignore[dict-item]
     results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output == 2 + 3 + 4 + 5
-    if has_xarray:
-        if storage == "file_array":
-            load_xarray_dataset(run_folder=tmp_path)
-        xarray_dataset_from_results(inputs, results, pipeline)
+    if storage == "file_array":
+        load_xarray_dataset(run_folder=tmp_path)
+    xarray_dataset_from_results(inputs, results, pipeline)
 
 
 def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
