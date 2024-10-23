@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         run: uv venv --python ${{ matrix.python-version }}
 
-      - name: Install pipefunc minimal
+      - name: Install pipefunc (minimal)
         run: |
           # Install minimal dependencies for testing
           uv pip install -e ".[test]"
@@ -33,7 +33,7 @@ jobs:
           source .venv/bin/activate
           pytest
 
-      - name: Install more dependencies
+      - name: Install pipefunc (all dependencies)
         run: |
           if [[ ${{ matrix.python-version }} == "3.13t" ]]; then
             # Install all optional dependencies that work with 3.13t
