@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
+[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
 [![CodSpeed Badge](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/pipefunc/pipefunc)
