@@ -139,12 +139,12 @@ class ResourceProfiler:
         import psutil
 
         process = psutil.Process(self.pid)
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set():  # pragma: no cover
             try:
                 mem_info = process.memory_info()
                 memory = mem_info.rss
                 cpu_percent = process.cpu_percent()
-            except psutil.NoSuchProcess:  # pragma: no cover
+            except psutil.NoSuchProcess:
                 break
 
             self.stats.memory.update(memory)
