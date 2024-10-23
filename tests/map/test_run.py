@@ -1490,8 +1490,11 @@ def test_internal_shape_in_pipefunc():
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
-@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
-def test_parallel_warning_and_error():
+@pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
+def test_parallel_warning_and_error(storage: str):
+    if storage == "zarr_memory" and not has_zarr:
+        pytest.skip("zarr not installed")
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
@@ -1512,12 +1515,15 @@ def test_parallel_warning_and_error():
     inputs = {"x": [1, 2, 3]}
     with pytest.warns(
         UserWarning,
-        match="The chosen storage type `zarr_memory` does not support process-based parallel execution",
+        match=f"The chosen storage type `{storage}` does not support process-based parallel execution",
     ):
-        pipeline.map(inputs, storage="zarr_memory", parallel=True, executor=ProcessPoolExecutor())
+        pipeline.map(inputs, storage=storage, parallel=True, executor=ProcessPoolExecutor())
 
-    with pytest.raises(ValueError, match="The chosen storage type `zarr_memory` does not support"):
-        pipeline.map(inputs, storage="zarr_memory", parallel=True)
+    with pytest.raises(
+        ValueError,
+        match=f"The chosen storage type `{storage}` does not support process-based parallel execution",
+    ):
+        pipeline.map(inputs, storage=storage, parallel=True)
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
