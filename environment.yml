@@ -22,6 +22,8 @@ dependencies:
   - zarr
   # optional-dependencies: pandas
   - pandas
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
