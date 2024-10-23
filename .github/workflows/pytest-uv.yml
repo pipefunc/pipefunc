@@ -1,0 +1,37 @@
+name: pytest-uv
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.13t"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv venv --python ${{ matrix.python-version }}
+
+      - name: Install pipefunc
+        shell: bash -l {0}
+        run: |
+          # Install all optional dependencies that work with 3.13t
+          uv pip install -e ".[xarray,widgets,pandas,test]"
+
+      - name: Run Python
+        shell: bash -l {0}
+        run: |
+          source .venv/bin/activate
+          python -c "import pipefunc; print(pipefunc.__version__)"
+          pytest
