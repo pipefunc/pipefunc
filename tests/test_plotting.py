@@ -20,10 +20,10 @@ has_holoviews = importlib.util.find_spec("holoviews") is not None
 has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def patched_show():
     if not has_matplotlib:
-        pytest.skip("matplotlib not installed")
+        yield
     import matplotlib.pyplot as plt
 
     with patch.object(plt, "show") as mock_show:
@@ -32,6 +32,8 @@ def patched_show():
 
 @pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
 def test_plot() -> None:
+    import graphviz
+
     @pipefunc("c")
     def a(b):
         return b
@@ -41,7 +43,8 @@ def test_plot() -> None:
         return c
 
     pipeline = Pipeline([a, c])
-    pipeline.visualize()
+    fig = pipeline.visualize()
+    assert isinstance(fig, graphviz.Digraph)
 
 
 @pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
@@ -67,7 +70,7 @@ def test_plot_with_defaults(backend) -> None:
 
 
 @pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
-def test_plot_with_defaults_and_bound(patched_show) -> None:
+def test_plot_with_defaults_and_bound() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -105,7 +108,7 @@ def test_plot_with_mapspec(tmp_path: Path, backend) -> None:
 
 
 @pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
-def test_plot_nested_func(patched_show) -> None:
+def test_plot_nested_func() -> None:
     @pipefunc("c", bound={"x": 2})
     def f(a, b, x):
         return a, b, x
@@ -120,7 +123,7 @@ def test_plot_nested_func(patched_show) -> None:
 
 
 @pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
-def test_plotting_resources(patched_show) -> None:
+def test_plotting_resources() -> None:
     @pipefunc(output_name="c", resources_variable="resources", resources={"gpus": 8})
     def f_c(a, b, resources):
         return resources.gpus
