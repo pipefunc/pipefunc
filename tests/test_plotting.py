@@ -24,6 +24,7 @@ has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
 def patched_show():
     if not has_matplotlib:
         yield
+        return
     import matplotlib.pyplot as plt
 
     with patch.object(plt, "show") as mock_show:
