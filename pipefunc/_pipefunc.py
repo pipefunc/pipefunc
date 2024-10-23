@@ -32,6 +32,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     format_function_call,
     get_local_ip,
+    requires,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -652,6 +653,7 @@ class PipeFunc(Generic[T]):
     @profile.setter
     def profile(self, enable: bool) -> None:
         """Enable or disable profiling for the wrapped function."""
+        requires("psutil", reason="profile", extras="profiling")
         self._profile = enable
         if enable:
             self.profiling_stats = ProfilingStats()
