@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import re
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -15,13 +16,22 @@ from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import _reduced_axes, load_outputs, load_xarray_dataset, run
 from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_base import StorageBase, storage_registry
-from pipefunc.map.xarray import xarray_dataset_from_results
 from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+has_xarray = importlib.util.find_spec("xarray") is not None
+
 storage_options = list(storage_registry)
+
+
+def xarray_dataset_from_results(*args, **kwargs):
+    if has_xarray:
+        from pipefunc.map.xarray import xarray_dataset_from_results
+
+        return xarray_dataset_from_results(*args, **kwargs)
+    return None
 
 
 @pytest.fixture(params=storage_options)
