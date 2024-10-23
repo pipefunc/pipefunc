@@ -653,9 +653,9 @@ class PipeFunc(Generic[T]):
     @profile.setter
     def profile(self, enable: bool) -> None:
         """Enable or disable profiling for the wrapped function."""
-        requires("psutil", reason="profile", extras="profiling")
         self._profile = enable
         if enable:
+            requires("psutil", reason="profile", extras="profiling")
             self.profiling_stats = ProfilingStats()
         else:
             self.profiling_stats = None
