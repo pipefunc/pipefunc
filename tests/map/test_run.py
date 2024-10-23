@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_xarray = importlib.util.find_spec("xarray") is not None
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+has_zarr = importlib.util.find_spec("zarr") is not None
 
 storage_options = list(storage_registry)
 
@@ -1049,11 +1051,14 @@ def test_growing_axis(tmp_path: Path) -> None:
     )
 
 
-def test_storage_options():
+def test_storage_options_invalid():
     f = PipeFunc(lambda x: x, "y")
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
         Pipeline([f]).map({"x": 1}, None, storage="invalid")
 
+
+@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
+def test_storage_options_zarr_memory_parallel():
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}
     with pytest.raises(
@@ -1514,8 +1519,9 @@ def test_parallel_warning_and_error():
         pipeline.map(inputs, storage="zarr_memory", parallel=True)
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
-async def test_run_async():
+async def test_run_async_with_progress():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
