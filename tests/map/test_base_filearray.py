@@ -154,7 +154,7 @@ def test_sliced_arange(array_type: Callable[..., StorageBase]):
     assert (arr[:, :, :] == np_arr[:, :, :]).all()
     assert (arr[:, ::2, :] == np_arr[:, ::2, :]).all()
     assert (arr[:, ::3, :] == np_arr[:, ::3, :]).all()
-    if arr.storage_id == "storage_id":
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[:, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[:, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
@@ -177,7 +177,7 @@ def test_sliced_arange_minimal(array_type: Callable[..., StorageBase]):
     assert (arr[:, 1] == np_arr[:, 1]).all()
     assert (arr[0, -1] == np_arr[0, -1]).all()
     assert (arr[:, -1] == np_arr[:, -1]).all()
-    if arr.storage_id != "storage_id":
+    if arr.storage_id != "zarr_file_array":
         assert (arr[:, ::-1] == np_arr[:, ::-1]).all()
 
 
@@ -191,7 +191,7 @@ def test_sliced_arange_minimal2(array_type: Callable[..., StorageBase]):
     assert (arr[0, :, 1] == np_arr[0, :, 1]).all()
     assert (arr[0, 0, -1] == np_arr[0, 0, -1]).all()
     assert (arr[0, :, -1] == np_arr[0, :, -1]).all()
-    if arr.storage_id == "storage_id":
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[0, ::-1, 0] == np_arr[0, ::-1, 0]).all()
     assert (arr[0, ::-1, -1] == np_arr[0, ::-1, -1]).all()
@@ -285,7 +285,7 @@ def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., St
     arr.dump((1, 1), data2)
 
     # Test retrieving the entire array
-    if arr.storage_id == "storage_id":
+    if arr.storage_id == "zarr_file_array":
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
         return
@@ -375,7 +375,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(
     arr.dump((0, 0), data1)
     arr.dump((1, 1), data2)
 
-    if arr.storage_id == "storage_id":
+    if arr.storage_id == "zarr_file_array":
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
     else:
@@ -411,7 +411,7 @@ def test_sliced_arange_splat(array_type: Callable[..., StorageBase]):
     assert (arr[0, 1:, ::2, -1] == np_arr[1:, ::2, -1]).all()
     assert (arr[0, 2, ::2, -1] == np_arr[2, ::2, -1]).all()
     assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
-    if arr.storage_id == "storage_id":
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[0, :, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[0, :, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
@@ -477,7 +477,7 @@ def test_list_or_arrays(array_type) -> None:
     # list of 2 (4,4) arrays
     value = [np.random.rand(4, 4) for _ in range(2)]  # noqa: NPY002
     arr.dump((0, 0, 0), value)
-    if arr.storage_id != "storage_id":
+    if arr.storage_id != "zarr_file_array":
         assert isinstance(arr[0, 0, 0], list)
     else:
         assert isinstance(arr[0, 0, 0], np.ndarray)
