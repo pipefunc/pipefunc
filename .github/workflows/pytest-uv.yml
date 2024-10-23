@@ -26,7 +26,7 @@ jobs:
       - name: Install pipefunc
         shell: bash -l {0}
         run: |
-          # Install all optional dependencies except plotting
+          # Install all optional dependencies that work with 3.13t
           uv pip install -e ".[xarray,widgets,pandas,test]"
 
       - name: Run Python
