@@ -1,5 +1,5 @@
 import array
-import importlib.metadata
+import importlib.util
 from collections import Counter, OrderedDict, defaultdict, deque
 from typing import Any
 
@@ -8,7 +8,7 @@ import pytest
 
 from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
 
-has_pandas = importlib.metadata.version("pandas") is not None
+has_pandas = importlib.util.find_spec("pandas") is not None
 
 M = _HASH_MARKER
 
@@ -46,7 +46,10 @@ def test_to_hashable_numpy_array() -> None:
     assert result[2][2] == (1, 2, 3, 4)  # type: ignore[index]
 
 
+@pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 def test_to_hashable_pandas_series() -> None:
+    import pandas as pd
+
     series = pd.Series([1, 2, 3], name="test")
     result = to_hashable(series)
     assert isinstance(result, tuple)
@@ -56,7 +59,10 @@ def test_to_hashable_pandas_series() -> None:
     assert result[2][1] == (M, dict, ((0, 1), (1, 2), (2, 3)))  # type: ignore[index]
 
 
+@pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 def test_to_hashable_pandas_dataframe() -> None:
+    import pandas as pd
+
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
     result = to_hashable(df)
     assert isinstance(result, tuple)
