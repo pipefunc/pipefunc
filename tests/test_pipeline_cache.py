@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 def test_tuple_outputs_with_cache() -> None:
     @pipefunc(
         output_name=("c", "_throw"),
-        profile=True,
         debug=True,
         cache=True,
         output_picker=dict.__getitem__,
