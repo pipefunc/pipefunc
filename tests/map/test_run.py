@@ -1490,6 +1490,7 @@ def test_internal_shape_in_pipefunc():
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
+@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
 def test_parallel_warning_and_error():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
