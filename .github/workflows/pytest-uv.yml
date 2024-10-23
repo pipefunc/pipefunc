@@ -27,7 +27,7 @@ jobs:
         shell: bash -l {0}
         run: |
           # Install all optional dependencies except plotting
-          uv pip install -e ".[adaptive,xarray,zarr,widgets,test]"
+          uv pip install -e ".[xarray,widgets,pandas,test]"
 
       - name: Run Python
         shell: bash -l {0}
