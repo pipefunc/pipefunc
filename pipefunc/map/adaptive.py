@@ -17,18 +17,16 @@ from pipefunc.map._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
+    _maybe_iterate_axes,
     _process_task,
-    _reduced_axes,
     _run_iteration_and_process,
     _submit_func,
-    _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
-from pipefunc.map._storage_base import _iterate_shape_indices
+from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable
 
     import adaptive_scheduler
     import numpy.typing as npt
@@ -468,66 +466,6 @@ def create_learners_from_sweep(
         learners.append(learner)
         folders.append(sweep_run)
     return learners, folders
-
-
-def _identify_cross_product_axes(pipeline: Pipeline) -> tuple[str, ...]:
-    reduced = _reduced_axes(pipeline)
-    impossible_axes: set[str] = set()  # Constructing this as a safety measure (for assert below)
-    for func in pipeline.leaf_nodes:
-        for output_name in pipeline.func_dependencies(func):
-            for name in at_least_tuple(output_name):
-                if name in reduced:
-                    impossible_axes.update(reduced[name])
-
-    possible_axes: set[str] = set()
-    for func in pipeline.leaf_nodes:
-        axes = pipeline.independent_axes_in_mapspecs(func.output_name)
-        possible_axes.update(axes)
-
-    assert not (possible_axes & impossible_axes)
-    return tuple(sorted(possible_axes))
-
-
-def _iterate_axes(
-    independent_axes: tuple[str, ...],
-    inputs: dict[str, Any],
-    mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
-) -> Generator[dict[str, Any], None, None]:
-    shape: list[int] = []
-    for axis in independent_axes:
-        parameter, dim = next(
-            (p, axes.index(axis))
-            for p, axes in mapspec_axes.items()
-            if axis in axes and p in inputs
-        )
-        shape.append(shapes[parameter][dim])
-
-    for indices in _iterate_shape_indices(tuple(shape)):
-        yield dict(zip(independent_axes, indices))
-
-
-def _maybe_iterate_axes(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    fixed_indices: dict[str, int | slice] | None,
-    split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
-) -> Generator[dict[str, int | slice] | None, None, None]:
-    if fixed_indices:
-        assert not split_independent_axes
-        _validate_fixed_indices(fixed_indices, inputs, pipeline)
-        yield fixed_indices
-        return
-    if not split_independent_axes:
-        yield None
-        return
-    independent_axes = _identify_cross_product_axes(pipeline)
-    axes = pipeline.mapspec_axes
-    shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
-    for _fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
-        _validate_fixed_indices(_fixed_indices, inputs, pipeline)
-        yield _fixed_indices
 
 
 def _adaptive_wrapper(

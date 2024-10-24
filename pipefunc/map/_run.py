@@ -26,7 +26,13 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
+from pipefunc.map._run_info import (
+    DirectValue,
+    RunInfo,
+    _external_shape,
+    _internal_shape,
+    map_shapes,
+)
 from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
@@ -113,6 +119,7 @@ def run(
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
+    split_independent_axes: bool = False,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
 ) -> OrderedDict[str, Result]:
@@ -170,6 +177,8 @@ def run(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
+    split_independent_axes
+        Whether to split independent axes.
     auto_subpipeline
         If ``True``, a subpipeline is created with the specified ``inputs``, using
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
@@ -245,6 +254,7 @@ def run_async(
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
+    split_independent_axes: bool = False,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
 ) -> AsyncRun:
@@ -300,6 +310,8 @@ def run_async(
     fixed_indices
         A dictionary mapping axes names to indices that should be fixed for the run.
         If not provided, all indices are iterated over.
+    split_independent_axes
+        Whether to split independent axes.
     auto_subpipeline
         If ``True``, a subpipeline is created with the specified ``inputs``, using
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
@@ -325,7 +337,9 @@ def run_async(
         in_async=True,
     )
 
-    async def _run_pipeline() -> OrderedDict[str, Result]:
+    async def _run_pipeline(
+        fixed_indices: dict[str, int | slice] | None,
+    ) -> OrderedDict[str, Result]:
         with _maybe_executor(executor, parallel=True) as ex:
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
@@ -342,10 +356,18 @@ def run_async(
         _maybe_persist_memory(store, persist_memory)
         return outputs
 
-    task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
-        progress.display()
+    iterator = _maybe_iterate_axes(
+        pipeline,
+        inputs,
+        fixed_indices,
+        split_independent_axes,
+        run_info.internal_shapes,
+    )
+    for _fixed_indices in iterator:
+        task = asyncio.create_task(_run_pipeline(_fixed_indices))
+        if progress is not None:
+            progress.attach_task(task)
+    progress.display()
     return AsyncRun(task, run_info, progress)
 
 
@@ -1219,3 +1241,63 @@ def _get_partially_reduced_axes(
     assert func.mapspec is not None
     spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
     return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
+
+
+def _identify_cross_product_axes(pipeline: Pipeline) -> tuple[str, ...]:
+    reduced = _reduced_axes(pipeline)
+    impossible_axes: set[str] = set()  # Constructing this as a safety measure (for assert below)
+    for func in pipeline.leaf_nodes:
+        for output_name in pipeline.func_dependencies(func):
+            for name in at_least_tuple(output_name):
+                if name in reduced:
+                    impossible_axes.update(reduced[name])
+
+    possible_axes: set[str] = set()
+    for func in pipeline.leaf_nodes:
+        axes = pipeline.independent_axes_in_mapspecs(func.output_name)
+        possible_axes.update(axes)
+
+    assert not (possible_axes & impossible_axes)
+    return tuple(sorted(possible_axes))
+
+
+def _iterate_axes(
+    independent_axes: tuple[str, ...],
+    inputs: dict[str, Any],
+    mapspec_axes: dict[str, tuple[str, ...]],
+    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+) -> Generator[dict[str, Any], None, None]:
+    shape: list[int] = []
+    for axis in independent_axes:
+        parameter, dim = next(
+            (p, axes.index(axis))
+            for p, axes in mapspec_axes.items()
+            if axis in axes and p in inputs
+        )
+        shape.append(shapes[parameter][dim])
+
+    for indices in _iterate_shape_indices(tuple(shape)):
+        yield dict(zip(independent_axes, indices))
+
+
+def _maybe_iterate_axes(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    fixed_indices: dict[str, int | slice] | None,
+    split_independent_axes: bool,  # noqa: FBT001
+    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+) -> Generator[dict[str, int | slice] | None, None, None]:
+    if fixed_indices:
+        assert not split_independent_axes
+        _validate_fixed_indices(fixed_indices, inputs, pipeline)
+        yield fixed_indices
+        return
+    if not split_independent_axes:
+        yield None
+        return
+    independent_axes = _identify_cross_product_axes(pipeline)
+    axes = pipeline.mapspec_axes
+    shapes = map_shapes(pipeline, inputs, internal_shapes).shapes
+    for _fixed_indices in _iterate_axes(independent_axes, inputs, axes, shapes):
+        _validate_fixed_indices(_fixed_indices, inputs, pipeline)
+        yield _fixed_indices
