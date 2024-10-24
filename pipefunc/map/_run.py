@@ -1011,7 +1011,7 @@ def _executors_for_generation(
     return executors
 
 
-def _has_adaptive_scheduler() -> bool:
+def _adaptive_scheduler_imported() -> bool:
     return "adaptive_scheduler" in sys.modules
 
 
@@ -1023,10 +1023,10 @@ def _maybe_finalize_executors(
         return
     executors = _executors_for_generation(generation, executor)
     for ex in executors:
-        if _has_adaptive_scheduler():
-            import adaptive_scheduler
+        if _adaptive_scheduler_imported():
+            from adaptive_scheduler import SlurmExecutor
 
-            if isinstance(ex, adaptive_scheduler.SlurmExecutor):
+            if isinstance(ex, SlurmExecutor):
                 ex.finalize()
 
 
@@ -1064,7 +1064,7 @@ def _result(x: Any | Future) -> Any:
 
 
 def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
-    if _has_adaptive_scheduler():
+    if _adaptive_scheduler_imported():
         from adaptive_scheduler import SlurmTask
 
         if isinstance(task, SlurmTask):
