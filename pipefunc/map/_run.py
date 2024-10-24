@@ -82,15 +82,7 @@ def _prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
-    if not isinstance(executor, dict) and _adaptive_scheduler_imported():
-        from adaptive_scheduler import SlurmExecutor
-
-        if isinstance(executor, SlurmExecutor):
-            if not in_async:
-                msg = "Cannot use a `SlurmExecutor` in non-async mode, use `pipefunc.run_async` instead."
-                raise ValueError(msg)
-            # If a single SlurmExecutor is provided, we need to create a new one for each output
-            executor = {func.output_name: executor.new() for func in pipeline.functions}
+    executor = _maybe_convert_slurm_executor(executor, pipeline, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -1267,3 +1259,21 @@ def _get_partially_reduced_axes(
     assert func.mapspec is not None
     spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
     return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
+
+
+def _maybe_convert_slurm_executor(
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    pipeline: Pipeline,
+    in_async: bool,  # noqa: FBT001
+) -> Executor | dict[_OUTPUT_TYPE, Executor] | None:
+    """Convert a single SlurmExecutor to a dict of executors if needed."""
+    if _adaptive_scheduler_imported():
+        from adaptive_scheduler import SlurmExecutor
+
+        if isinstance(executor, SlurmExecutor):
+            if not in_async:
+                msg = "Cannot use a `SlurmExecutor` in non-async mode, use `pipefunc.run_async` instead."
+                raise ValueError(msg)
+            # If a single SlurmExecutor is provided, we need to create a new one for each output
+            return {func.output_name: executor.new() for func in pipeline.functions}
+    return executor
