@@ -1026,7 +1026,7 @@ def _maybe_finalize_executors(
         if _has_adaptive_scheduler():
             import adaptive_scheduler
 
-            if isinstance(ex, adaptive_scheduler.SLURMExecutor):
+            if isinstance(ex, adaptive_scheduler.SlurmExecutor):
                 ex.finalize()
 
 
