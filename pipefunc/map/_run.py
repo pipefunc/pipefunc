@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import sys
 import time
 import warnings
 from collections import OrderedDict, defaultdict
@@ -931,6 +932,7 @@ async def _run_and_process_generation_async(
         progress,
         cache,
     )
+    _maybe_finalize_executors(generation, executor)
     await _process_generation_async(generation, tasks, store, outputs)
 
 
@@ -997,6 +999,37 @@ def _executor_for_func(
     return executor
 
 
+def _executors_for_generation(
+    generation: list[PipeFunc],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+) -> list[Executor]:
+    executors = []
+    for func in generation:
+        ex = _executor_for_func(func, executor)
+        if ex is not None and ex not in executors:
+            executors.append(ex)
+    return executors
+
+
+def _has_adaptive_scheduler() -> bool:
+    return "adaptive_scheduler" in sys.modules
+
+
+def _maybe_finalize_executors(
+    generation: list[PipeFunc],
+    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+) -> None:
+    if executor is None:
+        return
+    executors = _executors_for_generation(generation, executor)
+    for ex in executors:
+        if _has_adaptive_scheduler():
+            import adaptive_scheduler
+
+            if isinstance(ex, adaptive_scheduler.SLURMExecutor):
+                ex.finalize()
+
+
 def _submit_generation(
     run_info: RunInfo,
     generation: list[PipeFunc],
@@ -1031,6 +1064,11 @@ def _result(x: Any | Future) -> Any:
 
 
 def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
+    if _has_adaptive_scheduler():
+        from adaptive_scheduler import SlurmTask
+
+        if isinstance(task, SlurmTask):
+            return task
     return asyncio.wrap_future(task, loop=loop)
 
 
