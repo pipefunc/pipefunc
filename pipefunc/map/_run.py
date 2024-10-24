@@ -70,6 +70,7 @@ def _prepare_run(
     dict[str, StorageBase | Path | DirectValue],
     OrderedDict[str, Result],
     bool,
+    Executor | dict[_OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
     if not parallel and show_progress:
@@ -81,6 +82,15 @@ def _prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
+    if not isinstance(executor, dict) and _adaptive_scheduler_imported():
+        from adaptive_scheduler import SlurmExecutor
+
+        if isinstance(executor, SlurmExecutor):
+            if not in_async:
+                msg = "Cannot use a `SlurmExecutor` in non-async mode, use `pipefunc.run_async` instead."
+                raise ValueError(msg)
+            # If a single SlurmExecutor is provided, we need to create a new one for each output
+            executor = {func.output_name: executor.new() for func in pipeline.functions}
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -98,7 +108,7 @@ def _prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel, progress
+    return pipeline, run_info, store, outputs, parallel, executor, progress
 
 
 def run(
@@ -180,7 +190,7 @@ def run(
         Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
-    pipeline, run_info, store, outputs, parallel, progress = _prepare_run(
+    pipeline, run_info, store, outputs, parallel, executor, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -310,7 +320,7 @@ def run_async(
         Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, _, progress = _prepare_run(
+    pipeline, run_info, store, outputs, _, executor, progress = _prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
