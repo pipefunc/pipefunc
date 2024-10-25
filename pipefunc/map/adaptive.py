@@ -13,7 +13,8 @@ from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run import (
+from pipefunc.map._run._info import DirectValue, RunInfo, _external_shape, map_shapes
+from pipefunc.map._run._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
@@ -24,7 +25,6 @@ from pipefunc.map._run import (
     _validate_fixed_indices,
     run,
 )
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
 from pipefunc.map._storage._base import _iterate_shape_indices
 
 if TYPE_CHECKING:

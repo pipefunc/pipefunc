@@ -10,7 +10,7 @@ import ipywidgets as widgets
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
-    from pipefunc.map._run import _Status
+    from pipefunc.map._run._run import _Status
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
