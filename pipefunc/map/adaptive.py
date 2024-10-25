@@ -21,7 +21,7 @@ from pipefunc.map._map._map import (
     _submit_func,
 )
 from pipefunc.map._map._map import (
-    map as sync_map,
+    run_map as sync_map,
 )
 from pipefunc.map._map._prepare import _reduced_axes, _validate_fixed_indices
 from pipefunc.map._map._run_info import RunInfo

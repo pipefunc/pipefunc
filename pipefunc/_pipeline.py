@@ -34,8 +34,8 @@ from pipefunc._utils import (
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._map._map import AsyncMap, map_async
-from pipefunc.map._map._map import map as sync_map
+from pipefunc.map._map._map import AsyncMap, run_map_async
+from pipefunc.map._map._map import run_map as sync_map
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -808,7 +808,7 @@ class Pipeline:
             The ``task`` can be awaited to get the final result of the pipeline.
 
         """
-        return map_async(
+        return run_map_async(
             self,
             inputs,
             run_folder,

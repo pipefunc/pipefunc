@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-def map(  # noqa: A001
+def run_map(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
@@ -176,7 +176,7 @@ class AsyncMap(NamedTuple):
         return loop.run_until_complete(self.task)  # pragma: no cover
 
 
-def map_async(
+def run_map_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
