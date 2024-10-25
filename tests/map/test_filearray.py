@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pipefunc.map._filearray import FileArray, _load_all, _select_by_mask, dump, load
+from pipefunc.map._storage._file import FileArray, _load_all, _select_by_mask, dump, load
 
 # The tests for all file array types are in `test_base_filearray.py`!
 # Here are only the tests that are specific to the `FileArray` class.

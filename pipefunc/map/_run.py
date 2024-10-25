@@ -27,7 +27,7 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
-from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence

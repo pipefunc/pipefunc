@@ -1,7 +1,4 @@
 # This file is part of the pipefunc package.
-# Originally, it is based on code from the `aiida-dynamic-workflows` package.
-# Its license can be found in the LICENSE file in this folder.
-# See `git diff 98a1736 pipefunc/map/_filearray.py` for the changes made.
 
 from __future__ import annotations
 
@@ -15,7 +12,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage_base import (
+from pipefunc.map._storage._base import (
     StorageBase,
     _iterate_shape_indices,
     _normalize_key,
@@ -27,13 +24,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 storage_registry: dict[str, type[StorageBase]] = {}
-
-
-def read(name: str | Path) -> bytes:
-    """Load file contents as a bytestring."""
-    with open(name, "rb") as f:  # noqa: PTH123
-        return f.read()
-
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
@@ -273,9 +263,15 @@ class FileArray(StorageBase):
         return True
 
 
+def _read(name: str | Path) -> bytes:
+    """Load file contents as a bytestring."""
+    with open(name, "rb") as f:  # noqa: PTH123
+        return f.read()
+
+
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
-        return read(f) if f.is_file() else None
+        return _read(f) if f.is_file() else None
 
     def maybe_load(x: str | None) -> Any | None:
         return cloudpickle.loads(x) if x is not None else None

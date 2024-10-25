@@ -15,7 +15,7 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
-from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
+from pipefunc.map._storage._base import StorageBase, _select_by_mask, register_storage
 
 
 class ZarrFileArray(StorageBase):
@@ -335,7 +335,7 @@ class CloudPickleCodec(Codec):
 
     Examples
     --------
-    >>> from pipefunc.map.zarr import CloudPickleCodec
+    >>> from pipefunc.map._storage._zarr import CloudPickleCodec
     >>> import numpy as np
     >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
     >>> f = CloudPickleCodec()

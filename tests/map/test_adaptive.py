@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import StorageBase, load_outputs
+from pipefunc.map._run import load_outputs
 from pipefunc.map._run_info import RunInfo
+from pipefunc.map._storage._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
     create_learners,

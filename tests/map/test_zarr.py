@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import zarr
 
-from pipefunc.map.zarr import CloudPickleCodec, ZarrFileArray, _select_by_mask
+from pipefunc.map._storage._zarr import CloudPickleCodec, ZarrFileArray, _select_by_mask
 
 
 def test_zarr_array_init():
