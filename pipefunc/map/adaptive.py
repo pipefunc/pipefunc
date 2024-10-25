@@ -19,9 +19,7 @@ from pipefunc.map._map._map import (
     _process_task,
     _run_iteration_and_process,
     _submit_func,
-)
-from pipefunc.map._map._map import (
-    run_map as sync_map,
+    run_map,
 )
 from pipefunc.map._map._prepare import _reduced_axes, _validate_fixed_indices
 from pipefunc.map._map._run_info import RunInfo
@@ -404,7 +402,7 @@ class _MapWrapper:
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
-        sync_map(
+        run_map(
             self.pipeline,
             self.inputs,
             self.run_folder,
