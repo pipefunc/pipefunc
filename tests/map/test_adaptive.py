@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import StorageBase, load_outputs
+from pipefunc.map._run import load_outputs
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map.adaptive import (
     LearnersDict,
@@ -15,6 +15,7 @@ from pipefunc.map.adaptive import (
     create_learners_from_sweep,
     to_adaptive_learner,
 )
+from pipefunc.map.storage._base import StorageBase
 from pipefunc.sweep import Sweep
 from pipefunc.typing import Array  # noqa: TCH001
 

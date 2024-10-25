@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage_base import StorageBase, get_storage_class
+from pipefunc.map.storage._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline

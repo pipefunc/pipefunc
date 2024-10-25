@@ -25,7 +25,7 @@ from pipefunc.map._run import (
     run,
 )
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
-from pipefunc.map._storage_base import _iterate_shape_indices
+from pipefunc.map.storage._base import _iterate_shape_indices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
-    from pipefunc.map._storage_base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
+    from pipefunc.map.storage._base import StorageBase
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 

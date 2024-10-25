@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._dictarray import DictArray
-from pipefunc.map._filearray import FileArray
-from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map.storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map.storage._dict import DictArray
+from pipefunc.map.storage._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,7 +31,7 @@ def array_type(request, tmp_path: Path):
         def _array_type(shape, internal_shape=None, shape_mask=None):
             import zarr
 
-            from pipefunc.map.zarr import ZarrFileArray
+            from pipefunc.map.storage._zarr import ZarrFileArray
 
             store = zarr.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
