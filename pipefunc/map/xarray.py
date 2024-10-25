@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pipefunc import Pipeline
-    from pipefunc.map._map._base import Result
+    from pipefunc.map._map._result import Result
 
 
 def load_xarray(

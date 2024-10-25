@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc
     from pipefunc._widgets import ProgressTracker
 
-    from ._base import DirectValue
+    from ._result import DirectValue
 
 
 @dataclass

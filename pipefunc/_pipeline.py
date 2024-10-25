@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     import IPython.display
 
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._map._base import Result
+    from pipefunc.map._map._result import Result
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]

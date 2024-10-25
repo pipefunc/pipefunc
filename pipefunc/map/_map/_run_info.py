@@ -14,7 +14,7 @@ from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._storage_array._base import StorageBase, get_storage_class
 
-from ._base import DirectValue
+from ._result import DirectValue
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, map_shapes
 
 if TYPE_CHECKING:

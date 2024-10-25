@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
-    from pipefunc.map._map._base import DirectValue
+    from pipefunc.map._map._result import DirectValue
     from pipefunc.map._storage_array._base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources

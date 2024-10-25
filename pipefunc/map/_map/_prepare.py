@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._widgets import ProgressTracker
 
-    from ._base import DirectValue, Result
+    from ._result import DirectValue, Result
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]

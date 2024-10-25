@@ -185,17 +185,17 @@ if __name__ == "__main__":
 
     import pipefunc
     import pipefunc._plotting
-    import pipefunc.map._run
+    from pipefunc.map import map, map_async
 
     # map vs map_async
     compare_param_descriptions(
         pipefunc.Pipeline.map,
-        pipefunc.map._run._core.run,
+        map,
         allow_missing=["pipeline"],
     )
     compare_param_descriptions(
         pipefunc.Pipeline.map_async,
-        pipefunc.map._run._core.map_async,
+        map_async,
         allow_missing=["parallel", "pipeline"],
         allow_discrepancy=["show_progress"],
     )

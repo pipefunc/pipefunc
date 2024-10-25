@@ -24,8 +24,8 @@ from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key
 from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
-from ._base import DirectValue, Result
 from ._prepare import prepare_run
+from ._result import DirectValue, Result
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 
 if TYPE_CHECKING:
