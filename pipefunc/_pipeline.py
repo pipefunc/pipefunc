@@ -34,7 +34,7 @@ from pipefunc._utils import (
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._map._map import AsyncMap, map, map_async
+from pipefunc.map._map._map import AsyncMap, blocking_map, map_async
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -707,7 +707,7 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        return map(
+        return blocking_map(
             self,
             inputs,
             run_folder,

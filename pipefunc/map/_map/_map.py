@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-def map(  # noqa: A001
+def blocking_map(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
