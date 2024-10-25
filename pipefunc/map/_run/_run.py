@@ -8,7 +8,6 @@ import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
@@ -28,6 +27,8 @@ from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run._info import DirectValue, RunInfo, _external_shape, _internal_shape
 from pipefunc.map._storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
+
+from ._progress import Status, init_tracker
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -93,7 +94,7 @@ def _prepare_run(
     )
     outputs: OrderedDict[str, Result] = OrderedDict()
     store = run_info.init_store()
-    progress = _init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
@@ -709,7 +710,7 @@ def _mask_fixed_axes(
 def _status_submit(
     func: Callable[..., Any],
     executor: Executor,
-    status: _Status,
+    status: Status,
     progress: ProgressTracker,
     *args: Any,
 ) -> Future:
@@ -725,7 +726,7 @@ def _maybe_parallel_map(
     func: Callable[..., Any],
     seq: Sequence,
     executor: Executor | None,
-    status: _Status | None,
+    status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
     if executor is not None:
@@ -739,7 +740,7 @@ def _maybe_parallel_map(
 def _maybe_submit(
     func: Callable[..., Any],
     executor: Executor | None,
-    status: _Status | None,
+    status: Status | None,
     progress: ProgressTracker | None,
     *args: Any,
 ) -> Any:
@@ -830,63 +831,6 @@ def _load_file_arrays(kwargs: dict[str, Any]) -> None:
 class _KwargsTask(NamedTuple):
     kwargs: dict[str, Any]
     task: tuple[Any, _MapSpecArgs] | Any
-
-
-@dataclass
-class _Status:
-    """A class to keep track of the progress of a function."""
-
-    n_total: int
-    n_in_progress: int = 0
-    n_completed: int = 0
-    n_failed: int = 0
-    start_time: float | None = None
-    end_time: float | None = None
-
-    @property
-    def n_left(self) -> int:
-        return self.n_total - self.n_completed - self.n_failed
-
-    def mark_in_progress(self) -> None:
-        if self.start_time is None:
-            self.start_time = time.monotonic()
-        self.n_in_progress += 1
-
-    def mark_complete(self, _: Any) -> None:  # needs arg to be used as callback
-        self.n_in_progress -= 1
-        self.n_completed += 1
-        if self.n_completed == self.n_total:
-            self.end_time = time.monotonic()
-
-    @property
-    def progress(self) -> float:
-        return self.n_completed / self.n_total
-
-    def elapsed_time(self) -> float:
-        assert self.start_time is not None
-        if self.end_time is None:
-            return time.monotonic() - self.start_time
-        return self.end_time - self.start_time
-
-
-def _init_tracker(
-    store: dict[str, StorageBase | Path | DirectValue],
-    functions: list[PipeFunc],
-    show_progress: bool,  # noqa: FBT001
-    in_async: bool,  # noqa: FBT001
-) -> ProgressTracker | None:
-    if not show_progress:
-        return None
-    requires("ipywidgets", reason="show_progress", extras="ipywidgets")
-    from pipefunc._widgets import ProgressTracker
-
-    progress = {}
-    for func in functions:
-        name, *_ = at_least_tuple(func.output_name)  # if multiple, the have equal size
-        s = store[name]
-        size = s.size if isinstance(s, StorageBase) else 1
-        progress[func.output_name] = _Status(n_total=size)
-    return ProgressTracker(progress, None, display=False, in_async=in_async)
 
 
 # NOTE: A similar async version of this function is provided below.
