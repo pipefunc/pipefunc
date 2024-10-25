@@ -22,7 +22,7 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key
-from pipefunc.map._storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage_array._base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 from ._base import DirectValue, Result
 from ._info import RunInfo, _external_shape, _internal_shape

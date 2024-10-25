@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage._base import StorageBase, get_storage_class
+from pipefunc.map._storage_array._base import StorageBase, get_storage_class
 
 from ._base import DirectValue
 
@@ -141,7 +141,7 @@ class RunInfo:
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
-                arrays = _init_file_arrays(
+                arrays = _init_arrays(
                     output_name,
                     shape,
                     mask,
@@ -343,7 +343,7 @@ def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
-def _init_file_arrays(
+def _init_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
@@ -353,11 +353,11 @@ def _init_file_arrays(
     external_shape = _external_shape(shape, mask)
     internal_shape = _internal_shape(shape, mask)
     output_names = at_least_tuple(output_name)
-    paths = [_maybe_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    paths = [_maybe_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
     return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
-def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | None:
+def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
     if run_folder is None:
         return None
     assert isinstance(output_name, str)

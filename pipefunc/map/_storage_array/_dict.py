@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage._base import (
+from pipefunc.map._storage_array._base import (
     StorageBase,
     _normalize_key,
     _select_by_mask,

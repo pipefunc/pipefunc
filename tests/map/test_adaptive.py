@@ -9,7 +9,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._run._info import RunInfo
 from pipefunc.map._run._io import load_outputs
-from pipefunc.map._storage._base import StorageBase
+from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
     create_learners,

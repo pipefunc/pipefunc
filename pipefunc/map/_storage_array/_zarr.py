@@ -15,7 +15,7 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
-from pipefunc.map._storage._base import StorageBase, _select_by_mask, register_storage
+from pipefunc.map._storage_array._base import StorageBase, _select_by_mask, register_storage
 
 
 class ZarrFileArray(StorageBase):

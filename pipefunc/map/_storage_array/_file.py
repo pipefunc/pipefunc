@@ -12,7 +12,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage._base import (
+from pipefunc.map._storage_array._base import (
     StorageBase,
     _iterate_shape_indices,
     _normalize_key,
