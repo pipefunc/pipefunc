@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from adaptive_scheduler.utils import EXECUTOR_TYPES
 
     from pipefunc._pipefunc import PipeFunc
-    from pipefunc.map._map import RunInfo
+    from pipefunc.map._map._run_info import RunInfo
     from pipefunc.map.adaptive import LearnersDict
 
 

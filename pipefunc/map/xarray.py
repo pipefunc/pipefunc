@@ -12,7 +12,7 @@ import pandas as pd
 import xarray as xr
 
 from pipefunc.map import MapSpec, load_outputs
-from pipefunc.map._map import RunInfo
+from pipefunc.map._map._run_info import RunInfo
 from pipefunc.map._mapspec import mapspec_axes, trace_dependencies
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pipefunc import Pipeline
-    from pipefunc.map._map import Result
+    from pipefunc.map._map._base import Result
 
 
 def load_xarray(
