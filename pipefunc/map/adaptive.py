@@ -21,10 +21,7 @@ from pipefunc.map._map._map import (
     _submit_func,
     map,
 )
-from pipefunc.map._map._prepare import (
-    _reduced_axes,
-    _validate_fixed_indices,
-)
+from pipefunc.map._map._prepare import _reduced_axes, _validate_fixed_indices
 from pipefunc.map._map._run_info import RunInfo
 from pipefunc.map._map._shapes import external_shape_from_mask, map_shapes
 from pipefunc.map._mapspec import MapSpec
