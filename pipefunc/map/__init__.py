@@ -3,7 +3,7 @@
 from contextlib import suppress as _suppress
 
 from ._map._io import load_outputs, load_xarray_dataset
-from ._map._map import blocking_map, map_async
+from ._map._map import map, map_async
 from ._map._run_info import RunInfo
 from ._mapspec import MapSpec
 from ._storage_array._base import StorageBase, register_storage, storage_registry
@@ -16,7 +16,7 @@ __all__ = [
     "load_outputs",
     "load_xarray_dataset",
     "map_async",
-    "blocking_map",
+    "map",
     "MapSpec",
     "register_storage",
     "RunInfo",

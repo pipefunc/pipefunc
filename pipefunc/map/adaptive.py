@@ -19,7 +19,9 @@ from pipefunc.map._map._map import (
     _process_task,
     _run_iteration_and_process,
     _submit_func,
-    blocking_map,
+)
+from pipefunc.map._map._map import (
+    map as sync_map,
 )
 from pipefunc.map._map._prepare import _reduced_axes, _validate_fixed_indices
 from pipefunc.map._map._run_info import RunInfo
@@ -388,7 +390,7 @@ def _execute_iteration_in_map_spec(
 
 @dataclass(frozen=True, slots=True)
 class _MapWrapper:
-    """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
+    """Wraps the `pipefunc.map.map` function and makes it a callable with a single unused argument.
 
     Copies the Pipeline and removes the cache to avoid issues with the parallel execution.
     """
@@ -402,7 +404,7 @@ class _MapWrapper:
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
-        blocking_map(
+        sync_map(
             self.pipeline,
             self.inputs,
             self.run_folder,
