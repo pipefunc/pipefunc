@@ -160,7 +160,7 @@ def run(
            - Use output names as keys and storage class names as values.
            - Use an empty string ``""`` as a key to set a default storage class.
 
-        Available storage classes are registered in `pipefunc.map._storage_registry`.
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
@@ -290,7 +290,7 @@ def run_async(
            - Use output names as keys and storage class names as values.
            - Use an empty string ``""`` as a key to set a default storage class.
 
-        Available storage classes are registered in `pipefunc.map._storage_registry`.
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
