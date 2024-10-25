@@ -12,7 +12,6 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._map._info import RunInfo
 from pipefunc.map._map._prepare import (
     _reduced_axes,
     _validate_fixed_indices,
@@ -26,6 +25,7 @@ from pipefunc.map._map._run import (
     _submit_func,
     run,
 )
+from pipefunc.map._map._run_info import RunInfo
 from pipefunc.map._map._shapes import external_shape_from_mask, map_shapes
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._storage_array._base import iterate_shape_indices

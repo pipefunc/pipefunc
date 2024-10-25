@@ -311,11 +311,11 @@ def _init_arrays(
     storage_class: type[StorageBase],
     run_folder: Path | None,
 ) -> list[StorageBase]:
-    ext_shape = external_shape_from_mask(shape, mask)
+    external_shape = external_shape_from_mask(shape, mask)
     internal_shape = internal_shape_from_mask(shape, mask)
     output_names = at_least_tuple(output_name)
     paths = [_maybe_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
-    return [storage_class(path, ext_shape, internal_shape, mask) for path in paths]
+    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
 def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:

@@ -9,8 +9,8 @@ from pipefunc._utils import at_least_tuple
 from pipefunc.map._mapspec import validate_consistent_axes
 from pipefunc.map._storage_array._base import StorageBase
 
-from ._info import RunInfo
 from ._progress import init_tracker
+from ._run_info import RunInfo
 
 if TYPE_CHECKING:
     from pathlib import Path

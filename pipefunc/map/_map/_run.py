@@ -36,8 +36,8 @@ if TYPE_CHECKING:
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
-    from ._info import RunInfo
     from ._progress import Status
+    from ._run_info import RunInfo
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
