@@ -12,14 +12,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import (
-    at_least_tuple,
-    dump,
-    handle_error,
-    is_running_in_ipynb,
-    load,
-    prod,
-)
+from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key
 from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
