@@ -28,13 +28,6 @@ if TYPE_CHECKING:
 
 storage_registry: dict[str, type[StorageBase]] = {}
 
-
-def read(name: str | Path) -> bytes:
-    """Load file contents as a bytestring."""
-    with open(name, "rb") as f:  # noqa: PTH123
-        return f.read()
-
-
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
 
@@ -273,9 +266,15 @@ class FileArray(StorageBase):
         return True
 
 
+def _read(name: str | Path) -> bytes:
+    """Load file contents as a bytestring."""
+    with open(name, "rb") as f:  # noqa: PTH123
+        return f.read()
+
+
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
-        return read(f) if f.is_file() else None
+        return _read(f) if f.is_file() else None
 
     def maybe_load(x: str | None) -> Any | None:
         return cloudpickle.loads(x) if x is not None else None
