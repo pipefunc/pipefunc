@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-def run(
+def map(  # noqa: A001
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
@@ -157,7 +157,7 @@ def run(
     return outputs
 
 
-class AsyncRun(NamedTuple):
+class AsyncMap(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     progress: ProgressTracker | None
@@ -176,7 +176,7 @@ class AsyncRun(NamedTuple):
         return loop.run_until_complete(self.task)  # pragma: no cover
 
 
-def run_async(
+def map_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
@@ -190,7 +190,7 @@ def run_async(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
-) -> AsyncRun:
+) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
@@ -289,7 +289,7 @@ def run_async(
     if progress is not None:
         progress.attach_task(task)
         progress.display()
-    return AsyncRun(task, run_info, progress)
+    return AsyncMap(task, run_info, progress)
 
 
 def _maybe_persist_memory(

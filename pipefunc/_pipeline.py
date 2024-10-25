@@ -34,7 +34,7 @@ from pipefunc._utils import (
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._map import AsyncRun, run, run_async
+from pipefunc.map._map import AsyncMap, map, map_async
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -707,7 +707,7 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        return run(
+        return map(
             self,
             inputs,
             run_folder,
@@ -737,7 +737,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
-    ) -> AsyncRun:
+    ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
@@ -807,7 +807,7 @@ class Pipeline:
             The ``task`` can be awaited to get the final result of the pipeline.
 
         """
-        return run_async(
+        return map_async(
             self,
             inputs,
             run_folder,

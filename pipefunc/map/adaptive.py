@@ -12,18 +12,18 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._map._prepare import (
-    _reduced_axes,
-    _validate_fixed_indices,
-)
-from pipefunc.map._map._run import (
+from pipefunc.map._map._map import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
     _process_task,
     _run_iteration_and_process,
     _submit_func,
-    run,
+    map,
+)
+from pipefunc.map._map._prepare import (
+    _reduced_axes,
+    _validate_fixed_indices,
 )
 from pipefunc.map._map._run_info import RunInfo
 from pipefunc.map._map._shapes import external_shape_from_mask, map_shapes
@@ -405,7 +405,7 @@ class _MapWrapper:
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
-        run(
+        map(
             self.pipeline,
             self.inputs,
             self.run_folder,
