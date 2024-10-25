@@ -27,7 +27,7 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key, validate_consistent_axes
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, _internal_shape
-from pipefunc.map.storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -160,7 +160,7 @@ def run(
            - Use output names as keys and storage class names as values.
            - Use an empty string ``""`` as a key to set a default storage class.
 
-        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Available storage classes are registered in `pipefunc.map._storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
@@ -290,7 +290,7 @@ def run_async(
            - Use output names as keys and storage class names as values.
            - Use an empty string ``""`` as a key to set a default storage class.
 
-        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Available storage classes are registered in `pipefunc.map._storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.

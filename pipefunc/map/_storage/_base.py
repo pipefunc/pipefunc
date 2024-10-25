@@ -180,7 +180,7 @@ def _normalize_key(
 def get_storage_class(storage: str) -> type[StorageBase]:
     """Get the storage class by its identifier.
 
-    See `pipefunc.map.storage_registry` for available storage classes.
+    See `pipefunc.map._storage_registry` for available storage classes.
 
     Parameters
     ----------

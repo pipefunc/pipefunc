@@ -25,7 +25,7 @@ from pipefunc.map._run import (
     run,
 )
 from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
-from pipefunc.map.storage._base import _iterate_shape_indices
+from pipefunc.map._storage._base import _iterate_shape_indices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
+    from pipefunc.map._storage._base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
-    from pipefunc.map.storage._base import StorageBase
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
@@ -205,7 +205,7 @@ def create_learners(
            - Use output names as keys and storage class names as values.
            - Use an empty string ``""`` as a key to set a default storage class.
 
-        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Available storage classes are registered in `pipefunc.map._storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     return_output
         Whether to return the output of the function in the learner.

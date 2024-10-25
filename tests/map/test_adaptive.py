@@ -9,13 +9,13 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._run import load_outputs
 from pipefunc.map._run_info import RunInfo
+from pipefunc.map._storage._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
     create_learners,
     create_learners_from_sweep,
     to_adaptive_learner,
 )
-from pipefunc.map.storage._base import StorageBase
 from pipefunc.sweep import Sweep
 from pipefunc.typing import Array  # noqa: TCH001
 
