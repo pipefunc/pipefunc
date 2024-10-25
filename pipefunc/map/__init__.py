@@ -26,6 +26,6 @@ __all__ = [
 ]
 
 with _suppress(ImportError):
-    from ._storage_array import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
+    from ._storage_array._zarr import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
 
     __all__ += ["ZarrFileArray", "ZarrMemoryArray", "ZarrSharedMemoryArray"]

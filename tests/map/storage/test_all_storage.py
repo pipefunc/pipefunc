@@ -31,7 +31,7 @@ def array_type(request, tmp_path: Path):
         def _array_type(shape, internal_shape=None, shape_mask=None):
             import zarr
 
-            from pipefunc.map._storage_array._zarr import ZarrFileArray
+            from pipefunc.map import ZarrFileArray
 
             store = zarr.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
