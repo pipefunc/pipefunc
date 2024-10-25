@@ -3,12 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import (
-    requires,
-)
-from pipefunc.map._run._info import RunInfo
+from pipefunc._utils import requires
 
-from ._core import _load_from_store, _maybe_load_array
+from ._info import RunInfo
+from ._run import _load_from_store, _maybe_load_array
 
 if TYPE_CHECKING:
     import xarray as xr

@@ -22,9 +22,10 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key
-from pipefunc.map._run._info import DirectValue, RunInfo, _external_shape, _internal_shape
 from pipefunc.map._storage._base import StorageBase, _iterate_shape_indices, _select_by_mask
 
+from ._base import DirectValue, Result
+from ._info import RunInfo, _external_shape, _internal_shape
 from ._prepare import prepare_run
 
 if TYPE_CHECKING:
@@ -300,14 +301,6 @@ def _maybe_persist_memory(
                 arr.persist()
 
 
-class Result(NamedTuple):
-    function: str
-    kwargs: dict[str, Any]
-    output_name: str
-    output: Any
-    store: StorageBase | Path | DirectValue
-
-
 def _dump_single_output(
     func: PipeFunc,
     output: Any,
@@ -463,8 +456,8 @@ def _update_array(
     assert isinstance(func.mapspec, MapSpec)
     external_shape = _external_shape(shape, shape_mask)
     output_key = func.mapspec.output_key(external_shape, index)
-    for file_array, _output in zip(arrays, outputs):
-        file_array.dump(output_key, _output)
+    for array, _output in zip(arrays, outputs):
+        array.dump(output_key, _output)
 
 
 def _indices_to_flat_index(
@@ -860,7 +853,7 @@ def _output_from_mapspec_task(
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
     for index in args.existing:
-        outputs = [file_array.get_from_index(index) for file_array in args.arrays]
+        outputs = [array.get_from_index(index) for array in args.arrays]
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
     return tuple(x.reshape(args.shape) for x in args.result_arrays)

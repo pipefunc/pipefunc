@@ -13,7 +13,12 @@ from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run._core import (
+from pipefunc.map._run._info import RunInfo, _external_shape, map_shapes
+from pipefunc.map._run._prepare import (
+    _reduced_axes,
+    _validate_fixed_indices,
+)
+from pipefunc.map._run._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
@@ -21,11 +26,6 @@ from pipefunc.map._run._core import (
     _run_iteration_and_process,
     _submit_func,
     run,
-)
-from pipefunc.map._run._info import DirectValue, RunInfo, _external_shape, map_shapes
-from pipefunc.map._run._prepare import (
-    _reduced_axes,
-    _validate_fixed_indices,
 )
 from pipefunc.map._storage._base import _iterate_shape_indices
 
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
+    from pipefunc.map._run._base import DirectValue
     from pipefunc.map._storage._base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources
@@ -370,18 +371,18 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     # Load the data if it exists
-    if all(arr.has_index(index) for arr in file_arrays):
+    if all(arr.has_index(index) for arr in arrays):
         if not return_output:
             return None
-        return tuple(arr.get_from_index(index) for arr in file_arrays)
+        return tuple(arr.get_from_index(index) for arr in arrays)
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays, cache)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, arrays, cache)
     if not return_output:
         return None
     return outputs if isinstance(func.output_name, tuple) else outputs[0]

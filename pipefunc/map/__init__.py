@@ -3,9 +3,9 @@
 from contextlib import suppress as _suppress
 
 from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run._core import run, run_async
 from pipefunc.map._run._info import RunInfo
 from pipefunc.map._run._io import load_outputs, load_xarray_dataset
+from pipefunc.map._run._run import run, run_async
 from pipefunc.map._storage import (
     DictArray,
     FileArray,

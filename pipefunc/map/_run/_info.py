@@ -14,23 +14,12 @@ from pipefunc._version import __version__
 from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._storage._base import StorageBase, get_storage_class
 
+from ._base import DirectValue
+
 if TYPE_CHECKING:
     from pipefunc import Pipeline
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-
-
-class _Missing: ...
-
-
-class DirectValue:
-    __slots__ = ["value"]
-
-    def __init__(self, value: Any | type[_Missing] = _Missing) -> None:
-        self.value = value
-
-    def exists(self) -> bool:
-        return self.value is not _Missing
 
 
 class Shapes(NamedTuple):

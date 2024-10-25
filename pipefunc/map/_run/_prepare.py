@@ -5,13 +5,11 @@ from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, TypeAlias
 
-from pipefunc._utils import (
-    at_least_tuple,
-)
+from pipefunc._utils import at_least_tuple
 from pipefunc.map._mapspec import validate_consistent_axes
-from pipefunc.map._run._info import DirectValue, RunInfo
 from pipefunc.map._storage._base import StorageBase
 
+from ._info import RunInfo
 from ._progress import init_tracker
 
 if TYPE_CHECKING:
@@ -19,7 +17,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._widgets import ProgressTracker
-    from pipefunc.map._run._core import Result
+
+    from ._base import DirectValue, Result
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
