@@ -14,8 +14,9 @@ from pipefunc._utils import prod
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._run import _reduced_axes, load_outputs, run
 from pipefunc.map._run_info import RunInfo, map_shapes
-from pipefunc.map._storage import FileArray, SharedMemoryDictArray
 from pipefunc.map._storage._base import StorageBase, storage_registry
+from pipefunc.map._storage._dict import SharedMemoryDictArray
+from pipefunc.map._storage._file import FileArray
 from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
