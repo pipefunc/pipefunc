@@ -22,11 +22,11 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 from pipefunc.map._mapspec import MapSpec, _shape_to_key
-from pipefunc.map._storage_array._base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 from ._base import DirectValue, Result
-from ._info import RunInfo, _external_shape, _internal_shape
 from ._prepare import prepare_run
+from ._shapes import external_shape_from_mask, internal_shape_from_mask
 
 if TYPE_CHECKING:
     from collections import OrderedDict
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
+    from ._info import RunInfo
     from ._progress import Status
 
 
@@ -363,7 +364,7 @@ def _select_kwargs(
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
-    external_shape = _external_shape(shape, shape_mask)
+    external_shape = external_shape_from_mask(shape, shape_mask)
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
@@ -454,7 +455,7 @@ def _update_array(
     outputs: tuple[Any, ...],
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
-    external_shape = _external_shape(shape, shape_mask)
+    external_shape = external_shape_from_mask(shape, shape_mask)
     output_key = func.mapspec.output_key(external_shape, index)
     for array, _output in zip(arrays, outputs):
         array.dump(output_key, _output)
@@ -467,8 +468,8 @@ def _indices_to_flat_index(
     external_index: tuple[int, ...],
     internal_index: tuple[int, ...],
 ) -> np.int_:
-    full_index = _select_by_mask(shape_mask, external_index, internal_index)
-    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    full_index = select_by_mask(shape_mask, external_index, internal_index)
+    full_shape = select_by_mask(shape_mask, shape, internal_shape)
     return np.ravel_multi_index(full_index, full_shape)
 
 
@@ -479,11 +480,11 @@ def _set_output(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
 ) -> None:
-    external_shape = _external_shape(shape, shape_mask)
-    internal_shape = _internal_shape(shape, shape_mask)
+    external_shape = external_shape_from_mask(shape, shape_mask)
+    internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
     assert np.shape(output) == internal_shape
-    for internal_index in _iterate_shape_indices(internal_shape):
+    for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
             internal_shape,
@@ -589,8 +590,8 @@ def _mask_fixed_axes(
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
-    external_key = _external_shape(key, shape_mask)  # type: ignore[arg-type]
-    external_shape = _external_shape(shape, shape_mask)
+    external_key = external_shape_from_mask(key, shape_mask)  # type: ignore[arg-type]
+    external_shape = external_shape_from_mask(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[external_key] = True
     return select.flat

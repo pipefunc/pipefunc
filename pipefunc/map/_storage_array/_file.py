@@ -12,12 +12,13 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage_array._base import (
+
+from ._base import (
     StorageBase,
-    _iterate_shape_indices,
-    _normalize_key,
-    _select_by_mask,
+    iterate_shape_indices,
+    normalize_key,
     register_storage,
+    select_by_mask,
 )
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        return _normalize_key(
+        return normalize_key(
             key,
             self.shape,
             self.internal_shape,
@@ -92,7 +93,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (self._key_to_file(x) for x in _iterate_shape_indices(self.shape))
+        return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
 
     def _slice_indices(
         self,
@@ -205,19 +206,19 @@ class FileArray(StorageBase):
         arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in _iterate_shape_indices(self.shape):
+        for external_index in iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
+                for internal_index in iterate_shape_indices(self.internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
+                for internal_index in iterate_shape_indices(self.internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.MaskedArray(arr, mask=full_mask, dtype=object)

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._run._run import _func_kwargs, _load_arrays, _select_kwargs
+from pipefunc.map._map._run import _func_kwargs, _load_arrays, _select_kwargs
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from adaptive_scheduler.utils import EXECUTOR_TYPES
 
     from pipefunc._pipefunc import PipeFunc
-    from pipefunc.map._run._info import RunInfo
+    from pipefunc.map._map import RunInfo
     from pipefunc.map.adaptive import LearnersDict
 
 

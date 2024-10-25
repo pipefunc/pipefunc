@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._storage_array._base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 from pipefunc.map._storage_array._dict import DictArray
 from pipefunc.map._storage_array._file import FileArray
 
@@ -205,7 +205,7 @@ def test_file_array_with_internal_arrays(array_type: Callable[..., StorageBase])
     shape_mask = (True, True, False, False, False)
     arr = array_type(shape, shape_mask=shape_mask, internal_shape=internal_shape)
     full_shape = (2, 2, 3, 3, 4)
-    assert _select_by_mask(shape_mask, shape, internal_shape) == full_shape
+    assert select_by_mask(shape_mask, shape, internal_shape) == full_shape
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
 
@@ -380,7 +380,7 @@ def test_file_array_with_internal_arrays_full_array_different_order(
             arr.to_array(splat_internal=False)
     else:
         assert arr.to_array(splat_internal=False).shape == (2, 2)
-    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    full_shape = select_by_mask(shape_mask, shape, internal_shape)
     assert arr.to_array(splat_internal=True).shape == full_shape
 
     # Test slicing
@@ -535,7 +535,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         shape_mask=(True, False, True, False),
     )
     arrs = [f_arr, z_arr, d_arr]
-    for index in _iterate_shape_indices(external_shape):
+    for index in iterate_shape_indices(external_shape):
         x = np.random.rand(*internal_shape)  # noqa: NPY002
         for arr in arrs:
             arr.dump(key=index, value=x)
@@ -589,7 +589,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         shape_mask=(True, False, True, False),
     )
     arrs = [f_arr, z_arr, dict_arr]
-    for index in _iterate_shape_indices(external_shape):
+    for index in iterate_shape_indices(external_shape):
         if np.random.rand() < 0.5:  # noqa: NPY002
             continue
         x = np.random.rand(*internal_shape)  # noqa: NPY002

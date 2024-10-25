@@ -12,13 +12,12 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run._info import RunInfo, _external_shape, map_shapes
-from pipefunc.map._run._prepare import (
+from pipefunc.map._map._info import RunInfo
+from pipefunc.map._map._prepare import (
     _reduced_axes,
     _validate_fixed_indices,
 )
-from pipefunc.map._run._run import (
+from pipefunc.map._map._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
@@ -27,7 +26,9 @@ from pipefunc.map._run._run import (
     _submit_func,
     run,
 )
-from pipefunc.map._storage_array._base import _iterate_shape_indices
+from pipefunc.map._map._shapes import external_shape_from_mask, map_shapes
+from pipefunc.map._mapspec import MapSpec
+from pipefunc.map._storage_array._base import iterate_shape_indices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
-    from pipefunc.map._run._base import DirectValue
+    from pipefunc.map._map import DirectValue
     from pipefunc.map._storage_array._base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources
@@ -331,7 +332,7 @@ def _sequence(
         return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
-    assert len(fixed_mask) == prod(_external_shape(shape, mask))
+    assert len(fixed_mask) == prod(external_shape_from_mask(shape, mask))
     return np.flatnonzero(fixed_mask)
 
 
@@ -506,7 +507,7 @@ def _iterate_axes(
         )
         shape.append(shapes[parameter][dim])
 
-    for indices in _iterate_shape_indices(tuple(shape)):
+    for indices in iterate_shape_indices(tuple(shape)):
         yield dict(zip(independent_axes, indices))
 
 
