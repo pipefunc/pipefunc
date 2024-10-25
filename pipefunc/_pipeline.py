@@ -34,7 +34,7 @@ from pipefunc._utils import (
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._map._map import AsyncMap, run_map, run_map_async
+from pipefunc.map._map._run import AsyncMap, run_map, run_map_async
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,

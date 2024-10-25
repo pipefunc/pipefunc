@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
 
-from ._map import _load_from_store, _maybe_load_array
+from ._run import _load_from_store, _maybe_load_array
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
