@@ -6,7 +6,7 @@ import numpy as np
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._run._info import map_shapes
-from pipefunc.map._run._run import load_outputs
+from pipefunc.map._run._io import load_outputs
 from pipefunc.sweep import Sweep
 from pipefunc.typing import Array  # noqa: TCH001
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pipefunc import Pipeline
-    from pipefunc.map._run._run import Result
+    from pipefunc.map._run._core import Result
 
 
 def _data_loader(

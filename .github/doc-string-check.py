@@ -190,12 +190,12 @@ if __name__ == "__main__":
     # map vs map_async
     compare_param_descriptions(
         pipefunc.Pipeline.map,
-        pipefunc.map._run.run,
+        pipefunc.map._run._core.run,
         allow_missing=["pipeline"],
     )
     compare_param_descriptions(
         pipefunc.Pipeline.map_async,
-        pipefunc.map._run.run_async,
+        pipefunc.map._run._core.run_async,
         allow_missing=["parallel", "pipeline"],
         allow_discrepancy=["show_progress"],
     )
