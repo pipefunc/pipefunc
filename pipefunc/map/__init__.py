@@ -2,7 +2,7 @@
 
 from contextlib import suppress as _suppress
 
-from ._map._io import load_outputs, load_xarray_dataset
+from ._map._load import load_outputs, load_xarray_dataset
 from ._map._run import run_map, run_map_async
 from ._map._run_info import RunInfo
 from ._mapspec import MapSpec

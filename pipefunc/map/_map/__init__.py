@@ -1,4 +1,4 @@
-from ._io import load_outputs, load_xarray_dataset
+from ._load import load_outputs, load_xarray_dataset
 from ._progress import Status
 from ._result import DirectValue, Result
 from ._run import AsyncMap, run_map, run_map_async
