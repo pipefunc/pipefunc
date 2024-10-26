@@ -11,10 +11,10 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._map._load import load_outputs
-from pipefunc.map._map._prepare import _reduced_axes
-from pipefunc.map._map._run_info import RunInfo, map_shapes
+from pipefunc.map._load import load_outputs
 from pipefunc.map._mapspec import trace_dependencies
+from pipefunc.map._prepare import _reduced_axes
+from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
@@ -43,7 +43,7 @@ def load_xarray_dataset(*args, **kwargs):
     """Simple wrapper to avoid importing xarray in the global scope."""
     if not has_xarray:
         return None
-    from pipefunc.map._map._load import load_xarray_dataset
+    from pipefunc.map._load import load_xarray_dataset
 
     return load_xarray_dataset(*args, **kwargs)
 

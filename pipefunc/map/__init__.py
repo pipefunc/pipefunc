@@ -2,10 +2,10 @@
 
 from contextlib import suppress as _suppress
 
-from ._map._load import load_outputs, load_xarray_dataset
-from ._map._run import run_map, run_map_async
-from ._map._run_info import RunInfo
+from ._load import load_outputs, load_xarray_dataset
 from ._mapspec import MapSpec
+from ._run import run_map, run_map_async
+from ._run_info import RunInfo
 from ._storage_array._base import StorageBase, register_storage, storage_registry
 from ._storage_array._dict import DictArray, SharedMemoryDictArray
 from ._storage_array._file import FileArray

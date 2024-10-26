@@ -34,7 +34,6 @@ from pipefunc._utils import (
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._map._run import AsyncMap, run_map, run_map_async
 from pipefunc.map._mapspec import (
     ArraySpec,
     MapSpec,
@@ -42,6 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
+from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     import IPython.display
 
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._map._result import Result
+    from pipefunc.map._result import Result
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]

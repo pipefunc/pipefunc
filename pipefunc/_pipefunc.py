@@ -35,8 +35,8 @@ from pipefunc._utils import (
     requires,
 )
 from pipefunc.lazy import evaluate_lazy
-from pipefunc.map._map._run import _EVALUATED_RESOURCES
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
