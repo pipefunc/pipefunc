@@ -7,70 +7,20 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
-from pipefunc.map._mapspec import MapSpec, array_shape
-from pipefunc.map._storage._base import StorageBase, get_storage_class
+from pipefunc.map._mapspec import MapSpec
+from pipefunc.map._storage_array._base import StorageBase, get_storage_class
+
+from ._result import DirectValue
+from ._shapes import external_shape_from_mask, internal_shape_from_mask, map_shapes
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-
-
-class _Missing: ...
-
-
-class DirectValue:
-    __slots__ = ["value"]
-
-    def __init__(self, value: Any | type[_Missing] = _Missing) -> None:
-        self.value = value
-
-    def exists(self) -> bool:
-        return self.value is not _Missing
-
-
-class Shapes(NamedTuple):
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
-
-
-def map_shapes(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
-) -> Shapes:
-    if internal_shapes is None:
-        internal_shapes = {}
-    internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
-
-    input_parameters = set(pipeline.topological_generations.root_args)
-
-    inputs_with_defaults = pipeline.defaults | inputs
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
-        p: array_shape(inputs_with_defaults[p], p)
-        for p in input_parameters
-        if p in pipeline.mapspec_names
-    }
-    masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
-    mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
-    for func in mapspec_funcs:
-        assert func.mapspec is not None  # mypy
-        input_shapes = {p: shapes[p] for p in func.mapspec.input_names if p in shapes}
-        output_shapes = {p: internal[p] for p in func.mapspec.output_names if p in internal}
-        output_shape, mask = func.mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
-        shapes[func.output_name] = output_shape
-        masks[func.output_name] = mask
-        if isinstance(func.output_name, tuple):
-            for output_name in func.output_name:
-                shapes[output_name] = output_shape
-                masks[output_name] = mask
-
-    assert all(k in shapes for k in pipeline.mapspec_names if k not in internal)
-    return Shapes(shapes, masks)
 
 
 @dataclass(frozen=True, eq=True)
@@ -152,7 +102,7 @@ class RunInfo:
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
-                arrays = _init_file_arrays(
+                arrays = _init_arrays(
                     output_name,
                     shape,
                     mask,
@@ -354,30 +304,22 @@ def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
-def _init_file_arrays(
+def _init_arrays(
     output_name: _OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
 ) -> list[StorageBase]:
-    external_shape = _external_shape(shape, mask)
-    internal_shape = _internal_shape(shape, mask)
+    external_shape = external_shape_from_mask(shape, mask)
+    internal_shape = internal_shape_from_mask(shape, mask)
     output_names = at_least_tuple(output_name)
-    paths = [_maybe_file_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
+    paths = [_maybe_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
     return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
 
 
-def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | None:
+def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
     if run_folder is None:
         return None
     assert isinstance(output_name, str)
     return run_folder / "outputs" / output_name
-
-
-def _internal_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
-    return tuple(s for s, m in zip(shape, mask) if not m)
-
-
-def _external_shape(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
-    return tuple(s for s, m in zip(shape, mask) if m)

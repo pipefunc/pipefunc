@@ -41,7 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import AsyncRun, run, run_async
+from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 from pipefunc.typing import (
     Array,
@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     import IPython.display
 
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._run import Result
+    from pipefunc.map._result import Result
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
@@ -707,7 +707,7 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        return run(
+        return run_map(
             self,
             inputs,
             run_folder,
@@ -737,7 +737,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
-    ) -> AsyncRun:
+    ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
@@ -807,7 +807,7 @@ class Pipeline:
             The ``task`` can be awaited to get the final result of the pipeline.
 
         """
-        return run_async(
+        return run_map_async(
             self,
             inputs,
             run_folder,

@@ -10,7 +10,7 @@ import ipywidgets as widgets
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
-    from pipefunc.map._run import _Status
+    from pipefunc.map._progress import Status
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
@@ -43,7 +43,7 @@ class ProgressTracker:
 
     def __init__(
         self,
-        progress_dict: dict[_OUTPUT_TYPE, _Status],
+        progress_dict: dict[_OUTPUT_TYPE, Status],
         task: asyncio.Task[Any] | None = None,
         *,
         target_progress_change: float = 0.05,
@@ -52,7 +52,7 @@ class ProgressTracker:
         in_async: bool = True,
     ) -> None:
         self.task: asyncio.Task[None] | None = task
-        self.progress_dict: dict[_OUTPUT_TYPE, _Status] = progress_dict
+        self.progress_dict: dict[_OUTPUT_TYPE, Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
         self.auto_update_task: asyncio.Task | None = None
@@ -124,7 +124,7 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
-    def _update_labels(self, name: _OUTPUT_TYPE, status: _Status) -> None:
+    def _update_labels(self, name: _OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"

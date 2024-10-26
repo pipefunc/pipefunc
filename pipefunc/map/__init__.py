@@ -2,26 +2,23 @@
 
 from contextlib import suppress as _suppress
 
-from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._run import load_outputs, load_xarray_dataset, run
-from pipefunc.map._run_info import RunInfo
-from pipefunc.map._storage import (
-    DictArray,
-    FileArray,
-    SharedMemoryDictArray,
-    StorageBase,
-    register_storage,
-    storage_registry,
-)
+from ._load import load_outputs, load_xarray_dataset
+from ._mapspec import MapSpec
+from ._run import run_map, run_map_async
+from ._run_info import RunInfo
+from ._storage_array._base import StorageBase, register_storage, storage_registry
+from ._storage_array._dict import DictArray, SharedMemoryDictArray
+from ._storage_array._file import FileArray
 
 __all__ = [
     "DictArray",
     "FileArray",
     "load_outputs",
     "load_xarray_dataset",
+    "run_map_async",
+    "run_map",
     "MapSpec",
     "register_storage",
-    "run",
     "RunInfo",
     "SharedMemoryDictArray",
     "storage_registry",
@@ -29,6 +26,6 @@ __all__ = [
 ]
 
 with _suppress(ImportError):
-    from pipefunc.map._storage import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
+    from ._storage_array._zarr import ZarrFileArray, ZarrMemoryArray, ZarrSharedMemoryArray
 
     __all__ += ["ZarrFileArray", "ZarrMemoryArray", "ZarrSharedMemoryArray"]

@@ -10,12 +10,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage._base import (
-    StorageBase,
-    _normalize_key,
-    _select_by_mask,
-    register_storage,
-)
+
+from ._base import StorageBase, normalize_key, register_storage, select_by_mask
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -70,7 +66,7 @@ class DictArray(StorageBase):
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
-        key = _normalize_key(key, self.shape, self.internal_shape, self.shape_mask)
+        key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
         if any(isinstance(k, slice) for k in key):
             shape = tuple(
@@ -143,7 +139,7 @@ class DictArray(StorageBase):
         data = _masked_empty(self.full_shape)
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
-            full_index = _select_by_mask(
+            full_index = select_by_mask(
                 self.shape_mask,
                 external_index,
                 (slice(None),) * len(self.internal_shape),
@@ -173,7 +169,7 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
-        key = _normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
+        key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key, self.shape)):
                 if self.internal_shape:

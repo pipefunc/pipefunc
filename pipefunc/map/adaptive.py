@@ -13,19 +13,19 @@ from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._mapspec import MapSpec
+from pipefunc.map._prepare import _reduced_axes, _validate_fixed_indices
 from pipefunc.map._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
     _process_task,
-    _reduced_axes,
     _run_iteration_and_process,
     _submit_func,
-    _validate_fixed_indices,
-    run,
+    run_map,
 )
-from pipefunc.map._run_info import DirectValue, RunInfo, _external_shape, map_shapes
-from pipefunc.map._storage._base import _iterate_shape_indices
+from pipefunc.map._run_info import RunInfo
+from pipefunc.map._shapes import external_shape_from_mask, map_shapes
+from pipefunc.map._storage_array._base import iterate_shape_indices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -35,7 +35,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
-    from pipefunc.map._storage._base import StorageBase
+    from pipefunc.map._result import DirectValue
+    from pipefunc.map._storage_array._base import StorageBase
     from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
@@ -328,7 +329,7 @@ def _sequence(
         return range(prod(shape))
     fixed_mask = _mask_fixed_axes(fixed_indices, mapspec, shape, mask)
     assert fixed_mask is not None
-    assert len(fixed_mask) == prod(_external_shape(shape, mask))
+    assert len(fixed_mask) == prod(external_shape_from_mask(shape, mask))
     return np.flatnonzero(fixed_mask)
 
 
@@ -368,18 +369,18 @@ def _execute_iteration_in_map_spec(
 
     Meets the requirements of `adaptive.SequenceLearner`.
     """
-    file_arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     # Load the data if it exists
-    if all(arr.has_index(index) for arr in file_arrays):
+    if all(arr.has_index(index) for arr in arrays):
         if not return_output:
             return None
-        return tuple(arr.get_from_index(index) for arr in file_arrays)
+        return tuple(arr.get_from_index(index) for arr in arrays)
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, file_arrays, cache)
+    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, arrays, cache)
     if not return_output:
         return None
     return outputs if isinstance(func.output_name, tuple) else outputs[0]
@@ -387,7 +388,7 @@ def _execute_iteration_in_map_spec(
 
 @dataclass(frozen=True, slots=True)
 class _MapWrapper:
-    """Wraps the `pipefunc.map.run` function and makes it a callable with a single unused argument.
+    """Wraps the `pipefunc.map.map` function and makes it a callable with a single unused argument.
 
     Copies the Pipeline and removes the cache to avoid issues with the parallel execution.
     """
@@ -401,7 +402,7 @@ class _MapWrapper:
 
     def __call__(self, _: Any) -> None:
         """Run the pipeline."""
-        run(
+        run_map(
             self.pipeline,
             self.inputs,
             self.run_folder,
@@ -503,7 +504,7 @@ def _iterate_axes(
         )
         shape.append(shapes[parameter][dim])
 
-    for indices in _iterate_shape_indices(tuple(shape)):
+    for indices in iterate_shape_indices(tuple(shape)):
         yield dict(zip(independent_axes, indices))
 
 

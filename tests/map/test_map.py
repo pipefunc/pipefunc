@@ -11,12 +11,13 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
+from pipefunc.map._load import load_outputs
 from pipefunc.map._mapspec import trace_dependencies
-from pipefunc.map._run import _reduced_axes, load_outputs, run
+from pipefunc.map._prepare import _reduced_axes
 from pipefunc.map._run_info import RunInfo, map_shapes
-from pipefunc.map._storage._base import StorageBase, storage_registry
-from pipefunc.map._storage._dict import SharedMemoryDictArray
-from pipefunc.map._storage._file import FileArray
+from pipefunc.map._storage_array._base import StorageBase, storage_registry
+from pipefunc.map._storage_array._dict import SharedMemoryDictArray
+from pipefunc.map._storage_array._file import FileArray
 from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ def load_xarray_dataset(*args, **kwargs):
     """Simple wrapper to avoid importing xarray in the global scope."""
     if not has_xarray:
         return None
-    from pipefunc.map._run import load_xarray_dataset
+    from pipefunc.map._load import load_xarray_dataset
 
     return load_xarray_dataset(*args, **kwargs)
 
@@ -71,7 +72,7 @@ def test_simple(storage, tmp_path: Path) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
@@ -126,7 +127,7 @@ def test_simple_2_dim_array(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output_name == "sum"
     assert results["sum"].output.tolist() == [24, 30, 36, 42]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [24, 30, 36, 42]
@@ -159,7 +160,7 @@ def test_simple_2_dim_array_to_1_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(12).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output_name == "sum"
     assert results["sum"].output.tolist() == [12, 44, 76]
     assert load_outputs("sum", run_folder=tmp_path).tolist() == [12, 44, 76]
@@ -199,7 +200,7 @@ def test_simple_2_dim_array_to_1_dim_to_0_dim(tmp_path: Path) -> None:
     )
 
     inputs = {"x": np.arange(1, 13).reshape(3, 4)}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["prod"].output_name == "prod"
     assert isinstance(results["prod"].output, np.int_)
     assert results["prod"].output == 1961990553600
@@ -219,7 +220,7 @@ def run_outer_product(pipeline: Pipeline, tmp_path: Path) -> None:
     """Run the outer product test for the given pipeline."""
     # Used in the next three tests where we use alternative ways of defining the same pipeline
     inputs = {"x": [1, 2, 3], "y": [1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["z"].output_name == "z"
     expected = [[2, 3, 4], [3, 4, 5], [4, 5, 6]]
     assert results["z"].output.tolist() == expected
@@ -314,8 +315,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     )
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     inputs = {"n": 4}
-    results = run(
-        pipeline,
+    results = pipeline.map(
         inputs,
         run_folder=tmp_path,
         internal_shapes={"x": (4,)},
@@ -382,7 +382,7 @@ def test_simple_multi_output(tmp_path: Path, double_it) -> None:
     )
 
     inputs = {"x": [0, 1, 2, 3]}
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["sum"].output == 6
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 6
@@ -426,8 +426,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     ]
     inputs = {"shape": (1, 2, 3)}
     internal_shapes: dict[str, int | tuple[int, ...]] = {"array": (1, 2, 3)}
-    results = run(
-        pipeline,
+    results = pipeline.map(
         inputs,
         run_folder=tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
@@ -543,7 +542,7 @@ def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  #
         "electrostatics": (3, 2),
         "charge": (3, 2),
     }
-    results = run(pipeline, inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["average_charge"].output == 1.0
     assert results["average_charge"].output_name == "average_charge"
     assert load_outputs("average_charge", run_folder=tmp_path) == 1.0
@@ -1523,7 +1522,7 @@ def test_parallel_warning_and_error(storage: str):
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
-async def test_run_async_with_progress():
+async def test_map_async_with_progress():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
@@ -1541,13 +1540,13 @@ async def test_run_async_with_progress():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_run_info = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
+    async_map = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
     # Test that the progress tracket is working
-    async_run_info.progress.update_progress()
-    async_run_info.progress._first_auto_update_interval = 0.0
-    async_run_info.progress._toggle_auto_update()  # Turn off auto update
-    async_run_info.progress._toggle_auto_update()  # Turn on auto update
-    result = await async_run_info.task
+    async_map.progress.update_progress()
+    async_map.progress._first_auto_update_interval = 0.0
+    async_map.progress._toggle_auto_update()  # Turn off auto update
+    async_map.progress._toggle_auto_update()  # Turn on auto update
+    result = await async_map.task
     assert result["r"].output == 12
 
 
@@ -1652,7 +1651,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
         )
 
 
-def test_run_range():
+def test_map_range():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x
