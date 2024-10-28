@@ -5,12 +5,12 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
+from pipefunc._pipeline._types import _OUTPUT_TYPE
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 
 if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc
 
-from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
