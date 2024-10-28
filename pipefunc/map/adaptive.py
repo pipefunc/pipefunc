@@ -12,9 +12,10 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._prepare import _reduced_axes, _validate_fixed_indices
-from pipefunc.map._run import (
+
+from ._mapspec import MapSpec
+from ._prepare import _reduced_axes, _validate_fixed_indices
+from ._run import (
     _func_kwargs,
     _load_from_store,
     _mask_fixed_axes,
@@ -23,9 +24,9 @@ from pipefunc.map._run import (
     _submit_func,
     run_map,
 )
-from pipefunc.map._run_info import RunInfo
-from pipefunc.map._shapes import external_shape_from_mask, map_shapes
-from pipefunc.map._storage_array._base import iterate_shape_indices
+from ._run_info import RunInfo
+from ._shapes import external_shape_from_mask, map_shapes
+from ._storage_array._base import iterate_shape_indices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
@@ -35,11 +36,12 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc.cache import _CacheBase
-    from pipefunc.map._result import DirectValue
-    from pipefunc.map._storage_array._base import StorageBase
-    from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
+
+    from ._result import DirectValue
+    from ._storage_array._base import StorageBase
+    from .adaptive_scheduler import AdaptiveSchedulerDetails
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
@@ -121,7 +123,7 @@ class LearnersDict(LearnersDictType):
             The output depends on the value of `returns`.
 
         """
-        from pipefunc.map.adaptive_scheduler import slurm_run_setup
+        from .adaptive_scheduler import slurm_run_setup
 
         if self.run_info is None:
             msg = "`run_info` must be provided. Set `learners_dict.run_info`."

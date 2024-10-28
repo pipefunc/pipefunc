@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
-from pipefunc.map._mapspec import MapSpec
-from pipefunc.map._storage_array._base import StorageBase, get_storage_class
 
+from ._mapspec import MapSpec
 from ._result import DirectValue
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, map_shapes
+from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline

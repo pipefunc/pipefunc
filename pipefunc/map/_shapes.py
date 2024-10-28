@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._mapspec import array_shape
+
+from ._mapspec import array_shape
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
