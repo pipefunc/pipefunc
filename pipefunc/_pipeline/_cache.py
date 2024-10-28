@@ -10,7 +10,7 @@ from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_has
 if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc
 
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 _CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 

@@ -7,7 +7,7 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
@@ -19,8 +19,7 @@ from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 
 @dataclass(frozen=True, eq=True)

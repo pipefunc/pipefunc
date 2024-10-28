@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
@@ -16,7 +16,8 @@ from pipefunc.typing import (
     is_type_compatible,
 )
 
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+if TYPE_CHECKING:
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 
 def validate_consistent_defaults(

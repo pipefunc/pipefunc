@@ -16,7 +16,7 @@ import functools
 import inspect
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
@@ -64,11 +64,9 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
 
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
-
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class Pipeline:

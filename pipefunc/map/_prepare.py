@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 
@@ -16,12 +16,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
 
     from ._result import DirectValue, Result
-
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def prepare_run(

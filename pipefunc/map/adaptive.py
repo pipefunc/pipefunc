@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
     from pipefunc.cache import _CacheBase
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
@@ -42,9 +43,6 @@ if TYPE_CHECKING:
     from ._result import DirectValue
     from ._storage_array._base import StorageBase
     from .adaptive_scheduler import AdaptiveSchedulerDetails
-
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 class LearnerPipeFunc(NamedTuple):

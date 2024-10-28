@@ -21,7 +21,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -44,10 +44,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipefunc import Pipeline
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+
 MAX_PARAMS_LEN = 15
 
 

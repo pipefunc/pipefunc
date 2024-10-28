@@ -7,7 +7,7 @@ import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -26,14 +26,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
     from ._run_info import RunInfo
-
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def run_map(

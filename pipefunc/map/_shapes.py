@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple
 
@@ -8,8 +8,7 @@ from ._mapspec import array_shape
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
 
 
 class Shapes(NamedTuple):

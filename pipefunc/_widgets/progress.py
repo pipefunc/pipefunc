@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 import IPython.display
 import ipywidgets as widgets
@@ -10,9 +10,8 @@ import ipywidgets as widgets
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
+    from pipefunc._pipeline._types import _OUTPUT_TYPE
     from pipefunc.map._progress import Status
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def _span(class_name: str, value: str) -> str:
