@@ -8,12 +8,12 @@ from ._mapspec import array_shape
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 class Shapes(NamedTuple):
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
-    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    shapes: dict[OUTPUT_TYPE, tuple[int, ...]]
+    masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
 
 
 def map_shapes(
@@ -28,7 +28,7 @@ def map_shapes(
     input_parameters = set(pipeline.topological_generations.root_args)
 
     inputs_with_defaults = pipeline.defaults | inputs
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]] = {
+    shapes: dict[OUTPUT_TYPE, tuple[int, ...]] = {
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
         if p in pipeline.mapspec_names

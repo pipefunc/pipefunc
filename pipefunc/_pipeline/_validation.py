@@ -17,12 +17,12 @@ from pipefunc.typing import (
 )
 
 if TYPE_CHECKING:
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 def validate_consistent_defaults(
     functions: list[PipeFunc],
-    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
+    output_to_func: dict[OUTPUT_TYPE, PipeFunc],
 ) -> None:
     """Check that the default values for shared arguments are consistent."""
     arg_defaults = {}

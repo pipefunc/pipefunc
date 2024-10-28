@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.cache import _CacheBase
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
@@ -74,9 +74,9 @@ class LearnersDict(LearnersDictType):
         super().__init__(learners_dict or {})
         self.run_info: RunInfo | None = run_info
 
-    def flatten(self) -> dict[_OUTPUT_TYPE, list[SequenceLearner]]:
+    def flatten(self) -> dict[OUTPUT_TYPE, list[SequenceLearner]]:
         """Flatten the learners into a dictionary with the output names as keys."""
-        flat_learners: dict[_OUTPUT_TYPE, list[SequenceLearner]] = {}
+        flat_learners: dict[OUTPUT_TYPE, list[SequenceLearner]] = {}
         for learners_lists in self.data.values():
             for learners in learners_lists:
                 for learner_with_pipefunc in learners:
@@ -156,7 +156,7 @@ def create_learners(
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -493,7 +493,7 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[OUTPUT_TYPE, tuple[int, ...]],
 ) -> Generator[dict[str, Any], None, None]:
     shape: list[int] = []
     for axis in independent_axes:

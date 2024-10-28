@@ -22,7 +22,6 @@ import networkx as nx
 
 from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
-from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
@@ -48,6 +47,7 @@ from ._mapspec import (
     find_non_root_axes,
     replace_none_in_axes,
 )
+from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from ._validation import (
     validate_consistent_defaults,
     validate_consistent_type_annotations,
@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
 
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
 
@@ -254,7 +254,7 @@ class Pipeline:
         self._validate()
         return f
 
-    def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
+    def drop(self, *, f: PipeFunc | None = None, output_name: OUTPUT_TYPE | None = None) -> None:
         """Drop a function from the pipeline.
 
         Parameters
@@ -308,7 +308,7 @@ class Pipeline:
         self._validate()
 
     @functools.cached_property
-    def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+    def output_to_func(self) -> dict[OUTPUT_TYPE, PipeFunc]:
         """Return a mapping from output names to functions.
 
         The mapping includes functions with multiple outputs both as individual
@@ -322,7 +322,7 @@ class Pipeline:
             Shortcut for accessing the function corresponding to a specific output name.
 
         """
-        output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
+        output_to_func: dict[OUTPUT_TYPE, PipeFunc] = {}
         for f in self.functions:
             output_to_func[f.output_name] = f
             if isinstance(f.output_name, tuple):
@@ -330,7 +330,7 @@ class Pipeline:
                     output_to_func[name] = f
         return output_to_func
 
-    def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
+    def __getitem__(self, output_name: OUTPUT_TYPE) -> PipeFunc:
         """Return the function corresponding to a specific output name.
 
         See Also
@@ -345,12 +345,12 @@ class Pipeline:
             raise KeyError(msg)
         return self.output_to_func[output_name]
 
-    def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
+    def __contains__(self, output_name: OUTPUT_TYPE) -> bool:
         """Check if the pipeline contains a function with a specific output name."""
         return output_name in self.output_to_func
 
     @functools.cached_property
-    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
+    def node_mapping(self) -> dict[OUTPUT_TYPE, PipeFunc | str]:
         """Return a mapping from node names to nodes.
 
         Returns
@@ -358,7 +358,7 @@ class Pipeline:
             A mapping from node names to nodes.
 
         """
-        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
+        mapping: dict[OUTPUT_TYPE, PipeFunc | str] = {}
         for node in self.graph.nodes:
             if isinstance(node, PipeFunc):
                 if isinstance(node.output_name, tuple):
@@ -413,7 +413,7 @@ class Pipeline:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
-    def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
+    def func(self, output_name: OUTPUT_TYPE) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -441,7 +441,7 @@ class Pipeline:
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self)
 
-    def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
+    def __call__(self, __output_name__: OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
@@ -468,7 +468,7 @@ class Pipeline:
         self,
         func: PipeFunc,
         flat_scope_kwargs: dict[str, Any],
-        all_results: dict[_OUTPUT_TYPE, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
@@ -505,9 +505,9 @@ class Pipeline:
     def _run(
         self,
         *,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         flat_scope_kwargs: dict[str, Any],
-        all_results: dict[_OUTPUT_TYPE, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
         full_output: bool,
         used_parameters: set[str | None],
     ) -> Any:
@@ -562,7 +562,7 @@ class Pipeline:
 
     def run(
         self,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         *,
         full_output: bool = False,
         kwargs: dict[str, Any],
@@ -599,7 +599,7 @@ class Pipeline:
 
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
-        all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
 
         self._run(
@@ -626,10 +626,10 @@ class Pipeline:
         run_folder: str | Path | None = None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        output_names: set[_OUTPUT_TYPE] | None = None,
+        output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
-        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
-        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+        executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -729,9 +729,9 @@ class Pipeline:
         run_folder: str | Path | None = None,
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        output_names: set[_OUTPUT_TYPE] | None = None,
-        executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
-        storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+        output_names: set[OUTPUT_TYPE] | None = None,
+        executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -822,7 +822,7 @@ class Pipeline:
             show_progress=show_progress,
         )
 
-    def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
+    def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.
 
         Parameters
@@ -844,7 +844,7 @@ class Pipeline:
         self._internal_cache.arg_combinations[output_name] = arg_set
         return arg_set
 
-    def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
+    def root_args(self, output_name: OUTPUT_TYPE) -> tuple[str, ...]:
         """Return the root arguments required to compute a specific output."""
         if r := self._internal_cache.root_args.get(output_name):
             return r
@@ -855,7 +855,7 @@ class Pipeline:
         self._internal_cache.root_args[output_name] = root_args
         return root_args
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def func_dependencies(self, output_name: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         """Return the functions required to compute a specific output.
 
         See Also
@@ -865,7 +865,7 @@ class Pipeline:
         """
         return _traverse_graph(output_name, "predecessors", self.graph, self.node_mapping)
 
-    def func_dependents(self, name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def func_dependents(self, name: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         """Return the functions that depend on a specific input/output.
 
         See Also
@@ -1057,7 +1057,7 @@ class Pipeline:
         return flat_scope_kwargs
 
     @functools.cached_property
-    def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
+    def all_arg_combinations(self) -> dict[OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
 
         Returns
@@ -1073,7 +1073,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def all_root_args(self) -> dict[_OUTPUT_TYPE, tuple[str, ...]]:
+    def all_root_args(self) -> dict[OUTPUT_TYPE, tuple[str, ...]]:
         """Return the root arguments required to compute all outputs."""
         return {
             node.output_name: self.root_args(node.output_name)
@@ -1228,7 +1228,7 @@ class Pipeline:
         self,
         *,
         conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
     ) -> list[str]:
         if output_name is None:
             output_name = self.unique_leaf_node.output_name
@@ -1369,7 +1369,7 @@ class Pipeline:
         *,
         color_combinable: bool = False,
         conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
     ) -> None:
         """Visualize the pipeline as a directed graph.
 
@@ -1427,7 +1427,7 @@ class Pipeline:
 
     def simplified_pipeline(
         self,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
         *,
         conservatively_combine: bool = False,
     ) -> Pipeline:
@@ -1535,8 +1535,8 @@ class Pipeline:
 
     def nest_funcs(
         self,
-        output_names: set[_OUTPUT_TYPE] | Literal["*"],
-        new_output_name: _OUTPUT_TYPE | None = None,
+        output_names: set[OUTPUT_TYPE] | Literal["*"],
+        new_output_name: OUTPUT_TYPE | None = None,
     ) -> NestedPipeFunc:
         """Replaces a set of output names with a single nested function inplace.
 
@@ -1642,9 +1642,9 @@ class Pipeline:
     def _axis_in_root_arg(
         self,
         axis: str,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         root_args: tuple[str, ...] | None = None,
-        visited: set[_OUTPUT_TYPE] | None = None,
+        visited: set[OUTPUT_TYPE] | None = None,
         result: set[bool] | None = None,
     ) -> bool:
         if root_args is None:
@@ -1681,7 +1681,7 @@ class Pipeline:
 
         return all(result)
 
-    def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+    def independent_axes_in_mapspecs(self, output_name: OUTPUT_TYPE) -> set[str]:
         """Return the axes that are both in the output and in the root arguments.
 
         Identifies axes that are cross-products and can be computed independently.
@@ -1698,7 +1698,7 @@ class Pipeline:
     def subpipeline(
         self,
         inputs: set[str] | None = None,
-        output_names: set[_OUTPUT_TYPE] | None = None,
+        output_names: set[OUTPUT_TYPE] | None = None,
     ) -> Pipeline:
         """Create a new pipeline containing only the nodes between the specified inputs and outputs.
 
@@ -1787,13 +1787,13 @@ class Generations(NamedTuple):
 @dataclass(frozen=True, slots=True, eq=True)
 class _Bound:
     name: str
-    output_name: _OUTPUT_TYPE
+    output_name: OUTPUT_TYPE
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class _Resources:
     name: str
-    output_name: _OUTPUT_TYPE
+    output_name: OUTPUT_TYPE
 
 
 class _PipelineAsFunc:
@@ -1815,7 +1815,7 @@ class _PipelineAsFunc:
     def __init__(
         self,
         pipeline: Pipeline,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
@@ -1914,8 +1914,8 @@ class _PipelineAsFunc:
 def _update_all_results(
     func: PipeFunc,
     r: Any,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
+    output_name: OUTPUT_TYPE,
+    all_results: dict[OUTPUT_TYPE, Any],
     lazy: bool,  # noqa: FBT001
 ) -> None:
     if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
@@ -1994,14 +1994,14 @@ def _compute_arg_mapping(
 
 
 def _traverse_graph(
-    start: _OUTPUT_TYPE | PipeFunc,
+    start: OUTPUT_TYPE | PipeFunc,
     direction: Literal["predecessors", "successors"],
     graph: nx.DiGraph,
-    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
-) -> list[_OUTPUT_TYPE]:
+    node_mapping: dict[OUTPUT_TYPE, PipeFunc | str],
+) -> list[OUTPUT_TYPE]:
     visited = set()
 
-    def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def _traverse(x: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         results = set()
         if isinstance(x, str | tuple):
             x = node_mapping[x]
@@ -2034,7 +2034,7 @@ def _find_nodes_between(
 
 @dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
-    arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
-    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
-    func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
-    func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+    arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
+    root_args: dict[OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)

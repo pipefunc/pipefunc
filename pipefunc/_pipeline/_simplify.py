@@ -14,15 +14,15 @@ if TYPE_CHECKING:
     import networkx as nx
 
     from pipefunc._pipeline import Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 def simplified_pipeline(
     functions: list[PipeFunc],
     graph: nx.DiGraph,
-    all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
-    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
-    output_name: _OUTPUT_TYPE,
+    all_root_args: dict[OUTPUT_TYPE, tuple[str, ...]],
+    node_mapping: dict[OUTPUT_TYPE, PipeFunc | str],
+    output_name: OUTPUT_TYPE,
     *,
     conservatively_combine: bool = False,
 ) -> Pipeline:
@@ -73,7 +73,7 @@ def simplified_pipeline(
     return Pipeline(funcs)  # type: ignore[arg-type]
 
 
-def _output_name(i: int, nested_funcs: list[list[PipeFunc]], all_inputs: set[str]) -> _OUTPUT_TYPE:
+def _output_name(i: int, nested_funcs: list[list[PipeFunc]], all_inputs: set[str]) -> OUTPUT_TYPE:
     to_combine = nested_funcs[i]
     # Get all outputs for functions to combine
     current_outputs = {n for f in to_combine for n in at_least_tuple(f.output_name)}
@@ -99,7 +99,7 @@ def _flatten_dict(d: dict[PipeFunc, list[PipeFunc]]) -> list[PipeFunc]:
 def _identify_combinable_nodes(
     func: PipeFunc,
     graph: nx.DiGraph,
-    all_root_args: dict[_OUTPUT_TYPE, tuple[str, ...]],
+    all_root_args: dict[OUTPUT_TYPE, tuple[str, ...]],
     *,
     conservatively_combine: bool = False,
 ) -> dict[PipeFunc, set[PipeFunc]]:

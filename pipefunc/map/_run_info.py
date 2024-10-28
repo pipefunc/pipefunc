@@ -19,7 +19,7 @@ from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 @dataclass(frozen=True, eq=True)
@@ -27,12 +27,12 @@ class RunInfo:
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
-    shapes: dict[_OUTPUT_TYPE, tuple[int, ...]]
+    shapes: dict[OUTPUT_TYPE, tuple[int, ...]]
     internal_shapes: dict[str, int | tuple[int, ...]] | None
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    shape_masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
-    storage: str | dict[_OUTPUT_TYPE, str]
+    storage: str | dict[OUTPUT_TYPE, str]
     pipefunc_version: str = __version__
 
     def __post_init__(self) -> None:
@@ -53,7 +53,7 @@ class RunInfo:
         inputs: dict[str, Any],
         internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
         *,
-        storage: str | dict[_OUTPUT_TYPE, str],
+        storage: str | dict[OUTPUT_TYPE, str],
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = _maybe_run_folder(run_folder, storage)
@@ -77,7 +77,7 @@ class RunInfo:
             storage=storage,
         )
 
-    def storage_class(self, output_name: _OUTPUT_TYPE) -> type[StorageBase]:
+    def storage_class(self, output_name: OUTPUT_TYPE) -> type[StorageBase]:
         if isinstance(self.storage, str):
             return get_storage_class(self.storage)
         default: str | None = self.storage.get("")
@@ -97,7 +97,7 @@ class RunInfo:
         # Initialize StorageBase instances for each map spec output
         for mapspec in self.mapspecs:
             # `mapspec.output_names` is always tuple, even for single output
-            output_name: _OUTPUT_TYPE = name_mapping[mapspec.output_names]
+            output_name: OUTPUT_TYPE = name_mapping[mapspec.output_names]
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
@@ -185,7 +185,7 @@ class RunInfo:
         return Path(run_folder) / "run_info.json"
 
 
-def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
+def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
     if isinstance(storage, str):
         return get_storage_class(storage).requires_serialization
     return any(get_storage_class(s).requires_serialization for s in storage.values())
@@ -193,7 +193,7 @@ def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
 
 def _maybe_run_folder(
     run_folder: str | Path | None,
-    storage: str | dict[_OUTPUT_TYPE, str],
+    storage: str | dict[OUTPUT_TYPE, str],
 ) -> Path | None:
     if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
@@ -304,7 +304,7 @@ def _defaults_path(run_folder: Path) -> Path:
 
 
 def _init_arrays(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],

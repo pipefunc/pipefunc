@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipefunc import Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -164,7 +164,7 @@ class PipeFunc(Generic[T]):
     def __init__(
         self,
         func: T,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         *,
         output_picker: Callable[[Any, str], Any] | None = None,
         renames: dict[str, str] | None = None,
@@ -187,7 +187,7 @@ class PipeFunc(Generic[T]):
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
         self.__name__ = _get_name(func)
-        self._output_name: _OUTPUT_TYPE = output_name
+        self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
@@ -233,7 +233,7 @@ class PipeFunc(Generic[T]):
         return self._bound
 
     @functools.cached_property
-    def output_name(self) -> _OUTPUT_TYPE:
+    def output_name(self) -> OUTPUT_TYPE:
         """Return the output name(s) of the wrapped function.
 
         Returns
@@ -852,7 +852,7 @@ class PipeFunc(Generic[T]):
 
 
 def pipefunc(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     *,
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
@@ -1045,7 +1045,7 @@ class NestedPipeFunc(PipeFunc):
     def __init__(
         self,
         pipefuncs: list[PipeFunc],
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
@@ -1060,7 +1060,7 @@ class NestedPipeFunc(PipeFunc):
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
-        self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
         self._output_picker = None
@@ -1166,9 +1166,9 @@ class _NestedFuncWrapper:
     order specified by the output_name.
     """
 
-    def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
+    def __init__(self, func: Callable[..., dict[str, Any]], output_name: OUTPUT_TYPE) -> None:
         self.func: Callable[..., dict[str, Any]] = func
-        self.output_name: _OUTPUT_TYPE = output_name
+        self.output_name: OUTPUT_TYPE = output_name
         self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -1296,7 +1296,7 @@ def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
         raise ValueError(msg)
 
 
-def _validate_output_name(output_name: _OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
+def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
     if not all(x in all_outputs for x in at_least_tuple(output_name)):
@@ -1325,15 +1325,15 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 
 
 def _rename_output_name(
-    original_output_name: _OUTPUT_TYPE,
+    original_output_name: OUTPUT_TYPE,
     renames: dict[str, str],
-) -> _OUTPUT_TYPE:
+) -> OUTPUT_TYPE:
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
     return tuple(renames.get(name, name) for name in original_output_name)

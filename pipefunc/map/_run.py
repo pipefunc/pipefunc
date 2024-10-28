@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline._types import _OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
@@ -40,10 +40,10 @@ def run_map(
     run_folder: str | Path | None = None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    output_names: set[_OUTPUT_TYPE] | None = None,
+    output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
-    storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -173,9 +173,9 @@ def run_map_async(
     run_folder: str | Path | None = None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
     *,
-    output_names: set[_OUTPUT_TYPE] | None = None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None = None,
-    storage: str | dict[_OUTPUT_TYPE, str] = "file_array",
+    output_names: set[OUTPUT_TYPE] | None = None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -363,7 +363,7 @@ def _select_kwargs(
     return selected
 
 
-def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
+def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -525,9 +525,9 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
-) -> Generator[Executor | dict[_OUTPUT_TYPE, Executor] | None, None, None]:
+) -> Generator[Executor | dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield new_executor
@@ -639,7 +639,7 @@ class _StoredValue(NamedTuple):
 
 
 def _load_from_store(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     store: dict[str, StorageBase | Path | DirectValue],
     *,
     return_output: bool = True,
@@ -721,7 +721,7 @@ def _run_and_process_generation(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -743,7 +743,7 @@ async def _run_and_process_generation_async(
     store: dict[str, StorageBase | Path | DirectValue],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor],
+    executor: Executor | dict[OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -787,7 +787,7 @@ def _submit_func(
     run_info: RunInfo,
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -805,7 +805,7 @@ def _submit_func(
 
 def _executor_for_func(
     func: PipeFunc,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> Executor | None:
     if isinstance(executor, dict):
         if func.output_name in executor:
@@ -827,7 +827,7 @@ def _submit_generation(
     generation: list[PipeFunc],
     store: dict[str, StorageBase | Path | DirectValue],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:

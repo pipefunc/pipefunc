@@ -5,14 +5,14 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-from pipefunc._pipeline._types import _OUTPUT_TYPE
+from pipefunc._pipeline._types import OUTPUT_TYPE
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
 
 if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc
 
 
-_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
+_CACHE_KEY_TYPE: TypeAlias = tuple[OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
 def create_cache(
@@ -49,7 +49,7 @@ def create_cache(
 
 
 def compute_cache_key(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     kwargs: dict[str, Any],
     root_args: tuple[str, ...],
 ) -> _CACHE_KEY_TYPE | None:
@@ -112,8 +112,8 @@ def get_result_from_cache(
     func: PipeFunc,
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE | None,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
+    output_name: OUTPUT_TYPE,
+    all_results: dict[OUTPUT_TYPE, Any],
     full_output: bool,  # noqa: FBT001
     used_parameters: set[str | None],
     lazy: bool = False,  # noqa: FBT002, FBT001
