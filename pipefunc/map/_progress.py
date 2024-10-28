@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._storage_array._base import StorageBase
+
+from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
     from pathlib import Path
