@@ -12,7 +12,7 @@ import numpy as np
 from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
-from pipefunc._pipeline import _Bound, _Resources
+from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 

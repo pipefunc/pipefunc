@@ -1,60 +1,21 @@
-
 from __future__ import annotations
 
-import functools
-import inspect
 import tempfile
 import time
 import warnings
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-import networkx as nx
-
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
-from pipefunc._profile import print_profiling_stats
-from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
-from pipefunc._utils import (
-    assert_complete_kwargs,
-    at_least_tuple,
-    clear_cached_properties,
-    handle_error,
-)
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
-from pipefunc.exceptions import UnusedParametersError
-from pipefunc.lazy import _LazyFunction, task_graph
-from pipefunc.map._mapspec import (
-    ArraySpec,
-    MapSpec,
-    mapspec_axes,
-    mapspec_dimensions,
-    validate_consistent_axes,
-)
-from pipefunc.map._run import AsyncMap, run_map, run_map_async
-from pipefunc.resources import Resources
-from pipefunc.typing import (
-    Array,
-    NoAnnotation,
-    Unresolvable,
-    is_object_array_type,
-    is_type_compatible,
-)
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
-    from collections.abc import Callable, Iterable
-    from concurrent.futures import Executor
-    from pathlib import Path
+    from pipefunc._pipefunc import PipeFunc
 
-    import graphviz
-    import holoviews as hv
-    import IPython.display
+_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
-    from pipefunc._profile import ProfilingStats
-    from pipefunc.map._result import Result
+_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
-def _create_cache(
+def create_cache(
     cache_type: Literal["lru", "hybrid", "disk", "simple"] | None,
     lazy: bool,  # noqa: FBT001
     cache_kwargs: dict[str, Any] | None,
@@ -87,7 +48,7 @@ def _create_cache(
     raise ValueError(msg)
 
 
-def _compute_cache_key(
+def compute_cache_key(
     output_name: _OUTPUT_TYPE,
     kwargs: dict[str, Any],
     root_args: tuple[str, ...],
@@ -133,8 +94,7 @@ def _compute_cache_key(
     return output_name, tuple(cache_key_items)
 
 
-
-def _update_cache(
+def update_cache(
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE,
     r: Any,
@@ -148,7 +108,7 @@ def _update_cache(
         cache.put(cache_key, r)
 
 
-def _get_result_from_cache(
+def get_result_from_cache(
     func: PipeFunc,
     cache: LRUCache | HybridCache | DiskCache | SimpleCache,
     cache_key: _CACHE_KEY_TYPE | None,
@@ -158,6 +118,8 @@ def _get_result_from_cache(
     used_parameters: set[str | None],
     lazy: bool = False,  # noqa: FBT002, FBT001
 ) -> tuple[bool, bool]:
+    from ._base import _update_all_results
+
     # Used in _run
     result_from_cache = False
     if cache_key is not None and cache_key in cache:

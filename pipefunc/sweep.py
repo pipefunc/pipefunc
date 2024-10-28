@@ -11,7 +11,7 @@ from pipefunc._utils import at_least_tuple, requires
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 
-    from pipefunc._pipeline import _OUTPUT_TYPE, Pipeline
+    from pipefunc._pipeline._base import _OUTPUT_TYPE, Pipeline
 
 
 def _combined_exclude(

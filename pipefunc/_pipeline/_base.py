@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-import tempfile
 import time
-import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
 
@@ -31,7 +29,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     handle_error,
 )
-from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
@@ -43,12 +41,12 @@ from pipefunc.map._mapspec import (
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
-from pipefunc.typing import (
-    Array,
-    NoAnnotation,
-    Unresolvable,
-    is_object_array_type,
-    is_type_compatible,
+
+from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
+from ._validation import (
+    _check_consistent_defaults,
+    _check_consistent_type_annotations,
+    _validate_scopes,
 )
 
 if TYPE_CHECKING:
@@ -66,7 +64,6 @@ if TYPE_CHECKING:
 
 
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 
 class Pipeline:
@@ -177,7 +174,7 @@ class Pipeline:
         self._cache_kwargs = cache_kwargs
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
-        self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        self.cache = create_cache(cache_type, lazy, cache_kwargs)
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
@@ -522,12 +519,12 @@ class Pipeline:
         result_from_cache = False
         if use_cache:
             assert cache is not None
-            cache_key = _compute_cache_key(
+            cache_key = compute_cache_key(
                 func.output_name,
                 self._func_defaults(func) | flat_scope_kwargs | func._bound,
                 root_args,
             )
-            return_now, result_from_cache = _get_result_from_cache(
+            return_now, result_from_cache = get_result_from_cache(
                 func,
                 cache,
                 cache_key,
@@ -556,7 +553,7 @@ class Pipeline:
         r = _execute_func(func, func_args, self.lazy)
         if use_cache and cache_key is not None:
             assert cache is not None
-            _update_cache(cache, cache_key, r, start_time)
+            update_cache(cache, cache_key, r, start_time)
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
@@ -1931,30 +1928,6 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-
-def _check_consistent_defaults(
-    functions: list[PipeFunc],
-    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
-) -> None:
-    """Check that the default values for shared arguments are consistent."""
-    arg_defaults = {}
-    for f in functions:
-        for arg, default_value in f.defaults.items():
-            if arg in f._bound or arg in output_to_func:
-                continue
-            if arg not in arg_defaults:
-                arg_defaults[arg] = default_value
-            elif default_value != arg_defaults[arg]:
-                msg = (
-                    f"Inconsistent default values for argument '{arg}' in"
-                    " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function."
-                )
-                raise ValueError(msg)
-
-
-
-
 def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
     if lazy:
         return _LazyFunction(func, kwargs=func_args)
@@ -1964,7 +1937,6 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         handle_error(e, func, func_args)
         # handle_error raises but mypy doesn't know that
         raise  # pragma: no cover
-
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
@@ -2157,94 +2129,9 @@ def _find_nodes_between(
     return reachable_from_inputs & reachable_to_outputs
 
 
-def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
-    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
-    if new_scope is not None:
-        all_scopes.add(new_scope)
-    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
-    if overlap := all_scopes & all_parameters:
-        overlap_str = ", ".join(overlap)
-        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
-        raise ValueError(msg)
-
-
 @dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
     arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
     func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
-
-
-def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
-    """Check that the type annotations for shared arguments are consistent."""
-    for node in graph.nodes:
-        if not isinstance(node, PipeFunc):
-            continue
-        deps = nx.descendants_at_distance(graph, node, 1)
-        output_types = node.output_annotation
-        for dep in deps:
-            assert isinstance(dep, PipeFunc)
-            for parameter_name, input_type in dep.parameter_annotations.items():
-                if parameter_name not in output_types:
-                    continue
-                if _mapspec_is_generated(node, dep):
-                    # NOTE: We cannot check the type-hints for auto-generated MapSpecs
-                    continue
-                if _mapspec_with_internal_shape(node, parameter_name):
-                    # NOTE: We cannot verify the type hints because the output
-                    # might be any iterable instead of an Array as returned by
-                    # a map operation.
-                    continue
-                output_type = output_types[parameter_name]
-                if (
-                    _axis_is_reduced(node, dep, parameter_name)
-                    and not is_object_array_type(output_type)
-                    and not isinstance(output_type, Unresolvable)
-                    and output_type is not NoAnnotation
-                ):
-                    output_type = Array[output_type]  # type: ignore[valid-type]
-                if not is_type_compatible(output_type, input_type):
-                    msg = (
-                        f"Inconsistent type annotations for:"
-                        f"\n  - Argument `{parameter_name}`"
-                        f"\n  - Function `{node.__name__}(...)` returns:\n      `{output_type}`."
-                        f"\n  - Function `{dep.__name__}(...)` expects:\n      `{input_type}`."
-                        "\nPlease make sure the shared input arguments have the same type."
-                        "\nNote that the output type displayed above might be wrapped in"
-                        " `pipefunc.typing.Array` if using `MapSpec`s."
-                        " Disable this check by setting `validate_type_annotations=False`."
-                    )
-                    raise TypeError(msg)
-
-
-def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
-    """Whether the output was the result of a map, and the input takes the entire result."""
-    output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
-    input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
-    if f_in.mapspec:
-        input_spec_axes = next(
-            (s.axes for s in f_in.mapspec.inputs if s.name == parameter_name),
-            None,
-        )
-    else:
-        input_spec_axes = None
-    return parameter_name in output_mapspec_names and (
-        parameter_name not in input_mapspec_names
-        or (input_spec_axes is not None and None in input_spec_axes)
-    )
-
-
-def _mapspec_is_generated(f_out: PipeFunc, f_in: PipeFunc) -> bool:
-    if f_out.mapspec is None or f_in.mapspec is None:
-        return False
-    return f_out.mapspec._is_generated or f_in.mapspec._is_generated
-
-
-def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
-    """Whether the output was not from a map operation but returned an array with internal shape."""
-    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
-        return False
-    output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
-    all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
-    return not all_inputs_in_outputs
