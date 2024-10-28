@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from pipefunc.map import MapSpec, load_outputs
-from pipefunc.map._mapspec import mapspec_axes, trace_dependencies
-from pipefunc.map._run_info import RunInfo
+from ._load import load_outputs
+from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
+from ._run_info import RunInfo
 
 if TYPE_CHECKING:
     from collections import OrderedDict
@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pipefunc import Pipeline
-    from pipefunc.map._result import Result
+
+    from ._result import Result
 
 
 def load_xarray(

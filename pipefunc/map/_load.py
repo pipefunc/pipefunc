@@ -44,7 +44,7 @@ def load_xarray_dataset(
 
     """
     requires("xarray", reason="load_xarray_dataset", extras="xarray")
-    from pipefunc.map.xarray import load_xarray_dataset
+    from .xarray import load_xarray_dataset
 
     run_info = RunInfo.load(run_folder)
     return load_xarray_dataset(

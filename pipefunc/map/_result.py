@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pipefunc.map._storage_array._base import StorageBase
+    from ._storage_array._base import StorageBase
 
 
 class _Missing: ...
