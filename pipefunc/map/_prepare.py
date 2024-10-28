@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections import OrderedDict, defaultdict
 from concurrent.futures import Executor, ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 
@@ -16,12 +16,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
 
     from ._result import DirectValue, Result
-
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def prepare_run(
@@ -30,10 +28,10 @@ def prepare_run(
     inputs: dict[str, Any],
     run_folder: str | Path | None,
     internal_shapes: dict[str, int | tuple[int, ...]] | None,
-    output_names: set[_OUTPUT_TYPE] | None,
+    output_names: set[OUTPUT_TYPE] | None,
     parallel: bool,
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
-    storage: str | dict[_OUTPUT_TYPE, str],
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    storage: str | dict[OUTPUT_TYPE, str],
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
@@ -85,7 +83,7 @@ def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
     store: dict[str, StorageBase | Path | DirectValue],
-    executor: Executor | dict[_OUTPUT_TYPE, Executor] | None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> None:
     if isinstance(executor, dict):
         uses_default_executor: set[str] = set(store.keys()) - {

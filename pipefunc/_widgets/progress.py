@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 import IPython.display
 import ipywidgets as widgets
@@ -10,9 +10,8 @@ import ipywidgets as widgets
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
+    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.map._progress import Status
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
 def _span(class_name: str, value: str) -> str:
@@ -23,7 +22,7 @@ def _create_button(description: str, button_style: str, icon: str) -> widgets.Bu
     return widgets.Button(description=description, button_style=button_style, icon=icon)
 
 
-def _create_progress_bar(name: _OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
+def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
     return widgets.FloatProgress(
         value=progress,
         max=1.0,
@@ -43,7 +42,7 @@ class ProgressTracker:
 
     def __init__(
         self,
-        progress_dict: dict[_OUTPUT_TYPE, Status],
+        progress_dict: dict[OUTPUT_TYPE, Status],
         task: asyncio.Task[Any] | None = None,
         *,
         target_progress_change: float = 0.05,
@@ -52,7 +51,7 @@ class ProgressTracker:
         in_async: bool = True,
     ) -> None:
         self.task: asyncio.Task[None] | None = task
-        self.progress_dict: dict[_OUTPUT_TYPE, Status] = progress_dict
+        self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
         self.auto_update_task: asyncio.Task | None = None
@@ -63,9 +62,9 @@ class ProgressTracker:
         self._max_auto_update_interval: float = 10.0
         self._first_auto_update_interval: float = 1.0
         self._sync_update_interval: float = 0.1
-        self.progress_bars: dict[_OUTPUT_TYPE, widgets.FloatProgress] = {}
-        self.labels: dict[_OUTPUT_TYPE, dict[_OUTPUT_TYPE, widgets.HTML]] = {}
-        self.buttons: dict[_OUTPUT_TYPE, widgets.Button] = {
+        self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
+        self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
+        self.buttons: dict[OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button("Update Progress", "info", "refresh"),
             "toggle_auto_update": _create_button("Start Auto-Update", "success", "refresh"),
             "cancel": _create_button("Cancel Calculation", "danger", "stop"),
@@ -124,7 +123,7 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
-    def _update_labels(self, name: _OUTPUT_TYPE, status: Status) -> None:
+    def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]
         iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
