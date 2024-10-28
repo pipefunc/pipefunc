@@ -19,7 +19,7 @@ from pipefunc.typing import (
 _OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
 
 
-def _check_consistent_defaults(
+def validate_consistent_defaults(
     functions: list[PipeFunc],
     output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
 ) -> None:
@@ -40,7 +40,7 @@ def _check_consistent_defaults(
                 raise ValueError(msg)
 
 
-def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
+def validate_consistent_type_annotations(graph: nx.DiGraph) -> None:
     """Check that the type annotations for shared arguments are consistent."""
     for node in graph.nodes:
         if not isinstance(node, PipeFunc):
@@ -82,6 +82,17 @@ def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
                     raise TypeError(msg)
 
 
+def validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
+    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
+    if new_scope is not None:
+        all_scopes.add(new_scope)
+    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
+    if overlap := all_scopes & all_parameters:
+        overlap_str = ", ".join(overlap)
+        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
+        raise ValueError(msg)
+
+
 def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
     """Whether the output was the result of a map, and the input takes the entire result."""
     output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
@@ -112,14 +123,3 @@ def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
     output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
     all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
     return not all_inputs_in_outputs
-
-
-def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
-    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
-    if new_scope is not None:
-        all_scopes.add(new_scope)
-    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
-    if overlap := all_scopes & all_parameters:
-        overlap_str = ", ".join(overlap)
-        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
-        raise ValueError(msg)

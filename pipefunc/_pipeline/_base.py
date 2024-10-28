@@ -44,9 +44,9 @@ from pipefunc.resources import Resources
 
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._validation import (
-    _check_consistent_defaults,
-    _check_consistent_type_annotations,
-    _validate_scopes,
+    validate_consistent_defaults,
+    validate_consistent_type_annotations,
+    validate_scopes,
 )
 
 if TYPE_CHECKING:
@@ -378,7 +378,7 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
@@ -1019,7 +1019,7 @@ class Pipeline:
         >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
-        _validate_scopes(self.functions, scope)
+        validate_scopes(self.functions, scope)
         all_inputs = set(self.topological_generations.root_args)
         all_outputs = self.all_output_names
         if inputs == "*":
@@ -1108,11 +1108,11 @@ class Pipeline:
 
     def _validate(self) -> None:
         """Validate the pipeline."""
-        _validate_scopes(self.functions)
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        validate_scopes(self.functions)
+        validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
         if self.validate_type_annotations:
-            _check_consistent_type_annotations(self.graph)
+            validate_consistent_type_annotations(self.graph)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
