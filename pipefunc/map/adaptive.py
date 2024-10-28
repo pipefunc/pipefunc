@@ -123,7 +123,7 @@ class LearnersDict(LearnersDictType):
             The output depends on the value of `returns`.
 
         """
-        from pipefunc.map.adaptive_scheduler import slurm_run_setup
+        from .adaptive_scheduler import slurm_run_setup
 
         if self.run_info is None:
             msg = "`run_info` must be provided. Set `learners_dict.run_info`."

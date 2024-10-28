@@ -8,7 +8,8 @@ import itertools
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import prod
-from pipefunc.map._mapspec import shape_to_strides
+
+from ._mapspec import shape_to_strides
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
