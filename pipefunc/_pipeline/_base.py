@@ -64,9 +64,10 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
 
-    from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
+
+    from ._types import OUTPUT_TYPE
 
 
 class Pipeline:

@@ -5,9 +5,7 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 from pipefunc._pipefunc import PipeFunc
-from pipefunc._utils import (
-    at_least_tuple,
-)
+from pipefunc._utils import at_least_tuple
 from pipefunc.typing import (
     Array,
     NoAnnotation,
@@ -17,7 +15,7 @@ from pipefunc.typing import (
 )
 
 if TYPE_CHECKING:
-    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from ._types import OUTPUT_TYPE
 
 
 def validate_consistent_defaults(

@@ -5,8 +5,9 @@ import time
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-from pipefunc._pipeline._types import OUTPUT_TYPE
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
+
+from ._types import OUTPUT_TYPE
 
 if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc

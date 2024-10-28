@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
     import networkx as nx
 
-    from pipefunc._pipeline import Pipeline
-    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from ._base import Pipeline
+    from ._types import OUTPUT_TYPE
 
 
 def simplified_pipeline(
