@@ -14,7 +14,7 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
     return n * (None,) + (axis,)
 
 
-def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
+def add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
     # Modify the MapSpec of functions that depend on `p` to include the new axis
     for f in functions:
         if p not in f.parameters or p in f._bound:
@@ -39,10 +39,10 @@ def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[P
         f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs), _is_generated=True)
         for o in output_specs:
             dims[o.name] = len(o.axes)
-            _add_mapspec_axis(o.name, dims, axis, functions)
+            add_mapspec_axis(o.name, dims, axis, functions)
 
 
-def _find_non_root_axes(
+def find_non_root_axes(
     mapspecs: list[MapSpec],
     root_args: list[str],
 ) -> dict[str, list[str | None]]:
@@ -58,7 +58,7 @@ def _find_non_root_axes(
     return non_root_inputs
 
 
-def _replace_none_in_axes(
+def replace_none_in_axes(
     mapspecs: list[MapSpec],
     non_root_inputs: dict[str, list[str]],
     multi_output_mapping: dict[str, tuple[str, ...]],
@@ -83,7 +83,7 @@ def _replace_none_in_axes(
     assert not any(None in axes for axes in non_root_inputs.values())
 
 
-def _create_missing_mapspecs(
+def create_missing_mapspecs(
     functions: list[PipeFunc],
     non_root_inputs: dict[str, set[str]],
 ) -> set[PipeFunc]:

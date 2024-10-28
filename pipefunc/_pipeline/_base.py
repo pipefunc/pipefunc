@@ -43,10 +43,10 @@ from pipefunc.resources import Resources
 
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
-    _add_mapspec_axis,
-    _create_missing_mapspecs,
-    _find_non_root_axes,
-    _replace_none_in_axes,
+    add_mapspec_axis,
+    create_missing_mapspecs,
+    find_non_root_axes,
+    replace_none_in_axes,
 )
 from ._validation import (
     validate_consistent_defaults,
@@ -1201,11 +1201,11 @@ class Pipeline:
         """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
         root_args = self.topological_generations.root_args
         mapspecs = self.mapspecs(ordered=False)
-        non_root_inputs = _find_non_root_axes(mapspecs, root_args)
+        non_root_inputs = find_non_root_axes(mapspecs, root_args)
         output_names = {at_least_tuple(f.output_name) for f in self.functions}
         multi_output_mapping = {n: names for names in output_names for n in names if len(names) > 1}
-        _replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
-        return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
+        replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
+        return create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
     def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
         """Add a new axis to ``parameter``'s `MapSpec`.
@@ -1222,7 +1222,7 @@ class Pipeline:
         """
         self._autogen_mapspec_axes()
         for p in parameter:
-            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
+            add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._clear_internal_cache()
         self._validate()
 
