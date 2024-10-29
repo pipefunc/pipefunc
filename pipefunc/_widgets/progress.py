@@ -55,7 +55,6 @@ class ProgressTracker:
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
         self.auto_update_task: asyncio.Task | None = None
-        self.first_update: bool = True
         self.in_async: bool = in_async
         self.last_update_time: float = 0.0
         self._min_auto_update_interval: float = 0.1
@@ -86,6 +85,9 @@ class ProgressTracker:
             "interval-label",
             "Auto-update every: N/A",
         )
+        self._initial_update_period: float = 30.0
+        self._initial_update_interval: float = 1.0
+        self.start_time: float = 0.0
         if display:
             self.display()
         if self.task is not None:
@@ -163,20 +165,24 @@ class ProgressTracker:
 
     async def _auto_update_progress(self) -> None:
         """Periodically update the progress."""
+        self.start_time = time.monotonic()
         while self.auto_update:
             self.update_progress()
-            if self.first_update:
-                new_interval = self._first_auto_update_interval
-                self.first_update = False
+            current_time = time.monotonic()
+            elapsed_since_start = current_time - self.start_time
+
+            if elapsed_since_start <= self._initial_update_period:
+                new_interval = self._initial_update_interval
             else:
                 new_interval = self._calculate_adaptive_interval_with_previous()
+
             if self._all_completed():
                 break
-            if not self.first_update:
-                self.auto_update_interval_label.value = _span(
-                    "interval-label",
-                    f"Auto-update every: {new_interval:.2f} sec",
-                )
+
+            self.auto_update_interval_label.value = _span(
+                "interval-label",
+                f"Auto-update every: {new_interval:.2f} sec",
+            )
             await asyncio.sleep(new_interval)
 
     def _all_completed(self) -> bool:
@@ -203,7 +209,6 @@ class ProgressTracker:
             "danger" if self.auto_update else "success"
         )
         if self.auto_update:
-            self.first_update = True
             self.auto_update_task = asyncio.create_task(self._auto_update_progress())
         elif self.auto_update_task is not None:
             self.auto_update_task.cancel()
