@@ -1381,5 +1381,5 @@ def _get_name(func: Callable[..., Any]) -> str:
         if "." in qualname:
             *_, class_name, method_name = qualname.split(".")
             return f"{class_name}.{method_name}"
-        return qualname
+        return qualname  # pragma: no cover
     return func.__name__
