@@ -107,7 +107,7 @@ class ProgressTracker:
             "Auto-update every: N/A",
         )
         self._initial_update_period: float = 30.0
-        self._initial_update_interval: float = 1.0
+        self._initial_max_update_interval: float = 1.0
         self.start_time: float = 0.0
         if display:
             self.display()
@@ -192,10 +192,9 @@ class ProgressTracker:
             current_time = time.monotonic()
             elapsed_since_start = current_time - self.start_time
 
+            new_interval = self._calculate_adaptive_interval_with_previous()
             if elapsed_since_start <= self._initial_update_period:
-                new_interval = self._initial_update_interval
-            else:
-                new_interval = self._calculate_adaptive_interval_with_previous()
+                new_interval = min(new_interval, self._initial_max_update_interval)
 
             if self._all_completed():
                 break
