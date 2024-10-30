@@ -802,3 +802,22 @@ def test_unpicklable_run_with_mapspec():
     r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
     assert isinstance(r["y"].output, np.ndarray)
     assert r["z"].output.tolist() == [1, 2, 3, 4]
+
+
+def test_duplicate_output_names() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        Pipeline([f, f])
+
+    p = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        p.add(f)
