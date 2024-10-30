@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from pipefunc.map import MapSpec, load_outputs
-from pipefunc.map._mapspec import mapspec_axes, trace_dependencies
-from pipefunc.map._run_info import RunInfo
+from ._load import load_outputs
+from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
+from ._run_info import RunInfo
 
 if TYPE_CHECKING:
     from collections import OrderedDict
@@ -22,20 +22,8 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pipefunc import Pipeline
-    from pipefunc.map._run import Result
 
-
-def _data_loader(
-    output_name: str,
-    *,
-    run_folder: Path | None = None,
-    data: dict[str, Result] | None = None,
-) -> Any:
-    if data is not None:
-        assert data is not None
-        return data[output_name].output
-    assert run_folder is not None
-    return load_outputs(output_name, run_folder=run_folder)
+    from ._result import Result
 
 
 def load_xarray(
@@ -54,6 +42,59 @@ def load_xarray(
         data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
+
+
+def load_xarray_dataset(
+    mapspecs: list[MapSpec],
+    inputs: dict[str, Any],
+    *,
+    run_folder: str | Path,
+    output_names: list[str] | None = None,
+    load_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the xarray dataset."""
+    if not output_names:
+        run_info = RunInfo.load(run_folder)
+        output_names = sorted(run_info.all_output_names)
+    return _xarray_dataset(
+        mapspecs,
+        inputs,
+        data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
+        output_names=output_names,
+        load_intermediate=load_intermediate,
+    )
+
+
+def xarray_dataset_from_results(
+    inputs: dict[str, Any],
+    results: OrderedDict[str, Result],
+    pipeline: Pipeline,
+    *,
+    load_intermediate: bool = True,
+) -> xr.Dataset:
+    """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
+    mapspecs = pipeline.mapspecs()
+    output_names = sorted(results.keys())
+    return _xarray_dataset(
+        mapspecs,
+        inputs,
+        data_loader=partial(_data_loader, data=results),
+        output_names=output_names,
+        load_intermediate=load_intermediate,
+    )
+
+
+def _data_loader(
+    output_name: str,
+    *,
+    run_folder: Path | None = None,
+    data: dict[str, Result] | None = None,
+) -> Any:
+    if data is not None:
+        assert data is not None
+        return data[output_name].output
+    assert run_folder is not None
+    return load_outputs(output_name, run_folder=run_folder)
 
 
 def _xarray(
@@ -99,27 +140,6 @@ def _xarray(
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
 
-def load_xarray_dataset(
-    mapspecs: list[MapSpec],
-    inputs: dict[str, Any],
-    *,
-    run_folder: str | Path,
-    output_names: list[str] | None = None,
-    load_intermediate: bool = True,
-) -> xr.Dataset:
-    """Load the xarray dataset."""
-    if not output_names:
-        run_info = RunInfo.load(run_folder)
-        output_names = sorted(run_info.all_output_names)
-    return _xarray_dataset(
-        mapspecs,
-        inputs,
-        data_loader=partial(_data_loader, run_folder=run_folder),  # type: ignore[arg-type]
-        output_names=output_names,
-        load_intermediate=load_intermediate,
-    )
-
-
 def _xarray_dataset(
     mapspecs: list[MapSpec],
     inputs: dict[str, Any],
@@ -143,22 +163,3 @@ def _xarray_dataset(
         array = data_loader(name)
         ds[name] = array if isinstance(array, np.ndarray) else ((), array)
     return ds
-
-
-def xarray_dataset_from_results(
-    inputs: dict[str, Any],
-    results: OrderedDict[str, Result],
-    pipeline: Pipeline,
-    *,
-    load_intermediate: bool = True,
-) -> xr.Dataset:
-    """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
-    mapspecs = pipeline.mapspecs()
-    output_names = sorted(results.keys())
-    return _xarray_dataset(
-        mapspecs,
-        inputs,
-        data_loader=partial(_data_loader, data=results),
-        output_names=output_names,
-        load_intermediate=load_intermediate,
-    )

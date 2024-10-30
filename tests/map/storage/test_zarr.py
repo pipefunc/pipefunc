@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import zarr
 
-from pipefunc.map.zarr import CloudPickleCodec, ZarrFileArray, _select_by_mask
+from pipefunc.map._storage_array._zarr import CloudPickleCodec, ZarrFileArray, select_by_mask
 
 
 def test_zarr_array_init():
@@ -105,7 +105,7 @@ def test_zarr_array_with_internal_arrays():
         internal_shape=internal_shape,
     )
     full_shape = (2, 2, 3, 3, 4)
-    assert _select_by_mask(shape_mask, shape, internal_shape) == full_shape
+    assert select_by_mask(shape_mask, shape, internal_shape) == full_shape
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
 

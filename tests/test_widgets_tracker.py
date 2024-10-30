@@ -73,7 +73,6 @@ async def test_progress_tracker_calculate_adaptive_interval(mock_progress_dict, 
 async def test_progress_tracker_auto_update_progress(mock_progress_dict, mock_task):
     progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
     progress.auto_update = True
-    progress.first_update = False
     update_progress_mock = Mock()
     with (
         patch.object(progress, "update_progress", update_progress_mock),

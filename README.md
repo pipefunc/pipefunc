@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
+[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
 [![CodSpeed Badge](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/pipefunc/pipefunc)
@@ -89,23 +89,10 @@ pipeline = Pipeline([f_c, f_d, f_e], profile=True)  # `profile=True` enables res
 
 # Call the pipeline directly for different outputs:
 assert pipeline("d", a=2, b=3) == 15
-assert pipeline("e", a=2, b=3, x=1) == 75
-
-# Or create a new function for a specific output
-h_d = pipeline.func("d")
-assert h_d(a=2, b=3) == 15
-
-h_e = pipeline.func("e")
-assert h_e(a=2, b=3, x=1) == 75
-# Instead of providing the root arguments, you can also provide the intermediate results directly
-assert h_e(c=5, d=15, x=1) == 75
+assert pipeline("e", a=2, b=3) == 75
 
 # Visualize the pipeline
 pipeline.visualize()
-
-# Get all possible argument mappings for each function
-all_args = pipeline.all_arg_combinations
-print(all_args)
 
 # Show resource reporting (only works if profile=True)
 pipeline.print_profiling_stats()

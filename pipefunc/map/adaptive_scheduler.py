@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._run import _func_kwargs, _load_file_arrays, _select_kwargs
 from pipefunc.resources import Resources
+
+from ._run import _func_kwargs, _load_arrays, _select_kwargs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,8 +21,9 @@ if TYPE_CHECKING:
     from adaptive_scheduler.utils import EXECUTOR_TYPES
 
     from pipefunc._pipefunc import PipeFunc
-    from pipefunc.map._run_info import RunInfo
-    from pipefunc.map.adaptive import LearnersDict
+
+    from ._run_info import RunInfo
+    from .adaptive import LearnersDict
 
 
 class AdaptiveSchedulerDetails(NamedTuple):
@@ -200,7 +202,7 @@ def _eval_resources(
     run_info: RunInfo,
 ) -> Resources:
     kwargs = _func_kwargs(func, run_info, run_info.init_store())
-    _load_file_arrays(kwargs)
+    _load_arrays(kwargs)
     if index is not None:
         shape = run_info.shapes[func.output_name]
         shape_mask = run_info.shape_masks[func.output_name]

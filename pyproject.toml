@@ -20,10 +20,11 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = ["networkx", "psutil", "cloudpickle", "numpy"]
+dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
 xarray = ["xarray"]
@@ -31,6 +32,7 @@ widgets = ["ipywidgets", "anywidget"]
 zarr = ["zarr"]
 pandas = ["pandas"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz", "anywidget"]
+profiling = ["psutil"]
 test = [
     "pytest",
     "pytest-asyncio",
@@ -38,9 +40,6 @@ test = [
     "pytest-cov",
     "pytest-xdist",
     "coverage",
-    "adaptive",
-    "xarray",
-    "zarr",
     "versioningit",
 ]
 docs = [
@@ -60,7 +59,7 @@ docs = [
     "nltk",
     "scikit-image",
 ]
-all = ["pipefunc[adaptive,xarray,zarr,plotting,widgets]"]
+all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "pre-commit",

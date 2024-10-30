@@ -9,7 +9,6 @@ dependencies:
   - pip
   # from pyproject.toml
   - networkx
-  - psutil
   - cloudpickle
   - numpy
   # optional-dependencies: adaptive
@@ -24,6 +23,8 @@ dependencies:
   - zarr
   # optional-dependencies: pandas
   - pandas
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -38,7 +39,4 @@ dependencies:
   - pytest-cov
   - pytest-xdist
   - coverage
-  - adaptive
-  - xarray
-  - zarr
   - versioningit
