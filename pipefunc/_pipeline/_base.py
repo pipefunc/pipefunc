@@ -242,6 +242,11 @@ class Pipeline:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
+        if f.output_name in self.output_to_func:
+            msg = (
+                f"The function with output name `{f.output_name!r}` already exists in the pipeline."
+            )
+            raise ValueError(msg)
         self.functions.append(f)
         f._pipelines.add(self)
 
