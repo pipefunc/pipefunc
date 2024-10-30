@@ -560,6 +560,12 @@ def test_defaults_dataclass_factory():
     @dataclass
     class TestClass:
         x0: list[int] = field(default_factory=lambda: [1, 2, 3])
+        y0: int = field(default=100)
 
     pf = PipeFunc(TestClass, "container")
     assert pf.defaults["x0"] == [1, 2, 3]
+    assert pf() == TestClass(x0=[1, 2, 3], y0=100)
+
+    pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
+    assert pf2.defaults["x0"] == [4, 5, 6]
+    assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
