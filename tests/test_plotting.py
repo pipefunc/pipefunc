@@ -18,6 +18,7 @@ import importlib
 has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 has_holoviews = importlib.util.find_spec("holoviews") is not None
 has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
+has_anywidget = importlib.util.find_spec("anywidget") is not None
 
 
 @pytest.fixture(autouse=True)
@@ -177,6 +178,23 @@ def test_visualize_graphviz(
             figsize=10,
             include_full_mapspec=True,
         )
+
+
+@pytest.mark.skipif(
+    not has_pygraphviz or not has_anywidget,
+    reason="pygraphviz or anywidget not installed",
+)
+def test_plotting_widget(everything_pipeline: Pipeline) -> None:
+    # Note: Not sure how to test this properly, just make sure it runs
+    widget = everything_pipeline.visualize(backend="graphviz_widget")
+    first, second, widget = widget.children
+    reset_button, direction_selector = first.children
+    search_input, search_type_selector, case_toggle = second.children
+    reset_button.click()
+    direction_selector.value = "downstream"
+    search_input.value = "c"
+    search_type_selector.value = "included"
+    case_toggle.value = True
 
 
 @pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
