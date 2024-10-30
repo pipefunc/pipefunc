@@ -231,7 +231,7 @@ def requires(*packages: str, reason: str = "", extras: str | None = None) -> Non
     conda_name_mapping = {"graphviz": "python-graphviz"}
 
     for package in packages:
-        if not is_installed(package):
+        if is_installed(package):
             continue
         conda_package = conda_name_mapping.get(package, package)
         error_message = f"The '{package}' package is required"

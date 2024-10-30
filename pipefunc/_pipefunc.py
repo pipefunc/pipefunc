@@ -21,7 +21,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -32,6 +32,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     format_function_call,
     get_local_ip,
+    requires,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
@@ -43,10 +44,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipefunc import Pipeline
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
+
 MAX_PARAMS_LEN = 15
 
 
@@ -162,7 +164,7 @@ class PipeFunc(Generic[T]):
     def __init__(
         self,
         func: T,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         *,
         output_picker: Callable[[Any, str], Any] | None = None,
         renames: dict[str, str] | None = None,
@@ -184,8 +186,8 @@ class PipeFunc(Generic[T]):
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
-        self.__name__ = func.__name__
-        self._output_name: _OUTPUT_TYPE = output_name
+        self.__name__ = _get_name(func)
+        self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
@@ -231,7 +233,7 @@ class PipeFunc(Generic[T]):
         return self._bound
 
     @functools.cached_property
-    def output_name(self) -> _OUTPUT_TYPE:
+    def output_name(self) -> OUTPUT_TYPE:
         """Return the output name(s) of the wrapped function.
 
         Returns
@@ -654,6 +656,7 @@ class PipeFunc(Generic[T]):
         """Enable or disable profiling for the wrapped function."""
         self._profile = enable
         if enable:
+            requires("psutil", reason="profile", extras="profiling")
             self.profiling_stats = ProfilingStats()
         else:
             self.profiling_stats = None
@@ -849,7 +852,7 @@ class PipeFunc(Generic[T]):
 
 
 def pipefunc(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     *,
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
@@ -1042,7 +1045,7 @@ class NestedPipeFunc(PipeFunc):
     def __init__(
         self,
         pipefuncs: list[PipeFunc],
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
@@ -1057,7 +1060,7 @@ class NestedPipeFunc(PipeFunc):
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
-        self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
         self._output_picker = None
@@ -1163,9 +1166,9 @@ class _NestedFuncWrapper:
     order specified by the output_name.
     """
 
-    def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
+    def __init__(self, func: Callable[..., dict[str, Any]], output_name: OUTPUT_TYPE) -> None:
         self.func: Callable[..., dict[str, Any]] = func
-        self.output_name: _OUTPUT_TYPE = output_name
+        self.output_name: OUTPUT_TYPE = output_name
         self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -1300,7 +1303,7 @@ def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
         raise ValueError(msg)
 
 
-def _validate_output_name(output_name: _OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
+def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
     if not all(x in all_outputs for x in at_least_tuple(output_name)):
@@ -1329,15 +1332,15 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(output: Any, name: str, output_name: _OUTPUT_TYPE) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 
 
 def _rename_output_name(
-    original_output_name: _OUTPUT_TYPE,
+    original_output_name: OUTPUT_TYPE,
     renames: dict[str, str],
-) -> _OUTPUT_TYPE:
+) -> OUTPUT_TYPE:
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
     return tuple(renames.get(name, name) for name in original_output_name)
@@ -1375,3 +1378,15 @@ def _maybe_update_kwargs_with_resources(
             kwargs[resources_variable] = resources(kwargs)
         else:
             kwargs[resources_variable] = resources
+
+
+def _get_name(func: Callable[..., Any]) -> str:
+    if isinstance(func, PipeFunc):
+        return _get_name(func.func)
+    if inspect.ismethod(func):
+        qualname = func.__qualname__
+        if "." in qualname:
+            *_, class_name, method_name = qualname.split(".")
+            return f"{class_name}.{method_name}"
+        return qualname  # pragma: no cover
+    return func.__name__
