@@ -22,8 +22,6 @@ dependencies:
   - zarr
   # optional-dependencies: pandas
   - pandas
-  # optional-dependencies: profiling
-  - psutil
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -31,6 +29,8 @@ dependencies:
   - bokeh
   - python-graphviz
   - jupyter_bokeh
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: test
   - pytest
   - pytest-asyncio
