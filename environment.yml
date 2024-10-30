@@ -30,6 +30,7 @@ dependencies:
   - holoviews
   - bokeh
   - python-graphviz
+  - jupyter_bokeh
   # optional-dependencies: test
   - pytest
   - pytest-asyncio

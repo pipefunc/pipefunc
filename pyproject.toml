@@ -31,8 +31,15 @@ xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]
 pandas = ["pandas"]
+plotting = [
+    "matplotlib",
+    "pygraphviz",
+    "holoviews",
+    "bokeh",
+    "graphviz",
+    "jupyter_bokeh",
+]
 profiling = ["psutil"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
     "pytest-asyncio",
