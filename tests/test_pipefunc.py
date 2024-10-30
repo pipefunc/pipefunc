@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import pytest
@@ -554,3 +554,12 @@ def test_class_name_in_pipefunc_name() -> None:
 
     pf = PipeFunc(f, output_name="out")
     assert pf.__name__ == "f"
+
+
+def test_defaults_dataclass_factory():
+    @dataclass
+    class TestClass:
+        x0: list[int] = field(default_factory=lambda: [1, 2, 3])
+
+    pf = PipeFunc(TestClass, "container")
+    assert pf.defaults["x0"] == [1, 2, 3]

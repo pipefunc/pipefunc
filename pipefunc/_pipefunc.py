@@ -9,6 +9,7 @@ These `PipeFunc` objects are used to construct a `pipefunc.Pipeline`.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime
 import functools
 import getpass
@@ -278,6 +279,21 @@ class PipeFunc(Generic[T]):
         """
         parameters = self.original_parameters
         defaults = {}
+
+        # Handle dataclass case
+        if dataclasses.is_dataclass(self.func):
+            fields = dataclasses.fields(self.func)
+            for f in fields:
+                new_name = self._renames.get(f.name, f.name)
+                if new_name in self._defaults:
+                    defaults[new_name] = self._defaults[new_name]
+                elif f.default_factory is not dataclasses.MISSING:
+                    defaults[new_name] = f.default_factory()
+                elif f.default is not dataclasses.MISSING:
+                    defaults[new_name] = f.default
+            return defaults
+
+        # Handle regular function case
         for original_name, v in parameters.items():
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
