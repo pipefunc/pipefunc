@@ -631,7 +631,7 @@ def test_unhashable_defaults() -> None:
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", defaults={"b": {}})
+    @pipefunc(output_name="d", defaults={"b": {}})
     def g(a, b):
         return a + b
 
