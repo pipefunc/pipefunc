@@ -23,8 +23,6 @@ dependencies:
   - zarr
   # optional-dependencies: pandas
   - pandas
-  # optional-dependencies: profiling
-  - psutil
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -32,6 +30,8 @@ dependencies:
   - bokeh
   - python-graphviz
   - anywidget
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: docs
   - sphinx
   - sphinx-autodoc-typehints
