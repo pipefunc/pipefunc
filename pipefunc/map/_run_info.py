@@ -7,21 +7,22 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 from pipefunc.map._safe_eval import evaluate_expression
 
 from ._mapspec import MapSpec
-from ._result import DirectValue
-from ._shapes import _shape_and_mask, map_shapes
+from ._result import DirectValue, LazyStorage
+from ._shapes import _shape_and_mask, internal_shape_from_mask, map_shapes, shape_is_resolved
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
+    from ._result import StoreType
     from ._types import ShapeDict, ShapeTuple, UserShapeDict
 
 
@@ -103,10 +104,10 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, StorageBase | LazyStorage | Path | DirectValue]:
-        store: dict[str, StorageBase | LazyStorage | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, StoreType]:
+        store: dict[str, StoreType] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
-        # Initialize LazyStore instances for each map spec output
+        # Initialize LazyStorage instances for each map spec output
         for mapspec in self.mapspecs:
             # `mapspec.output_names` is always tuple, even for single output
             output_name: OUTPUT_TYPE = name_mapping[mapspec.output_names]
@@ -122,7 +123,7 @@ class RunInfo:
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
-        # Set up paths or DirectValue for outputs not initialized as LazyStore
+        # Set up paths or DirectValue for outputs not initialized as LazyStorage
         for output_name in self.all_output_names:
             if output_name not in store:
                 store[output_name] = (
@@ -204,7 +205,7 @@ class RunInfo:
         if output_name not in self.resolved_shapes:
             return False
         shape = self.resolved_shapes[output_name]
-        if not _is_resolved(shape):
+        if not shape_is_resolved(shape):
             resolved_shape = _resolve_shape(shape, kwargs)
             self.resolved_shapes[output_name] = resolved_shape
             for name in at_least_tuple(output_name):
@@ -214,54 +215,18 @@ class RunInfo:
 
         # Now that new shape is known, update downstream shapes
         internal: ShapeDict = {
-            name: _internal_shape(shape, self.shape_masks[name])
+            name: internal_shape_from_mask(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
             if not isinstance(name, tuple)
         }
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         for name, shape in self.resolved_shapes.items():
-            if not _is_resolved(shape):
+            if not shape_is_resolved(shape):
                 new_shape, _ = _shape_and_mask(mapspecs[name], self.resolved_shapes, internal)
                 self.resolved_shapes[name] = new_shape
                 if not isinstance(name, tuple):
-                    internal[name] = _internal_shape(new_shape, self.shape_masks[name])
+                    internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         return True
-
-
-def _is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
-    return all(isinstance(i, int) for i in shape)
-
-
-def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
-    if run_folder is None:
-        return None
-    assert isinstance(output_name, str)
-    return run_folder / "outputs" / output_name
-
-
-@dataclass
-class LazyStorage:
-    """Object that can generate a StorageBase instance if its shape is resolved."""
-
-    output_name: str
-    shape: ShapeTuple
-    shape_mask: tuple[bool, ...]
-    storage_class: type[StorageBase]
-    run_folder: Path | None
-
-    def evaluate(self) -> StorageBase:
-        if not _is_resolved(self.shape):
-            msg = "Cannot evaluate lazy store with unresolved shape."
-            raise ValueError(msg)
-        path = _maybe_array_path(self.output_name, self.run_folder)
-        external_shape = _external_shape(self.shape, self.shape_mask)
-        internal_shape = _internal_shape(self.shape, self.shape_mask)
-        return self.storage_class(path, external_shape, internal_shape, self.shape_mask)
-
-    def maybe_evaluate(self) -> StorageBase | LazyStorage:
-        if _is_resolved(self.shape):
-            return self.evaluate()
-        return self
 
 
 def _resolve_shape(
@@ -411,14 +376,3 @@ def _init_arrays(
         LazyStorage(name, shape, mask, storage_class, run_folder).maybe_evaluate()
         for name in at_least_tuple(output_name)
     ]
-
-
-S = TypeVar("S")
-
-
-def _internal_shape(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
-    return tuple(s for s, m in zip(shape, mask) if not m)
-
-
-def _external_shape(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
-    return tuple(s for s, m in zip(shape, mask) if m)

@@ -13,7 +13,7 @@ from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
 from pipefunc.map._adaptive_lazy_sequence_learner import LazySequence, LazySequenceLearner
-from pipefunc.map._run_info import LazyStorage, _is_resolved
+from pipefunc.map._run_info import shape_is_resolved
 
 from ._mapspec import MapSpec
 from ._prepare import _reduced_axes, _validate_fixed_indices
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
-    from ._result import DirectValue
+    from ._result import StoreType
     from ._storage_array._base import StorageBase
     from ._types import ShapeTuple, UserShapeDict
     from .adaptive_scheduler import AdaptiveSchedulerDetails
@@ -285,7 +285,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -302,7 +302,7 @@ def _learner(
         )
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
-        if not _is_resolved(shape):
+        if not shape_is_resolved(shape):
             lazy_sequence = _lazy_sequence(fixed_indices, func, run_info, store, mask)
             return LazySequenceLearner(func, lazy_sequence)
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
@@ -325,14 +325,14 @@ class _LazySequence:
     fixed_indices: dict[str, int | slice] | None
     func: PipeFunc
     run_info: RunInfo
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue]
+    store: dict[str, StoreType]
     mask: tuple[bool, ...]
 
     def __call__(self) -> npt.NDArray[np.int_] | range:
         kwargs = _func_kwargs(self.func, self.run_info, self.store)
         self.run_info.resolve_shapes(self.func.output_name, kwargs)
         shape = self.run_info.resolved_shapes[self.func.output_name]
-        assert _is_resolved(shape)
+        assert shape_is_resolved(shape)
         assert self.func.mapspec is not None
         return _sequence(self.fixed_indices, self.func.mapspec, shape, self.mask)
 
@@ -341,7 +341,7 @@ def _lazy_sequence(
     fixed_indices: dict[str, int | slice] | None,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     mask: tuple[bool, ...],
 ) -> LazySequence:
     _callable = _LazySequence(fixed_indices, func, run_info, store, mask)
@@ -373,7 +373,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -396,7 +396,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -415,7 +415,7 @@ def _execute_iteration_in_map_spec(
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.resolved_shapes[func.output_name]
-    assert _is_resolved(shape)
+    assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, arrays, cache)
     if not return_output:
@@ -542,7 +542,7 @@ def _iterate_axes(
         shape.append(shapes[parameter][dim])
     new_shape = tuple(shape)
     # We can assert this because the internal_shapes should never appear as independent axes
-    assert _is_resolved(new_shape)
+    assert shape_is_resolved(new_shape)
     for indices in iterate_shape_indices(new_shape):
         yield dict(zip(independent_axes, indices))
 

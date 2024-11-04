@@ -9,7 +9,7 @@ from pipefunc._utils import at_least_tuple
 
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
-from ._run_info import LazyStorage, RunInfo
+from ._run_info import RunInfo
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets import ProgressTracker
     from pipefunc.map._types import UserShapeDict
 
-    from ._result import DirectValue, Result
+    from ._result import Result, StoreType
 
 
 def prepare_run(
@@ -41,7 +41,7 @@ def prepare_run(
 ) -> tuple[
     Pipeline,
     RunInfo,
-    dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    dict[str, StoreType],
     OrderedDict[str, Result],
     bool,
     ProgressTracker | None,
@@ -83,7 +83,7 @@ def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
 
 def _check_parallel(
     parallel: bool,  # noqa: FBT001
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> None:
     if isinstance(executor, dict):

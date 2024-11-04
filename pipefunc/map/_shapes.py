@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple
 
@@ -74,9 +74,16 @@ def map_shapes(
     return Shapes(shapes, masks)
 
 
-def internal_shape_from_mask(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+S = TypeVar("S")
+
+
+def internal_shape_from_mask(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
     return tuple(s for s, m in zip(shape, mask) if not m)
 
 
-def external_shape_from_mask(shape: tuple[int, ...], mask: tuple[bool, ...]) -> tuple[int, ...]:
+def external_shape_from_mask(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
     return tuple(s for s, m in zip(shape, mask) if m)
+
+
+def shape_is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
+    return all(isinstance(i, int) for i in shape)

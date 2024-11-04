@@ -9,13 +9,10 @@ from pipefunc._utils import at_least_tuple, requires
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pipefunc import PipeFunc
     from pipefunc._widgets import ProgressTracker
 
-    from ._result import DirectValue
-    from ._run_info import LazyStorage
+    from ._result import StoreType
 
 
 @dataclass
@@ -56,7 +53,7 @@ class Status:
 
 
 def init_tracker(
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
+    store: dict[str, StoreType],
     functions: list[PipeFunc],
     show_progress: bool,  # noqa: FBT001
     in_async: bool,  # noqa: FBT001

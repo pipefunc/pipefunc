@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._run_info import _is_resolved
+from pipefunc.map._run_info import shape_is_resolved
 from pipefunc.resources import Resources
 
 from ._run import _func_kwargs, _load_arrays, _maybe_evaluate_lazy_store, _select_kwargs
@@ -209,7 +209,7 @@ def _eval_resources(
         if run_info.resolve_shapes(func.output_name, kwargs):
             _maybe_evaluate_lazy_store(store, run_info)
         shape = run_info.resolved_shapes[func.output_name]
-        assert _is_resolved(shape)
+        assert shape_is_resolved(shape)
         shape_mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs(func, kwargs, shape, shape_mask, index)
     return resources(kwargs)
