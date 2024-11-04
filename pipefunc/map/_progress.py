@@ -56,7 +56,7 @@ class Status:
 
 
 def init_tracker(
-    store: dict[str, LazyStorage | StorageBase | Path | DirectValue],
+    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
     functions: list[PipeFunc],
     show_progress: bool,  # noqa: FBT001
     in_async: bool,  # noqa: FBT001
