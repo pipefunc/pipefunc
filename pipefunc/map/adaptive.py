@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
-    from ._result import DirectValue
+    from ._result import StoreType
     from ._storage_array._base import StorageBase
     from ._types import ShapeTuple, UserShapeDict
     from .adaptive_scheduler import AdaptiveSchedulerDetails
@@ -283,7 +283,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -338,7 +338,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -361,7 +361,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
