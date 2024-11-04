@@ -124,7 +124,7 @@ def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
     return not all_inputs_in_outputs
 
 
-def validate_no_duplicates(
+def validate_unique_output_names(
     output_name: OUTPUT_TYPE,
     output_to_func: dict[OUTPUT_TYPE, PipeFunc],
 ) -> None:

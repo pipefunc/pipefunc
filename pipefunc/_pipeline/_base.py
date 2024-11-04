@@ -51,8 +51,8 @@ from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified
 from ._validation import (
     validate_consistent_defaults,
     validate_consistent_type_annotations,
-    validate_no_duplicates,
     validate_scopes,
+    validate_unique_output_names,
 )
 
 if TYPE_CHECKING:
@@ -244,7 +244,7 @@ class Pipeline:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
-        validate_no_duplicates(f.output_name, self.output_to_func)
+        validate_unique_output_names(f.output_name, self.output_to_func)
         self.functions.append(f)
         f._pipelines.add(self)
 
