@@ -11,8 +11,8 @@ from pipefunc._utils import (
     format_args,
     format_function_call,
     format_kwargs,
+    is_min_version,
     load,
-    min_version_check,
     requires,
 )
 
@@ -238,7 +238,7 @@ def test_requires() -> None:
         requires("package_name_missing_for_sure", reason="testing", extras="test")
 
 
-def test_min_version_check():
+def test_is_min_version():
     # Basic version checks
-    assert min_version_check("numpy", "1.0.0")
-    assert not min_version_check("pipefunc", "999.0.0")
+    assert is_min_version("numpy", "1.0.0")
+    assert not is_min_version("pipefunc", "999.0.0")

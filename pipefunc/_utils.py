@@ -246,7 +246,7 @@ def requires(*packages: str, reason: str = "", extras: str | None = None) -> Non
         raise ImportError(error_message)
 
 
-def min_version_check(package: str, version: str) -> bool:
+def is_min_version(package: str, version: str) -> bool:
     """Check if a package is at least a given version."""
     import importlib.metadata
 

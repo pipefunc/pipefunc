@@ -4,7 +4,7 @@ import sys
 import warnings
 from typing import TYPE_CHECKING
 
-from pipefunc._utils import min_version_check
+from pipefunc._utils import is_min_version
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -21,7 +21,7 @@ def _adaptive_scheduler_imported() -> bool:
         return False
     # The SlurmExecutor was introduced in version 2.13.0
     min_version = "2.13.0"
-    if not min_version_check("adaptive_scheduler", min_version):
+    if not is_min_version("adaptive_scheduler", min_version):
         msg = f"The 'adaptive_scheduler' package must be at least version {min_version}."
         warnings.warn(msg, stacklevel=2)
         return False
