@@ -103,8 +103,8 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, LazyStorage | StorageBase | Path | DirectValue]:
-        store: dict[str, LazyStorage | StorageBase | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, StorageBase | LazyStorage | Path | DirectValue]:
+        store: dict[str, StorageBase | LazyStorage | Path | DirectValue] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
         # Initialize LazyStore instances for each map spec output
         for mapspec in self.mapspecs:
