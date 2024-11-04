@@ -11,11 +11,16 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
-from pipefunc.map._safe_eval import evaluate_expression
 
 from ._mapspec import MapSpec
 from ._result import DirectValue, LazyStorage
-from ._shapes import _shape_and_mask, internal_shape_from_mask, map_shapes, shape_is_resolved
+from ._shapes import (
+    _shape_and_mask,
+    internal_shape_from_mask,
+    map_shapes,
+    resolve_shape,
+    shape_is_resolved,
+)
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
@@ -206,7 +211,7 @@ class RunInfo:
             return False
         shape = self.resolved_shapes[output_name]
         if not shape_is_resolved(shape):
-            resolved_shape = _resolve_shape(shape, kwargs)
+            resolved_shape = resolve_shape(shape, kwargs)
             self.resolved_shapes[output_name] = resolved_shape
             for name in at_least_tuple(output_name):
                 self.resolved_shapes[name] = resolved_shape
@@ -227,23 +232,6 @@ class RunInfo:
                 if not isinstance(name, tuple):
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         return True
-
-
-def _resolve_shape(
-    shape: ShapeTuple,
-    kwargs: dict[str, Any],
-) -> tuple[int, ...]:
-    resolved_shape: list[int] = []
-    for x in shape:
-        if isinstance(x, int):
-            resolved_shape.append(x)
-        else:
-            i = evaluate_expression(x, kwargs)
-            if not isinstance(i, int):
-                msg = f"Expression `{x}` must evaluate to an integer but it evaluated to `{i}`."
-                raise TypeError(msg)
-            resolved_shape.append(i)
-    return tuple(resolved_shape)
 
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
