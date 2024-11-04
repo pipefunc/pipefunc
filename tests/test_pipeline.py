@@ -821,3 +821,22 @@ def test_duplicate_output_names() -> None:
         match="The function with output name `'y'` already exists in the pipeline.",
     ):
         p.add(f)
+
+
+def test_adding_duplicates_output_name_tuple() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    @pipefunc(output_name=("y", "y2"))
+    def g(b):
+        return b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "The function with output name `'y'` already exists in the pipeline (`f(...) → y`)",
+        ),
+    ):
+        pipeline.add(g)
