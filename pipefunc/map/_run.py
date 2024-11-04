@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
+    from ._result import StoreType
     from ._run_info import RunInfo
     from ._types import UserShapeDict
 
@@ -285,7 +286,7 @@ def run_map_async(
 
 
 def _maybe_persist_memory(
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     persist_memory: bool,  # noqa: FBT001
 ) -> None:
     if persist_memory:  # Only relevant for memory based storage
@@ -297,7 +298,7 @@ def _maybe_persist_memory(
 def _dump_single_output(
     func: PipeFunc,
     output: Any,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
@@ -314,7 +315,7 @@ def _dump_single_output(
 def _single_dump_single_output(
     output: Any,
     output_name: str,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
@@ -328,7 +329,7 @@ def _single_dump_single_output(
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
@@ -550,7 +551,7 @@ def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
@@ -641,7 +642,7 @@ class _StoredValue(NamedTuple):
 
 def _load_from_store(
     output_name: OUTPUT_TYPE,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     *,
     return_output: bool = True,
 ) -> _StoredValue:
@@ -677,7 +678,7 @@ def _load_from_store(
 def _submit_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
@@ -719,7 +720,7 @@ class _KwargsTask(NamedTuple):
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
@@ -741,7 +742,7 @@ def _run_and_process_generation(
 async def _run_and_process_generation_async(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[OUTPUT_TYPE, Executor],
@@ -764,7 +765,7 @@ async def _run_and_process_generation_async(
 def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     outputs: dict[str, Result],
 ) -> None:
     for func in generation:
@@ -775,7 +776,7 @@ def _process_generation(
 async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     outputs: dict[str, Result],
 ) -> None:
     for func in generation:
@@ -786,7 +787,7 @@ async def _process_generation_async(
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
@@ -826,7 +827,7 @@ def _executor_for_func(
 def _submit_generation(
     run_info: RunInfo,
     generation: list[PipeFunc],
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
@@ -864,7 +865,7 @@ def _to_result_dict(
     func: PipeFunc,
     kwargs: dict[str, Any],
     output: Any,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> dict[str, Result]:
     # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
     # was used.
@@ -884,7 +885,7 @@ def _to_result_dict(
 def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
@@ -900,7 +901,7 @@ def _process_task(
 async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()

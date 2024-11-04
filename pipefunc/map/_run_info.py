@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
+    from ._result import StoreType
     from ._types import ShapeTuple, UserShapeDict
 
 
@@ -93,8 +94,8 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
-        store: dict[str, StorageBase | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, StoreType]:
+        store: dict[str, StoreType] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
         # Initialize StorageBase instances for each map spec output
         for mapspec in self.mapspecs:
