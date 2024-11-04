@@ -4,7 +4,6 @@ import cloudpickle
 import numpy as np
 import pytest
 
-from pipefunc import __version__ as pipefunc_version
 from pipefunc._utils import (
     _cached_load,
     _is_equal,
@@ -241,5 +240,5 @@ def test_requires() -> None:
 
 def test_min_version_check():
     # Basic version checks
-    assert min_version_check("pipefunc", pipefunc_version)
+    assert min_version_check("numpy", "1.0.0")
     assert not min_version_check("pipefunc", "999.0.0")
