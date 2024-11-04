@@ -10,9 +10,11 @@ if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
+    from ._types import ShapeDict, ShapeTuple, UserShapeDict
+
 
 class Shapes(NamedTuple):
-    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]]
+    shapes: dict[OUTPUT_TYPE, ShapeTuple]
     masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
 
 
@@ -23,7 +25,7 @@ def _input_shapes_and_masks(
     input_parameters = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = pipeline.defaults | inputs
     # The type of the shapes is `int | str` but we only use ints in this function
-    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]] = {
+    shapes: dict[OUTPUT_TYPE, ShapeTuple] = {
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
         if p in pipeline.mapspec_names
@@ -34,9 +36,9 @@ def _input_shapes_and_masks(
 
 def _shape_and_mask(
     mapspec: MapSpec,
-    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]],
-    internal_shapes: dict[str, tuple[int | str, ...]],
-) -> tuple[tuple[int | str, ...], tuple[bool, ...]]:
+    shapes: dict[OUTPUT_TYPE, ShapeTuple],
+    internal_shapes: ShapeDict,
+) -> tuple[ShapeTuple, tuple[bool, ...]]:
     input_shapes = {p: shapes[p] for p in mapspec.input_names if p in shapes}
     output_shapes = {p: internal_shapes[p] for p in mapspec.output_names if p in internal_shapes}
     output_shape, mask = mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
@@ -46,12 +48,12 @@ def _shape_and_mask(
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}
     internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
-    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]] = {}
+    shapes: dict[OUTPUT_TYPE, ShapeTuple] = {}
     masks: dict[OUTPUT_TYPE, tuple[bool, ...]] = {}
     input_shapes, input_masks = _input_shapes_and_masks(pipeline, inputs)
     shapes.update(input_shapes)

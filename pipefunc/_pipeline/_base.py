@@ -38,6 +38,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._types import UserShapeDict
 from pipefunc.resources import Resources
 
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
@@ -66,6 +67,7 @@ if TYPE_CHECKING:
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
+    from pipefunc.map._types import UserShapeDict
 
     from ._types import OUTPUT_TYPE
 
@@ -630,7 +632,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None = None,
-        internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
@@ -733,7 +735,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None = None,
-        internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,

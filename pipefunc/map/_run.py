@@ -32,13 +32,14 @@ if TYPE_CHECKING:
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
+    from ._types import UserShapeDict
 
 
 def run_map(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
@@ -171,7 +172,7 @@ def run_map_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,

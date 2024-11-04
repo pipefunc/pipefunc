@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
+    from pipefunc.map._types import UserShapeDict
 
     from ._result import DirectValue, Result
 
@@ -27,7 +28,7 @@ def prepare_run(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
+    internal_shapes: UserShapeDict | None,
     output_names: set[OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,

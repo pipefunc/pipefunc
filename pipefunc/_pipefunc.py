@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc.map._types import ShapeTuple
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -175,7 +176,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | str | tuple[int | str, ...] | None = None,
+        internal_shape: int | str | ShapeTuple | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -192,7 +193,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: int | str | tuple[int | str, ...] | None = internal_shape
+        self.internal_shape: int | str | ShapeTuple | None = internal_shape
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -878,7 +879,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | str | tuple[int | str, ...] | None = None,
+    internal_shape: int | str | ShapeTuple | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]

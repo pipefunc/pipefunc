@@ -21,8 +21,8 @@ from ._storage_array._base import StorageBase, get_storage_class
 if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
-if TYPE_CHECKING:
-    from pipefunc import Pipeline
+
+    from ._types import ShapeDict, ShapeTuple, UserShapeDict
 
 
 @dataclass(frozen=True, eq=True)
@@ -36,9 +36,9 @@ class RunInfo:
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
-    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]]
-    resolved_shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]]
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
+    shapes: dict[OUTPUT_TYPE, ShapeTuple]
+    resolved_shapes: dict[OUTPUT_TYPE, ShapeTuple]
+    internal_shapes: UserShapeDict | None
     shape_masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
@@ -61,7 +61,7 @@ class RunInfo:
         run_folder: str | Path | None,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         storage: str | dict[OUTPUT_TYPE, str],
         cleanup: bool = True,
@@ -213,7 +213,7 @@ class RunInfo:
             return False
 
         # Now that new shape is known, update downstream shapes
-        internal: dict[str, tuple[int | str, ...]] = {
+        internal: ShapeDict = {
             name: _internal_shape(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
             if not isinstance(name, tuple)
@@ -228,7 +228,7 @@ class RunInfo:
         return True
 
 
-def _is_resolved(shape: tuple[int | str, ...]) -> TypeGuard[tuple[int, ...]]:
+def _is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
     return all(isinstance(i, int) for i in shape)
 
 
@@ -244,7 +244,7 @@ class LazyStorage:
     """Object that can generate a StorageBase instance if its shape is resolved."""
 
     output_name: str
-    shape: tuple[int | str, ...]
+    shape: ShapeTuple
     shape_mask: tuple[bool, ...]
     storage_class: type[StorageBase]
     run_folder: Path | None
@@ -265,7 +265,7 @@ class LazyStorage:
 
 
 def _resolve_shape(
-    shape: tuple[int | str, ...],
+    shape: ShapeTuple,
     kwargs: dict[str, Any],
 ) -> tuple[int, ...]:
     resolved_shape: list[int] = []
@@ -300,9 +300,9 @@ def _maybe_run_folder(
 
 # TODO: remove and make `internal_shapes` a property of RunInfo
 def _construct_internal_shapes(
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None,
+    internal_shapes: UserShapeDict | None,
     pipeline: Pipeline,
-) -> dict[str, int | str | tuple[int | str, ...]] | None:
+) -> UserShapeDict | None:
     if internal_shapes is None:
         internal_shapes = {}
     for f in pipeline.functions:
@@ -327,7 +327,7 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
@@ -402,7 +402,7 @@ def _defaults_path(run_folder: Path) -> Path:
 
 def _init_arrays(
     output_name: OUTPUT_TYPE,
-    shape: tuple[int | str, ...],
+    shape: ShapeTuple,
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
