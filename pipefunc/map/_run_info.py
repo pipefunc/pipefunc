@@ -7,92 +7,22 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
-from pipefunc.map._mapspec import MapSpec, array_shape
 from pipefunc.map._safe_eval import evaluate_expression
-from pipefunc.map._storage_base import StorageBase, get_storage_class
+
+from ._mapspec import MapSpec
+from ._result import DirectValue
+from ._shapes import _shape_and_mask, map_shapes
+from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
     from pipefunc import Pipeline
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-
-
-class _Missing: ...
-
-
-class DirectValue:
-    __slots__ = ["value"]
-
-    def __init__(self, value: Any | type[_Missing] = _Missing) -> None:
-        self.value = value
-
-    def exists(self) -> bool:
-        return self.value is not _Missing
-
-
-class Shapes(NamedTuple):
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
-    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
-
-
-def _input_shapes_and_masks(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-) -> Shapes:
-    input_parameters = set(pipeline.topological_generations.root_args)
-    inputs_with_defaults = pipeline.defaults | inputs
-    # The type of the shapes is `int | str` but we only use ints in this function
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {
-        p: array_shape(inputs_with_defaults[p], p)
-        for p in input_parameters
-        if p in pipeline.mapspec_names
-    }
-    masks = {name: len(shape) * (True,) for name, shape in shapes.items()}
-    return Shapes(shapes, masks)
-
-
-def map_shapes(
-    pipeline: Pipeline,
-    inputs: dict[str, Any],
-    internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
-) -> Shapes:
-    if internal_shapes is None:
-        internal_shapes = {}
-    internal = {k: at_least_tuple(v) for k, v in internal_shapes.items()}
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]] = {}
-    masks: dict[_OUTPUT_TYPE, tuple[bool, ...]] = {}
-    input_shapes, input_masks = _input_shapes_and_masks(pipeline, inputs)
-    shapes.update(input_shapes)
-    masks.update(input_masks)
-
-    mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
-    for func in mapspec_funcs:
-        assert func.mapspec is not None  # mypy
-        output_shape, mask = _shape_and_mask(func.mapspec, shapes, internal)
-        shapes[func.output_name] = output_shape
-        masks[func.output_name] = mask
-        if isinstance(func.output_name, tuple):
-            for output_name in func.output_name:
-                shapes[output_name] = output_shape
-                masks[output_name] = mask
-
-    assert all(k in shapes for k in pipeline.mapspec_names if k not in internal)
-    return Shapes(shapes, masks)
-
-
-def _shape_and_mask(
-    mapspec: MapSpec,
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]],
-    internal_shapes: dict[str, tuple[int | str, ...]],
-) -> tuple[tuple[int | str, ...], tuple[bool, ...]]:
-    input_shapes = {p: shapes[p] for p in mapspec.input_names if p in shapes}
-    output_shapes = {p: internal_shapes[p] for p in mapspec.output_names if p in internal_shapes}
-    output_shape, mask = mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
-    return output_shape, mask
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+if TYPE_CHECKING:
+    from pipefunc import Pipeline
 
 
 @dataclass(frozen=True, eq=True)
@@ -106,13 +36,13 @@ class RunInfo:
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
-    shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
-    resolved_shapes: dict[_OUTPUT_TYPE, tuple[int | str, ...]]
+    shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]]
+    resolved_shapes: dict[OUTPUT_TYPE, tuple[int | str, ...]]
     internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None
-    shape_masks: dict[_OUTPUT_TYPE, tuple[bool, ...]]
+    shape_masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
-    storage: str | dict[_OUTPUT_TYPE, str]
+    storage: str | dict[OUTPUT_TYPE, str]
     pipefunc_version: str = __version__
 
     def __post_init__(self) -> None:
@@ -133,7 +63,7 @@ class RunInfo:
         inputs: dict[str, Any],
         internal_shapes: dict[str, int | str | tuple[int | str, ...]] | None = None,
         *,
-        storage: str | dict[_OUTPUT_TYPE, str],
+        storage: str | dict[OUTPUT_TYPE, str],
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = _maybe_run_folder(run_folder, storage)
@@ -159,7 +89,7 @@ class RunInfo:
             storage=storage,
         )
 
-    def storage_class(self, output_name: _OUTPUT_TYPE) -> type[StorageBase]:
+    def storage_class(self, output_name: OUTPUT_TYPE) -> type[StorageBase]:
         if isinstance(self.storage, str):
             return get_storage_class(self.storage)
         default: str | None = self.storage.get("")
@@ -179,18 +109,18 @@ class RunInfo:
         # Initialize LazyStore instances for each map spec output
         for mapspec in self.mapspecs:
             # `mapspec.output_names` is always tuple, even for single output
-            output_name: _OUTPUT_TYPE = name_mapping[mapspec.output_names]
+            output_name: OUTPUT_TYPE = name_mapping[mapspec.output_names]
             if mapspec.inputs:
                 shape = self.shapes[output_name]
                 mask = self.shape_masks[output_name]
-                storages = _init_storages(
+                arrays = _init_arrays(
                     output_name,
                     shape,
                     mask,
                     self.storage_class(output_name),
                     self.run_folder,
                 )
-                store.update(zip(mapspec.output_names, storages))
+                store.update(zip(mapspec.output_names, arrays))
 
         # Set up paths or DirectValue for outputs not initialized as LazyStore
         for output_name in self.all_output_names:
@@ -269,7 +199,7 @@ class RunInfo:
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
 
-    def resolve_shapes(self, output_name: _OUTPUT_TYPE, kwargs: dict[str, Any]) -> bool:
+    def resolve_shapes(self, output_name: OUTPUT_TYPE, kwargs: dict[str, Any]) -> bool:
         """Resolve shapes that depend on kwargs."""
         if output_name not in self.resolved_shapes:
             return False
@@ -302,6 +232,13 @@ def _is_resolved(shape: tuple[int | str, ...]) -> TypeGuard[tuple[int, ...]]:
     return all(isinstance(i, int) for i in shape)
 
 
+def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
+    if run_folder is None:
+        return None
+    assert isinstance(output_name, str)
+    return run_folder / "outputs" / output_name
+
+
 @dataclass
 class LazyStorage:
     """Object that can generate a StorageBase instance if its shape is resolved."""
@@ -316,7 +253,7 @@ class LazyStorage:
         if not _is_resolved(self.shape):
             msg = "Cannot evaluate lazy store with unresolved shape."
             raise ValueError(msg)
-        path = _maybe_file_array_path(self.output_name, self.run_folder)
+        path = _maybe_array_path(self.output_name, self.run_folder)
         external_shape = _external_shape(self.shape, self.shape_mask)
         internal_shape = _internal_shape(self.shape, self.shape_mask)
         return self.storage_class(path, external_shape, internal_shape, self.shape_mask)
@@ -344,7 +281,7 @@ def _resolve_shape(
     return tuple(resolved_shape)
 
 
-def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
+def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
     if isinstance(storage, str):
         return get_storage_class(storage).requires_serialization
     return any(get_storage_class(s).requires_serialization for s in storage.values())
@@ -352,7 +289,7 @@ def _requires_serialization(storage: str | dict[_OUTPUT_TYPE, str]) -> bool:
 
 def _maybe_run_folder(
     run_folder: str | Path | None,
-    storage: str | dict[_OUTPUT_TYPE, str],
+    storage: str | dict[OUTPUT_TYPE, str],
 ) -> Path | None:
     if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
@@ -463,8 +400,8 @@ def _defaults_path(run_folder: Path) -> Path:
     return run_folder / "defaults" / "defaults.cloudpickle"
 
 
-def _init_storages(
-    output_name: _OUTPUT_TYPE,
+def _init_arrays(
+    output_name: OUTPUT_TYPE,
     shape: tuple[int | str, ...],
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
@@ -474,13 +411,6 @@ def _init_storages(
         LazyStorage(name, shape, mask, storage_class, run_folder).maybe_evaluate()
         for name in at_least_tuple(output_name)
     ]
-
-
-def _maybe_file_array_path(output_name: str, run_folder: Path | None) -> Path | None:
-    if run_folder is None:
-        return None
-    assert isinstance(output_name, str)
-    return run_folder / "outputs" / output_name
 
 
 S = TypeVar("S")

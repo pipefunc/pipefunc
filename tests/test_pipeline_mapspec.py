@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import importlib.util
 from concurrent.futures import Executor
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
@@ -352,6 +355,7 @@ def test_validation_parallel():
         pipeline.map({}, parallel=False, show_progress=True)
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_with_progress() -> None:
     @pipefunc(output_name="out", mapspec="a[i] -> out[i]")
     def f(a):

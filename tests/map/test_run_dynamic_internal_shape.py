@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map._run import load_outputs
+from pipefunc.map._load import load_outputs
 from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:

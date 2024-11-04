@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+import importlib.util
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-import zarr
 
 from pipefunc._utils import prod
-from pipefunc.map._dictarray import DictArray
-from pipefunc.map._filearray import FileArray
-from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
-from pipefunc.map.zarr import ZarrFileArray
+from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
+from pipefunc.map._storage_array._dict import DictArray
+from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
+
+has_zarr = importlib.util.find_spec("zarr") is not None
 
 
 @pytest.fixture(params=["file_array", "zarr_array", "dict"])
@@ -24,8 +25,14 @@ def array_type(request, tmp_path: Path):
         def _array_type(shape, internal_shape=None, shape_mask=None):
             return FileArray(tmp_path, shape, internal_shape, shape_mask)
     elif request.param == "zarr_array":
+        if not has_zarr:
+            pytest.skip("zarr not installed")
 
         def _array_type(shape, internal_shape=None, shape_mask=None):
+            import zarr
+
+            from pipefunc.map import ZarrFileArray
+
             store = zarr.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
     elif request.param == "dict":
@@ -147,7 +154,7 @@ def test_sliced_arange(array_type: Callable[..., StorageBase]):
     assert (arr[:, :, :] == np_arr[:, :, :]).all()
     assert (arr[:, ::2, :] == np_arr[:, ::2, :]).all()
     assert (arr[:, ::3, :] == np_arr[:, ::3, :]).all()
-    if isinstance(arr, ZarrFileArray):
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[:, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[:, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
@@ -170,7 +177,7 @@ def test_sliced_arange_minimal(array_type: Callable[..., StorageBase]):
     assert (arr[:, 1] == np_arr[:, 1]).all()
     assert (arr[0, -1] == np_arr[0, -1]).all()
     assert (arr[:, -1] == np_arr[:, -1]).all()
-    if not isinstance(arr, ZarrFileArray):
+    if arr.storage_id != "zarr_file_array":
         assert (arr[:, ::-1] == np_arr[:, ::-1]).all()
 
 
@@ -184,7 +191,7 @@ def test_sliced_arange_minimal2(array_type: Callable[..., StorageBase]):
     assert (arr[0, :, 1] == np_arr[0, :, 1]).all()
     assert (arr[0, 0, -1] == np_arr[0, 0, -1]).all()
     assert (arr[0, :, -1] == np_arr[0, :, -1]).all()
-    if isinstance(arr, ZarrFileArray):
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[0, ::-1, 0] == np_arr[0, ::-1, 0]).all()
     assert (arr[0, ::-1, -1] == np_arr[0, ::-1, -1]).all()
@@ -198,7 +205,7 @@ def test_file_array_with_internal_arrays(array_type: Callable[..., StorageBase])
     shape_mask = (True, True, False, False, False)
     arr = array_type(shape, shape_mask=shape_mask, internal_shape=internal_shape)
     full_shape = (2, 2, 3, 3, 4)
-    assert _select_by_mask(shape_mask, shape, internal_shape) == full_shape
+    assert select_by_mask(shape_mask, shape, internal_shape) == full_shape
     data1 = np.arange(np.prod(internal_shape)).reshape(internal_shape)
     data2 = np.ones(internal_shape)
 
@@ -278,7 +285,7 @@ def test_file_array_with_internal_arrays_full_array(array_type: Callable[..., St
     arr.dump((1, 1), data2)
 
     # Test retrieving the entire array
-    if isinstance(arr, ZarrFileArray):
+    if arr.storage_id == "zarr_file_array":
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
         return
@@ -368,12 +375,12 @@ def test_file_array_with_internal_arrays_full_array_different_order(
     arr.dump((0, 0), data1)
     arr.dump((1, 1), data2)
 
-    if isinstance(arr, ZarrFileArray):
+    if arr.storage_id == "zarr_file_array":
         with pytest.raises(NotImplementedError):
             arr.to_array(splat_internal=False)
     else:
         assert arr.to_array(splat_internal=False).shape == (2, 2)
-    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    full_shape = select_by_mask(shape_mask, shape, internal_shape)
     assert arr.to_array(splat_internal=True).shape == full_shape
 
     # Test slicing
@@ -404,7 +411,7 @@ def test_sliced_arange_splat(array_type: Callable[..., StorageBase]):
     assert (arr[0, 1:, ::2, -1] == np_arr[1:, ::2, -1]).all()
     assert (arr[0, 2, ::2, -1] == np_arr[2, ::2, -1]).all()
     assert (arr[0, :1, :1, -1] == np_arr[:1, :1, -1]).all()
-    if isinstance(arr, ZarrFileArray):
+    if arr.storage_id == "zarr_file_array":
         return  # ZarrFileArray does not support negative step
     assert (arr[0, :, ::-1, :] == np_arr[:, ::-1, :]).all()
     assert (arr[0, :, ::-1, ::2] == np_arr[:, ::-1, ::2]).all()
@@ -470,7 +477,7 @@ def test_list_or_arrays(array_type) -> None:
     # list of 2 (4,4) arrays
     value = [np.random.rand(4, 4) for _ in range(2)]  # noqa: NPY002
     arr.dump((0, 0, 0), value)
-    if not isinstance(arr, ZarrFileArray):
+    if arr.storage_id != "zarr_file_array":
         assert isinstance(arr[0, 0, 0], list)
     else:
         assert isinstance(arr[0, 0, 0], np.ndarray)
@@ -503,7 +510,10 @@ def test_with_internal_shape_list(array_type) -> None:
     assert arr[0, 0, 1] == 2
 
 
+@pytest.mark.skipif(not has_zarr, reason="zarr not installed")
 def test_compare_equal(tmp_path: Path) -> None:
+    from pipefunc.map import ZarrFileArray
+
     external_shape = (2, 3)
     internal_shape = (4, 5)
     z_arr = ZarrFileArray(
@@ -525,7 +535,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         shape_mask=(True, False, True, False),
     )
     arrs = [f_arr, z_arr, d_arr]
-    for index in _iterate_shape_indices(external_shape):
+    for index in iterate_shape_indices(external_shape):
         x = np.random.rand(*internal_shape)  # noqa: NPY002
         for arr in arrs:
             arr.dump(key=index, value=x)
@@ -579,7 +589,7 @@ def test_compare_equal(tmp_path: Path) -> None:
         shape_mask=(True, False, True, False),
     )
     arrs = [f_arr, z_arr, dict_arr]
-    for index in _iterate_shape_indices(external_shape):
+    for index in iterate_shape_indices(external_shape):
         if np.random.rand() < 0.5:  # noqa: NPY002
             continue
         x = np.random.rand(*internal_shape)  # noqa: NPY002
