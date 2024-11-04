@@ -32,13 +32,14 @@ if TYPE_CHECKING:
 
     from ._progress import Status
     from ._run_info import RunInfo
+    from ._types import UserShapeDict
 
 
 def run_map(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
@@ -171,7 +172,7 @@ def run_map_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,

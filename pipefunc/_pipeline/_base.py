@@ -66,6 +66,7 @@ if TYPE_CHECKING:
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
+    from pipefunc.map._types import UserShapeDict
 
     from ._types import OUTPUT_TYPE
 
@@ -630,7 +631,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None = None,
-        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
@@ -733,7 +734,7 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None = None,
-        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,

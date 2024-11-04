@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
     from ._result import DirectValue
     from ._storage_array._base import StorageBase
+    from ._types import ShapeTuple, UserShapeDict
     from .adaptive_scheduler import AdaptiveSchedulerDetails
 
 
@@ -154,7 +155,7 @@ def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
@@ -396,7 +397,7 @@ class _MapWrapper:
     pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    internal_shapes: UserShapeDict | None
     parallel: bool
     cleanup: bool
 
@@ -416,7 +417,7 @@ def create_learners_from_sweep(
     pipeline: Pipeline,
     sweep: Sweep,
     run_folder: str | Path,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -493,7 +494,7 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[OUTPUT_TYPE, ShapeTuple],
 ) -> Generator[dict[str, Any], None, None]:
     shape: list[int] = []
     for axis in independent_axes:
@@ -513,7 +514,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: UserShapeDict | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes
