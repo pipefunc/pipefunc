@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 
+from ._adaptive_scheduler_slurm_executor import maybe_convert_slurm_executor
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
 from ._run_info import RunInfo
@@ -44,6 +45,7 @@ def prepare_run(
     dict[str, StoreType],
     OrderedDict[str, Result],
     bool,
+    Executor | dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
     if not parallel and show_progress:
@@ -55,6 +57,7 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
+    executor = maybe_convert_slurm_executor(executor, pipeline, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -72,7 +75,7 @@ def prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel, progress
+    return pipeline, run_info, store, outputs, parallel, executor, progress
 
 
 def _cannot_be_parallelized(pipeline: Pipeline) -> bool:

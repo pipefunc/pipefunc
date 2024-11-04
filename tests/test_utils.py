@@ -4,6 +4,7 @@ import cloudpickle
 import numpy as np
 import pytest
 
+from pipefunc import __version__ as pipefunc_version
 from pipefunc._utils import (
     _cached_load,
     _is_equal,
@@ -12,6 +13,7 @@ from pipefunc._utils import (
     format_function_call,
     format_kwargs,
     load,
+    min_version_check,
     requires,
 )
 
@@ -235,3 +237,9 @@ def test_equal_dicts():
 def test_requires() -> None:
     with pytest.raises(ImportError, match="package is required for"):
         requires("package_name_missing_for_sure", reason="testing", extras="test")
+
+
+def test_min_version_check():
+    # Basic version checks
+    assert min_version_check("pipefunc", pipefunc_version)
+    assert not min_version_check("pipefunc", "999.0.0")

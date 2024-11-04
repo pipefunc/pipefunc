@@ -244,3 +244,19 @@ def requires(*packages: str, reason: str = "", extras: str | None = None) -> Non
         error_message += f"- pip install {package}\n"
         error_message += f"- conda install -c conda-forge {conda_package}"
         raise ImportError(error_message)
+
+
+def min_version_check(package: str, version: str) -> bool:
+    """Check if a package is at least a given version."""
+    import importlib.metadata
+
+    installed_version = importlib.metadata.version(package)
+    installed_major, installed_minor, installed_patch, *_ = installed_version.split(".")
+    major, minor, patch, *_ = version.split(".")
+    if installed_major < major:
+        return False
+    if installed_major == major and installed_minor < minor:
+        return False
+    if installed_major == major and installed_minor == minor and installed_patch < patch:  # noqa: SIM103
+        return False
+    return True

@@ -12,9 +12,21 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    handle_error,
+    is_installed,
+    is_running_in_ipynb,
+    load,
+    prod,
+)
 from pipefunc.cache import HybridCache, to_hashable
 
+from ._adaptive_scheduler_slurm_executor import (
+    maybe_finalize_slurm_executors,
+    maybe_multi_run_manager,
+)
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
@@ -24,6 +36,8 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 if TYPE_CHECKING:
     from collections import OrderedDict
     from collections.abc import Callable, Generator, Sequence
+
+    from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
@@ -115,7 +129,7 @@ def run_map(
         Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
-    pipeline, run_info, store, outputs, parallel, progress = prepare_run(
+    pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -154,6 +168,7 @@ class AsyncMap(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     progress: ProgressTracker | None
+    multi_run_manager: MultiRunManager | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():  # pragma: no cover
@@ -167,6 +182,21 @@ class AsyncMap(NamedTuple):
 
         loop = asyncio.get_event_loop()  # pragma: no cover
         return loop.run_until_complete(self.task)  # pragma: no cover
+
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:
+        """Display the pipeline widget."""
+        if (
+            self.multi_run_manager is not None
+            and is_running_in_ipynb()
+            and is_installed("ipywidgets")
+        ):
+            return self.multi_run_manager.info()._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
 
 
 def run_map_async(
@@ -245,7 +275,7 @@ def run_map_async(
         Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, _, progress = prepare_run(
+    pipeline, run_info, store, outputs, _, executor, progress = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -261,6 +291,8 @@ def run_map_async(
         in_async=True,
     )
 
+    multi_run_manager = maybe_multi_run_manager(executor)
+
     async def _run_pipeline() -> OrderedDict[str, Result]:
         with _maybe_executor(executor, parallel=True) as ex:
             assert ex is not None
@@ -274,6 +306,7 @@ def run_map_async(
                     executor=ex,
                     progress=progress,
                     cache=pipeline.cache,
+                    multi_run_manager=multi_run_manager,
                 )
         _maybe_persist_memory(store, persist_memory)
         return outputs
@@ -282,7 +315,7 @@ def run_map_async(
     if progress is not None:
         progress.attach_task(task)
         progress.display()
-    return AsyncMap(task, run_info, progress)
+    return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
 def _maybe_persist_memory(
@@ -748,6 +781,7 @@ async def _run_and_process_generation_async(
     executor: Executor | dict[OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
+    multi_run_manager: MultiRunManager | None = None,
 ) -> None:
     tasks = _submit_generation(
         run_info,
@@ -758,6 +792,7 @@ async def _run_and_process_generation_async(
         progress,
         cache,
     )
+    maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
     await _process_generation_async(generation, tasks, store, outputs)
 
 
