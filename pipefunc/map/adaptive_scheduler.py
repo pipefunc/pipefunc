@@ -101,7 +101,9 @@ def slurm_run_setup(
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 tracker.update(
-                    resources=learner.pipefunc.resources if not ignore_resources else None,
+                    resources=learner.pipefunc.resources  # type: ignore[has-type]
+                    if not ignore_resources
+                    else None,
                     func=learner.pipefunc,
                     learner=learner.learner,
                     run_info=learners_dict.run_info,

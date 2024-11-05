@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import sys
 import warnings
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple, is_min_version
-from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
     import functools
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc.resources import Resources
 
 
 def _adaptive_scheduler_imported() -> bool:
@@ -129,7 +129,7 @@ def slurm_executor_for_map(
         resources = _resources_from_process_index(process_index, i)
         scheduler_resources = _adaptive_scheduler_resource_dict(resources)
         resources_list.append(scheduler_resources)
-    executor_kwargs = _list_of_dicts_to_dict_of_lists(resources_list)
+    executor_kwargs = _list_of_dicts_to_dict_of_tuples(resources_list)
     return SlurmExecutor(
         name=_slurm_name(process_index.keywords["func"].output_name),
         **executor_kwargs,
@@ -139,8 +139,9 @@ def slurm_executor_for_map(
 def slurm_executor_for_single(func: PipeFunc, kwargs: dict[str, Any]) -> Executor:
     from adaptive_scheduler import SlurmExecutor
 
-    resources = func.resources(**kwargs) if callable(func.resources) else func.resources
-    assert isinstance(resources, Resources) or resources is None
+    resources: Resources | None = (
+        func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
+    )
     scheduler_resources = _adaptive_scheduler_resource_dict(resources)
     return SlurmExecutor(name=_slurm_name(func.output_name), **scheduler_resources)
 
@@ -154,9 +155,8 @@ def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, 
     return {
         "extra_scheduler": __extra_scheduler(resources),
         "executor_type": __executor_type(resources),
-        "cpus_per_node": resources.cpus_per_node,
-        "cpus": resources.cpus,
-        "nodes": resources.nodes,
+        "cores_per_node": resources.cpus_per_node or resources.cpus,
+        "nodes": resources.nodes or 1,
         "partition": resources.partition,
     }
 
@@ -184,7 +184,10 @@ def _resources_from_process_index(
     return selected[_EVALUATED_RESOURCES]
 
 
-def _list_of_dicts_to_dict_of_lists(
-    list_of_dicts: list[dict[str, Any]],
-) -> dict[str, list[Any]]:
-    return {k: [d[k] for d in list_of_dicts] for k in list_of_dicts[0]}
+T = TypeVar("T")
+
+
+def _list_of_dicts_to_dict_of_tuples(
+    list_of_dicts: list[dict[str, T]],
+) -> dict[str, tuple[T, ...]]:
+    return {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
