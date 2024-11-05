@@ -436,18 +436,10 @@ _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 def _run_iteration(
     func: PipeFunc,
-    kwargs: dict[str, Any],
-    shape: tuple[int, ...],
-    shape_mask: tuple[bool, ...],
-    index: int,
+    selected: dict[str, Any],
     cache: _CacheBase | None,
 ) -> Any:
-    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-
     def compute_fn() -> Any:
-        if callable(func.resources):  # type: ignore[has-type]
-            kw = kwargs if func.resources_scope == "map" else selected
-            selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
         try:
             return func(**selected)
         except Exception as e:
@@ -467,7 +459,11 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    if callable(func.resources):  # type: ignore[has-type]
+        kw = kwargs if func.resources_scope == "map" else selected
+        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+    output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
     _update_array(func, arrays, shape, shape_mask, index, outputs)
     return outputs
