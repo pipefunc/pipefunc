@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import sys
 import warnings
-from typing import TYPE_CHECKING, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard
 
-from pipefunc._utils import is_min_version
+from pipefunc._utils import at_least_tuple, is_min_version
+from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
+    import functools
     from concurrent.futures import Executor
 
     from adaptive_scheduler import MultiRunManager, SlurmExecutor
@@ -53,7 +55,7 @@ def maybe_convert_slurm_executor(
 
 def _executors_for_generation(
     generation: list[PipeFunc],
-    executor: Executor | dict[OUTPUT_TYPE, Executor],
+    executor: dict[OUTPUT_TYPE, Executor],
 ) -> list[Executor]:
     from ._run import _executor_for_func
 
@@ -67,7 +69,7 @@ def _executors_for_generation(
 
 def maybe_finalize_slurm_executors(
     generation: list[PipeFunc],
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     multi_run_manager: MultiRunManager | None,
 ) -> None:
     if executor is None:
@@ -85,13 +87,13 @@ def maybe_finalize_slurm_executors(
 
 
 def maybe_multi_run_manager(
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
 ) -> MultiRunManager | None:
     if isinstance(executor, dict) and _adaptive_scheduler_imported():
         from adaptive_scheduler import MultiRunManager, SlurmExecutor
 
         for ex in executor.values():
-            if isinstance(ex, SlurmExecutor):
+            if isinstance(ex, SlurmExecutor) or ex is SlurmExecutor:
                 return MultiRunManager()
     return None
 
@@ -110,3 +112,79 @@ def is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmExe
     from adaptive_scheduler import SlurmExecutor
 
     return executor is SlurmExecutor
+
+
+def _slurm_name(output_name: OUTPUT_TYPE) -> str:
+    return "-".join(at_least_tuple(output_name))
+
+
+def slurm_executor_for_map(
+    process_index: functools.partial[tuple[Any, ...]],
+    seq: list[int],
+) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
+    from adaptive_scheduler import SlurmExecutor
+
+    resources_list: list[dict[str, Any]] = []
+    for i in seq:
+        resources = _resources_from_process_index(process_index, i)
+        scheduler_resources = _adaptive_scheduler_resource_dict(resources)
+        resources_list.append(scheduler_resources)
+    executor_kwargs = _list_of_dicts_to_dict_of_lists(resources_list)
+    return SlurmExecutor(
+        name=_slurm_name(process_index.keywords["func"].output_name),
+        **executor_kwargs,
+    )
+
+
+def slurm_executor_for_single(func: PipeFunc, kwargs: dict[str, Any]) -> Executor:
+    from adaptive_scheduler import SlurmExecutor
+
+    resources = func.resources(**kwargs) if callable(func.resources) else func.resources
+    assert isinstance(resources, Resources) or resources is None
+    scheduler_resources = _adaptive_scheduler_resource_dict(resources)
+    return SlurmExecutor(name=_slurm_name(func.output_name), **scheduler_resources)
+
+
+def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, Any]:
+    if resources is None:
+        return {}
+    assert _adaptive_scheduler_imported()
+    from .adaptive_scheduler import __executor_type, __extra_scheduler
+
+    return {
+        "extra_scheduler": __extra_scheduler(resources),
+        "executor_type": __executor_type(resources),
+        "cpus_per_node": resources.cpus_per_node,
+        "cpus": resources.cpus,
+        "nodes": resources.nodes,
+        "partition": resources.partition,
+    }
+
+
+def _resources_from_process_index(
+    process_index: functools.partial[tuple[Any, ...]],
+    index: int,
+) -> Resources | None:
+    from ._run import _EVALUATED_RESOURCES, _select_kwargs_and_eval_resources
+    # Import here to avoid circular imports
+
+    kw = process_index.keywords
+    if kw["func"].resources is None:
+        return None
+    # NOTE: We are executing this line below 2 times for each index.
+    # This is not ideal, if it becomes a performance issue we can cache
+    # the result.
+    selected = _select_kwargs_and_eval_resources(
+        kw["func"],
+        kw["kwargs"],
+        kw["shape"],
+        kw["shape_mask"],
+        index,
+    )
+    return selected[_EVALUATED_RESOURCES]
+
+
+def _list_of_dicts_to_dict_of_lists(
+    list_of_dicts: list[dict[str, Any]],
+) -> dict[str, list[Any]]:
+    return {k: [d[k] for d in list_of_dicts] for k in list_of_dicts[0]}

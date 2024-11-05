@@ -45,7 +45,7 @@ def prepare_run(
     dict[str, StoreType],
     OrderedDict[str, Result],
     bool,
-    Executor | dict[OUTPUT_TYPE, Executor] | None,
+    dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
     if not parallel and show_progress:
@@ -58,6 +58,8 @@ def prepare_run(
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     executor = maybe_convert_slurm_executor(executor, pipeline, in_async)
+    if executor is not None and not isinstance(executor, dict):
+        executor = {"": executor}
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)

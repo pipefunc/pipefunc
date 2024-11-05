@@ -24,9 +24,11 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
-    is_slurm_executor,
+    is_slurm_executor_type,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
+    slurm_executor_for_map,
+    slurm_executor_for_single,
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
@@ -276,7 +278,7 @@ def run_map_async(
         Whether to display a progress bar.
 
     """
-    pipeline, run_info, store, outputs, _, executor, progress = prepare_run(
+    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -292,10 +294,10 @@ def run_map_async(
         in_async=True,
     )
 
-    multi_run_manager = maybe_multi_run_manager(executor)
+    multi_run_manager = maybe_multi_run_manager(executor_dict)
 
     async def _run_pipeline() -> OrderedDict[str, Result]:
-        with _maybe_executor(executor, parallel=True) as ex:
+        with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
@@ -577,12 +579,12 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
-) -> Generator[Executor | dict[OUTPUT_TYPE, Executor] | None, None, None]:
+) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
-            yield new_executor
+            yield {"": new_executor}
     else:
         yield executor
 
@@ -656,56 +658,48 @@ def _status_submit(
 
 
 def _maybe_parallel_map(
-    func: functools.partial[tuple[Any, ...]],
+    process_index: functools.partial[tuple[Any, ...]],
     seq: list[int],
-    executor: Executor | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
-    if executor is not None:
-        if is_slurm_executor(executor):
-            futs = []
-            for i in seq:
-                resources = _resources_from_process_index(func, i)
-                fut = executor.submit(i, resources)
-                futs.append(fut)
-            return futs
+    func = process_index.keywords["func"]
+    ex = _executor_for_func(func, executor)
+    if ex is not None:
+        if is_slurm_executor_type(ex):
+            ex = slurm_executor_for_map(process_index, seq)
+            assert isinstance(executor, dict)
+            executor[func.output_name] = ex  # type: ignore[assignment]
         if status is not None:
             assert progress is not None
-            return [_status_submit(func, executor, status, progress, i) for i in seq]
-        return [executor.submit(func, i) for i in seq]
-    return [func(i) for i in seq]
+            return [_status_submit(process_index, ex, status, progress, i) for i in seq]
+        return [ex.submit(process_index, i) for i in seq]
+    return [process_index(i) for i in seq]
 
 
-def _resources_from_process_index(
-    process_index: functools.partial[tuple[Any, ...]],
-    index: int,
-) -> Any:
-    kw = process_index.keywords
-    assert kw["func"].resources is not None
-    selected = _select_kwargs_and_eval_resources(
-        kw["func"],
-        kw["kwargs"],
-        kw["shape"],
-        kw["shape_mask"],
-        index,
-    )
-    return selected[_EVALUATED_RESOURCES]
-
-
-def _maybe_submit(
-    func: Callable[..., Any],
-    executor: Executor | None,
+def _maybe_submit_single(
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
-    *args: Any,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    store: dict[str, StoreType],
+    cache: _CacheBase | None,
 ) -> Any:
-    if executor:
+    args = (func, kwargs, store, cache)
+    ex = _executor_for_func(func, executor)
+    if is_slurm_executor_type(ex):
+        ex = slurm_executor_for_single(func, kwargs)
+        assert isinstance(executor, dict)
+        executor[func.output_name] = ex  # type: ignore[assignment]
+
+    if ex:
         if status is not None:
             assert progress is not None
-            return _status_submit(func, executor, status, progress, *args)
-        return executor.submit(func, *args)
-    return func(*args)
+            return _status_submit(_submit_single, ex, status, progress, *args)
+        return ex.submit(_submit_single, *args)
+    return _submit_single(*args)
 
 
 class _StoredValue(NamedTuple):
@@ -796,7 +790,7 @@ def _run_and_process_generation(
     store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -818,7 +812,7 @@ async def _run_and_process_generation_async(
     store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[OUTPUT_TYPE, Executor],
+    executor: dict[OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -864,39 +858,37 @@ def _submit_func(
     run_info: RunInfo,
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
-    ex = _executor_for_func(func, executor)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, ex, status, progress)
+        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, ex, status, progress, func, kwargs, store, cache)
+        task = _maybe_submit_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
 def _executor_for_func(
     func: PipeFunc,
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
 ) -> Executor | None:
-    if isinstance(executor, dict):
-        if func.output_name in executor:
-            return executor[func.output_name]
-        if "" in executor:
-            return executor[""]
-        msg = (
-            f"No executor found for output `{func.output_name}`."
-            f" Please either specify an executor for this output using"
-            f" `executor['{func.output_name}'] = ...`, or provide a default executor"
-            f' using `executor[""] = ...`.'
-        )
-        raise ValueError(msg)
-    return executor
+    assert isinstance(executor, dict)
+    if func.output_name in executor:
+        return executor[func.output_name]
+    if "" in executor:
+        return executor[""]
+    msg = (
+        f"No executor found for output `{func.output_name}`."
+        f" Please either specify an executor for this output using"
+        f" `executor['{func.output_name}'] = ...`, or provide a default executor"
+        f' using `executor[""] = ...`.'
+    )
+    raise ValueError(msg)
 
 
 def _submit_generation(
@@ -904,7 +896,7 @@ def _submit_generation(
     generation: list[PipeFunc],
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
