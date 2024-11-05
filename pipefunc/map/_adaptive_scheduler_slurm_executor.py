@@ -1,3 +1,5 @@
+"""Helpers for adaptive_scheduler.SlurmExecutor class introduced in 2.13.0."""
+
 from __future__ import annotations
 
 import sys

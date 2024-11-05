@@ -445,8 +445,9 @@ def _run_iteration(
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
 
     def compute_fn() -> Any:
-        if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
-            selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
+        if callable(func.resources):  # type: ignore[has-type]
+            kw = kwargs if func.resources_scope == "map" else selected
+            selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
         try:
             return func(**selected)
         except Exception as e:
