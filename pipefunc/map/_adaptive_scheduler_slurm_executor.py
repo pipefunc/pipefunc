@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import sys
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from pipefunc._utils import is_min_version
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
 
-    from adaptive_scheduler import MultiRunManager
+    from adaptive_scheduler import MultiRunManager, SlurmExecutor
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
@@ -94,3 +94,19 @@ def maybe_multi_run_manager(
             if isinstance(ex, SlurmExecutor):
                 return MultiRunManager()
     return None
+
+
+def is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
+    if not _adaptive_scheduler_imported():
+        return False
+    from adaptive_scheduler import SlurmExecutor
+
+    return isinstance(executor, SlurmExecutor)
+
+
+def is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmExecutor]]:
+    if not _adaptive_scheduler_imported():
+        return False
+    from adaptive_scheduler import SlurmExecutor
+
+    return executor is SlurmExecutor

@@ -24,6 +24,7 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
+    is_slurm_executor,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
 )
@@ -476,14 +477,12 @@ def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    selected: dict[str, Any] | None,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    if selected is None:
-        selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
+    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
     _update_array(func, arrays, shape, shape_mask, index, outputs)
@@ -615,7 +614,6 @@ def _prepare_submit_map_spec(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
-        selected=None,
         shape=shape,
         shape_mask=mask,
         arrays=arrays,
@@ -658,18 +656,41 @@ def _status_submit(
 
 
 def _maybe_parallel_map(
-    func: Callable[..., Any],
-    seq: Sequence,
+    func: functools.partial[tuple[Any, ...]],
+    seq: list[int],
     executor: Executor | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
     if executor is not None:
+        if is_slurm_executor(executor):
+            futs = []
+            for i in seq:
+                resources = _resources_from_process_index(func, i)
+                fut = executor.submit(i, resources)
+                futs.append(fut)
+            return futs
         if status is not None:
             assert progress is not None
-            return [_status_submit(func, executor, status, progress, x) for x in seq]
-        return [executor.submit(func, x) for x in seq]
-    return [func(x) for x in seq]
+            return [_status_submit(func, executor, status, progress, i) for i in seq]
+        return [executor.submit(func, i) for i in seq]
+    return [func(i) for i in seq]
+
+
+def _resources_from_process_index(
+    process_index: functools.partial[tuple[Any, ...]],
+    index: int,
+) -> Any:
+    kw = process_index.keywords
+    assert kw["func"].resources is not None
+    selected = _select_kwargs_and_eval_resources(
+        kw["func"],
+        kw["kwargs"],
+        kw["shape"],
+        kw["shape_mask"],
+        index,
+    )
+    return selected[_EVALUATED_RESOURCES]
 
 
 def _maybe_submit(
