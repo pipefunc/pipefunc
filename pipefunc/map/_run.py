@@ -398,6 +398,16 @@ def _select_kwargs(
     return selected
 
 
+def _eval_resources_in_selected(
+    kwargs: dict[str, Any],
+    selected: dict[str, Any],
+    func: PipeFunc,
+) -> None:
+    if callable(func.resources):  # type: ignore[has-type]
+        kw = kwargs if func.resources_scope == "map" else selected
+        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+
+
 def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
@@ -460,9 +470,7 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    if callable(func.resources):  # type: ignore[has-type]
-        kw = kwargs if func.resources_scope == "map" else selected
-        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+    _eval_resources_in_selected(kwargs, selected, func)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
     _update_array(func, arrays, shape, shape_mask, index, outputs)
