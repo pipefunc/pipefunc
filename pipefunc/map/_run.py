@@ -398,7 +398,7 @@ def _select_kwargs(
     return selected
 
 
-def _eval_resources_in_selected(
+def _maybe_eval_resources_in_selected(
     kwargs: dict[str, Any],
     selected: dict[str, Any],
     func: PipeFunc,
@@ -406,6 +406,18 @@ def _eval_resources_in_selected(
     if callable(func.resources):  # type: ignore[has-type]
         kw = kwargs if func.resources_scope == "map" else selected
         selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+
+
+def _select_kwargs_and_eval_resources(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+    index: int,
+) -> dict[str, Any]:
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    _maybe_eval_resources_in_selected(kwargs, selected, func)
+    return selected
 
 
 def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
@@ -464,13 +476,14 @@ def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    selected: dict[str, Any] | None,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-    _eval_resources_in_selected(kwargs, selected, func)
+    if selected is None:
+        selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
     _update_array(func, arrays, shape, shape_mask, index, outputs)
@@ -602,6 +615,7 @@ def _prepare_submit_map_spec(
         _run_iteration_and_process,
         func=func,
         kwargs=kwargs,
+        selected=None,
         shape=shape,
         shape_mask=mask,
         arrays=arrays,
