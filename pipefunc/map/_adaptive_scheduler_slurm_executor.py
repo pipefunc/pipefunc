@@ -41,10 +41,11 @@ def maybe_convert_slurm_executor(
     if _adaptive_scheduler_imported():
         from adaptive_scheduler import SlurmExecutor
 
+        if (isinstance(executor, SlurmExecutor) or executor is SlurmExecutor) and not in_async:
+            msg = "Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.run_async` instead."
+            raise ValueError(msg)
+
         if isinstance(executor, SlurmExecutor):
-            if not in_async:
-                msg = "Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.run_async` instead."
-                raise ValueError(msg)
             # If a single SlurmExecutor is provided, we need to create a new one for each output
             return {
                 func.output_name: executor.new(update={"name": f"{executor.name}-{i}"})
