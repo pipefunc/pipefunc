@@ -877,7 +877,8 @@ def _executor_for_func(
     func: PipeFunc,
     executor: dict[OUTPUT_TYPE, Executor] | None,
 ) -> Executor | None:
-    assert isinstance(executor, dict)
+    if executor is None:
+        return None
     if func.output_name in executor:
         return executor[func.output_name]
     if "" in executor:
