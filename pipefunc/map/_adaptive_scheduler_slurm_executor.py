@@ -120,31 +120,43 @@ def _slurm_name(output_name: OUTPUT_TYPE) -> str:
 
 
 def slurm_executor_for_map(
+    executor: SlurmExecutor | type[SlurmExecutor],
     process_index: functools.partial[tuple[Any, ...]],
     seq: list[int],
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     from adaptive_scheduler import SlurmExecutor
 
-    resources_list: list[dict[str, Any]] = []
-    for i in seq:
-        resources = _resources_from_process_index(process_index, i)
-        scheduler_resources = _adaptive_scheduler_resource_dict(resources)
-        resources_list.append(scheduler_resources)
-    executor_kwargs = _list_of_dicts_to_dict_of_tuples(resources_list)
-    return SlurmExecutor(
-        name=_slurm_name(process_index.keywords["func"].output_name),
-        **executor_kwargs,
-    )
+    func = process_index.keywords["func"]
+    if func.resources is not None:
+        resources_list: list[dict[str, Any]] = []
+        for i in seq:
+            resources = _resources_from_process_index(process_index, i)
+            scheduler_resources = _adaptive_scheduler_resource_dict(resources)
+            resources_list.append(scheduler_resources)
+        executor_kwargs = _list_of_dicts_to_dict_of_tuples(resources_list)
+    else:
+        executor_kwargs = {}
+    executor_kwargs["name"] = _slurm_name(func.output_name)  # type: ignore[assignment]
+    if isinstance(executor, SlurmExecutor):
+        return executor.new(update=executor_kwargs)
+    return SlurmExecutor(**executor_kwargs)
 
 
-def slurm_executor_for_single(func: PipeFunc, kwargs: dict[str, Any]) -> Executor:
+def slurm_executor_for_single(
+    executor: SlurmExecutor | type[SlurmExecutor],
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+) -> Executor:
     from adaptive_scheduler import SlurmExecutor
 
     resources: Resources | None = (
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
-    scheduler_resources = _adaptive_scheduler_resource_dict(resources)
-    return SlurmExecutor(name=_slurm_name(func.output_name), **scheduler_resources)
+    executor_kwargs = _adaptive_scheduler_resource_dict(resources) if resources is not None else {}
+    executor_kwargs["name"] = _slurm_name(func.output_name)
+    if isinstance(executor, SlurmExecutor):
+        return executor.new(update=executor_kwargs)
+    return SlurmExecutor(**executor_kwargs)
 
 
 def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, Any]:
@@ -170,8 +182,7 @@ def _resources_from_process_index(
     # Import here to avoid circular imports
 
     kw = process_index.keywords
-    if kw["func"].resources is None:
-        return None
+    assert kw["func"].resources is not None
     # NOTE: We are executing this line below 2 times for each index.
     # This is not ideal, if it becomes a performance issue we can cache
     # the result.

@@ -24,6 +24,7 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
+    is_slurm_executor,
     is_slurm_executor_type,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
@@ -190,7 +191,7 @@ class AsyncMap(NamedTuple):
         self,
         include: set[str] | None = None,
         exclude: set[str] | None = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str]:  # pragma: no cover
         """Display the pipeline widget."""
         if (
             self.multi_run_manager is not None
@@ -667,8 +668,8 @@ def _maybe_parallel_map(
     func = process_index.keywords["func"]
     ex = _executor_for_func(func, executor)
     if ex is not None:
-        if is_slurm_executor_type(ex):
-            ex = slurm_executor_for_map(process_index, seq)
+        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
+            ex = slurm_executor_for_map(ex, process_index, seq)
             assert isinstance(executor, dict)
             executor[func.output_name] = ex  # type: ignore[assignment]
         if status is not None:
@@ -689,8 +690,8 @@ def _maybe_submit_single(
 ) -> Any:
     args = (func, kwargs, store, cache)
     ex = _executor_for_func(func, executor)
-    if is_slurm_executor_type(ex):
-        ex = slurm_executor_for_single(func, kwargs)
+    if is_slurm_executor(ex) or is_slurm_executor_type(ex):
+        ex = slurm_executor_for_single(ex, func, kwargs)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
 
