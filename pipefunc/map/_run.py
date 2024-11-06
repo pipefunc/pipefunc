@@ -186,9 +186,9 @@ class AsyncMap(NamedTuple):
         loop = asyncio.get_event_loop()  # pragma: no cover
         return loop.run_until_complete(self.task)  # pragma: no cover
 
-    def display(self) -> None:
+    def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
-        if is_running_in_ipynb():  # pragma: no cover
+        if is_running_in_ipynb():
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
