@@ -137,6 +137,7 @@ def _map_slurm_executor_kwargs(
     assert resources is not None
     if not callable(resources):
         kwargs = _adaptive_scheduler_resource_dict(resources)
+        # Remove keys with None or [] values
         return {k: v for k, v in kwargs.items() if v}
     for i in seq:
         evaluated_resources = _resources_from_process_index(process_index, i)
