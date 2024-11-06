@@ -125,7 +125,9 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = []
+omit = [
+    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+]
 
 [tool.ruff]
 line-length = 100

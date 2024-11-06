@@ -78,7 +78,7 @@ def slurm_executor_for_single(
     resources: Resources | None = (
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
-    executor_kwargs = _adaptive_scheduler_resource_dict(resources) if resources is not None else {}
+    executor_kwargs = _adaptive_scheduler_resource_dict(resources)
     executor_kwargs["name"] = _slurm_name(func.output_name)
     return _new_slurm_executor(executor, **executor_kwargs)
 
@@ -133,6 +133,7 @@ def _map_slurm_executor_kwargs(
 ) -> dict[str, tuple[Any, ...]]:
     resources_list: list[dict[str, Any]] = []
     resources = process_index.keywords["func"].resources
+    assert resources is not None
     if not callable(resources):
         kwargs = _adaptive_scheduler_resource_dict(resources)
         return {k: v for k, v in kwargs.items() if v}
@@ -149,7 +150,7 @@ def _new_slurm_executor(
 ) -> SlurmExecutor:
     from adaptive_scheduler import SlurmExecutor
 
-    if is_slurm_executor(executor):
+    if is_slurm_executor(executor):  # type: ignore[arg-type]
         return executor.new(update=kwargs)
     assert isinstance(executor, type)
     assert issubclass(executor, SlurmExecutor)
