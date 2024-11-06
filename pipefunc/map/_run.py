@@ -193,6 +193,8 @@ class AsyncMap(NamedTuple):
                 self.progress.display()
             if self.multi_run_manager is not None:
                 self.multi_run_manager.display()
+        else:
+            print("⚠️ Display is only supported in Jupyter notebooks.")
 
 
 def run_map_async(
