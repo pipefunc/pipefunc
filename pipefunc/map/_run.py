@@ -16,7 +16,6 @@ from pipefunc._utils import (
     at_least_tuple,
     dump,
     handle_error,
-    is_installed,
     is_running_in_ipynb,
     load,
     prod,
@@ -187,20 +186,13 @@ class AsyncMap(NamedTuple):
         loop = asyncio.get_event_loop()  # pragma: no cover
         return loop.run_until_complete(self.task)  # pragma: no cover
 
-    def _repr_mimebundle_(
-        self,
-        include: set[str] | None = None,
-        exclude: set[str] | None = None,
-    ) -> dict[str, str]:  # pragma: no cover
+    def display(self) -> None:
         """Display the pipeline widget."""
-        if (
-            self.multi_run_manager is not None
-            and is_running_in_ipynb()
-            and is_installed("ipywidgets")
-        ):
-            return self.multi_run_manager.info()._repr_mimebundle_(include=include, exclude=exclude)
-        # Return a plaintext representation of the object
-        return {"text/plain": repr(self)}
+        if is_running_in_ipynb():
+            if self.progress is not None:
+                self.progress.display()
+            if self.multi_run_manager is not None:
+                self.multi_run_manager.display()
 
 
 def run_map_async(
@@ -316,9 +308,12 @@ def run_map_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
-        progress.display()
+    if is_running_in_ipynb():
+        if progress is not None:
+            progress.attach_task(task)
+            progress.display()
+        if multi_run_manager is not None:
+            multi_run_manager.display()
     return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
