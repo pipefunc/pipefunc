@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 
-from ._adaptive_scheduler_slurm_executor import maybe_convert_slurm_executor
+from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
 from ._run_info import RunInfo
@@ -57,7 +57,7 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
-    executor = maybe_convert_slurm_executor(executor, pipeline, in_async)
+    validate_slurm_executor(executor, in_async)
     if executor is not None and not isinstance(executor, dict):
         executor = {"": executor}
     elif isinstance(executor, dict):
