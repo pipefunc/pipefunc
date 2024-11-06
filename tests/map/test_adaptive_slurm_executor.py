@@ -132,16 +132,21 @@ def pipeline() -> Pipeline:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("use_mock", [True, False])
+@pytest.mark.parametrize("use_instance", [True, False])
 async def test_adaptive_slurm_executor(
     pipeline: Pipeline,
     tmp_path: Path,
     use_mock: bool,  # noqa: FBT001
+    use_instance: bool,  # noqa: FBT001
 ) -> None:
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
     inputs = {"x": range(10)}
     run_folder = tmp_path / "my_run_folder"
-    ex = MockSlurmExecutor() if use_mock else SlurmExecutor(cores_per_node=1)
+    if use_mock:
+        ex = MockSlurmExecutor() if use_instance else MockSlurmExecutor
+    else:
+        ex = SlurmExecutor(cores_per_node=1) if use_instance else SlurmExecutor
     runner = pipeline.map_async(
         inputs,
         run_folder,

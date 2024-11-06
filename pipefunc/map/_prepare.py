@@ -57,11 +57,11 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
-    validate_slurm_executor(executor, in_async)
     if executor is not None and not isinstance(executor, dict):
         executor = {"": executor}
     elif isinstance(executor, dict):
         executor = executor.copy()  # this dict might be mutated, so we copy it
+    validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
