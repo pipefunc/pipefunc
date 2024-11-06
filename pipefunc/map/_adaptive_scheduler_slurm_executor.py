@@ -202,4 +202,6 @@ T = TypeVar("T")
 def _list_of_dicts_to_dict_of_tuples(
     list_of_dicts: list[dict[str, T]],
 ) -> dict[str, tuple[T, ...]]:
-    return {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
+    tuples = {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
+    # Remove keys with all None or [] values
+    return {k: v for k, v in tuples.items() if any(v)}
