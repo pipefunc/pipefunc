@@ -44,7 +44,7 @@ def maybe_multi_run_manager(
 
 
 def is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
-    if not _adaptive_scheduler_imported():
+    if not _adaptive_scheduler_imported():  # pragma: no cover
         return False
     from adaptive_scheduler import SlurmExecutor
 
@@ -52,7 +52,7 @@ def is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
 
 
 def is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmExecutor]]:
-    if not _adaptive_scheduler_imported():
+    if not _adaptive_scheduler_imported():  # pragma: no cover
         return False
     from adaptive_scheduler import SlurmExecutor
 
@@ -85,11 +85,9 @@ def slurm_executor_for_single(
 
 def maybe_finalize_slurm_executors(
     generation: list[PipeFunc],
-    executor: dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor],
     multi_run_manager: MultiRunManager | None,
 ) -> None:
-    if executor is None:
-        return
     executors = _executors_for_generation(generation, executor)
     for ex in executors:
         if _adaptive_scheduler_imported():
@@ -99,7 +97,6 @@ def maybe_finalize_slurm_executors(
                 assert multi_run_manager is not None
                 run_manager = ex.finalize()
                 multi_run_manager.add_run_manager(run_manager)
-    return
 
 
 def _adaptive_scheduler_imported() -> bool:
