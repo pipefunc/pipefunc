@@ -1,4 +1,4 @@
-"""Helpers for adaptive_scheduler.SlurmExecutor class introduced in 2.13.0."""
+"""Helpers for adaptive_scheduler.SlurmExecutor class introduced in 2.13.3."""
 
 from __future__ import annotations
 
@@ -100,8 +100,8 @@ def _adaptive_scheduler_imported() -> bool:
     """Check if the adaptive_scheduler package is imported and at the correct version."""
     if "adaptive_scheduler" not in sys.modules:  # pragma: no cover
         return False
-    # The SlurmExecutor was introduced in version 2.13.0
-    min_version = "2.13.0"
+    # The SlurmExecutor was introduced in version 2.13.3
+    min_version = "2.13.3"
     if not is_min_version("adaptive_scheduler", min_version):  # pragma: no cover
         msg = f"The 'adaptive_scheduler' package must be at least version {min_version}."
         warnings.warn(msg, stacklevel=2)
