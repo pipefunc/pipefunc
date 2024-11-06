@@ -659,24 +659,24 @@ def _status_submit(
 
 
 def _maybe_parallel_map(
+    func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
-    seq: list[int],
+    indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
-    func = process_index.keywords["func"]
     ex = _executor_for_func(func, executor)
     if ex is not None:
         if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-            ex = slurm_executor_for_map(ex, process_index, seq)
+            ex = slurm_executor_for_map(ex, process_index, indices)
             assert isinstance(executor, dict)
             executor[func.output_name] = ex  # type: ignore[assignment]
         if status is not None:
             assert progress is not None
-            return [_status_submit(process_index, ex, status, progress, i) for i in seq]
-        return [ex.submit(process_index, i) for i in seq]
-    return [process_index(i) for i in seq]
+            return [_status_submit(process_index, ex, status, progress, i) for i in indices]
+        return [ex.submit(process_index, i) for i in indices]
+    return [process_index(i) for i in indices]
 
 
 def _maybe_submit_single(
@@ -688,13 +688,12 @@ def _maybe_submit_single(
     store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
-    args = (func, kwargs, store, cache)
+    args = (func, kwargs, store, cache)  # args for _submit_single
     ex = _executor_for_func(func, executor)
     if is_slurm_executor(ex) or is_slurm_executor_type(ex):
         ex = slurm_executor_for_single(ex, func, kwargs)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
-
     if ex:
         if status is not None:
             assert progress is not None
@@ -867,7 +866,7 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
         task = _maybe_submit_single(executor, status, progress, func, kwargs, store, cache)
