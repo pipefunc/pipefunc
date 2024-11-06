@@ -164,3 +164,14 @@ async def test_adaptive_mock_slurm_executor(
     fut = ex.submit(lambda x: x, "echo 'Hello World'")
     ex.finalize()
     await fut
+
+
+def test_slurm_executor_map_exception(
+    pipeline: Pipeline,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.run_async` instead.",
+    ):
+        pipeline.map({}, tmp_path, executor=MockSlurmExecutor(cores_per_node=1))
