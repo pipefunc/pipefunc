@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import warnings
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple, is_min_version
@@ -104,8 +103,7 @@ def _adaptive_scheduler_imported() -> bool:
     min_version = "2.13.3"
     if not is_min_version("adaptive_scheduler", min_version):  # pragma: no cover
         msg = f"The 'adaptive_scheduler' package must be at least version {min_version}."
-        warnings.warn(msg, stacklevel=2)
-        return False
+        raise ImportError(msg)
     return True
 
 
