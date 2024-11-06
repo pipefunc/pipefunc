@@ -109,12 +109,17 @@ class MockSlurmExecutor(SlurmExecutor):
 
 @pytest.fixture
 def pipeline() -> Pipeline:
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1})
     def double_it(x: int) -> int:
         assert isinstance(x, int)
         return 2 * x
 
-    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=lambda kw: {"cpus": kw["y"] + 1},
+        resources_scope="element",
+    )
     def add_one(y):
         return y + 1
 

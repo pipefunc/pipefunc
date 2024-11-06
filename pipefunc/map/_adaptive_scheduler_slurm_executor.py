@@ -135,9 +135,13 @@ def _map_slurm_executor_kwargs(
     seq: list[int],
 ) -> dict[str, tuple[Any, ...]]:
     resources_list: list[dict[str, Any]] = []
+    resources = process_index.keywords["func"].resources
+    if not callable(resources):
+        kwargs = _adaptive_scheduler_resource_dict(resources)
+        return {k: v for k, v in kwargs.items() if v}
     for i in seq:
-        resources = _resources_from_process_index(process_index, i)
-        scheduler_resources = _adaptive_scheduler_resource_dict(resources)
+        evaluated_resources = _resources_from_process_index(process_index, i)
+        scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
         resources_list.append(scheduler_resources)
     return _list_of_dicts_to_dict_of_tuples(resources_list)
 
