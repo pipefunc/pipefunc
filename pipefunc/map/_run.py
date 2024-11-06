@@ -310,9 +310,10 @@ def run_map_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
+    if progress is not None:
+        progress.attach_task(task)
     if is_running_in_ipynb():  # pragma: no cover
         if progress is not None:
-            progress.attach_task(task)
             progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
