@@ -188,7 +188,7 @@ class AsyncMap(NamedTuple):
 
     def display(self) -> None:
         """Display the pipeline widget."""
-        if is_running_in_ipynb():
+        if is_running_in_ipynb():  # pragma: no cover
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
@@ -310,7 +310,7 @@ def run_map_async(
         return outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if is_running_in_ipynb():
+    if is_running_in_ipynb():  # pragma: no cover
         if progress is not None:
             progress.attach_task(task)
             progress.display()
