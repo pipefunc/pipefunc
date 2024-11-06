@@ -150,7 +150,7 @@ async def test_adaptive_slurm_executor(
     runner = pipeline.map_async(
         inputs,
         run_folder,
-        executor=ex,
+        executor=ex,  # type: ignore[arg-type]
         show_progress=True,
     )
     result = await runner.task

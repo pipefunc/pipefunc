@@ -556,7 +556,7 @@ def test_class_name_in_pipefunc_name() -> None:
     assert pf.__name__ == "f"
 
 
-def test_defaults_dataclass_factory():
+def test_defaults_dataclass_factory() -> None:
     @dataclass
     class TestClass:
         x0: list[int] = field(default_factory=lambda: [1, 2, 3])
