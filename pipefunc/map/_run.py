@@ -22,6 +22,14 @@ from pipefunc._utils import (
 )
 from pipefunc.cache import HybridCache, to_hashable
 
+from ._adaptive_scheduler_slurm_executor import (
+    is_slurm_executor,
+    is_slurm_executor_type,
+    maybe_finalize_slurm_executors,
+    maybe_multi_run_manager,
+    slurm_executor_for_map,
+    slurm_executor_for_single,
+)
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
@@ -31,6 +39,8 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 if TYPE_CHECKING:
     from collections import OrderedDict
     from collections.abc import Callable, Generator, Sequence
+
+    from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
@@ -161,6 +171,7 @@ class AsyncMap(NamedTuple):
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     progress: ProgressTracker | None
+    multi_run_manager: MultiRunManager | None
 
     def result(self) -> OrderedDict[str, Result]:
         if is_running_in_ipynb():  # pragma: no cover
@@ -174,6 +185,16 @@ class AsyncMap(NamedTuple):
 
         loop = asyncio.get_event_loop()  # pragma: no cover
         return loop.run_until_complete(self.task)  # pragma: no cover
+
+    def display(self) -> None:  # pragma: no cover
+        """Display the pipeline widget."""
+        if is_running_in_ipynb():
+            if self.progress is not None:
+                self.progress.display()
+            if self.multi_run_manager is not None:
+                self.multi_run_manager.display()
+        else:
+            print("⚠️ Display is only supported in Jupyter notebooks.")
 
 
 def run_map_async(
@@ -268,6 +289,8 @@ def run_map_async(
         in_async=True,
     )
 
+    multi_run_manager = maybe_multi_run_manager(executor_dict)
+
     async def _run_pipeline() -> OrderedDict[str, Result]:
         with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
@@ -281,6 +304,7 @@ def run_map_async(
                     executor=ex,
                     progress=progress,
                     cache=pipeline.cache,
+                    multi_run_manager=multi_run_manager,
                 )
         _maybe_persist_memory(store, persist_memory)
         return outputs
@@ -288,8 +312,12 @@ def run_map_async(
     task = asyncio.create_task(_run_pipeline())
     if progress is not None:
         progress.attach_task(task)
-        progress.display()
-    return AsyncMap(task, run_info, progress)
+    if is_running_in_ipynb():  # pragma: no cover
+        if progress is not None:
+            progress.display()
+        if multi_run_manager is not None:
+            multi_run_manager.display()
+    return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
 def _maybe_persist_memory(
@@ -372,6 +400,28 @@ def _select_kwargs(
     return selected
 
 
+def _maybe_eval_resources_in_selected(
+    kwargs: dict[str, Any],
+    selected: dict[str, Any],
+    func: PipeFunc,
+) -> None:
+    if callable(func.resources):  # type: ignore[has-type]
+        kw = kwargs if func.resources_scope == "map" else selected
+        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+
+
+def _select_kwargs_and_eval_resources(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+    index: int,
+) -> dict[str, Any]:
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    _maybe_eval_resources_in_selected(kwargs, selected, func)
+    return selected
+
+
 def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
@@ -410,17 +460,10 @@ _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 def _run_iteration(
     func: PipeFunc,
-    kwargs: dict[str, Any],
-    shape: tuple[int, ...],
-    shape_mask: tuple[bool, ...],
-    index: int,
+    selected: dict[str, Any],
     cache: _CacheBase | None,
 ) -> Any:
-    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-
     def compute_fn() -> Any:
-        if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
-            selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
         try:
             return func(**selected)
         except Exception as e:
@@ -440,7 +483,8 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
 ) -> tuple[Any, ...]:
-    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
+    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
+    output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
     _update_array(func, arrays, shape, shape_mask, index, outputs)
     return outputs
@@ -622,6 +666,10 @@ def _maybe_parallel_map(
 ) -> list[Any]:
     ex = _executor_for_func(func, executor)
     if ex is not None:
+        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
+            ex = slurm_executor_for_map(ex, process_index, indices)
+            assert isinstance(executor, dict)
+            executor[func.output_name] = ex  # type: ignore[assignment]
         if status is not None:
             assert progress is not None
             return [_status_submit(process_index, ex, status, progress, i) for i in indices]
@@ -640,6 +688,10 @@ def _maybe_submit_single(
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _submit_single
     ex = _executor_for_func(func, executor)
+    if is_slurm_executor(ex) or is_slurm_executor_type(ex):
+        ex = slurm_executor_for_single(ex, func, kwargs)
+        assert isinstance(executor, dict)
+        executor[func.output_name] = ex  # type: ignore[assignment]
     if ex:
         if status is not None:
             assert progress is not None
@@ -761,6 +813,7 @@ async def _run_and_process_generation_async(
     executor: dict[OUTPUT_TYPE, Executor],
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
+    multi_run_manager: MultiRunManager | None = None,
 ) -> None:
     tasks = _submit_generation(
         run_info,
@@ -771,6 +824,7 @@ async def _run_and_process_generation_async(
         progress,
         cache,
     )
+    maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
     await _process_generation_async(generation, tasks, store, outputs)
 
 

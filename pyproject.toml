@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]

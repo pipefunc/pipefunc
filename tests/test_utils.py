@@ -11,6 +11,7 @@ from pipefunc._utils import (
     format_args,
     format_function_call,
     format_kwargs,
+    is_min_version,
     load,
     requires,
 )
@@ -235,3 +236,20 @@ def test_equal_dicts():
 def test_requires() -> None:
     with pytest.raises(ImportError, match="package is required for"):
         requires("package_name_missing_for_sure", reason="testing", extras="test")
+
+
+def test_is_min_version():
+    # Basic version checks
+    assert is_min_version("numpy", "1.0.0")
+    assert not is_min_version("pipefunc", "999.0.0")
+
+    major, minor, patch = map(int, np.__version__.split("."))
+
+    assert is_min_version("numpy", f"{major}.{minor}.{patch-1}")
+    assert not is_min_version("numpy", f"{major}.{minor}.{patch+1}")
+
+    assert is_min_version("numpy", f"{major}.{minor-1}.{patch}")
+    assert not is_min_version("numpy", f"{major}.{minor+1}.{patch}")
+
+    assert is_min_version("numpy", f"{major-1}.{minor}.{patch}")
+    assert not is_min_version("numpy", f"{major+1}.{minor}.{patch}")
