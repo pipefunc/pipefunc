@@ -114,6 +114,7 @@ def _executors_for_generation(
     executor: dict[OUTPUT_TYPE, Executor],
 ) -> list[Executor]:
     from ._run import _executor_for_func
+    # Import here to avoid circular imports
 
     executors = []
     for func in generation:
