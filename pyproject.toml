@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]
@@ -125,7 +125,9 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = []
+omit = [
+    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+]
 
 [tool.ruff]
 line-length = 100

@@ -102,7 +102,9 @@ def slurm_run_setup(
                 learners.append(learner.learner)
                 fnames.append(_fname(run_folder, learner.pipefunc, i))
                 tracker.update(
-                    resources=learner.pipefunc.resources if not ignore_resources else None,
+                    resources=learner.pipefunc.resources  # type: ignore[has-type]
+                    if not ignore_resources
+                    else None,
                     func=learner.pipefunc,
                     learner=learner.learner,
                     run_info=learners_dict.run_info,
@@ -240,6 +242,10 @@ def _extra_scheduler(
             return _extra_scheduler(index, resources_instance, func, run_info)  # type: ignore[return-value]
 
         return _fn
+    return __extra_scheduler(resources)
+
+
+def __extra_scheduler(resources: Resources) -> list[str]:
     extra_scheduler = []
     if resources.memory:
         extra_scheduler.append(f"--mem={resources.memory}")
@@ -266,6 +272,10 @@ def _executor_type(
             return _executor_type(index, resources_instance, func, run_info)
 
         return _fn
+    return __executor_type(resources)
+
+
+def __executor_type(resources: Resources) -> EXECUTOR_TYPES:
     return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
 
 

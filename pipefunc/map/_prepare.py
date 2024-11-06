@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
 
+from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
 from ._run_info import RunInfo
@@ -44,6 +45,7 @@ def prepare_run(
     dict[str, StoreType],
     OrderedDict[str, Result],
     bool,
+    dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
     if not parallel and show_progress:
@@ -55,6 +57,11 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
+    if executor is not None and not isinstance(executor, dict):
+        executor = {"": executor}
+    elif isinstance(executor, dict):
+        executor = executor.copy()  # this dict might be mutated, so we copy it
+    validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
@@ -72,7 +79,7 @@ def prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    return pipeline, run_info, store, outputs, parallel, progress
+    return pipeline, run_info, store, outputs, parallel, executor, progress
 
 
 def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
@@ -101,7 +108,7 @@ def _check_parallel(
     for storage in store.values():
         if isinstance(storage, StorageBase) and not storage.parallelizable:
             recommendation = (
-                "Consider\n - using a file-based storage or `shared_memory` / `zarr_shared_memory`"
+                "Consider\n - using a file-based storage or `shared_memory_dict` / `zarr_shared_memory`"
                 " for parallel execution,\n - disable parallel execution,\n - or use a different executor.\n"
             )
             default = f"The chosen storage type `{storage.storage_id}` does not support process-based parallel execution."
