@@ -42,6 +42,46 @@ def maybe_multi_run_manager(
     return None
 
 
+def maybe_update_slurm_executor_single(
+    func: PipeFunc,
+    ex: Executor,
+    executor: dict[OUTPUT_TYPE, Executor],
+    kwargs: dict[str, Any],
+) -> Executor:
+    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+        ex = _slurm_executor_for_single(ex, func, kwargs)
+        assert isinstance(executor, dict)
+        executor[func.output_name] = ex  # type: ignore[assignment]
+    return ex
+
+
+def maybe_update_slurm_executor_map(
+    func: PipeFunc,
+    ex: Executor,
+    executor: dict[OUTPUT_TYPE, Executor],
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+) -> Executor:
+    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+        ex = _slurm_executor_for_map(ex, process_index, indices)
+        assert isinstance(executor, dict)
+        executor[func.output_name] = ex  # type: ignore[assignment]
+    return ex
+
+
+def maybe_finalize_slurm_executors(
+    generation: list[PipeFunc],
+    executor: dict[OUTPUT_TYPE, Executor],
+    multi_run_manager: MultiRunManager | None,
+) -> None:
+    executors = _executors_for_generation(generation, executor)
+    for ex in executors:
+        if _adaptive_scheduler_imported() and _is_slurm_executor(ex):
+            assert multi_run_manager is not None
+            run_manager = ex.finalize()
+            multi_run_manager.add_run_manager(run_manager)
+
+
 def _is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
     if executor is None or not _adaptive_scheduler_imported():  # pragma: no cover
         return False
@@ -80,19 +120,6 @@ def _slurm_executor_for_single(
     executor_kwargs = _adaptive_scheduler_resource_dict(resources)
     executor_kwargs["name"] = _slurm_name(func.output_name)
     return _new_slurm_executor(executor, **executor_kwargs)
-
-
-def maybe_finalize_slurm_executors(
-    generation: list[PipeFunc],
-    executor: dict[OUTPUT_TYPE, Executor],
-    multi_run_manager: MultiRunManager | None,
-) -> None:
-    executors = _executors_for_generation(generation, executor)
-    for ex in executors:
-        if _adaptive_scheduler_imported() and _is_slurm_executor(ex):
-            assert multi_run_manager is not None
-            run_manager = ex.finalize()
-            multi_run_manager.add_run_manager(run_manager)
 
 
 def _adaptive_scheduler_imported() -> bool:
@@ -203,30 +230,3 @@ def _list_of_dicts_to_dict_of_tuples(
     tuples = {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
     # Remove keys with all None or [] values
     return {k: v for k, v in tuples.items() if any(v)}
-
-
-def maybe_update_slurm_executor_single(
-    func: PipeFunc,
-    ex: Executor,
-    executor: dict[OUTPUT_TYPE, Executor],
-    kwargs: dict[str, Any],
-) -> Executor:
-    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
-        ex = _slurm_executor_for_single(ex, func, kwargs)
-        assert isinstance(executor, dict)
-        executor[func.output_name] = ex  # type: ignore[assignment]
-    return ex
-
-
-def maybe_update_slurm_executor_map(
-    func: PipeFunc,
-    ex: Executor,
-    executor: dict[OUTPUT_TYPE, Executor],
-    process_index: functools.partial[tuple[Any, ...]],
-    indices: list[int],
-) -> Executor:
-    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
-        ex = _slurm_executor_for_map(ex, process_index, indices)
-        assert isinstance(executor, dict)
-        executor[func.output_name] = ex  # type: ignore[assignment]
-    return ex
