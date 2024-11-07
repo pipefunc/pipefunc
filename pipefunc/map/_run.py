@@ -681,13 +681,13 @@ def _maybe_parallel_map(
 
 
 def _wrap_with_status_update(
-    process_index: functools.partial[tuple[Any, ...]],
+    func: Callable[..., Any],
     status: Status,
     progress: ProgressTracker,
-) -> Callable[..., tuple[Any, ...]]:
-    def wrapped(i: int) -> Any:
+) -> Callable[..., Any]:
+    def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
-        result = process_index(i)
+        result = func(*args)
         status.mark_complete()
         progress.update_progress()
         return result
@@ -706,12 +706,15 @@ def _maybe_execute_single(
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
-    if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-        ex = slurm_executor_for_single(ex, func, kwargs)
-        assert isinstance(executor, dict)
-        executor[func.output_name] = ex  # type: ignore[assignment]
     if ex:
+        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
+            ex = slurm_executor_for_single(ex, func, kwargs)
+            assert isinstance(executor, dict)
+            executor[func.output_name] = ex  # type: ignore[assignment]
         return _submit(_execute_single, ex, status, progress, *args)
+    if status is not None:
+        assert progress is not None
+        return _wrap_with_status_update(_execute_single, status, progress)(*args)
     return _execute_single(*args)
 
 
