@@ -695,7 +695,7 @@ def _wrap_with_status_update(
     return wrapped
 
 
-def _maybe_submit_single(
+def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
@@ -704,15 +704,15 @@ def _maybe_submit_single(
     store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
-    args = (func, kwargs, store, cache)  # args for _submit_single
+    args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
     if is_slurm_executor(ex) or is_slurm_executor_type(ex):
         ex = slurm_executor_for_single(ex, func, kwargs)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
     if ex:
-        return _submit(_submit_single, ex, status, progress, *args)
-    return _submit_single(*args)
+        return _submit(_execute_single, ex, status, progress, *args)
+    return _execute_single(*args)
 
 
 class _StoredValue(NamedTuple):
@@ -755,7 +755,7 @@ def _load_from_store(
     return _StoredValue(outputs, all_exist)
 
 
-def _submit_single(
+def _execute_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -882,7 +882,7 @@ def _submit_func(
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_submit_single(executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
