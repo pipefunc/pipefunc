@@ -641,13 +641,16 @@ def _mask_fixed_axes(
     return select.flat
 
 
-def _status_submit(
+def _submit(
     func: Callable[..., Any],
     executor: Executor,
-    status: Status,
-    progress: ProgressTracker,
+    status: Status | None,
+    progress: ProgressTracker | None,
     *args: Any,
 ) -> Future:
+    if status is None:
+        return executor.submit(func, *args)
+    assert progress is not None
     status.mark_in_progress()
     fut = executor.submit(func, *args)
     fut.add_done_callback(status.mark_complete)
@@ -670,11 +673,26 @@ def _maybe_parallel_map(
             ex = slurm_executor_for_map(ex, process_index, indices)
             assert isinstance(executor, dict)
             executor[func.output_name] = ex  # type: ignore[assignment]
-        if status is not None:
-            assert progress is not None
-            return [_status_submit(process_index, ex, status, progress, i) for i in indices]
-        return [ex.submit(process_index, i) for i in indices]
+        return [_submit(process_index, ex, status, progress, i) for i in indices]
+    if status is not None:
+        assert progress is not None
+        process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     return [process_index(i) for i in indices]
+
+
+def _wrap_with_status_update(
+    process_index: functools.partial[tuple[Any, ...]],
+    status: Status,
+    progress: ProgressTracker,
+) -> Callable[..., tuple[Any, ...]]:
+    def wrapped(i: int) -> Any:
+        status.mark_in_progress()
+        result = process_index(i)
+        status.mark_complete()
+        progress.update_progress()
+        return result
+
+    return wrapped
 
 
 def _maybe_submit_single(
@@ -693,10 +711,7 @@ def _maybe_submit_single(
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
     if ex:
-        if status is not None:
-            assert progress is not None
-            return _status_submit(_submit_single, ex, status, progress, *args)
-        return ex.submit(_submit_single, *args)
+        return _submit(_submit_single, ex, status, progress, *args)
     return _submit_single(*args)
 
 
@@ -930,11 +945,10 @@ def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Futu
 def _to_result_dict(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    output: Any,
+    output: tuple[Any, ...],
     store: dict[str, StoreType],
 ) -> dict[str, Result]:
-    # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
-    # was used.
+    # Note that the kwargs still contain the StorageBase objects if mapspec was used.
     return {
         output_name: Result(
             function=func.__name__,

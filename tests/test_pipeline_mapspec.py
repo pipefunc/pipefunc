@@ -348,11 +348,6 @@ def test_validation_parallel():
         match="Cannot use an executor without `parallel=True`",
     ):
         pipeline.map({}, parallel=False, executor=Executor())
-    with pytest.raises(
-        ValueError,
-        match="Cannot use `show_progress=True` with `parallel=False`",
-    ):
-        pipeline.map({}, parallel=False, show_progress=True)
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
@@ -364,3 +359,6 @@ def test_with_progress() -> None:
     pipeline = Pipeline([f])
     r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
     assert r_map["out"].output.tolist() == [1, 2, 3]
+
+    r_map_sequential = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True, parallel=False)
+    assert r_map_sequential["out"].output.tolist() == [1, 2, 3]

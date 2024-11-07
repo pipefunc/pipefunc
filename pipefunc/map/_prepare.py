@@ -48,9 +48,6 @@ def prepare_run(
     dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
-    if not parallel and show_progress:
-        msg = "Cannot use `show_progress=True` with `parallel=False`."
-        raise ValueError(msg)
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
