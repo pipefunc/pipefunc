@@ -6,6 +6,7 @@ from concurrent.futures import Executor
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc.typing import Array  # noqa: TCH001
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
@@ -353,12 +354,18 @@ def test_validation_parallel():
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_with_progress() -> None:
     @pipefunc(output_name="out", mapspec="a[i] -> out[i]")
-    def f(a):
+    def f(a: int) -> int:
         return a
 
-    pipeline = Pipeline([f])
+    @pipefunc(output_name="out_sum")
+    def g(out: Array[int]) -> int:
+        return sum(out)
+
+    pipeline = Pipeline([f, g])
     r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
     assert r_map["out"].output.tolist() == [1, 2, 3]
+    assert r_map["out_sum"].output == 6
 
     r_map_sequential = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True, parallel=False)
     assert r_map_sequential["out"].output.tolist() == [1, 2, 3]
+    assert r_map_sequential["out_sum"].output == 6
