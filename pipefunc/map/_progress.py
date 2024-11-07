@@ -35,7 +35,7 @@ class Status:
             self.start_time = time.monotonic()
         self.n_in_progress += 1
 
-    def mark_complete(self, _: Any) -> None:  # needs arg to be used as callback
+    def mark_complete(self, _: Any = None) -> None:  # needs arg to be used as callback
         self.n_in_progress -= 1
         self.n_completed += 1
         if self.n_completed == self.n_total:
