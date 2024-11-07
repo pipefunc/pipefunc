@@ -23,12 +23,10 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
-    is_slurm_executor,
-    is_slurm_executor_type,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
-    slurm_executor_for_map,
-    slurm_executor_for_single,
+    maybe_update_slurm_executor_map,
+    maybe_update_slurm_executor_single,
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
@@ -669,10 +667,8 @@ def _maybe_parallel_map(
 ) -> list[Any]:
     ex = _executor_for_func(func, executor)
     if ex is not None:
-        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-            ex = slurm_executor_for_map(ex, process_index, indices)
-            assert isinstance(executor, dict)
-            executor[func.output_name] = ex  # type: ignore[assignment]
+        assert executor is not None
+        ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         return [_submit(process_index, ex, status, progress, i) for i in indices]
     if status is not None:
         assert progress is not None
@@ -707,10 +703,8 @@ def _maybe_execute_single(
     args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
     if ex:
-        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-            ex = slurm_executor_for_single(ex, func, kwargs)
-            assert isinstance(executor, dict)
-            executor[func.output_name] = ex  # type: ignore[assignment]
+        assert executor is not None
+        ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
         return _submit(_execute_single, ex, status, progress, *args)
     if status is not None:
         assert progress is not None
