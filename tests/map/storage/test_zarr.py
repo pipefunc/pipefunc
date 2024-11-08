@@ -35,6 +35,7 @@ def test_zarr_array_getitem():
     assert arr[0:1, 0] == {"a": 1}
     assert arr.has_index(0)
     assert not arr.has_index(3)
+    assert arr.parallelizable
 
 
 def test_zarr_array_to_array():
