@@ -1055,11 +1055,8 @@ def test_storage_options_invalid():
 def test_storage_options_zarr_memory_parallel():
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}
-    with pytest.raises(
-        ValueError,
-        match="The chosen storage type `zarr_memory` does not support process-based parallel execution.",
-    ):
-        pipeline.map(inputs, storage="zarr_memory", parallel=True)
+    result = pipeline.map(inputs, storage="zarr_memory", parallel=True)
+    assert result["y"].output.tolist() == [1, 2, 3]
 
 
 def test_custom_executor():

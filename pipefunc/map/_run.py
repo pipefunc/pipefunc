@@ -480,11 +480,22 @@ def _run_iteration_and_process(
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
+    *,
+    force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(func, arrays, shape, shape_mask, index, outputs, in_executor=True)
+    _update_array(
+        func,
+        arrays,
+        shape,
+        shape_mask,
+        index,
+        outputs,
+        in_executor=True,
+        force_dump=force_dump,
+    )
     return outputs
 
 
@@ -497,11 +508,16 @@ def _update_array(
     outputs: Iterable[Any],
     *,
     in_executor: bool,
+    force_dump: bool = False,  # Only true in `adaptive.py`
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
-        if in_executor and array.parallelizable or not in_executor and not array.parallelizable:
+        if (
+            force_dump
+            or (in_executor and array.parallelizable)
+            or (not in_executor and not array.parallelizable)
+        ):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)
