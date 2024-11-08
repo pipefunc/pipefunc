@@ -9,16 +9,21 @@ dependencies:
   - pip
   # from pyproject.toml
   - networkx
-  - psutil
   - cloudpickle
   - numpy
   # optional-dependencies: adaptive
   - adaptive
-  - adaptive-scheduler>=2.12.0
+  - adaptive-scheduler>=2.13.3
   # optional-dependencies: xarray
   - xarray
+  # optional-dependencies: widgets
+  - ipywidgets
   # optional-dependencies: zarr
   - zarr
+  # optional-dependencies: pandas
+  - pandas
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
@@ -27,17 +32,17 @@ dependencies:
   - python-graphviz
   # optional-dependencies: docs
   - sphinx
+  - sphinx-autodoc-typehints
   - sphinx-book-theme
-  - myst-parser
+  - sphinx-copybutton
+  - sphinx-notfound-page
+  - sphinx-togglebutton
   - emoji
   - jupytext
-  - sphinx-autodoc-typehints
-  - pytest-xdist
+  - myst-parser
   - versioningit
-  - sphinx-togglebutton
-  - sphinx-copybutton
   - seaborn
   - nltk
   - scikit-image
   - pip:
-    - myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip
+    - myst-nb

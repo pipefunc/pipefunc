@@ -23,5 +23,6 @@ pipefunc.cache
 pipefunc.resources
 pipefunc.lazy
 pipefunc.sweep
+pipefunc.testing
 pipefunc.typing
 ```

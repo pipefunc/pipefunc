@@ -1,7 +1,6 @@
 """Custom type hinting utilities for pipefunc."""
 
 import re
-import sys
 import warnings
 from collections.abc import Callable, Iterable
 from types import UnionType
@@ -57,8 +56,7 @@ class TypeCheckMemo(NamedTuple):
 
 def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
     """Evaluate a forward reference using the provided memo."""
-    kw = {} if sys.version_info < (3, 13) else {"self_type": memo.self_type}
-    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), **kw)
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
@@ -163,10 +161,7 @@ def _compare_single_annotated_type(
     return is_type_compatible(primary_type, other_type, memo)
 
 
-def _compare_generic_type_origins(
-    incoming_origin: type[Any],
-    required_origin: type[Any],
-) -> bool:
+def _compare_generic_type_origins(incoming_origin: type[Any], required_origin: type[Any]) -> bool:
     """Compare the origins of generic types for compatibility."""
     if isinstance(incoming_origin, type) and isinstance(required_origin, type):
         return issubclass(incoming_origin, required_origin)

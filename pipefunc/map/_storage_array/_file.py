@@ -1,12 +1,10 @@
 # This file is part of the pipefunc package.
-# Originally, it is based on code from the `aiida-dynamic-workflows` package.
-# Its license can be found in the LICENSE file in this folder.
-# See `git diff 98a1736 pipefunc/map/_filearray.py` for the changes made.
 
 from __future__ import annotations
 
 import concurrent.futures
 import itertools
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,25 +12,19 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._storage_base import (
+
+from ._base import (
     StorageBase,
-    _iterate_shape_indices,
-    _normalize_key,
-    _select_by_mask,
+    iterate_shape_indices,
+    normalize_key,
     register_storage,
+    select_by_mask,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 storage_registry: dict[str, type[StorageBase]] = {}
-
-
-def read(name: str | Path) -> bytes:
-    """Load file contents as a bytestring."""
-    with open(name, "rb") as f:  # noqa: PTH123
-        return f.read()
-
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
 
@@ -74,7 +66,7 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        return _normalize_key(
+        return normalize_key(
             key,
             self.shape,
             self.internal_shape,
@@ -101,7 +93,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (self._key_to_file(x) for x in _iterate_shape_indices(self.shape))
+        return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
 
     def _slice_indices(
         self,
@@ -214,26 +206,29 @@ class FileArray(StorageBase):
         arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in _iterate_shape_indices(self.shape):
+        for external_index in iterate_shape_indices(self.shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
+                for internal_index in iterate_shape_indices(self.internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in _iterate_shape_indices(self.internal_shape):
-                    full_index = _select_by_mask(self.shape_mask, external_index, internal_index)
+                for internal_index in iterate_shape_indices(self.internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
         return np.ma.MaskedArray(arr, mask=full_mask, dtype=object)
 
     def mask_linear(self) -> list[bool]:
         """Return a list of booleans indicating which elements are missing."""
-        return [not self._index_to_file(i).is_file() for i in range(self.size)]
+        # We use os.listdir to check if a file exists instead of checking with
+        # self._index_to_file(i).is_file() because this is more efficient.
+        existing_files = set(os.listdir(self.folder))
+        return [self.filename_template.format(i) not in existing_files for i in range(self.size)]
 
     @property
     def mask(self) -> np.ma.core.MaskedArray:
@@ -269,9 +264,15 @@ class FileArray(StorageBase):
         return True
 
 
+def _read(name: str | Path) -> bytes:
+    """Load file contents as a bytestring."""
+    with open(name, "rb") as f:  # noqa: PTH123
+        return f.read()
+
+
 def _load_all(filenames: Iterator[Path]) -> list[Any]:
     def maybe_read(f: Path) -> Any | None:
-        return read(f) if f.is_file() else None
+        return _read(f) if f.is_file() else None
 
     def maybe_load(x: str | None) -> Any | None:
         return cloudpickle.loads(x) if x is not None else None

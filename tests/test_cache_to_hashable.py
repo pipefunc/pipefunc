@@ -1,12 +1,14 @@
 import array
+import importlib.util
 from collections import Counter, OrderedDict, defaultdict, deque
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import pytest
 
-from pipefunc.cache import _HASH_MARKER, to_hashable
+from pipefunc.cache import _HASH_MARKER, UnhashableError, _cloudpickle_key, to_hashable
+
+has_pandas = importlib.util.find_spec("pandas") is not None
 
 M = _HASH_MARKER
 
@@ -44,7 +46,10 @@ def test_to_hashable_numpy_array() -> None:
     assert result[2][2] == (1, 2, 3, 4)  # type: ignore[index]
 
 
+@pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 def test_to_hashable_pandas_series() -> None:
+    import pandas as pd
+
     series = pd.Series([1, 2, 3], name="test")
     result = to_hashable(series)
     assert isinstance(result, tuple)
@@ -54,7 +59,10 @@ def test_to_hashable_pandas_series() -> None:
     assert result[2][1] == (M, dict, ((0, 1), (1, 2), (2, 3)))  # type: ignore[index]
 
 
+@pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 def test_to_hashable_pandas_dataframe() -> None:
+    import pandas as pd
+
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
     result = to_hashable(df)
     assert isinstance(result, tuple)
@@ -81,8 +89,8 @@ def test_to_hashable_unhashable_object() -> None:
             raise TypeError(msg)
 
     obj = Unhashable()
-    result = to_hashable(obj)
-    assert result == (M, Unhashable, str(obj))
+    result = to_hashable(obj, fallback_to_pickle=True)
+    assert result == (M, Unhashable, _cloudpickle_key(obj))
 
 
 def test_to_hashable_unhashable_object_no_fallback() -> None:
@@ -93,7 +101,7 @@ def test_to_hashable_unhashable_object_no_fallback() -> None:
 
     obj = Unhashable()
     with pytest.raises(TypeError):
-        to_hashable(obj, fallback_to_str=False)
+        to_hashable(obj, fallback_to_pickle=False)
 
 
 def test_to_hashable_custom_hashable_object() -> None:
@@ -156,8 +164,13 @@ def test_unhashable_type():
         hash(Unhashable)
     with pytest.raises(NotImplementedError, match="Not implemented"):
         hash(Unhashable())
+
     x = Unhashable()
-    assert to_hashable(x) == (_HASH_MARKER, "Unhashable", str(x))
+    with pytest.raises(
+        UnhashableError,
+        match="cannot be hashed using `pipefunc.cache.to_hashable`",
+    ):
+        to_hashable(x, fallback_to_pickle=True)
 
     class UnhashableWithMeta(metaclass=Meta):  # only hash(type(obj)) works
         def __hash__(self) -> int:
