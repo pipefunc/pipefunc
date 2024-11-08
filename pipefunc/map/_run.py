@@ -515,7 +515,7 @@ def _update_array(
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
-        if force_dump or (array.parallelizable != in_post_process):
+        if force_dump or (array.dump_in_subprocess != in_post_process):
             # If the data can be written during the function call inside the executor (e.g., a file array),
             # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
             # We do this to offload the I/O to the executor process if possible.

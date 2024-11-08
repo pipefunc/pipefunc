@@ -203,8 +203,8 @@ class DictArray(StorageBase):
         self._dict = load(self._path())
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return False
 
 
@@ -244,8 +244,8 @@ class SharedMemoryDictArray(DictArray):
         )
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
