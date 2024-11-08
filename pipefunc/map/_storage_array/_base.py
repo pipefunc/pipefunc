@@ -83,6 +83,10 @@ class StorageBase(abc.ABC):
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None: ...
 
     @property
+    @abc.abstractmethod
+    def parallelizable(self) -> bool: ...
+
+    @property
     def size(self) -> int:
         """Return number of elements in the array."""
         return prod(self.shape)
