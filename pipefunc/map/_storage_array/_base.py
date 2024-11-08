@@ -86,7 +86,6 @@ class StorageBase(abc.ABC):
     @abc.abstractmethod
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
-        return True
 
     @property
     def size(self) -> int:
