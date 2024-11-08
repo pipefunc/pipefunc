@@ -259,8 +259,8 @@ class FileArray(StorageBase):
             dump(value, file)
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
