@@ -499,10 +499,12 @@ def _update_array(
     in_executor: bool,
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
-    external_shape = external_shape_from_mask(shape, shape_mask)
-    output_key = func.mapspec.output_key(external_shape, index)
+    output_key = None
     for array, _output in zip(arrays, outputs):
         if in_executor and array.parallelizable or not in_executor and not array.parallelizable:
+            if output_key is None:  # Only calculate the output key if needed
+                external_shape = external_shape_from_mask(shape, shape_mask)
+                output_key = func.mapspec.output_key(external_shape, index)
             # If the data can be written during the function call inside the executor (e.g., a file array),
             # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
             # We do this to offload the I/O to the executor process if possible.
