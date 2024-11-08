@@ -505,6 +505,7 @@ def _update_array(
         if in_executor and array.parallelizable or not in_executor and not array.parallelizable:
             # If the data can be written during the function call inside the executor (e.g., a file array),
             # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
+            # We do this to offload the I/O to the executor process if possible.
             array.dump(output_key, _output)
 
 
