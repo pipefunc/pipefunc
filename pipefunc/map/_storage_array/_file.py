@@ -258,11 +258,6 @@ class FileArray(StorageBase):
             file = self._key_to_file(index)
             dump(value, file)
 
-    @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
-        return True
-
 
 def _read(name: str | Path) -> bytes:
     """Load file contents as a bytestring."""

@@ -202,11 +202,6 @@ class DictArray(StorageBase):
             return
         self._dict = load(self._path())
 
-    @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
-        return False
-
 
 def _masked_empty(shape: tuple[int, ...]) -> np.ndarray:
     # This is a workaround for the fact that setting `x[:] = np.ma.masked`
@@ -242,11 +237,6 @@ class SharedMemoryDictArray(DictArray):
             shape_mask=shape_mask,
             mapping=mapping,
         )
-
-    @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
-        return True
 
 
 register_storage(DictArray)
