@@ -510,6 +510,8 @@ def _update_array(
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
 ) -> None:
+    # This function is called both in the main process (in post processing) and in the executor process.
+    # It needs to only dump the data once.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
