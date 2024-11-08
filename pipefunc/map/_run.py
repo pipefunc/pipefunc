@@ -514,7 +514,7 @@ def _update_array(
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
     # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
-    # We do this to offload the I/O to the executor process if possible.
+    # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
