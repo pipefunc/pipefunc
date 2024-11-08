@@ -54,9 +54,9 @@ Whether you're working with data processing, scientific computations, machine le
 1. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
 1. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
 1. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
+1. ⚡ **Ultra-Fast Performance**: Minimal overhead of [about 15 µs](https://pipefunc.readthedocs.io/en/latest/faq/#what-is-the-overhead-efficiency-performance-of-pipefunc) per function in the graph, ensuring blazingly fast execution.
 1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
-1. ⚡ **Ultra-Fast Performance**: Minimal overhead of about 15 µs per function in the graph, ensuring blazingly fast execution.
 1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
 1. 🤓 **Nerd stats**: >600 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
 
