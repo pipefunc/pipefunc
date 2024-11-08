@@ -36,7 +36,7 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 
 if TYPE_CHECKING:
     from collections import OrderedDict
-    from collections.abc import Callable, Generator, Sequence
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
     from adaptive_scheduler import MultiRunManager
 
@@ -484,7 +484,7 @@ def _run_iteration_and_process(
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(func, arrays, shape, shape_mask, index, outputs)
+    _update_array(func, arrays, shape, shape_mask, index, outputs, in_executor=True)
     return outputs
 
 
@@ -494,13 +494,18 @@ def _update_array(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
-    outputs: tuple[Any, ...],
+    outputs: Iterable[Any],
+    *,
+    in_executor: bool,
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
     external_shape = external_shape_from_mask(shape, shape_mask)
     output_key = func.mapspec.output_key(external_shape, index)
     for array, _output in zip(arrays, outputs):
-        array.dump(output_key, _output)
+        if in_executor and array.parallelizable or not in_executor and not array.parallelizable:
+            # If the data can be written during the function call inside the executor (e.g., a file array),
+            # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
+            array.dump(output_key, _output)
 
 
 def _indices_to_flat_index(
@@ -918,11 +923,15 @@ def _submit_generation(
 
 
 def _output_from_mapspec_task(
+    func: PipeFunc,
+    store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_executor=False)
 
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
@@ -968,7 +977,7 @@ def _process_task(
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         outputs_list = [_result(x) for x in r]
-        output = _output_from_mapspec_task(args, outputs_list)
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
@@ -986,7 +995,7 @@ async def _process_task_async(
         r, args = task
         futs = [_result_async(x, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)
-        output = _output_from_mapspec_task(args, outputs_list)
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
