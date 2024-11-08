@@ -865,6 +865,8 @@ By using this benchmark as a baseline, you can assess performance changes after 
 To further analyze performance, consider profiling individual functions using the `profile` option in `Pipeline`.
 This will provide insights into resource usage, including CPU and memory consumption, helping you identify potential bottlenecks.
 
+For context, consider that submitting a function to a `ThreadPoolExecutor` or `ProcessPoolExecutor` typically introduces an overhead of around 1-2 ms per function call (100x slower than the overhead of `pipefunc`), or that serializing results to disk can add an overhead of 1-100 ms per function call (100x to 10,000x slower).
+
 ## How to mock functions in a pipeline for testing?
 
 When mocking a function within a `Pipeline` for testing purposes, you can use the {class}`pipefunc.testing.patch` utility.
