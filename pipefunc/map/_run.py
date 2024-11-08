@@ -512,13 +512,13 @@ def _update_array(
 ) -> None:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
+    # If the data can be written during the function call inside the executor (e.g., a file array),
+    # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
+    # We do this to offload the I/O to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
         if force_dump or (array.dump_in_subprocess != in_post_process):
-            # If the data can be written during the function call inside the executor (e.g., a file array),
-            # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
-            # We do this to offload the I/O to the executor process if possible.
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)
