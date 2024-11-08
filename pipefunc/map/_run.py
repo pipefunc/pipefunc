@@ -493,7 +493,7 @@ def _run_iteration_and_process(
         shape_mask,
         index,
         outputs,
-        in_executor=True,
+        in_post_process=False,
         force_dump=force_dump,
     )
     return outputs
@@ -507,23 +507,19 @@ def _update_array(
     index: int,
     outputs: Iterable[Any],
     *,
-    in_executor: bool,
+    in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
 ) -> None:
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
-        if (
-            force_dump
-            or (in_executor and array.parallelizable)
-            or (not in_executor and not array.parallelizable)
-        ):
-            if output_key is None:  # Only calculate the output key if needed
-                external_shape = external_shape_from_mask(shape, shape_mask)
-                output_key = func.mapspec.output_key(external_shape, index)
+        if force_dump or (array.parallelizable != in_post_process):
             # If the data can be written during the function call inside the executor (e.g., a file array),
             # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
             # We do this to offload the I/O to the executor process if possible.
+            if output_key is None:  # Only calculate the output key if needed
+                external_shape = external_shape_from_mask(shape, shape_mask)
+                output_key = func.mapspec.output_key(external_shape, index)
             array.dump(output_key, _output)
 
 
@@ -950,7 +946,7 @@ def _output_from_mapspec_task(
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_executor=False)
+        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
 
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
