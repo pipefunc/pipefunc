@@ -858,7 +858,7 @@ The performance is measured by the time it takes to process `N**3` iterations th
 
 For the provided example, you might expect an output similar to `Time: 14.93 µs per iteration` on a MacBook Pro M2.
 The number reported above might be slower because it is running on ReadTheDocs' hosted hardware.
-It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc`.
+It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc` instead of parallelization and serialization overhead.
 Results can vary depending on your hardware and current system load.
 
 By using this benchmark as a baseline, you can assess performance changes after modifying your pipeline or optimizing your function logic.
