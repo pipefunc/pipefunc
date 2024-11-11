@@ -12,7 +12,6 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._adaptive_lazy_sequence_learner import LazySequence, LazySequenceLearner
 from pipefunc.map._run_info import shape_is_resolved
 
 from ._mapspec import MapSpec
@@ -303,8 +302,8 @@ def _learner(
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
         if not shape_is_resolved(shape):
-            lazy_sequence = _lazy_sequence(fixed_indices, func, run_info, store, mask)
-            return LazySequenceLearner(func, lazy_sequence)
+            msg = "Dynamic internal_shapes not supported in `create_learners`."
+            raise ValueError(msg)
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
         return SequenceLearner(f, sequence)
     f = functools.partial(
@@ -316,36 +315,6 @@ def _learner(
     )
     sequence = [None]  # type: ignore[list-item,assignment]
     return SequenceLearner(f, sequence)
-
-
-@dataclass
-class _LazySequence:
-    """A lazy sequence that can be evaluated on demand."""
-
-    fixed_indices: dict[str, int | slice] | None
-    func: PipeFunc
-    run_info: RunInfo
-    store: dict[str, StoreType]
-    mask: tuple[bool, ...]
-
-    def __call__(self) -> npt.NDArray[np.int_] | range:
-        kwargs = _func_kwargs(self.func, self.run_info, self.store)
-        self.run_info.resolve_shapes(self.func.output_name, kwargs)
-        shape = self.run_info.resolved_shapes[self.func.output_name]
-        assert shape_is_resolved(shape)
-        assert self.func.mapspec is not None
-        return _sequence(self.fixed_indices, self.func.mapspec, shape, self.mask)
-
-
-def _lazy_sequence(
-    fixed_indices: dict[str, int | slice] | None,
-    func: PipeFunc,
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-    mask: tuple[bool, ...],
-) -> LazySequence:
-    _callable = _LazySequence(fixed_indices, func, run_info, store, mask)
-    return LazySequence(callable=_callable)  # type: ignore[arg-type]
 
 
 def _key(fixed_indices: dict[str, int | slice] | None) -> tuple[AxisIndex, ...] | None:
