@@ -23,12 +23,10 @@ from pipefunc._utils import (
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
-    is_slurm_executor,
-    is_slurm_executor_type,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
-    slurm_executor_for_map,
-    slurm_executor_for_single,
+    maybe_update_slurm_executor_map,
+    maybe_update_slurm_executor_single,
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
@@ -39,7 +37,7 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 
 if TYPE_CHECKING:
     from collections import OrderedDict
-    from collections.abc import Callable, Generator, Sequence
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
     from adaptive_scheduler import MultiRunManager
 
@@ -483,11 +481,22 @@ def _run_iteration_and_process(
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
+    *,
+    force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(func, arrays, shape, shape_mask, index, outputs)
+    _update_array(
+        func,
+        arrays,
+        shape,
+        shape_mask,
+        index,
+        outputs,
+        in_post_process=False,
+        force_dump=force_dump,
+    )
     return outputs
 
 
@@ -497,13 +506,24 @@ def _update_array(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
-    outputs: tuple[Any, ...],
+    outputs: Iterable[Any],
+    *,
+    in_post_process: bool,
+    force_dump: bool = False,  # Only true in `adaptive.py`
 ) -> None:
+    # This function is called both in the main process (in post processing) and in the executor process.
+    # It needs to only dump the data once.
+    # If the data can be written during the function call inside the executor (e.g., a file array),
+    # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
+    # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
-    external_shape = external_shape_from_mask(shape, shape_mask)
-    output_key = func.mapspec.output_key(external_shape, index)
+    output_key = None
     for array, _output in zip(arrays, outputs):
-        array.dump(output_key, _output)
+        if force_dump or (array.dump_in_subprocess != in_post_process):
+            if output_key is None:  # Only calculate the output key if needed
+                external_shape = external_shape_from_mask(shape, shape_mask)
+                output_key = func.mapspec.output_key(external_shape, index)
+            array.dump(output_key, _output)
 
 
 def _indices_to_flat_index(
@@ -643,13 +663,16 @@ def _mask_fixed_axes(
     return select.flat
 
 
-def _status_submit(
+def _submit(
     func: Callable[..., Any],
     executor: Executor,
-    status: Status,
-    progress: ProgressTracker,
+    status: Status | None,
+    progress: ProgressTracker | None,
     *args: Any,
 ) -> Future:
+    if status is None:
+        return executor.submit(func, *args)
+    assert progress is not None
     status.mark_in_progress()
     fut = executor.submit(func, *args)
     fut.add_done_callback(status.mark_complete)
@@ -668,18 +691,31 @@ def _maybe_parallel_map(
 ) -> list[Any]:
     ex = _executor_for_func(func, executor)
     if ex is not None:
-        if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-            ex = slurm_executor_for_map(ex, process_index, indices)
-            assert isinstance(executor, dict)
-            executor[func.output_name] = ex  # type: ignore[assignment]
-        if status is not None:
-            assert progress is not None
-            return [_status_submit(process_index, ex, status, progress, i) for i in indices]
-        return [ex.submit(process_index, i) for i in indices]
+        assert executor is not None
+        ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
+        return [_submit(process_index, ex, status, progress, i) for i in indices]
+    if status is not None:
+        assert progress is not None
+        process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     return [process_index(i) for i in indices]
 
 
-def _maybe_submit_single(
+def _wrap_with_status_update(
+    func: Callable[..., Any],
+    status: Status,
+    progress: ProgressTracker,
+) -> Callable[..., Any]:
+    def wrapped(*args: Any) -> Any:
+        status.mark_in_progress()
+        result = func(*args)
+        status.mark_complete()
+        progress.update_progress()
+        return result
+
+    return wrapped
+
+
+def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
@@ -688,18 +724,16 @@ def _maybe_submit_single(
     store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
-    args = (func, kwargs, store, cache)  # args for _submit_single
+    args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
-    if is_slurm_executor(ex) or is_slurm_executor_type(ex):
-        ex = slurm_executor_for_single(ex, func, kwargs)
-        assert isinstance(executor, dict)
-        executor[func.output_name] = ex  # type: ignore[assignment]
     if ex:
-        if status is not None:
-            assert progress is not None
-            return _status_submit(_submit_single, ex, status, progress, *args)
-        return ex.submit(_submit_single, *args)
-    return _submit_single(*args)
+        assert executor is not None
+        ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
+        return _submit(_execute_single, ex, status, progress, *args)
+    if status is not None:
+        assert progress is not None
+        return _wrap_with_status_update(_execute_single, status, progress)(*args)
+    return _execute_single(*args)
 
 
 class _StoredValue(NamedTuple):
@@ -743,7 +777,7 @@ def _load_from_store(
     return _StoredValue(outputs, all_exist)
 
 
-def _submit_single(
+def _execute_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -882,7 +916,7 @@ def _submit_func(
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_submit_single(executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
@@ -921,11 +955,15 @@ def _submit_generation(
 
 
 def _output_from_mapspec_task(
+    func: PipeFunc,
+    store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
 
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
@@ -945,11 +983,10 @@ def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Futu
 def _to_result_dict(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    output: Any,
+    output: tuple[Any, ...],
     store: dict[str, StoreType],
 ) -> dict[str, Result]:
-    # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
-    # was used.
+    # Note that the kwargs still contain the StorageBase objects if mapspec was used.
     return {
         output_name: Result(
             function=func.__name__,
@@ -972,7 +1009,7 @@ def _process_task(
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         outputs_list = [_result(x) for x in r]
-        output = _output_from_mapspec_task(args, outputs_list)
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
@@ -990,7 +1027,7 @@ async def _process_task_async(
         r, args = task
         futs = [_result_async(x, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)
-        output = _output_from_mapspec_task(args, outputs_list)
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)

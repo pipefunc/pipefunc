@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import warnings
 from collections import OrderedDict, defaultdict
-from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
@@ -11,9 +9,9 @@ from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
 from ._run_info import RunInfo
-from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
+    from concurrent.futures import Executor
     from pathlib import Path
 
     from pipefunc import PipeFunc, Pipeline
@@ -48,9 +46,6 @@ def prepare_run(
     dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
 ]:
-    if not parallel and show_progress:
-        msg = "Cannot use `show_progress=True` with `parallel=False`."
-        raise ValueError(msg)
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
@@ -101,31 +96,6 @@ def _check_parallel(
             names = uses_default_executor if output_name == "" else at_least_tuple(output_name)
             _check_parallel(parallel, {n: store[n] for n in names}, ex)
         return
-    if isinstance(executor, ThreadPoolExecutor):
-        return
-    if not parallel or not store:
-        return
-    for storage in store.values():
-        if isinstance(storage, StorageBase) and not storage.parallelizable:
-            recommendation = (
-                "Consider\n - using a file-based storage or `shared_memory_dict` / `zarr_shared_memory`"
-                " for parallel execution,\n - disable parallel execution,\n - or use a different executor.\n"
-            )
-            default = f"The chosen storage type `{storage.storage_id}` does not support process-based parallel execution."
-            if executor is None:
-                msg = (
-                    f"{default}"
-                    f" PipeFunc defaults to using a `ProcessPoolExecutor`, which requires a parallelizable storage."
-                    f" {recommendation}"
-                )
-                raise ValueError(msg)
-            assert executor is not None
-            msg = (
-                f"{default}"
-                f" If the current executor of type `{type(executor).__name__}` is process-based, it is incompatible."
-                f" {recommendation}"
-            )
-            warnings.warn(msg, stacklevel=2)
 
 
 def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:

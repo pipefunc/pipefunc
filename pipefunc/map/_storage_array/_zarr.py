@@ -211,8 +211,8 @@ class ZarrFileArray(StorageBase):
         return slice_indices
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
@@ -285,8 +285,8 @@ class ZarrMemoryArray(ZarrFileArray):
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return False
 
 
@@ -319,8 +319,8 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         )
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 

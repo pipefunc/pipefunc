@@ -417,7 +417,16 @@ def _execute_iteration_in_map_spec(
     shape = run_info.resolved_shapes[func.output_name]
     assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, arrays, cache)
+    outputs = _run_iteration_and_process(
+        index,
+        func,
+        kwargs,
+        shape,
+        mask,
+        arrays,
+        cache,
+        force_dump=True,
+    )
     if not return_output:
         return None
     return outputs if isinstance(func.output_name, tuple) else outputs[0]

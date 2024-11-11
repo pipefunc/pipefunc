@@ -858,12 +858,14 @@ The performance is measured by the time it takes to process `N**3` iterations th
 
 For the provided example, you might expect an output similar to `Time: 14.93 µs per iteration` on a MacBook Pro M2.
 The number reported above might be slower because it is running on ReadTheDocs' hosted hardware.
-It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc`.
+It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc` instead of parallelization and serialization overhead.
 Results can vary depending on your hardware and current system load.
 
 By using this benchmark as a baseline, you can assess performance changes after modifying your pipeline or optimizing your function logic.
 To further analyze performance, consider profiling individual functions using the `profile` option in `Pipeline`.
 This will provide insights into resource usage, including CPU and memory consumption, helping you identify potential bottlenecks.
+
+For context, consider that submitting a function to a `ThreadPoolExecutor` or `ProcessPoolExecutor` typically introduces an overhead of around 1-2 ms per function call (100x slower than the overhead of `pipefunc`), or that serializing results to disk can add an overhead of 1-100 ms per function call (100x to 10,000x slower).
 
 ## How to mock functions in a pipeline for testing?
 
