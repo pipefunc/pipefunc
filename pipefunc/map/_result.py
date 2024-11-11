@@ -42,7 +42,7 @@ class LazyStorage:
     run_folder: Path | None
 
     def evaluate(self) -> StorageBase:
-        if not shape_is_resolved(self.shape):
+        if not shape_is_resolved(self.shape):  # pragma: no cover
             msg = "Cannot evaluate lazy store with unresolved shape."
             raise ValueError(msg)
         path = _maybe_array_path(self.output_name, self.run_folder)

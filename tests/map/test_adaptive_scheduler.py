@@ -513,3 +513,16 @@ def test_independent_axes_2(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     run(info)
+
+
+def test_dynamic_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=("n",))
+    def f(n):
+        return list(range(n))
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match="Dynamic `internal_shapes` not supported in `create_learners`.",
+    ):
+        create_learners(pipeline, {"n": 10}, tmp_path, split_independent_axes=True)
