@@ -888,10 +888,7 @@ async def _process_generation_async(
         outputs.update(_outputs)
 
 
-def _maybe_evaluate_lazy_store(
-    store: dict[str, StorageBase | LazyStorage | Path | DirectValue],
-    run_info: RunInfo,
-) -> None:
+def _maybe_evaluate_lazy_store(store: dict[str, StoreType], run_info: RunInfo) -> None:
     for name, storage in store.items():
         if isinstance(storage, LazyStorage):
             storage.shape = run_info.resolved_shapes[name]
