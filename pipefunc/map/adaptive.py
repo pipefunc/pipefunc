@@ -252,11 +252,15 @@ def create_learners(
         split_independent_axes,
         run_info.internal_shapes,
     )
+
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
             gen_learners = []
             for func in gen:
+                if not shape_is_resolved(run_info.resolved_shapes[func.output_name]):
+                    msg = "Dynamic `internal_shapes` not supported in `create_learners`."
+                    raise ValueError(msg)
                 learner = _learner(
                     func=func,
                     run_info=run_info,
@@ -301,9 +305,7 @@ def _learner(
         )
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
-        if not shape_is_resolved(shape):
-            msg = "Dynamic internal_shapes not supported in `create_learners`."
-            raise ValueError(msg)
+        assert shape_is_resolved(shape)
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
         return SequenceLearner(f, sequence)
     f = functools.partial(
