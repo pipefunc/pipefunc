@@ -12,7 +12,7 @@ from pipefunc._utils import at_least_tuple, requires
 from pipefunc.map._run_info import shape_is_resolved
 from pipefunc.resources import Resources
 
-from ._run import _func_kwargs, _load_arrays, _maybe_evaluate_lazy_store, _select_kwargs
+from ._run import _func_kwargs, _load_arrays, _select_kwargs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -208,8 +208,6 @@ def _eval_resources(
     kwargs = _func_kwargs(func, run_info, store)
     _load_arrays(kwargs)
     if index is not None:
-        if run_info.resolve_shapes(func.output_name, kwargs):
-            _maybe_evaluate_lazy_store(store, run_info)
         shape = run_info.resolved_shapes[func.output_name]
         assert shape_is_resolved(shape)
         shape_mask = run_info.shape_masks[func.output_name]
