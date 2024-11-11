@@ -346,11 +346,7 @@ def _dump_single_output(
     return (output,)
 
 
-def _single_dump_single_output(
-    output: Any,
-    output_name: str,
-    store: dict[str, StoreType],
-) -> None:
+def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -360,11 +356,7 @@ def _single_dump_single_output(
         storage.value = output
 
 
-def _func_kwargs(
-    func: PipeFunc,
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-) -> dict[str, Any]:
+def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType]) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
@@ -457,11 +449,7 @@ def _get_or_set_cache(
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
-def _run_iteration(
-    func: PipeFunc,
-    selected: dict[str, Any],
-    cache: _CacheBase | None,
-) -> Any:
+def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase | None) -> Any:
     def compute_fn() -> Any:
         try:
             return func(**selected)
