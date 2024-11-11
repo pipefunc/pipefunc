@@ -57,3 +57,27 @@ def test_exception():
         match="Expression `'a' + 'b'` must evaluate to an integer but it evaluated to `ab`.",
     ):
         pipeline.map({"n": 4}, run_folder=None, parallel=False)
+
+
+def test_2d_internal_shape() -> None:
+    @pipefunc(output_name="n")
+    def f(a) -> int:
+        return 4 + a
+
+    @pipefunc(output_name="x", internal_shape=("n",))
+    def g(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([f, g, h])
+    pipeline.add_mapspec_axis("a", axis="j")
+    assert pipeline.mapspecs_as_strings == [
+        "a[j] -> n[j]",
+        "n[j] -> x[i, j]",
+        "x[i, j] -> y[i, j]",
+    ]
+    results = pipeline.map({"a": [0, 0]}, run_folder=None, parallel=False)
+    assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
