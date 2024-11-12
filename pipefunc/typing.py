@@ -301,8 +301,8 @@ def safe_get_type_hints(
         hints = get_type_hints(func, include_extras=include_extras)
     except Exception:  # noqa: BLE001
         hints = func.__annotations__
-
-    memo = TypeCheckMemo(globals=func.__globals__, locals=None)
+    _globals = getattr(func, "__globals__", {})
+    memo = TypeCheckMemo(globals=_globals, locals=None)
     resolved_hints = {}
     for arg, hint in hints.items():
         try:
