@@ -1045,6 +1045,40 @@ help(func_e.call_with_root_args)
 
 This shows the signature and the doc-string of the `call_with_root_args` method.
 
+## dataclasses and pydantic.BaseModel as PipeFunc
+
+`PipeFunc` can be used with `dataclasses` and `pydantic.BaseModel` classes as `PipeFunc`s.
+
+Suppose we have a `dataclass` and a `pydantic.BaseModel` class:
+
+```{code-cell} ipython3
+from dataclasses import dataclass
+
+@dataclass
+class InputDataClass:
+    a: int
+    b: int
+
+class PydanticModel(BaseModel):
+    x: int
+    y: int
+
+# We can use these classes as PipeFuncs
+
+pf1 = PipeFunc(InputDataClass, output_name="dataclass")
+pf2 = PipeFunc(PydanticModel, output_name="pydantic")
+
+pipeline = Pipeline([pf1, pf2])
+pipeline.map(inputs={"a": 1, "b": 2, "x": 3, "y": 4})
+```
+
+:::{admonition} Careful with ``default_factory``!
+:class: warning
+When using `dataclasses` or `pydantic.BaseModel` with ``dataclasses.field(..., default_factory=...)`` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the class is defined.
+So if you are using mutable defaults, make sure to not mutate the value in the function body!
+This is the same behavior as with regular Python functions.
+:::
+
 ## Parameter Sweeps
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
