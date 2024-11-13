@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._simplify import _combine_nodes, _identify_combinable_nodes
+from pipefunc._pipeline._simplify import _combine_nodes, _identify_combinable_nodes
 
 
 def test_identify_combinable_nodes():

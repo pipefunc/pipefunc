@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map._run import load_outputs
-from pipefunc.map._run_info import map_shapes
+from pipefunc.map._load import load_outputs
+from pipefunc.map._shapes import map_shapes
 from pipefunc.sweep import Sweep
 from pipefunc.typing import Array  # noqa: TCH001
 

@@ -15,13 +15,18 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
-from pipefunc.map._storage_base import StorageBase, _select_by_mask, register_storage
+
+from ._base import StorageBase, register_storage, select_by_mask
 
 
 class ZarrFileArray(StorageBase):
-    """Array interface to a Zarr store."""
+    """Array interface to a Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_file_array"
+    requires_serialization = True
 
     def __init__(
         self,
@@ -51,7 +56,7 @@ class ZarrFileArray(StorageBase):
         if object_codec is None:
             object_codec = CloudPickleCodec()
 
-        chunks = _select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
+        chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         self.array = zarr.open(
             self.store,
             mode="a",
@@ -85,7 +90,7 @@ class ZarrFileArray(StorageBase):
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
         np_index = np.unravel_index(index, self.shape)
-        full_index = _select_by_mask(
+        full_index = select_by_mask(
             self.shape_mask,
             np_index,
             (slice(None),) * len(self.internal_shape),
@@ -140,16 +145,12 @@ class ZarrFileArray(StorageBase):
             raise NotImplementedError(msg)
 
         mask = self._mask[:]
-        slc = _select_by_mask(
+        slc = select_by_mask(
             self.shape_mask,
             (slice(None),) * len(self.shape),
             (None,) * len(self.internal_shape),  # Adds axes with size 1
         )
-        tile_shape = _select_by_mask(
-            self.shape_mask,
-            (1,) * len(self.shape),
-            self.internal_shape,
-        )
+        tile_shape = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         mask = np.tile(mask[slc], tile_shape)
 
         return np.ma.MaskedArray(self.array[:], mask=mask, dtype=object)
@@ -178,7 +179,7 @@ class ZarrFileArray(StorageBase):
                 if self.internal_shape:
                     value = np.asarray(value)  # in case it's a list
                     assert value.shape == self.internal_shape
-                    full_index = _select_by_mask(
+                    full_index = select_by_mask(
                         self.shape_mask,
                         external_index,
                         (slice(None),) * len(self.internal_shape),
@@ -193,7 +194,7 @@ class ZarrFileArray(StorageBase):
             value = np.asarray(value)  # in case it's a list
             assert value.shape == self.internal_shape
             assert len(key) == len(self.shape)
-            full_index = _select_by_mask(
+            full_index = select_by_mask(
                 self.shape_mask,
                 key,
                 (slice(None),) * len(self.internal_shape),
@@ -213,18 +214,15 @@ class ZarrFileArray(StorageBase):
         return slice_indices
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
 class _SharedDictStore(zarr.storage.KVStore):
     """Custom Store subclass using a shared dictionary."""
 
-    def __init__(
-        self,
-        shared_dict: multiprocessing.managers.DictProxy | None = None,
-    ) -> None:
+    def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
         """Initialize the _SharedDictStore.
 
         Parameters
@@ -240,9 +238,13 @@ class _SharedDictStore(zarr.storage.KVStore):
 
 
 class ZarrMemoryArray(ZarrFileArray):
-    """Array interface to an in-memory Zarr store."""
+    """Array interface to an in-memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_memory"
+    requires_serialization = False
 
     def __init__(
         self,
@@ -289,15 +291,19 @@ class ZarrMemoryArray(ZarrFileArray):
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return False
 
 
 class ZarrSharedMemoryArray(ZarrMemoryArray):
-    """Array interface to a shared memory Zarr store."""
+    """Array interface to a shared memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_shared_memory"
+    requires_serialization = True
 
     def __init__(
         self,
@@ -322,8 +328,8 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         )
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
@@ -339,7 +345,7 @@ class CloudPickleCodec(Codec):
 
     Examples
     --------
-    >>> from pipefunc.map.zarr import CloudPickleCodec
+    >>> from pipefunc.map._storage._zarr import CloudPickleCodec
     >>> import numpy as np
     >>> x = np.array(['foo', 'bar', 'baz'], dtype='object')
     >>> f = CloudPickleCodec()
@@ -350,10 +356,7 @@ class CloudPickleCodec(Codec):
 
     codec_id = "cloudpickle"
 
-    def __init__(
-        self,
-        protocol: int = cloudpickle.DEFAULT_PROTOCOL,
-    ) -> None:
+    def __init__(self, protocol: int = cloudpickle.DEFAULT_PROTOCOL) -> None:
         """Initialize the CloudPickleCodec codec.
 
         Parameters
@@ -410,10 +413,7 @@ class CloudPickleCodec(Codec):
             The configuration of the codec.
 
         """
-        return {
-            "id": self.codec_id,
-            "protocol": self.protocol,
-        }
+        return {"id": self.codec_id, "protocol": self.protocol}
 
     def __repr__(self) -> str:
         """Return a string representation of the codec."""
