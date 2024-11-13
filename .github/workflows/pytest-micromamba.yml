@@ -1,4 +1,4 @@
-name: pytest
+name: pytest-micromamba
 
 on:
   pull_request:
@@ -11,25 +11,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Update Python version in environment.yml
         run: |
-          sed -i 's/- python/- python=${{ matrix.python-version }}/g' environment.yml
+          sed -i '/^\s*-\s*python\s*$/ s/$/=${{ matrix.python-version }}/' environment.yml
           echo "Updated environment.yml content:"
           cat environment.yml
 
       - name: Install Conda environment with micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           cache-environment: true
@@ -39,8 +34,7 @@ jobs:
         run: |
           pip install -e ".[test,all]"
 
-      # Linux and macOS
-      - name: Run Python
+      - name: Run pytest
         shell: bash -l {0}
         run: |
           python -c "import pipefunc; print(pipefunc.__version__)"

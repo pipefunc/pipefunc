@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 def test_tuple_outputs_with_cache() -> None:
     @pipefunc(
         output_name=("c", "_throw"),
-        profile=True,
         debug=True,
         cache=True,
         output_picker=dict.__getitem__,
@@ -169,12 +168,16 @@ def test_cache_non_root_args() -> None:
 
 
 def test_sharing_defaults() -> None:
+    calls = {"f": 0, "g": 0}
+
     @pipefunc(output_name="c", defaults={"b": 1}, cache=True)
     def f(a, b):
+        calls["f"] += 1
         return a + b
 
     @pipefunc(output_name="d", cache=True)
     def g(b, c):
+        calls["g"] += 1
         return b + c
 
     pipeline = Pipeline([f, g], cache_type="simple")
@@ -184,8 +187,19 @@ def test_sharing_defaults() -> None:
         ("c", (("a", 1), ("b", 1))): 2,
         ("d", (("a", 1), ("b", 1))): 3,
     }
-    assert pipeline.map(inputs={"a": 1})["d"].output == 3
-    assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
+    # Call again, should use cache
+    assert pipeline("d", a=1) == 3
+    assert calls == {"f": 1, "g": 1}
+    # reset calls because `map`'s keys are different anyway
+    calls["f"] = 0
+    calls["g"] = 0
+    for _ in range(2):
+        assert pipeline.map(inputs={"a": 1})["d"].output == 3
+        assert calls == {"f": 1, "g": 1}
+    for _ in range(2):
+        # Call with different arguments
+        assert pipeline.map(inputs={"a": 1, "b": 2})["d"].output == 5
+        assert calls == {"f": 2, "g": 2}
 
 
 def test_autoset_cache() -> None:
@@ -196,3 +210,40 @@ def test_autoset_cache() -> None:
     pipeline = Pipeline([f])
     assert pipeline.cache is not None
     assert isinstance(pipeline.cache, LRUCache)
+
+
+@pytest.mark.parametrize("cache_type", ["simple", "lru", "hybrid", "disk"])
+def test_cache_with_map(cache_type, tmp_path: Path) -> None:
+    calls = {"f": 0, "g": 0}
+
+    @pipefunc(
+        output_name="c",
+        defaults={"b": 1},
+        cache=True,
+        mapspec="a[i] -> c[i]",
+    )
+    def f(a, b):
+        calls["f"] += 1
+        return a + b
+
+    @pipefunc(output_name="d", cache=True)
+    def g(b, c):
+        calls["g"] += 1
+        return b + sum(c)
+
+    cache_kwargs: dict[str, Any]
+    if cache_type == "disk":
+        cache_kwargs = {"cache_dir": tmp_path}
+    elif cache_type in ("lru", "hybrid"):
+        cache_kwargs = {"shared": False}
+    else:
+        cache_kwargs = {}
+    pipeline = Pipeline([f, g], cache_type=cache_type, cache_kwargs=cache_kwargs)
+    a = [1, 2, 3]
+    for _ in range(3):
+        assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
+        assert calls == {"f": len(a), "g": 1}
+    for _ in range(3):
+        # Call with different arguments
+        assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
+        assert calls == {"f": 2 * len(a), "g": 2}
