@@ -20,7 +20,7 @@ def test_pipeline_and_all_arg_combinations_lazy() -> None:
     def f3(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True, lazy=True)
+    pipeline = Pipeline([f1, f2, f3], debug=True, lazy=True)
 
     fc = pipeline.func("c")
     fd = pipeline.func("d")

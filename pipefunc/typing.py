@@ -1,8 +1,8 @@
 """Custom type hinting utilities for pipefunc."""
 
-import sys
+import re
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from types import UnionType
 from typing import (
     Annotated,
@@ -56,8 +56,7 @@ class TypeCheckMemo(NamedTuple):
 
 def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
     """Evaluate a forward reference using the provided memo."""
-    kw = {} if sys.version_info < (3, 13) else {"self_type": memo.self_type}
-    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), **kw)
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
@@ -126,7 +125,7 @@ def _handle_union_types(
     return None
 
 
-def _extract_array_element_type(metadata: list[Any]) -> Any | None:
+def _extract_array_element_type(metadata: Iterable[Any]) -> Any | None:
     """Extract the ArrayElementType from the metadata if it exists."""
     return next((get_args(t)[0] for t in metadata if get_origin(t) is ArrayElementType), None)
 
@@ -162,10 +161,7 @@ def _compare_single_annotated_type(
     return is_type_compatible(primary_type, other_type, memo)
 
 
-def _compare_generic_type_origins(
-    incoming_origin: type[Any],
-    required_origin: type[Any],
-) -> bool:
+def _compare_generic_type_origins(incoming_origin: type[Any], required_origin: type[Any]) -> bool:
     """Compare the origins of generic types for compatibility."""
     if isinstance(incoming_origin, type) and isinstance(required_origin, type):
         return issubclass(incoming_origin, required_origin)
@@ -211,8 +207,8 @@ def _handle_generic_types(
 
 
 def is_type_compatible(
-    incoming_type: type[Any],
-    required_type: type[Any],
+    incoming_type: Any,
+    required_type: Any,
     memo: TypeCheckMemo | None = None,
 ) -> bool:
     """Check if the incoming type is compatible with the required type, resolving forward references."""
@@ -262,8 +258,10 @@ def _is_typevar_compatible(
 def is_object_array_type(tp: Any) -> bool:
     """Check if the given type is similar to `Array[T]`.
 
-    2. `Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], T]`
-    3. `numpy.ndarray[Any, numpy.dtype[numpy.object_]]`
+    Specifically, this function checks if the type is either:
+
+    1. `Annotated[numpy.ndarray[Any, numpy.dtype[numpy.object_]], T]`
+    2. `numpy.ndarray[Any, numpy.dtype[numpy.object_]]`
     """
     if get_origin(tp) is np.ndarray:
         # Base case: directly an np.ndarray[Any, np.dtype[np.object_]]
@@ -303,8 +301,8 @@ def safe_get_type_hints(
         hints = get_type_hints(func, include_extras=include_extras)
     except Exception:  # noqa: BLE001
         hints = func.__annotations__
-
-    memo = TypeCheckMemo(globals=func.__globals__, locals=None)
+    _globals = getattr(func, "__globals__", {})
+    memo = TypeCheckMemo(globals=_globals, locals=None)
     resolved_hints = {}
     for arg, hint in hints.items():
         try:
@@ -313,3 +311,46 @@ def safe_get_type_hints(
             resolved_hints[arg] = Unresolvable(str(hint))
 
     return resolved_hints
+
+
+def _args_as_string(args: Iterable[Any]) -> str:
+    return ", ".join(type_as_string(arg) for arg in args)
+
+
+def type_as_string(type_: Any) -> str:  # noqa: PLR0911
+    """Get a string representation of a type."""
+    if isinstance(type_, str):
+        return _clean_type_string(type_)  # Handle forward references
+    if isinstance(type_, Unresolvable):
+        return _clean_type_string(type_.type_str)
+    if isinstance(type_, ForwardRef):
+        return _clean_type_string(type_.__forward_arg__)
+    if isinstance(type_, TypeVar):
+        return _clean_type_string(type_.__name__)
+    if isinstance(type_, list):  # e.g., the arg list in `Callable[[here], Any]`
+        return f"[{_args_as_string(type_)}]"
+
+    origin = get_origin(type_)
+    if origin is not None:
+        args = get_args(type_)
+        if is_object_array_type(type_):
+            element_type = _extract_array_element_type(args[1:])
+            _Array = Array.__name__  # noqa: N806
+            return f"{_Array}[{type_as_string(element_type)}]" if element_type else _Array
+        return f"{_clean_type_string(origin.__name__)}[{_args_as_string(args)}]"
+
+    if hasattr(type_, "__name__"):
+        return _clean_type_string(type_.__name__)
+
+    # Fall back to string representation if all else fails
+    return _clean_type_string(str(type_))
+
+
+def _clean_type_string(type_str: str) -> str:
+    # Remove 'typing.' prefix
+    type_str = re.sub(r"\btyping\.", "", type_str)
+    # Remove 'collections.abc.' prefix
+    type_str = re.sub(r"\bcollections\.abc\.", "", type_str)
+    # Replace 'UnionType' with 'Union'
+    type_str = re.sub(r"\bUnionType\b", "Union", type_str)
+    return type_str  # noqa: RET504

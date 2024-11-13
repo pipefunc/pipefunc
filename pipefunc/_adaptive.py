@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import functools
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from adaptive import DataSaver, Learner1D, Learner2D, LearnerND
+from adaptive.types import Int
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.map.adaptive import _validate_adaptive
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pipefunc import Pipeline
+
+PointType: TypeAlias = tuple[Int, Any]
 
 
 def _adaptive_wrapper(
