@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import tempfile
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -905,7 +906,7 @@ def _submit_task(
     run_info: RunInfo,
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -1062,15 +1063,16 @@ def compare(
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
     results = {}
-    new_run_folder = Path(tempfile.mkdtemp())  # noqa: F821
+    new_run_folder = Path(tempfile.mkdtemp())
     new_run_info = run_info.copy(run_folder=new_run_folder)
     for func in pipeline.functions:
         if output_names is not None and set(at_least_tuple(func.output_name)) not in output_names:
             continue
         kwargs = _func_kwargs(func, run_info, store)
         task = _submit_task(func, kwargs, new_run_info, store, None, None)
-        output = _process_task(func, task, new_run_folder, store, None)
+        output = _process_task(func, task, store)
         for output_name, result in output.items():
+            assert run_info.run_folder is not None
             expected_output = load_outputs(output_name, run_folder=run_info.run_folder)
             actual_output = result.output
             results[output_name] = TestResult(
