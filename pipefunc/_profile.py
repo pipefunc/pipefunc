@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from pipefunc._utils import table
+from pipefunc._utils import requires, table
 
 if TYPE_CHECKING:
     import sys
@@ -84,13 +84,7 @@ class ResourceProfiler:
 
     """
 
-    def __init__(
-        self,
-        pid: int,
-        stats: ProfilingStats,
-        *,
-        interval: float = 10,
-    ) -> None:
+    def __init__(self, pid: int, stats: ProfilingStats, *, interval: float = 10) -> None:
         """Initialize the ResourceProfiler instance."""
         self.pid = pid
         self.stats = stats
@@ -141,15 +135,16 @@ class ResourceProfiler:
 
     def measure_resources(self) -> None:
         """Measure resource usage (CPU and memory) for the specified process."""
+        requires("psutil", reason="profile", extras="profiling")
         import psutil
 
         process = psutil.Process(self.pid)
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set():  # pragma: no cover
             try:
                 mem_info = process.memory_info()
                 memory = mem_info.rss
                 cpu_percent = process.cpu_percent()
-            except psutil.NoSuchProcess:  # pragma: no cover
+            except psutil.NoSuchProcess:
                 break
 
             self.stats.memory.update(memory)

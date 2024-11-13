@@ -1,7 +1,4 @@
-# This file is part of the pipefunc package.
-# Originally, it is based on code from the `aiida-dynamic-workflows` package.
-# Its license can be found in the LICENSE file in this folder.
-# See `git diff 98a1736 pipefunc/map/_filearray.py` for the changes made.
+"""Implements the base class and helpers for file/memory-based arrays."""
 
 from __future__ import annotations
 
@@ -22,15 +19,17 @@ if TYPE_CHECKING:
 storage_registry = {}
 
 
-def _iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
+def iterate_shape_indices(shape: tuple[int, ...]) -> Iterator[tuple[int, ...]]:
+    """Iterate over all indices of a given shape."""
     return itertools.product(*map(range, shape))
 
 
-def _select_by_mask(
+def select_by_mask(
     mask: tuple[bool, ...],
     tuple1: tuple[Any, ...],
     tuple2: tuple[Any, ...],
 ) -> tuple[Any, ...]:
+    """Select elements from two tuples based on a mask."""
     result = []
     index1, index2 = 0, 0
     for m in mask:
@@ -85,7 +84,8 @@ class StorageBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def parallelizable(self) -> bool: ...
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
 
     @property
     def size(self) -> int:
@@ -100,7 +100,7 @@ class StorageBase(abc.ABC):
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""
-        return _select_by_mask(self.shape_mask, self.shape, self.internal_shape)
+        return select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
     @functools.cached_property
     def strides(self) -> tuple[int, ...]:
@@ -133,7 +133,7 @@ def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> N
     storage_registry[storage_id] = cls
 
 
-def _normalize_key(
+def normalize_key(
     key: tuple[int | slice, ...],
     shape: tuple[int, ...],
     internal_shape: tuple[int, ...],
@@ -177,7 +177,26 @@ def _normalize_key(
     return tuple(normalized_key)
 
 
-def _get_storage_class(storage: str) -> type[StorageBase]:
+def get_storage_class(storage: str) -> type[StorageBase]:
+    """Get the storage class by its identifier.
+
+    See `pipefunc.map.storage_registry` for available storage classes.
+
+    Parameters
+    ----------
+    storage
+        The storage class identifier.
+
+    Returns
+    -------
+    The storage class.
+
+    Raises
+    ------
+    ValueError
+        If the storage class is not found.
+
+    """
     if storage not in storage_registry:
         available = ", ".join(storage_registry.keys())
         msg = f"Storage class `{storage}` not found, only `{available}` available."

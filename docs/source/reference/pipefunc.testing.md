@@ -1,7 +1,7 @@
-## `pipefunc.map.zarr` module
+## `pipefunc.testing` module
 
 ```{eval-rst}
-.. automodule:: pipefunc.map.zarr
+.. automodule:: pipefunc.testing
     :members:
     :undoc-members:
     :show-inheritance:

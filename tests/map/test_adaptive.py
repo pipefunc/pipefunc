@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import StorageBase, load_outputs
+from pipefunc.map._load import load_outputs
 from pipefunc.map._run_info import RunInfo
+from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
     create_learners,
@@ -470,3 +471,25 @@ def test_adaptive_wrapper_invalid(tmp_path: Path, pipeline: Pipeline) -> None:
             adaptive_output="sum_",
             run_folder_template=run_folder_template,
         )
+
+
+def test_adaptive_wrapper_with_heterogeneous_storage(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    storage = {
+        "": "dict",
+        "sum_": "file_array",
+    }
+    learner = to_adaptive_learner(
+        pipeline,
+        inputs={"x": [0, 1, 2, 3]},
+        adaptive_dimensions={"c": (0, 100), "d": (-1, 1), "e": (-1, 1)},
+        adaptive_output="sum_",
+        run_folder_template=run_folder_template,
+        map_kwargs={"parallel": False, "storage": storage},
+    )
+    assert isinstance(learner, adaptive.LearnerND)
+    npoints_goal = 5
+    adaptive.runner.simple(learner, npoints_goal=npoints_goal)
+
+    assert learner.to_numpy().shape == (npoints_goal, 4)
+    assert len(list(tmp_path.glob("*"))) == npoints_goal

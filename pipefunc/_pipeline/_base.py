@@ -14,41 +14,45 @@ from __future__ import annotations
 
 import functools
 import inspect
-import tempfile
 import time
-import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
 from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
-from pipefunc._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
     handle_error,
 )
-from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache, to_hashable
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc.exceptions import UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
-    ArraySpec,
     MapSpec,
     mapspec_axes,
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import run
+from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
-from pipefunc.typing import (
-    Array,
-    NoAnnotation,
-    Unresolvable,
-    is_object_array_type,
-    is_type_compatible,
+
+from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
+from ._mapspec import (
+    add_mapspec_axis,
+    create_missing_mapspecs,
+    find_non_root_axes,
+    replace_none_in_axes,
+)
+from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
+from ._validation import (
+    validate_consistent_defaults,
+    validate_consistent_type_annotations,
+    validate_scopes,
+    validate_unique_output_names,
 )
 
 if TYPE_CHECKING:
@@ -62,11 +66,10 @@ if TYPE_CHECKING:
     import IPython.display
 
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._run import Result
+    from pipefunc.map._result import Result
+    from pipefunc.map._types import UserShapeDict
 
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-_CACHE_KEY_TYPE: TypeAlias = tuple[_OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
+    from ._types import OUTPUT_TYPE
 
 
 class Pipeline:
@@ -177,7 +180,7 @@ class Pipeline:
         self._cache_kwargs = cache_kwargs
         if cache_type is None and any(f.cache for f in self.functions):
             cache_type = "lru"
-        self.cache = _create_cache(cache_type, lazy, cache_kwargs)
+        self.cache = create_cache(cache_type, lazy, cache_kwargs)
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
@@ -207,11 +210,7 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
-    def add(
-        self,
-        f: PipeFunc | Callable,
-        mapspec: str | MapSpec | None = None,
-    ) -> PipeFunc:
+    def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
         Always creates a copy of the `PipeFunc` instance to avoid side effects.
@@ -245,6 +244,7 @@ class Pipeline:
             msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
             raise TypeError(msg)
 
+        validate_unique_output_names(f.output_name, self.output_to_func)
         self.functions.append(f)
         f._pipelines.add(self)
 
@@ -258,7 +258,7 @@ class Pipeline:
         self._validate()
         return f
 
-    def drop(self, *, f: PipeFunc | None = None, output_name: _OUTPUT_TYPE | None = None) -> None:
+    def drop(self, *, f: PipeFunc | None = None, output_name: OUTPUT_TYPE | None = None) -> None:
         """Drop a function from the pipeline.
 
         Parameters
@@ -312,7 +312,7 @@ class Pipeline:
         self._validate()
 
     @functools.cached_property
-    def output_to_func(self) -> dict[_OUTPUT_TYPE, PipeFunc]:
+    def output_to_func(self) -> dict[OUTPUT_TYPE, PipeFunc]:
         """Return a mapping from output names to functions.
 
         The mapping includes functions with multiple outputs both as individual
@@ -326,7 +326,7 @@ class Pipeline:
             Shortcut for accessing the function corresponding to a specific output name.
 
         """
-        output_to_func: dict[_OUTPUT_TYPE, PipeFunc] = {}
+        output_to_func: dict[OUTPUT_TYPE, PipeFunc] = {}
         for f in self.functions:
             output_to_func[f.output_name] = f
             if isinstance(f.output_name, tuple):
@@ -334,7 +334,7 @@ class Pipeline:
                     output_to_func[name] = f
         return output_to_func
 
-    def __getitem__(self, output_name: _OUTPUT_TYPE) -> PipeFunc:
+    def __getitem__(self, output_name: OUTPUT_TYPE) -> PipeFunc:
         """Return the function corresponding to a specific output name.
 
         See Also
@@ -349,12 +349,12 @@ class Pipeline:
             raise KeyError(msg)
         return self.output_to_func[output_name]
 
-    def __contains__(self, output_name: _OUTPUT_TYPE) -> bool:
+    def __contains__(self, output_name: OUTPUT_TYPE) -> bool:
         """Check if the pipeline contains a function with a specific output name."""
         return output_name in self.output_to_func
 
     @functools.cached_property
-    def node_mapping(self) -> dict[_OUTPUT_TYPE, PipeFunc | str]:
+    def node_mapping(self) -> dict[OUTPUT_TYPE, PipeFunc | str]:
         """Return a mapping from node names to nodes.
 
         Returns
@@ -362,7 +362,7 @@ class Pipeline:
             A mapping from node names to nodes.
 
         """
-        mapping: dict[_OUTPUT_TYPE, PipeFunc | str] = {}
+        mapping: dict[OUTPUT_TYPE, PipeFunc | str] = {}
         for node in self.graph.nodes:
             if isinstance(node, PipeFunc):
                 if isinstance(node.output_name, tuple):
@@ -385,7 +385,7 @@ class Pipeline:
             representing dependencies between functions.
 
         """
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         g = nx.DiGraph()
         for f in self.functions:
             g.add_node(f)
@@ -417,7 +417,7 @@ class Pipeline:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
-    def func(self, output_name: _OUTPUT_TYPE) -> _PipelineAsFunc:
+    def func(self, output_name: OUTPUT_TYPE) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -445,7 +445,7 @@ class Pipeline:
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self)
 
-    def __call__(self, __output_name__: _OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
+    def __call__(self, __output_name__: OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
 
         Parameters
@@ -472,7 +472,7 @@ class Pipeline:
         self,
         func: PipeFunc,
         flat_scope_kwargs: dict[str, Any],
-        all_results: dict[_OUTPUT_TYPE, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
         full_output: bool,  # noqa: FBT001
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
@@ -509,9 +509,9 @@ class Pipeline:
     def _run(
         self,
         *,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         flat_scope_kwargs: dict[str, Any],
-        all_results: dict[_OUTPUT_TYPE, Any],
+        all_results: dict[OUTPUT_TYPE, Any],
         full_output: bool,
         used_parameters: set[str | None],
     ) -> Any:
@@ -526,12 +526,12 @@ class Pipeline:
         result_from_cache = False
         if use_cache:
             assert cache is not None
-            cache_key = _compute_cache_key(
+            cache_key = compute_cache_key(
                 func.output_name,
                 self._func_defaults(func) | flat_scope_kwargs | func._bound,
                 root_args,
             )
-            return_now, result_from_cache = _get_result_from_cache(
+            return_now, result_from_cache = get_result_from_cache(
                 func,
                 cache,
                 cache_key,
@@ -560,13 +560,13 @@ class Pipeline:
         r = _execute_func(func, func_args, self.lazy)
         if use_cache and cache_key is not None:
             assert cache is not None
-            _update_cache(cache, cache_key, r, start_time)
+            update_cache(cache, cache_key, r, start_time)
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
     def run(
         self,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         *,
         full_output: bool = False,
         kwargs: dict[str, Any],
@@ -603,7 +603,7 @@ class Pipeline:
 
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
-        all_results: dict[_OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
 
         self._run(
@@ -628,16 +628,17 @@ class Pipeline:
         self,
         inputs: dict[str, Any],
         run_folder: str | Path | None = None,
-        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
-        output_names: set[_OUTPUT_TYPE] | None = None,
+        output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
-        executor: Executor | None = None,
-        storage: str = "file_array",
+        executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
+        show_progress: bool = False,
     ) -> OrderedDict[str, Result]:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -654,18 +655,35 @@ class Pipeline:
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
             You will receive an exception if the shapes cannot be inferred and need to be provided.
-            The ``internal_shape`` can also be provided via the `PipeFunc(..., internal_shape=...)` argument.
-            If a `PipeFunc` has an `internal_shape` argument _and_ it is provided here, the provided value is used.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
             The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
         parallel
             Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
         executor
-            The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-            is used. Only relevant if ``parallel=True``.
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+
+            If parallel is ``False``, this argument is ignored.
         storage
-            The storage class to use for the file arrays.
-            Can use any registered storage class. See `pipefunc.map.storage_registry`.
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -679,9 +697,21 @@ class Pipeline:
             `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar. Only works if ``parallel=True``.
+
+        See Also
+        --------
+        map_async
+            The asynchronous version of this method.
+
+        Returns
+        -------
+            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            use `Result.output` to get the actual result.
 
         """
-        return run(
+        return run_map(
             self,
             inputs,
             run_folder,
@@ -694,9 +724,109 @@ class Pipeline:
             cleanup=cleanup,
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
         )
 
-    def arg_combinations(self, output_name: _OUTPUT_TYPE) -> set[tuple[str, ...]]:
+    def map_async(
+        self,
+        inputs: dict[str, Any],
+        run_folder: str | Path | None = None,
+        internal_shapes: UserShapeDict | None = None,
+        *,
+        output_names: set[OUTPUT_TYPE] | None = None,
+        executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+        persist_memory: bool = True,
+        cleanup: bool = True,
+        fixed_indices: dict[str, int | slice] | None = None,
+        auto_subpipeline: bool = False,
+        show_progress: bool = False,
+    ) -> AsyncMap:
+        """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
+
+        Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
+
+        Parameters
+        ----------
+        inputs
+            The inputs to the pipeline. The keys should be the names of the input
+            parameters of the pipeline functions and the values should be the
+            corresponding input data, these are either single values for functions without ``mapspec``
+            or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
+        run_folder
+            The folder to store the run information. If ``None``, either a temporary folder
+            is created or no folder is used, depending on whether the storage class requires serialization.
+        internal_shapes
+            The shapes for intermediary outputs that cannot be inferred from the inputs.
+            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+            If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
+        output_names
+            The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+        executor
+            The executor to use for parallel execution. Can be specified as:
+
+            1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+            2. A `concurrent.futures.Executor` instance: Used for all outputs.
+            3. A dictionary: Specify different executors for different outputs.
+
+               - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+               - Use an empty string ``""`` as a key to set a default executor.
+        storage
+            The storage class to use for storing intermediate and final results.
+            Can be specified as:
+
+            1. A string: Use a single storage class for all outputs.
+            2. A dictionary: Specify different storage classes for different outputs.
+
+               - Use output names as keys and storage class names as values.
+               - Use an empty string ``""`` as a key to set a default storage class.
+
+            Available storage classes are registered in `pipefunc.map.storage_registry`.
+            Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        persist_memory
+            Whether to write results to disk when memory based storage is used.
+            Does not have any effect when file based storage is used.
+        cleanup
+            Whether to clean up the ``run_folder`` before running the pipeline.
+        fixed_indices
+            A dictionary mapping axes names to indices that should be fixed for the run.
+            If not provided, all indices are iterated over.
+        auto_subpipeline
+            If ``True``, a subpipeline is created with the specified ``inputs``, using
+            `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+            of providing the root arguments. If ``False``, all root arguments must be provided,
+            and an exception is raised if any are missing.
+        show_progress
+            Whether to display a progress bar.
+
+        See Also
+        --------
+        map
+            The synchronous version of this method.
+
+        Returns
+        -------
+            An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
+            The ``task`` can be awaited to get the final result of the pipeline.
+
+        """
+        return run_map_async(
+            self,
+            inputs,
+            run_folder,
+            internal_shapes=internal_shapes,
+            output_names=output_names,
+            executor=executor,
+            storage=storage,
+            persist_memory=persist_memory,
+            cleanup=cleanup,
+            fixed_indices=fixed_indices,
+            auto_subpipeline=auto_subpipeline,
+            show_progress=show_progress,
+        )
+
+    def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
         """Return the arguments required to compute a specific output.
 
         Parameters
@@ -718,7 +848,7 @@ class Pipeline:
         self._internal_cache.arg_combinations[output_name] = arg_set
         return arg_set
 
-    def root_args(self, output_name: _OUTPUT_TYPE) -> tuple[str, ...]:
+    def root_args(self, output_name: OUTPUT_TYPE) -> tuple[str, ...]:
         """Return the root arguments required to compute a specific output."""
         if r := self._internal_cache.root_args.get(output_name):
             return r
@@ -729,7 +859,7 @@ class Pipeline:
         self._internal_cache.root_args[output_name] = root_args
         return root_args
 
-    def func_dependencies(self, output_name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def func_dependencies(self, output_name: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         """Return the functions required to compute a specific output.
 
         See Also
@@ -739,7 +869,7 @@ class Pipeline:
         """
         return _traverse_graph(output_name, "predecessors", self.graph, self.node_mapping)
 
-    def func_dependents(self, name: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def func_dependents(self, name: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         """Return the functions that depend on a specific input/output.
 
         See Also
@@ -896,7 +1026,7 @@ class Pipeline:
         >>> pipeline.update_scope(None, inputs="*", outputs="*")  # Remove scope from all inputs and outputs
 
         """
-        _validate_scopes(self.functions, scope)
+        validate_scopes(self.functions, scope)
         all_inputs = set(self.topological_generations.root_args)
         all_outputs = self.all_output_names
         if inputs == "*":
@@ -931,7 +1061,7 @@ class Pipeline:
         return flat_scope_kwargs
 
     @functools.cached_property
-    def all_arg_combinations(self) -> dict[_OUTPUT_TYPE, set[tuple[str, ...]]]:
+    def all_arg_combinations(self) -> dict[OUTPUT_TYPE, set[tuple[str, ...]]]:
         """Compute all possible argument mappings for the pipeline.
 
         Returns
@@ -947,7 +1077,7 @@ class Pipeline:
         }
 
     @functools.cached_property
-    def all_root_args(self) -> dict[_OUTPUT_TYPE, tuple[str, ...]]:
+    def all_root_args(self) -> dict[OUTPUT_TYPE, tuple[str, ...]]:
         """Return the root arguments required to compute all outputs."""
         return {
             node.output_name: self.root_args(node.output_name)
@@ -985,11 +1115,11 @@ class Pipeline:
 
     def _validate(self) -> None:
         """Validate the pipeline."""
-        _validate_scopes(self.functions)
-        _check_consistent_defaults(self.functions, output_to_func=self.output_to_func)
+        validate_scopes(self.functions)
+        validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
         if self.validate_type_annotations:
-            _check_consistent_type_annotations(self.graph)
+            validate_consistent_type_annotations(self.graph)
 
     def _validate_mapspec(self) -> None:
         """Validate the MapSpecs for all functions in the pipeline."""
@@ -1010,7 +1140,7 @@ class Pipeline:
         if len(leaf_nodes) != 1:  # pragma: no cover
             msg = (
                 "The pipeline has multiple leaf nodes. Please specify the output_name"
-                " argument to disambiguate.",
+                " argument to disambiguate."
             )
             raise ValueError(msg)
         return leaf_nodes[0]
@@ -1073,11 +1203,11 @@ class Pipeline:
         """Generate `MapSpec`s for functions that return arrays with ``internal_shapes``."""
         root_args = self.topological_generations.root_args
         mapspecs = self.mapspecs(ordered=False)
-        non_root_inputs = _find_non_root_axes(mapspecs, root_args)
+        non_root_inputs = find_non_root_axes(mapspecs, root_args)
         output_names = {at_least_tuple(f.output_name) for f in self.functions}
         multi_output_mapping = {n: names for names in output_names for n in names if len(names) > 1}
-        _replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
-        return _create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
+        replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
+        return create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
     def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
         """Add a new axis to ``parameter``'s `MapSpec`.
@@ -1094,7 +1224,7 @@ class Pipeline:
         """
         self._autogen_mapspec_axes()
         for p in parameter:
-            _add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
+            add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._clear_internal_cache()
         self._validate()
 
@@ -1102,7 +1232,7 @@ class Pipeline:
         self,
         *,
         conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
     ) -> list[str]:
         if output_name is None:
             output_name = self.unique_leaf_node.output_name
@@ -1185,6 +1315,7 @@ class Pipeline:
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
+        include_full_mapspec: bool = False,
         return_type: Literal["graphviz", "html"] | None = None,
     ) -> graphviz.Digraph | IPython.display.HTML:
         """Visualize the pipeline as a directed graph using Graphviz.
@@ -1205,6 +1336,8 @@ class Pipeline:
             Graphviz-specific keyword arguments for customizing the graph's appearance.
         show_legend
             Whether to show the legend in the graph visualization.
+        include_full_mapspec
+            Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
         return_type
             The format to return the visualization in.
             If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -1229,6 +1362,7 @@ class Pipeline:
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,
+            include_full_mapspec=include_full_mapspec,
             return_type=return_type,
         )
 
@@ -1239,7 +1373,7 @@ class Pipeline:
         *,
         color_combinable: bool = False,
         conservatively_combine: bool = False,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
     ) -> None:
         """Visualize the pipeline as a directed graph.
 
@@ -1253,9 +1387,9 @@ class Pipeline:
         color_combinable
             Whether to color combinable nodes differently.
         conservatively_combine
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
         output_name
-            Argument as passed to `Pipeline.simply_pipeline`.
+            Argument as passed to `Pipeline.simplify_pipeline`.
 
         """
         from pipefunc._plotting import visualize_matplotlib
@@ -1297,7 +1431,7 @@ class Pipeline:
 
     def simplified_pipeline(
         self,
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
         *,
         conservatively_combine: bool = False,
     ) -> Pipeline:
@@ -1405,8 +1539,8 @@ class Pipeline:
 
     def nest_funcs(
         self,
-        output_names: set[_OUTPUT_TYPE] | Literal["*"],
-        new_output_name: _OUTPUT_TYPE | None = None,
+        output_names: set[OUTPUT_TYPE] | Literal["*"],
+        new_output_name: OUTPUT_TYPE | None = None,
     ) -> NestedPipeFunc:
         """Replaces a set of output names with a single nested function inplace.
 
@@ -1512,9 +1646,9 @@ class Pipeline:
     def _axis_in_root_arg(
         self,
         axis: str,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         root_args: tuple[str, ...] | None = None,
-        visited: set[_OUTPUT_TYPE] | None = None,
+        visited: set[OUTPUT_TYPE] | None = None,
         result: set[bool] | None = None,
     ) -> bool:
         if root_args is None:
@@ -1551,7 +1685,7 @@ class Pipeline:
 
         return all(result)
 
-    def independent_axes_in_mapspecs(self, output_name: _OUTPUT_TYPE) -> set[str]:
+    def independent_axes_in_mapspecs(self, output_name: OUTPUT_TYPE) -> set[str]:
         """Return the axes that are both in the output and in the root arguments.
 
         Identifies axes that are cross-products and can be computed independently.
@@ -1568,7 +1702,7 @@ class Pipeline:
     def subpipeline(
         self,
         inputs: set[str] | None = None,
-        output_names: set[_OUTPUT_TYPE] | None = None,
+        output_names: set[OUTPUT_TYPE] | None = None,
     ) -> Pipeline:
         """Create a new pipeline containing only the nodes between the specified inputs and outputs.
 
@@ -1657,13 +1791,13 @@ class Generations(NamedTuple):
 @dataclass(frozen=True, slots=True, eq=True)
 class _Bound:
     name: str
-    output_name: _OUTPUT_TYPE
+    output_name: OUTPUT_TYPE
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class _Resources:
     name: str
-    output_name: _OUTPUT_TYPE
+    output_name: OUTPUT_TYPE
 
 
 class _PipelineAsFunc:
@@ -1685,7 +1819,7 @@ class _PipelineAsFunc:
     def __init__(
         self,
         pipeline: Pipeline,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
@@ -1784,8 +1918,8 @@ class _PipelineAsFunc:
 def _update_all_results(
     func: PipeFunc,
     r: Any,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
+    output_name: OUTPUT_TYPE,
+    all_results: dict[OUTPUT_TYPE, Any],
     lazy: bool,  # noqa: FBT001
 ) -> None:
     if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
@@ -1801,96 +1935,6 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _update_cache(
-    cache: LRUCache | HybridCache | DiskCache | SimpleCache,
-    cache_key: _CACHE_KEY_TYPE,
-    r: Any,
-    start_time: float,
-) -> None:
-    # Used in _run
-    if isinstance(cache, HybridCache):
-        duration = time.perf_counter() - start_time
-        cache.put(cache_key, r, duration)
-    else:
-        cache.put(cache_key, r)
-
-
-def _get_result_from_cache(
-    func: PipeFunc,
-    cache: LRUCache | HybridCache | DiskCache | SimpleCache,
-    cache_key: _CACHE_KEY_TYPE | None,
-    output_name: _OUTPUT_TYPE,
-    all_results: dict[_OUTPUT_TYPE, Any],
-    full_output: bool,  # noqa: FBT001
-    used_parameters: set[str | None],
-    lazy: bool = False,  # noqa: FBT002, FBT001
-) -> tuple[bool, bool]:
-    # Used in _run
-    result_from_cache = False
-    if cache_key is not None and cache_key in cache:
-        r = cache.get(cache_key)
-        _update_all_results(func, r, output_name, all_results, lazy)
-        result_from_cache = True
-        if not full_output:
-            used_parameters.add(None)  # indicate that the result was from cache
-            return True, result_from_cache
-    return False, result_from_cache
-
-
-def _check_consistent_defaults(
-    functions: list[PipeFunc],
-    output_to_func: dict[_OUTPUT_TYPE, PipeFunc],
-) -> None:
-    """Check that the default values for shared arguments are consistent."""
-    arg_defaults = {}
-    for f in functions:
-        for arg, default_value in f.defaults.items():
-            if arg in f._bound or arg in output_to_func:
-                continue
-            if arg not in arg_defaults:
-                arg_defaults[arg] = default_value
-            elif default_value != arg_defaults[arg]:
-                msg = (
-                    f"Inconsistent default values for argument '{arg}' in"
-                    " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function."
-                )
-                raise ValueError(msg)
-
-
-def _create_cache(
-    cache_type: Literal["lru", "hybrid", "disk", "simple"] | None,
-    lazy: bool,  # noqa: FBT001
-    cache_kwargs: dict[str, Any] | None,
-) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
-    if cache_type is None:
-        return None
-    if cache_kwargs is None:
-        cache_kwargs = {}
-    if cache_type == "lru":
-        cache_kwargs.setdefault("shared", not lazy)
-        return LRUCache(**cache_kwargs)
-    if cache_type == "hybrid":
-        if lazy:
-            warnings.warn(
-                "Hybrid cache uses function evaluation duration which"
-                " is not measured correctly when using `lazy=True`.",
-                UserWarning,
-                stacklevel=2,
-            )
-        cache_kwargs.setdefault("shared", not lazy)
-        return HybridCache(**cache_kwargs)
-    if cache_type == "disk":
-        cache_kwargs.setdefault("lru_shared", not lazy)
-        cache_kwargs.setdefault("cache_dir", tempfile.gettempdir())
-        return DiskCache(**cache_kwargs)
-    if cache_type == "simple":
-        return SimpleCache()
-
-    msg = f"Invalid cache type: {cache_type}."
-    raise ValueError(msg)
-
-
 def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
     if lazy:
         return _LazyFunction(func, kwargs=func_args)
@@ -1900,52 +1944,6 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
         handle_error(e, func, func_args)
         # handle_error raises but mypy doesn't know that
         raise  # pragma: no cover
-
-
-def _compute_cache_key(
-    output_name: _OUTPUT_TYPE,
-    kwargs: dict[str, Any],
-    root_args: tuple[str, ...],
-) -> _CACHE_KEY_TYPE | None:
-    """Compute the cache key for a specific output name.
-
-    The cache key is a tuple consisting of the output name and a tuple of
-    root input keys and their corresponding values. Root inputs are the
-    inputs that are not derived from any other function in the pipeline.
-
-    If any of the root inputs required for the output_name are not available
-    in kwargs, the cache key computation is skipped, and the method returns
-    None. This can happen when a non-root input is directly provided as an
-    input to another function, in which case the result should not be
-    cached.
-
-    Parameters
-    ----------
-    output_name
-        The identifier for the return value of the pipeline.
-    kwargs
-        Keyword arguments to be passed to the pipeline functions.
-    root_args
-        The names of the pipeline function's root inputs.
-
-    Returns
-    -------
-        A tuple containing the output name and a tuple of root input keys
-        and their corresponding values, or None if the cache key computation
-        is skipped.
-
-    """
-    cache_key_items = []
-    for k in root_args:
-        if k not in kwargs:
-            # This means the computation was run with non-root inputs
-            # i.e., the output of a function was directly provided as an input to
-            # another function. In this case, we don't want to cache the result.
-            return None
-        key = to_hashable(kwargs[k])
-        cache_key_items.append((k, key))
-
-    return output_name, tuple(cache_key_items)
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
@@ -1999,115 +1997,15 @@ def _compute_arg_mapping(
         _compute_arg_mapping(graph, func, head, new_args, [*replaced, node], arg_set)
 
 
-def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None, ...]:
-    n = dims.get(p, 1) - 1
-    return n * (None,) + (axis,)
-
-
-def _add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
-    # Modify the MapSpec of functions that depend on `p` to include the new axis
-    for f in functions:
-        if p not in f.parameters or p in f._bound:
-            continue
-        if f.mapspec is None:
-            axes = _axes_from_dims(p, dims, axis)
-            input_specs = [ArraySpec(p, axes)]
-            output_specs = [ArraySpec(name, (axis,)) for name in at_least_tuple(f.output_name)]
-        else:
-            existing_inputs = set(f.mapspec.input_names)
-            if p in existing_inputs:
-                input_specs = [
-                    s.add_axes(axis) if s.name == p and axis not in s.axes else s
-                    for s in f.mapspec.inputs
-                ]
-            else:
-                axes = _axes_from_dims(p, dims, axis)
-                input_specs = [*f.mapspec.inputs, ArraySpec(p, axes)]
-            output_specs = [
-                s.add_axes(axis) if axis not in s.axes else s for s in f.mapspec.outputs
-            ]
-        f.mapspec = MapSpec(tuple(input_specs), tuple(output_specs), _is_generated=True)
-        for o in output_specs:
-            dims[o.name] = len(o.axes)
-            _add_mapspec_axis(o.name, dims, axis, functions)
-
-
-def _find_non_root_axes(
-    mapspecs: list[MapSpec],
-    root_args: list[str],
-) -> dict[str, list[str | None]]:
-    non_root_inputs: dict[str, list[str | None]] = {}
-    for mapspec in mapspecs:
-        for spec in mapspec.inputs:
-            if spec.name not in root_args:
-                if spec.name not in non_root_inputs:
-                    non_root_inputs[spec.name] = spec.rank * [None]  # type: ignore[assignment]
-                for i, axis in enumerate(spec.axes):
-                    if axis is not None:
-                        non_root_inputs[spec.name][i] = axis
-    return non_root_inputs
-
-
-def _replace_none_in_axes(
-    mapspecs: list[MapSpec],
-    non_root_inputs: dict[str, list[str]],
-    multi_output_mapping: dict[str, tuple[str, ...]],
-) -> None:
-    all_axes_names = {
-        axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
-    }
-
-    i = 0
-    axis_template = "unnamed_{}"
-    for name, axes in non_root_inputs.items():
-        for j, axis in enumerate(axes):
-            if axis is None:
-                while (new_axis := axis_template.format(i)) in all_axes_names:
-                    i += 1
-                non_root_inputs[name][j] = new_axis
-                all_axes_names.add(new_axis)
-                if name in multi_output_mapping:
-                    # If output is a tuple, update its axes with the new axis.
-                    for output_name in multi_output_mapping[name]:
-                        non_root_inputs[output_name][j] = new_axis
-    assert not any(None in axes for axes in non_root_inputs.values())
-
-
-def _create_missing_mapspecs(
-    functions: list[PipeFunc],
-    non_root_inputs: dict[str, set[str]],
-) -> set[PipeFunc]:
-    # Mapping from output_name to PipeFunc for functions without a MapSpec
-    outputs_without_mapspec: dict[str, PipeFunc] = {
-        name: func
-        for func in functions
-        if func.mapspec is None
-        for name in at_least_tuple(func.output_name)
-    }
-
-    missing: set[str] = non_root_inputs.keys() & outputs_without_mapspec.keys()
-    func_with_new_mapspecs = set()
-    for p in missing:
-        func = outputs_without_mapspec[p]
-        if func in func_with_new_mapspecs:
-            continue  # already added a MapSpec because of multiple outputs
-        axes = tuple(non_root_inputs[p])
-        outputs = tuple(ArraySpec(x, axes) for x in at_least_tuple(func.output_name))
-        func.mapspec = MapSpec(inputs=(), outputs=outputs, _is_generated=True)
-        func_with_new_mapspecs.add(func)
-        print(f"Autogenerated MapSpec for `{func}`: `{func.mapspec}`")
-    return func_with_new_mapspecs
-
-
 def _traverse_graph(
-    start: _OUTPUT_TYPE | PipeFunc,
+    start: OUTPUT_TYPE | PipeFunc,
     direction: Literal["predecessors", "successors"],
     graph: nx.DiGraph,
-    node_mapping: dict[_OUTPUT_TYPE, PipeFunc | str],
-) -> list[_OUTPUT_TYPE]:
+    node_mapping: dict[OUTPUT_TYPE, PipeFunc | str],
+) -> list[OUTPUT_TYPE]:
     visited = set()
 
-    def _traverse(x: _OUTPUT_TYPE | PipeFunc) -> list[_OUTPUT_TYPE]:
+    def _traverse(x: OUTPUT_TYPE | PipeFunc) -> list[OUTPUT_TYPE]:
         results = set()
         if isinstance(x, str | tuple):
             x = node_mapping[x]
@@ -2138,94 +2036,9 @@ def _find_nodes_between(
     return reachable_from_inputs & reachable_to_outputs
 
 
-def _validate_scopes(functions: list[PipeFunc], new_scope: str | None = None) -> None:
-    all_scopes = {scope for f in functions for scope in f.parameter_scopes}
-    if new_scope is not None:
-        all_scopes.add(new_scope)
-    all_parameters = {p for f in functions for p in f.parameters + at_least_tuple(f.output_name)}
-    if overlap := all_scopes & all_parameters:
-        overlap_str = ", ".join(overlap)
-        msg = f"Scope(s) `{overlap_str}` are used as both parameter and scope."
-        raise ValueError(msg)
-
-
 @dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
-    arg_combinations: dict[_OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
-    root_args: dict[_OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
-    func: dict[_OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
-    func_defaults: dict[_OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
-
-
-def _check_consistent_type_annotations(graph: nx.DiGraph) -> None:
-    """Check that the type annotations for shared arguments are consistent."""
-    for node in graph.nodes:
-        if not isinstance(node, PipeFunc):
-            continue
-        deps = nx.descendants_at_distance(graph, node, 1)
-        output_types = node.output_annotation
-        for dep in deps:
-            assert isinstance(dep, PipeFunc)
-            for parameter_name, input_type in dep.parameter_annotations.items():
-                if parameter_name not in output_types:
-                    continue
-                if _mapspec_is_generated(node, dep):
-                    # NOTE: We cannot check the type-hints for auto-generated MapSpecs
-                    continue
-                if _mapspec_with_internal_shape(node, parameter_name):
-                    # NOTE: We cannot verify the type hints because the output
-                    # might be any iterable instead of an Array as returned by
-                    # a map operation.
-                    continue
-                output_type = output_types[parameter_name]
-                if (
-                    _axis_is_reduced(node, dep, parameter_name)
-                    and not is_object_array_type(output_type)
-                    and not isinstance(output_type, Unresolvable)
-                    and output_type is not NoAnnotation
-                ):
-                    output_type = Array[output_type]  # type: ignore[valid-type]
-                if not is_type_compatible(output_type, input_type):
-                    msg = (
-                        f"Inconsistent type annotations for:"
-                        f"\n  - Argument `{parameter_name}`"
-                        f"\n  - Function `{node.__name__}(...)` returns:\n      `{output_type}`."
-                        f"\n  - Function `{dep.__name__}(...)` expects:\n      `{input_type}`."
-                        "\nPlease make sure the shared input arguments have the same type."
-                        "\nNote that the output type displayed above might be wrapped in"
-                        " `pipefunc.typing.Array` if using `MapSpec`s."
-                        " Disable this check by setting `validate_type_annotations=False`."
-                    )
-                    raise TypeError(msg)
-
-
-def _axis_is_reduced(f_out: PipeFunc, f_in: PipeFunc, parameter_name: str) -> bool:
-    """Whether the output was the result of a map, and the input takes the entire result."""
-    output_mapspec_names = f_out.mapspec.output_names if f_out.mapspec else ()
-    input_mapspec_names = f_in.mapspec.input_names if f_in.mapspec else ()
-    if f_in.mapspec:
-        input_spec_axes = next(
-            (s.axes for s in f_in.mapspec.inputs if s.name == parameter_name),
-            None,
-        )
-    else:
-        input_spec_axes = None
-    return parameter_name in output_mapspec_names and (
-        parameter_name not in input_mapspec_names
-        or (input_spec_axes is not None and None in input_spec_axes)
-    )
-
-
-def _mapspec_is_generated(f_out: PipeFunc, f_in: PipeFunc) -> bool:
-    if f_out.mapspec is None or f_in.mapspec is None:
-        return False
-    return f_out.mapspec._is_generated or f_in.mapspec._is_generated
-
-
-def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
-    """Whether the output was not from a map operation but returned an array with internal shape."""
-    if f_out.mapspec is None or parameter_name not in f_out.mapspec.output_names:
-        return False
-    output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
-    all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
-    return not all_inputs_in_outputs
+    arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
+    root_args: dict[OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
