@@ -267,6 +267,8 @@ def is_min_version(package: str, version: str) -> bool:
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
     if "pydantic" not in sys.modules:
         return False
+    if not inspect.isclass(x):
+        return False
     import pydantic
 
     return issubclass(x, pydantic.BaseModel)
