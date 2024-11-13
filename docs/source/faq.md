@@ -1045,7 +1045,7 @@ help(func_e.call_with_root_args)
 
 This shows the signature and the doc-string of the `call_with_root_args` method.
 
-## dataclasses and pydantic.BaseModel as PipeFunc
+## `dataclasses` and `pydantic.BaseModel` as `PipeFunc`
 
 `PipeFunc` can be used with `dataclasses` and `pydantic.BaseModel` classes as `PipeFunc`s.
 
@@ -1076,9 +1076,9 @@ assert result["dataclass"].output == InputDataClass(a=1, b=2)
 assert result["pydantic"].output == PydanticModel(x=3, y=4)
 ```
 
-:::{admonition} Careful with ``default_factory``!
+:::{admonition} Careful with `default_factory`!
 :class: warning
-When using `dataclasses` or `pydantic.BaseModel` with ``dataclasses.field(..., default_factory=...)`` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the class is defined.
+When using `dataclasses` or `pydantic.BaseModel` with `dataclasses.field(..., default_factory=...)` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the `PipeFunc` class is defined.
 So if you are using mutable defaults, make sure to not mutate the value in the function body!
 This is the same behavior as with regular Python functions.
 :::
