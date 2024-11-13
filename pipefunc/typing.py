@@ -1,7 +1,6 @@
 """Custom type hinting utilities for pipefunc."""
 
 import re
-import sys
 import warnings
 from collections.abc import Callable, Iterable
 from types import UnionType
@@ -57,8 +56,7 @@ class TypeCheckMemo(NamedTuple):
 
 def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
     """Evaluate a forward reference using the provided memo."""
-    kw = {} if sys.version_info < (3, 13) else {"self_type": memo.self_type}
-    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), **kw)
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:
@@ -303,8 +301,8 @@ def safe_get_type_hints(
         hints = get_type_hints(func, include_extras=include_extras)
     except Exception:  # noqa: BLE001
         hints = func.__annotations__
-
-    memo = TypeCheckMemo(globals=func.__globals__, locals=None)
+    _globals = getattr(func, "__globals__", {})
+    memo = TypeCheckMemo(globals=_globals, locals=None)
     resolved_hints = {}
     for arg, hint in hints.items():
         try:

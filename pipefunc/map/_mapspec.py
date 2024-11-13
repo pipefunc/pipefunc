@@ -10,9 +10,13 @@ import itertools
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
+
+if TYPE_CHECKING:
+    from ._types import ShapeDict, ShapeTuple
 
 
 def shape_to_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
@@ -76,7 +80,7 @@ class ArraySpec:
         """Return the rank of this array spec."""
         return len(self.axes)
 
-    def validate(self, shape: tuple[int, ...]) -> None:
+    def validate(self, shape: ShapeTuple) -> None:
         """Raise an exception if 'shape' is not compatible with this array spec."""
         if len(shape) != self.rank:
             msg = (
@@ -151,9 +155,9 @@ class MapSpec:
 
     def shape(
         self,
-        input_shapes: dict[str, tuple[int, ...]],
-        internal_shapes: dict[str, tuple[int, ...]] | None = None,
-    ) -> tuple[tuple[int, ...], tuple[bool, ...]]:
+        input_shapes: ShapeDict,
+        internal_shapes: ShapeDict | None = None,
+    ) -> tuple[ShapeTuple, tuple[bool, ...]]:
         """Return the shape of the output of this MapSpec.
 
         Parameters
@@ -430,9 +434,9 @@ def mapspec_axes(mapspecs: list[MapSpec]) -> dict[str, tuple[str, ...]]:
 
 def _validate_shapes(
     input_names: set[str],
-    input_shapes: dict[str, tuple[int, ...]],
+    input_shapes: ShapeDict,
     inputs: tuple[ArraySpec, ...],
-    internal_shapes: dict[str, tuple[int, ...]] | None,
+    internal_shapes: ShapeDict | None,
     output_names: tuple[str, ...],
 ) -> None:
     if extra_names := input_shapes.keys() - input_names:
@@ -453,7 +457,7 @@ def _validate_shapes(
 def _get_common_dim(
     arrays: list[ArraySpec],
     index: str,
-    input_shapes: dict[str, tuple[int, ...]],
+    input_shapes: ShapeDict,
 ) -> int:
     def _get_dim(array: ArraySpec, index: str) -> int:
         axis = array.axes.index(index)
@@ -469,7 +473,7 @@ def _get_common_dim(
 
 def _get_output_dim(
     output: ArraySpec,
-    internal_shapes: dict[str, tuple[int, ...]],
+    internal_shapes: ShapeDict,
     internal_shape_index: int,
 ) -> int:
     if output.name not in internal_shapes:

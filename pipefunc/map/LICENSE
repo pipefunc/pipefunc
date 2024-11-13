@@ -22,4 +22,4 @@
 
 Note from `pipefunc` author about this LICENSE file: This file is a copy of the
 LICENSE file from the https://github.com/microsoft/aiida-dynamic-workflows repository.
-Both the `_mapspec` and the `_filearray` modules are based on code from that repository.
+Both the `_mapspec` and the `_storage._file` modules are based on code from that repository.

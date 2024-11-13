@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pipefunc.map._filearray import FileArray, _load_all, _select_by_mask, dump, load
+from pipefunc.map._storage_array._file import FileArray, _load_all, dump, load, select_by_mask
 
 # The tests for all file array types are in `test_base_filearray.py`!
 # Here are only the tests that are specific to the `FileArray` class.
@@ -182,7 +182,7 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
     shape = (1,)
     internal_shape = (2,)
     shape_mask = (True, False)  # means shape is (1, 2)
-    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    full_shape = select_by_mask(shape_mask, shape, internal_shape)
     assert full_shape == (1, 2)
 
     arr = FileArray(folder, shape, shape_mask=shape_mask, internal_shape=internal_shape)

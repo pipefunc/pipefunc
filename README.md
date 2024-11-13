@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest.yml)
+[![pytest](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml/badge.svg)](https://github.com/pipefunc/pipefunc/actions/workflows/pytest-micromamba.yml)
 [![Conda](https://img.shields.io/badge/install%20with-conda-green.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![Coverage](https://img.shields.io/codecov/c/github/pipefunc/pipefunc)](https://codecov.io/gh/pipefunc/pipefunc)
 [![CodSpeed Badge](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/pipefunc/pipefunc)
@@ -54,6 +54,7 @@ Whether you're working with data processing, scientific computations, machine le
 1. 👮 **Type Annotations Validation**: Validates the type annotations between functions to ensure type consistency.
 1. 🎛️ **Resource Usage Profiling**: Get reports on CPU usage, memory consumption, and execution time to identify bottlenecks and optimize your code.
 1. 🔄 **Automatic parallelization**: Automatically runs pipelines in parallel (local or remote) with shared memory and disk caching options.
+1. ⚡ **Ultra-Fast Performance**: Minimal overhead of [about 15 µs](https://pipefunc.readthedocs.io/en/latest/faq/#what-is-the-overhead-efficiency-performance-of-pipefunc) per function in the graph, ensuring blazingly fast execution.
 1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
@@ -89,23 +90,10 @@ pipeline = Pipeline([f_c, f_d, f_e], profile=True)  # `profile=True` enables res
 
 # Call the pipeline directly for different outputs:
 assert pipeline("d", a=2, b=3) == 15
-assert pipeline("e", a=2, b=3, x=1) == 75
-
-# Or create a new function for a specific output
-h_d = pipeline.func("d")
-assert h_d(a=2, b=3) == 15
-
-h_e = pipeline.func("e")
-assert h_e(a=2, b=3, x=1) == 75
-# Instead of providing the root arguments, you can also provide the intermediate results directly
-assert h_e(c=5, d=15, x=1) == 75
+assert pipeline("e", a=2, b=3) == 75
 
 # Visualize the pipeline
 pipeline.visualize()
-
-# Get all possible argument mappings for each function
-all_args = pipeline.all_arg_combinations
-print(all_args)
 
 # Show resource reporting (only works if profile=True)
 pipeline.print_profiling_stats()

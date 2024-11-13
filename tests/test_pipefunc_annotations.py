@@ -1,7 +1,7 @@
 import numpy as np
 
 from pipefunc import PipeFunc, pipefunc
-from pipefunc._pipeline import _axis_is_reduced, _mapspec_with_internal_shape
+from pipefunc._pipeline._validation import _axis_is_reduced, _mapspec_with_internal_shape
 
 
 def test_pipeline_function_annotations_single_output():

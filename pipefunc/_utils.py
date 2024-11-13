@@ -10,13 +10,15 @@ import socket
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+    import pydantic
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -221,12 +223,17 @@ def is_running_in_ipynb() -> bool:
         return False  # Probably standard Python interpreter
 
 
+def is_installed(package: str) -> bool:
+    """Check if a package is installed."""
+    return importlib.util.find_spec(package) is not None
+
+
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
     conda_name_mapping = {"graphviz": "python-graphviz"}
 
     for package in packages:
-        if importlib.util.find_spec(package):
+        if is_installed(package):
             continue
         conda_package = conda_name_mapping.get(package, package)
         error_message = f"The '{package}' package is required"
@@ -239,3 +246,29 @@ def requires(*packages: str, reason: str = "", extras: str | None = None) -> Non
         error_message += f"- pip install {package}\n"
         error_message += f"- conda install -c conda-forge {conda_package}"
         raise ImportError(error_message)
+
+
+def is_min_version(package: str, version: str) -> bool:
+    """Check if a package is at least a given version."""
+    import importlib.metadata
+
+    installed_version = importlib.metadata.version(package)
+    installed_major, installed_minor, installed_patch, *_ = installed_version.split(".")
+    major, minor, patch, *_ = version.split(".")
+    if installed_major < major:
+        return False
+    if installed_major == major and installed_minor < minor:
+        return False
+    if installed_major == major and installed_minor == minor and installed_patch < patch:  # noqa: SIM103
+        return False
+    return True
+
+
+def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
+    if "pydantic" not in sys.modules:
+        return False
+    if not inspect.isclass(x):
+        return False
+    import pydantic
+
+    return issubclass(x, pydantic.BaseModel)
