@@ -110,7 +110,7 @@ mock_scontrol_response = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_subprocess_run():
     with patch("subprocess.run") as mocked_run:
         # Mock the subprocess.run return value
