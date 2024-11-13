@@ -27,6 +27,8 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_installed,
+    is_running_in_ipynb,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc.exceptions import UnusedParametersError
@@ -64,6 +66,7 @@ if TYPE_CHECKING:
     import graphviz
     import holoviews as hv
     import IPython.display
+    import matplotlib.pyplot as plt
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
@@ -1374,7 +1377,7 @@ class Pipeline:
         color_combinable: bool = False,
         conservatively_combine: bool = False,
         output_name: OUTPUT_TYPE | None = None,
-    ) -> None:
+    ) -> plt.Figure:
         """Visualize the pipeline as a directed graph.
 
         Parameters
@@ -1401,7 +1404,7 @@ class Pipeline:
             )
         else:
             func_node_colors = None
-        visualize_matplotlib(
+        return visualize_matplotlib(
             self.graph,
             figsize=figsize,
             filename=filename,
@@ -1781,6 +1784,20 @@ class Pipeline:
                 raise ValueError(msg)
 
         return pipeline
+
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:
+        """Display the pipeline widget."""
+        if is_running_in_ipynb() and is_installed("ipywidgets"):
+            from pipefunc._widgets.pipeline import PipelineWidget
+
+            widget = PipelineWidget(self).tab
+            return widget._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
 
 
 class Generations(NamedTuple):

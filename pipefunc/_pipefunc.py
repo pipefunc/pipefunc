@@ -1269,10 +1269,17 @@ class ErrorSnapshot:
         with open(filename, "rb") as f:  # noqa: PTH123
             return cloudpickle.load(f)
 
-    def _ipython_display_(self) -> None:  # pragma: no cover
-        from IPython.display import HTML, display
-
-        display(HTML(f"<pre>{self}</pre>"))
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:
+        mime_bundle = {"text/html": f"<pre>{self}</pre>", "text/plain": str(self)}
+        if include is not None:
+            mime_bundle = {k: v for k, v in mime_bundle.items() if k in include}
+        if exclude is not None:
+            mime_bundle = {k: v for k, v in mime_bundle.items() if k not in exclude}
+        return mime_bundle
 
 
 def _validate_identifier(name: str, value: Any) -> None:
