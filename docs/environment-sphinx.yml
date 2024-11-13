@@ -32,6 +32,9 @@ dependencies:
   - holoviews
   - bokeh
   - python-graphviz
+  - jupyter_bokeh
+  # optional-dependencies: profiling
+  - psutil
   # optional-dependencies: docs
   - sphinx
   - sphinx-autodoc-typehints
