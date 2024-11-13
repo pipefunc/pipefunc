@@ -858,12 +858,14 @@ The performance is measured by the time it takes to process `N**3` iterations th
 
 For the provided example, you might expect an output similar to `Time: 14.93 µs per iteration` on a MacBook Pro M2.
 The number reported above might be slower because it is running on ReadTheDocs' hosted hardware.
-It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc`.
+It's important to note that this benchmark avoids parallel computations and caches results in memory (using a `dict`) to focus on the overhead introduced by `pipefunc` instead of parallelization and serialization overhead.
 Results can vary depending on your hardware and current system load.
 
 By using this benchmark as a baseline, you can assess performance changes after modifying your pipeline or optimizing your function logic.
 To further analyze performance, consider profiling individual functions using the `profile` option in `Pipeline`.
 This will provide insights into resource usage, including CPU and memory consumption, helping you identify potential bottlenecks.
+
+For context, consider that submitting a function to a `ThreadPoolExecutor` or `ProcessPoolExecutor` typically introduces an overhead of around 1-2 ms per function call (100x slower than the overhead of `pipefunc`), or that serializing results to disk can add an overhead of 1-100 ms per function call (100x to 10,000x slower).
 
 ## How to mock functions in a pipeline for testing?
 
@@ -1042,6 +1044,44 @@ help(func_e.call_with_root_args)
 ```
 
 This shows the signature and the doc-string of the `call_with_root_args` method.
+
+## `dataclasses` and `pydantic.BaseModel` as `PipeFunc`
+
+`PipeFunc` can be used with `dataclasses` and `pydantic.BaseModel` classes as `PipeFunc`s.
+
+Suppose we have a `dataclass` and a `pydantic.BaseModel` class:
+
+```python
+from pipefunc import PipeFunc, Pipeline
+from dataclasses import dataclass
+from pydantic import BaseModel
+
+@dataclass
+class InputDataClass:
+    a: int
+    b: int
+
+class PydanticModel(BaseModel):
+    x: int
+    y: int
+
+# We can use these classes as PipeFuncs
+
+pf1 = PipeFunc(InputDataClass, output_name="dataclass")
+pf2 = PipeFunc(PydanticModel, output_name="pydantic")
+
+pipeline = Pipeline([pf1, pf2])
+result = pipeline.map(inputs={"a": 1, "b": 2, "x": 3, "y": 4}, parallel=False)
+assert result["dataclass"].output == InputDataClass(a=1, b=2)
+assert result["pydantic"].output == PydanticModel(x=3, y=4)
+```
+
+:::{admonition} Careful with `default_factory`!
+:class: warning
+When using `dataclasses` or `pydantic.BaseModel` with `dataclasses.field(..., default_factory=...)` or `pydantic.Field(..., default_factory=...)`, the default value will be computed only once when the `PipeFunc` class is defined.
+So if you are using mutable defaults, make sure to not mutate the value in the function body!
+This is the same behavior as with regular Python functions.
+:::
 
 ## Parameter Sweeps
 

@@ -9,6 +9,7 @@ These `PipeFunc` objects are used to construct a `pipefunc.Pipeline`.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime
 import functools
 import getpass
@@ -32,6 +33,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     format_function_call,
     get_local_ip,
+    is_pydantic_base_model,
     requires,
 )
 from pipefunc.lazy import evaluate_lazy
@@ -43,9 +45,11 @@ from pipefunc.typing import NoAnnotation, safe_get_type_hints
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pydantic
+
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
-
+    from pipefunc.map._types import ShapeTuple
 
 T = TypeVar("T", bound=Callable[..., Any])
 
@@ -174,7 +178,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | tuple[int, ...] | None = None,
+        internal_shape: int | ShapeTuple | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -191,7 +195,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: int | tuple[int, ...] | None = internal_shape
+        self.internal_shape: int | ShapeTuple | None = internal_shape
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -278,6 +282,25 @@ class PipeFunc(Generic[T]):
         """
         parameters = self.original_parameters
         defaults = {}
+
+        # Handle dataclass case
+        if dataclasses.is_dataclass(self.func):
+            fields = dataclasses.fields(self.func)
+            for f in fields:
+                new_name = self._renames.get(f.name, f.name)
+                if new_name in self._defaults:
+                    defaults[new_name] = self._defaults[new_name]
+                elif f.default_factory is not dataclasses.MISSING:
+                    defaults[new_name] = f.default_factory()
+                elif f.default is not dataclasses.MISSING:
+                    defaults[new_name] = f.default
+            return defaults
+
+        # Handle pydantic case
+        if is_pydantic_base_model(self.func):
+            return _pydantic_defaults(self.func, self._renames, self._defaults)
+
+        # Handle regular function case
         for original_name, v in parameters.items():
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
@@ -708,7 +731,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        if inspect.isclass(func):
+        if inspect.isclass(func) and not is_pydantic_base_model(func):
             func = func.__init__
         type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
@@ -862,7 +885,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | tuple[int, ...] | None = None,
+    internal_shape: int | ShapeTuple | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -1383,3 +1406,27 @@ def _get_name(func: Callable[..., Any]) -> str:
             return f"{class_name}.{method_name}"
         return qualname  # pragma: no cover
     return func.__name__
+
+
+def _pydantic_defaults(
+    func: type[pydantic.BaseModel],
+    renames: dict[str, Any],
+    defaults: dict[str, Any],
+) -> dict[str, Any]:
+    import pydantic
+
+    if pydantic.__version__.split(".", 1)[0] == "1":  # pragma: no cover
+        msg = "Pydantic version 1 defaults cannot be extracted."
+        warnings.warn(msg, UserWarning, stacklevel=2)
+        return {}
+    from pydantic_core import PydanticUndefined
+
+    for name, field_ in func.model_fields.items():
+        new_name = renames.get(name, name)
+        if new_name in defaults:
+            defaults[new_name] = defaults[new_name]
+        elif field_.default_factory is not None:
+            defaults[new_name] = field_.default_factory()
+        elif field_.default is not PydanticUndefined:
+            defaults[new_name] = field_.default
+    return defaults

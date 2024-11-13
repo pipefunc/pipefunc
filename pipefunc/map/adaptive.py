@@ -40,8 +40,9 @@ if TYPE_CHECKING:
     from pipefunc.resources import Resources
     from pipefunc.sweep import Sweep
 
-    from ._result import DirectValue
+    from ._result import StoreType
     from ._storage_array._base import StorageBase
+    from ._types import ShapeTuple, UserShapeDict
     from .adaptive_scheduler import AdaptiveSchedulerDetails
 
 
@@ -154,7 +155,7 @@ def create_learners(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     return_output: bool = False,
@@ -282,7 +283,7 @@ def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
 def _learner(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None,
     *,
@@ -337,7 +338,7 @@ def _execute_iteration_in_single(
     _: Any,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     *,
     return_output: bool = False,
 ) -> Any | None:
@@ -360,7 +361,7 @@ def _execute_iteration_in_map_spec(
     index: int,
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase | Path | DirectValue],
+    store: dict[str, StoreType],
     cache: _CacheBase | None,
     *,
     return_output: bool = False,
@@ -380,7 +381,16 @@ def _execute_iteration_in_map_spec(
     kwargs = _func_kwargs(func, run_info, store)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    outputs = _run_iteration_and_process(index, func, kwargs, shape, mask, arrays, cache)
+    outputs = _run_iteration_and_process(
+        index,
+        func,
+        kwargs,
+        shape,
+        mask,
+        arrays,
+        cache,
+        force_dump=True,
+    )
     if not return_output:
         return None
     return outputs if isinstance(func.output_name, tuple) else outputs[0]
@@ -396,7 +406,7 @@ class _MapWrapper:
     pipeline: Pipeline
     inputs: dict[str, Any]
     run_folder: Path
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    internal_shapes: UserShapeDict | None
     parallel: bool
     cleanup: bool
 
@@ -416,7 +426,7 @@ def create_learners_from_sweep(
     pipeline: Pipeline,
     sweep: Sweep,
     run_folder: str | Path,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
     parallel: bool = True,
     cleanup: bool = True,
@@ -493,7 +503,7 @@ def _iterate_axes(
     independent_axes: tuple[str, ...],
     inputs: dict[str, Any],
     mapspec_axes: dict[str, tuple[str, ...]],
-    shapes: dict[OUTPUT_TYPE, tuple[int, ...]],
+    shapes: dict[OUTPUT_TYPE, ShapeTuple],
 ) -> Generator[dict[str, Any], None, None]:
     shape: list[int] = []
     for axis in independent_axes:
@@ -513,7 +523,7 @@ def _maybe_iterate_axes(
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     split_independent_axes: bool,  # noqa: FBT001
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: UserShapeDict | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:
         assert not split_independent_axes

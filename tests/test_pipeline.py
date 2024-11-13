@@ -631,7 +631,7 @@ def test_unhashable_defaults() -> None:
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", defaults={"b": {}})
+    @pipefunc(output_name="d", defaults={"b": {}})
     def g(a, b):
         return a + b
 
@@ -802,3 +802,41 @@ def test_unpicklable_run_with_mapspec():
     r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
     assert isinstance(r["y"].output, np.ndarray)
     assert r["z"].output.tolist() == [1, 2, 3, 4]
+
+
+def test_duplicate_output_names() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        Pipeline([f, f])
+
+    p = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        p.add(f)
+
+
+def test_adding_duplicates_output_name_tuple() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    @pipefunc(output_name=("y", "y2"))
+    def g(b):
+        return b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "The function with output name `'y'` already exists in the pipeline (`f(...) → y`)",
+        ),
+    ):
+        pipeline.add(g)
