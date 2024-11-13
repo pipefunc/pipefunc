@@ -104,7 +104,7 @@ def test_simple(storage, tmp_path: Path) -> None:
         pipeline.split_disconnected()
     assert results["y"].store is not None
     assert isinstance(results["y"].store, StorageBase)
-    assert isinstance(results["y"].store.parallelizable, bool)
+    assert isinstance(results["y"].store.dump_in_subprocess, bool)
     assert results["y"].store.has_index(0)
 
 
@@ -862,7 +862,7 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     assert results["c"].output.shape == (2, 2)
     assert results["c"].store is not None
     assert isinstance(results["c"].store, StorageBase)
-    assert isinstance(results["c"].store.parallelizable, bool)
+    assert isinstance(results["c"].store.dump_in_subprocess, bool)
     assert results["c"].output.tolist() == [[2, 0], [3, -1]]
     assert load_outputs("c", run_folder=tmp_path).tolist() == [[2, 0], [3, -1]]
     load_xarray_dataset(run_folder=tmp_path)
@@ -1055,11 +1055,8 @@ def test_storage_options_invalid():
 def test_storage_options_zarr_memory_parallel():
     pipeline = Pipeline([PipeFunc(lambda x: x, "y", mapspec="x[i] -> y[i]")])
     inputs = {"x": [1, 2, 3]}
-    with pytest.raises(
-        ValueError,
-        match="The chosen storage type `zarr_memory` does not support process-based parallel execution.",
-    ):
-        pipeline.map(inputs, storage="zarr_memory", parallel=True)
+    result = pipeline.map(inputs, storage="zarr_memory", parallel=True)
+    assert result["y"].output.tolist() == [1, 2, 3]
 
 
 def test_custom_executor():
@@ -1487,7 +1484,7 @@ def test_internal_shape_in_pipefunc():
 
 
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
-def test_parallel_warning_and_error(storage: str):
+def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
 
@@ -1509,17 +1506,9 @@ def test_parallel_warning_and_error(storage: str):
 
     pipeline = Pipeline([f, g, h, i])
     inputs = {"x": [1, 2, 3]}
-    with pytest.warns(
-        UserWarning,
-        match=f"The chosen storage type `{storage}` does not support process-based parallel execution",
-    ):
-        pipeline.map(inputs, storage=storage, parallel=True, executor=ProcessPoolExecutor())
-
-    with pytest.raises(
-        ValueError,
-        match=f"The chosen storage type `{storage}` does not support process-based parallel execution",
-    ):
-        pipeline.map(inputs, storage=storage, parallel=True)
+    r1 = pipeline.map(inputs, storage=storage, parallel=True, executor=ProcessPoolExecutor())
+    r2 = pipeline.map(inputs, storage=storage, parallel=True)
+    assert r1["r"].output == r2["r"].output == 12
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
@@ -1636,21 +1625,21 @@ def test_pipeline_with_heterogeneous_executor() -> None:
     with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
         pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
 
-    # Test incompatible storage with executor
-    with pytest.warns(
-        UserWarning,
-        match=re.escape(
-            "The chosen storage type `dict` does not support process-based parallel execution.",
-        ),
-    ):
-        pipeline.map(
-            inputs,
-            executor={
-                "z": ProcessPoolExecutor(max_workers=2),
-                "": ThreadPoolExecutor(max_workers=2),
-            },
-            storage={"": "dict"},
-        )
+    # Dict storage with different executors
+    r = pipeline.map(
+        inputs,
+        executor={
+            "z": ProcessPoolExecutor(max_workers=2),
+            "": ThreadPoolExecutor(max_workers=2),
+        },
+        storage={"": "dict"},
+    )
+    thread_names = r["y1"].output.tolist()
+    assert len(thread_names) > 1
+    assert all("ThreadPool" in name for name in thread_names)
+    process_names = r["z"].output.tolist()
+    assert all("Process-" in name for name in process_names)
+    assert r["y2"].output.tolist() == [2, 3, 4]
 
 
 def test_map_range():

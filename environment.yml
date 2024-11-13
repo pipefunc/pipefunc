@@ -24,6 +24,8 @@ dependencies:
   - pandas
   # optional-dependencies: profiling
   - psutil
+  # optional-dependencies: pydantic
+  - pydantic
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz

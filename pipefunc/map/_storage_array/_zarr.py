@@ -20,7 +20,10 @@ from ._base import StorageBase, register_storage, select_by_mask
 
 
 class ZarrFileArray(StorageBase):
-    """Array interface to a Zarr store."""
+    """Array interface to a Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_file_array"
     requires_serialization = True
@@ -211,8 +214,8 @@ class ZarrFileArray(StorageBase):
         return slice_indices
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 
@@ -235,7 +238,10 @@ class _SharedDictStore(zarr.storage.KVStore):
 
 
 class ZarrMemoryArray(ZarrFileArray):
-    """Array interface to an in-memory Zarr store."""
+    """Array interface to an in-memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_memory"
     requires_serialization = False
@@ -285,13 +291,16 @@ class ZarrMemoryArray(ZarrFileArray):
         zarr.convenience.copy_store(self.persistent_store, self.store, if_exists="replace")
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return False
 
 
 class ZarrSharedMemoryArray(ZarrMemoryArray):
-    """Array interface to a shared memory Zarr store."""
+    """Array interface to a shared memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_shared_memory"
     requires_serialization = True
@@ -319,8 +328,8 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         )
 
     @property
-    def parallelizable(self) -> bool:
-        """Return whether the storage is parallelizable."""
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
 

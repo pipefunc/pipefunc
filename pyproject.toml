@@ -33,6 +33,7 @@ zarr = ["zarr"]
 ray = ["ray"]
 pandas = ["pandas"]
 profiling = ["psutil"]
+pydantic = ["pydantic"]
 plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
@@ -60,14 +61,15 @@ docs = [
     "nltk",
     "scikit-image",
 ]
-all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets,ray]"]
+# all doesn't include 'ray' and 'pydantic'
+all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "pre-commit",
     "ruff",
     "mypy",
     "versioningit",
-    "pipefunc[all,test,docs]",
+    "pipefunc[all,test,docs,pydantic]",
 ]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
