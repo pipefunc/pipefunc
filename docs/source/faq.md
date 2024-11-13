@@ -1051,8 +1051,10 @@ This shows the signature and the doc-string of the `call_with_root_args` method.
 
 Suppose we have a `dataclass` and a `pydantic.BaseModel` class:
 
-```{code-cell} ipython3
+```python
+from pipefunc import PipeFunc, Pipeline
 from dataclasses import dataclass
+from pydantic import BaseModel
 
 @dataclass
 class InputDataClass:
@@ -1069,7 +1071,9 @@ pf1 = PipeFunc(InputDataClass, output_name="dataclass")
 pf2 = PipeFunc(PydanticModel, output_name="pydantic")
 
 pipeline = Pipeline([pf1, pf2])
-pipeline.map(inputs={"a": 1, "b": 2, "x": 3, "y": 4})
+result = pipeline.map(inputs={"a": 1, "b": 2, "x": 3, "y": 4}, parallel=False)
+assert result["dataclass"].output == InputDataClass(a=1, b=2)
+assert result["pydantic"].output == PydanticModel(x=3, y=4)
 ```
 
 :::{admonition} Careful with ``default_factory``!
