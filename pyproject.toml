@@ -30,6 +30,7 @@ adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]
+ray = ["ray"]
 pandas = ["pandas"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
@@ -60,7 +61,7 @@ docs = [
     "nltk",
     "scikit-image",
 ]
-# all doesn't include 'pydantic' because there are no specific features that depend on it
+# all doesn't include 'ray' and 'pydantic'
 all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",

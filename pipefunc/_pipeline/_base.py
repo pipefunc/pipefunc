@@ -633,6 +633,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        use_ray: bool = False,
         storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -672,6 +673,10 @@ class Pipeline:
                - Use an empty string ``""`` as a key to set a default executor.
 
             If parallel is ``False``, this argument is ignored.
+        use_ray
+            Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
+            If ``True``, ``executor`` and ``parallel`` is ignored. Ray is not compatible with shared memory
+            based ``storage`` classes.
         storage
             The storage class to use for storing intermediate and final results.
             Can be specified as:
@@ -719,6 +724,7 @@ class Pipeline:
             output_names=output_names,
             parallel=parallel,
             executor=executor,
+            use_ray=use_ray,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,

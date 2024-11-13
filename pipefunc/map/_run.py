@@ -60,6 +60,7 @@ def run_map(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    use_ray: bool = False,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -101,6 +102,10 @@ def run_map(
            - Use an empty string ``""`` as a key to set a default executor.
 
         If parallel is ``False``, this argument is ignored.
+    use_ray
+        Whether to use `ray` for parallel execution. If ``True``, `ray` must be installed.
+        If ``True``, ``executor`` and ``parallel`` is ignored. Ray is not compatible with shared memory
+        based ``storage`` classes.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -147,7 +152,7 @@ def run_map(
     )
     if progress is not None:
         progress.display()
-    with _maybe_executor(executor, parallel) as ex:
+    with _maybe_executor(executor, parallel, use_ray) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
@@ -156,6 +161,7 @@ def run_map(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                use_ray=use_ray,
                 progress=progress,
                 cache=pipeline.cache,
             )
@@ -600,8 +606,15 @@ def _existing_and_missing_indices(
 def _maybe_executor(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
+    use_ray: bool = False,  # noqa: FBT001, FBT002
 ) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
-    if executor is None and parallel:
+    if use_ray:
+        import ray
+
+        if not ray.is_initialized():
+            ray.init(ignore_reinit_error=True)
+        yield None
+    elif executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
             yield {"": new_executor}
     else:
@@ -686,12 +699,15 @@ def _maybe_parallel_map(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
     progress: ProgressTracker | None,
+    use_ray: bool,  # noqa: FBT001
 ) -> list[Any]:
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         return [_submit(process_index, ex, status, progress, i) for i in indices]
+    if use_ray:
+        process_index = _ray_remote(process_index)  # type: ignore[assignment]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
@@ -721,17 +737,23 @@ def _maybe_execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    use_ray: bool,  # noqa: FBT001
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
+    if use_ray:  # noqa: SIM108
+        f = _ray_remote(_execute_single)  # type: ignore[assignment]
+    else:
+        f = _execute_single
+
     ex = _executor_for_func(func, executor)
     if ex:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
-        return _submit(_execute_single, ex, status, progress, *args)
+        return _submit(f, ex, status, progress, *args)
     if status is not None:
         assert progress is not None
-        return _wrap_with_status_update(_execute_single, status, progress)(*args)
-    return _execute_single(*args)
+        return _wrap_with_status_update(f, status, progress)(*args)
+    return f(*args)
 
 
 class _StoredValue(NamedTuple):
@@ -817,12 +839,14 @@ class _KwargsTask(NamedTuple):
 
 # NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    use_ray: bool,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -832,10 +856,11 @@ def _run_and_process_generation(
         store,
         fixed_indices,
         executor,
+        use_ray,
         progress,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs)
+    _process_generation(generation, tasks, store, outputs, use_ray)
 
 
 async def _run_and_process_generation_async(
@@ -855,8 +880,9 @@ async def _run_and_process_generation_async(
         store,
         fixed_indices,
         executor,
-        progress,
-        cache,
+        use_ray=False,
+        progress=progress,
+        cache=cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
     await _process_generation_async(generation, tasks, store, outputs)
@@ -868,9 +894,10 @@ def _process_generation(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    use_ray: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store)
+        _outputs = _process_task(func, tasks[func], store, use_ray)
         outputs.update(_outputs)
 
 
@@ -891,6 +918,7 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    use_ray: bool = False,  # noqa: FBT001, FBT002
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -898,10 +926,27 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(
+            func,
+            args.process_index,
+            args.missing,
+            executor,
+            status,
+            progress,
+            use_ray,
+        )
         task = r, args
     else:
-        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_execute_single(
+            executor,
+            status,
+            progress,
+            func,
+            kwargs,
+            store,
+            cache,
+            use_ray,
+        )
     return _KwargsTask(kwargs, task)
 
 
@@ -930,11 +975,12 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    use_ray: bool,  # noqa: FBT001
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
+        func: _submit_func(func, run_info, store, fixed_indices, executor, use_ray, progress, cache)
         for func in generation
     }
 
@@ -957,7 +1003,11 @@ def _output_from_mapspec_task(
     return tuple(x.reshape(args.shape) for x in args.result_arrays)
 
 
-def _result(x: Any | Future) -> Any:
+def _result(x: Any | Future, use_ray: bool) -> Any:  # noqa: FBT001
+    if use_ray:
+        import ray
+
+        return ray.get(x)  # type: ignore[arg-type]
     return x.result() if isinstance(x, Future) else x
 
 
@@ -989,14 +1039,15 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
+    use_ray: bool,  # noqa: FBT001
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = [_result(x) for x in r]
+        outputs_list = [_result(x, use_ray) for x in r]
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
-        r = _result(task)
+        r = _result(task, use_ray)
         output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
 
@@ -1018,3 +1069,14 @@ async def _process_task_async(
         r = await _result_async(task, loop)
         output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
+
+
+@functools.cache
+def _ray_remote(func: Callable[..., Any]) -> Callable[..., Any]:
+    import ray
+
+    if isinstance(func, functools.partial):
+        original_func = func.func
+        remote_func = ray.remote(original_func)
+        return functools.partial(remote_func.remote, *func.args, **func.keywords)
+    return ray.remote(func).remote
