@@ -20,7 +20,10 @@ from ._base import StorageBase, register_storage, select_by_mask
 
 
 class ZarrFileArray(StorageBase):
-    """Array interface to a Zarr store."""
+    """Array interface to a Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_file_array"
     requires_serialization = True
@@ -235,7 +238,10 @@ class _SharedDictStore(zarr.storage.KVStore):
 
 
 class ZarrMemoryArray(ZarrFileArray):
-    """Array interface to an in-memory Zarr store."""
+    """Array interface to an in-memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_memory"
     requires_serialization = False
@@ -291,7 +297,10 @@ class ZarrMemoryArray(ZarrFileArray):
 
 
 class ZarrSharedMemoryArray(ZarrMemoryArray):
-    """Array interface to a shared memory Zarr store."""
+    """Array interface to a shared memory Zarr store.
+
+    Only exists if the `zarr` package is installed!
+    """
 
     storage_id = "zarr_shared_memory"
     requires_serialization = True

@@ -107,6 +107,7 @@ if __name__ == "__main__":
         "profiling",
         "widgets",
         "xarray",
+        "pydantic",
         "zarr",
     )
     # Generate environment.yml

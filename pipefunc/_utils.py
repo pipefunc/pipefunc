@@ -10,13 +10,15 @@ import socket
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+    import pydantic
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -260,3 +262,13 @@ def is_min_version(package: str, version: str) -> bool:
     if installed_major == major and installed_minor == minor and installed_patch < patch:  # noqa: SIM103
         return False
     return True
+
+
+def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
+    if "pydantic" not in sys.modules:
+        return False
+    if not inspect.isclass(x):
+        return False
+    import pydantic
+
+    return issubclass(x, pydantic.BaseModel)
