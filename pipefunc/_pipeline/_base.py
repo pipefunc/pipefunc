@@ -1792,7 +1792,7 @@ class Pipeline:
     ) -> dict[str, str]:
         """Display the pipeline widget."""
         if is_running_in_ipynb() and is_installed("ipywidgets"):
-            from ._widgets.pipeline import PipelineWidget
+            from pipefunc._widgets.pipeline import PipelineWidget
 
             widget = PipelineWidget(self).tab
             return widget._repr_mimebundle_(include=include, exclude=exclude)
