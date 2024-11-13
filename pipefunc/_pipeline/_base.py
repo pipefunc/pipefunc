@@ -1782,6 +1782,99 @@ class Pipeline:
 
         return pipeline
 
+    @classmethod
+    def from_explicit_connections(cls, connections: dict[PipeFunc, set[PipeFunc]]) -> Pipeline:
+        """Create a pipeline from an explicit connections.
+
+        This function ensures that connections in the graph are as expected. In
+        case of mismatches, it raises a `ValueError` with the details of the mismatch.
+
+        Parameters
+        ----------
+        connections
+            A dictionary mapping functions to sets of functions that depend on them.
+
+        Returns
+        -------
+            A new pipeline with the functions and connections specified in the graph.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="c")
+        ... def f_c(a, b):
+        ...     return a + b
+
+        >>> @pipefunc(output_name="d")
+        ... def f_d(b, c, x=1):  # "c" is the output of f_c
+        ...     return b * c
+
+        >>> @pipefunc(output_name="e")
+        ... def f_e(c, d, x=1):  # "d" is the output of f_d
+        ...     return c * d * x
+
+        >>> graph = {f_c: [f_d, f_e], f_d: [f_e]}
+        >>> pipeline = Pipeline.from_explicit_graph(graph)
+
+        """
+        pipeline = cls([])
+        added = set()
+        added_edges: set[tuple[OUTPUT_TYPE, OUTPUT_TYPE]] = set()
+        for f, dependents in connections.items():
+            if f not in added:
+                pipeline.add(f)
+                added.add(f)
+            for dependent in dependents:
+                added_edges.add((f.output_name, dependent.output_name))
+                if dependent not in added:
+                    pipeline.add(dependent)
+                    added.add(dependent)
+        # We're first keeping the output names as the functions themselves are
+        # copied when calling `add`. Then we get the actual functions in the pipeline.
+        expected_nodes = {pipeline.output_to_func[f.output_name] for f in added}
+        expected_edges = {
+            (pipeline.output_to_func[u], pipeline.output_to_func[v]) for u, v in added_edges
+        }
+
+        # Now check that the connections are as in the provided graph
+        nodes = {n for n in pipeline.graph.nodes if isinstance(n, PipeFunc)}
+        edges = {
+            (u, v)
+            for u, v in pipeline.graph.edges
+            if isinstance(u, PipeFunc) and isinstance(v, PipeFunc)
+        }
+
+        # Check for node mismatches
+        if nodes != expected_nodes:
+            extra_nodes = nodes - expected_nodes
+            msg = (
+                "Node Mismatch Found:\n"
+                "-------------------\n"
+                "Expected Nodes:\n"
+                f"{expected_nodes}\n\n"
+                "Actual Nodes:\n"
+                f"{nodes}\n\n"
+                "Extra Nodes:\n"
+                f"{extra_nodes}"
+            )
+            raise ValueError(msg)
+
+        # Check for edge mismatches
+        if edges != expected_edges:
+            extra_edges = edges - expected_edges
+            msg = (
+                "Edge Mismatch Found:\n"
+                "-------------------\n"
+                "Expected Edges:\n"
+                f"{expected_edges}\n\n"
+                "Actual Edges:\n"
+                f"{edges}\n\n"
+                "Extra Edges:\n"
+                f"{extra_edges}"
+            )
+            raise ValueError(msg)
+
+        return pipeline
+
 
 class Generations(NamedTuple):
     root_args: list[str]

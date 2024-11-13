@@ -763,6 +763,31 @@ def test_invalid_type_hints():
         Pipeline([f, g])
 
 
+def test_from_nodes_and_edges():
+    @pipefunc(output_name="c")
+    def f_c(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f_d(b, c, x=1):  # "c" is the output of f_c
+        return b * c
+
+    @pipefunc(output_name="e")
+    def f_e(c, d, x=1):  # "d" is the output of f_d
+        return c * d * x
+
+    graph = {f_c: [f_d, f_e], f_d: [f_e]}
+    pipeline = Pipeline.from_explicit_connections(graph)
+    assert pipeline(a=1, b=2) == 18
+
+    with pytest.raises(
+        ValueError,
+        match="Edge Mismatch Found",
+    ):
+        # Missing the connection between f_d and f_e
+        Pipeline.from_explicit_connections({f_c: [f_d, f_e]})
+
+
 class Unpicklable:
     def __init__(self, a) -> None:
         self.a = a

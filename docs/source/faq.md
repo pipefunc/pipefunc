@@ -697,6 +697,57 @@ There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive s
 Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
 See [this tutorial](adaptive.md) for a detailed example of how to use `adaptive` with `pipefunc`.
 
+## How can I build a pipeline with explicit connections and verify them?
+
+You can create a `Pipeline` from a set of explicitly defined connections using the {class}`~pipeline.Pipeline.from_explicit_connections` class method.
+This method not only builds the pipeline based on the provided connections but also verifies that the pipeline’s graph matches the expected structure derived from these connections.
+
+This feature is particularly useful for those who want to ensure that their pipeline's structure is precisely as they expect, without relying solely on the auto-connection feature.
+
+**How Does It Work?**
+
+When you provide a dictionary of connections, `from_explicit_connections` will:
+
+1. Construct the pipeline according to the specified connections.
+2. Ensure that every function and connection (edge) in the pipeline is exactly as you defined.
+3. If there is any mismatch in nodes or connections (edges), an error will be raised with a detailed message indicating the discrepancies.
+
+This allows for precise control over the pipeline's structure, making sure that each function is connected exactly as intended.
+This might be especially important in complex workflows where the accuracy of connections is critical.
+
+**Example Usage:**
+
+```python
+from pipefunc import pipefunc, Pipeline
+
+@pipefunc(output_name="c")
+def f_c(a, b):
+    return a + b
+
+@pipefunc(output_name="d")
+def f_d(b, c, x=1):
+    return b * c
+
+@pipefunc(output_name="e")
+def f_e(c, d, x=1):
+    return c * d * x
+
+# Define connections explicitly
+connections = {
+    f_c: {f_d, f_e},
+    f_d: {f_e}
+}
+
+# Create a pipeline from explicit connections
+pipeline = Pipeline.from_explicit_connections(connections)
+```
+
+**Why Use This Method?**
+
+- **Exact Control**: You may prefer explicit connections when you need to guarantee the pipeline's structure—ensuring it precisely mirrors your expectations.
+- **Verification**: If there's any discrepancy between what you intend and what the pipeline builds, the method will immediately raise an error, allowing you to catch mistakes early.
+- **Complex Workflows**: In complex or critical workflows, explicit connections help avoid issues related to unintended auto-connections.
+
 ## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
 
 PipeFunc can also be used with the `adaptive_scheduler` package to run the pipeline on a cluster.
