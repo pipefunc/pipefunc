@@ -1,61 +1,72 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import itertools
-import tempfile
 import time
-from collections import OrderedDict, defaultdict
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, load, prod
-from pipefunc.cache import HybridCache, to_hashable
-from pipefunc.map._mapspec import (
-    MapSpec,
-    _shape_to_key,
-    validate_consistent_axes,
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
 )
-from pipefunc.map._run_info import RunInfo, _external_shape, _internal_shape, _load_input
-from pipefunc.map._storage_base import StorageBase, _iterate_shape_indices, _select_by_mask
+from pipefunc.cache import HybridCache, to_hashable
+
+from ._adaptive_scheduler_slurm_executor import (
+    maybe_finalize_slurm_executors,
+    maybe_multi_run_manager,
+    maybe_update_slurm_executor_map,
+    maybe_update_slurm_executor_single,
+)
+from ._mapspec import MapSpec, _shape_to_key
+from ._prepare import prepare_run
+from ._result import DirectValue, Result
+from ._shapes import external_shape_from_mask, internal_shape_from_mask
+from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Sequence
+    from collections import OrderedDict
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
-    import xarray as xr
+    from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
-
-_OUTPUT_TYPE: TypeAlias = str | tuple[str, ...]
-
-
-def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
-    return all(f.mapspec is None for f in pipeline.functions) and all(
-        len(fs) == 1 for fs in pipeline.topological_generations.function_lists
-    )
+    from ._progress import Status
+    from ._result import StoreType
+    from ._run_info import RunInfo
+    from ._types import UserShapeDict
 
 
-def run(
+def run_map(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: str | Path | None = None,
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
     *,
-    output_names: set[_OUTPUT_TYPE] | None = None,
+    output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
-    executor: Executor | None = None,
-    storage: str = "file_array",
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-) -> dict[str, Result]:
+    show_progress: bool = False,
+) -> OrderedDict[str, Result]:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -68,21 +79,40 @@ def run(
         corresponding input data, these are either single values for functions without ``mapspec``
         or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
     run_folder
-        The folder to store the run information. If ``None``, a temporary folder
-        is created.
+        The folder to store the run information. If ``None``, either a temporary folder
+        is created or no folder is used, depending on whether the storage class requires serialization.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
         You will receive an exception if the shapes cannot be inferred and need to be provided.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+        If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
-        Whether to run the functions in parallel.
+        Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
-        The executor to use for parallel execution. If ``None``, a `ProcessPoolExecutor`
-        is used. Only relevant if ``parallel=True``.
+        The executor to use for parallel execution. Can be specified as:
+
+        1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+
+           - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+           - Use an empty string ``""`` as a key to set a default executor.
+
+        If parallel is ``False``, this argument is ignored.
     storage
-        The storage class to use for the file arrays.
-        Can use any registered storage class. See `pipefunc.map.storage_registry`.
+        The storage class to use for storing intermediate and final results.
+        Can be specified as:
+
+        1. A string: Use a single storage class for all outputs.
+        2. A dictionary: Specify different storage classes for different outputs.
+
+           - Use output names as keys and storage class names as values.
+           - Use an empty string ``""`` as a key to set a default storage class.
+
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -96,30 +126,27 @@ def run(
         `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
+    show_progress
+        Whether to display a progress bar. Only works if ``parallel=True``.
 
     """
-    inputs = pipeline._flatten_scopes(inputs)
-    if auto_subpipeline or output_names is not None:
-        pipeline = pipeline.subpipeline(set(inputs), output_names)
-    _validate_complete_inputs(pipeline, inputs)
-    validate_consistent_axes(pipeline.mapspecs(ordered=False))
-    _validate_fixed_indices(fixed_indices, inputs, pipeline)
-    run_folder = _ensure_run_folder(run_folder)
-    run_info = RunInfo.create(
-        run_folder,
-        pipeline,
-        inputs,
-        internal_shapes,
+    pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
+        pipeline=pipeline,
+        inputs=inputs,
+        run_folder=run_folder,
+        internal_shapes=internal_shapes,
+        output_names=output_names,
+        parallel=parallel,
+        executor=executor,
         storage=storage,
         cleanup=cleanup,
+        fixed_indices=fixed_indices,
+        auto_subpipeline=auto_subpipeline,
+        show_progress=show_progress,
+        in_async=False,
     )
-    run_info.dump(run_folder)
-    outputs: dict[str, Result] = OrderedDict()
-    store = run_info.init_store()
-    if _cannot_be_parallelized(pipeline):
-        parallel = False
-    _check_parallel(parallel, store)
-
+    if progress is not None:
+        progress.display()
     with _maybe_executor(executor, parallel) as ex:
         for gen in pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -129,116 +156,222 @@ def run(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                progress=progress,
                 cache=pipeline.cache,
             )
-
-    if persist_memory:  # Only relevant for memory based storage
-        for arr in store.values():
-            arr.persist()
-
+    if progress is not None:  # final update
+        progress.update_progress(force=True)
+    _maybe_persist_memory(store, persist_memory)
     return outputs
 
 
-class Result(NamedTuple):
-    function: str
-    kwargs: dict[str, Any]
-    output_name: str
-    output: Any
-    store: StorageBase | None
-    run_folder: Path
+class AsyncMap(NamedTuple):
+    task: asyncio.Task[OrderedDict[str, Result]]
+    run_info: RunInfo
+    progress: ProgressTracker | None
+    multi_run_manager: MultiRunManager | None
+
+    def result(self) -> OrderedDict[str, Result]:
+        if is_running_in_ipynb():  # pragma: no cover
+            if self.task.done():
+                return self.task.result()
+            msg = (
+                "Cannot block the event loop when running in a Jupyter notebook."
+                " Use `await runner.task` instead."
+            )
+            raise RuntimeError(msg)
+
+        loop = asyncio.get_event_loop()  # pragma: no cover
+        return loop.run_until_complete(self.task)  # pragma: no cover
+
+    def display(self) -> None:  # pragma: no cover
+        """Display the pipeline widget."""
+        if is_running_in_ipynb():
+            if self.progress is not None:
+                self.progress.display()
+            if self.multi_run_manager is not None:
+                self.multi_run_manager.display()
+        else:
+            print("⚠️ Display is only supported in Jupyter notebooks.")
 
 
-def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
-    """Load the outputs of a run."""
-    run_folder = Path(run_folder)
-    run_info = RunInfo.load(run_folder)
-    outputs = [
-        _load_parameter(output_name, run_info, run_info.init_store())
-        for output_name in output_names
-    ]
-    outputs = [_maybe_load_file_array(o) for o in outputs]
-    return outputs[0] if len(output_names) == 1 else outputs
+def run_map_async(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: str | Path | None = None,
+    internal_shapes: UserShapeDict | None = None,
+    *,
+    output_names: set[OUTPUT_TYPE] | None = None,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    persist_memory: bool = True,
+    cleanup: bool = True,
+    fixed_indices: dict[str, int | slice] | None = None,
+    auto_subpipeline: bool = False,
+    show_progress: bool = False,
+) -> AsyncMap:
+    """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
-
-def load_xarray_dataset(
-    *output_name: str,
-    run_folder: str | Path,
-    load_intermediate: bool = True,
-) -> xr.Dataset:
-    """Load the output(s) of a `pipeline.map` as an `xarray.Dataset`.
+    Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
 
     Parameters
     ----------
-    output_name
-        The names of the outputs to load. If empty, all outputs are loaded.
+    pipeline
+        The pipeline to run.
+    inputs
+        The inputs to the pipeline. The keys should be the names of the input
+        parameters of the pipeline functions and the values should be the
+        corresponding input data, these are either single values for functions without ``mapspec``
+        or lists of values or `numpy.ndarray`s for functions with ``mapspec``.
     run_folder
-        The folder where the pipeline run was stored.
-    load_intermediate
-        Whether to load intermediate outputs as coordinates.
+        The folder to store the run information. If ``None``, either a temporary folder
+        is created or no folder is used, depending on whether the storage class requires serialization.
+    internal_shapes
+        The shapes for intermediary outputs that cannot be inferred from the inputs.
+        You will receive an exception if the shapes cannot be inferred and need to be provided.
+        The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
+        If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
+    output_names
+        The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+    executor
+        The executor to use for parallel execution. Can be specified as:
 
-    Returns
-    -------
-        An `xarray.Dataset` containing the outputs of the pipeline run.
+        1. ``None``: A `concurrent.futures.ProcessPoolExecutor` is used (only if ``parallel=True``).
+        2. A `concurrent.futures.Executor` instance: Used for all outputs.
+        3. A dictionary: Specify different executors for different outputs.
+
+           - Use output names as keys and `~concurrent.futures.Executor` instances as values.
+           - Use an empty string ``""`` as a key to set a default executor.
+    storage
+        The storage class to use for storing intermediate and final results.
+        Can be specified as:
+
+        1. A string: Use a single storage class for all outputs.
+        2. A dictionary: Specify different storage classes for different outputs.
+
+           - Use output names as keys and storage class names as values.
+           - Use an empty string ``""`` as a key to set a default storage class.
+
+        Available storage classes are registered in `pipefunc.map.storage_registry`.
+        Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+    persist_memory
+        Whether to write results to disk when memory based storage is used.
+        Does not have any effect when file based storage is used.
+    cleanup
+        Whether to clean up the ``run_folder`` before running the pipeline.
+    fixed_indices
+        A dictionary mapping axes names to indices that should be fixed for the run.
+        If not provided, all indices are iterated over.
+    auto_subpipeline
+        If ``True``, a subpipeline is created with the specified ``inputs``, using
+        `Pipeline.subpipeline`. This allows to provide intermediate results in the ``inputs`` instead
+        of providing the root arguments. If ``False``, all root arguments must be provided,
+        and an exception is raised if any are missing.
+    show_progress
+        Whether to display a progress bar.
 
     """
-    from pipefunc.map.xarray import load_xarray_dataset
-
-    run_info = RunInfo.load(run_folder)
-    return load_xarray_dataset(
-        run_info.mapspecs,
-        run_info.inputs,
+    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
+        pipeline=pipeline,
+        inputs=inputs,
         run_folder=run_folder,
-        output_names=output_name,  # type: ignore[arg-type]
-        load_intermediate=load_intermediate,
+        internal_shapes=internal_shapes,
+        output_names=output_names,
+        parallel=True,
+        executor=executor,
+        storage=storage,
+        cleanup=cleanup,
+        fixed_indices=fixed_indices,
+        auto_subpipeline=auto_subpipeline,
+        show_progress=show_progress,
+        in_async=True,
     )
 
+    multi_run_manager = maybe_multi_run_manager(executor_dict)
 
-def _output_path(output_name: str, run_folder: Path) -> Path:
-    return run_folder / "outputs" / f"{output_name}.cloudpickle"
+    async def _run_pipeline() -> OrderedDict[str, Result]:
+        with _maybe_executor(executor_dict, parallel=True) as ex:
+            assert ex is not None
+            for gen in pipeline.topological_generations.function_lists:
+                await _run_and_process_generation_async(
+                    generation=gen,
+                    run_info=run_info,
+                    store=store,
+                    outputs=outputs,
+                    fixed_indices=fixed_indices,
+                    executor=ex,
+                    progress=progress,
+                    cache=pipeline.cache,
+                    multi_run_manager=multi_run_manager,
+                )
+        _maybe_persist_memory(store, persist_memory)
+        return outputs
+
+    task = asyncio.create_task(_run_pipeline())
+    if progress is not None:
+        progress.attach_task(task)
+    if is_running_in_ipynb():  # pragma: no cover
+        if progress is not None:
+            progress.display()
+        if multi_run_manager is not None:
+            multi_run_manager.display()
+    return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
-def _dump_output(func: PipeFunc, output: Any, run_folder: Path) -> tuple[Any, ...]:
-    folder = run_folder / "outputs"
-    folder.mkdir(parents=True, exist_ok=True)
+def _maybe_persist_memory(
+    store: dict[str, StoreType],
+    persist_memory: bool,  # noqa: FBT001
+) -> None:
+    if persist_memory:  # Only relevant for memory based storage
+        for arr in store.values():
+            if isinstance(arr, StorageBase):
+                arr.persist()
 
+
+def _dump_single_output(
+    func: PipeFunc,
+    output: Any,
+    store: dict[str, StoreType],
+) -> tuple[Any, ...]:
     if isinstance(func.output_name, tuple):
         new_output = []  # output in same order as func.output_name
         for output_name in func.output_name:
             assert func.output_picker is not None
             _output = func.output_picker(output, output_name)
             new_output.append(_output)
-            path = _output_path(output_name, run_folder)
-            dump(_output, path)
+            _single_dump_single_output(_output, output_name, store)
         return tuple(new_output)
-    path = _output_path(func.output_name, run_folder)
-    dump(output, path)
+    _single_dump_single_output(output, func.output_name, store)
     return (output,)
 
 
-def _load_output(output_name: str, run_folder: Path) -> Any:
-    path = _output_path(output_name, run_folder)
-    return load(path)
-
-
-def _load_parameter(parameter: str, run_info: RunInfo, store: dict[str, StorageBase]) -> Any:
-    if parameter in run_info.input_paths:
-        return _load_input(parameter, run_info.input_paths)
-    if parameter not in run_info.shapes or not any(run_info.shape_masks[parameter]):
-        return _load_output(parameter, run_info.run_folder)
-    return store[parameter]
+def _single_dump_single_output(
+    output: Any,
+    output_name: str,
+    store: dict[str, StoreType],
+) -> None:
+    storage = store[output_name]
+    assert not isinstance(storage, StorageBase)
+    if isinstance(storage, Path):
+        dump(output, path=storage)
+    else:
+        assert isinstance(storage, DirectValue)
+        storage.value = output
 
 
 def _func_kwargs(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StoreType],
 ) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
             kwargs[p] = func._bound[p]
-        elif p in run_info.input_paths or p in run_info.all_output_names:
-            kwargs[p] = _load_parameter(p, run_info, store)
+        elif p in run_info.inputs:
+            kwargs[p] = run_info.inputs[p]
+        elif p in run_info.all_output_names:
+            kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
         else:  # pragma: no cover
@@ -257,15 +390,37 @@ def _select_kwargs(
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
-    external_shape = _external_shape(shape, shape_mask)
+    external_shape = external_shape_from_mask(shape, shape_mask)
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_file_array(selected)
+    _load_arrays(selected)
     return selected
 
 
-def _init_result_arrays(output_name: _OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
+def _maybe_eval_resources_in_selected(
+    kwargs: dict[str, Any],
+    selected: dict[str, Any],
+    func: PipeFunc,
+) -> None:
+    if callable(func.resources):  # type: ignore[has-type]
+        kw = kwargs if func.resources_scope == "map" else selected
+        selected[_EVALUATED_RESOURCES] = func.resources(kw)  # type: ignore[has-type]
+
+
+def _select_kwargs_and_eval_resources(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    shape: tuple[int, ...],
+    shape_mask: tuple[bool, ...],
+    index: int,
+) -> dict[str, Any]:
+    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
+    _maybe_eval_resources_in_selected(kwargs, selected, func)
+    return selected
+
+
+def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -303,17 +458,10 @@ _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 def _run_iteration(
     func: PipeFunc,
-    kwargs: dict[str, Any],
-    shape: tuple[int, ...],
-    shape_mask: tuple[bool, ...],
-    index: int,
+    selected: dict[str, Any],
     cache: _CacheBase | None,
 ) -> Any:
-    selected = _select_kwargs(func, kwargs, shape, shape_mask, index)
-
     def compute_fn() -> Any:
-        if callable(func.resources) and func.mapspec is not None and func.resources_scope == "map":  # type: ignore[has-type]
-            selected[_EVALUATED_RESOURCES] = func.resources(kwargs)  # type: ignore[has-type]
         try:
             return func(**selected)
         except Exception as e:
@@ -330,28 +478,51 @@ def _run_iteration_and_process(
     kwargs: dict[str, Any],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
-    file_arrays: Sequence[StorageBase],
+    arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
+    *,
+    force_dump: bool = False,
 ) -> tuple[Any, ...]:
-    output = _run_iteration(func, kwargs, shape, shape_mask, index, cache)
+    selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
+    output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_file_array(func, file_arrays, shape, shape_mask, index, outputs)
+    _update_array(
+        func,
+        arrays,
+        shape,
+        shape_mask,
+        index,
+        outputs,
+        in_post_process=False,
+        force_dump=force_dump,
+    )
     return outputs
 
 
-def _update_file_array(
+def _update_array(
     func: PipeFunc,
-    file_arrays: Sequence[StorageBase],
+    arrays: Sequence[StorageBase],
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     index: int,
-    outputs: tuple[Any, ...],
+    outputs: Iterable[Any],
+    *,
+    in_post_process: bool,
+    force_dump: bool = False,  # Only true in `adaptive.py`
 ) -> None:
+    # This function is called both in the main process (in post processing) and in the executor process.
+    # It needs to only dump the data once.
+    # If the data can be written during the function call inside the executor (e.g., a file array),
+    # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
+    # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
-    external_shape = _external_shape(shape, shape_mask)
-    output_key = func.mapspec.output_key(external_shape, index)
-    for file_array, _output in zip(file_arrays, outputs):
-        file_array.dump(output_key, _output)
+    output_key = None
+    for array, _output in zip(arrays, outputs):
+        if force_dump or (array.dump_in_subprocess != in_post_process):
+            if output_key is None:  # Only calculate the output key if needed
+                external_shape = external_shape_from_mask(shape, shape_mask)
+                output_key = func.mapspec.output_key(external_shape, index)
+            array.dump(output_key, _output)
 
 
 def _indices_to_flat_index(
@@ -361,8 +532,8 @@ def _indices_to_flat_index(
     external_index: tuple[int, ...],
     internal_index: tuple[int, ...],
 ) -> np.int_:
-    full_index = _select_by_mask(shape_mask, external_index, internal_index)
-    full_shape = _select_by_mask(shape_mask, shape, internal_shape)
+    full_index = select_by_mask(shape_mask, external_index, internal_index)
+    full_shape = select_by_mask(shape_mask, shape, internal_shape)
     return np.ravel_multi_index(full_index, full_shape)
 
 
@@ -373,11 +544,11 @@ def _set_output(
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
 ) -> None:
-    external_shape = _external_shape(shape, shape_mask)
-    internal_shape = _internal_shape(shape, shape_mask)
+    external_shape = external_shape_from_mask(shape, shape_mask)
+    internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
     assert np.shape(output) == internal_shape
-    for internal_index in _iterate_shape_indices(internal_shape):
+    for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
             internal_shape,
@@ -404,12 +575,12 @@ def _update_result_array(
 
 
 def _existing_and_missing_indices(
-    file_arrays: list[StorageBase],
+    arrays: list[StorageBase],
     fixed_mask: np.flatiter[npt.NDArray[np.bool_]] | None,
 ) -> tuple[list[int], list[int]]:
     # TODO: when `fixed_indices` are used we could be more efficient by not
     # computing the full mask.
-    masks = (arr.mask_linear() for arr in file_arrays)
+    masks = (arr.mask_linear() for arr in arrays)
     if fixed_mask is None:
         fixed_mask = itertools.repeat(object=True)  # type: ignore[assignment]
 
@@ -427,12 +598,12 @@ def _existing_and_missing_indices(
 
 @contextmanager
 def _maybe_executor(
-    executor: Executor | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
     parallel: bool,  # noqa: FBT001
-) -> Generator[Executor | None, None, None]:
+) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
-            yield new_executor
+            yield {"": new_executor}
     else:
         yield executor
 
@@ -444,21 +615,21 @@ class _MapSpecArgs(NamedTuple):
     result_arrays: list[np.ndarray]
     shape: tuple[int, ...]
     mask: tuple[bool, ...]
-    file_arrays: list[StorageBase]
+    arrays: list[StorageBase]
 
 
 def _prepare_submit_map_spec(
     func: PipeFunc,
     kwargs: dict[str, Any],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
-    file_arrays = [store[name] for name in at_least_tuple(func.output_name)]
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
@@ -466,12 +637,12 @@ def _prepare_submit_map_spec(
         kwargs=kwargs,
         shape=shape,
         shape_mask=mask,
-        file_arrays=file_arrays,
+        arrays=arrays,
         cache=cache,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
-    existing, missing = _existing_and_missing_indices(file_arrays, fixed_mask)  # type: ignore[arg-type]
-    return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, file_arrays)
+    existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
+    return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, arrays)
 
 
 def _mask_fixed_axes(
@@ -483,59 +654,139 @@ def _mask_fixed_axes(
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
-    external_key = _external_shape(key, shape_mask)  # type: ignore[arg-type]
-    external_shape = _external_shape(shape, shape_mask)
+    external_key = external_shape_from_mask(key, shape_mask)  # type: ignore[arg-type]
+    external_shape = external_shape_from_mask(shape, shape_mask)
     select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
     select[external_key] = True
     return select.flat
 
 
-def _maybe_parallel_map(func: Callable[..., Any], seq: Sequence, executor: Executor | None) -> Any:
-    if executor is not None:
-        return executor.map(func, seq)
-    return map(func, seq)
-
-
-def _maybe_submit(func: Callable[..., Any], executor: Executor | None, *args: Any) -> Any:
-    if executor:
+def _submit(
+    func: Callable[..., Any],
+    executor: Executor,
+    status: Status | None,
+    progress: ProgressTracker | None,
+    *args: Any,
+) -> Future:
+    if status is None:
         return executor.submit(func, *args)
-    return func(*args)
+    assert progress is not None
+    status.mark_in_progress()
+    fut = executor.submit(func, *args)
+    fut.add_done_callback(status.mark_complete)
+    if not progress.in_async:
+        fut.add_done_callback(progress.update_progress)
+    return fut
 
 
-def _maybe_load_single_output(
+def _maybe_parallel_map(
     func: PipeFunc,
-    run_folder: Path,
-    *,
-    return_output: bool = True,
-) -> tuple[Any, bool]:
-    """Load the output if it exists.
-
-    Returns the output and a boolean indicating whether the output exists.
-    """
-    output_paths = [_output_path(p, run_folder) for p in at_least_tuple(func.output_name)]
-    if all(p.is_file() for p in output_paths):
-        if not return_output:
-            return None, True
-        outputs = [load(p) for p in output_paths]
-        if isinstance(func.output_name, tuple):
-            return outputs, True
-        return outputs[0], True
-    return None, False
+    process_index: functools.partial[tuple[Any, ...]],
+    indices: list[int],
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    status: Status | None,
+    progress: ProgressTracker | None,
+) -> list[Any]:
+    ex = _executor_for_func(func, executor)
+    if ex is not None:
+        assert executor is not None
+        ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
+        return [_submit(process_index, ex, status, progress, i) for i in indices]
+    if status is not None:
+        assert progress is not None
+        process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
+    return [process_index(i) for i in indices]
 
 
-def _submit_single(
+def _wrap_with_status_update(
+    func: Callable[..., Any],
+    status: Status,
+    progress: ProgressTracker,
+) -> Callable[..., Any]:
+    def wrapped(*args: Any) -> Any:
+        status.mark_in_progress()
+        result = func(*args)
+        status.mark_complete()
+        progress.update_progress()
+        return result
+
+    return wrapped
+
+
+def _maybe_execute_single(
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    status: Status | None,
+    progress: ProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    run_folder: Path,
+    store: dict[str, StoreType],
+    cache: _CacheBase | None,
+) -> Any:
+    args = (func, kwargs, store, cache)  # args for _execute_single
+    ex = _executor_for_func(func, executor)
+    if ex:
+        assert executor is not None
+        ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
+        return _submit(_execute_single, ex, status, progress, *args)
+    if status is not None:
+        assert progress is not None
+        return _wrap_with_status_update(_execute_single, status, progress)(*args)
+    return _execute_single(*args)
+
+
+class _StoredValue(NamedTuple):
+    value: Any
+    exists: bool
+
+
+def _load_from_store(
+    output_name: OUTPUT_TYPE,
+    store: dict[str, StoreType],
+    *,
+    return_output: bool = True,
+) -> _StoredValue:
+    outputs: list[Any] = []
+    all_exist = True
+
+    for name in at_least_tuple(output_name):
+        storage = store[name]
+        if isinstance(storage, StorageBase):
+            outputs.append(storage)
+        elif isinstance(storage, Path):
+            if storage.is_file():
+                outputs.append(load(storage) if return_output else None)
+            else:
+                all_exist = False
+                outputs.append(None)
+        else:
+            assert isinstance(storage, DirectValue)
+            if storage.exists():
+                outputs.append(storage.value)
+            else:
+                all_exist = False
+                outputs.append(None)
+
+    if not return_output:
+        outputs = None  # type: ignore[assignment]
+    elif len(outputs) == 1:
+        outputs = outputs[0]
+
+    return _StoredValue(outputs, all_exist)
+
+
+def _execute_single(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
     # Load the output if it exists
-    output, exists = _maybe_load_single_output(func, run_folder)
+    output, exists = _load_from_store(func.output_name, store, return_output=True)
     if exists:
         return output
 
     # Otherwise, run the function
-    _load_file_array(kwargs)
+    _load_arrays(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -548,22 +799,15 @@ def _submit_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_file_array(x: Any) -> Any:
+def _maybe_load_array(x: Any) -> Any:
     if isinstance(x, StorageBase):
         return x.to_array()
     return x
 
 
-def _load_file_array(kwargs: dict[str, Any]) -> None:
+def _load_arrays(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_file_array(v)
-
-
-def _ensure_run_folder(run_folder: str | Path | None) -> Path:
-    if run_folder is None:
-        tmp_dir = tempfile.mkdtemp()
-        run_folder = Path(tmp_dir)
-    return Path(run_folder)
+        kwargs[k] = _maybe_load_array(v)
 
 
 class _KwargsTask(NamedTuple):
@@ -571,179 +815,206 @@ class _KwargsTask(NamedTuple):
     task: tuple[Any, _MapSpecArgs] | Any
 
 
+# NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StoreType],
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
-    tasks: dict[PipeFunc, _KwargsTask] = {}
+    tasks = _submit_generation(
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
+    )
+    _process_generation(generation, tasks, store, outputs)
+
+
+async def _run_and_process_generation_async(
+    generation: list[PipeFunc],
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+    outputs: dict[str, Result],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: dict[OUTPUT_TYPE, Executor],
+    progress: ProgressTracker | None,
+    cache: _CacheBase | None = None,
+    multi_run_manager: MultiRunManager | None = None,
+) -> None:
+    tasks = _submit_generation(
+        run_info,
+        generation,
+        store,
+        fixed_indices,
+        executor,
+        progress,
+        cache,
+    )
+    maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
+    await _process_generation_async(generation, tasks, store, outputs)
+
+
+# NOTE: A similar async version of this function is provided below.
+def _process_generation(
+    generation: list[PipeFunc],
+    tasks: dict[PipeFunc, _KwargsTask],
+    store: dict[str, StoreType],
+    outputs: dict[str, Result],
+) -> None:
     for func in generation:
-        tasks[func] = _submit_func(func, run_info, store, fixed_indices, executor, cache)
+        _outputs = _process_task(func, tasks[func], store)
+        outputs.update(_outputs)
+
+
+async def _process_generation_async(
+    generation: list[PipeFunc],
+    tasks: dict[PipeFunc, _KwargsTask],
+    store: dict[str, StoreType],
+    outputs: dict[str, Result],
+) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], run_info.run_folder, store, executor)
+        _outputs = await _process_task_async(func, tasks[func], store)
         outputs.update(_outputs)
 
 
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
-    store: dict[str, StorageBase],
+    store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
-    executor: Executor | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
-        r = _maybe_parallel_map(args.process_index, args.missing, executor)
+        r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_submit(_submit_single, executor, func, kwargs, run_info.run_folder, cache)
+        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
-def _process_task(
+def _executor_for_func(
     func: PipeFunc,
-    kwargs_task: _KwargsTask,
-    run_folder: Path,
-    store: dict[str, StorageBase],
-    executor: Executor | None = None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+) -> Executor | None:
+    if executor is None:
+        return None
+    if func.output_name in executor:
+        return executor[func.output_name]
+    if "" in executor:
+        return executor[""]
+    msg = (
+        f"No executor found for output `{func.output_name}`."
+        f" Please either specify an executor for this output using"
+        f" `executor['{func.output_name}'] = ...`, or provide a default executor"
+        f' using `executor[""] = ...`.'
+    )
+    raise ValueError(msg)
+
+
+def _submit_generation(
+    run_info: RunInfo,
+    generation: list[PipeFunc],
+    store: dict[str, StoreType],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    progress: ProgressTracker | None,
+    cache: _CacheBase | None = None,
+) -> dict[PipeFunc, _KwargsTask]:
+    return {
+        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
+        for func in generation
+    }
+
+
+def _output_from_mapspec_task(
+    func: PipeFunc,
+    store: dict[str, StoreType],
+    args: _MapSpecArgs,
+    outputs_list: list[list[Any]],
+) -> tuple[np.ndarray, ...]:
+    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    for index, outputs in zip(args.missing, outputs_list):
+        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
+
+    for index in args.existing:
+        outputs = [array.get_from_index(index) for array in args.arrays]
+        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
+
+    return tuple(x.reshape(args.shape) for x in args.result_arrays)
+
+
+def _result(x: Any | Future) -> Any:
+    return x.result() if isinstance(x, Future) else x
+
+
+def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
+    return asyncio.wrap_future(task, loop=loop)
+
+
+def _to_result_dict(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    output: tuple[Any, ...],
+    store: dict[str, StoreType],
 ) -> dict[str, Result]:
-    kwargs, task = kwargs_task
-    if func.mapspec and func.mapspec.inputs:
-        r, args = task
-        outputs_list = list(r)
-
-        for index, outputs in zip(args.missing, outputs_list):
-            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-
-        for index in args.existing:
-            outputs = [file_array.get_from_index(index) for file_array in args.file_arrays]
-            _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-
-        output = tuple(x.reshape(args.shape) for x in args.result_arrays)
-    else:
-        r = task.result() if executor else task  # type: ignore[union-attr]
-        output = _dump_output(func, r, run_folder)
-
-    # Note that the kwargs still contain the StorageBase objects if _submit_map_spec
-    # was used.
+    # Note that the kwargs still contain the StorageBase objects if mapspec was used.
     return {
         output_name: Result(
             function=func.__name__,
             kwargs=kwargs,
             output_name=output_name,
             output=_output,
-            store=store.get(output_name),
-            run_folder=run_folder,
+            store=store[output_name],
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
 
 
-def _check_parallel(parallel: bool, store: dict[str, StorageBase]) -> None:  # noqa: FBT001
-    if not parallel or not store:
-        return
-    # Assumes all storage classes are the same! Might change in the future.
-    storage = next(iter(store.values()))
-    if not storage.parallelizable:
-        msg = (
-            f"Parallel execution is not supported with `{storage.storage_id}` storage."
-            " Use a file based storage or `shared_memory` / `zarr_shared_memory`."
-        )
-        raise ValueError(msg)
-
-
-def _validate_complete_inputs(pipeline: Pipeline, inputs: dict[str, Any]) -> None:
-    """Validate that all required inputs are provided.
-
-    Note that `output_name is None` means that all outputs are required!
-    This is in contrast to some other functions, where ``None`` means that the
-    `pipeline.unique_leaf_node` is used.
-    """
-    root_args = set(pipeline.topological_generations.root_args)
-    inputs_with_defaults = set(inputs) | set(pipeline.defaults)
-    if missing := root_args - set(inputs_with_defaults):
-        missing_args = ", ".join(missing)
-        msg = f"Missing inputs: `{missing_args}`."
-        raise ValueError(msg)
-    if extra := set(inputs_with_defaults) - root_args:
-        extra_args = ", ".join(extra)
-        msg = f"Got extra inputs: `{extra_args}` that are not accepted by this pipeline."
-        raise ValueError(msg)
-
-
-def _validate_fixed_indices(
-    fixed_indices: dict[str, int | slice] | None,
-    inputs: dict[str, Any],
-    pipeline: Pipeline,
-) -> None:
-    if fixed_indices is None:
-        return
-    extra = set(fixed_indices)
-    axes = pipeline.mapspec_axes
-    for parameter, axes_ in axes.items():
-        for axis in axes_:
-            if axis in fixed_indices:
-                extra.discard(axis)
-        if parameter in inputs:
-            key = tuple(fixed_indices.get(axis, slice(None)) for axis in axes_)
-            if len(key) == 1:
-                key = key[0]  # type: ignore[assignment]
-            try:
-                inputs[parameter][key]
-            except IndexError as e:
-                msg = f"Fixed index `{key}` for parameter `{parameter}` is out of bounds."
-                raise IndexError(msg) from e
-    if extra:
-        msg = f"Got extra `fixed_indices`: `{extra}` that are not accepted by this map."
-        raise ValueError(msg)
-
-    reduced_axes = _reduced_axes(pipeline)
-    for name, axes_set in reduced_axes.items():
-        if reduced := set(axes_set) & set(fixed_indices):
-            reduced_str = ", ".join(reduced)
-            msg = f"Axis `{reduced_str}` in `{name}` is reduced and cannot be in `fixed_indices`."
-            raise ValueError(msg)
-
-
-def _reduced_axes(pipeline: Pipeline) -> dict[str, set[str]]:
-    # TODO: check the overlap between this an `independent_axes_in_mapspecs`.
-    # It might be that this function could be used instead.
-    reduced_axes: dict[str, set[str]] = defaultdict(set)
-    axes = pipeline.mapspec_axes
-    for name in pipeline.mapspec_names:
-        for func in pipeline.functions:
-            if _is_parameter_reduced_by_function(func, name):
-                reduced_axes[name].update(axes[name])
-            elif _is_parameter_partially_reduced_by_function(func, name):
-                _axes = _get_partially_reduced_axes(func, name, axes)
-                reduced_axes[name].update(_axes)
-    return dict(reduced_axes)
-
-
-def _is_parameter_reduced_by_function(func: PipeFunc, name: str) -> bool:
-    return name in func.parameters and (
-        func.mapspec is None or name not in func.mapspec.input_names
-    )
-
-
-def _is_parameter_partially_reduced_by_function(func: PipeFunc, name: str) -> bool:
-    if func.mapspec is None or name not in func.mapspec.input_names:
-        return False
-    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
-    return None in spec.axes
-
-
-def _get_partially_reduced_axes(
+# NOTE: A similar async version of this function is provided below.
+def _process_task(
     func: PipeFunc,
-    name: str,
-    axes: dict[str, tuple[str, ...]],
-) -> tuple[str, ...]:
-    assert func.mapspec is not None
-    spec = next(spec for spec in func.mapspec.inputs if spec.name == name)
-    return tuple(ax for ax, spec_ax in zip(axes[name], spec.axes) if spec_ax is None)
+    kwargs_task: _KwargsTask,
+    store: dict[str, StoreType],
+) -> dict[str, Result]:
+    kwargs, task = kwargs_task
+    if func.mapspec and func.mapspec.inputs:
+        r, args = task
+        outputs_list = [_result(x) for x in r]
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
+    else:
+        r = _result(task)
+        output = _dump_single_output(func, r, store)
+    return _to_result_dict(func, kwargs, output, store)
+
+
+async def _process_task_async(
+    func: PipeFunc,
+    kwargs_task: _KwargsTask,
+    store: dict[str, StoreType],
+) -> dict[str, Result]:
+    kwargs, task = kwargs_task
+    loop = asyncio.get_event_loop()
+    if func.mapspec and func.mapspec.inputs:
+        r, args = task
+        futs = [_result_async(x, loop) for x in r]
+        outputs_list = await asyncio.gather(*futs)
+        output = _output_from_mapspec_task(func, store, args, outputs_list)
+    else:
+        assert isinstance(task, Future)
+        r = await _result_async(task, loop)
+        output = _dump_single_output(func, r, store)
+    return _to_result_dict(func, kwargs, output, store)

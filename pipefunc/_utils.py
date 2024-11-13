@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import importlib.util
 import inspect
 import math
 import operator
+import socket
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+    import pydantic
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -37,6 +41,7 @@ def load(path: Path, *, cache: bool = False) -> Any:
 
 def dump(obj: Any, path: Path) -> None:
     """Dump an object to a path using cloudpickle."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as f:
         cloudpickle.dump(obj, f)
 
@@ -196,3 +201,74 @@ def assert_complete_kwargs(
         valid_kwargs -= set(skip)
     missing = valid_kwargs - set(kwargs)
     assert not missing, f"Missing required kwargs: {missing}"
+
+
+def get_local_ip() -> str:
+    try:
+        # Create a socket to connect to a remote host
+        # This helps in getting the network interface's IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # This does not actually connect to '8.8.8.8', it is simply used to find the local IP
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:  # noqa: BLE001  # pragma: no cover
+        return "unknown"
+
+
+def is_running_in_ipynb() -> bool:
+    """Check if the code is running in a Jupyter notebook."""
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
+    except NameError:
+        return False  # Probably standard Python interpreter
+
+
+def is_installed(package: str) -> bool:
+    """Check if a package is installed."""
+    return importlib.util.find_spec(package) is not None
+
+
+def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
+    """Check if a package is installed, raise an ImportError if not."""
+    conda_name_mapping = {"graphviz": "python-graphviz"}
+
+    for package in packages:
+        if is_installed(package):
+            continue
+        conda_package = conda_name_mapping.get(package, package)
+        error_message = f"The '{package}' package is required"
+        if reason:
+            error_message += f" for {reason}"
+        error_message += ".\n"
+        error_message += "Please install it using one of the following methods:\n"
+        if extras:
+            error_message += f'- pip install "pipefunc[{extras}]"\n'
+        error_message += f"- pip install {package}\n"
+        error_message += f"- conda install -c conda-forge {conda_package}"
+        raise ImportError(error_message)
+
+
+def is_min_version(package: str, version: str) -> bool:
+    """Check if a package is at least a given version."""
+    import importlib.metadata
+
+    installed_version = importlib.metadata.version(package)
+    installed_major, installed_minor, installed_patch, *_ = installed_version.split(".")
+    major, minor, patch, *_ = version.split(".")
+    if installed_major < major:
+        return False
+    if installed_major == major and installed_minor < minor:
+        return False
+    if installed_major == major and installed_minor == minor and installed_patch < patch:  # noqa: SIM103
+        return False
+    return True
+
+
+def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
+    if "pydantic" not in sys.modules:
+        return False
+    if not inspect.isclass(x):
+        return False
+    import pydantic
+
+    return issubclass(x, pydantic.BaseModel)

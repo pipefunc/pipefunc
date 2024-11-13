@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 PIP_ONLY_DEPS: set[str] = {"myst-nb"}
 REPLACE_DEPS: dict[str, str] = {
-    "myst-nb": "myst-nb @ https://github.com/basnijholt/MyST-NB/archive/refs/heads/coalesce_streams.zip",
+    "graphviz": "python-graphviz",
 }
 SKIP_DEPS: set[str] = {"pipefunc"}
 
@@ -100,7 +100,16 @@ if __name__ == "__main__":
     with open("pyproject.toml") as f:  # noqa: PTH123
         data = tomllib.loads(f.read())
 
-    sections = ("adaptive", "plotting", "xarray", "zarr")
+    sections = (
+        "adaptive",
+        "pandas",
+        "plotting",
+        "profiling",
+        "widgets",
+        "xarray",
+        "pydantic",
+        "zarr",
+    )
     # Generate environment.yml
     generate_environment_yml(
         data,

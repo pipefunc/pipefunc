@@ -22,12 +22,12 @@ jobs:
 
       - name: Update Python version in environment.yml
         run: |
-          sed -i 's/- python/- python=${{ env.python-version }}/g' environment.yml
+          sed -i '/^\s*-\s*python\s*$/ s/$/=${{ env.python-version }}/' environment.yml
           echo "Updated environment.yml content:"
           cat environment.yml
 
       - name: Install Conda environment with micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           cache-environment: true

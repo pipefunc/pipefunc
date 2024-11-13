@@ -288,10 +288,7 @@ class Resources:
 
         return Resources(**max_data)
 
-    def with_defaults(
-        self,
-        default_resources: Resources | None,
-    ) -> Resources:
+    def with_defaults(self, default_resources: Resources | None) -> Resources:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
             return self
