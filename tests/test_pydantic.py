@@ -10,11 +10,11 @@ def test_pydantic_annotations() -> None:
         y: int = 1
         z: dict = Field(default_factory=dict)
 
-    foo = PipeFunc(Foo, "foo")
+    foo = PipeFunc(Foo, "foo", defaults={"x": 2})
 
     type_hints = safe_get_type_hints(Foo)
     assert type_hints == {"x": int, "y": int, "z": dict}
-    assert foo.defaults == {"y": 1, "z": {}}
+    assert foo.defaults == {"x": 2, "y": 1, "z": {}}
     assert foo.parameter_annotations == {"x": int, "y": int, "z": dict}
 
     class Bar(BaseModel):
@@ -35,6 +35,6 @@ def test_dataclass_annotations() -> None:
         y: int = 1
         z: dict = field(default_factory=dict)
 
-    foo = PipeFunc(Foo, "foo")
-    assert foo.defaults == {"y": 1, "z": {}}
+    foo = PipeFunc(Foo, "foo", defaults={"x": 2})
+    assert foo.defaults == {"x": 2, "y": 1, "z": {}}
     assert foo.parameter_annotations == {"x": int, "y": int, "z": dict}
