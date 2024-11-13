@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc._cache import DiskCache, HybridCache, LRUCache, SimpleCache
+from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -150,7 +150,7 @@ def test_cache_property(shared):
     assert cache_dict == {"test": "value"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache_dir(tmp_path):
     return tmp_path / "cache"
 
@@ -397,3 +397,10 @@ def test_simple_cache():
     assert len(cache) == 1
     cache.clear()
     assert len(cache) == 0
+
+
+def test_disk_cache_pickling(tmp_path: Path) -> None:
+    cache = DiskCache(cache_dir=tmp_path, with_lru_cache=False)
+    cache.put("key1", "value1")
+    cache2 = pickle.loads(pickle.dumps(cache))  # noqa: S301
+    assert cache2.get("key1") == "value1"

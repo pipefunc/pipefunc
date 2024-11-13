@@ -9,29 +9,35 @@ dependencies:
   - pip
   # from pyproject.toml
   - networkx
-  - psutil
   - cloudpickle
   - numpy
   - tomli
   # optional-dependencies: adaptive
   - adaptive
-  - adaptive-scheduler>=2.12.0
+  - adaptive-scheduler>=2.13.3
   # optional-dependencies: xarray
   - xarray
+  # optional-dependencies: widgets
+  - ipywidgets
   # optional-dependencies: zarr
   - zarr
+  # optional-dependencies: pandas
+  - pandas
+  # optional-dependencies: profiling
+  - psutil
+  # optional-dependencies: pydantic
+  - pydantic
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
+  - python-graphviz
   # optional-dependencies: test
   - pytest
-  - coverage
-  - pytest-cov
-  - pandas
-  - adaptive
-  - xarray
-  - zarr
-  - versioningit
+  - pytest-asyncio
   - pytest-codspeed
+  - pytest-cov
+  - pytest-xdist
+  - coverage
+  - versioningit

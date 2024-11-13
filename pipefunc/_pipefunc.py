@@ -9,14 +9,20 @@ These `PipeFunc` objects are used to construct a `pipefunc.Pipeline`.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime
 import functools
+import getpass
 import inspect
 import os
+import platform
+import traceback
 import warnings
 import weakref
+from collections import defaultdict
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -26,17 +32,27 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
+    get_local_ip,
+    is_pydantic_base_model,
+    requires,
 )
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
+from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
-    from pipefunc import Pipeline
+    from pathlib import Path
 
+    import pydantic
+
+    from pipefunc import Pipeline
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc.map._types import ShapeTuple
 
 T = TypeVar("T", bound=Callable[..., Any])
-_OUTPUT_TYPE: TypeAlias = Union[str, tuple[str, ...]]
+
 MAX_PARAMS_LEN = 15
 
 
@@ -49,6 +65,7 @@ class PipeFunc(Generic[T]):
         The original function to be wrapped.
     output_name
         The identifier for the output of the wrapped function.
+        Provide a tuple of strings for multiple outputs.
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the ``output_name`` (str) as second argument, and returns the desired output.
@@ -78,6 +95,13 @@ class PipeFunc(Generic[T]):
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    internal_shape
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -92,6 +116,13 @@ class PipeFunc(Generic[T]):
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -110,6 +141,12 @@ class PipeFunc(Generic[T]):
     Returns
     -------
         A `PipeFunc` instance that wraps the original function with the specified return identifier.
+
+    Attributes
+    ----------
+    error_snapshot
+        If an error occurs while calling the function, this attribute will contain
+        an `ErrorSnapshot` instance with information about the error.
 
     Examples
     --------
@@ -131,9 +168,9 @@ class PipeFunc(Generic[T]):
     def __init__(
         self,
         func: T,
-        output_name: _OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE,
         *,
-        output_picker: Callable[[str, Any], Any] | None = None,
+        output_picker: Callable[[Any, str], Any] | None = None,
         renames: dict[str, str] | None = None,
         defaults: dict[str, Any] | None = None,
         bound: dict[str, Any] | None = None,
@@ -141,21 +178,24 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
+        internal_shape: int | ShapeTuple | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
         | None = None,
         resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         self.func: Callable[..., Any] = func
-        self.__name__ = func.__name__
-        self._output_name: _OUTPUT_TYPE = output_name
+        self.__name__ = _get_name(func)
+        self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
+        self.internal_shape: int | ShapeTuple | None = internal_shape
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -163,10 +203,12 @@ class PipeFunc(Generic[T]):
         self._bound: dict[str, Any] = bound or {}
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
+        self.resources_scope: Literal["map", "element"] = resources_scope
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
         self._validate()
+        self.error_snapshot: ErrorSnapshot | None = None
 
     @property
     def renames(self) -> dict[str, str]:
@@ -195,7 +237,7 @@ class PipeFunc(Generic[T]):
         return self._bound
 
     @functools.cached_property
-    def output_name(self) -> _OUTPUT_TYPE:
+    def output_name(self) -> OUTPUT_TYPE:
         """Return the output name(s) of the wrapped function.
 
         Returns
@@ -240,6 +282,25 @@ class PipeFunc(Generic[T]):
         """
         parameters = self.original_parameters
         defaults = {}
+
+        # Handle dataclass case
+        if dataclasses.is_dataclass(self.func):
+            fields = dataclasses.fields(self.func)
+            for f in fields:
+                new_name = self._renames.get(f.name, f.name)
+                if new_name in self._defaults:
+                    defaults[new_name] = self._defaults[new_name]
+                elif f.default_factory is not dataclasses.MISSING:
+                    defaults[new_name] = f.default_factory()
+                elif f.default is not dataclasses.MISSING:
+                    defaults[new_name] = f.default
+            return defaults
+
+        # Handle pydantic case
+        if is_pydantic_base_model(self.func):
+            return _pydantic_defaults(self.func, self._renames, self._defaults)
+
+        # Handle regular function case
         for original_name, v in parameters.items():
             new_name = self._renames.get(original_name, original_name)
             if new_name in self._defaults:
@@ -504,6 +565,17 @@ class PipeFunc(Generic[T]):
                 f" parameter names. The overlap is: {overlap}"
             )
             raise ValueError(msg)
+        if len(self._renames) != len(self._inverse_renames):
+            inverse_renames = defaultdict(list)
+            for k, v in self._renames.items():
+                inverse_renames[v].append(k)
+            violations = {k: v for k, v in inverse_renames.items() if len(v) > 1}
+            violation_details = "; ".join(f"`{k}: {v}`" for k, v in violations.items())
+            msg = (
+                f"The `renames` should be a one-to-one mapping. Found violations where "
+                f"multiple keys map to the same value: {violation_details}."
+            )
+            raise ValueError(msg)
         self._validate_update(
             self._renames,
             "renames",
@@ -527,12 +599,21 @@ class PipeFunc(Generic[T]):
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
+            "internal_shape": self.internal_shape,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
+            "resources_scope": self.resources_scope,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
+
+    @functools.cached_property
+    def _evaluate_lazy(self) -> bool:
+        """Return whether the function should evaluate lazy arguments."""
+        # This is a cached property because it is slow and otherwise called multiple times.
+        # We assume that once it is set, it does not change during the lifetime of the object.
+        return any(p.lazy for p in self._pipelines)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
@@ -542,6 +623,7 @@ class PipeFunc(Generic[T]):
             The return value of the wrapped function.
 
         """
+        evaluated_resources = kwargs.pop(_EVALUATED_RESOURCES, None)
         kwargs = self._flatten_scopes(kwargs)
         if extra := set(kwargs) - set(self.parameters):
             msg = (
@@ -555,13 +637,24 @@ class PipeFunc(Generic[T]):
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
         with self._maybe_profiler():
-            args = evaluate_lazy(args)
-            kwargs = evaluate_lazy(kwargs)
-            if self.resources_variable:
-                kwargs[self.resources_variable] = (
-                    self.resources(kwargs) if callable(self.resources) else self.resources
+            if self._evaluate_lazy:
+                args = evaluate_lazy(args)
+                kwargs = evaluate_lazy(kwargs)
+            _maybe_update_kwargs_with_resources(
+                kwargs,
+                self.resources_variable,
+                evaluated_resources,
+                self.resources,
+            )
+            try:
+                result = self.func(*args, **kwargs)
+            except Exception as e:
+                print(
+                    f"An error occurred while calling the function `{self.__name__}`"
+                    f" with the arguments `{args=}` and `{kwargs=}`.",
                 )
-            result = self.func(*args, **kwargs)
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                raise
 
         if self.debug:
             func_str = format_function_call(self.__name__, (), kwargs)
@@ -586,6 +679,7 @@ class PipeFunc(Generic[T]):
         """Enable or disable profiling for the wrapped function."""
         self._profile = enable
         if enable:
+            requires("psutil", reason="profile", extras="profiling")
             self.profiling_stats = ProfilingStats()
         else:
             self.profiling_stats = None
@@ -630,6 +724,38 @@ class PipeFunc(Generic[T]):
             else:
                 new_kwargs[k] = v
         return new_kwargs
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        if inspect.isclass(func) and not is_pydantic_base_model(func):
+            func = func.__init__
+        type_hints = safe_get_type_hints(func, include_extras=True)
+        return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
+
+    @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+        """Return the type annotation of the wrapped function's output."""
+        func = self.func
+        if isinstance(func, _NestedFuncWrapper):
+            func = func.func
+        if inspect.isclass(func) and isinstance(self.output_name, str):
+            return {self.output_name: func}
+        if self._output_picker is None:
+            hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
+        else:
+            # We cannot determine the output type if a custom output picker
+            # is used, however, if the output is a tuple and the _default_output_picker
+            # is used, we can determine the output type.
+            hint = NoAnnotation
+        if not isinstance(self.output_name, tuple):
+            return {self.output_name: hint}
+        if get_origin(hint) is tuple:
+            return dict(zip(self.output_name, get_args(hint)))
+        return {name: NoAnnotation for name in self.output_name}
 
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
@@ -749,7 +875,7 @@ class PipeFunc(Generic[T]):
 
 
 def pipefunc(
-    output_name: _OUTPUT_TYPE,
+    output_name: OUTPUT_TYPE,
     *,
     output_picker: Callable[[Any, str], Any] | None = None,
     renames: dict[str, str] | None = None,
@@ -759,11 +885,13 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
+    internal_shape: int | ShapeTuple | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
     | None = None,
     resources_variable: str | None = None,
+    resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
@@ -772,6 +900,7 @@ def pipefunc(
     ----------
     output_name
         The identifier for the output of the decorated function.
+        Provide a tuple of strings for multiple outputs.
     output_picker
         A function that takes the output of the wrapped function as first argument
         and the ``output_name`` (str) as second argument, and returns the desired output.
@@ -801,6 +930,13 @@ def pipefunc(
         This is a specification for mapping that dictates how input values should
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
+    internal_shape
+        Specifies the shape of the returned value(s). This parameters is required only
+        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
+        be derived from the inputs. The shape can be a single integer or a tuple of
+        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
+        provide the shape for one of the outputs. This works because the shape of all
+        outputs are required to be identical.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -815,6 +951,13 @@ def pipefunc(
         if ``resources_variable="resources"``, the function will be called as
         ``func(..., resources=Resources(...))``. This is useful when the function handles internal
         parallelization.
+    resources_scope
+        Determines how resources are allocated in relation to the mapspec:
+
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+
+        If no mapspec is defined, this parameter is ignored.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -838,7 +981,8 @@ def pipefunc(
     See Also
     --------
     PipeFunc
-        A function wrapper class for pipeline functions with additional attributes.
+        A function wrapper class for pipeline functions. Has the same functionality
+        as the `pipefunc` decorator but can be used to wrap existing functions.
 
     Examples
     --------
@@ -877,8 +1021,10 @@ def pipefunc(
             debug=debug,
             cache=cache,
             mapspec=mapspec,
+            internal_shape=internal_shape,
             resources=resources,
             resources_variable=resources_variable,
+            resources_scope=resources_scope,
             scope=scope,
         )
 
@@ -922,7 +1068,7 @@ class NestedPipeFunc(PipeFunc):
     def __init__(
         self,
         pipefuncs: list[PipeFunc],
-        output_name: _OUTPUT_TYPE | None = None,
+        output_name: OUTPUT_TYPE | None = None,
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
@@ -937,7 +1083,7 @@ class NestedPipeFunc(PipeFunc):
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
-        self._output_name: _OUTPUT_TYPE = output_name or self._all_outputs
+        self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
         self._output_picker = None
@@ -976,6 +1122,7 @@ class NestedPipeFunc(PipeFunc):
         return MapSpec(
             tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
+            _is_generated=True,
         )
 
     @functools.cached_property
@@ -1042,9 +1189,9 @@ class _NestedFuncWrapper:
     order specified by the output_name.
     """
 
-    def __init__(self, func: Callable[..., dict[str, Any]], output_name: _OUTPUT_TYPE) -> None:
+    def __init__(self, func: Callable[..., dict[str, Any]], output_name: OUTPUT_TYPE) -> None:
         self.func: Callable[..., dict[str, Any]] = func
-        self.output_name: _OUTPUT_TYPE = output_name
+        self.output_name: OUTPUT_TYPE = output_name
         self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -1052,6 +1199,80 @@ class _NestedFuncWrapper:
         if isinstance(self.output_name, str):
             return result_dict[self.output_name]
         return tuple(result_dict[name] for name in self.output_name)
+
+
+def _timestamp() -> str:
+    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+
+
+@dataclass
+class ErrorSnapshot:
+    """A snapshot that represents an error in a function call."""
+
+    function: Callable[..., Any]
+    exception: Exception
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+    traceback: str = field(init=False)
+    timestamp: str = field(default_factory=_timestamp)
+    user: str = field(default_factory=getpass.getuser)
+    machine: str = field(default_factory=platform.node)
+    ip_address: str = field(default_factory=get_local_ip)
+    current_directory: str = field(default_factory=os.getcwd)
+
+    def __post_init__(self) -> None:
+        tb = traceback.format_exception(
+            type(self.exception),
+            self.exception,
+            self.exception.__traceback__,
+        )
+        self.traceback = "".join(tb)
+
+    def __str__(self) -> str:
+        args_repr = ", ".join(repr(a) for a in self.args)
+        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
+        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
+
+        return (
+            "ErrorSnapshot:\n"
+            "--------------\n"
+            f"- 🛠 Function: {func_name}\n"
+            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
+            f"- 💥 Exception message: {self.exception}\n"
+            f"- 📋 Args: ({args_repr})\n"
+            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
+            f"- 🕒 Timestamp: {self.timestamp}\n"
+            f"- 👤 User: {self.user}\n"
+            f"- 💻 Machine: {self.machine}\n"
+            f"- 📡 IP Address: {self.ip_address}\n"
+            f"- 📂 Current Directory: {self.current_directory}\n"
+            "\n"
+            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
+            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
+            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
+            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
+            " and load it using `ErrorSnapshot.load_from_file(filename)`."
+        )
+
+    def reproduce(self) -> Any | None:
+        """Attempt to recreate the error by calling the function with stored arguments."""
+        return self.function(*self.args, **self.kwargs)
+
+    def save_to_file(self, filename: str | Path) -> None:
+        """Save the error snapshot to a file using cloudpickle."""
+        with open(filename, "wb") as f:  # noqa: PTH123
+            cloudpickle.dump(self, f)
+
+    @classmethod
+    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
+        """Load an error snapshot from a file using cloudpickle."""
+        with open(filename, "rb") as f:  # noqa: PTH123
+            return cloudpickle.load(f)
+
+    def _ipython_display_(self) -> None:  # pragma: no cover
+        from IPython.display import HTML, display
+
+        display(HTML(f"<pre>{self}</pre>"))
 
 
 def _validate_identifier(name: str, value: Any) -> None:
@@ -1098,7 +1319,7 @@ def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
         raise ValueError(msg)
 
 
-def _validate_output_name(output_name: _OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
+def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
     if not all(x in all_outputs for x in at_least_tuple(output_name)):
@@ -1127,19 +1348,15 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
             raise ValueError(msg)
 
 
-def _default_output_picker(
-    output: Any,
-    name: str,
-    output_name: _OUTPUT_TYPE,
-) -> Any:
+def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
     return output[output_name.index(name)]
 
 
 def _rename_output_name(
-    original_output_name: _OUTPUT_TYPE,
+    original_output_name: OUTPUT_TYPE,
     renames: dict[str, str],
-) -> _OUTPUT_TYPE:
+) -> OUTPUT_TYPE:
     if isinstance(original_output_name, str):
         return renames.get(original_output_name, original_output_name)
     return tuple(renames.get(name, name) for name in original_output_name)
@@ -1162,3 +1379,54 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
 def _maybe_mapspec(mapspec: str | MapSpec | None) -> MapSpec | None:
     """Return either a MapSpec or None, depending on the input."""
     return MapSpec.from_string(mapspec) if isinstance(mapspec, str) else mapspec
+
+
+def _maybe_update_kwargs_with_resources(
+    kwargs: dict[str, Any],
+    resources_variable: str | None,
+    evaluated_resources: Resources | None,
+    resources: Resources | Callable[[dict[str, Any]], Resources] | None,
+) -> None:
+    if resources_variable:
+        if evaluated_resources is not None:
+            kwargs[resources_variable] = evaluated_resources
+        elif callable(resources):
+            kwargs[resources_variable] = resources(kwargs)
+        else:
+            kwargs[resources_variable] = resources
+
+
+def _get_name(func: Callable[..., Any]) -> str:
+    if isinstance(func, PipeFunc):
+        return _get_name(func.func)
+    if inspect.ismethod(func):
+        qualname = func.__qualname__
+        if "." in qualname:
+            *_, class_name, method_name = qualname.split(".")
+            return f"{class_name}.{method_name}"
+        return qualname  # pragma: no cover
+    return func.__name__
+
+
+def _pydantic_defaults(
+    func: type[pydantic.BaseModel],
+    renames: dict[str, Any],
+    defaults: dict[str, Any],
+) -> dict[str, Any]:
+    import pydantic
+
+    if pydantic.__version__.split(".", 1)[0] == "1":  # pragma: no cover
+        msg = "Pydantic version 1 defaults cannot be extracted."
+        warnings.warn(msg, UserWarning, stacklevel=2)
+        return {}
+    from pydantic_core import PydanticUndefined
+
+    for name, field_ in func.model_fields.items():
+        new_name = renames.get(name, name)
+        if new_name in defaults:
+            defaults[new_name] = defaults[new_name]
+        elif field_.default_factory is not None:
+            defaults[new_name] = field_.default_factory()
+        elif field_.default is not PydanticUndefined:
+            defaults[new_name] = field_.default
+    return defaults

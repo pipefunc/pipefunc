@@ -9,9 +9,13 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -295,10 +299,7 @@ class Resources:
 
         return Resources(**max_data)
 
-    def with_defaults(
-        self,
-        default_resources: Resources | None,
-    ) -> Resources:
+    def with_defaults(self, default_resources: Resources | None) -> Resources:
         """Combine the Resources instance with default resources."""
         if default_resources is None:
             return self

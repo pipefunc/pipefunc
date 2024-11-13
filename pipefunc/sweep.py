@@ -6,12 +6,12 @@ from collections.abc import Hashable, Iterable
 from itertools import product
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, requires
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 
-    from pipefunc._pipeline import _OUTPUT_TYPE, Pipeline
+    from pipefunc._pipeline._base import OUTPUT_TYPE, Pipeline
 
 
 def _combined_exclude(
@@ -484,12 +484,13 @@ def count_sweep(
         # TODO: we can likely special case this to be faster.
         sweep = sweep.list()  # type: ignore[assignment]
     assert isinstance(sweep, Iterable)
-    counts: dict[_OUTPUT_TYPE, dict[tuple[Any, ...], int]] = {}
+    counts: dict[OUTPUT_TYPE, dict[tuple[Any, ...], int]] = {}
     deps = pipeline.func_dependencies(output_name)
     for _output_name in deps:
         arg_combination = pipeline.root_args(_output_name)
         assert isinstance(arg_combination, tuple)
         if use_pandas:
+            requires("pandas", reason="count_sweep", extras="pandas")
             import pandas as pd
 
             df = pd.DataFrame(list(sweep))

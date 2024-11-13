@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_outputs
+from pipefunc.map._load import load_outputs
 from pipefunc.map._run_info import RunInfo
+from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.map.adaptive import (
     LearnersDict,
     create_learners,
@@ -16,6 +17,7 @@ from pipefunc.map.adaptive import (
     to_adaptive_learner,
 )
 from pipefunc.sweep import Sweep
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +25,8 @@ if TYPE_CHECKING:
 # Tests with create_learners
 
 
-def test_basic(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_basic(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="z")
     def add(x: int, y: int) -> int:
         assert isinstance(x, int)
@@ -42,28 +45,20 @@ def test_basic(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        run_folder=tmp_path,
+        storage=storage,
+        run_folder=tmp_path if storage == "file_array" else None,
         return_output=True,
     )
     learners.simple_run()
     flat_learners = learners.flatten()
     assert len(flat_learners) == 2
-    assert flat_learners["foo.z"][0].data == {
-        0: (2,),
-        1: (3,),
-        2: (4,),
-        3: (3,),
-        4: (4,),
-        5: (5,),
-        6: (4,),
-        7: (5,),
-        8: (6,),
-    }
+    assert flat_learners["foo.z"][0].data == {0: 2, 1: 3, 2: 4, 3: 3, 4: 4, 5: 5, 6: 4, 7: 5, 8: 6}
     adaptive.runner.simple(flat_learners["prod"][0])
     assert flat_learners["prod"][0].data == {0: 172800}
 
 
-def test_simple_from_step(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_simple_from_step(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="x")
     def generate_seeds(n: int) -> list[int]:
         return list(range(n))
@@ -74,7 +69,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         return x * 2
 
     @pipefunc(output_name="sum")
-    def take_sum(y: list[int]) -> int:
+    def take_sum(y: Array[int]) -> int:
         return sum(y)
 
     pipeline = Pipeline(
@@ -88,7 +83,8 @@ def test_simple_from_step(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        run_folder=tmp_path,
+        run_folder=tmp_path if storage == "file_array" else None,
+        storage=storage,
         internal_shapes={"x": 4},  # 4 should become (4,)
         return_output=True,
     )
@@ -98,7 +94,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
     adaptive.runner.simple(flat_learners["x"][0])
     assert flat_learners["x"][0].data == {0: [0, 1, 2, 3]}
     adaptive.runner.simple(flat_learners["y"][0])
-    assert flat_learners["y"][0].data == {0: (0,), 1: (2,), 2: (4,), 3: (6,)}
+    assert flat_learners["y"][0].data == {0: 0, 1: 2, 2: 4, 3: 6}
     adaptive.runner.simple(flat_learners["sum"][0])
     assert flat_learners["sum"][0].data == {0: 12}
 
@@ -236,9 +232,10 @@ def test_basic_with_fixed_indices(tmp_path: Path) -> None:
     flat_learners = learners.flatten()
     assert len(flat_learners) == 1
     adaptive.runner.simple(flat_learners["z"][0])
-    assert flat_learners["z"][0].data == {0: ((1, 1),), 1: ((1, 2),), 2: ((1, 3),)}
+    assert flat_learners["z"][0].data == {0: (1, 1), 1: (1, 2), 2: (1, 3)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
+    assert isinstance(store["z"], StorageBase)
     assert store["z"].to_array().tolist() == [
         [(1, 1), (1, 2), (1, 3)],
         [None, None, None],
@@ -277,9 +274,10 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     assert len(flat_learners["z"]) == 12
     for learner in flat_learners["z"][:-3]:
         adaptive.runner.simple(learner)
-    assert flat_learners["z"][0].data == {0: ((1, 1),)}
+    assert flat_learners["z"][0].data == {0: (1, 1)}
     run_info = RunInfo.load(run_folder=tmp_path)
     store = run_info.init_store()
+    assert isinstance(store["z"], StorageBase)
     assert store["z"].to_array().tolist() == [
         [(1, 1), (1, 2), (1, 3), (1, 4)],
         [(2, 1), (2, 2), (2, 3), (2, 4)],
@@ -287,7 +285,8 @@ def test_basic_with_split_independent_axes(tmp_path: Path) -> None:
     ]
 
 
-def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_create_learners_split_axes_with_reduction(tmp_path: Path, storage: str) -> None:
     @pipefunc(output_name="y")
     def double_it(x: int) -> int:
         return 2 * x
@@ -310,7 +309,8 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
     learners = create_learners(
         pipeline,
         inputs,
-        tmp_path,
+        tmp_path if storage == "file_array" else None,
+        storage=storage,
         return_output=True,
         split_independent_axes=True,
     )
@@ -334,13 +334,14 @@ def test_create_learners_split_axes_with_reduction(tmp_path: Path) -> None:
     ]
 
 
-def test_internal_shapes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_internal_shapes(storage: str, tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
     def f(x):
         return x
 
     @pipefunc(output_name="r", mapspec="y[i, j] -> r[i, j, k]")
-    def g(y, z) -> int:  # noqa: ARG001
+    def g(y, z) -> int:
         return z
 
     pipeline = Pipeline([f, g])
@@ -349,8 +350,9 @@ def test_internal_shapes(tmp_path: Path) -> None:
     internal_shapes = {"r": 5}
     results = pipeline.map(
         inputs,
-        tmp_path,
+        tmp_path if storage == "file_array" else None,
         internal_shapes,  # type: ignore[arg-type]
+        storage=storage,
         parallel=False,
     )
     learners = create_learners(
@@ -364,9 +366,10 @@ def test_internal_shapes(tmp_path: Path) -> None:
     assert results
     assert learners
     learners.simple_run()
-    r_map = load_outputs("r", run_folder=tmp_path)
-    r_adap = load_outputs("r", run_folder=tmp_path / "learners")
-    assert r_map.tolist() == r_adap.tolist()
+    if storage == "file_array":
+        r_map = load_outputs("r", run_folder=tmp_path)
+        r_adap = load_outputs("r", run_folder=tmp_path / "learners")
+        assert r_map.tolist() == r_adap.tolist()
 
 
 def test_learners_dict_no_run_info():
@@ -375,14 +378,14 @@ def test_learners_dict_no_run_info():
         learners_dict.to_slurm_run()
 
 
-@pytest.fixture()
+@pytest.fixture
 def pipeline() -> Pipeline:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: float, c: float) -> float:
         return 2 * x + c
 
     @pipefunc(output_name="sum_")
-    def take_sum(y: list[float], d: float, e: float) -> float:
+    def take_sum(y: Array[float], d: float, e: float) -> float:
         return sum(y) / d + e
 
     return Pipeline([double_it, take_sum])
@@ -468,3 +471,25 @@ def test_adaptive_wrapper_invalid(tmp_path: Path, pipeline: Pipeline) -> None:
             adaptive_output="sum_",
             run_folder_template=run_folder_template,
         )
+
+
+def test_adaptive_wrapper_with_heterogeneous_storage(tmp_path: Path, pipeline: Pipeline) -> None:
+    run_folder_template = f"{tmp_path}/run_folder_{{}}"
+    storage = {
+        "": "dict",
+        "sum_": "file_array",
+    }
+    learner = to_adaptive_learner(
+        pipeline,
+        inputs={"x": [0, 1, 2, 3]},
+        adaptive_dimensions={"c": (0, 100), "d": (-1, 1), "e": (-1, 1)},
+        adaptive_output="sum_",
+        run_folder_template=run_folder_template,
+        map_kwargs={"parallel": False, "storage": storage},
+    )
+    assert isinstance(learner, adaptive.LearnerND)
+    npoints_goal = 5
+    adaptive.runner.simple(learner, npoints_goal=npoints_goal)
+
+    assert learner.to_numpy().shape == (npoints_goal, 4)
+    assert len(list(tmp_path.glob("*"))) == npoints_goal

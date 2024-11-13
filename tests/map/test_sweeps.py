@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map._run import load_outputs
-from pipefunc.map._run_info import map_shapes
+from pipefunc.map._load import load_outputs
+from pipefunc.map._shapes import map_shapes
 from pipefunc.sweep import Sweep
+from pipefunc.typing import Array  # noqa: TCH001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,7 +22,7 @@ def test_simple_sweep(tmp_path: Path) -> None:
         return x + y
 
     @pipefunc(output_name="sum")
-    def take_sum(z: np.ndarray[Any, np.dtype[np.int_]]) -> int:
+    def take_sum(z: Array[int]) -> int:
         assert isinstance(z, np.ndarray)
         return sum(z)
 

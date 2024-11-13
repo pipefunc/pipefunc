@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import importlib.util
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
+from pipefunc._pipefunc import ErrorSnapshot
 from pipefunc.resources import Resources
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
+has_psutil = importlib.util.find_spec("psutil") is not None
+
+
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_pipe_func_profile() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
@@ -225,7 +234,7 @@ def test_nested_func() -> None:
     def g(f):
         return f
 
-    def h(g, x):  # noqa: ARG001
+    def h(g, x):
         return g
 
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")])
@@ -495,3 +504,68 @@ def test_picklable_resources() -> None:
     f2 = pickle.loads(p)  # noqa: S301
     assert f2.resources({}).memory == "1GB"
     assert f2(a=1, b=2) == 3
+
+
+def test_func_with_duplicate_renamed_args():
+    with pytest.raises(ValueError, match="should be a one-to-one mapping."):
+
+        @pipefunc(output_name="z", renames={"x": "a", "y": "a"})
+        def f(x, y):
+            return x + y
+
+
+def test_error_snapshot(tmp_path: Path) -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        msg = "This is a test error"
+        raise ValueError(msg)
+
+    with pytest.raises(ValueError, match="This is a test error"):
+        f(a=1, b=2)
+    snap = f.error_snapshot
+    assert snap is not None
+    assert isinstance(snap, ErrorSnapshot)
+    with pytest.raises(ValueError, match="This is a test error"):
+        snap.reproduce()
+    assert isinstance(snap.exception, ValueError)
+    assert "ErrorSnapshot:" in str(snap)
+    snap.save_to_file(tmp_path / "snap.pkl")
+    snap2 = ErrorSnapshot.load_from_file(tmp_path / "snap.pkl")
+    assert snap2.exception.args == snap.exception.args
+
+
+def test_class_name_in_pipefunc_name() -> None:
+    class MyClass:
+        @classmethod
+        def my_cls_method(cls):
+            return 1
+
+        def my_method(self):
+            return 1
+
+    pf = PipeFunc(MyClass.my_cls_method, output_name="out")
+    assert pf.__name__ == "MyClass.my_cls_method"
+
+    pf = PipeFunc(MyClass().my_method, output_name="out")
+    assert pf.__name__ == "MyClass.my_method"
+
+    def f():
+        return 1
+
+    pf = PipeFunc(f, output_name="out")
+    assert pf.__name__ == "f"
+
+
+def test_defaults_dataclass_factory() -> None:
+    @dataclass
+    class TestClass:
+        x0: list[int] = field(default_factory=lambda: [1, 2, 3])
+        y0: int = field(default=100)
+
+    pf = PipeFunc(TestClass, "container")
+    assert pf.defaults["x0"] == [1, 2, 3]
+    assert pf() == TestClass(x0=[1, 2, 3], y0=100)
+
+    pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
+    assert pf2.defaults["x0"] == [4, 5, 6]
+    assert pf2() == TestClass(x0=[4, 5, 6], y0=100)

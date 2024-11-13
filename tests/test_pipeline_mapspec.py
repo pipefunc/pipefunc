@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import importlib.util
+from concurrent.futures import Executor
+
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
+from pipefunc.typing import Array  # noqa: TCH001
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_adding_zipped_axes_to_mapspec_less_pipeline() -> None:
@@ -211,7 +217,7 @@ def test_combining_mapspecs() -> None:
         output_name="electrostatics",
         mapspec="'V_left[i], V_right[j], mesh[a, b, c], materials[a, b] -> electrostatics[i, j, a, b, c]'",
     )
-    def electrostatics(V_left, V_right, mesh, materials):  # noqa: N803, ARG001
+    def electrostatics(V_left, V_right, mesh, materials):  # noqa: N803
         return 1
 
     @pipefunc(
@@ -334,3 +340,32 @@ def test_calling_add_with_autogen_mapspec():
         internal_shapes={"foo_out": (3,)},
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
+
+
+def test_validation_parallel():
+    pipeline = Pipeline([])
+    with pytest.raises(
+        ValueError,
+        match="Cannot use an executor without `parallel=True`",
+    ):
+        pipeline.map({}, parallel=False, executor=Executor())
+
+
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
+def test_with_progress() -> None:
+    @pipefunc(output_name="out", mapspec="a[i] -> out[i]")
+    def f(a: int) -> int:
+        return a
+
+    @pipefunc(output_name="out_sum")
+    def g(out: Array[int]) -> int:
+        return sum(out)
+
+    pipeline = Pipeline([f, g])
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
+    assert r_map["out"].output.tolist() == [1, 2, 3]
+    assert r_map["out_sum"].output == 6
+
+    r_map_sequential = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True, parallel=False)
+    assert r_map_sequential["out"].output.tolist() == [1, 2, 3]
+    assert r_map_sequential["out_sum"].output == 6

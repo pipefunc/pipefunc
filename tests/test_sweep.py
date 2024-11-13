@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from itertools import product
 
 import pytest
@@ -7,8 +8,10 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc.sweep import MultiSweep, Sweep, count_sweep, generate_sweep, set_cache_for_sweep
 
+has_pandas = importlib.util.find_spec("pandas") is not None
 
-@pytest.fixture()
+
+@pytest.fixture
 def pipeline():
     @pipefunc(output_name="c")
     def f1(a, b):
@@ -22,7 +25,7 @@ def pipeline():
     def f3(c, d, x=1):
         return c * d * x
 
-    return Pipeline([f1, f2, f3], debug=True, profile=True)
+    return Pipeline([f1, f2, f3], debug=True)
 
 
 def test_generate_sweep_no_dims():
@@ -70,6 +73,7 @@ def test_generate_sweep():
     ]
 
 
+@pytest.mark.skipif(not has_pandas, reason="pandas not installed")
 @pytest.mark.parametrize("use_pandas", [True, False])
 def test_count_sweep(pipeline, use_pandas):
     sweep = [

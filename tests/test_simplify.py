@@ -5,24 +5,24 @@ from __future__ import annotations
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._simplify import _combine_nodes, _identify_combinable_nodes
+from pipefunc._pipeline._simplify import _combine_nodes, _identify_combinable_nodes
 
 
 def test_identify_combinable_nodes():
     @pipefunc(output_name=("d", "e"))
-    def f_d(b, g, x=1):  # noqa: ARG001
+    def f_d(b, g, x=1):
         pass
 
     @pipefunc(output_name=("g", "h"))
-    def f_g(a, x=1):  # noqa: ARG001
+    def f_g(a, x=1):
         pass
 
     @pipefunc(output_name="gg")
-    def f_gg(g):  # noqa: ARG001
+    def f_gg(g):
         pass
 
     @pipefunc(output_name="i")
-    def f_i(gg, b, e):  # noqa: ARG001
+    def f_i(gg, b, e):
         pass
 
     pipeline = Pipeline([f_d, f_g, f_i, f_gg])

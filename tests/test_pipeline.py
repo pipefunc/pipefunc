@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import importlib.util
 import pickle
 import re
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+has_psutil = importlib.util.find_spec("psutil") is not None
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -24,7 +33,7 @@ def test_pipeline_and_all_arg_combinations() -> None:
     def f3(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
+    pipeline = Pipeline([f1, f2, f3], debug=True)
 
     fc = pipeline.func("c")
     fd = pipeline.func("d")
@@ -97,7 +106,7 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
     def f3(c, d, x=1):
         return c * d * x
 
-    pipeline = Pipeline([f1, f2, f3], debug=True, profile=True)
+    pipeline = Pipeline([f1, f2, f3], debug=True)
 
     fc = pipeline.func("c")
     fd = pipeline.func("d")
@@ -164,6 +173,7 @@ def test_output_name_in_kwargs() -> None:
         assert p("a", a=1)
 
 
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_profiling() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
@@ -196,7 +206,7 @@ def test_pipe_func_and_execution() -> None:
     pipe_func2 = PipeFunc(func2, "out2", renames={"x": "x2"})
     pipe_func3 = PipeFunc(func3, "out3", renames={"y": "y3", "z": "z3"})
 
-    pipeline = Pipeline([pipe_func1, pipe_func2, pipe_func3], debug=True, profile=True)
+    pipeline = Pipeline([pipe_func1, pipe_func2, pipe_func3], debug=True)
 
     # Create _PipelineAsFunc instances
     function1 = pipeline.func("out1")
@@ -228,7 +238,6 @@ def test_pipe_func_and_execution() -> None:
 def test_tuple_outputs() -> None:
     @pipefunc(
         output_name=("c", "_throw"),
-        profile=True,
         debug=True,
         output_picker=dict.__getitem__,
     )
@@ -236,11 +245,11 @@ def test_tuple_outputs() -> None:
         return {"c": a + b, "_throw": 1}
 
     @pipefunc(output_name=("d", "e"))
-    def f_d(b, c, x=1):  # noqa: ARG001
+    def f_d(b, c, x=1):
         return b * c, 1
 
     @pipefunc(output_name=("g", "h"), output_picker=getattr)
-    def f_g(c, e, x=1):  # noqa: ARG001
+    def f_g(c, e, x=1):
         from types import SimpleNamespace
 
         print(f"Called f_g with c={c} and e={e}")
@@ -253,7 +262,6 @@ def test_tuple_outputs() -> None:
     pipeline = Pipeline(
         [f_c, f_d, f_g, f_i],
         debug=True,
-        profile=True,
     )
     f = pipeline.func("i")
     r = f.call_full_output(a=1, b=2, x=3)["i"]
@@ -418,11 +426,12 @@ def test_used_variable() -> None:
 
 def test_handle_error() -> None:
     @pipefunc(output_name="c")
-    def f1(a, b):  # noqa: ARG001
+    def f1(a, b):
         msg = "Test error"
         raise ValueError(msg)
 
     pipeline = Pipeline([f1])
+    assert pipeline.error_snapshot is None
     try:
         pipeline("c", a=1, b=2)
     except ValueError as e:
@@ -431,6 +440,7 @@ def test_handle_error() -> None:
         # NOTE: with pytest.raises match="..." does not work
         # with add_note for some reason on my Mac, however,
         # on CI it works fine (Linux)...
+    assert pipeline.error_snapshot is not None
 
 
 def test_output_picker_single_output() -> None:
@@ -621,7 +631,7 @@ def test_unhashable_defaults() -> None:
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", defaults={"b": {}})
+    @pipefunc(output_name="d", defaults={"b": {}})
     def g(a, b):
         return a + b
 
@@ -633,6 +643,7 @@ def test_unhashable_defaults() -> None:
         Pipeline([f, g])
 
 
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_set_debug_and_profile() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
@@ -731,3 +742,101 @@ def test_parameterless_pipefunc() -> None:
     ]
     r = pipeline.map({})
     assert r["e"].output == 3
+
+
+def test_invalid_type_hints():
+    @pipefunc(("y1", "y2"))
+    def f(a: int, b: str) -> tuple[int, str]:
+        return (a, b)
+
+    @pipefunc("z")
+    def g(
+        y1: int,
+        y2: float,  # Incorrect type hint (should be str)
+    ) -> str:
+        return f"{y1=}, {y2=}"
+
+    with pytest.raises(
+        TypeError,
+        match="Inconsistent type annotations for",
+    ):
+        Pipeline([f, g])
+
+
+class Unpicklable:
+    def __init__(self, a) -> None:
+        self.a = a
+
+    def __getstate__(self):
+        msg = "Unpicklable object"
+        raise RuntimeError(msg)
+
+
+def test_unpicklable_run(tmp_path: Path) -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return Unpicklable(a)
+
+    @pipefunc(output_name="z")
+    def g(y):
+        return 1
+
+    pipeline = Pipeline([f, g])
+
+    r = pipeline.map({"a": 1}, storage="dict", parallel=False)
+    assert isinstance(r["y"].output, Unpicklable)
+    assert r["z"].output == 1
+
+
+def test_unpicklable_run_with_mapspec():
+    @pipefunc(output_name="y", mapspec="a[i] -> y[i]")
+    def f(a):
+        return Unpicklable(a)
+
+    @pipefunc(output_name="z", mapspec="a[i] -> z[i]")
+    def g(a):
+        return a
+
+    pipeline = Pipeline([f, g])
+    inputs = {"a": [1, 2, 3, 4]}
+    r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
+    assert isinstance(r["y"].output, np.ndarray)
+    assert r["z"].output.tolist() == [1, 2, 3, 4]
+
+
+def test_duplicate_output_names() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        Pipeline([f, f])
+
+    p = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match="The function with output name `'y'` already exists in the pipeline.",
+    ):
+        p.add(f)
+
+
+def test_adding_duplicates_output_name_tuple() -> None:
+    @pipefunc(output_name="y")
+    def f(a):
+        return a
+
+    @pipefunc(output_name=("y", "y2"))
+    def g(b):
+        return b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "The function with output name `'y'` already exists in the pipeline (`f(...) → y`)",
+        ),
+    ):
+        pipeline.add(g)
