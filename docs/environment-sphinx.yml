@@ -52,5 +52,5 @@ dependencies:
   - nltk
   - scikit-image
   - pip:
-    - pydra
     - myst-nb
+    - pydra
