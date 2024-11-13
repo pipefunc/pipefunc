@@ -28,12 +28,12 @@ dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
-widgets = ["ipywidgets"]
+widgets = ["ipywidgets", "anywidget"]
 zarr = ["zarr"]
 pandas = ["pandas"]
+plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
     "pytest-asyncio",
