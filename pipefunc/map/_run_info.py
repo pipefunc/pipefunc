@@ -21,14 +21,17 @@ if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
+    from ._result import StoreType
+    from ._types import ShapeTuple, UserShapeDict
+
 
 @dataclass(frozen=True, eq=True)
 class RunInfo:
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
-    shapes: dict[OUTPUT_TYPE, tuple[int, ...]]
-    internal_shapes: dict[str, int | tuple[int, ...]] | None
+    shapes: dict[OUTPUT_TYPE, ShapeTuple]
+    internal_shapes: UserShapeDict | None
     shape_masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
     mapspecs_as_strings: list[str]
@@ -51,7 +54,7 @@ class RunInfo:
         run_folder: str | Path | None,
         pipeline: Pipeline,
         inputs: dict[str, Any],
-        internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+        internal_shapes: UserShapeDict | None = None,
         *,
         storage: str | dict[OUTPUT_TYPE, str],
         cleanup: bool = True,
@@ -91,8 +94,8 @@ class RunInfo:
             raise ValueError(msg)
         return get_storage_class(storage)
 
-    def init_store(self) -> dict[str, StorageBase | Path | DirectValue]:
-        store: dict[str, StorageBase | Path | DirectValue] = {}
+    def init_store(self) -> dict[str, StoreType]:
+        store: dict[str, StoreType] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
         # Initialize StorageBase instances for each map spec output
         for mapspec in self.mapspecs:
@@ -203,9 +206,9 @@ def _maybe_run_folder(
 
 
 def _construct_internal_shapes(
-    internal_shapes: dict[str, int | tuple[int, ...]] | None,
+    internal_shapes: UserShapeDict | None,
     pipeline: Pipeline,
-) -> dict[str, int | tuple[int, ...]] | None:
+) -> UserShapeDict | None:
     if internal_shapes is None:
         internal_shapes = {}
     for f in pipeline.functions:
@@ -230,7 +233,7 @@ def _compare_to_previous_run_info(
     pipeline: Pipeline,
     run_folder: Path,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
 ) -> None:  # pragma: no cover
     if not RunInfo.path(run_folder).is_file():
         return
@@ -305,7 +308,7 @@ def _defaults_path(run_folder: Path) -> Path:
 
 def _init_arrays(
     output_name: OUTPUT_TYPE,
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,

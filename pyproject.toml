@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler>=2.12.0"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
 widgets = ["ipywidgets"]
 zarr = ["zarr"]
@@ -40,6 +40,7 @@ plotting = [
     "jupyter_bokeh",
 ]
 profiling = ["psutil"]
+pydantic = ["pydantic"]
 test = [
     "pytest",
     "pytest-asyncio",
@@ -66,6 +67,7 @@ docs = [
     "nltk",
     "scikit-image",
 ]
+# all doesn't include 'pydantic' because there are no specific features that depend on it
 all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
 dev = [ # all + dev deps
     "black[jupyter]",
@@ -73,7 +75,7 @@ dev = [ # all + dev deps
     "ruff",
     "mypy",
     "versioningit",
-    "pipefunc[all,test,docs]",
+    "pipefunc[all,test,docs,pydantic]",
 ]
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
@@ -132,7 +134,9 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = []
+omit = [
+    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+]
 
 [tool.ruff]
 line-length = 100

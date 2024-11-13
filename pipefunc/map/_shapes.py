@@ -10,16 +10,18 @@ if TYPE_CHECKING:
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
+    from ._types import ShapeTuple, UserShapeDict
+
 
 class Shapes(NamedTuple):
-    shapes: dict[OUTPUT_TYPE, tuple[int, ...]]
+    shapes: dict[OUTPUT_TYPE, ShapeTuple]
     masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
 
 
 def map_shapes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
-    internal_shapes: dict[str, int | tuple[int, ...]] | None = None,
+    internal_shapes: UserShapeDict | None = None,
 ) -> Shapes:
     if internal_shapes is None:
         internal_shapes = {}

@@ -122,3 +122,15 @@ def _mapspec_with_internal_shape(f_out: PipeFunc, parameter_name: str) -> bool:
     output_spec = next(s for s in f_out.mapspec.outputs if s.name == parameter_name)
     all_inputs_in_outputs = f_out.mapspec.input_indices.issuperset(output_spec.indices)
     return not all_inputs_in_outputs
+
+
+def validate_unique_output_names(
+    output_name: OUTPUT_TYPE,
+    output_to_func: dict[OUTPUT_TYPE, PipeFunc],
+) -> None:
+    for name in at_least_tuple(output_name):
+        for other in output_to_func:
+            if name in at_least_tuple(other):
+                func = output_to_func[other]
+                msg = f"The function with output name `{name!r}` already exists in the pipeline (`{func}`)."
+                raise ValueError(msg)

@@ -84,7 +84,8 @@ class StorageBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def parallelizable(self) -> bool: ...
+    def dump_in_subprocess(self) -> bool:
+        """Indicates if the storage can be dumped in a subprocess and read by the main process."""
 
     @property
     def size(self) -> int:

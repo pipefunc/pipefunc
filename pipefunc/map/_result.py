@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple
+from pathlib import Path
+from typing import Any, NamedTuple, TypeAlias
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from ._storage_array._base import StorageBase
+from ._storage_array._base import StorageBase
 
 
 class _Missing: ...
@@ -21,9 +19,12 @@ class DirectValue:
         return self.value is not _Missing
 
 
+StoreType: TypeAlias = StorageBase | Path | DirectValue
+
+
 class Result(NamedTuple):
     function: str
     kwargs: dict[str, Any]
     output_name: str
     output: Any
-    store: StorageBase | Path | DirectValue
+    store: StoreType
