@@ -3,9 +3,17 @@
 #
 
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
+
+from docutils import nodes
+from docutils.nodes import Node
+from docutils.statemachine import ViewList
+from sphinx import addnodes
+from sphinx.directives.other import TocTree
+from sphinx.util.nodes import nested_parse_with_titles
 
 package_path = Path("../..").resolve()
 sys.path.insert(0, str(package_path))
@@ -116,6 +124,48 @@ def convert_notebook_to_md(input_file: Path, output_file: Path) -> None:
     jupytext.write(notebook, output_file)
 
 
+def get_top_yaml_block(file_path: Path):
+    with file_path.open(encoding="utf-8") as f:
+        content = f.read()
+    # Split the content by '---' and check for valid sections
+    sections = content.split("---")
+    if len(sections) >= 3:  # noqa: PLR2004
+        # Return the content between the first and second '---'
+        return "---\n" + sections[1].strip() + "\n---"
+    msg = "Invalid YAML block in the file."
+    raise ValueError(msg)
+
+
+def split_notebook_by_headers(notebook_md: Path) -> list[str]:
+    with notebook_md.open(encoding="utf-8") as f:
+        content = f.read()
+
+    folder = notebook_md.parent / "tutorial"
+    folder.mkdir(exist_ok=True, parents=True)
+
+    yaml_block = get_top_yaml_block(notebook_md)
+    headers = [
+        ("getting_started.md", "# Tutorial for Pipefunc Package"),
+        ("advanced.md", "## Advanced features"),
+        ("examples.md", "## Full Examples"),
+    ]
+    parts = []
+    for i, (_, header) in enumerate(headers):
+        assert header in content
+        part, content = content.split(header, 1)
+        content = header + content
+        if i > 0:
+            part = yaml_block + part
+        parts.append(part)
+    # Add the last part
+    parts.append(yaml_block + content)
+    for (filename, _), part in zip(headers, parts):
+        with (folder / filename).open("w", encoding="utf-8") as f:
+            f.write(part)
+
+    return parts
+
+
 def _change_alerts_to_admonitions(input_text: str) -> str:
     # Splitting the text into lines
     lines = input_text.split("\n")
@@ -196,6 +246,62 @@ def process_readme_for_sphinx_docs(readme_path: Path, docs_path: Path) -> None:
     change_alerts_to_admonitions(output_file, output_file)
 
 
+class ExpandHeadersTocTree(TocTree):
+    def run(self) -> list[Node]:
+        # Make sure the directive is not set to hidden.
+        assert self.options.get("hidden", False) == False
+
+        # Initialize a root list for our toc
+        root_list = nodes.bullet_list()
+
+        # We expect a single document name (e.g., 'tutorial') as the content of this directive
+        docname = self.content[0].strip()
+
+        # Read the target document from Sphinx's environment
+        env = self.state.document.settings.env
+        doc_path = env.doc2path(docname)
+
+        # Read and parse the document's contents to extract its section titles
+        with open(doc_path, "r") as doc_file:
+            doc_content = doc_file.readlines()
+
+        # Create a string list from the document lines
+        viewlist = ViewList(doc_content, docname)
+
+        # Parse the document to get all section titles
+        section_titles = []
+        print("yolo", viewlist)
+        for line in viewlist:
+            if line.startswith("# ") or line.startswith("## "):
+                # We assume that lines starting with '#' are section headers
+                title_text = line.strip("#").strip()
+                section_id = re.sub(r"\s+", "-", title_text.lower())
+                section_titles.append((title_text, section_id))
+
+        # Create list items for each section header
+        for title, section_id in section_titles:
+            node = addnodes.compact_paragraph()
+            target = f"{docname}#{section_id}"
+            xref_node = addnodes.pending_xref(
+                target, reftype="doc", refdomain="std", reftarget=target
+            )
+            xref_node += nodes.inline(
+                "", title, classes=["xref", "std", "std-doc"]
+            )  # Corrected here
+            node += xref_node
+            root_list += nodes.list_item("", node)
+
+        # Now we generate the actual hidden toctree to be used
+        self.options["hidden"] = True
+        toctree_output = super().run()
+
+        # Append our dynamically generated list of section links to the wrapper node
+        wrapper_node = toctree_output[-1]
+        wrapper_node.append(root_list)
+
+        return toctree_output
+
+
 # Process the README.md file for Sphinx documentation
 readme_path = package_path / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
@@ -214,4 +320,5 @@ nb_merge_streams = True
 
 
 def setup(app) -> None:
-    pass
+    app.add_directive("expand_headers_toc", ExpandHeadersTocTree)
+    return {"version": "1", "parallel_read_safe": True}
