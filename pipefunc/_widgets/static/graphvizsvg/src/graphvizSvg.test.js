@@ -198,19 +198,50 @@ describe("GraphvizSvg", () => {
     const options = {
       svg: svgContent,
       ready() {
+        // Debug the graph structure
+        console.log("Nodes by name:", Object.keys(this._nodesByName));
+        console.log("Edges by name:", Object.keys(this._edgesByName));
+
         const nodeA = this._nodesByName["A"];
+        console.log("Node A found:", !!nodeA);
+
+        // Debug the linked method
         const linkedNodes = this.linked(nodeA, false);
-        expect(linkedNodes.length).toBe(2); // Should find B and C
-        const linkedNames = linkedNodes.map((_, el) => $(el).attr("data-name")).get();
+        console.log("Linked nodes length:", linkedNodes.length);
+
+        const linkedNames = linkedNodes
+          .map((_, el) => {
+            const name = $(el).attr("data-name");
+            console.log("Found linked node:", name);
+            return name;
+          })
+          .get();
+
+        // Add more detailed assertions
+        expect(linkedNodes.length).toBe(
+          2,
+          `Expected 2 linked nodes but found ${linkedNodes.length}: ${linkedNames.join(", ")}`
+        );
+
         expect(linkedNames).toContain("B");
         expect(linkedNames).toContain("C");
+
+        // Let's also test the intermediate connections
+        const directLinks = this.linkedFrom(nodeA, false);
+        console.log(
+          "Direct links from A:",
+          directLinks.map((_, el) => $(el).attr("data-name")).get()
+        );
+
+        const nodeB = this._nodesByName["B"];
+        const linksFromB = this.linkedFrom(nodeB, false);
+        console.log("Links from B:", linksFromB.map((_, el) => $(el).attr("data-name")).get());
+
         done();
       },
     };
-
     container.graphviz(options);
   });
-
   test("should highlight specified nodes and dim others", (done) => {
     const svgContent = `<svg width="100pt" height="100pt">
       <g>
