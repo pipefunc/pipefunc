@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "GraphvizSvg.js",
   "scripts": {
-    "test": "jest --config jest.config.js --coverage"
+    "test": "jest --config jest.config.js --coverage",
+		"dev": "npm run build -- --sourcemap=inline --watch",
+		"build": "esbuild src/GraphVizSvg.js --minify --format=esm --bundle --outdir=static"
   },
   "keywords": [],
   "author": "",
