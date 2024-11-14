@@ -1,0 +1,10 @@
+{
+	"scripts": {
+		"dev": "npm run build -- --sourcemap=inline --watch",
+		"build": "esbuild js/widget.js --minify --format=esm --bundle --outdir=static"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"esbuild": "^0.24.0"
+	}
+}

@@ -1,34 +1,8 @@
-from pathlib import Path
 from typing import Any
 
-import anywidget
 import ipywidgets as widgets
-import traitlets
 
-
-class PipeFuncGraphWidget(anywidget.AnyWidget):
-    """A widget for rendering a graphviz graph using d3-graphviz.
-
-    Example:
-    -------
-    >>> dot_string = "digraph { a -> b; b -> c; c -> a; }"
-    >>> pipe_func_graph_widget = PipeFuncGraphWidget(dot_source=dot_string)
-    >>> pipe_func_graph_widget
-
-    """
-
-    _esm = Path(__file__).parent / "static" / "graphviz_widget.js"
-
-    _css = """
-    #graph {
-        margin: auto;
-    }
-    """
-
-    dot_source = traitlets.Unicode("").tag(sync=True)
-    selected_direction = traitlets.Unicode("bidirectional").tag(sync=True)
-    search_type = traitlets.Unicode("included").tag(sync=True)
-    case_sensitive = traitlets.Bool(False).tag(sync=True)  # noqa: FBT003
+from .graphviz_widget import PipeFuncGraphWidget
 
 
 def graph_widget(dot_string: str = "digraph { a -> b; b -> c; c -> a; }") -> widgets.VBox:
