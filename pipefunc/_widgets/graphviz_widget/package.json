@@ -1,9 +1,13 @@
 {
 	"scripts": {
-		"dev": "npm run build -- --sourcemap=inline --watch",
-		"build": "esbuild js/widget.js --minify --format=esm --bundle --outdir=static"
+        "build": "esbuild js/widget.js --format=esm --bundle --outdir=static --loader:.wasm=file",
+        "dev": "npm run build -- --sourcemap=inline --watch"
 	},
-	"dependencies": {},
+	"dependencies": {
+		"d3": "7.6.1",
+		"d3-graphviz": "4.4.0",
+		"graphvizsvg": "file:../graphvizsvg"
+	},
 	"devDependencies": {
 		"esbuild": "^0.24.0"
 	}
