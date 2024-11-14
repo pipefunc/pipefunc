@@ -1,7 +1,7 @@
 {
   "name": "static",
   "version": "1.0.0",
-  "main": "GraphvizSvg.js",
+  "main": "src/graphvizsvg.js",
   "scripts": {
     "test": "jest --config jest.config.js --coverage",
 		"dev": "npm run build -- --sourcemap=inline --watch",
