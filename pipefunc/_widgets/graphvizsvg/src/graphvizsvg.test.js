@@ -1,6 +1,6 @@
 // graphvizSvg.test.js
 import $ from "jquery";
-import GraphvizSvg from "./GraphvizSvg";
+import GraphvizSvg from "./graphvizsvg";
 import "jquery-mousewheel";
 import "jquery-color";
 import "bootstrap";
@@ -528,4 +528,5 @@ describe("GraphvizSvg", () => {
     };
     container.graphviz(options);
   });
+
 });
