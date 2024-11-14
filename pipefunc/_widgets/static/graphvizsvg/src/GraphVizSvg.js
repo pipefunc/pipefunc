@@ -365,43 +365,35 @@ class GraphvizSvg {
 
   linkedTo(node, includeEdges) {
     const $retval = $();
-    this.findLinked(node, includeEdges, (nodeName, edgeName) => {
-      const match = `->${nodeName}`;
-      if (edgeName.endsWith(match)) {
-        return edgeName.substring(0, edgeName.length - match.length);
-      }
-      return null;
+    const nodeName = $(node).attr('data-name');
+
+    // Only find direct incoming connections
+    this.findLinked(node, includeEdges, (_, edgeName) => {
+        const match = edgeName.match(new RegExp(`^(.*)->${nodeName}`));
+        return match ? match[1] : null;
     }, $retval);
+
     return $retval;
   }
-
   linkedFrom(node, includeEdges) {
     const $retval = $();
-    this.findLinked(node, includeEdges, (nodeName, edgeName) => {
-      const match = `${nodeName}->`;
-      if (edgeName.startsWith(match)) {
-        return edgeName.substring(match.length);
-      }
-      return null;
+    const nodeName = $(node).attr('data-name');
+
+    // Only find direct outgoing connections
+    this.findLinked(node, includeEdges, (_, edgeName) => {
+        const match = edgeName.match(new RegExp(`^${nodeName}->(.*)`));
+        return match ? match[1] : null;
     }, $retval);
+
     return $retval;
   }
 
   linked(node, includeEdges) {
     const $retval = $();
-    this.findLinked(node, includeEdges, (nodeName, edgeName) => {
-      const undirectedPattern1 = `${nodeName}--(.*)`;
-      const undirectedPattern2 = `(.*)--${nodeName}`;
-      const match1 = edgeName.match(new RegExp(undirectedPattern1));
-      const match2 = edgeName.match(new RegExp(undirectedPattern2));
-      if (match1) {
-        return match1[1];
-      } else if (match2) {
-        return match2[1];
-      }
-      return null;
-    }, $retval);
-    return $retval;
+    $retval.push(node);  // Add the original node
+    const fromNodes = this.linkedFrom(node, includeEdges);
+    const toNodes = this.linkedTo(node, includeEdges);
+    return $retval.add(fromNodes).add(toNodes);
   }
 
   tooltip($elements, show) {
