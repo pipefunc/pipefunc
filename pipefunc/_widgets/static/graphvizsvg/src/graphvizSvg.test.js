@@ -461,4 +461,71 @@ describe("GraphvizSvg", () => {
     };
     container.graphviz(options);
   });
+
+  test("should handle edge attributes", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+      <g>
+        <g class="node"><title>A</title><ellipse cx="50" cy="50" rx="30" ry="30"/></g>
+        <g class="node"><title>B</title><ellipse cx="150" cy="50" rx="30" ry="30"/></g>
+        <g class="edge">
+          <title>A->B</title>
+          <path d="M50,50 L150,50" stroke="#ff0000" stroke-width="2"/>
+        </g>
+      </g>
+    </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        const edge = $(this._edgesByName["A->B"]);
+        const color = edge.find("path").data("graphviz.svg.color");
+        expect(color.stroke).toBe("#ff0000");
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  test("should handle user comments", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+      <g>
+        <!-- User Comment -->
+        <g class="node">
+          <title>A</title>
+          <ellipse cx="50" cy="50" rx="30" ry="30"/>
+        </g>
+      </g>
+    </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        const node = $(this._nodesByName["A"]);
+        expect(node.attr("data-comment")).toBe("User Comment");
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  test("should handle sendToBack with and without background", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+      <g>
+        <polygon points="0,0 100,0 100,100 0,100" fill="#ffffff"/>
+        <g class="node"><title>A</title><ellipse cx="50" cy="50" rx="30" ry="30"/></g>
+      </g>
+    </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        const node = $(this._nodesByName["A"]);
+        this.sendToBack(node);
+        // Should be after background polygon
+        expect(node.prev().prop("tagName")).toBe("polygon");
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
 });
