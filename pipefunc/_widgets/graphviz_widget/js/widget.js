@@ -1,41 +1,19 @@
-function loadScript(url) {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = url;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
-        document.head.append(script);
-    });
-}
+import GraphvizSvg from 'graphvizsvg';
+import { graphviz } from 'd3-graphviz';
+import * as d3 from 'd3';
 
-async function loadAllScripts() {
-    const scripts = [
-        "https://unpkg.com/jquery@3.6.1/dist/jquery.min.js",
-        "https://unpkg.com/jquery-mousewheel@3.1.13/jquery.mousewheel.js",
-        "https://unpkg.com/jquery-color@2.2.0/dist/jquery.color.js",
-        "https://unpkg.com/d3@7.6.1/dist/d3.min.js",
-        "https://cdn.jsdelivr.net/gh/mountainstorm/jquery.graphviz.svg@master/js/jquery.graphviz.svg.js",
-        "https://unpkg.com/@hpcc-js/wasm@1.18.0/dist/index.min.js",
-        "https://unpkg.com/d3-graphviz@4.4.0/build/d3-graphviz.min.js",
-    ];
-
-    for (const script of scripts) {
-        await loadScript(script);
-    }
-}
-
-function getLegendElements(GraphvizSvg, $) {
+function getLegendElements(graphvizInstance, $) {
     const legendNodes = [];
     const legendEdges = [];
 
-    GraphvizSvg.nodes().each(function () {
+    graphvizInstance.nodes().each(function () {
         const $node = $(this);
         if ($node.attr("data-name").startsWith("legend_")) {
             legendNodes.push($node[0]);
         }
     });
 
-    GraphvizSvg.edges().each(function () {
+    graphvizInstance.edges().each(function () {
         const $edge = $(this);
         if ($edge.attr("data-name").startsWith("legend_")) {
             legendEdges.push($edge[0]);
@@ -44,9 +22,9 @@ function getLegendElements(GraphvizSvg, $) {
     return { legendNodes: $(legendNodes), legendEdges: $(legendEdges) };
 }
 
-function findEdges(text, searchFunction, GraphvizSvg, $) {
+function findEdges(text, searchFunction, graphvizInstance, $) {
     const $set = $();
-    GraphvizSvg.edges().each((index, edge) => {
+    graphvizInstance.edges().each((index, edge) => {
         if (edge.textContent && searchFunction(text, edge.textContent)) {
             $set.push(edge);
         }
@@ -54,9 +32,9 @@ function findEdges(text, searchFunction, GraphvizSvg, $) {
     return $set;
 }
 
-function findNodes(text, searchFunction, nodeName, nodeLabel, GraphvizSvg, $) {
+function findNodes(text, searchFunction, nodeName, nodeLabel, graphvizInstance, $) {
     const $set = $();
-    const nodes = GraphvizSvg.nodesByName();
+    const nodes = graphvizInstance.nodesByName();
 
     for (const [nodeID, node] of Object.entries(nodes)) {
         if (
@@ -69,7 +47,7 @@ function findNodes(text, searchFunction, nodeName, nodeLabel, GraphvizSvg, $) {
     return $set;
 }
 
-function search(text, searchObject, GraphvizSvg, $) {
+function search(text, searchObject, graphvizInstance, $) {
     let searchFunction;
 
     switch (searchObject.type) {
@@ -97,7 +75,7 @@ function search(text, searchObject, GraphvizSvg, $) {
 
     let $edges = $();
     if (searchObject.edgeLabel) {
-        $edges = findEdges(text, searchFunction, GraphvizSvg, $);
+        $edges = findEdges(text, searchFunction, graphvizInstance, $);
     }
 
     let $nodes = $();
@@ -107,16 +85,16 @@ function search(text, searchObject, GraphvizSvg, $) {
             searchFunction,
             searchObject.nodeName,
             searchObject.nodeLabel,
-            GraphvizSvg,
+            graphvizInstance,
             $
         );
     }
     return { nodes: $nodes, edges: $edges };
 }
 
-function getConnectedNodes(nodeSet, mode, GraphvizSvg) {
+function getConnectedNodes(nodeSet, mode, graphvizInstance) {
     let resultSet = $().add(nodeSet);
-    const nodes = GraphvizSvg.nodesByName();
+    const nodes = graphvizInstance.nodesByName();
 
     nodeSet.each((i, el) => {
         if (mode === "single") {
@@ -126,44 +104,45 @@ function getConnectedNodes(nodeSet, mode, GraphvizSvg) {
             if ((mode === "bidirectional" || mode === "upstream") && startNode) {
                 resultSet = resultSet
                     .add(nodes[startNode])
-                    .add(GraphvizSvg.linkedTo(nodes[startNode], true));
+                    .add(graphvizInstance.linkedTo(nodes[startNode], true));
             }
             if ((mode === "bidirectional" || mode === "downstream") && endNode) {
                 resultSet = resultSet
                     .add(nodes[endNode])
-                    .add(GraphvizSvg.linkedFrom(nodes[endNode], true));
+                    .add(graphvizInstance.linkedFrom(nodes[endNode], true));
             }
         } else {
             if (mode === "bidirectional" || mode === "upstream") {
-                resultSet = resultSet.add(GraphvizSvg.linkedTo(el, true));
+                resultSet = resultSet.add(graphvizInstance.linkedTo(el, true));
             }
             if (mode === "bidirectional" || mode === "downstream") {
-                resultSet = resultSet.add(GraphvizSvg.linkedFrom(el, true));
+                resultSet = resultSet.add(graphvizInstance.linkedFrom(el, true));
             }
         }
     });
     return resultSet;
 }
 
-function highlightSelection(GraphvizSvg, currentSelection, $) {
+function highlightSelection(graphvizInstance, currentSelection, $) {
     let highlightedNodes = $();
     let highlightedEdges = $();
 
     currentSelection.forEach((selection) => {
-        const nodes = getConnectedNodes(selection.set, selection.direction, GraphvizSvg);
+        const nodes = getConnectedNodes(selection.set, selection.direction, graphvizInstance);
         highlightedNodes = highlightedNodes.add(nodes);
     });
 
-    const { legendNodes, legendEdges } = getLegendElements(GraphvizSvg, $);
+    const { legendNodes, legendEdges } = getLegendElements(graphvizInstance, $);
     highlightedNodes = highlightedNodes.add(legendNodes);
     highlightedEdges = highlightedEdges.add(legendEdges);
 
-    GraphvizSvg.highlight(highlightedNodes, highlightedEdges);
+    graphvizInstance.highlight(highlightedNodes, highlightedEdges);
 }
 
-function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, getSelectedDirection) {
+function handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, getSelectedDirection) {
     // Add hover event listeners for edges
-    GraphvizSvg.edges().each(function () {
+    console.log("graphvizInstance", graphvizInstance);
+    graphvizInstance.edges().each(function () {
         const $edge = $(this);
 
         // Store the original color if not already stored
@@ -186,7 +165,7 @@ function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, getSelectedDi
     });
 
     // Add event listeners for nodes
-    GraphvizSvg.nodes().click(function (event) {
+    graphvizInstance.nodes().click(function (event) {
         const nodeSet = $().add(this);
         const selectionObject = {
             set: nodeSet,
@@ -198,31 +177,26 @@ function handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, getSelectedDi
             currentSelection.splice(0, currentSelection.length, selectionObject);
         }
 
-        highlightSelection(GraphvizSvg, currentSelection, $);
+        highlightSelection(graphvizInstance, currentSelection, $);
     });
 
     // Add a keydown event listener for escape key to reset highlights
     $(document).keydown(function (event) {
         if (event.keyCode === 27) {
             // Escape key
-            GraphvizSvg.highlight();
+            graphvizInstance.highlight();
         }
     });
 }
 
 async function initialize({ model }) {
-    await loadAllScripts();
 }
 
 async function render({ model, el }) {
-
-    const $ = window.jQuery;
-    const d3 = window.d3;
-
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
-
-    const d3graphviz = d3.select("#graph").graphviz();
-    let GraphvizSvg;
+    const d3graphviz = graphviz("#graph");
+    console.log("d3graphviz", d3graphviz);
+    let graphvizInstance;
     const currentSelection = [];
     let selectedDirection = model.get("selected_direction") || "bidirectional";
 
@@ -257,7 +231,7 @@ async function render({ model, el }) {
 
     const resetGraph = () => {
         d3graphviz.resetZoom();
-        GraphvizSvg.highlight();
+        graphvizInstance.highlight();
         currentSelection.length = 0;
     };
 
@@ -267,11 +241,11 @@ async function render({ model, el }) {
     };
 
     const searchAndHighlight = (query) => {
-        const searchResults = search(query, searchObject, GraphvizSvg, $);
-        const { legendNodes, legendEdges } = getLegendElements(GraphvizSvg, $);
+        const searchResults = search(query, searchObject, graphvizInstance, $);
+        const { legendNodes, legendEdges } = getLegendElements(graphvizInstance, $);
         const nodesToHighlight = searchResults.nodes.add(legendNodes);
         const edgesToHighlight = searchResults.edges.add(legendEdges);
-        GraphvizSvg.highlight(nodesToHighlight, edgesToHighlight);
+        graphvizInstance.highlight(nodesToHighlight, edgesToHighlight);
     };
 
     model.on("change:search_type", () => {
@@ -298,13 +272,15 @@ async function render({ model, el }) {
         }
     });
 
-    $(document).ready(function () {
+    $(document).ready(() => {
         $("#graph").graphviz({
             shrink: null,
             zoom: false,
             ready: function () {
-                GraphvizSvg = this;
-                handleGraphvizSvgEvents(GraphvizSvg, $, currentSelection, () => selectedDirection);
+                console.log("ready");
+                const graphvizInstance = new GraphvizSvg(this);
+                console.log("ready graphvizInstance", graphvizInstance);
+                handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
             },
         });
     });
