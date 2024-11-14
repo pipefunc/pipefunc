@@ -1,5 +1,8 @@
 // graphvizSvg.js
-import $ from 'jquery';
+import jQuery from "jquery";
+if (typeof window !== "undefined") {
+  window.jQuery = window.$ = jQuery;
+}
 import 'jquery-mousewheel';
 import 'jquery-color';
 import 'bootstrap';
@@ -17,7 +20,7 @@ class GraphvizSvg {
         const $a = $(this);
         $a.tooltip({
           container: $graph,
-          placement: 'auto left',
+          placement: 'left',
           animation: false,
           viewport: null,
         }).on('hide.bs.tooltip', function () {
@@ -194,7 +197,7 @@ class GraphvizSvg {
     }
 
     // Remove namespace from a[xlink:title]
-    $el.children('a').filter(function () { return $(this).attr('xlink:title'); }).each(function () {
+    $el.find('a').filter(function () { return $(this).attr('xlink:title'); }).each(function () {
       const $a = $(this);
       $a.attr('title', $a.attr('xlink:title'));
       $a.removeAttr('xlink:title');
@@ -399,7 +402,7 @@ class GraphvizSvg {
   tooltip($elements, show) {
     const options = this.options;
     $elements.each(function () {
-      $(this).children('a[title]').each(function () {
+      $(this).find('a[title]').each(function () {
         if (show) {
           options.tooltips.show.call(this);
         } else {
