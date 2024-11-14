@@ -149,6 +149,7 @@ class GraphvizSvg {
 
   setupNodesEdges($el, isNode) {
     const options = this.options;
+    const that = this;  // Store reference to GraphvizSvg instance
 
     // Save the colors of the paths, ellipses, and polygons
     $el.find('polygon, ellipse, path').each((_, elem) => {
@@ -202,9 +203,9 @@ class GraphvizSvg {
       $a.attr('title', $a.attr('xlink:title'));
       $a.removeAttr('xlink:title');
       if (options.tooltips) {
-        options.tooltips.init.call(this, this.$element);
+        options.tooltips.init.call(this, that.$element);
       }
-    }.bind(this));
+    });
   }
 
   setupZoom() {

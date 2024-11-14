@@ -1,11 +1,11 @@
 {
-  "name": "static",
+  "name": "graphvizsvg",
   "version": "1.0.0",
   "main": "src/graphvizsvg.js",
   "scripts": {
     "test": "jest --config jest.config.js --coverage",
-		"dev": "npm run build -- --sourcemap=inline --watch",
-		"build": "esbuild src/GraphVizSvg.js --minify --format=esm --bundle --outdir=static"
+    "dev": "npm run build -- --sourcemap=inline --watch",
+    "build": "esbuild src/GraphVizSvg.js --minify --format=esm --bundle --outdir=static"
   },
   "keywords": [],
   "author": "",
@@ -20,11 +20,9 @@
     "jsdom": "^25.0.1"
   },
   "dependencies": {
-    "bootstrap": "5.3.3",
-    "d3-graphviz": "^4.4.0",
-    "jquery": "^3.6.1",
-    "jquery-color": "^2.2.0",
-    "jquery-mousewheel": "^3.1.13",
-    "util": "^0.12.5"
+    "jquery": "3.3.1",
+    "jquery-mousewheel": "3.1.13",
+    "jquery-color": "2.2.0",
+    "bootstrap": "4.1.3"
   }
 }
