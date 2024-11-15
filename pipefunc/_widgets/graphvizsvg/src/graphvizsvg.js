@@ -3,7 +3,6 @@ import jQuery from "jquery";
 if (typeof window !== "undefined") {
   window.jQuery = window.$ = jQuery;
 }
-import "jquery-mousewheel";
 import "jquery-color";
 import "bootstrap";
 
@@ -47,7 +46,6 @@ class GraphvizSvg {
         }
       },
     },
-    zoom: true,
     highlight: {
       selected(col) {
         return col;
@@ -142,10 +140,6 @@ class GraphvizSvg {
     this.$graph.attr("data-name", $title.text());
     $title.remove();
 
-    if (options.zoom) {
-      this.setupZoom();
-    }
-
     // Notify when setup is complete
     if (options.ready) {
       options.ready.call(this);
@@ -216,50 +210,6 @@ class GraphvizSvg {
           options.tooltips.init.call(this, that.$element);
         }
       });
-  }
-
-  setupZoom() {
-    this.zoom = {
-      width: this.$svg.attr("width"),
-      height: this.$svg.attr("height"),
-      percentage: null,
-    };
-    this.scaleView(100.0);
-    this.$element.on("mousewheel", (evt) => {
-      if (evt.shiftKey) {
-        let percentage = this.zoom.percentage;
-        percentage -= evt.deltaY * evt.deltaFactor;
-        if (percentage < 100.0) {
-          percentage = 100.0;
-        }
-        // Get pointer offset in view
-        const dx = evt.pageX - this.$svg.offset().left;
-        const dy = evt.pageY - this.$svg.offset().top;
-        const rx = dx / this.$svg.width();
-        const ry = dy / this.$svg.height();
-
-        // Offset within frame ($element)
-        const px = evt.pageX - this.$element.offset().left;
-        const py = evt.pageY - this.$element.offset().top;
-
-        this.scaleView(percentage);
-        // Scroll so pointer is still in the same place
-        this.$element.scrollLeft(rx * this.$svg.width() + 0.5 - px);
-        this.$element.scrollTop(ry * this.$svg.height() + 0.5 - py);
-        return false; // Stop propagation
-      }
-    });
-  }
-
-  scaleView(percentage) {
-    this.$svg.attr("width", `${percentage}%`);
-    this.$svg.attr("height", `${percentage}%`);
-    this.zoom.percentage = percentage;
-    // Update tooltip position
-    const $everything = this.$nodes.add(this.$edges);
-    $everything.children("a[title]").each((_, el) => {
-      this.options.tooltips.update.call(el);
-    });
   }
 
   scaleNode($node) {

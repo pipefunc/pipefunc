@@ -1,5 +1,4 @@
 // jest.setup.js
-require("jquery-mousewheel");
 require("jquery-color");
 
 const { TextEncoder, TextDecoder } = require("util");

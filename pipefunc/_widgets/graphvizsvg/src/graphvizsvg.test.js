@@ -1,7 +1,6 @@
 // graphvizSvg.test.js
 import $ from "jquery";
 import GraphvizSvg from "./graphvizsvg";
-import "jquery-mousewheel";
 import "jquery-color";
 import "bootstrap";
 
@@ -66,55 +65,6 @@ describe("GraphvizSvg", () => {
         const linkedNodes = this.linkedFrom(nodeA, false);
         expect(linkedNodes.length).toBe(1);
         expect($(linkedNodes[0]).attr("data-name")).toBe("B");
-        done();
-      },
-    };
-
-    container.graphviz(options);
-  });
-
-  test("should initialize with default options when none are provided", (done) => {
-    container.graphviz({
-      ready() {
-        expect(this.options.zoom).toBe(true);
-        expect(this.options.shrink).toEqual({ x: 4.0625, y: 4.0625 }); // 0.125pt converted to px
-        done();
-      },
-    });
-  });
-
-  test("should scale the view on zoom", (done) => {
-    const svgContent = `<svg width="100pt" height="100pt">
-      <g>
-        <g class="node">
-          <title>Node1</title>
-          <ellipse cx="50" cy="50" rx="30" ry="30" fill="#ff0000"/>
-        </g>
-      </g>
-    </svg>`;
-
-    const options = {
-      svg: svgContent,
-      ready() {
-        const initialWidth = this.$svg.attr("width");
-        const initialHeight = this.$svg.attr("height");
-
-        // Simulate mousewheel event with Shift key pressed
-        const event = $.Event("mousewheel", {
-          shiftKey: true,
-          deltaY: -1,
-          deltaFactor: 10,
-          pageX: 60,
-          pageY: 60,
-        });
-
-        this.$element.trigger(event);
-
-        const newWidth = this.$svg.attr("width");
-        const newHeight = this.$svg.attr("height");
-
-        expect(newWidth).not.toBe(initialWidth);
-        expect(newHeight).not.toBe(initialHeight);
         done();
       },
     };
@@ -274,27 +224,6 @@ describe("GraphvizSvg", () => {
     };
 
     container.graphviz(options);
-  });
-
-  test("should initialize with default options when none are provided", (done) => {
-    container.graphviz({
-      svg: `<svg></svg>`,
-      ready() {
-        expect(this.options.zoom).toBe(true);
-        done();
-      },
-    });
-  });
-
-  test("should not set up zoom when zoom option is false", (done) => {
-    container.graphviz({
-      svg: `<svg></svg>`,
-      zoom: false,
-      ready() {
-        expect(this.zoom).toBeUndefined();
-        done();
-      },
-    });
   });
 
   test("should handle invalid SVG content gracefully", (done) => {
