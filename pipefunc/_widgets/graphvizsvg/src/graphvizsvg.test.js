@@ -177,45 +177,38 @@ describe("GraphvizSvg", () => {
       <g>
         <g class="node">
           <title>A</title>
-          <ellipse cx="50" cy="50" rx="30" ry="30" fill="#ff0000"/>
+          <ellipse cx="50" cy="50" rx="30" ry="30"/>
         </g>
         <g class="node">
           <title>B</title>
-          <ellipse cx="150" cy="50" rx="30" ry="30" fill="#00ff00"/>
+          <ellipse cx="150" cy="50" rx="30" ry="30"/>
         </g>
         <g class="node">
           <title>C</title>
-          <ellipse cx="100" cy="100" rx="30" ry="30" fill="#0000ff"/>
+          <ellipse cx="100" cy="100" rx="30" ry="30"/>
         </g>
         <g class="edge">
           <title>A->B</title>
-          <path d="M50,50 L150,50" stroke="#000000"/>
+          <path d="M50,50 L150,50"/>
         </g>
         <g class="edge">
           <title>B->C</title>
-          <path d="M150,50 L100,100" stroke="#000000"/>
+          <path d="M150,50 L100,100"/>
         </g>
       </g>
     </svg>`;
-
     const options = {
       svg: svgContent,
       ready() {
         const nodeA = this._nodesByName["A"];
-        const linkedNodes = this.linked(nodeA, false);
-
-        // Should find A (self) and B (direct connection)
+        // Should find both B and C through transitive connection
+        const linkedNodes = this.linkedFrom(nodeA, false);
         expect(linkedNodes.length).toBe(2);
         const linkedNames = linkedNodes
           .map((_, el) => $(el).attr("data-name"))
           .get()
           .sort();
-        expect(linkedNames).toEqual(["A", "B"]); // Only direct connections plus self
-
-        // Test direct connections
-        const directLinks = this.linkedFrom(nodeA, false);
-        expect(directLinks.map((_, el) => $(el).attr("data-name")).get()).toEqual(["B"]);
-
+        expect(linkedNames).toEqual(["B", "C"]);
         done();
       },
     };
@@ -388,37 +381,31 @@ describe("GraphvizSvg", () => {
         </g>
       </g>
     </svg>`;
-
     const options = {
       svg: svgContent,
       ready() {
         const nodeA = this._nodesByName["A"];
-        const linkedNodes = this.linked(nodeA, false);
-        // Should find A (self) and B (direct connection)
-        expect(linkedNodes.length).toBe(2);
-        const linkedNames = linkedNodes
-          .map((_, el) => $(el).attr("data-name"))
-          .get()
-          .sort();
-        expect(linkedNames).toEqual(["A", "B"]);
 
-        // Test individual directions
+        // Test outgoing connections (should find both B and C)
         expect(
           this.linkedFrom(nodeA, false)
             .map((_, el) => $(el).attr("data-name"))
             .get()
-        ).toEqual(["B"]);
+            .sort()
+        ).toEqual(["B", "C"]);
+
+        // Test incoming connections (should find none)
         expect(
           this.linkedTo(nodeA, false)
             .map((_, el) => $(el).attr("data-name"))
             .get()
         ).toEqual([]);
+
         done();
       },
     };
     container.graphviz(options);
   });
-
   test("should handle cycles in the graph", (done) => {
     const svgContent = `<svg width="100pt" height="100pt">
       <g>
@@ -430,32 +417,24 @@ describe("GraphvizSvg", () => {
         <g class="edge"><title>C->A</title><path d="M100,100 L50,50"/></g>
       </g>
     </svg>`;
-
     const options = {
       svg: svgContent,
       ready() {
         const nodeA = this._nodesByName["A"];
-        const linkedNodes = this.linked(nodeA, false);
-        // Our implementation includes A (self), B (outgoing), and C (incoming)
-        // This is actually an improvement over the original which would fail with cycles
-        expect(linkedNodes.length).toBe(3);
-        const linkedNames = linkedNodes
-          .map((_, el) => $(el).attr("data-name"))
-          .get()
-          .sort();
-        expect(linkedNames).toEqual(["A", "B", "C"]);
-
-        // Individual directions still work as expected
+        // Test outgoing connections from A (should find all nodes due to cycle: A->B->C->A)
         expect(
           this.linkedFrom(nodeA, false)
             .map((_, el) => $(el).attr("data-name"))
             .get()
-        ).toEqual(["B"]);
+            .sort()
+        ).toEqual(["A", "B", "C"]);
+        // Test incoming connections to A (should find all nodes due to cycle: C->A->B->C)
         expect(
           this.linkedTo(nodeA, false)
             .map((_, el) => $(el).attr("data-name"))
             .get()
-        ).toEqual(["C"]);
+            .sort()
+        ).toEqual(["A", "B", "C"]);
         done();
       },
     };

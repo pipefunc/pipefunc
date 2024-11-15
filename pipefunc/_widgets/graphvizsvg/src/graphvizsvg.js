@@ -381,16 +381,19 @@ class GraphvizSvg {
 
   linkedTo(node, includeEdges) {
     const $retval = $();
-    const nodeName = $(node).attr("data-name");
-
-    // Only find direct incoming connections
     this.findLinked(
       node,
       includeEdges,
-      (_, edgeName) => {
-        const [source, target] = edgeName.split("->");
-        const match = target === nodeName ? source : null;
-        return match;
+      (nodeName, edgeName) => {
+        let other = null;
+        const connection = edgeName.split("->");
+        if (
+          connection.length > 1 &&
+          (connection[1] === nodeName || connection[1].startsWith(nodeName + ":"))
+        ) {
+          return connection[0].split(":")[0];
+        }
+        return other;
       },
       $retval
     );
@@ -399,15 +402,19 @@ class GraphvizSvg {
 
   linkedFrom(node, includeEdges) {
     const $retval = $();
-    const nodeName = $(node).attr("data-name");
-
-    // Only find direct outgoing connections
     this.findLinked(
       node,
       includeEdges,
-      (_, edgeName) => {
-        const [source, target] = edgeName.split("->");
-        return source === nodeName ? target : null;
+      (nodeName, edgeName) => {
+        let other = null;
+        const connection = edgeName.split("->");
+        if (
+          connection.length > 1 &&
+          (connection[0] === nodeName || connection[0].startsWith(nodeName + ":"))
+        ) {
+          return connection[1].split(":")[0];
+        }
+        return other;
       },
       $retval
     );
