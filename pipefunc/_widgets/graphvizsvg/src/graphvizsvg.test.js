@@ -529,4 +529,56 @@ describe("GraphvizSvg", () => {
     container.graphviz(options);
   });
 
+  test("should find linked nodes with complex names including special characters", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+      <g>
+        <g class="node">
+          <title>a</title>
+          <ellipse cx="50" cy="50" rx="30" ry="30"/>
+        </g>
+        <g class="node">
+          <title>f(...) → c</title>
+          <ellipse cx="150" cy="50" rx="30" ry="30"/>
+        </g>
+        <g class="node">
+          <title>g(...) → d</title>
+          <ellipse cx="250" cy="50" rx="30" ry="30"/>
+        </g>
+        <g class="edge">
+          <title>a->f(...) → c</title>
+          <path d="M50,50 L150,50"/>
+        </g>
+        <g class="edge">
+          <title>f(...) → c->g(...) → d</title>
+          <path d="M150,50 L250,50"/>
+        </g>
+      </g>
+    </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        // Test incoming connections to f(...) → c
+        const nodeF = this._nodesByName["f(...) → c"];
+        const incomingNodes = this.linkedTo(nodeF, false);
+        expect(incomingNodes.map((_, el) => $(el).attr("data-name")).get()).toEqual(["a"]);
+
+        // Test outgoing connections from f(...) → c
+        const outgoingNodes = this.linkedFrom(nodeF, false);
+        expect(outgoingNodes.map((_, el) => $(el).attr("data-name")).get()).toEqual(["g(...) → d"]);
+
+        // Test all connections (both directions)
+        const allConnected = this.linked(nodeF, false);
+        expect(
+          allConnected
+            .map((_, el) => $(el).attr("data-name"))
+            .get()
+            .sort()
+        ).toEqual(["a", "f(...) → c", "g(...) → d"]);
+
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
 });
