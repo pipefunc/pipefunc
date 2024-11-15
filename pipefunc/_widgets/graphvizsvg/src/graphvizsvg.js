@@ -369,26 +369,36 @@ class GraphvizSvg {
 
   linkedTo(node, includeEdges) {
     const $retval = $();
-    const nodeName = $(node).attr('data-name');
+    const nodeName = $(node).attr("data-name");
 
     // Only find direct incoming connections
-    this.findLinked(node, includeEdges, (_, edgeName) => {
-        const match = edgeName.match(new RegExp(`^(.*)->${nodeName}`));
-        return match ? match[1] : null;
-    }, $retval);
-
+    this.findLinked(
+      node,
+      includeEdges,
+      (_, edgeName) => {
+        const [source, target] = edgeName.split("->");
+        const match = target === nodeName ? source : null;
+        return match;
+      },
+      $retval
+    );
     return $retval;
   }
+
   linkedFrom(node, includeEdges) {
     const $retval = $();
-    const nodeName = $(node).attr('data-name');
+    const nodeName = $(node).attr("data-name");
 
     // Only find direct outgoing connections
-    this.findLinked(node, includeEdges, (_, edgeName) => {
-        const match = edgeName.match(new RegExp(`^${nodeName}->(.*)`));
-        return match ? match[1] : null;
-    }, $retval);
-
+    this.findLinked(
+      node,
+      includeEdges,
+      (_, edgeName) => {
+        const [source, target] = edgeName.split("->");
+        return source === nodeName ? target : null;
+      },
+      $retval
+    );
     return $retval;
   }
 
