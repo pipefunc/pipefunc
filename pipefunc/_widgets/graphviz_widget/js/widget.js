@@ -1,6 +1,6 @@
+import * as d3 from "d3";
 import GraphvizSvg from "graphvizsvg";
 import { graphviz } from "d3-graphviz";
-import * as d3 from "d3";
 
 function getLegendElements(graphvizInstance, $) {
   const legendNodes = [];
