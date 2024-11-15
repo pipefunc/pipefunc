@@ -340,10 +340,10 @@ class GraphvizSvg {
     $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
       const color = $this.data("graphviz.svg.color");
-      if (color.fill && $this.prop("tagName") !== "path") {
+      if (color.fill && color.fill != "none") {
         $this.attr("fill", getColor(color.fill, bg));
       }
-      if (color.stroke) {
+      if (color.stroke && color.stroke != "none") {
         $this.attr("stroke", getColor(color.stroke, bg));
       }
     });
@@ -353,10 +353,10 @@ class GraphvizSvg {
     $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
       const color = $this.data("graphviz.svg.color");
-      if (color.fill) {
+      if (color.fill && color.fill != "none") {
         $this.attr("fill", color.fill);
       }
-      if (color.stroke) {
+      if (color.stroke && color.stroke != "none") {
         $this.attr("stroke", color.stroke);
       }
     });
