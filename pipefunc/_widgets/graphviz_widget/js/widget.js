@@ -1,6 +1,6 @@
-import GraphvizSvg from 'graphvizsvg';
-import { graphviz } from 'd3-graphviz';
-import * as d3 from 'd3';
+import GraphvizSvg from "graphvizsvg";
+import { graphviz } from "d3-graphviz";
+import * as d3 from "d3";
 
 function getLegendElements(graphvizInstance, $) {
     const legendNodes = [];
@@ -190,8 +190,7 @@ function handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, getSelec
     });
 }
 
-async function initialize({ model }) {
-}
+async function initialize({ model }) {}
 
 async function render({ model, el }) {
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
@@ -215,7 +214,7 @@ async function render({ model, el }) {
         ready: function () {
             const graphvizInstance = this;
             handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
-        }
+        },
     });
 
     const renderGraph = (dotSource) => {
@@ -237,7 +236,7 @@ async function render({ model, el }) {
             .on("end", function () {
                 // This is the key line that reconnects d3 and GraphvizSvg
                 // Calls the jquery.graphviz.svg setup directly
-                $('#graph').data('graphviz.svg').setup(); // Re-setup after rendering
+                $("#graph").data("graphviz.svg").setup(); // Re-setup after rendering
             });
     };
 
@@ -290,7 +289,12 @@ async function render({ model, el }) {
             zoom: false,
             ready: function () {
                 const graphvizInstance = new GraphvizSvg(this);
-                handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
+                handleGraphvizSvgEvents(
+                    graphvizInstance,
+                    $,
+                    currentSelection,
+                    () => selectedDirection
+                );
             },
         });
     });
