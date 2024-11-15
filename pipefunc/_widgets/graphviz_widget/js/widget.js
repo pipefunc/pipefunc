@@ -145,8 +145,9 @@ function handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, getSelec
     graphvizInstance.edges().each(function () {
         const $edge = $(this);
 
-        // Store the original color if not already stored
-        $edge.data("original-stroke", $edge.find("path").attr("stroke-width"));
+        // Store the original stroke width, with a fallback to "1"
+        const originalStroke = $edge.attr("stroke-width") || "1";
+        $edge.data("original-stroke", originalStroke);
 
         $edge.on("mouseenter", function () {
             // Highlight edge by making the stroke width thicker
