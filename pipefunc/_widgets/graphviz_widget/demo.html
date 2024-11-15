@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>PipeFunc Graph</title>
+</head>
+
+<body>
+    <div id="graph" style="text-align: center;"></div>
+    <script type="module">
+        import widget from './static/widget.js';
+
+        const model = {
+            selected_direction: 'bidirectional',
+            search_type: 'contains',
+            case_sensitive: false,
+            dot_source: 'digraph { a -> b }',
+
+            get: function (key) {
+                return this[key];
+            },
+            set: function (key, value) {
+                this[key] = value;
+                this.trigger(`change:${key}`, this, value);
+                return Promise.resolve();
+            },
+            on: function (event, callback) {
+                if (!this._callbacks) this._callbacks = {};
+                if (!this._callbacks[event]) this._callbacks[event] = [];
+                this._callbacks[event].push(callback);
+                return this;
+            },
+            trigger: function (event, ...args) {
+                if (this._callbacks && this._callbacks[event]) {
+                    this._callbacks[event].forEach(cb => cb(...args));
+                }
+            }
+        };
+
+        const el = document.getElementById('graph');
+
+        async function main() {
+            await widget.initialize({ model });
+
+            // First set the dot source
+            const url = "https://gist.githubusercontent.com/basnijholt/02e2ed6675a752e55f969ca42cb81460/raw/8adadcef38456a4a3e8894b3e171a0da61f7ff16/pipefunc-example.dot";
+            const response = await fetch(url);
+            const dotSource = await response.text();
+            model.set('dot_source', dotSource);
+
+            // Then render
+            await widget.render({ model, el });
+        }
+
+        main();
+    </script>
+</body>
+
+</html>
