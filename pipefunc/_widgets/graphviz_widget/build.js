@@ -15,33 +15,36 @@
  * - https://github.com/evanw/esbuild/issues/408#issuecomment-757555771
  * - https://github.com/magjac/d3-graphviz/tree/v3.0.0-bundled-wasm.1
  */
-const esbuild = require('esbuild');
-const wasmPlugin = require('./esbuild-wasm-plugin');
+const esbuild = require("esbuild");
+const wasmPlugin = require("./esbuild-wasm-plugin");
 
-const watch = process.argv.includes('--watch');
+const watch = process.argv.includes("--watch");
 
 const buildOptions = {
-  entryPoints: ['js/widget.js'],
+  entryPoints: ["js/widget.js"],
   bundle: true,
-  format: 'esm',
-  outdir: 'static',
+  format: "esm",
+  outdir: "static",
   plugins: [wasmPlugin],
-  sourcemap: watch ? 'inline' : false,
+  sourcemap: watch ? "inline" : false,
   loader: {
-    '.wasm': 'binary'
+    ".wasm": "binary",
   },
   alias: {
     // This tells esbuild to use our local copy of the WASM file
-    '@hpcc-js/wasm/dist/graphvizlib.wasm': './static/graphvizlib.wasm'
-  }
+    "@hpcc-js/wasm/dist/graphvizlib.wasm": "./static/graphvizlib.wasm",
+  },
 };
 
 if (watch) {
   // Use context for watch mode
-  esbuild.context(buildOptions).then(context => {
-    context.watch();
-    console.log('Watching for changes...');
-  }).catch(() => process.exit(1));
+  esbuild
+    .context(buildOptions)
+    .then((context) => {
+      context.watch();
+      console.log("Watching for changes...");
+    })
+    .catch(() => process.exit(1));
 } else {
   // Regular build
   esbuild.build(buildOptions).catch(() => process.exit(1));
