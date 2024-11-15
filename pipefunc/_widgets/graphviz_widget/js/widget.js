@@ -195,9 +195,8 @@ async function initialize({ model }) {
 async function render({ model, el }) {
     el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
     const d3graphviz = graphviz("#graph");
-    console.log("d3graphviz", d3graphviz);
-    let graphvizInstance;
     const currentSelection = [];
+
     let selectedDirection = model.get("selected_direction") || "bidirectional";
 
     const searchObject = {
@@ -207,6 +206,16 @@ async function render({ model, el }) {
         nodeLabel: true,
         edgeLabel: true,
     };
+
+    // Initialize GraphvizSvg first
+    $("#graph").graphviz({
+        shrink: null,
+        zoom: false,
+        ready: function () {
+            const graphvizInstance = this;
+            handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
+        }
+    });
 
     const renderGraph = (dotSource) => {
         const transition = d3
@@ -225,7 +234,9 @@ async function render({ model, el }) {
             .zoom(true)
             .renderDot(dotSource)
             .on("end", function () {
-                $("#graph").data("graphviz.svg").setup();
+                // This is the key line that reconnects d3 and GraphvizSvg
+                // Calls the jquery.graphviz.svg setup directly
+                $('#graph').data('graphviz.svg').setup(); // Re-setup after rendering
             });
     };
 
@@ -277,9 +288,7 @@ async function render({ model, el }) {
             shrink: null,
             zoom: false,
             ready: function () {
-                console.log("ready");
                 const graphvizInstance = new GraphvizSvg(this);
-                console.log("ready graphvizInstance", graphvizInstance);
                 handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
             },
         });
