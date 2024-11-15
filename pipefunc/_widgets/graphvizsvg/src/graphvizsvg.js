@@ -3,47 +3,47 @@ import jQuery from "jquery";
 if (typeof window !== "undefined") {
   window.jQuery = window.$ = jQuery;
 }
-import 'jquery-mousewheel';
-import 'jquery-color';
-import 'bootstrap';
+import "jquery-mousewheel";
+import "jquery-color";
+import "bootstrap";
 
 class GraphvizSvg {
-  static VERSION = '1.0.1';
+  static VERSION = "1.0.1";
   static GVPT_2_PX = 32.5;
 
   static DEFAULTS = {
     url: null,
     svg: null,
-    shrink: '0.125pt',
+    shrink: "0.125pt",
     tooltips: {
       init($graph) {
         const $a = $(this);
         $a.tooltip({
           container: $graph,
-          placement: 'left',
+          placement: "left",
           animation: false,
           viewport: null,
-        }).on('hide.bs.tooltip', function () {
+        }).on("hide.bs.tooltip", function () {
           // keep them visible even if you accidentally mouse over
-          if ($a.attr('data-tooltip-keepvisible')) {
+          if ($a.attr("data-tooltip-keepvisible")) {
             return false;
           }
         });
       },
       show() {
         const $a = $(this);
-        $a.attr('data-tooltip-keepvisible', true);
-        $a.tooltip('show');
+        $a.attr("data-tooltip-keepvisible", true);
+        $a.tooltip("show");
       },
       hide() {
         const $a = $(this);
-        $a.removeAttr('data-tooltip-keepvisible');
-        $a.tooltip('hide');
+        $a.removeAttr("data-tooltip-keepvisible");
+        $a.tooltip("hide");
       },
       update() {
         const $this = $(this);
-        if ($this.attr('data-tooltip-keepvisible')) {
-          $this.tooltip('show');
+        if ($this.attr("data-tooltip-keepvisible")) {
+          $this.tooltip("show");
         }
       },
     },
@@ -65,7 +65,7 @@ class GraphvizSvg {
     this.enabled = null;
     this.$element = null;
 
-    this.init('graphviz.svg', element, options);
+    this.init("graphviz.svg", element, options);
   }
 
   init(type, element, options) {
@@ -75,11 +75,16 @@ class GraphvizSvg {
     this.options = this.getOptions(options);
 
     if (this.options.url) {
-      $.get(this.options.url, null, (data) => {
-        const svg = $('svg', data);
-        this.$element.html(document.adoptNode(svg[0]));
-        this.setup();
-      }, 'xml');
+      $.get(
+        this.options.url,
+        null,
+        (data) => {
+          const svg = $("svg", data);
+          this.$element.html(document.adoptNode(svg[0]));
+          this.setup();
+        },
+        "xml"
+      );
     } else {
       if (this.options.svg) {
         this.$element.html(this.options.svg);
@@ -96,7 +101,7 @@ class GraphvizSvg {
     options = $.extend({}, this.getDefaults(), this.$element.data(), options);
 
     if (options.shrink) {
-      if (typeof options.shrink !== 'object') {
+      if (typeof options.shrink !== "object") {
         options.shrink = {
           x: options.shrink,
           y: options.shrink,
@@ -112,20 +117,20 @@ class GraphvizSvg {
     const options = this.options;
 
     // Save key elements in the graph for easy access
-    const $svg = $(this.$element.children('svg'));
-    const $graph = $svg.children('g:first');
+    const $svg = $(this.$element.children("svg"));
+    const $graph = $svg.children("g:first");
     this.$svg = $svg;
     this.$graph = $graph;
-    this.$background = $graph.children('polygon:first'); // might not exist
-    this.$nodes = $graph.children('.node');
-    this.$edges = $graph.children('.edge');
+    this.$background = $graph.children("polygon:first"); // might not exist
+    this.$nodes = $graph.children(".node");
+    this.$edges = $graph.children(".edge");
     this._nodesByName = {};
     this._edgesByName = {};
 
     // Add top-level class and copy background color to element
-    this.$element.addClass('graphviz-svg');
+    this.$element.addClass("graphviz-svg");
     if (this.$background.length) {
-      this.$element.css('background', this.$background.attr('fill'));
+      this.$element.css("background", this.$background.attr("fill"));
     }
 
     // Setup all the nodes and edges
@@ -133,8 +138,8 @@ class GraphvizSvg {
     this.$edges.each((_, el) => this.setupNodesEdges($(el), false));
 
     // Remove the graph title element
-    const $title = this.$graph.children('title');
-    this.$graph.attr('data-name', $title.text());
+    const $title = this.$graph.children("title");
+    this.$graph.attr("data-name", $title.text());
     $title.remove();
 
     if (options.zoom) {
@@ -149,15 +154,15 @@ class GraphvizSvg {
 
   setupNodesEdges($el, isNode) {
     const options = this.options;
-    const that = this;  // Store reference to GraphvizSvg instance
+    const that = this; // Store reference to GraphvizSvg instance
 
     // Save the colors of the paths, ellipses, and polygons
-    $el.find('polygon, ellipse, path').each((_, elem) => {
+    $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
       // Save original colors
-      $this.data('graphviz.svg.color', {
-        fill: $this.attr('fill'),
-        stroke: $this.attr('stroke'),
+      $this.data("graphviz.svg.color", {
+        fill: $this.attr("fill"),
+        stroke: $this.attr("stroke"),
       });
 
       // Shrink it if it's a node
@@ -167,11 +172,11 @@ class GraphvizSvg {
     });
 
     // Save the node name and check for user comments
-    const $title = $el.children('title');
+    const $title = $el.children("title");
     if ($title.length) {
       // Remove any compass points
-      const title = $title.text().replace(/:[snew][ew]?/g, '');
-      $el.attr('data-name', title);
+      const title = $title.text().replace(/:[snew][ew]?/g, "");
+      $el.attr("data-name", title);
       $title.remove();
       if (isNode) {
         this._nodesByName[title] = $el[0];
@@ -185,37 +190,42 @@ class GraphvizSvg {
       }
       if (previousSibling && previousSibling.nodeType === 8) {
         const htmlDecode = (input) => {
-          const e = document.createElement('div');
+          const e = document.createElement("div");
           e.innerHTML = input;
           return e.childNodes[0].nodeValue;
         };
         const value = htmlDecode(previousSibling.nodeValue.trim());
         if (value !== title) {
           // User-added comment
-          $el.attr('data-comment', value);
+          $el.attr("data-comment", value);
         }
       }
     }
 
     // Remove namespace from a[xlink:title]
-    $el.find('a').filter(function () { return $(this).attr('xlink:title'); }).each(function () {
-      const $a = $(this);
-      $a.attr('title', $a.attr('xlink:title'));
-      $a.removeAttr('xlink:title');
-      if (options.tooltips) {
-        options.tooltips.init.call(this, that.$element);
-      }
-    });
+    $el
+      .find("a")
+      .filter(function () {
+        return $(this).attr("xlink:title");
+      })
+      .each(function () {
+        const $a = $(this);
+        $a.attr("title", $a.attr("xlink:title"));
+        $a.removeAttr("xlink:title");
+        if (options.tooltips) {
+          options.tooltips.init.call(this, that.$element);
+        }
+      });
   }
 
   setupZoom() {
     this.zoom = {
-      width: this.$svg.attr('width'),
-      height: this.$svg.attr('height'),
+      width: this.$svg.attr("width"),
+      height: this.$svg.attr("height"),
       percentage: null,
     };
     this.scaleView(100.0);
-    this.$element.on('mousewheel', (evt) => {
+    this.$element.on("mousewheel", (evt) => {
       if (evt.shiftKey) {
         let percentage = this.zoom.percentage;
         percentage -= evt.deltaY * evt.deltaFactor;
@@ -234,20 +244,20 @@ class GraphvizSvg {
 
         this.scaleView(percentage);
         // Scroll so pointer is still in the same place
-        this.$element.scrollLeft((rx * this.$svg.width()) + 0.5 - px);
-        this.$element.scrollTop((ry * this.$svg.height()) + 0.5 - py);
+        this.$element.scrollLeft(rx * this.$svg.width() + 0.5 - px);
+        this.$element.scrollTop(ry * this.$svg.height() + 0.5 - py);
         return false; // Stop propagation
       }
     });
   }
 
   scaleView(percentage) {
-    this.$svg.attr('width', `${percentage}%`);
-    this.$svg.attr('height', `${percentage}%`);
+    this.$svg.attr("width", `${percentage}%`);
+    this.$svg.attr("height", `${percentage}%`);
     this.zoom.percentage = percentage;
     // Update tooltip position
     const $everything = this.$nodes.add(this.$edges);
-    $everything.children('a[title]').each((_, el) => {
+    $everything.children("a[title]").each((_, el) => {
       this.options.tooltips.update.call(el);
     });
   }
@@ -255,36 +265,38 @@ class GraphvizSvg {
   scaleNode($node) {
     const dx = this.options.shrink.x;
     const dy = this.options.shrink.y;
-    const tagName = $node.prop('tagName');
-    if (tagName === 'ellipse') {
-      $node.attr('rx', parseFloat($node.attr('rx')) - dx);
-      $node.attr('ry', parseFloat($node.attr('ry')) - dy);
-    } else if (tagName === 'polygon') {
+    const tagName = $node.prop("tagName");
+    if (tagName === "ellipse") {
+      $node.attr("rx", parseFloat($node.attr("rx")) - dx);
+      $node.attr("ry", parseFloat($node.attr("ry")) - dy);
+    } else if (tagName === "polygon") {
       // Scale manually
       const bbox = $node[0].getBBox();
-      const cx = bbox.x + (bbox.width / 2);
-      const cy = bbox.y + (bbox.height / 2);
-      const pts = $node.attr('points').trim().split(' ');
-      const points = pts.map((pt) => {
-        const [xStr, yStr] = pt.split(',');
-        const ox = parseFloat(xStr);
-        const oy = parseFloat(yStr);
-        const newX = (((cx - ox) / (bbox.width / 2) * dx) + ox).toFixed(2);
-        const newY = (((cy - oy) / (bbox.height / 2) * dy) + oy).toFixed(2);
-        return `${newX},${newY}`;
-      }).join(' ');
-      $node.attr('points', points);
+      const cx = bbox.x + bbox.width / 2;
+      const cy = bbox.y + bbox.height / 2;
+      const pts = $node.attr("points").trim().split(" ");
+      const points = pts
+        .map((pt) => {
+          const [xStr, yStr] = pt.split(",");
+          const ox = parseFloat(xStr);
+          const oy = parseFloat(yStr);
+          const newX = (((cx - ox) / (bbox.width / 2)) * dx + ox).toFixed(2);
+          const newY = (((cy - oy) / (bbox.height / 2)) * dy + oy).toFixed(2);
+          return `${newX},${newY}`;
+        })
+        .join(" ");
+      $node.attr("points", points);
     }
   }
 
   convertToPx(val) {
     let retval = val;
-    if (typeof val === 'string') {
+    if (typeof val === "string") {
       let end = val.length;
       let factor = 1.0;
-      if (val.endsWith('px')) {
+      if (val.endsWith("px")) {
         end -= 2;
-      } else if (val.endsWith('pt')) {
+      } else if (val.endsWith("pt")) {
         end -= 2;
         factor = GraphvizSvg.GVPT_2_PX;
       }
@@ -313,7 +325,7 @@ class GraphvizSvg {
     if (includeEdges) {
       $edges = $retval;
     }
-    const names = this.findEdge($node.attr('data-name'), testEdge, $edges);
+    const names = this.findEdge($node.attr("data-name"), testEdge, $edges);
     names.forEach((name) => {
       const n = this._nodesByName[name];
       if (!$retval.is(n)) {
@@ -324,28 +336,28 @@ class GraphvizSvg {
   }
 
   colorElement($el, getColor) {
-    const bg = this.$element.css('background');
-    $el.find('polygon, ellipse, path').each((_, elem) => {
+    const bg = this.$element.css("background");
+    $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
-      const color = $this.data('graphviz.svg.color');
-      if (color.fill && $this.prop('tagName') !== 'path') {
-        $this.attr('fill', getColor(color.fill, bg));
+      const color = $this.data("graphviz.svg.color");
+      if (color.fill && $this.prop("tagName") !== "path") {
+        $this.attr("fill", getColor(color.fill, bg));
       }
       if (color.stroke) {
-        $this.attr('stroke', getColor(color.stroke, bg));
+        $this.attr("stroke", getColor(color.stroke, bg));
       }
     });
   }
 
   restoreElement($el) {
-    $el.find('polygon, ellipse, path').each((_, elem) => {
+    $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
-      const color = $this.data('graphviz.svg.color');
+      const color = $this.data("graphviz.svg.color");
       if (color.fill) {
-        $this.attr('fill', color.fill);
+        $this.attr("fill", color.fill);
       }
       if (color.stroke) {
-        $this.attr('stroke', color.stroke);
+        $this.attr("stroke", color.stroke);
       }
     });
   }
@@ -404,7 +416,7 @@ class GraphvizSvg {
 
   linked(node, includeEdges) {
     const $retval = $();
-    $retval.push(node);  // Add the original node
+    $retval.push(node); // Add the original node
     const fromNodes = this.linkedFrom(node, includeEdges);
     const toNodes = this.linkedTo(node, includeEdges);
     return $retval.add(fromNodes).add(toNodes);
@@ -413,13 +425,15 @@ class GraphvizSvg {
   tooltip($elements, show) {
     const options = this.options;
     $elements.each(function () {
-      $(this).find('a[title]').each(function () {
-        if (show) {
-          options.tooltips.show.call(this);
-        } else {
-          options.tooltips.hide.call(this);
-        }
-      });
+      $(this)
+        .find("a[title]")
+        .each(function () {
+          if (show) {
+            options.tooltips.show.call(this);
+          } else {
+            options.tooltips.hide.call(this);
+          }
+        });
     });
   }
 
@@ -468,12 +482,12 @@ class GraphvizSvg {
 function Plugin(option) {
   return this.each(function () {
     const $this = $(this);
-    let data = $this.data('graphviz.svg');
-    const options = typeof option === 'object' && option;
+    let data = $this.data("graphviz.svg");
+    const options = typeof option === "object" && option;
 
     if (!data && /destroy/.test(option)) return;
-    if (!data) $this.data('graphviz.svg', (data = new GraphvizSvg(this, options)));
-    if (typeof option === 'string') data[option]();
+    if (!data) $this.data("graphviz.svg", (data = new GraphvizSvg(this, options)));
+    if (typeof option === "string") data[option]();
   });
 }
 
