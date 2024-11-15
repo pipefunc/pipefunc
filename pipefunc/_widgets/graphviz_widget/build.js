@@ -29,11 +29,7 @@ const buildOptions = {
   sourcemap: watch ? "inline" : false,
   loader: {
     ".wasm": "binary",
-  },
-  alias: {
-    // This tells esbuild to use our local copy of the WASM file
-    "@hpcc-js/wasm/dist/graphvizlib.wasm": "./static/graphvizlib.wasm",
-  },
+  }
 };
 
 if (watch) {

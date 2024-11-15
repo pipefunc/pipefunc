@@ -216,6 +216,7 @@ async function render({ model, el }) {
   const originalFetch = window.fetch;
   window.fetch = function (url, options) {
     if (url.toString().includes("graphvizlib.wasm")) {
+      console.log("Intercepted WASM fetch");
       return Promise.resolve(new Response(wasmBinary));
     }
     return originalFetch(url, options);
@@ -223,6 +224,7 @@ async function render({ model, el }) {
 
   el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
   const d3graphvizInstance = d3graphviz("#graph", { useWorker: false }); // Important: disable worker to use our embedded binary;
+
   // Wait for initialization
   await new Promise((resolve) => {
     d3graphvizInstance.on("initEnd", resolve);
