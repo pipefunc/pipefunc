@@ -7,8 +7,9 @@
  * - Supports watch mode for development
  * - Uses ESM format for compatibility with Jupyter widgets
  *
- * The alias configuration ensures that any attempts to load the WASM file
- * directly (e.g., from @hpcc-js/wasm) will use our embedded version instead.
+ * Note: We need to copy the WASM file to ./static first (via npm run copy-wasm)
+ * to have a consistent, reliable path to import from. This is more robust than
+ * referencing it directly from nested node_modules.
  *
  * This is inspired by:
  * - https://github.com/evanw/esbuild/issues/408#issuecomment-757555771
