@@ -282,8 +282,7 @@ async function render({ model, el }) {
             searchAndHighlight(msg.query);
         }
     });
-
-    $(document).ready(() => {
+    $(function () {
         $("#graph").graphviz({
             shrink: null,
             zoom: false,
