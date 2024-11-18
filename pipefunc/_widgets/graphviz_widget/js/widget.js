@@ -223,6 +223,12 @@ async function render({ model, el }) {
   };
 
   el.innerHTML = '<div id="graph" style="text-align: center;"></div>';
+
+  // Ensure the DOM is fully rendered before initializing Graphviz
+  await new Promise((resolve) => {
+    $(document).ready(resolve);
+  });
+
   const d3graphvizInstance = d3graphviz("#graph", { useWorker: false }); // Important: disable worker to use our embedded binary;
 
   // Wait for initialization
