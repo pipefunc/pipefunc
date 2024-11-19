@@ -248,12 +248,14 @@ async function render({ model, el }) {
     edgeLabel: true,
   };
 
+  let graphvizInstance;
+
   // Initialize GraphvizSvg first
   $("#graph").graphviz({
     shrink: null,
     zoom: false,
     ready: function () {
-      const graphvizInstance = this;
+      graphvizInstance = this;
       handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
     },
   });
@@ -319,16 +321,6 @@ async function render({ model, el }) {
     } else if (msg.action === "search") {
       searchAndHighlight(msg.query);
     }
-  });
-  $(function () {
-    $("#graph").graphviz({
-      shrink: null,
-      zoom: false,
-      ready: function () {
-        const graphvizInstance = new GraphvizSvg(this);
-        handleGraphvizSvgEvents(graphvizInstance, $, currentSelection, () => selectedDirection);
-      },
-    });
   });
 
   renderGraph(model.get("dot_source"));
