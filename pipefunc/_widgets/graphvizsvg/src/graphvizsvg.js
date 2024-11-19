@@ -5,6 +5,7 @@ if (typeof window !== "undefined") {
 }
 import "bootstrap";
 import { ColorUtil } from "./color";
+import { colorElement, restoreElement, highlight, tooltip, bringToFront, sendToBack } from "./styling";
 
 class GraphvizSvg {
   static VERSION = "1.0.1";
@@ -285,35 +286,30 @@ class GraphvizSvg {
     });
   }
 
-  colorElement($el, getColor) {
-    const bg = this.$element.css("background");
-    $el.find("polygon, ellipse, path").each((_, elem) => {
-      const $this = $(elem);
-      const color = $this.data("graphviz.svg.color");
+  highlight($nodesEdges, tooltips) {
+    return highlight($nodesEdges, tooltips, this);
+  }
 
-      if (color.fill && color.fill !== "none") {
-        const newFill = getColor(color.fill, bg);
-        $this.attr("fill", newFill);
-      }
-      if (color.stroke && color.stroke !== "none") {
-        const newStroke = getColor(color.stroke, bg);
-        $this.attr("stroke", newStroke);
-      }
-    });
+  colorElement($el, getColor) {
+    return colorElement($el, getColor, this);
   }
 
   restoreElement($el) {
-    $el.find("polygon, ellipse, path").each((_, elem) => {
-      const $this = $(elem);
-      const color = $this.data("graphviz.svg.color");
-      if (color.fill && color.fill != "none") {
-        $this.attr("fill", color.fill);
-      }
-      if (color.stroke && color.stroke != "none") {
-        $this.attr("stroke", color.stroke);
-      }
-    });
+    return restoreElement($el, this);
   }
+
+  tooltip($elements, show) {
+    return tooltip($elements, show, this);
+  }
+
+  bringToFront($el) {
+    return bringToFront($el, this);
+  }
+
+  sendToBack($el) {
+    return sendToBack($el, this);
+  }
+
 
   // Public methods
   nodes() {
@@ -380,57 +376,6 @@ class GraphvizSvg {
     const fromNodes = this.linkedFrom(node, includeEdges);
     const toNodes = this.linkedTo(node, includeEdges);
     return $retval.add(fromNodes).add(toNodes);
-  }
-
-  tooltip($elements, show) {
-    const options = this.options;
-    $elements.each(function () {
-      $(this)
-        .find("a[title]")
-        .each(function () {
-          if (show) {
-            options.tooltips.show.call(this);
-          } else {
-            options.tooltips.hide.call(this);
-          }
-        });
-    });
-  }
-
-  bringToFront($elements) {
-    $elements.detach().appendTo(this.$graph);
-  }
-
-  sendToBack($elements) {
-    if (this.$background.length) {
-      $elements.insertAfter(this.$background);
-    } else {
-      $elements.detach().prependTo(this.$graph);
-    }
-  }
-
-  highlight($nodesEdges, tooltips) {
-    const options = this.options;
-    const $everything = this.$nodes.add(this.$edges);
-    if ($nodesEdges && $nodesEdges.length > 0) {
-      // Dim all other elements
-      $everything.not($nodesEdges).each((_, el) => {
-        this.colorElement($(el), options.highlight.unselected);
-        this.tooltip($(el));
-      });
-      $nodesEdges.each((_, el) => {
-        this.colorElement($(el), options.highlight.selected);
-      });
-      if (tooltips) {
-        this.tooltip($nodesEdges, true);
-      }
-    } else {
-      // Restore all elements
-      $everything.each((_, el) => {
-        this.restoreElement($(el));
-      });
-      this.tooltip($everything);
-    }
   }
 
   destroy() {
