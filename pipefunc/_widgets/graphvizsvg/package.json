@@ -1,10 +1,10 @@
 {
   "name": "graphvizsvg",
   "version": "1.0.0",
-  "main": "src/graphvizsvg.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "jest --config jest.config.js --coverage",
-    "build": "esbuild src/graphvizsvg.js --minify --format=esm --bundle --outdir=static",
+    "build": "esbuild src/index.js --minify --format=esm --bundle --outdir=static",
     "dev": "npm run build -- --sourcemap=inline --watch"
   },
   "keywords": [],

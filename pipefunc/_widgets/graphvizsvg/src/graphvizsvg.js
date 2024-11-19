@@ -1,9 +1,5 @@
 // graphvizSvg.js
-import jQuery from "jquery";
-if (typeof window !== "undefined") {
-  window.jQuery = window.$ = jQuery;
-}
-import "bootstrap";
+import $ from "jquery";
 import { setup } from "./setup";
 import { ColorUtil } from "./color";
 import { linkedTo, linkedFrom, linked, findEdge, findLinked } from "./graph";
@@ -206,29 +202,5 @@ class GraphvizSvg {
     this.$element.off(`.${this.type}`).removeData(this.type);
   }
 }
-
-// jQuery plugin definition
-function Plugin(option) {
-  return this.each(function () {
-    const $this = $(this);
-    let data = $this.data("graphviz.svg");
-    const options = typeof option === "object" && option;
-
-    if (!data && /destroy/.test(option)) return;
-    if (!data) $this.data("graphviz.svg", (data = new GraphvizSvg(this, options)));
-    if (typeof option === "string") data[option]();
-  });
-}
-
-const old = $.fn.graphviz;
-
-$.fn.graphviz = Plugin;
-$.fn.graphviz.Constructor = GraphvizSvg;
-
-// No conflict
-$.fn.graphviz.noConflict = function () {
-  $.fn.graphviz = old;
-  return this;
-};
 
 export default GraphvizSvg;
