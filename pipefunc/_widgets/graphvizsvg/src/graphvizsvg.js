@@ -6,7 +6,15 @@ if (typeof window !== "undefined") {
 import "bootstrap";
 import { setup } from "./setup";
 import { ColorUtil } from "./color";
-import { colorElement, restoreElement, highlight, tooltip, bringToFront, sendToBack } from "./styling";
+import { linkedTo, linkedFrom, linked, findEdge, findLinked } from "./graph";
+import {
+  colorElement,
+  restoreElement,
+  highlight,
+  tooltip,
+  bringToFront,
+  sendToBack,
+} from "./styling";
 
 class GraphvizSvg {
   static VERSION = "1.0.1";
@@ -133,36 +141,6 @@ class GraphvizSvg {
     return retval;
   }
 
-  findEdge(nodeName, testEdge, $retval) {
-    const retval = [];
-    for (const name in this._edgesByName) {
-      const match = testEdge(nodeName, name);
-      if (match) {
-        if ($retval) {
-          $retval.push(this._edgesByName[name]);
-        }
-        retval.push(match);
-      }
-    }
-    return retval;
-  }
-
-  findLinked(node, includeEdges, testEdge, $retval) {
-    const $node = $(node);
-    let $edges = null;
-    if (includeEdges) {
-      $edges = $retval;
-    }
-    const names = this.findEdge($node.attr("data-name"), testEdge, $edges);
-    names.forEach((name) => {
-      const n = this._nodesByName[name];
-      if (!$retval.is(n)) {
-        $retval.push(n);
-        this.findLinked(n, includeEdges, testEdge, $retval);
-      }
-    });
-  }
-
   highlight($nodesEdges, tooltips) {
     return highlight($nodesEdges, tooltips, this);
   }
@@ -187,7 +165,6 @@ class GraphvizSvg {
     return sendToBack($el, this);
   }
 
-
   // Public methods
   nodes() {
     return this.$nodes;
@@ -206,53 +183,23 @@ class GraphvizSvg {
   }
 
   linkedTo(node, includeEdges) {
-    const $retval = $();
-    this.findLinked(
-      node,
-      includeEdges,
-      (nodeName, edgeName) => {
-        let other = null;
-        const connection = edgeName.split("->");
-        if (
-          connection.length > 1 &&
-          (connection[1] === nodeName || connection[1].startsWith(nodeName + ":"))
-        ) {
-          return connection[0].split(":")[0];
-        }
-        return other;
-      },
-      $retval
-    );
-    return $retval;
+    return linkedTo(node, includeEdges, this);
   }
 
   linkedFrom(node, includeEdges) {
-    const $retval = $();
-    this.findLinked(
-      node,
-      includeEdges,
-      (nodeName, edgeName) => {
-        let other = null;
-        const connection = edgeName.split("->");
-        if (
-          connection.length > 1 &&
-          (connection[0] === nodeName || connection[0].startsWith(nodeName + ":"))
-        ) {
-          return connection[1].split(":")[0];
-        }
-        return other;
-      },
-      $retval
-    );
-    return $retval;
+    return linkedFrom(node, includeEdges, this);
   }
 
   linked(node, includeEdges) {
-    const $retval = $();
-    $retval.push(node); // Add the original node
-    const fromNodes = this.linkedFrom(node, includeEdges);
-    const toNodes = this.linkedTo(node, includeEdges);
-    return $retval.add(fromNodes).add(toNodes);
+    return linked(node, includeEdges, this);
+  }
+
+  findEdge(nodeName, testEdge, $retval) {
+    return findEdge(nodeName, testEdge, $retval, this);
+  }
+
+  findLinked(node, includeEdges, testEdge, $retval) {
+    return findLinked(node, includeEdges, testEdge, $retval, this);
   }
 
   destroy() {
