@@ -3,8 +3,8 @@ import jQuery from "jquery";
 if (typeof window !== "undefined") {
   window.jQuery = window.$ = jQuery;
 }
-import "jquery-color";
 import "bootstrap";
+import { ColorUtil } from "./color";
 
 class GraphvizSvg {
   static VERSION = "1.0.1";
@@ -51,7 +51,7 @@ class GraphvizSvg {
         return col;
       },
       unselected(col, bg) {
-        return $.Color(col).transition(bg, 0.9);
+        return ColorUtil.transition(col, bg, 0.9);
       },
     },
     ready: null,
@@ -290,11 +290,14 @@ class GraphvizSvg {
     $el.find("polygon, ellipse, path").each((_, elem) => {
       const $this = $(elem);
       const color = $this.data("graphviz.svg.color");
-      if (color.fill && color.fill != "none") {
-        $this.attr("fill", getColor(color.fill, bg));
+
+      if (color.fill && color.fill !== "none") {
+        const newFill = getColor(color.fill, bg);
+        $this.attr("fill", newFill);
       }
-      if (color.stroke && color.stroke != "none") {
-        $this.attr("stroke", getColor(color.stroke, bg));
+      if (color.stroke && color.stroke !== "none") {
+        const newStroke = getColor(color.stroke, bg);
+        $this.attr("stroke", newStroke);
       }
     });
   }
