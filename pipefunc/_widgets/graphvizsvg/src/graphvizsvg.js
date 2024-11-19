@@ -1,7 +1,7 @@
-// graphvizSvg.js
+// graphvizsvg.js
 import $ from "jquery";
 import { setup } from "./setup";
-import { ColorUtil } from "./color";
+import { ColorUtil, convertToPx } from "./utils";
 import { linkedTo, linkedFrom, linked, findEdge, findLinked } from "./graph";
 import {
   colorElement,
@@ -115,26 +115,10 @@ class GraphvizSvg {
           y: options.shrink,
         };
       }
-      options.shrink.x = this.convertToPx(options.shrink.x);
-      options.shrink.y = this.convertToPx(options.shrink.y);
+      options.shrink.x = convertToPx(options.shrink.x, GraphvizSvg.GVPT_2_PX);
+      options.shrink.y = convertToPx(options.shrink.y, GraphvizSvg.GVPT_2_PX);
     }
     return options;
-  }
-
-  convertToPx(val) {
-    let retval = val;
-    if (typeof val === "string") {
-      let end = val.length;
-      let factor = 1.0;
-      if (val.endsWith("px")) {
-        end -= 2;
-      } else if (val.endsWith("pt")) {
-        end -= 2;
-        factor = GraphvizSvg.GVPT_2_PX;
-      }
-      retval = parseFloat(val.substring(0, end)) * factor;
-    }
-    return retval;
   }
 
   highlight($nodesEdges, tooltips) {
@@ -161,7 +145,6 @@ class GraphvizSvg {
     return sendToBack($el, this);
   }
 
-  // Public methods
   nodes() {
     return this.$nodes;
   }

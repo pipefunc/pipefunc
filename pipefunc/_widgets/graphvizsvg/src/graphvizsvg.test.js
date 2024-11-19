@@ -1,7 +1,6 @@
 // graphvizSvg.test.js
 import $ from "jquery";
-import GraphvizSvg from "./graphvizsvg";
-import "bootstrap";
+import GraphvizSvg from "./index";
 
 describe("GraphvizSvg", () => {
   let container;

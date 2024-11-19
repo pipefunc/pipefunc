@@ -1,3 +1,4 @@
+// setup.js
 import $ from 'jquery';
 
 export function setup(context) {

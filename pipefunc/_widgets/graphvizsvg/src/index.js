@@ -1,3 +1,4 @@
+// index.js
 import GraphvizSvg from './graphvizsvg';
 import "bootstrap";
 import './plugin';

@@ -1,4 +1,6 @@
 // styling.js
+import $ from "jquery";
+
 export function highlight($nodesEdges, tooltips, context) {
   const options = context.options;
   const $everything = context.$nodes.add(context.$edges);
