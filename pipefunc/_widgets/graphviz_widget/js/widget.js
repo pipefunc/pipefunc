@@ -19,7 +19,7 @@
  */
 
 import * as d3 from "d3";
-import GraphvizSvg from "graphvizsvg";
+import "graphvizsvg";
 import { graphviz as d3graphviz } from "d3-graphviz";
 
 // Import the WASM binary that's now embedded in our bundle
