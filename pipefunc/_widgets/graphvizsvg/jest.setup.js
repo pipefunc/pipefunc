@@ -1,6 +1,4 @@
 // jest.setup.js
-require("jquery-color");
-
 const { TextEncoder, TextDecoder } = require("util");
 
 global.TextEncoder = TextEncoder;

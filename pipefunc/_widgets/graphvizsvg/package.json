@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "jquery": "3.7.1",
-    "jquery-color": "3.0.0",
     "bootstrap": "4.6.2"
   }
 }

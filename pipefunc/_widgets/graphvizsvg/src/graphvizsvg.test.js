@@ -1,7 +1,6 @@
 // graphvizSvg.test.js
 import $ from "jquery";
 import GraphvizSvg from "./graphvizsvg";
-import "jquery-color";
 import "bootstrap";
 
 describe("GraphvizSvg", () => {

@@ -1,6 +1,6 @@
 // color.ts
 export class ColorUtil {
-  static parseColor(color: string): { r: number, g: number, b: number } {
+  static parseColor(color) {
     // Handle rgb format (for background)
     if (color.startsWith('rgb')) {
       const match = color.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)/);
@@ -22,7 +22,7 @@ export class ColorUtil {
     };
   }
 
-  static transition(color1: string, color2: string, amount: number): string {
+  static transition(color1, color2, amount) {
     const c1 = ColorUtil.parseColor(color1);
     const c2 = ColorUtil.parseColor(color2.match(/^rgb\([^)]+\)/)?.[0] ?? color2);
 
