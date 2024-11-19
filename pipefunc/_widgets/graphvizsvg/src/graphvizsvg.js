@@ -93,6 +93,10 @@ class GraphvizSvg {
     }
   }
 
+  setup() {
+    return setup(this);
+  }
+
   getDefaults() {
     return GraphvizSvg.DEFAULTS;
   }
