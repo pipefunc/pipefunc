@@ -270,6 +270,7 @@ async function render({ model, el }) {
       .zoomScaleExtent([0, Infinity])
       .zoom(true)
       .renderDot(dotSource)
+      .fit(true)
       .on("end", function () {
         // This is the key line that reconnects d3 and GraphvizSvg
         // Calls the jquery.graphviz.svg setup directly
