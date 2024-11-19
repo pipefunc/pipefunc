@@ -1,4 +1,4 @@
-// graphvizSvg.test.js
+// graphvizsvg.test.js
 import $ from "jquery";
 import GraphvizSvg from "./index";
 
