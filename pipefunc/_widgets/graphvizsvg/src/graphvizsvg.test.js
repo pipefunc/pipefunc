@@ -901,4 +901,110 @@ describe("GraphvizSvg", () => {
     expect(typeof $.fn.graphviz).toBe("function");
     expect($.fn.graphviz.Constructor).toBe(GraphvizSvg);
   });
+
+  test("should handle node scaling with different shapes", () => {
+    // Mock getBBox
+    const mockGetBBox = () => ({
+      x: 0,
+      y: 0,
+      width: 60,
+      height: 60,
+    });
+
+    // Save original getBBox
+    const originalGetBBox = SVGElement.prototype.getBBox;
+
+    // Mock getBBox for all SVG elements
+    SVGElement.prototype.getBBox = mockGetBBox;
+
+    const svgContent = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <g>
+        <g class="node">
+          <title>A</title>
+          <ellipse cx="50" cy="50" rx="30" ry="30"/>
+        </g>
+        <g class="node">
+          <title>B</title>
+          <polygon points="0,0 60,0 60,60 0,60"/>
+        </g>
+      </g>
+    </svg>
+  `;
+
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: svgContent,
+      shrink: "5px",
+    });
+
+    // Test ellipse scaling
+    const ellipse = $(graphviz.$nodes).find("ellipse").first();
+    expect(parseFloat(ellipse.attr("rx"))).toBeLessThan(30);
+
+    // Test polygon scaling
+    const polygon = $(graphviz.$nodes).find("polygon").first();
+    const originalPoints = "0,0 60,0 60,60 0,60";
+    const newPoints = polygon.attr("points");
+
+    // Compare bounding box dimensions
+    const getMaxCoord = (points) => {
+      return Math.max(
+        ...points
+          .split(" ")
+          .map((p) => Math.max(...p.split(",").map((n) => Math.abs(parseFloat(n)))))
+      );
+    };
+
+    expect(getMaxCoord(newPoints)).toBeLessThan(getMaxCoord(originalPoints));
+
+    // Restore original getBBox
+    SVGElement.prototype.getBBox = originalGetBBox;
+  });
+
+  test("should handle tooltip visibility conditions", () => {
+    const svgContent = `
+    <svg>
+      <g>
+        <g class="node">
+          <title>A</title>
+          <a xlink:title="Test tooltip">
+            <text>Node A</text>
+          </a>
+        </g>
+      </g>
+    </svg>
+  `;
+
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: svgContent,
+      tooltips: {
+        init() {
+          const $a = $(this);
+          $a.attr("title", $a.attr("xlink:title"));
+        },
+        show() {
+          $(this).attr("data-tooltip-keepvisible", true);
+        },
+        hide() {
+          $(this).removeAttr("data-tooltip-keepvisible");
+        },
+        update() {
+          const $this = $(this);
+          if ($this.attr("data-tooltip-keepvisible")) {
+            // Mock update
+          }
+        },
+      },
+    });
+
+    const node = $(graphviz._nodesByName["A"]);
+    const link = node.find("a");
+
+    // Test tooltip visibility
+    graphviz.tooltip(node, true);
+    expect(link.attr("data-tooltip-keepvisible")).toBe("true");
+
+    graphviz.tooltip(node, false);
+    expect(link.attr("data-tooltip-keepvisible")).toBeUndefined();
+  });
 });
