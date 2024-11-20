@@ -487,4 +487,256 @@ describe("GraphvizSvg", () => {
     };
     container.graphviz(options);
   });
+
+  // Test styling functions
+  test("should apply and restore element colors", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+    <g>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30" fill="#ff0000" stroke="#000000"/>
+      </g>
+    </g>
+  </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        const node = $(this._nodesByName["A"]);
+        const ellipse = node.find("ellipse");
+
+        // Test color modification
+        this.colorElement(node, (color) => "#00ff00");
+        expect(ellipse.attr("fill")).toBe("#00ff00");
+
+        // Test color restoration
+        this.restoreElement(node);
+        expect(ellipse.attr("fill")).toBe("#ff0000");
+
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  // Test z-index manipulation
+  test("should handle z-index operations", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+    <g>
+      <polygon points="0,0 100,0 100,100 0,100" fill="#ffffff"/>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30"/>
+      </g>
+      <g class="node">
+        <title>B</title>
+        <ellipse cx="70" cy="70" rx="30" ry="30"/>
+      </g>
+    </g>
+  </svg>`;
+
+    const options = {
+      svg: svgContent,
+      ready() {
+        const nodeA = $(this._nodesByName["A"]);
+        const nodeB = $(this._nodesByName["B"]);
+
+        // Test bringing to front
+        this.bringToFront(nodeA);
+        expect(nodeA.index()).toBeGreaterThan(nodeB.index());
+
+        // Test sending to back
+        this.sendToBack(nodeA);
+        expect(nodeA.index()).toBeLessThan(nodeB.index());
+
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  // Test error handling
+  test("should handle invalid options gracefully", () => {
+    expect(() => {
+      container.graphviz({
+        svg: null,
+        url: null,
+      });
+    }).not.toThrow();
+  });
+
+  // Fix the tooltip test by mocking bootstrap's tooltip
+  test("should initialize and update tooltips", (done) => {
+    const svgContent = `<svg width="100pt" height="100pt">
+    <g>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30"/>
+        <a xlink:title="Node A tooltip">
+          <text x="50" y="50">A</text>
+        </a>
+      </g>
+    </g>
+  </svg>`;
+
+    const options = {
+      svg: svgContent,
+      tooltips: {
+        init() {
+          const $a = $(this);
+          $a.attr("title", $a.attr("xlink:title"));
+        },
+        show() {
+          $(this).attr("data-tooltip-keepvisible", true);
+        },
+        hide() {
+          $(this).removeAttr("data-tooltip-keepvisible");
+        },
+        update() {
+          // Mock update
+        },
+      },
+      ready() {
+        const node = this._nodesByName["A"];
+        const $a = $(node).find("a");
+
+        // Test tooltip initialization
+        expect($a.attr("title")).toBe("Node A tooltip");
+
+        // Test show/hide
+        this.tooltip($(node), true);
+        expect($a.attr("data-tooltip-keepvisible")).toBe("true");
+
+        this.tooltip($(node), false);
+        expect($a.attr("data-tooltip-keepvisible")).toBeUndefined();
+
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  test("should handle color transitions", () => {
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: `<svg><g>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30" fill="#ff0000" stroke="#000000"/>
+      </g>
+    </g></svg>`,
+    });
+
+    const node = $(graphviz._nodesByName["A"]);
+
+    // Test with RGB background
+    container.css("background", "rgb(255, 255, 255)");
+    graphviz.highlight(node);
+
+    // Test with HEX background
+    container.css("background", "#ffffff");
+    graphviz.highlight(node);
+  });
+
+  test("should handle different shrink options", () => {
+    // Test with numeric value
+    let graphviz = new GraphvizSvg(container[0], {
+      svg: "<svg><g></g></svg>",
+      shrink: 5,
+    });
+    expect(graphviz.options.shrink.x).toBe(5);
+    expect(graphviz.options.shrink.y).toBe(5);
+
+    // Test with object value
+    graphviz = new GraphvizSvg(container[0], {
+      svg: "<svg><g></g></svg>",
+      shrink: { x: "5px", y: "10pt" },
+    });
+    expect(graphviz.options.shrink.x).toBe(5);
+    expect(graphviz.options.shrink.y).toBe(325); // 10 * 32.5 (GVPT_2_PX)
+  });
+
+  test("should load SVG from URL", (done) => {
+    const mockSvgContent = `
+    <svg width="100pt" height="100pt">
+      <g>
+        <g class="node">
+          <title>A</title>
+          <ellipse cx="50" cy="50" rx="30" ry="30"/>
+        </g>
+      </g>
+    </svg>
+  `;
+
+    // Mock jQuery.get
+    const originalGet = $.get;
+    $.get = jest.fn((url, data, callback) => {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(mockSvgContent, "text/xml");
+      callback(xmlDoc, "success");
+    });
+
+    const options = {
+      url: "http://example.com/graph.svg",
+      ready() {
+        expect(this.$nodes.length).toBe(1);
+        $.get = originalGet; // Restore original
+        done();
+      },
+    };
+    container.graphviz(options);
+  });
+
+  test("should handle highlight options", () => {
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: `<svg><g>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30" fill="#ff0000"/>
+      </g>
+    </g></svg>`,
+      highlight: {
+        selected: (color) => "#00ff00",
+        unselected: (color, bg) => "#cccccc",
+      },
+    });
+
+    const node = $(graphviz._nodesByName["A"]);
+    graphviz.highlight(node);
+    expect(node.find("ellipse").attr("fill")).toBe("#00ff00");
+  });
+
+  test("should handle color parsing edge cases", () => {
+    const svgContent = `<svg><g>
+    <g class="node">
+      <title>A</title>
+      <ellipse cx="50" cy="50" rx="30" ry="30" fill="rgb(255, 0, 0)" stroke="rgb(0, 0, 0)"/>
+    </g>
+  </g></svg>`;
+
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: svgContent,
+    });
+
+    // Test with RGB colors
+    container.css("background", "rgb(255, 255, 255)");
+    const node = $(graphviz._nodesByName["A"]);
+    graphviz.highlight(node);
+
+    // Test with invalid color
+    container.css("background", "invalid");
+    graphviz.highlight(node);
+  });
+
+  test("should handle setup with missing elements", () => {
+    const svgContent = `<svg><g>
+    <!-- Empty graph -->
+  </g></svg>`;
+
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: svgContent,
+    });
+
+    expect(graphviz.$nodes.length).toBe(0);
+    expect(graphviz.$edges.length).toBe(0);
+  });
 });
