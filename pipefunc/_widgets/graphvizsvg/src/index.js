@@ -1,6 +1,9 @@
 // index.js
-import GraphvizSvg from './graphvizsvg';
+import jQuery from "jquery";
+window.jQuery = window.$ = jQuery;
+
+import GraphvizSvg from "./graphvizsvg";
 import "bootstrap";
-import './plugin';
+import "./plugin";
 
 export default GraphvizSvg;
