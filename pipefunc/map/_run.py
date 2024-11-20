@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import tempfile
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -28,9 +29,11 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
+from ._load import load_outputs
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
+from ._run_info import RunInfo
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -47,7 +50,6 @@ if TYPE_CHECKING:
 
     from ._progress import Status
     from ._result import StoreType
-    from ._run_info import RunInfo
     from ._types import UserShapeDict
 
 
@@ -895,6 +897,19 @@ def _submit_func(
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
+    return _submit_task(func, kwargs, run_info, store, fixed_indices, executor, progress, cache)
+
+
+def _submit_task(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+    fixed_indices: dict[str, int | slice] | None,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    progress: ProgressTracker | None = None,
+    cache: _CacheBase | None = None,
+) -> _KwargsTask:
     status = progress.progress_dict[func.output_name] if progress is not None else None
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
@@ -1018,3 +1033,52 @@ async def _process_task_async(
         r = await _result_async(task, loop)
         output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
+
+
+class TestResult(NamedTuple):
+    function: str
+    kwargs: dict[str, Any]
+    expected_output: Any
+    actual_output: Any
+
+
+def compare(
+    pipeline: Pipeline,
+    run_folder: str | Path,
+    output_names: set[str] | None = None,
+) -> dict[str, TestResult]:
+    """Rerun the pipeline and compare the outputs to the stored outputs.
+
+    Parameters
+    ----------
+    pipeline
+        The pipeline that was run.
+    run_folder
+        The folder where the pipeline run was stored.
+    output_names
+        The output(s) to test. If ``None``, all outputs are tested.
+
+    """
+    assert output_names is None or all(isinstance(o, str) for o in output_names)
+    run_info = RunInfo.load(run_folder)
+    store = run_info.init_store()
+    results = {}
+    new_run_folder = Path(tempfile.mkdtemp())
+    new_run_info = run_info.copy(run_folder=new_run_folder)
+    for func in pipeline.functions:
+        if output_names is not None and set(at_least_tuple(func.output_name)) not in output_names:
+            continue
+        kwargs = _func_kwargs(func, run_info, store)
+        task = _submit_task(func, kwargs, new_run_info, store, None, None)
+        output = _process_task(func, task, store)
+        for output_name, result in output.items():
+            assert run_info.run_folder is not None
+            expected_output = load_outputs(output_name, run_folder=run_info.run_folder)
+            actual_output = result.output
+            results[output_name] = TestResult(
+                function=result.function,
+                kwargs=result.kwargs,
+                expected_output=expected_output,
+                actual_output=actual_output,
+            )
+    return results

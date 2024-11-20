@@ -187,6 +187,11 @@ class RunInfo:
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
 
+    def copy(self, **update: Any) -> RunInfo:
+        data = asdict(self)
+        data.update(update)
+        return RunInfo(**data)
+
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
     if isinstance(storage, str):
