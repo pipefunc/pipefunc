@@ -826,4 +826,79 @@ describe("GraphvizSvg", () => {
       expect(graphviz.options.shrink.y).toBe(expected.y);
     });
   });
+
+  // Test highlight with null elements
+  test("should handle highlight with null elements", () => {
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: "<svg><g></g></svg>",
+    });
+
+    // Should not throw when highlighting null or empty selection
+    expect(() => {
+      graphviz.highlight(null);
+      graphviz.highlight($());
+    }).not.toThrow();
+  });
+
+  // Test color transition with invalid colors
+  test("should handle invalid color transitions", () => {
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: `<svg><g>
+      <g class="node">
+        <title>A</title>
+        <ellipse cx="50" cy="50" rx="30" ry="30" fill="invalid"/>
+      </g>
+    </g></svg>`,
+    });
+
+    const node = $(graphviz._nodesByName["A"]);
+
+    // Should not throw with invalid colors
+    expect(() => {
+      graphviz.highlight(node);
+    }).not.toThrow();
+  });
+
+  // Test edge case setup scenarios
+  test("should handle edge case setup scenarios", () => {
+    // Test with empty SVG
+    new GraphvizSvg(container[0], {
+      svg: "<svg></svg>",
+    });
+
+    // Test with no options
+    new GraphvizSvg(container[0]);
+
+    // Test with null SVG
+    new GraphvizSvg(container[0], {
+      svg: null,
+    });
+
+    // Verify no errors were thrown
+    expect(true).toBe(true);
+  });
+
+  // Fix the plugin methods test
+  test("should handle plugin methods and options", () => {
+    // Test method calls on instance
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: '<svg><g><g class="node"><title>A</title></g></g></svg>',
+    });
+
+    const highlightSpy = jest.spyOn(graphviz, "highlight");
+    const tooltipSpy = jest.spyOn(graphviz, "tooltip");
+    const destroySpy = jest.spyOn(graphviz, "destroy");
+
+    graphviz.highlight($());
+    graphviz.tooltip($(), true);
+    graphviz.destroy();
+
+    expect(highlightSpy).toHaveBeenCalled();
+    expect(tooltipSpy).toHaveBeenCalled();
+    expect(destroySpy).toHaveBeenCalled();
+
+    // Test plugin registration
+    expect(typeof $.fn.graphviz).toBe("function");
+    expect($.fn.graphviz.Constructor).toBe(GraphvizSvg);
+  });
 });
