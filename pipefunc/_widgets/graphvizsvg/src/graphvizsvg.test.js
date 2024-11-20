@@ -1,6 +1,7 @@
 // graphvizsvg.test.js
 import $ from "jquery";
 import GraphvizSvg from "./index";
+import { ColorUtil } from "./utils";
 
 describe("GraphvizSvg", () => {
   let container;
@@ -738,5 +739,91 @@ describe("GraphvizSvg", () => {
 
     expect(graphviz.$nodes.length).toBe(0);
     expect(graphviz.$edges.length).toBe(0);
+  });
+
+  test("should handle setup errors gracefully", () => {
+    const invalidSvgContent = "<svg><invalid>"; // Invalid SVG
+
+    expect(() => {
+      new GraphvizSvg(container[0], {
+        svg: invalidSvgContent,
+      });
+    }).not.toThrow();
+  });
+
+  // Test tooltip updates
+  test("should handle tooltip updates", () => {
+    const svgContent = `
+      <svg>
+        <g>
+          <g class="node">
+            <title>A</title>
+            <a xlink:title="Test tooltip">
+              <text>Node A</text>
+            </a>
+          </g>
+        </g>
+      </svg>
+    `;
+
+    const graphviz = new GraphvizSvg(container[0], {
+      svg: svgContent,
+      tooltips: {
+        init() {
+          $(this).attr("title", $(this).attr("xlink:title"));
+        },
+        show() {
+          $(this).attr("data-tooltip-keepvisible", true);
+        },
+        hide() {
+          $(this).removeAttr("data-tooltip-keepvisible");
+        },
+        update() {
+          if ($(this).attr("data-tooltip-keepvisible")) {
+            // Test update logic
+          }
+        },
+      },
+    });
+
+    const node = $(graphviz._nodesByName["A"]);
+    const link = node.find("a");
+
+    // Test tooltip update
+    link.attr("data-tooltip-keepvisible", true);
+    graphviz.tooltip(node, true);
+    expect(link.attr("data-tooltip-keepvisible")).toBe("true");
+  });
+
+  // Test color utilities
+  test("should handle various color formats", () => {
+    const colors = ["rgb(255, 0, 0)", "#ff0000", "rgb(0, 255, 0)", "#00ff00"];
+
+    colors.forEach((color) => {
+      const parsed = ColorUtil.parseColor(color);
+      expect(parsed).toHaveProperty("r");
+      expect(parsed).toHaveProperty("g");
+      expect(parsed).toHaveProperty("b");
+    });
+  });
+
+  // Test shrink option parsing
+  test("should handle various shrink option formats", () => {
+    const testCases = [
+      { input: "5px", expected: { x: 5, y: 5 } },
+      { input: "10pt", expected: { x: 325, y: 325 } }, // 10 * 32.5
+      { input: { x: "5px", y: "10pt" }, expected: { x: 5, y: 325 } },
+      { input: 5, expected: { x: 5, y: 5 } },
+    ];
+
+    testCases.forEach(({ input, expected }) => {
+      const graphviz = new GraphvizSvg(container[0], {
+        svg: "<svg><g></g></svg>",
+        shrink: input,
+      });
+
+      expect(graphviz.options.shrink.x).toBe(expected.x);
+      expect(graphviz.options.shrink.y).toBe(expected.y);
+    });
   });
 });
