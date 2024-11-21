@@ -96,7 +96,7 @@ function _setupNodesEdges($el, isNode, context) {
       $a.attr("title", $a.attr("xlink:title"));
       $a.removeAttr("xlink:title");
       if (options.tooltips) {
-        options.tooltips.init.call(context, context.$element);
+        options.tooltips.init.call(this, context.$element);
       }
     });
 }
