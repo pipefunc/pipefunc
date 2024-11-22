@@ -110,3 +110,7 @@ venv.bak/
 *.sbatch
 *.out
 *.batch
+
+# JavaScript
+# Ignore node_modules in any directory
+**/node_modules/
