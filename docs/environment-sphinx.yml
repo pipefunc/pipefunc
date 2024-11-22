@@ -30,7 +30,6 @@ dependencies:
   - holoviews
   - bokeh
   - python-graphviz
-  - graphviz-anywidget
   # optional-dependencies: profiling
   - psutil
   # optional-dependencies: pydantic
