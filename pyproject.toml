@@ -28,10 +28,17 @@ dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
-widgets = ["ipywidgets", "anywidget"]
+widgets = ["ipywidgets", "anywidget", "graphviz-anywidget"]
 zarr = ["zarr"]
 pandas = ["pandas"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
+plotting = [
+    "matplotlib",
+    "pygraphviz",
+    "holoviews",
+    "bokeh",
+    "graphviz",
+    "graphviz-anywidget",
+]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
 test = [
@@ -128,7 +135,7 @@ exclude_lines = [
 
 [tool.coverage.run]
 omit = [
-    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+    "pipefunc/map/_types.py", # Only imported in `if TYPE_CHECKING` block
 ]
 
 [tool.ruff]

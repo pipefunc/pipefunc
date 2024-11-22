@@ -29,6 +29,7 @@ from pipefunc._utils import (
     handle_error,
     is_running_in_ipynb,
     is_running_in_vscode,
+    requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc.exceptions import UnusedParametersError
@@ -1401,9 +1402,9 @@ class Pipeline:
             The resulting Graphviz Digraph object.
 
         """
+        requires("graphviz_anywidget", "visualize_graphviz_widget", "plotting")
         import graphviz
-
-        from pipefunc._widgets import graph_widget
+        from graphviz_anywidget import graph_widget
 
         graph = self.visualize_graphviz(
             orient=orient,
