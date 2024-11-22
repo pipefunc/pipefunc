@@ -28,7 +28,7 @@ dependencies = ["networkx", "cloudpickle", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 xarray = ["xarray"]
-widgets = ["ipywidgets", "anywidget", "graphviz-anywidget"]
+widgets = ["ipywidgets", "graphviz-anywidget"]
 zarr = ["zarr"]
 pandas = ["pandas"]
 plotting = [

@@ -18,7 +18,6 @@ dependencies:
   - xarray
   # optional-dependencies: widgets
   - ipywidgets
-  - anywidget
   - graphviz-anywidget
   # optional-dependencies: zarr
   - zarr
