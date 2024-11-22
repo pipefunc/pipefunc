@@ -1,8 +1,7 @@
 {
     "scripts": {
-        "copy-wasm": "mkdir -p ./static && cp -r node_modules/@hpcc-js/wasm/dist/graphvizlib.wasm ./static",
-        "build": "npm run copy-wasm && node build.js",
-        "dev": "npm run copy-wasm && node build.js --watch"
+        "build": "node build.js",
+        "dev": "node build.js --watch"
     },
     "dependencies": {
         "d3": "7.6.1",

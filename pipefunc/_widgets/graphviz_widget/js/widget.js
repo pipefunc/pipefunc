@@ -23,7 +23,7 @@ import "graphvizsvg";
 import { graphviz as d3graphviz } from "d3-graphviz";
 
 // Import the WASM binary that's now embedded in our bundle
-import wasmBinary from "../static/graphvizlib.wasm";
+import wasmBinary from "../node_modules/@hpcc-js/wasm/dist/graphvizlib.wasm";
 
 function getLegendElements(graphvizInstance, $) {
   const legendNodes = [];
