@@ -117,12 +117,7 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
     return a == b
 
 
-def equal_dicts(
-    d1: dict[str, Any],
-    d2: dict[str, Any],
-    *,
-    verbose: bool = False,
-) -> bool | None:
+def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False) -> bool | None:
     """Check if two dictionaries are equal.
 
     Returns True if the dictionaries are equal, False if they are not equal,
