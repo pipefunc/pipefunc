@@ -1404,7 +1404,7 @@ class Pipeline:
         """
         requires("graphviz_anywidget", "visualize_graphviz_widget", "plotting")
         import graphviz
-        from graphviz_anywidget import graph_widget
+        from graphviz_anywidget import graphviz_widget
 
         graph = self.visualize_graphviz(
             orient=orient,
@@ -1413,7 +1413,7 @@ class Pipeline:
         )
         assert isinstance(graph, graphviz.Digraph)
         dot_source = graph.source
-        return graph_widget(dot_source)
+        return graphviz_widget(dot_source)
 
     def visualize_matplotlib(
         self,
