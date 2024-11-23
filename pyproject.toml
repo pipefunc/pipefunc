@@ -33,7 +33,7 @@ zarr = ["zarr"]
 pandas = ["pandas"]
 plotting = [
     "matplotlib",
-    "pygraphviz",
+    "pygraphviz",  # only used matplotlib plotting (nx.graphviz_layout)
     "holoviews",
     "bokeh",
     "graphviz",
