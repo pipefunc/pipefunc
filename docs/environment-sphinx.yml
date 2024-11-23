@@ -18,7 +18,6 @@ dependencies:
   - xarray
   # optional-dependencies: widgets
   - ipywidgets
-  - graphviz-anywidget
   # optional-dependencies: zarr
   - zarr
   # optional-dependencies: pandas
@@ -42,10 +41,11 @@ dependencies:
   - sphinx-togglebutton
   - emoji
   - jupytext
+  - myst-nb
   - myst-parser
   - versioningit
   - seaborn
   - nltk
   - scikit-image
   - pip:
-    - myst-nb
+    - graphviz-anywidget

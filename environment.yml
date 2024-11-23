@@ -18,7 +18,6 @@ dependencies:
   - xarray
   # optional-dependencies: widgets
   - ipywidgets
-  - graphviz-anywidget
   # optional-dependencies: zarr
   - zarr
   # optional-dependencies: pandas
@@ -41,3 +40,5 @@ dependencies:
   - pytest-xdist
   - coverage
   - versioningit
+  - pip:
+    - graphviz-anywidget
