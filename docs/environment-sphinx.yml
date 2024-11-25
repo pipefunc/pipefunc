@@ -18,6 +18,7 @@ dependencies:
   - xarray
   # optional-dependencies: widgets
   - ipywidgets
+  - graphviz-anywidget
   # optional-dependencies: zarr
   - zarr
   # optional-dependencies: pandas
@@ -47,5 +48,3 @@ dependencies:
   - seaborn
   - nltk
   - scikit-image
-  - pip:
-    - graphviz-anywidget
