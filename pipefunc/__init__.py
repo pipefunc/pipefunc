@@ -6,15 +6,15 @@ from pipefunc._pipeline import Pipeline
 from pipefunc._version import __version__
 
 __all__ = [
-    "__version__",
-    "pipefunc",
+    "ErrorSnapshot",
+    "NestedPipeFunc",
     "PipeFunc",
     "Pipeline",
-    "NestedPipeFunc",
-    "ErrorSnapshot",
+    "__version__",
     "cache",
     "lazy",
     "map",
+    "pipefunc",
     "resources",
     "sweep",
     "testing",

@@ -1814,7 +1814,7 @@ class _PipelineAsFunc:
 
     """
 
-    __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
+    __slots__ = ["_call_with_root_args", "output_name", "pipeline", "root_args"]
 
     def __init__(
         self,
