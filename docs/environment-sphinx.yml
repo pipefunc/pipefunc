@@ -23,16 +23,16 @@ dependencies:
   - zarr
   # optional-dependencies: pandas
   - pandas
+  # optional-dependencies: profiling
+  - psutil
+  # optional-dependencies: pydantic
+  - pydantic
   # optional-dependencies: plotting
   - matplotlib
   - pygraphviz
   - holoviews
   - bokeh
   - python-graphviz
-  # optional-dependencies: profiling
-  - psutil
-  # optional-dependencies: pydantic
-  - pydantic
   # optional-dependencies: docs
   - sphinx
   - sphinx-autodoc-typehints

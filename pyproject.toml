@@ -31,6 +31,8 @@ xarray = ["xarray"]
 widgets = ["ipywidgets", "graphviz-anywidget"]
 zarr = ["zarr"]
 pandas = ["pandas"]
+profiling = ["psutil"]
+pydantic = ["pydantic"]
 plotting = [
     "matplotlib",
     "pygraphviz",  # only used matplotlib plotting (nx.graphviz_layout)
@@ -39,8 +41,6 @@ plotting = [
     "graphviz",
     "graphviz-anywidget",
 ]
-profiling = ["psutil"]
-pydantic = ["pydantic"]
 test = [
     "pytest",
     "pytest-asyncio",
