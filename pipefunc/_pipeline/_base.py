@@ -1385,19 +1385,37 @@ class Pipeline:
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
-        """Visualize the pipeline interactively as a directed graph using Graphviz and ipywidgets.
+        """Create an interactive visualization of the pipeline as a directed graph.
+
+        Creates a widget that allows interactive exploration of the pipeline graph.
+        The widget provides the following interactions:
+
+        - Zoom: Use mouse scroll
+        - Pan: Click and drag
+        - Node selection: Click on nodes to highlight connected nodes
+        - Multi-select: Shift-click on nodes to select multiple routes
+        - Search: Use the search box to highlight matching nodes
+        - Reset view: Press Escape
+
+        Requires the `graphviz-anywidget` package to be installed, which is maintained
+        by the pipefunc authors, see https://github.com/pipefunc/graphviz-anywidget
 
         Parameters
         ----------
         orient
-            Graph orientation: 'TB', 'LR', 'BT', 'RL'.
+            Graph orientation, controlling the main direction of the graph flow.
+            Options are:
+            - 'TB': Top to bottom
+            - 'LR': Left to right
+            - 'BT': Bottom to top
+            - 'RL': Right to left
         graphviz_kwargs
             Graphviz-specific keyword arguments for customizing the graph's appearance.
 
         Returns
         -------
         ipywidgets.VBox
-            The resulting Graphviz Digraph object.
+            Interactive widget containing the graph visualization.
 
         """
         requires(
