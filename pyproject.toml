@@ -33,7 +33,7 @@ zarr = ["zarr"]
 pandas = ["pandas"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
+plotting = ["matplotlib", "holoviews", "bokeh", "graphviz"]
 test = [
     "pytest",
     "pytest-asyncio",

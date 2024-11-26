@@ -28,7 +28,6 @@ dependencies:
   - pydantic
   # optional-dependencies: plotting
   - matplotlib
-  - pygraphviz
   - holoviews
   - bokeh
   - python-graphviz
