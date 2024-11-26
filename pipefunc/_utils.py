@@ -6,6 +6,7 @@ import importlib.util
 import inspect
 import math
 import operator
+import os
 import socket
 import sys
 import warnings
@@ -224,6 +225,11 @@ def is_running_in_ipynb() -> bool:
         return False  # Probably standard Python interpreter
 
 
+def is_running_in_vscode() -> bool:  # pragma: no cover
+    """Check if the code is running inside VS Code."""
+    return "VSCODE_PID" in os.environ
+
+
 def is_installed(package: str) -> bool:
     """Check if a package is installed."""
     return importlib.util.find_spec(package) is not None
@@ -231,7 +237,7 @@ def is_installed(package: str) -> bool:
 
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
-    conda_name_mapping = {"graphviz": "python-graphviz"}
+    conda_name_mapping = {"graphviz": "python-graphviz", "graphviz_anywidget": "graphviz-anywidget"}
 
     for package in packages:
         if is_installed(package):
