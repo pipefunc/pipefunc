@@ -39,7 +39,7 @@ jobs:
             # Install all optional dependencies that work with 3.13t
             uv pip install -e ".[xarray,widgets,pandas,test]"
           else
-            uv pip install -e ".[adaptive,xarray,widgets,zarr,pandas,profiling,pydantic,plotting,test]"
+            uv pip install -e ".[all,pydantic,test]"
           fi
 
       - name: Run pytest (all dependencies)

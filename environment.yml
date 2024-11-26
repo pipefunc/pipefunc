@@ -8,35 +8,35 @@ dependencies:
   - python
   - pip
   # from pyproject.toml
-  - networkx
   - cloudpickle
+  - networkx
   - numpy
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.13.3
-  # optional-dependencies: xarray
-  - xarray
-  # optional-dependencies: widgets
-  - ipywidgets
-  - graphviz-anywidget
-  # optional-dependencies: zarr
-  - zarr
   # optional-dependencies: pandas
   - pandas
+  # optional-dependencies: plotting
+  - bokeh
+  - python-graphviz
+  - holoviews
+  - matplotlib
   # optional-dependencies: profiling
   - psutil
   # optional-dependencies: pydantic
   - pydantic
-  # optional-dependencies: plotting
-  - matplotlib
-  - holoviews
-  - bokeh
-  - python-graphviz
+  # optional-dependencies: widgets
+  - graphviz-anywidget
+  - ipywidgets
+  # optional-dependencies: xarray
+  - xarray
+  # optional-dependencies: zarr
+  - zarr
   # optional-dependencies: test
-  - pytest
+  - coverage
   - pytest-asyncio
   - pytest-codspeed
   - pytest-cov
   - pytest-xdist
-  - coverage
+  - pytest
   - versioningit
