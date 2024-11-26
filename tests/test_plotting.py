@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 has_holoviews = importlib.util.find_spec("holoviews") is not None
 has_graphviz = importlib.util.find_spec("graphviz") is not None
 has_anywidget = importlib.util.find_spec("graphviz_anywidget") is not None
+has_graphviz_exec = shutil.which("dot") is not None
 
 
 @pytest.fixture(autouse=True)
@@ -197,7 +199,7 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     case_toggle.value = True
 
 
-@pytest.mark.skipif(not has_graphviz, reason="graphviz not installed")
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
 def test_visualize_graphviz_with_typing():
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> UnresolvableTypeHere:  # type: ignore[name-defined]  # noqa: F821
