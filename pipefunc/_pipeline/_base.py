@@ -28,7 +28,6 @@ from pipefunc._utils import (
     clear_cached_properties,
     handle_error,
     is_running_in_ipynb,
-    is_running_in_vscode,
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
@@ -1294,11 +1293,7 @@ class Pipeline:
 
         if backend is None:  # pragma: no cover
             if is_installed("graphviz"):
-                backend = (
-                    "graphviz_widget"
-                    if is_running_in_ipynb() and not is_running_in_vscode()
-                    else "graphviz"
-                )
+                backend = "graphviz_widget" if is_running_in_ipynb() else "graphviz"
             elif is_installed("matplotlib"):
                 backend = "matplotlib"
             elif is_installed("holoviews"):
