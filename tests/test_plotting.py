@@ -180,7 +180,10 @@ def test_visualize_graphviz(
         )
 
 
-@pytest.mark.skipif(not has_anywidget, reason="graphviz-anywidget not installed")
+@pytest.mark.skipif(
+    not has_anywidget or not has_graphviz,
+    reason="graphviz-anywidget not installed",
+)
 def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     # Note: Not sure how to test this properly, just make sure it runs
     widget = everything_pipeline.visualize(backend="graphviz_widget")

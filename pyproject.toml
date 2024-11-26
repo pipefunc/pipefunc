@@ -35,7 +35,6 @@ profiling = ["psutil"]
 pydantic = ["pydantic"]
 plotting = [
     "matplotlib",
-    "pygraphviz",  # only used matplotlib plotting (nx.graphviz_layout)
     "holoviews",
     "bokeh",
     "graphviz",
