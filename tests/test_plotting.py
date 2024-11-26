@@ -17,8 +17,8 @@ import importlib
 
 has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 has_holoviews = importlib.util.find_spec("holoviews") is not None
-has_pygraphviz = importlib.util.find_spec("pygraphviz") is not None
-has_anywidget = importlib.util.find_spec("anywidget") is not None
+has_graphviz = importlib.util.find_spec("graphviz") is not None
+has_anywidget = importlib.util.find_spec("graphviz_anywidget") is not None
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +32,7 @@ def patched_show():
         yield mock_show
 
 
-@pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
+@pytest.mark.skipif(not has_graphviz, reason="graphviz not installed")
 def test_plot() -> None:
     import graphviz
 
@@ -65,8 +65,8 @@ def test_plot_with_defaults(backend) -> None:
         pytest.skip("matplotlib not installed")
     elif backend == "holoviews" and not has_holoviews:
         pytest.skip("holoviews not installed")
-    elif backend == "graphviz" and not has_pygraphviz:
-        pytest.skip("pygraphviz not installed")
+    elif backend == "graphviz" and not has_graphviz:
+        pytest.skip("graphviz not installed")
 
     pipeline.visualize(backend=backend)
 
@@ -168,8 +168,8 @@ def test_visualize_graphviz(
         pytest.skip("matplotlib not installed")
     elif backend == "holoviews" and not has_holoviews:
         pytest.skip("holoviews not installed")
-    elif backend == "graphviz" and not has_pygraphviz:
-        pytest.skip("pygraphviz not installed")
+    elif backend == "graphviz" and not has_graphviz:
+        pytest.skip("graphviz not installed")
 
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
@@ -180,10 +180,7 @@ def test_visualize_graphviz(
         )
 
 
-@pytest.mark.skipif(
-    not has_pygraphviz or not has_anywidget,
-    reason="pygraphviz or anywidget not installed",
-)
+@pytest.mark.skipif(not has_anywidget, reason="graphviz-anywidget not installed")
 def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     # Note: Not sure how to test this properly, just make sure it runs
     widget = everything_pipeline.visualize(backend="graphviz_widget")
@@ -197,7 +194,7 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     case_toggle.value = True
 
 
-@pytest.mark.skipif(not has_pygraphviz, reason="pygraphviz not installed")
+@pytest.mark.skipif(not has_graphviz, reason="graphviz not installed")
 def test_visualize_graphviz_with_typing():
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> UnresolvableTypeHere:  # type: ignore[name-defined]  # noqa: F821
