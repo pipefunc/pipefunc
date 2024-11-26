@@ -1397,6 +1397,9 @@ class Pipeline:
         - Search: Use the search box to highlight matching nodes
         - Reset view: Press Escape
 
+        Requires the `graphviz-anywidget` package to be installed, which is maintained
+        by the pipefunc authors, see https://github.com/pipefunc/graphviz-anywidget
+
         Parameters
         ----------
         orient
