@@ -26,6 +26,7 @@ dependencies:
   # optional-dependencies: pydantic
   - pydantic
   # optional-dependencies: widgets
+  - graphviz-anywidget
   - ipywidgets
   # optional-dependencies: xarray
   - xarray

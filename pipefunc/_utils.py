@@ -231,7 +231,7 @@ def is_installed(package: str) -> bool:
 
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
-    conda_name_mapping = {"graphviz": "python-graphviz"}
+    conda_name_mapping = {"graphviz": "python-graphviz", "graphviz_anywidget": "graphviz-anywidget"}
 
     for package in packages:
         if is_installed(package):

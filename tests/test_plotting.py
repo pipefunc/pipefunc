@@ -182,6 +182,24 @@ def test_visualize_graphviz(
         )
 
 
+@pytest.mark.skipif(
+    not has_anywidget or not has_graphviz,
+    # NOTE: This should even work if 'dot' is not installed because it uses the Wasm graphviz
+    reason="graphviz-anywidget not installed",
+)
+def test_plotting_widget(everything_pipeline: Pipeline) -> None:
+    # Note: Not sure how to test this properly, just make sure it runs
+    widget = everything_pipeline.visualize(backend="graphviz_widget")
+    first, second, widget = widget.children
+    reset_button, direction_selector = first.children
+    search_input, search_type_selector, case_toggle = second.children
+    reset_button.click()
+    direction_selector.value = "downstream"
+    search_input.value = "c"
+    search_type_selector.value = "included"
+    case_toggle.value = True
+
+
 @pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
 def test_visualize_graphviz_with_typing():
     @pipefunc(output_name="c")

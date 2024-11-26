@@ -31,7 +31,7 @@ pandas = ["pandas"]
 plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-widgets = ["ipywidgets"]
+widgets = ["graphviz-anywidget", "ipywidgets"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 test = [
@@ -128,7 +128,7 @@ exclude_lines = [
 
 [tool.coverage.run]
 omit = [
-    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+    "pipefunc/map/_types.py", # Only imported in `if TYPE_CHECKING` block
 ]
 
 [tool.ruff]
