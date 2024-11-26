@@ -170,7 +170,7 @@ def test_visualize_graphviz(
         pytest.skip("matplotlib not installed")
     elif backend == "holoviews" and not has_holoviews:
         pytest.skip("holoviews not installed")
-    elif backend == "graphviz" and not has_graphviz and not has_graphviz_exec:
+    elif backend == "graphviz" and (not has_graphviz or not has_graphviz_exec):
         pytest.skip("graphviz not installed")
 
     everything_pipeline.visualize(backend=backend)
