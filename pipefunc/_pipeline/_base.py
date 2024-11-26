@@ -1293,7 +1293,10 @@ class Pipeline:
 
         if backend is None:  # pragma: no cover
             if is_installed("graphviz"):
-                backend = "graphviz_widget" if is_running_in_ipynb() else "graphviz"
+                if is_installed("graphviz_anywidget") and is_running_in_ipynb():
+                    backend = "graphviz_widget"
+                else:
+                    backend = "graphviz"
             elif is_installed("matplotlib"):
                 backend = "matplotlib"
             elif is_installed("holoviews"):
