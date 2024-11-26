@@ -1400,7 +1400,12 @@ class Pipeline:
             The resulting Graphviz Digraph object.
 
         """
-        requires("graphviz_anywidget", reason="visualize_graphviz_widget", extras="plotting")
+        requires(
+            "graphviz_anywidget",
+            "graphviz",
+            reason="visualize_graphviz_widget",
+            extras="plotting",
+        )
         import graphviz
         from graphviz_anywidget import graphviz_widget
 
