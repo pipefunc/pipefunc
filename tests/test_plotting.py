@@ -184,6 +184,7 @@ def test_visualize_graphviz(
 
 @pytest.mark.skipif(
     not has_anywidget or not has_graphviz,
+    # NOTE: This should even work if 'dot' is not installed because it uses the Wasm graphviz
     reason="graphviz-anywidget not installed",
 )
 def test_plotting_widget(everything_pipeline: Pipeline) -> None:
