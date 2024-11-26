@@ -24,49 +24,49 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = ["networkx", "cloudpickle", "numpy"]
+dependencies = ["cloudpickle", "networkx", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
-xarray = ["xarray"]
-widgets = ["ipywidgets"]
-zarr = ["zarr"]
 pandas = ["pandas"]
+plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-plotting = ["matplotlib", "holoviews", "bokeh", "graphviz"]
+widgets = ["ipywidgets"]
+xarray = ["xarray"]
+zarr = ["zarr"]
 test = [
-    "pytest",
+    "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
     "pytest-cov",
     "pytest-xdist",
-    "coverage",
+    "pytest",
     "versioningit",
 ]
 docs = [
-    "sphinx",
+    "emoji",
+    "jupytext",
+    "myst-nb",
+    "myst-parser",
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
-    "emoji",
-    "jupytext",
-    "myst-nb",
-    "myst-parser",
+    "sphinx",
     "versioningit",
     # Used for the example notebook
-    "seaborn",
     "nltk",
     "scikit-image",
+    "seaborn",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
+all = ["pipefunc[adaptive,pandas,plotting,profiling,pydantic,widgets,xarray,zarr]"]
 dev = [ # all + dev deps
     "black[jupyter]",
+    "mypy",
     "pre-commit",
     "ruff",
-    "mypy",
     "versioningit",
     "pipefunc[all,test,docs,pydantic]",
 ]
