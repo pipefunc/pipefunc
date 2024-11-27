@@ -63,7 +63,7 @@ docs = [
     "pipefunc[all]",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,pandas,plotting,profiling,pydantic,widgets,xarray,zarr]"]
+all = ["pipefunc[adaptive,pandas,plotting,profiling,widgets,xarray,zarr]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
