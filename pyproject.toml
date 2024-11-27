@@ -1,6 +1,6 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools", "wheel", "versioningit"]
+build-backend = "hatchling.build"
+requires = ["hatchling", "versioningit"]
 
 [project]
 name = "pipefunc"
@@ -24,49 +24,51 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = ["networkx", "cloudpickle", "numpy"]
+dependencies = ["cloudpickle", "networkx", "numpy"]
+
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
-xarray = ["xarray"]
-widgets = ["ipywidgets"]
-zarr = ["zarr"]
 pandas = ["pandas"]
+plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
+widgets = ["graphviz-anywidget", "ipywidgets"]
+xarray = ["xarray"]
+zarr = ["zarr"]
 test = [
-    "pytest",
+    "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
     "pytest-cov",
     "pytest-xdist",
-    "coverage",
+    "pytest",
     "versioningit",
 ]
 docs = [
-    "sphinx",
+    "emoji",
+    "jupytext",
+    "myst-nb",
+    "myst-parser",
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
-    "emoji",
-    "jupytext",
-    "myst-nb",
-    "myst-parser",
+    "sphinx",
     "versioningit",
     # Used for the example notebook
-    "seaborn",
     "nltk",
     "scikit-image",
+    "seaborn",
+    "pipefunc[all]",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
+all = ["pipefunc[adaptive,pandas,plotting,profiling,widgets,xarray,zarr]"]
 dev = [ # all + dev deps
     "black[jupyter]",
+    "mypy",
     "pre-commit",
     "ruff",
-    "mypy",
     "versioningit",
     "pipefunc[all,test,docs,pydantic]",
 ]
@@ -79,6 +81,16 @@ repository = "https://github.com/pipefunc/pipefunc"
 content-type = "text/markdown"
 file = "README.md"
 
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipefunc"]
+
+[tool.hatch.build.hooks.versioningit-onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
+
 [tool.versioningit]
 default-version = "0.0.0"
 
@@ -87,24 +99,10 @@ method = "git"
 match = ["v*"]
 default-tag = "0.0.0"
 
-[tool.setuptools.package-data]
-"pipefunc" = ["py.typed"]
-
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
-
-[tool.setuptools.cmdclass]
-sdist = "versioningit.cmdclass.sdist"
-build_py = "versioningit.cmdclass.build_py"
-
 [tool.versioningit.format]
 dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
 distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
-
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "module"
@@ -128,7 +126,7 @@ exclude_lines = [
 
 [tool.coverage.run]
 omit = [
-    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+    "pipefunc/map/_types.py", # Only imported in `if TYPE_CHECKING` block
 ]
 
 [tool.ruff]

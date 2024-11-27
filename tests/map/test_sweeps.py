@@ -8,7 +8,7 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.map._load import load_outputs
 from pipefunc.map._shapes import map_shapes
 from pipefunc.sweep import Sweep
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path

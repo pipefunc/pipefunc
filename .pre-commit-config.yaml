@@ -9,7 +9,7 @@ repos:
       - id: debug-statements
       - id: check-ast
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.7.3"
+    rev: "v0.8.0"
     hooks:
       - id: ruff
         exclude: docs/source/conf.py|ipynb_filter.py
@@ -26,6 +26,6 @@ repos:
           - pandas-stubs
           - types-psutil
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.8.0
+    rev: 0.8.1
     hooks:
       - id: nbstripout

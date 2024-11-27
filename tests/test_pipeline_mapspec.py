@@ -6,7 +6,7 @@ from concurrent.futures import Executor
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
