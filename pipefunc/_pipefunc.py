@@ -104,9 +104,11 @@ class PipeFunc(Generic[T]):
         outputs are required to be identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
-        This hook can be used for logging results, debugging, statistics, or other
-        side effects. It receives the `PipeFunc` instance, the return value of the
-        function, and the input values as a dictionary.
+        The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
+        This hook can be used for logging, visualization of intermediate results,
+        debugging, statistics collection, or other side effects. The hook is executed
+        synchronously after the function returns but before the result is passed to
+        the next function in the pipeline.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -941,9 +943,11 @@ def pipefunc(
         outputs are required to be identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
-        This hook can be used for logging results, debugging, statistics, or other
-        side effects. It receives the `PipeFunc` instance, the return value of the
-        function, and the input values as a dictionary.
+        The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
+        This hook can be used for logging, visualization of intermediate results,
+        debugging, statistics collection, or other side effects. The hook is executed
+        synchronously after the function returns but before the result is passed to
+        the next function in the pipeline.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
