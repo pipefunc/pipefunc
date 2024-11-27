@@ -119,7 +119,6 @@ if __name__ == "__main__":
         "pandas",
         "plotting",
         "profiling",
-        "pydantic",
         "widgets",
         "xarray",
         "zarr",
