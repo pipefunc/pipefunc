@@ -17,8 +17,6 @@ sys.path.insert(1, str(docs_path))
 
 import pipefunc  # noqa: E402, isort:skip
 
-pipefunc._pipeline._base.DEFAULT_VISUALIZATION_BACKEND = "graphviz"
-
 # -- Project information -----------------------------------------------------
 
 project = "pipefunc"

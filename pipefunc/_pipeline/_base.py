@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import os
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
@@ -73,11 +74,6 @@ if TYPE_CHECKING:
     from pipefunc.map._types import UserShapeDict
 
     from ._types import OUTPUT_TYPE
-
-# Allows to set a default visualization backend, e.g., used in docs
-# until AnyWidget shares JS code: https://github.com/manzt/anywidget/pull/628
-# https://github.com/manzt/anywidget/issues/613
-DEFAULT_VISUALIZATION_BACKEND = None
 
 
 class Pipeline:
@@ -1297,8 +1293,12 @@ class Pipeline:
                 return False
 
         if backend is None:  # pragma: no cover
-            if DEFAULT_VISUALIZATION_BACKEND is not None:
-                backend = DEFAULT_VISUALIZATION_BACKEND
+            if os.getenv("READTHEDOCS") is not None:
+                # Set a default visualization backend in the docs
+                # until AnyWidget shares JS code: https://github.com/manzt/anywidget/pull/628
+                # https://github.com/manzt/anywidget/issues/613
+                # TODO: Remove this.
+                backend = "graphviz"
             elif is_installed("graphviz"):
                 if is_installed("graphviz_anywidget") and is_running_in_ipynb():
                     backend = "graphviz_widget"
