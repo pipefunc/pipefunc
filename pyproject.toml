@@ -86,6 +86,10 @@ source = "versioningit"
 [tool.hatch.build.targets.wheel]
 packages = ["pipefunc"]
 
+[tool.hatch.build.hooks.versioningit-onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
+
 [tool.versioningit]
 default-version = "0.0.0"
 
@@ -98,10 +102,6 @@ default-tag = "0.0.0"
 dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
 distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
-
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "module"
