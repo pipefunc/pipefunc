@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -53,8 +54,10 @@ def test_exception():
 
     pipeline = Pipeline([g, h])
     with pytest.raises(
-        ValueError,
-        match="Expression `'a' + 'b'` must evaluate to an integer but it evaluated to `ab`.",
+        TypeError,
+        match=re.escape(
+            "Expression `'a' + 'b'` must evaluate to an integer but it evaluated to `ab`.",
+        ),
     ):
         pipeline.map({"n": 4}, run_folder=None, parallel=False)
 
