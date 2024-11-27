@@ -108,7 +108,7 @@ class PipeFunc(Generic[T]):
         This hook can be used for logging, visualization of intermediate results,
         debugging, statistics collection, or other side effects. The hook is executed
         synchronously after the function returns but before the result is passed to
-        the next function in the pipeline.
+        the next function in the pipeline. Keep the hook lightweight to avoid impacting performance.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -947,7 +947,7 @@ def pipefunc(
         This hook can be used for logging, visualization of intermediate results,
         debugging, statistics collection, or other side effects. The hook is executed
         synchronously after the function returns but before the result is passed to
-        the next function in the pipeline.
+        the next function in the pipeline. Keep the hook lightweight to avoid impacting performance.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
