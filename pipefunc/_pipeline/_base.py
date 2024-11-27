@@ -74,6 +74,11 @@ if TYPE_CHECKING:
 
     from ._types import OUTPUT_TYPE
 
+# Allows to set a default visualization backend, e.g., used in docs
+# until AnyWidget shares JS code: https://github.com/manzt/anywidget/pull/628
+# https://github.com/manzt/anywidget/issues/613
+DEFAULT_VISUALIZATION_BACKEND = None
+
 
 class Pipeline:
     """Pipeline class for managing and executing a sequence of functions.
@@ -1292,7 +1297,9 @@ class Pipeline:
                 return False
 
         if backend is None:  # pragma: no cover
-            if is_installed("graphviz"):
+            if DEFAULT_VISUALIZATION_BACKEND is not None:
+                backend = DEFAULT_VISUALIZATION_BACKEND
+            elif is_installed("graphviz"):
                 if is_installed("graphviz_anywidget") and is_running_in_ipynb():
                     backend = "graphviz_widget"
                 else:
