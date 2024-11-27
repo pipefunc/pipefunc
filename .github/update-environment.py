@@ -72,7 +72,11 @@ def generate_environment_yml(
 
     # Required deps from pyproject.toml
     env_yaml += write_deps(
-        [REPLACE_DEPS.get(dep, dep) for dep in dependencies if dep not in PIP_ONLY_DEPS],
+        [
+            REPLACE_DEPS.get(dep, dep)
+            for dep in dependencies
+            if dep not in PIP_ONLY_DEPS and dep not in SKIP_DEPS
+        ],
         added_deps,
         "from pyproject.toml",
     )
@@ -83,7 +87,11 @@ def generate_environment_yml(
             group_deps = clean_deps(data["project"]["optional-dependencies"][group])
             pip_deps += generate_pip_deps(group_deps)
             env_yaml += write_deps(
-                [REPLACE_DEPS.get(dep, dep) for dep in group_deps if dep not in PIP_ONLY_DEPS],
+                [
+                    REPLACE_DEPS.get(dep, dep)
+                    for dep in group_deps
+                    if dep not in PIP_ONLY_DEPS and dep not in SKIP_DEPS
+                ],
                 added_deps,
                 f"optional-dependencies: {group}",
             )
