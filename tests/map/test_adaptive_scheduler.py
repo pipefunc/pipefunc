@@ -9,7 +9,7 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
 from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, _or, slurm_run_setup
 from pipefunc.resources import Resources
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path

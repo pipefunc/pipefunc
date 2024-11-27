@@ -1083,6 +1083,56 @@ So if you are using mutable defaults, make sure to not mutate the value in the f
 This is the same behavior as with regular Python functions.
 :::
 
+## How to use post-execution hooks?
+
+Post-execution hooks allow you to execute custom code after a function completes. This is useful for logging, debugging, or collecting statistics about function execution.
+
+You can set a post-execution hook in two ways:
+
+1. When creating a `PipeFunc` using the `post_execution_hook` parameter
+2. When using the `@pipefunc` decorator
+
+The hook function receives three arguments:
+
+- The `PipeFunc` instance
+- The return value of the function
+- A dictionary of the input arguments
+
+Here's an example:
+
+```python
+from pipefunc import pipefunc, Pipeline
+
+def my_hook(func, result, kwargs):
+    print(f"Function {func.__name__} returned {result} with inputs {kwargs}")
+
+@pipefunc(output_name="c", post_execution_hook=my_hook)
+def f(a, b):
+    return a + b
+
+# The hook will print after each execution
+f(a=1, b=2)  # Prints: Function f returned 3 with inputs {'a': 1, 'b': 2}
+
+# Hooks also work in pipelines and with map operations
+@pipefunc(output_name="d")
+def g(c):
+    return c * 2
+
+pipeline = Pipeline([f, g])
+pipeline(a=1, b=2)  # Hook is called when f executes in the pipeline
+```
+
+Post-execution hooks are particularly useful for:
+
+- Debugging: Print intermediate results and inputs
+- Logging: Record function execution details
+- Profiling: Collect timing or resource usage statistics
+- Validation: Check results or inputs meet certain criteria
+- Monitoring: Track pipeline progress
+
+Note that hooks are executed synchronously after the function returns but before the result is passed to the next function in the pipeline.
+They should be kept lightweight to avoid impacting performance.
+
 ## Parameter Sweeps
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.

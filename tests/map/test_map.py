@@ -18,7 +18,7 @@ from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path

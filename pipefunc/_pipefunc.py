@@ -102,6 +102,13 @@ class PipeFunc(Generic[T]):
         integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
         provide the shape for one of the outputs. This works because the shape of all
         outputs are required to be identical.
+    post_execution_hook
+        A callback function that is invoked after the function is executed.
+        The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
+        This hook can be used for logging, visualization of intermediate results,
+        debugging, statistics collection, or other side effects. The hook is executed
+        synchronously after the function returns but before the result is passed to
+        the next function in the pipeline. Keep the hook lightweight to avoid impacting performance.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -179,6 +186,7 @@ class PipeFunc(Generic[T]):
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | str | ShapeTuple | None = None,
+        post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
         resources: dict
         | Resources
         | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -196,6 +204,7 @@ class PipeFunc(Generic[T]):
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
         self.internal_shape: int | str | ShapeTuple | None = internal_shape
+        self.post_execution_hook = post_execution_hook
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
         self._renames: dict[str, str] = renames or {}
@@ -600,6 +609,7 @@ class PipeFunc(Generic[T]):
             "cache": self.cache,
             "mapspec": self.mapspec,
             "internal_shape": self.internal_shape,
+            "post_execution_hook": self.post_execution_hook,
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
@@ -657,16 +667,9 @@ class PipeFunc(Generic[T]):
                 raise
 
         if self.debug:
-            func_str = format_function_call(self.__name__, (), kwargs)
-            now = datetime.datetime.now()  # noqa: DTZ005
-            msg = (
-                f"{now} - Function returning '{self.output_name}' was invoked"
-                f" as `{func_str}` and returned `{result}`."
-            )
-            if self.profiling_stats is not None:
-                dt = self.profiling_stats.time.average
-                msg += f" The execution time was {dt:.2e} seconds on average."
-            print(msg)
+            _default_debug_printer(self, result, kwargs)
+        if self.post_execution_hook is not None:
+            self.post_execution_hook(self, result, kwargs)
         return result
 
     @property
@@ -886,6 +889,7 @@ def pipefunc(
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | str | ShapeTuple | None = None,
+    post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
     resources: dict
     | Resources
     | Callable[[dict[str, Any]], Resources | dict[str, Any]]
@@ -937,6 +941,13 @@ def pipefunc(
         integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
         provide the shape for one of the outputs. This works because the shape of all
         outputs are required to be identical.
+    post_execution_hook
+        A callback function that is invoked after the function is executed.
+        The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
+        This hook can be used for logging, visualization of intermediate results,
+        debugging, statistics collection, or other side effects. The hook is executed
+        synchronously after the function returns but before the result is passed to
+        the next function in the pipeline. Keep the hook lightweight to avoid impacting performance.
     resources
         A dictionary or `Resources` instance containing the resources required
         for the function. This can be used to specify the number of CPUs, GPUs,
@@ -1022,6 +1033,7 @@ def pipefunc(
             cache=cache,
             mapspec=mapspec,
             internal_shape=internal_shape,
+            post_execution_hook=post_execution_hook,
             resources=resources,
             resources_variable=resources_variable,
             resources_scope=resources_scope,
@@ -1095,6 +1107,7 @@ class NestedPipeFunc(PipeFunc):
         self._bound: dict[str, Any] = {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
+        self.post_execution_hook = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc
@@ -1394,6 +1407,19 @@ def _maybe_update_kwargs_with_resources(
             kwargs[resources_variable] = resources(kwargs)
         else:
             kwargs[resources_variable] = resources
+
+
+def _default_debug_printer(func: PipeFunc, result: Any, kwargs: dict[str, Any]) -> None:
+    func_str = format_function_call(func.__name__, (), kwargs)
+    now = datetime.datetime.now()  # noqa: DTZ005
+    msg = (
+        f"{now} - Function returning '{func.output_name}' was invoked"
+        f" as `{func_str}` and returned `{result}`."
+    )
+    if func.profiling_stats is not None:
+        dt = func.profiling_stats.time.average
+        msg += f" The execution time was {dt:.2e} seconds on average."
+    print(msg)
 
 
 def _get_name(func: Callable[..., Any]) -> str:
