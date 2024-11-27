@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class _LazyFunction:
     """Lazy function wrapper for deferred evaluation of a function."""
 
-    __slots__ = ["func", "args", "kwargs", "_result", "_evaluated", "_id"]
+    __slots__ = ["_evaluated", "_id", "_result", "args", "func", "kwargs"]
 
     _counter = 0
 

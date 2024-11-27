@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
 
       - name: Set up Python
         run: uv venv --python ${{ matrix.python-version }}
@@ -39,8 +39,7 @@ jobs:
             # Install all optional dependencies that work with 3.13t
             uv pip install -e ".[xarray,widgets,pandas,test]"
           else
-            # Install all except plotting
-            uv pip install -e ".[adaptive,xarray,zarr,profiling,widgets,test]"
+            uv pip install -e ".[all,pydantic,test]"
           fi
 
       - name: Run pytest (all dependencies)

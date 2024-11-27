@@ -129,8 +129,7 @@ def validate_unique_output_names(
     output_to_func: dict[OUTPUT_TYPE, PipeFunc],
 ) -> None:
     for name in at_least_tuple(output_name):
-        for other in output_to_func:
+        for other, func in output_to_func.items():
             if name in at_least_tuple(other):
-                func = output_to_func[other]
                 msg = f"The function with output name `{name!r}` already exists in the pipeline (`{func}`)."
                 raise ValueError(msg)

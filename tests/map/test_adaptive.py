@@ -17,7 +17,7 @@ from pipefunc.map.adaptive import (
     to_adaptive_learner,
 )
 from pipefunc.sweep import Sweep
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path

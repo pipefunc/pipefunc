@@ -32,10 +32,10 @@ MAX_LABEL_LENGTH = 20
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
     """Gets the layout of the graph using Graphviz if available, otherwise defaults to a spring layout."""
     try:
-        return graphviz_layout(graph, prog="dot")
+        return graphviz_layout(graph, prog="dot")  # requires pygraphviz
     except ImportError:  # pragma: no cover
         warnings.warn(
-            "Graphviz is not installed. Using spring layout instead.",
+            "pygraphviz is not installed. Using spring layout instead.",
             ImportWarning,
             stacklevel=2,
         )

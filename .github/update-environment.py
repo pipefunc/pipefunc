@@ -9,7 +9,7 @@ import tomllib
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PIP_ONLY_DEPS: set[str] = {"myst-nb"}
+PIP_ONLY_DEPS: set[str] = set()
 REPLACE_DEPS: dict[str, str] = {
     "graphviz": "python-graphviz",
 }
@@ -33,14 +33,17 @@ def strip_extras(dep: str) -> str:
     return dep.split("[", 1)[0].strip()
 
 
-def write_deps(deps: Iterable[str], label: str = "", indent: int = 2) -> str:
+def write_deps(deps: Iterable[str], added_deps: set[str], label: str = "", indent: int = 2) -> str:
     """Write dependencies with optional label."""
     deps_str = ""
     space = " " * indent
     if label:
         deps_str += f"  # {label}\n"
     for dep in deps:
+        if dep in added_deps:
+            continue
         deps_str += f"{space}- {dep}\n"
+        added_deps.add(dep)
     return deps_str
 
 
@@ -55,6 +58,7 @@ def generate_environment_yml(
     """Generate environment.yml from pyproject.toml."""
     if pip_deps is None:
         pip_deps = []
+    added_deps: set[str] = set()
     dependencies = clean_deps(data["project"]["dependencies"])
     pip_deps += generate_pip_deps(dependencies)
 
@@ -64,11 +68,12 @@ def generate_environment_yml(
     env_yaml += "dependencies:\n"
 
     # Default packages
-    env_yaml += write_deps(default_packages)
+    env_yaml += write_deps(default_packages, added_deps)
 
     # Required deps from pyproject.toml
     env_yaml += write_deps(
         [REPLACE_DEPS.get(dep, dep) for dep in dependencies if dep not in PIP_ONLY_DEPS],
+        added_deps,
         "from pyproject.toml",
     )
 
@@ -79,6 +84,7 @@ def generate_environment_yml(
             pip_deps += generate_pip_deps(group_deps)
             env_yaml += write_deps(
                 [REPLACE_DEPS.get(dep, dep) for dep in group_deps if dep not in PIP_ONLY_DEPS],
+                added_deps,
                 f"optional-dependencies: {group}",
             )
 
@@ -86,7 +92,7 @@ def generate_environment_yml(
     if pip_deps:
         env_yaml += "  - pip:\n"
         # remove duplicates and no label for pip deps
-        env_yaml += write_deps(set(pip_deps), "", indent=4)
+        env_yaml += write_deps(set(pip_deps), added_deps, "", indent=4)
 
     if filename is not None:
         with open(filename, "w") as f:  # noqa: PTH123

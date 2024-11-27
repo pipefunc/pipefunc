@@ -27,6 +27,8 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_running_in_ipynb,
+    requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
 from pipefunc.exceptions import UnusedParametersError
@@ -64,6 +66,7 @@ if TYPE_CHECKING:
     import graphviz
     import holoviews as hv
     import IPython.display
+    import ipywidgets
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
@@ -1252,11 +1255,14 @@ class Pipeline:
     ) -> Any:
         """Visualize the pipeline as a directed graph.
 
+        If running in a Jupyter notebook and *not* in VS Code a widget-based backend
+        will be used if available.
+
         Parameters
         ----------
         backend
             The plotting backend to use. If ``None``, the best backend available
-            will be used in the following order: Graphviz,
+            will be used in the following order: Graphviz (widget), Graphviz,
             Matplotlib, and HoloViews.
         kwargs
             Additional keyword arguments passed to the plotting function.
@@ -1269,6 +1275,8 @@ class Pipeline:
         --------
         visualize_graphviz
             Create a directed graph using Graphviz (``backend="graphviz"``).
+        visualize_graphviz_widget
+            Create a directed graph using Graphviz and ipywidgets (``backend="graphviz_widget"``).
         visualize_matplotlib
             Create a directed graph using Matplotlib (``backend="matplotlib"``).
         visualize_holoviews
@@ -1285,7 +1293,10 @@ class Pipeline:
 
         if backend is None:  # pragma: no cover
             if is_installed("graphviz"):
-                backend = "graphviz"
+                if is_installed("graphviz_anywidget") and is_running_in_ipynb():
+                    backend = "graphviz_widget"
+                else:
+                    backend = "graphviz"
             elif is_installed("matplotlib"):
                 backend = "matplotlib"
             elif is_installed("holoviews"):
@@ -1299,6 +1310,8 @@ class Pipeline:
                 raise ImportError(msg)
         if backend == "graphviz":
             return self.visualize_graphviz(**kwargs)
+        if backend == "graphviz_widget":
+            return self.visualize_graphviz_widget(**kwargs)
         if backend == "matplotlib":
             return self.visualize_matplotlib(**kwargs)
         if backend == "holoviews":
@@ -1365,6 +1378,63 @@ class Pipeline:
             include_full_mapspec=include_full_mapspec,
             return_type=return_type,
         )
+
+    def visualize_graphviz_widget(
+        self,
+        *,
+        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        graphviz_kwargs: dict[str, Any] | None = None,
+    ) -> ipywidgets.VBox:
+        """Create an interactive visualization of the pipeline as a directed graph.
+
+        Creates a widget that allows interactive exploration of the pipeline graph.
+        The widget provides the following interactions:
+
+        - Zoom: Use mouse scroll
+        - Pan: Click and drag
+        - Node selection: Click on nodes to highlight connected nodes
+        - Multi-select: Shift-click on nodes to select multiple routes
+        - Search: Use the search box to highlight matching nodes
+        - Reset view: Press Escape
+
+        Requires the `graphviz-anywidget` package to be installed, which is maintained
+        by the pipefunc authors, see https://github.com/pipefunc/graphviz-anywidget
+
+        Parameters
+        ----------
+        orient
+            Graph orientation, controlling the main direction of the graph flow.
+            Options are:
+            - 'TB': Top to bottom
+            - 'LR': Left to right
+            - 'BT': Bottom to top
+            - 'RL': Right to left
+        graphviz_kwargs
+            Graphviz-specific keyword arguments for customizing the graph's appearance.
+
+        Returns
+        -------
+        ipywidgets.VBox
+            Interactive widget containing the graph visualization.
+
+        """
+        requires(
+            "graphviz_anywidget",
+            "graphviz",
+            reason="visualize_graphviz_widget",
+            extras="plotting",
+        )
+        import graphviz
+        from graphviz_anywidget import graphviz_widget
+
+        graph = self.visualize_graphviz(
+            orient=orient,
+            graphviz_kwargs=graphviz_kwargs,
+            return_type="graphviz",
+        )
+        assert isinstance(graph, graphviz.Digraph)
+        dot_source = graph.source
+        return graphviz_widget(dot_source)
 
     def visualize_matplotlib(
         self,
@@ -1814,7 +1884,7 @@ class _PipelineAsFunc:
 
     """
 
-    __slots__ = ["pipeline", "output_name", "root_args", "_call_with_root_args"]
+    __slots__ = ["_call_with_root_args", "output_name", "pipeline", "root_args"]
 
     def __init__(
         self,
