@@ -1,6 +1,6 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools", "wheel", "versioningit"]
+build-backend = "hatchling.build"
+requires = ["hatchling", "versioningit"]
 
 [project]
 name = "pipefunc"
@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: System :: Distributed Computing",
 ]
 dependencies = ["cloudpickle", "networkx", "numpy"]
+
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
 pandas = ["pandas"]
@@ -79,6 +80,16 @@ repository = "https://github.com/pipefunc/pipefunc"
 content-type = "text/markdown"
 file = "README.md"
 
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipefunc"]
+
+[tool.hatch.build.hooks.versioningit-onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
+
 [tool.versioningit]
 default-version = "0.0.0"
 
@@ -87,24 +98,10 @@ method = "git"
 match = ["v*"]
 default-tag = "0.0.0"
 
-[tool.setuptools.package-data]
-"pipefunc" = ["py.typed"]
-
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
-
-[tool.setuptools.cmdclass]
-sdist = "versioningit.cmdclass.sdist"
-build_py = "versioningit.cmdclass.build_py"
-
 [tool.versioningit.format]
 dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
 distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
-
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "module"
