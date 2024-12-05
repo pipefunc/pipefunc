@@ -62,6 +62,30 @@ def test_exception():
         pipeline.map({"n": 4}, run_folder=None, parallel=False)
 
 
+# Same as test_dynamic_internal_shape but specifying the internal shape in @pipefunc
+def test_2d_internal_shape_non_dynamic() -> None:
+    @pipefunc(output_name="n", mapspec="a[j] -> n[j]")
+    def f(a) -> int:
+        return 4 + a
+
+    @pipefunc(output_name="x", internal_shape=(4,), mapspec="n[j] -> x[i, j]")
+    def g(n: int) -> list[int]:
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([f, g, h], validate_type_annotations=False)
+    assert pipeline.mapspecs_as_strings == [
+        "a[j] -> n[j]",
+        "n[j] -> x[i, j]",
+        "x[i, j] -> y[i, j]",
+    ]
+    results = pipeline.map({"a": [0, 0]}, run_folder=None, parallel=False)
+    assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
+
+
 def test_2d_internal_shape() -> None:
     @pipefunc(output_name="n")
     def f(a) -> int:
@@ -76,6 +100,10 @@ def test_2d_internal_shape() -> None:
         return 2 * x
 
     pipeline = Pipeline([f, g, h])
+    assert pipeline.mapspecs_as_strings == [
+        "... -> x[i]",
+        "x[i] -> y[i]",
+    ]
     pipeline.add_mapspec_axis("a", axis="j")
     assert pipeline.mapspecs_as_strings == [
         "a[j] -> n[j]",

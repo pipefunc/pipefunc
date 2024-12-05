@@ -24,7 +24,7 @@ from ._shapes import (
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
-    from pipefunc import Pipeline
+    from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
     from ._result import StoreType
@@ -205,15 +205,31 @@ class RunInfo:
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
 
-    def resolve_shapes(self, output_name: OUTPUT_TYPE, kwargs: dict[str, Any]) -> bool:
+    def resolve_shapes(
+        self,
+        func: PipeFunc,
+        kwargs: dict[str, Any],
+        *,
+        is_map: bool,
+    ) -> bool:
         """Resolve shapes that depend on kwargs."""
-        if output_name not in self.resolved_shapes:
+        if func.output_name not in self.resolved_shapes:
             return False
-        shape = self.resolved_shapes[output_name]
+        shape = self.resolved_shapes[func.output_name]
         if not shape_is_resolved(shape):
+            if is_map:
+                from ._run import _select_kwargs
+
+                kwargs = _select_kwargs(
+                    func,
+                    kwargs,
+                    shape,  # type: ignore[arg-type]
+                    self.shape_masks[func.output_name],
+                    index=0,  # Just pick the first index
+                )
             resolved_shape = resolve_shape(shape, kwargs)
-            self.resolved_shapes[output_name] = resolved_shape
-            for name in at_least_tuple(output_name):
+            self.resolved_shapes[func.output_name] = resolved_shape
+            for name in at_least_tuple(func.output_name):
                 self.resolved_shapes[name] = resolved_shape
         else:
             return False
