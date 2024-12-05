@@ -209,17 +209,17 @@ class RunInfo:
         self,
         func: PipeFunc,
         kwargs: dict[str, Any],
-        *,
-        is_map: bool,
     ) -> bool:
         """Resolve shapes that depend on kwargs."""
         if func.output_name not in self.resolved_shapes:
             return False
         shape = self.resolved_shapes[func.output_name]
         if not shape_is_resolved(shape):
-            if is_map:
+            if has_map(func):
                 from ._run import _select_kwargs
 
+                # We assume that all outputs of a
+                # mapspec function have the same shape
                 kwargs = _select_kwargs(
                     func,
                     kwargs,
@@ -248,6 +248,10 @@ class RunInfo:
                 if not isinstance(name, tuple):
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         return True
+
+
+def has_map(func: PipeFunc) -> bool:
+    return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
 
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:

@@ -31,7 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, LazyStorage, Result
-from ._run_info import shape_is_resolved
+from ._run_info import has_map, shape_is_resolved
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -616,7 +616,6 @@ def _prepare_submit_map_spec(
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info, is_map=True)
     shape = run_info.resolved_shapes[func.output_name]
     assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
@@ -710,12 +709,10 @@ def _maybe_execute_single(
     progress: ProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    run_info: RunInfo,
     store: dict[str, StoreType],
     cache: _CacheBase | None,
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
-    _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info)
     ex = _executor_for_func(func, executor)
     if ex:
         assert executor is not None
@@ -891,10 +888,8 @@ def _maybe_resolve_and_evaluate_lazy_store(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     run_info: RunInfo,
-    *,
-    is_map: bool = False,
 ) -> None:
-    if run_info.resolve_shapes(func, kwargs, is_map=is_map):
+    if run_info.resolve_shapes(func, kwargs):
         _maybe_evaluate_lazy_store(store, run_info)
 
 
@@ -909,21 +904,13 @@ def _submit_func(
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
-    if func.mapspec and func.mapspec.inputs:
+    _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info)
+    if has_map(func):
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
-        task = _maybe_execute_single(
-            executor,
-            status,
-            progress,
-            func,
-            kwargs,
-            run_info,
-            store,
-            cache,
-        )
+        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
 
 
