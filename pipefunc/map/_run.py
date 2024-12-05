@@ -31,7 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, LazyStorage, Result
-from ._run_info import has_map, shape_is_resolved
+from ._run_info import requires_mapping, shape_is_resolved
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -905,7 +905,7 @@ def _submit_func(
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info)
-    if has_map(func):
+    if requires_mapping(func):
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args

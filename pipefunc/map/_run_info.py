@@ -215,7 +215,7 @@ class RunInfo:
             return False
         shape = self.resolved_shapes[func.output_name]
         if not shape_is_resolved(shape):
-            if has_map(func):
+            if requires_mapping(func):
                 from ._run import _select_kwargs
 
                 # We assume that all outputs of a
@@ -250,7 +250,7 @@ class RunInfo:
         return True
 
 
-def has_map(func: PipeFunc) -> bool:
+def requires_mapping(func: PipeFunc) -> bool:
     return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
 
 
