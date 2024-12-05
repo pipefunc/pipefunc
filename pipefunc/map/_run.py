@@ -30,7 +30,8 @@ from ._adaptive_scheduler_slurm_executor import (
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, Result
+from ._result import DirectValue, LazyStorage, Result
+from ._run_info import requires_mapping, shape_is_resolved
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -345,11 +346,7 @@ def _dump_single_output(
     return (output,)
 
 
-def _single_dump_single_output(
-    output: Any,
-    output_name: str,
-    store: dict[str, StoreType],
-) -> None:
+def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -359,11 +356,7 @@ def _single_dump_single_output(
         storage.value = output
 
 
-def _func_kwargs(
-    func: PipeFunc,
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-) -> dict[str, Any]:
+def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType]) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
@@ -456,11 +449,7 @@ def _get_or_set_cache(
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
-def _run_iteration(
-    func: PipeFunc,
-    selected: dict[str, Any],
-    cache: _CacheBase | None,
-) -> Any:
+def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase | None) -> Any:
     def compute_fn() -> Any:
         try:
             return func(**selected)
@@ -627,7 +616,8 @@ def _prepare_submit_map_spec(
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
+    assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -750,6 +740,7 @@ def _load_from_store(
 
     for name in at_least_tuple(output_name):
         storage = store[name]
+        assert not isinstance(storage, LazyStorage)  # should be evaluated by now
         if isinstance(storage, StorageBase):
             outputs.append(storage)
         elif isinstance(storage, Path):
@@ -885,6 +876,23 @@ async def _process_generation_async(
         outputs.update(_outputs)
 
 
+def _maybe_evaluate_lazy_store(store: dict[str, StoreType], run_info: RunInfo) -> None:
+    for name, storage in store.items():
+        if isinstance(storage, LazyStorage):
+            storage.shape = run_info.resolved_shapes[name]
+            store[name] = storage.maybe_evaluate()
+
+
+def _maybe_resolve_and_evaluate_lazy_store(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    store: dict[str, StoreType],
+    run_info: RunInfo,
+) -> None:
+    if run_info.resolve_shapes(func, kwargs):
+        _maybe_evaluate_lazy_store(store, run_info)
+
+
 def _submit_func(
     func: PipeFunc,
     run_info: RunInfo,
@@ -896,7 +904,8 @@ def _submit_func(
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
-    if func.mapspec and func.mapspec.inputs:
+    _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info)
+    if requires_mapping(func):
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
