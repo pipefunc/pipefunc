@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import re
 from typing import TYPE_CHECKING
 
@@ -112,3 +113,17 @@ def test_2d_internal_shape() -> None:
     ]
     results = pipeline.map({"a": [0, 0]}, run_folder=None, parallel=False)
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
+
+
+def test_internal_shape_2nd_step() -> None:
+    @pipefunc(output_name="x", internal_shape=("len(x)",))
+    def g() -> list[int]:
+        n = random.randint(1, 10)  # noqa: S311
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([g, h])
+    pipeline.map({}, run_folder=None, parallel=False)

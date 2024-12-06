@@ -24,7 +24,7 @@ class DirectValue:
         return self.value is not _Missing
 
 
-def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
+def _maybe_storage_path(output_name: str, run_folder: Path | None) -> Path | None:
     if run_folder is None:
         return None
     assert isinstance(output_name, str)
@@ -45,7 +45,7 @@ class LazyStorage:
         if not shape_is_resolved(self.shape):  # pragma: no cover
             msg = "Cannot evaluate lazy store with unresolved shape."
             raise ValueError(msg)
-        path = _maybe_array_path(self.output_name, self.run_folder)
+        path = _maybe_storage_path(self.output_name, self.run_folder)
         external_shape = external_shape_from_mask(self.shape, self.shape_mask)
         internal_shape = internal_shape_from_mask(self.shape, self.shape_mask)
         return self.storage_class(path, external_shape, internal_shape, self.shape_mask)
