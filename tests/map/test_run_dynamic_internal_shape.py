@@ -116,7 +116,7 @@ def test_2d_internal_shape() -> None:
 
 
 def test_internal_shape_2nd_step() -> None:
-    @pipefunc(output_name="x", internal_shape=("len(x)",))
+    @pipefunc(output_name="x", internal_shape=("?",))
     def g() -> list[int]:
         n = random.randint(1, 10)  # noqa: S311
         return list(range(n))

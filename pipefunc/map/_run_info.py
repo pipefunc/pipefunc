@@ -232,9 +232,13 @@ class RunInfo:
             for name in at_least_tuple(func.output_name):
                 self.resolved_shapes[name] = resolved_shape
         else:
-            return False
+            return True
 
-        # Now that new shape is known, update downstream shapes
+        self._resolve_downstream_shapes()
+        return True
+
+    def _resolve_downstream_shapes(self) -> None:
+        # After a new shape is known, update downstream shapes
         internal: ShapeDict = {
             name: internal_shape_from_mask(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
@@ -247,7 +251,6 @@ class RunInfo:
                 self.resolved_shapes[name] = new_shape
                 if not isinstance(name, tuple):
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
-        return True
 
 
 def requires_mapping(func: PipeFunc) -> bool:

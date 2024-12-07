@@ -826,7 +826,7 @@ def _run_and_process_generation(
         progress,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs)
+    _process_generation(generation, tasks, store, outputs, run_info)
 
 
 async def _run_and_process_generation_async(
@@ -850,7 +850,16 @@ async def _run_and_process_generation_async(
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs)
+    await _process_generation_async(generation, tasks, store, outputs, run_info)
+
+
+def _update_shapes_using_result(outputs: dict[str, Result], run_info: RunInfo) -> None:
+    for name, result in outputs.items():
+        shape = run_info.resolved_shapes.get(name, ())
+        if "?" in shape:
+            output_shape = np.shape(result.output)
+            run_info.resolved_shapes[name] = output_shape[: len(shape)]
+            run_info._resolve_downstream_shapes()
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -859,9 +868,11 @@ def _process_generation(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
+        _update_shapes_using_result(_outputs, run_info)
         outputs.update(_outputs)
 
 
@@ -870,9 +881,11 @@ async def _process_generation_async(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store)
+        _update_shapes_using_result(_outputs, run_info)
         outputs.update(_outputs)
 
 
