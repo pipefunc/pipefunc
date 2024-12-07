@@ -70,6 +70,9 @@ COMPARISON_OPERATORS = {
 }
 
 
+ALLOWED_ATTRS: set[str] = {"shape"}
+
+
 def _safe_eval(node: ast.AST, inputs: dict[str, Any]) -> Any:  # noqa: PLR0911, PLR0912
     if isinstance(node, ast.Expression):
         return _eval_expression(node, inputs)
@@ -142,7 +145,10 @@ def _eval_call(node: ast.Call, inputs: dict[str, Any]) -> Any:
 def _eval_attribute(node: ast.Attribute, inputs: dict[str, Any]) -> Any:
     value = _safe_eval(node.value, inputs)
     attr = node.attr
-    return getattr(value, attr)
+    if attr in ALLOWED_ATTRS:
+        return getattr(value, attr)
+    msg = f"Access to attribute '{attr}' is not allowed"
+    raise AttributeError(msg)
 
 
 def _eval_subscript(node: ast.Subscript, inputs: dict[str, Any]) -> Any:
