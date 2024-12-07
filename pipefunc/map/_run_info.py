@@ -232,7 +232,7 @@ class RunInfo:
             for name in at_least_tuple(func.output_name):
                 self.resolved_shapes[name] = resolved_shape
         else:
-            return True
+            return False
 
         self._resolve_downstream_shapes()
         return True

@@ -69,7 +69,6 @@ COMPARISON_OPERATORS = {
     ast.GtE: operator.ge,
 }
 
-
 ALLOWED_ATTRS: set[str] = {"shape"}
 
 
