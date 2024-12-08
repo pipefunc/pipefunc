@@ -31,7 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, LazyStorage, Result
-from ._run_info import requires_mapping, shape_is_resolved
+from ._run_info import requires_mapping
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -347,6 +347,7 @@ def _dump_single_output(
 
 
 def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
+    # TODO: update shape here! perhaps also eval store
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -617,7 +618,7 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
-    assert shape_is_resolved(shape)
+    # assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -826,7 +827,7 @@ def _run_and_process_generation(
         progress,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs)
+    _process_generation(generation, tasks, store, outputs, run_info)
 
 
 async def _run_and_process_generation_async(
@@ -850,7 +851,16 @@ async def _run_and_process_generation_async(
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs)
+    await _process_generation_async(generation, tasks, store, outputs, run_info)
+
+
+def _update_shapes_using_result(outputs: dict[str, Result], run_info: RunInfo) -> None:
+    for name, result in outputs.items():
+        shape = run_info.resolved_shapes.get(name, ())
+        if "?" in shape:
+            output_shape = np.shape(result.output)
+            run_info.resolved_shapes[name] = output_shape[: len(shape)]
+            run_info._resolve_downstream_shapes()
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -859,9 +869,11 @@ def _process_generation(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
+        _update_shapes_using_result(_outputs, run_info)
         outputs.update(_outputs)
 
 
@@ -870,9 +882,11 @@ async def _process_generation_async(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store)
+        _update_shapes_using_result(_outputs, run_info)
         outputs.update(_outputs)
 
 

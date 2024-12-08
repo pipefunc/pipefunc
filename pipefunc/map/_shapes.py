@@ -93,10 +93,10 @@ def shape_is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
 def resolve_shape(
     shape: ShapeTuple,
     kwargs: dict[str, Any],
-) -> tuple[int, ...]:
-    resolved_shape: list[int] = []
+) -> tuple[int | str, ...]:
+    resolved_shape: list[int | str] = []  # int or "?"
     for x in shape:
-        if isinstance(x, int):
+        if isinstance(x, int) or x == "?":
             resolved_shape.append(x)
         else:
             i = evaluate_expression(x, kwargs)
