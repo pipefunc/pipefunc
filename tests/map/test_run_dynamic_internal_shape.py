@@ -92,7 +92,7 @@ def test_2d_internal_shape() -> None:
     def f(a) -> int:
         return 4 + a
 
-    @pipefunc(output_name="x", internal_shape=("n",))
+    @pipefunc(output_name="x", internal_shape=("?",))
     def g(n: int) -> list[int]:
         return list(range(n))
 

@@ -347,6 +347,7 @@ def _dump_single_output(
 
 
 def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
+    # TODO: update shape here! perhaps also eval store
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -617,10 +618,10 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
-    assert shape_is_resolved(shape)
+    # assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays = _init_result_arrays(func.output_name, shape)
+    result_arrays =  _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
