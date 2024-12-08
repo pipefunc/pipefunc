@@ -31,7 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, LazyStorage, Result
-from ._run_info import requires_mapping, shape_is_resolved
+from ._run_info import requires_mapping
 from ._shapes import external_shape_from_mask, internal_shape_from_mask
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
@@ -621,7 +621,7 @@ def _prepare_submit_map_spec(
     # assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays =  _init_result_arrays(func.output_name, shape)
+    result_arrays = _init_result_arrays(func.output_name, shape)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
