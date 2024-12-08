@@ -231,10 +231,8 @@ class RunInfo:
             self.resolved_shapes[func.output_name] = resolved_shape
             for name in at_least_tuple(func.output_name):
                 self.resolved_shapes[name] = resolved_shape
-        else:
-            return False
+            self._resolve_downstream_shapes()
 
-        self._resolve_downstream_shapes()
         return True
 
     def _resolve_downstream_shapes(self) -> None:
