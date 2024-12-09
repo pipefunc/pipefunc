@@ -19,7 +19,7 @@ def test_dynamic_internal_shape(tmp_path: Path) -> None:
     def f() -> int:
         return 4
 
-    @pipefunc(output_name="x", internal_shape=("n",))
+    @pipefunc(output_name="x", internal_shape=("?",))
     def g(n: int) -> list[int]:
         return list(range(n))
 
@@ -116,6 +116,20 @@ def test_2d_internal_shape() -> None:
 
 
 def test_internal_shape_2nd_step() -> None:
+    @pipefunc(output_name="x", internal_shape=("?",))
+    def g() -> list[int]:
+        n = random.randint(1, 10)  # noqa: S311
+        return list(range(n))
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([g, h])
+    pipeline.map({}, run_folder=None, parallel=False)
+
+
+def test_internal_shape_2nd_step2() -> None:
     @pipefunc(output_name="x", internal_shape=("?",))
     def g() -> list[int]:
         n = random.randint(1, 10)  # noqa: S311

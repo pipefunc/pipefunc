@@ -30,9 +30,14 @@ from ._adaptive_scheduler_slurm_executor import (
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, LazyStorage, Result
-from ._run_info import requires_mapping
-from ._shapes import external_shape_from_mask, internal_shape_from_mask
+from ._result import DirectValue, Result
+from ._run_info import _update_shape_in_store, requires_mapping
+from ._shapes import (
+    _shape_and_mask,
+    external_shape_from_mask,
+    internal_shape_from_mask,
+    shape_is_resolved,
+)
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
@@ -414,7 +419,12 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
+def _init_result_arrays(
+    output_name: OUTPUT_TYPE,
+    shape: tuple[int | str, ...],
+) -> list[np.ndarray] | None:
+    if not shape_is_resolved(shape):
+        return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -508,6 +518,8 @@ def _update_array(
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
+        if not array.resolved_shape:
+            array.internal_shape = np.shape(_output)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -741,7 +753,8 @@ def _load_from_store(
 
     for name in at_least_tuple(output_name):
         storage = store[name]
-        assert not isinstance(storage, LazyStorage)  # should be evaluated by now
+        if isinstance(storage, StorageBase):
+            assert storage.resolved_shape  # should be evaluated by now
         if isinstance(storage, StorageBase):
             outputs.append(storage)
         elif isinstance(storage, Path):
@@ -854,13 +867,34 @@ async def _run_and_process_generation_async(
     await _process_generation_async(generation, tasks, store, outputs, run_info)
 
 
-def _update_shapes_using_result(outputs: dict[str, Result], run_info: RunInfo) -> None:
+def _update_shapes_using_result(
+    func: PipeFunc,
+    outputs: dict[str, Result],
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+) -> None:
     for name, result in outputs.items():
-        shape = run_info.resolved_shapes.get(name, ())
-        if "?" in shape:
-            output_shape = np.shape(result.output)
-            run_info.resolved_shapes[name] = output_shape[: len(shape)]
-            run_info._resolve_downstream_shapes()
+        _update_shape_using_result(func, name, result.output, run_info, store)
+
+
+def _update_shape_using_result(
+    func: PipeFunc,
+    name: str,
+    output: Any,
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+) -> None:
+    shape = run_info.resolved_shapes.get(name, ())
+    if "?" in shape:
+        internal_shape = np.shape(output)
+        new_shape, _ = _shape_and_mask(
+            func.mapspec,
+            run_info.resolved_shapes,
+            {name: internal_shape},
+        )
+        run_info.resolved_shapes[name] = new_shape
+        _update_shape_in_store(new_shape, store, name)
+        run_info.resolve_downstream_shapes(store)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -873,7 +907,7 @@ def _process_generation(
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
-        _update_shapes_using_result(_outputs, run_info)
+        _update_shapes_using_result(func, _outputs, run_info, store)
         outputs.update(_outputs)
 
 
@@ -886,25 +920,8 @@ async def _process_generation_async(
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store)
-        _update_shapes_using_result(_outputs, run_info)
+        _update_shapes_using_result(func, _outputs, run_info, store)
         outputs.update(_outputs)
-
-
-def _maybe_evaluate_lazy_store(store: dict[str, StoreType], run_info: RunInfo) -> None:
-    for name, storage in store.items():
-        if isinstance(storage, LazyStorage):
-            storage.shape = run_info.resolved_shapes[name]
-            store[name] = storage.maybe_evaluate()
-
-
-def _maybe_resolve_and_evaluate_lazy_store(
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    store: dict[str, StoreType],
-    run_info: RunInfo,
-) -> None:
-    if run_info.resolve_shapes(func, kwargs):
-        _maybe_evaluate_lazy_store(store, run_info)
 
 
 def _submit_func(
@@ -918,7 +935,6 @@ def _submit_func(
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
-    _maybe_resolve_and_evaluate_lazy_store(func, kwargs, store, run_info)
     if requires_mapping(func):
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)

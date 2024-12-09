@@ -5,7 +5,7 @@ from __future__ import annotations
 import abc
 import functools
 import itertools
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import shape_to_strides
@@ -45,8 +45,8 @@ def select_by_mask(
 class StorageBase(abc.ABC):
     """Base class for file-based arrays."""
 
-    shape: tuple[int, ...]
-    internal_shape: tuple[int, ...]
+    shape: tuple[int | str, ...]
+    internal_shape: tuple[int | str, ...]
     shape_mask: tuple[bool, ...]
     storage_id: str
     requires_serialization: bool
@@ -59,6 +59,22 @@ class StorageBase(abc.ABC):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
+
+    def set_shape(
+        self,
+        shape: tuple[int, ...] | None = None,
+        internal_shape: tuple[int, ...] | None = None,
+    ) -> None:
+        """Set the shape and internal shape of the array."""
+        if shape is not None:
+            self.shape = shape
+        if internal_shape is not None:
+            self.internal_shape = internal_shape
+
+    @property
+    def resolved_shape(self) -> bool:
+        """Return whether the shape is resolved."""
+        return all(isinstance(s, int) for s in self.shape + self.internal_shape)
 
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...
@@ -136,7 +152,7 @@ def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> N
 def normalize_key(
     key: tuple[int | slice, ...],
     shape: tuple[int, ...],
-    internal_shape: tuple[int, ...],
+    internal_shape: tuple[int | Literal["?"], ...],
     shape_mask: tuple[bool, ...],
     *,
     for_dump: bool = False,
