@@ -13,24 +13,37 @@ from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
 from pipefunc._version import __version__
 
 from ._mapspec import MapSpec
-from ._result import DirectValue
-from ._shapes import external_shape_from_mask, internal_shape_from_mask, map_shapes
+from ._result import DirectValue, LazyStorage
+from ._shapes import (
+    _shape_and_mask,
+    internal_shape_from_mask,
+    map_shapes,
+    resolve_shape,
+    shape_is_resolved,
+)
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
-    from pipefunc import Pipeline
+    from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
     from ._result import StoreType
-    from ._types import ShapeTuple, UserShapeDict
+    from ._types import ShapeDict, ShapeTuple, UserShapeDict
 
 
 @dataclass(frozen=True, eq=True)
 class RunInfo:
+    """Information about a ``pipeline.map()`` run.
+
+    The data in this class is immutable, except for ``resolved_shapes`` which
+    is updated as new shapes are resolved.
+    """
+
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
     shapes: dict[OUTPUT_TYPE, ShapeTuple]
+    resolved_shapes: dict[OUTPUT_TYPE, ShapeTuple]
     internal_shapes: UserShapeDict | None
     shape_masks: dict[OUTPUT_TYPE, tuple[bool, ...]]
     run_folder: Path | None
@@ -68,11 +81,13 @@ class RunInfo:
         _check_inputs(pipeline, inputs)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+        resolved_shapes = shapes.copy()
         return cls(
             inputs=inputs,
             defaults=pipeline.defaults,
             all_output_names=pipeline.all_output_names,
             shapes=shapes,
+            resolved_shapes=resolved_shapes,
             internal_shapes=internal_shapes,
             shape_masks=masks,
             mapspecs_as_strings=pipeline.mapspecs_as_strings,
@@ -97,7 +112,7 @@ class RunInfo:
     def init_store(self) -> dict[str, StoreType]:
         store: dict[str, StoreType] = {}
         name_mapping = {at_least_tuple(name): name for name in self.shapes}
-        # Initialize StorageBase instances for each map spec output
+        # Initialize LazyStorage instances for each map spec output
         for mapspec in self.mapspecs:
             # `mapspec.output_names` is always tuple, even for single output
             output_name: OUTPUT_TYPE = name_mapping[mapspec.output_names]
@@ -113,7 +128,7 @@ class RunInfo:
                 )
                 store.update(zip(mapspec.output_names, arrays))
 
-        # Set up paths or DirectValue for outputs not initialized as StorageBase
+        # Set up paths or DirectValue for outputs not initialized as LazyStorage
         for output_name in self.all_output_names:
             if output_name not in store:
                 store[output_name] = (
@@ -142,6 +157,7 @@ class RunInfo:
         return [MapSpec.from_string(ms) for ms in self.mapspecs_as_strings]
 
     def dump(self) -> None:
+        """Dump the RunInfo to a file."""
         if self.run_folder is None:  # pragma: no cover
             msg = "Cannot dump `RunInfo` without `run_folder`."
             raise ValueError(msg)
@@ -150,6 +166,7 @@ class RunInfo:
         data = asdict(self)
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
+        del data["resolved_shapes"]
         data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
         dicts_with_tuples = ["shapes", "shape_masks"]
@@ -181,11 +198,60 @@ class RunInfo:
         data["run_folder"] = Path(data["run_folder"])
         data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
         data["defaults"] = load(Path(data.pop("defaults_path")))
+        data["resolved_shapes"] = data["shapes"]
         return cls(**data)
 
     @staticmethod
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
+
+    def resolve_shapes(
+        self,
+        func: PipeFunc,
+        kwargs: dict[str, Any],
+    ) -> bool:
+        """Resolve shapes that depend on kwargs."""
+        if func.output_name not in self.resolved_shapes:
+            return False
+        shape = self.resolved_shapes[func.output_name]
+        if not shape_is_resolved(shape):
+            if requires_mapping(func):
+                from ._run import _select_kwargs
+
+                # We assume that all outputs of a
+                # mapspec function have the same shape
+                kwargs = _select_kwargs(
+                    func,
+                    kwargs,
+                    shape,  # type: ignore[arg-type]
+                    self.shape_masks[func.output_name],
+                    index=0,  # Just pick the first index
+                )
+            resolved_shape = resolve_shape(shape, kwargs)
+            self.resolved_shapes[func.output_name] = resolved_shape
+            for name in at_least_tuple(func.output_name):
+                self.resolved_shapes[name] = resolved_shape
+        else:
+            return False
+
+        # Now that new shape is known, update downstream shapes
+        internal: ShapeDict = {
+            name: internal_shape_from_mask(shape, self.shape_masks[name])
+            for name, shape in self.resolved_shapes.items()
+            if not isinstance(name, tuple)
+        }
+        mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
+        for name, shape in self.resolved_shapes.items():
+            if not shape_is_resolved(shape):
+                new_shape, _ = _shape_and_mask(mapspecs[name], self.resolved_shapes, internal)
+                self.resolved_shapes[name] = new_shape
+                if not isinstance(name, tuple):
+                    internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
+        return True
+
+
+def requires_mapping(func: PipeFunc) -> bool:
+    return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
 
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
@@ -205,6 +271,7 @@ def _maybe_run_folder(
     return Path(run_folder) if run_folder is not None else None
 
 
+# TODO: remove and make `internal_shapes` a property of RunInfo
 def _construct_internal_shapes(
     internal_shapes: UserShapeDict | None,
     pipeline: Pipeline,
@@ -312,16 +379,8 @@ def _init_arrays(
     mask: tuple[bool, ...],
     storage_class: type[StorageBase],
     run_folder: Path | None,
-) -> list[StorageBase]:
-    external_shape = external_shape_from_mask(shape, mask)
-    internal_shape = internal_shape_from_mask(shape, mask)
-    output_names = at_least_tuple(output_name)
-    paths = [_maybe_array_path(output_name, run_folder) for output_name in output_names]  # type: ignore[misc]
-    return [storage_class(path, external_shape, internal_shape, mask) for path in paths]
-
-
-def _maybe_array_path(output_name: str, run_folder: Path | None) -> Path | None:
-    if run_folder is None:
-        return None
-    assert isinstance(output_name, str)
-    return run_folder / "outputs" / output_name
+) -> list[StorageBase | LazyStorage]:
+    return [
+        LazyStorage(name, shape, mask, storage_class, run_folder).maybe_evaluate()
+        for name in at_least_tuple(output_name)
+    ]
