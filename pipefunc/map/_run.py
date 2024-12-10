@@ -420,10 +420,7 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(
-    output_name: OUTPUT_TYPE,
-    shape: ShapeTuple,
-) -> list[np.ndarray] | None:
+def _init_result_arrays(output_name: OUTPUT_TYPE, shape: ShapeTuple) -> list[np.ndarray] | None:
     if not shape_is_resolved(shape):
         return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]

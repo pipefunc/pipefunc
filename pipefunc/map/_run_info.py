@@ -237,11 +237,7 @@ def requires_mapping(func: PipeFunc) -> bool:
     return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
 
 
-def _update_shape_in_store(
-    shape: ShapeTuple,
-    store: dict[str, StoreType],
-    name: str,
-) -> None:
+def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
     storage = store.get(name)
     if isinstance(storage, StorageBase):
         storage.set_shape(shape)
