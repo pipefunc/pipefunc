@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple
-from pipefunc.map._safe_eval import evaluate_expression
 
 from ._mapspec import MapSpec, array_shape
 
@@ -88,20 +87,3 @@ def external_shape_from_mask(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tu
 
 def shape_is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
     return all(isinstance(i, int) for i in shape)
-
-
-def resolve_shape(
-    shape: ShapeTuple,
-    kwargs: dict[str, Any],
-) -> tuple[int | Literal["?"], ...]:
-    resolved_shape: list[int | Literal["?"]] = []  # int or "?"
-    for x in shape:
-        if isinstance(x, int) or x == "?":
-            resolved_shape.append(x)
-        else:
-            i = evaluate_expression(x, kwargs)
-            if not isinstance(i, int):
-                msg = f"Expression `{x}` must evaluate to an integer but it evaluated to `{i}`."
-                raise TypeError(msg)
-            resolved_shape.append(i)
-    return tuple(resolved_shape)

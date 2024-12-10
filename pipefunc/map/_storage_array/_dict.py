@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pipefunc._utils import dump, load
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import StorageBase, normalize_key, register_storage, select_by_mask
 
@@ -171,6 +172,8 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key, self.shape)):

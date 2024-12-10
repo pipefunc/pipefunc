@@ -106,6 +106,8 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> list[range]:
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0

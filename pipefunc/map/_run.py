@@ -8,7 +8,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -384,12 +384,13 @@ def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType])
 def _select_kwargs(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     external_shape = external_shape_from_mask(shape, shape_mask)
+    assert shape_is_resolved(external_shape)
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
@@ -410,7 +411,7 @@ def _maybe_eval_resources_in_selected(
 def _select_kwargs_and_eval_resources(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
 ) -> dict[str, Any]:
@@ -421,7 +422,7 @@ def _select_kwargs_and_eval_resources(
 
 def _init_result_arrays(
     output_name: OUTPUT_TYPE,
-    shape: tuple[int | Literal["?"], ...],
+    shape: ShapeTuple,
 ) -> list[np.ndarray] | None:
     if not shape_is_resolved(shape):
         return None
@@ -476,7 +477,7 @@ def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
@@ -502,7 +503,7 @@ def _run_iteration_and_process(
 def _update_array(
     func: PipeFunc,
     arrays: Sequence[StorageBase],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
     outputs: Iterable[Any],
@@ -524,6 +525,7 @@ def _update_array(
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
+                assert shape_is_resolved(external_shape)
                 output_key = func.mapspec.output_key(external_shape, index)
             array.dump(output_key, _output)
 
@@ -632,7 +634,6 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
-    assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)

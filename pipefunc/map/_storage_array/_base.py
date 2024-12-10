@@ -119,8 +119,10 @@ class StorageBase(abc.ABC):
         return len(self.shape)
 
     @functools.cached_property
-    def full_shape(self) -> ShapeTuple:
+    def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         return select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
     @functools.cached_property
