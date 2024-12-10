@@ -168,7 +168,7 @@ def _eval_list(node: ast.List, inputs: dict[str, Any]) -> list:
 
 
 def _eval_boolop(node: ast.BoolOp, inputs: dict[str, Any]) -> bool:
-    values = [_safe_eval(value, inputs) for value in node.values]  # noqa: PD011
+    values = [_safe_eval(value, inputs) for value in node.values]
     if isinstance(node.op, ast.And):
         return all(values)
     if isinstance(node.op, ast.Or):
