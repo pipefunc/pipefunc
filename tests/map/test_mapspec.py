@@ -353,7 +353,7 @@ def test_larger_output_then_input():  # noqa: PLR0915
 
     with pytest.raises(
         TypeError,
-        match="Internal shape for 'c' must be a tuple of integers or strings.",
+        match="Internal shape for 'c' must be a tuple of integers or '?'",
     ):
         mapspec.shape(input_shapes, internal_shapes={"c": (object(),)})
 

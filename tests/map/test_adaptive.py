@@ -500,7 +500,7 @@ def test_adaptive_run_dynamic_internal_shape():
     def f() -> int:
         return 10
 
-    @pipefunc(output_name="y", internal_shape=("n",))
+    @pipefunc(output_name="y", internal_shape=("?",))
     def g(n: int, a: float) -> list[float]:
         return [a * i for i in range(n)]
 
