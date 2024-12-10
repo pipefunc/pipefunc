@@ -10,12 +10,15 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pipefunc._utils import dump, load
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import StorageBase, normalize_key, register_storage, select_by_mask
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from multiprocessing.managers import DictProxy
+
+    from pipefunc.map._types import ShapeTuple
 
 
 class DictArray(StorageBase):
@@ -27,8 +30,8 @@ class DictArray(StorageBase):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         mapping: MutableMapping[tuple[int, ...], Any] | None = None,
@@ -51,11 +54,13 @@ class DictArray(StorageBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
+        assert shape_is_resolved(self.shape)
         np_index = np.unravel_index(index, self.shape)
         return self._dict[np_index]  # type: ignore[index]
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
+        assert shape_is_resolved(self.shape)
         np_index = np.unravel_index(index, self.shape)
         return np_index in self._dict
 
@@ -66,6 +71,8 @@ class DictArray(StorageBase):
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
         if any(isinstance(k, slice) for k in key):
@@ -123,6 +130,8 @@ class DictArray(StorageBase):
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return the array as a NumPy masked array."""
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         if splat_internal is None:
             splat_internal = bool(self.internal_shape)
         if not splat_internal:
@@ -151,6 +160,7 @@ class DictArray(StorageBase):
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
+        assert shape_is_resolved(self.shape)
         mask: np.ndarray = np.full(self.shape, fill_value=True, dtype=bool)
         for external_index in self._dict:
             mask[external_index] = False
@@ -169,6 +179,8 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
         if any(isinstance(k, slice) for k in key):
             for external_index in itertools.product(*self._slice_indices(key, self.shape)):

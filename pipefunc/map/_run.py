@@ -6,6 +6,7 @@ import itertools
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -31,7 +32,13 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
-from ._shapes import external_shape_from_mask, internal_shape_from_mask
+from ._run_info import _update_shape_in_store, requires_mapping
+from ._shapes import (
+    _shape_and_mask,
+    external_shape_from_mask,
+    internal_shape_from_mask,
+    shape_is_resolved,
+)
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
@@ -48,7 +55,7 @@ if TYPE_CHECKING:
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
-    from ._types import UserShapeDict
+    from ._types import ShapeTuple, UserShapeDict
 
 
 def run_map(
@@ -345,11 +352,7 @@ def _dump_single_output(
     return (output,)
 
 
-def _single_dump_single_output(
-    output: Any,
-    output_name: str,
-    store: dict[str, StoreType],
-) -> None:
+def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -359,11 +362,7 @@ def _single_dump_single_output(
         storage.value = output
 
 
-def _func_kwargs(
-    func: PipeFunc,
-    run_info: RunInfo,
-    store: dict[str, StoreType],
-) -> dict[str, Any]:
+def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType]) -> dict[str, Any]:
     kwargs = {}
     for p in func.parameters:
         if p in func._bound:
@@ -385,12 +384,13 @@ def _func_kwargs(
 def _select_kwargs(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     external_shape = external_shape_from_mask(shape, shape_mask)
+    assert shape_is_resolved(external_shape)
     input_keys = func.mapspec.input_keys(external_shape, index)
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
@@ -411,7 +411,7 @@ def _maybe_eval_resources_in_selected(
 def _select_kwargs_and_eval_resources(
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
 ) -> dict[str, Any]:
@@ -420,7 +420,12 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(output_name: OUTPUT_TYPE, shape: tuple[int, ...]) -> list[np.ndarray]:
+def _init_result_arrays(
+    output_name: OUTPUT_TYPE,
+    shape: ShapeTuple,
+) -> list[np.ndarray] | None:
+    if not shape_is_resolved(shape):
+        return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
 
@@ -456,11 +461,7 @@ def _get_or_set_cache(
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
-def _run_iteration(
-    func: PipeFunc,
-    selected: dict[str, Any],
-    cache: _CacheBase | None,
-) -> Any:
+def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase | None) -> Any:
     def compute_fn() -> Any:
         try:
             return func(**selected)
@@ -476,7 +477,7 @@ def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
@@ -502,7 +503,7 @@ def _run_iteration_and_process(
 def _update_array(
     func: PipeFunc,
     arrays: Sequence[StorageBase],
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
     index: int,
     outputs: Iterable[Any],
@@ -518,9 +519,13 @@ def _update_array(
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
+        if not array.resolved_shape:
+            internal_shape = np.shape(_output)
+            array.internal_shape = internal_shape[: len(array.internal_shape)]
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
+                assert shape_is_resolved(external_shape)
                 output_key = func.mapspec.output_key(external_shape, index)
             array.dump(output_key, _output)
 
@@ -608,12 +613,13 @@ def _maybe_executor(
         yield executor
 
 
-class _MapSpecArgs(NamedTuple):
+@dataclass
+class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
-    result_arrays: list[np.ndarray]
-    shape: tuple[int, ...]
+    result_arrays: list[np.ndarray] | None
+    shape: ShapeTuple
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
 
@@ -627,7 +633,7 @@ def _prepare_submit_map_spec(
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -751,6 +757,8 @@ def _load_from_store(
     for name in at_least_tuple(output_name):
         storage = store[name]
         if isinstance(storage, StorageBase):
+            assert storage.resolved_shape  # should be evaluated by now
+        if isinstance(storage, StorageBase):
             outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
@@ -835,7 +843,7 @@ def _run_and_process_generation(
         progress,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs)
+    _process_generation(generation, tasks, store, outputs, run_info)
 
 
 async def _run_and_process_generation_async(
@@ -859,7 +867,38 @@ async def _run_and_process_generation_async(
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs)
+    await _process_generation_async(generation, tasks, store, outputs, run_info)
+
+
+def _update_shapes_using_result(
+    func: PipeFunc,
+    outputs: dict[str, Result],
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+) -> None:
+    for name, result in outputs.items():
+        _update_shape_using_result(func, name, result.output, run_info, store)
+
+
+def _update_shape_using_result(
+    func: PipeFunc,
+    name: str,
+    output: Any,
+    run_info: RunInfo,
+    store: dict[str, StoreType],
+) -> None:
+    shape = run_info.resolved_shapes.get(name, ())
+    if "?" in shape:
+        assert func.mapspec is not None
+        internal_shape = np.shape(output)
+        new_shape, _ = _shape_and_mask(
+            func.mapspec,
+            run_info.resolved_shapes,
+            {name: internal_shape},
+        )
+        run_info.resolved_shapes[name] = new_shape
+        _update_shape_in_store(new_shape, store, name)
+        run_info.resolve_downstream_shapes(store)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -868,9 +907,11 @@ def _process_generation(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
+        _update_shapes_using_result(func, _outputs, run_info, store)
         outputs.update(_outputs)
 
 
@@ -879,9 +920,11 @@ async def _process_generation_async(
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
     outputs: dict[str, Result],
+    run_info: RunInfo,
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store)
+        _update_shapes_using_result(func, _outputs, run_info, store)
         outputs.update(_outputs)
 
 
@@ -896,7 +939,7 @@ def _submit_func(
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
-    if func.mapspec and func.mapspec.inputs:
+    if requires_mapping(func):
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
@@ -946,6 +989,16 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    if args.result_arrays is None:
+        index = 0
+        for output, array in zip(outputs_list[index], arrays):
+            internal_shape = np.shape(output)[: len(array.internal_shape)]
+            array.internal_shape = internal_shape
+            full_shape = select_by_mask(array.shape_mask, array.shape, internal_shape)
+            args.shape = full_shape
+        args.result_arrays = _init_result_arrays(func.output_name, full_shape)
+    assert shape_is_resolved(args.shape)
+    assert args.result_arrays is not None
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
         _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)

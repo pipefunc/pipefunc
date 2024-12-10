@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import multiprocessing.managers
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import numpy as np
@@ -15,8 +15,12 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import StorageBase, register_storage, select_by_mask
+
+if TYPE_CHECKING:
+    from pipefunc.map._types import ShapeTuple
 
 
 class ZarrFileArray(StorageBase):
@@ -31,8 +35,8 @@ class ZarrFileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | str | Path | None = None,
@@ -80,6 +84,7 @@ class ZarrFileArray(StorageBase):
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
+        assert shape_is_resolved(self.shape)
         return prod(self.shape)
 
     @property
@@ -89,6 +94,7 @@ class ZarrFileArray(StorageBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
+        assert shape_is_resolved(self.shape)
         np_index = np.unravel_index(index, self.shape)
         full_index = select_by_mask(
             self.shape_mask,
@@ -99,6 +105,7 @@ class ZarrFileArray(StorageBase):
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
+        assert shape_is_resolved(self.shape)
         np_index = np.unravel_index(index, self.shape)
         return not self._mask[np_index]
 
@@ -205,6 +212,7 @@ class ZarrFileArray(StorageBase):
         self._mask[key] = False
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
+        assert shape_is_resolved(self.shape)
         slice_indices = []
         for size, k in zip(self.shape, key):
             if isinstance(k, slice):

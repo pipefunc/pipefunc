@@ -12,6 +12,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import (
     StorageBase,
@@ -24,6 +25,7 @@ from ._base import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pipefunc.map._types import ShapeTuple
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -41,8 +43,8 @@ class FileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         filename_template: str = FILENAME_TEMPLATE,
@@ -66,6 +68,8 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         return normalize_key(
             key,
             self.shape,
@@ -93,6 +97,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
+        assert shape_is_resolved(self.shape)
         return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
 
     def _slice_indices(
@@ -101,6 +106,8 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> list[range]:
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0
@@ -188,6 +195,8 @@ class FileArray(StorageBase):
             The array containing all the data.
 
         """
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         if splat_internal is None:
             splat_internal = bool(self.internal_shape)
 
