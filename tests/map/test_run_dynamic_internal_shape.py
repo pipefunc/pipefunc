@@ -4,10 +4,14 @@ import random
 import re
 from typing import TYPE_CHECKING
 
+import numpy as np
+import numpy.typing as npt
 import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._load import load_outputs
+from pipefunc.map._shapes import shape_is_resolved
+from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -150,3 +154,22 @@ def test_internal_shape_2nd_step2() -> None:
 
     pipeline = Pipeline([g, h])
     pipeline.map({}, run_folder=None, parallel=False)
+
+
+def test_first_returns_2d() -> None:
+    @pipefunc(output_name="x", internal_shape=("?", "?"))
+    def g() -> npt.NDArray[np.int_]:
+        n = random.randint(1, 10)  # noqa: S311
+        m = random.randint(1, 10)  # noqa: S311
+        return np.arange(n * m).reshape(n, m)
+
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([g, h])
+    result = pipeline.map({}, run_folder=None, parallel=False)
+    assert result["y"].output.tolist() == (2 * result["x"].output).tolist()
+    assert isinstance(result["y"].store, StorageBase)
+    assert len(result["y"].store.shape) == 2
+    assert shape_is_resolved(result["y"].store.full_shape)

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipefunc._utils import at_least_tuple, requires
-from pipefunc.map._run_info import shape_is_resolved
+from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.resources import Resources
 
 from ._run import _func_kwargs, _load_arrays, _select_kwargs

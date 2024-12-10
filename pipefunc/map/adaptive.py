@@ -12,7 +12,7 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
-from pipefunc.map._run_info import shape_is_resolved
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._mapspec import MapSpec
 from ._prepare import _reduced_axes, _validate_fixed_indices
