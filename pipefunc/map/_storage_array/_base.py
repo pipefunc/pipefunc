@@ -59,14 +59,14 @@ class StorageBase(abc.ABC):
         self,
         folder: str | Path | None,
         shape: ShapeTuple,
-        internal_shape: tuple[int, ...] | None = None,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
 
     def set_shape(
         self,
-        shape: tuple[int, ...] | None = None,
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple | None = None,
+        internal_shape: ShapeTuple | None = None,
     ) -> None:
         """Set the shape and internal shape of the array."""
         if shape is not None:
@@ -119,7 +119,7 @@ class StorageBase(abc.ABC):
         return len(self.shape)
 
     @functools.cached_property
-    def full_shape(self) -> tuple[int, ...]:
+    def full_shape(self) -> ShapeTuple:
         """Return the full shape of the array."""
         return select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 

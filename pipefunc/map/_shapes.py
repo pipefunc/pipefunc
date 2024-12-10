@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.map._safe_eval import evaluate_expression
@@ -25,7 +25,7 @@ def _input_shapes_and_masks(
 ) -> Shapes:
     input_parameters = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = pipeline.defaults | inputs
-    # The type of the shapes is `int | str` but we only use ints in this function
+    # The type of the shapes is `int | Literal["?"]` but we only use ints in this function
     shapes: dict[OUTPUT_TYPE, ShapeTuple] = {
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
@@ -93,8 +93,8 @@ def shape_is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
 def resolve_shape(
     shape: ShapeTuple,
     kwargs: dict[str, Any],
-) -> tuple[int | str, ...]:
-    resolved_shape: list[int | str] = []  # int or "?"
+) -> tuple[int | Literal["?"], ...]:
+    resolved_shape: list[int | Literal["?"]] = []  # int or "?"
     for x in shape:
         if isinstance(x, int) or x == "?":
             resolved_shape.append(x)

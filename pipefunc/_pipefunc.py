@@ -185,7 +185,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | str | ShapeTuple | None = None,
+        internal_shape: int | Literal["?"] | ShapeTuple | None = None,
         post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
         resources: dict
         | Resources
@@ -203,7 +203,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: int | str | ShapeTuple | None = internal_shape
+        self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
         self.post_execution_hook = post_execution_hook
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
@@ -888,7 +888,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | str | ShapeTuple | None = None,
+    internal_shape: int | Literal["?"] | ShapeTuple | None = None,
     post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
     resources: dict
     | Resources

@@ -12,6 +12,7 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import (
     StorageBase,
@@ -67,6 +68,8 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         return normalize_key(
             key,
             self.shape,
@@ -94,6 +97,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
+        assert shape_is_resolved(self.shape)
         return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
 
     def _slice_indices(

@@ -57,7 +57,7 @@ def test_exception():
     with pytest.raises(
         TypeError,
         match=re.escape(
-            "Expression `'a' + 'b'` must evaluate to an integer but it evaluated to `ab`.",
+            "Internal shape for 'x' must be a tuple of integers or '?'.",
         ),
     ):
         pipeline.map({"n": 4}, run_folder=None, parallel=False)

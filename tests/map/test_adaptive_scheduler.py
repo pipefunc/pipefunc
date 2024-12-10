@@ -516,7 +516,7 @@ def test_independent_axes_2(tmp_path: Path) -> None:
 
 
 def test_dynamic_shapes(tmp_path: Path) -> None:
-    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=("n",))
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=("?",))
     def f(n):
         return list(range(n))
 

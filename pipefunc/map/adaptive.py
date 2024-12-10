@@ -518,7 +518,7 @@ def _iterate_axes(
     mapspec_axes: dict[str, tuple[str, ...]],
     shapes: dict[OUTPUT_TYPE, ShapeTuple],
 ) -> Generator[dict[str, Any], None, None]:
-    shape: list[int | str] = []
+    shape: list[int | Literal["?"]] = []
     for axis in independent_axes:
         parameter, dim = next(
             (p, axes.index(axis))

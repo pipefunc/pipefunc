@@ -8,7 +8,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
-    from ._types import UserShapeDict
+    from ._types import ShapeTuple, UserShapeDict
 
 
 def run_map(
@@ -421,7 +421,7 @@ def _select_kwargs_and_eval_resources(
 
 def _init_result_arrays(
     output_name: OUTPUT_TYPE,
-    shape: tuple[int | str, ...],
+    shape: tuple[int | Literal["?"], ...],
 ) -> list[np.ndarray] | None:
     if not shape_is_resolved(shape):
         return None
@@ -616,8 +616,8 @@ class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
-    result_arrays: list[np.ndarray]
-    shape: tuple[int, ...]
+    result_arrays: list[np.ndarray] | None
+    shape: ShapeTuple
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
 
@@ -632,6 +632,7 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
+    assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -887,6 +888,7 @@ def _update_shape_using_result(
 ) -> None:
     shape = run_info.resolved_shapes.get(name, ())
     if "?" in shape:
+        assert func.mapspec is not None
         internal_shape = np.shape(output)
         new_shape, _ = _shape_and_mask(
             func.mapspec,
@@ -994,7 +996,8 @@ def _output_from_mapspec_task(
             full_shape = select_by_mask(array.shape_mask, array.shape, internal_shape)
             args.shape = full_shape
         args.result_arrays = _init_result_arrays(func.output_name, full_shape)
-
+    assert shape_is_resolved(args.shape)
+    assert args.result_arrays is not None
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
         _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
