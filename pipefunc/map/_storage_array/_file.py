@@ -24,6 +24,7 @@ from ._base import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pipefunc.map._types import ShapeTuple
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -41,8 +42,8 @@ class FileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         filename_template: str = FILENAME_TEMPLATE,

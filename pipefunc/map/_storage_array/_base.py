@@ -5,16 +5,19 @@ from __future__ import annotations
 import abc
 import functools
 import itertools
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import shape_to_strides
+from pipefunc.map._shapes import shape_is_resolved
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
     import numpy as np
+
+    from pipefunc.map._types import ShapeTuple
 
 storage_registry = {}
 
@@ -45,8 +48,8 @@ def select_by_mask(
 class StorageBase(abc.ABC):
     """Base class for file-based arrays."""
 
-    shape: tuple[int | str, ...]
-    internal_shape: tuple[int | str, ...]
+    shape: ShapeTuple
+    internal_shape: ShapeTuple
     shape_mask: tuple[bool, ...]
     storage_id: str
     requires_serialization: bool
@@ -55,7 +58,7 @@ class StorageBase(abc.ABC):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
+        shape: ShapeTuple,
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
@@ -106,11 +109,13 @@ class StorageBase(abc.ABC):
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
+        assert shape_is_resolved(self.shape)
         return prod(self.shape)
 
     @property
     def rank(self) -> int:
         """Return the rank of the array."""
+        assert shape_is_resolved(self.shape)
         return len(self.shape)
 
     @functools.cached_property
@@ -121,6 +126,7 @@ class StorageBase(abc.ABC):
     @functools.cached_property
     def strides(self) -> tuple[int, ...]:
         """Return the strides of the array."""
+        assert shape_is_resolved(self.shape)
         return shape_to_strides(self.shape)
 
     def persist(self) -> None:  # noqa: B027
@@ -152,7 +158,7 @@ def register_storage(cls: type[StorageBase], storage_id: str | None = None) -> N
 def normalize_key(
     key: tuple[int | slice, ...],
     shape: tuple[int, ...],
-    internal_shape: tuple[int | Literal["?"], ...],
+    internal_shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
     *,
     for_dump: bool = False,

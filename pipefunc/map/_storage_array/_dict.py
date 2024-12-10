@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from multiprocessing.managers import DictProxy
 
+    from pipefunc.map._types import ShapeTuple
+
 
 class DictArray(StorageBase):
     """A `numpy.ndarray` backed by a `dict` with internal structure."""
@@ -27,8 +29,8 @@ class DictArray(StorageBase):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         mapping: MutableMapping[tuple[int, ...], Any] | None = None,

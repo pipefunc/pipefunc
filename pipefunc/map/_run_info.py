@@ -227,15 +227,6 @@ def requires_mapping(func: PipeFunc) -> bool:
     return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
 
 
-def _update_shapes_in_store(
-    shape: ShapeTuple,
-    store: dict[str, StoreType],
-    output_name: OUTPUT_TYPE,
-) -> None:
-    for name in at_least_tuple(output_name):
-        _update_shape_in_store(shape, store, name)
-
-
 def _update_shape_in_store(
     shape: ShapeTuple,
     store: dict[str, StoreType],

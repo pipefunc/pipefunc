@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import multiprocessing.managers
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import numpy as np
@@ -17,6 +17,9 @@ from numcodecs.registry import register_codec
 from pipefunc._utils import prod
 
 from ._base import StorageBase, register_storage, select_by_mask
+
+if TYPE_CHECKING:
+    from pipefunc.map._types import ShapeTuple
 
 
 class ZarrFileArray(StorageBase):
@@ -31,8 +34,8 @@ class ZarrFileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | str | Path | None = None,

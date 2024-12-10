@@ -6,6 +6,7 @@ import itertools
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -352,7 +353,6 @@ def _dump_single_output(
 
 
 def _single_dump_single_output(output: Any, output_name: str, store: dict[str, StoreType]) -> None:
-    # TODO: update shape here! perhaps also eval store
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -519,7 +519,8 @@ def _update_array(
     output_key = None
     for array, _output in zip(arrays, outputs):
         if not array.resolved_shape:
-            array.internal_shape = np.shape(_output)
+            internal_shape = np.shape(_output)
+            array.internal_shape = internal_shape[: len(array.internal_shape)]
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -610,7 +611,8 @@ def _maybe_executor(
         yield executor
 
 
-class _MapSpecArgs(NamedTuple):
+@dataclass
+class _MapSpecArgs:
     process_index: functools.partial[tuple[Any, ...]]
     existing: list[int]
     missing: list[int]
@@ -630,7 +632,6 @@ def _prepare_submit_map_spec(
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
-    # assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     result_arrays = _init_result_arrays(func.output_name, shape)
@@ -985,6 +986,15 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    if args.result_arrays is None:
+        index = 0
+        for output, array in zip(outputs_list[index], arrays):
+            internal_shape = np.shape(output)[: len(array.internal_shape)]
+            array.internal_shape = internal_shape
+            full_shape = select_by_mask(array.shape_mask, array.shape, internal_shape)
+            args.shape = full_shape
+        args.result_arrays = _init_result_arrays(func.output_name, full_shape)
+
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
         _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
