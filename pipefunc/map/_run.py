@@ -652,12 +652,12 @@ def _mask_fixed_axes(
     shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
+    if fixed_indices is None:
+        return None
     if not shape_is_resolved(shape):
         # In principle it should be possible if the "?" axes are not in the fixed_indices
         msg = "Cannot mask fixed axes for unresolved shapes."
         raise ValueError(msg)
-    if fixed_indices is None:
-        return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
     external_key = external_shape_from_mask(key, shape_mask)  # type: ignore[arg-type]
     external_shape = external_shape_from_mask(shape, shape_mask)
@@ -982,6 +982,8 @@ def _output_from_mapspec_task(
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
     assert shape_is_resolved(args.shape)
     assert args.result_arrays is not None
+    if args.missing:
+        _maybe_resolve_shapes_from_map(func, store, args, outputs_list)
     for index, outputs in zip(args.missing, outputs_list):
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
         _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
@@ -1040,7 +1042,6 @@ def _process_task(
     if requires_mapping(func):
         r, args = task
         outputs_list = [_result(x) for x in r]
-        _maybe_resolve_shapes_from_map(func, args, outputs_list, store)
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         r = _result(task)
@@ -1050,9 +1051,9 @@ def _process_task(
 
 def _maybe_resolve_shapes_from_map(
     func: PipeFunc,
+    store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
-    store: dict[str, StoreType],
 ) -> None:
     for output, name in zip(outputs_list[0], at_least_tuple(func.output_name)):
         array = store[name]
@@ -1076,7 +1077,6 @@ async def _process_task_async(
         r, args = task
         futs = [_result_async(x, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)
-        _maybe_resolve_shapes_from_map(func, args, outputs_list, store)
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         assert isinstance(task, Future)
