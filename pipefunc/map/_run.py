@@ -653,6 +653,7 @@ def _mask_fixed_axes(
     shape_mask: tuple[bool, ...],
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
     if not shape_is_resolved(shape):
+        # In principle it should be possible if the "?" axes are not in the fixed_indices
         msg = "Cannot mask fixed axes for unresolved shapes."
         raise ValueError(msg)
     if fixed_indices is None:
