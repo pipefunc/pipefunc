@@ -984,13 +984,6 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    if args.result_arrays is None:
-        index = 0
-        for output, array in zip(outputs_list[index], arrays):
-            _set_internal_shape(output, array)
-        # Outside the loop, just needs to do this once ⬇️
-        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
-        args.shape = array.full_shape
     assert shape_is_resolved(args.shape)
     assert args.result_arrays is not None
     for index, outputs in zip(args.missing, outputs_list):
@@ -1046,11 +1039,29 @@ def _process_task(
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         outputs_list = [_result(x) for x in r]
+        _maybe_resolve_shapes_from_map(func, args, outputs_list, store)
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
     return _to_result_dict(func, kwargs, output, store)
+
+
+def _maybe_resolve_shapes_from_map(
+    func: PipeFunc,
+    args: _MapSpecArgs,
+    outputs_list: list[list[Any]],
+    store: dict[str, StoreType],
+) -> None:
+    for output, name in zip(outputs_list[0], at_least_tuple(func.output_name)):
+        array = store[name]
+        assert isinstance(array, StorageBase)
+        _set_internal_shape(output, array)
+    # Outside the loop above, just needs to do this once ⬇️
+    assert isinstance(array, StorageBase)
+    if args.result_arrays is None:
+        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
+    args.shape = array.full_shape
 
 
 async def _process_task_async(
