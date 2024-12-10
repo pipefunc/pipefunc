@@ -517,8 +517,7 @@ def _update_array(
     output_key = None
     for array, _output in zip(arrays, outputs):
         if not array.resolved_shape:
-            internal_shape = np.shape(_output)
-            array.internal_shape = internal_shape[: len(array.internal_shape)]
+            _set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -988,11 +987,10 @@ def _output_from_mapspec_task(
     if args.result_arrays is None:
         index = 0
         for output, array in zip(outputs_list[index], arrays):
-            internal_shape = np.shape(output)[: len(array.internal_shape)]
-            array.internal_shape = internal_shape
-            full_shape = select_by_mask(array.shape_mask, array.shape, internal_shape)
-            args.shape = full_shape
-        args.result_arrays = _init_result_arrays(func.output_name, full_shape)
+            _set_internal_shape(output, array)
+        # Outside the loop, just needs to do this once ⬇️
+        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
+        args.shape = array.full_shape
     assert shape_is_resolved(args.shape)
     assert args.result_arrays is not None
     for index, outputs in zip(args.missing, outputs_list):
@@ -1004,6 +1002,11 @@ def _output_from_mapspec_task(
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
 
     return tuple(x.reshape(args.shape) for x in args.result_arrays)
+
+
+def _set_internal_shape(output: Any, storage: StorageBase) -> None:
+    internal_shape = np.shape(output)[: len(storage.internal_shape)]
+    storage.internal_shape = internal_shape
 
 
 def _result(x: Any | Future) -> Any:
