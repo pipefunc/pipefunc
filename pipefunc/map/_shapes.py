@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, TypeVar
 
 from pipefunc._utils import at_least_tuple
 
@@ -24,6 +24,7 @@ def _input_shapes_and_masks(
 ) -> Shapes:
     input_parameters = set(pipeline.topological_generations.root_args)
     inputs_with_defaults = pipeline.defaults | inputs
+    # The type of the shapes is `int | Literal["?"]` but we only use ints in this function
     shapes: dict[OUTPUT_TYPE, ShapeTuple] = {
         p: array_shape(inputs_with_defaults[p], p)
         for p in input_parameters
@@ -82,3 +83,7 @@ def internal_shape_from_mask(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tu
 
 def external_shape_from_mask(shape: tuple[S, ...], mask: tuple[bool, ...]) -> tuple[S, ...]:
     return tuple(s for s, m in zip(shape, mask) if m)
+
+
+def shape_is_resolved(shape: ShapeTuple) -> TypeGuard[tuple[int, ...]]:
+    return all(isinstance(i, int) for i in shape)
