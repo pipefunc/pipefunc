@@ -980,7 +980,7 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    if args.missing:
+    if args.missing:  # Means outputs_list has entries
         _maybe_resolve_shapes_from_map(func, store, args, outputs_list)
     assert args.result_arrays is not None
     assert shape_is_resolved(args.shape)

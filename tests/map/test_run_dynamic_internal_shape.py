@@ -87,17 +87,22 @@ def test_2d_internal_shape_non_dynamic() -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
 
 
-def test_2d_internal_shape() -> None:
+def test_2d_internal_shape(tmp_path: Path) -> None:
+    counters = {"f": 0, "g": 0, "h": 0}
+
     @pipefunc(output_name="n")
     def f(a) -> int:
+        counters["f"] += 1
         return 4 + a
 
     @pipefunc(output_name="x", internal_shape=("?",))
     def g(n: int) -> list[int]:
+        counters["g"] += 1
         return list(range(n))
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def h(x: int) -> int:
+        counters["h"] += 1
         return 2 * x
 
     pipeline = Pipeline([f, g, h])
@@ -111,8 +116,12 @@ def test_2d_internal_shape() -> None:
         "n[j] -> x[i, j]",
         "x[i, j] -> y[i, j]",
     ]
-    results = pipeline.map({"a": [0, 0]}, run_folder=None, parallel=False)
+    results = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False)
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
+    before = counters.copy()
+    # Should use existing results
+    results = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False, cleanup=False)
+    assert before == counters
 
 
 def test_internal_shape_2nd_step() -> None:
