@@ -25,7 +25,7 @@ from ._run import (
     _submit_func,
     run_map,
 )
-from ._run_info import RunInfo
+from ._run_info import RunInfo, requires_mapping
 from ._shapes import external_shape_from_mask, map_shapes
 from ._storage_array._base import iterate_shape_indices
 
@@ -300,7 +300,7 @@ def _learner(
     *,
     return_output: bool,
 ) -> SequenceLearner:
-    if func.mapspec and func.mapspec.inputs:
+    if requires_mapping(func):
         f = functools.partial(
             _execute_iteration_in_map_spec,
             func=func,
@@ -312,6 +312,7 @@ def _learner(
         shape = run_info.resolved_shapes[func.output_name]
         assert shape_is_resolved(shape)
         mask = run_info.shape_masks[func.output_name]
+        assert func.mapspec is not None
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
         return SequenceLearner(f, sequence)
     f = functools.partial(

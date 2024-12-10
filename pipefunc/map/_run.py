@@ -32,11 +32,10 @@ from ._adaptive_scheduler_slurm_executor import (
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
-from ._run_info import _update_shape_in_store, requires_mapping
+from ._run_info import requires_mapping
 from ._shapes import (
     external_shape_from_mask,
     internal_shape_from_mask,
-    shape_and_mask_from_mapspec,
     shape_is_resolved,
 )
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
@@ -650,9 +649,12 @@ def _prepare_submit_map_spec(
 def _mask_fixed_axes(
     fixed_indices: dict[str, int | slice] | None,
     mapspec: MapSpec,
-    shape: tuple[int, ...],
+    shape: ShapeTuple,
     shape_mask: tuple[bool, ...],
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
+    if not shape_is_resolved(shape):
+        msg = "Cannot mask fixed axes for unresolved shapes."
+        raise ValueError(msg)
     if fixed_indices is None:
         return None
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
@@ -885,15 +887,8 @@ def _update_shape_using_result(
     shape = run_info.resolved_shapes.get(name, ())
     if "?" in shape:
         assert func.mapspec is not None
-        internal_shape = np.shape(output)
-        new_shape, _ = shape_and_mask_from_mapspec(
-            func.mapspec,
-            run_info.resolved_shapes,
-            {name: internal_shape},
-        )
-        run_info.resolved_shapes[name] = new_shape
-        _update_shape_in_store(new_shape, store, name)
-        run_info.resolve_downstream_shapes(store)
+        internal_shape = np.shape(output)  # TODO: fix len(internal_shape) consistency!
+        run_info.resolve_downstream_shapes(store, {name: internal_shape})
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -997,8 +992,12 @@ def _output_from_mapspec_task(
     return tuple(x.reshape(args.shape) for x in args.result_arrays)
 
 
+def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
+    return np.shape(output)[: len(storage.internal_shape)]
+
+
 def _set_internal_shape(output: Any, storage: StorageBase) -> None:
-    internal_shape = np.shape(output)[: len(storage.internal_shape)]
+    internal_shape = _internal_shape(output, storage)
     # TODO: check before setting? perhaps it is already set or it is different from the set value
     storage.internal_shape = internal_shape
 
@@ -1037,7 +1036,7 @@ def _process_task(
     store: dict[str, StoreType],
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
-    if func.mapspec and func.mapspec.inputs:
+    if requires_mapping(func):
         r, args = task
         outputs_list = [_result(x) for x in r]
         _maybe_resolve_shapes_from_map(func, args, outputs_list, store)
@@ -1072,7 +1071,7 @@ async def _process_task_async(
 ) -> dict[str, Result]:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
-    if func.mapspec and func.mapspec.inputs:
+    if requires_mapping(func):
         r, args = task
         futs = [_result_async(x, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)

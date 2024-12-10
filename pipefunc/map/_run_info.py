@@ -205,13 +205,19 @@ class RunInfo:
     def path(run_folder: str | Path) -> Path:
         return Path(run_folder) / "run_info.json"
 
-    def resolve_downstream_shapes(self, store: dict[str, StoreType]) -> None:
+    def resolve_downstream_shapes(
+        self,
+        store: dict[str, StoreType],
+        internal_shape: dict[str, tuple[int, ...]] | None = None,
+    ) -> None:
         # After a new shape is known, update downstream shapes
         internal: ShapeDict = {
             name: internal_shape_from_mask(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
             if not isinstance(name, tuple)
         }
+        if internal_shape is not None:
+            internal.update(internal_shape)
         # RunInfo.mapspecs is topologically ordered
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         for name, shape in self.resolved_shapes.items():
@@ -234,7 +240,7 @@ def _first(x: T | tuple[T, ...]) -> T:
 
 
 def requires_mapping(func: PipeFunc) -> bool:
-    return func.mapspec is not None and func.mapspec.inputs  # type: ignore[return-value]
+    return func.mapspec is not None and bool(func.mapspec.inputs)
 
 
 def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
