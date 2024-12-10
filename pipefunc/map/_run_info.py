@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, eq=True)
 class RunInfo:
+    """Information about a ``pipeline.map()`` run."""
+
     inputs: dict[str, Any]
     defaults: dict[str, Any]
     all_output_names: set[str]
