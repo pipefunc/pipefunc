@@ -34,9 +34,9 @@ from ._prepare import prepare_run
 from ._result import DirectValue, Result
 from ._run_info import _update_shape_in_store, requires_mapping
 from ._shapes import (
-    _shape_and_mask,
     external_shape_from_mask,
     internal_shape_from_mask,
+    shape_and_mask_from_mapspec,
     shape_is_resolved,
 )
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
@@ -886,7 +886,7 @@ def _update_shape_using_result(
     if "?" in shape:
         assert func.mapspec is not None
         internal_shape = np.shape(output)
-        new_shape, _ = _shape_and_mask(
+        new_shape, _ = shape_and_mask_from_mapspec(
             func.mapspec,
             run_info.resolved_shapes,
             {name: internal_shape},

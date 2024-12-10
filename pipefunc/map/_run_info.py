@@ -15,10 +15,10 @@ from pipefunc._version import __version__
 from ._mapspec import MapSpec
 from ._result import DirectValue
 from ._shapes import (
-    _shape_and_mask,
     external_shape_from_mask,
     internal_shape_from_mask,
     map_shapes,
+    shape_and_mask_from_mapspec,
     shape_is_resolved,
 )
 from ._storage_array._base import StorageBase, get_storage_class
@@ -217,7 +217,7 @@ class RunInfo:
         for name, shape in self.resolved_shapes.items():
             if not shape_is_resolved(shape):
                 mapspec = mapspecs[_first(name)]
-                new_shape, _ = _shape_and_mask(mapspec, self.resolved_shapes, internal)
+                new_shape, _ = shape_and_mask_from_mapspec(mapspec, self.resolved_shapes, internal)
                 self.resolved_shapes[name] = new_shape
                 if not isinstance(name, tuple):
                     _update_shape_in_store(new_shape, store, name)

@@ -34,11 +34,16 @@ def _input_shapes_and_masks(
     return Shapes(shapes, masks)
 
 
-def _shape_and_mask(
+def shape_and_mask_from_mapspec(
     mapspec: MapSpec,
     shapes: dict[OUTPUT_TYPE, ShapeTuple],
     internal_shapes: ShapeDict,
 ) -> tuple[ShapeTuple, tuple[bool, ...]]:
+    """Determine the shape and mask from a mapspec.
+
+    Only requires the key-value pairs (need to be resolved) in `shapes` that appear in
+    `mapspec.input_names` and `mapspec.output_names`.
+    """
     input_shapes = {p: shapes[p] for p in mapspec.input_names if p in shapes}
     output_shapes = {p: internal_shapes[p] for p in mapspec.output_names if p in internal_shapes}
     output_shape, mask = mapspec.shape(input_shapes, output_shapes)  # type: ignore[arg-type]
@@ -62,7 +67,7 @@ def map_shapes(
     mapspec_funcs = [f for f in pipeline.sorted_functions if f.mapspec]
     for func in mapspec_funcs:
         assert func.mapspec is not None  # mypy
-        output_shape, mask = _shape_and_mask(func.mapspec, shapes, internal)
+        output_shape, mask = shape_and_mask_from_mapspec(func.mapspec, shapes, internal)
         shapes[func.output_name] = output_shape
         masks[func.output_name] = mask
         if isinstance(func.output_name, tuple):
