@@ -195,6 +195,8 @@ class FileArray(StorageBase):
             The array containing all the data.
 
         """
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         if splat_internal is None:
             splat_internal = bool(self.internal_shape)
 
