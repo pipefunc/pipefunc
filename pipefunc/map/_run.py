@@ -999,6 +999,7 @@ def _output_from_mapspec_task(
 
 def _set_internal_shape(output: Any, storage: StorageBase) -> None:
     internal_shape = np.shape(output)[: len(storage.internal_shape)]
+    # TODO: check before setting? perhaps it is already set or it is different from the set value
     storage.internal_shape = internal_shape
 
 
@@ -1075,6 +1076,7 @@ async def _process_task_async(
         r, args = task
         futs = [_result_async(x, loop) for x in r]
         outputs_list = await asyncio.gather(*futs)
+        _maybe_resolve_shapes_from_map(func, args, outputs_list, store)
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         assert isinstance(task, Future)
