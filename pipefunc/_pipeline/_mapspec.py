@@ -69,8 +69,8 @@ def replace_none_in_axes(
 
     This sets the axes that are None to `unnamed_{i}` even though in
     a previous output the axis might have been named. This is not a problem
-    because that axis name won't be used. For example given
-    `"x[i], y[j] -> a[i, j]"` and `"a[:, j] -> c[j]"` will result in
+    because in that case this axis name won't be used. For example given
+    `"x[i], y[j] -> a[i, j]"` and `"a[:, j] -> c[j]"` will still result in
     `{"a": ["unnamed_0", "j"]`.
     """
     all_axes_names = {
