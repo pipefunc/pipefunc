@@ -854,3 +854,25 @@ def test_double_output_then_iterate_over_single_axis():
         ],
     )
     pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+
+
+def test_double_output_then_iterate_over_single_axis_gen_job():
+    def f1(x, y):
+        return list(range(10)), list(range(10))
+
+    def f2(a):
+        return a
+
+    pipeline = Pipeline(
+        [
+            PipeFunc(
+                f1,
+                ("a", "b"),
+                mapspec="x[i], y[j] -> a[i, j, k], b[i, j, k]",
+                internal_shape=(10,),
+            ),
+            PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
+        ],
+    )
+    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    assert results["c"].output.shape == (3, 10)

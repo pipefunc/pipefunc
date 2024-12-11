@@ -63,6 +63,10 @@ def replace_none_in_axes(
     non_root_inputs: dict[str, list[str]],
     multi_output_mapping: dict[str, tuple[str, ...]],
 ) -> None:
+    """Replaces `None` in the axes of non-root inputs with unique names.
+
+    Mutates `non_root_inputs` in place!
+    """
     all_axes_names = {
         axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs
     }
@@ -79,6 +83,8 @@ def replace_none_in_axes(
                 if name in multi_output_mapping:
                     # If output is a tuple, update its axes with the new axis.
                     for output_name in multi_output_mapping[name]:
+                        if output_name not in non_root_inputs:
+                            continue
                         non_root_inputs[output_name][j] = new_axis
     assert not any(None in axes for axes in non_root_inputs.values())
 

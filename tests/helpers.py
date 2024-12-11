@@ -1,5 +1,4 @@
-from pipefunc import pipefunc
-from pipefunc.pipeline import Pipeline
+from pipefunc import Pipeline, pipefunc
 
 
 @pipefunc(output_name="test_function")
