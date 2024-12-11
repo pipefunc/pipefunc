@@ -338,17 +338,11 @@ def test_full_output() -> None:
     }
 
 
-@pipefunc(output_name="test_function")
-def test_function(arg1: str, arg2: str) -> str:
-    return f"{arg1} {arg2}"
-
-
-pipeline = Pipeline([test_function])
-
-
 def test_function_pickling() -> None:
+    from .helpers import pipeline_test_function
+
     # Get the _PipelineAsFunc instance from the pipeline
-    func = pipeline.func("test_function")
+    func = pipeline_test_function.func("test_function")
 
     # Pickle the _PipelineAsFunc instance
     pickled_func = pickle.dumps(func)
