@@ -62,13 +62,13 @@ class RunInfo:
         cleanup: bool = True,
     ) -> RunInfo:
         run_folder = _maybe_run_folder(run_folder, storage)
+        internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         if run_folder is not None:
             if cleanup:
                 _cleanup_run_folder(run_folder)
             else:
                 _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
-        internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         return cls(
             inputs=inputs,
