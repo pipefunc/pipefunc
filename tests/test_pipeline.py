@@ -840,3 +840,23 @@ def test_adding_duplicates_output_name_tuple() -> None:
         ),
     ):
         pipeline.add(g)
+
+
+def test_double_output_then_iterate_over_single_axis():
+    def f1(x, y):
+        return x, y
+
+    def f2(a):
+        return 1
+
+    pipeline = Pipeline(
+        [
+            PipeFunc(
+                f1,
+                ("a", "b"),
+                mapspec="x[i], y[j] -> a[i, j], b[i, j]",
+            ),
+            PipeFunc(f2, "c", mapspec="a[:, j] -> c[j]"),
+        ],
+    )
+    pipeline.map({"x": np.arange(3), "y": np.arange(3)})
