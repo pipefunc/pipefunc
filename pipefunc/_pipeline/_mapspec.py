@@ -66,6 +66,12 @@ def replace_none_in_axes(
     """Replaces `None` in the axes of non-root inputs with unique names.
 
     Mutates `non_root_inputs` in place!
+
+    This sets the axes that are None to `unnamed_{i}` even though in
+    a previous output the axis might have been named. This is not a problem
+    because that axis name won't be used. For example given
+    `"x[i], y[j] -> a[i, j]"` and `"a[:, j] -> c[j]"` will result in
+    `{"a": ["unnamed_0", "j"]`.
     """
     all_axes_names = {
         axis.name for mapspec in mapspecs for axis in mapspec.inputs + mapspec.outputs

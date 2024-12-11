@@ -854,6 +854,13 @@ def test_double_output_then_iterate_over_single_axis():
         ],
     )
     pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    assert pipeline.mapspec_axes == {
+        "a": ("i", "j"),
+        "b": ("i", "j"),
+        "c": ("j",),
+        "x": ("i",),
+        "y": ("j",),
+    }
 
 
 def test_double_output_then_iterate_over_single_axis_gen_job():
