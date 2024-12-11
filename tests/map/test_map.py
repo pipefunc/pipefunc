@@ -1653,3 +1653,33 @@ def test_map_range():
         ds = xarray_dataset_from_results(inputs, r, pipeline)
         assert ds.coords["x"].to_numpy().tolist() == [0, 1, 2]
         assert not r["y"].store.mask.all()
+
+
+def test_pipeline_loading_existing_results_with_internal_shape(tmp_path: Path) -> None:
+    # Modified from `test_pipeline_loading_existing_results`
+    counters = {"f": 0, "g": 0}
+
+    @pipefunc(output_name="z", internal_shape=(10,))
+    def f(x: int) -> list[int]:
+        counters["f"] += 1
+        return list(range(10))
+
+    @pipefunc(output_name="sum_", mapspec="z[i] -> sum_[i]")
+    def g(z: int) -> int:
+        counters["g"] += 1
+        return z + 1
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": 1}
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert counters["f"] == 1
+    assert counters["g"] == 10
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    assert counters["f"] == 1
+    assert counters["g"] == 10
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert counters["f"] == 2
+    assert counters["g"] == 20
