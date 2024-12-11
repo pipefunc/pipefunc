@@ -338,17 +338,11 @@ def test_full_output() -> None:
     }
 
 
-@pipefunc(output_name="test_function")
-def test_function(arg1: str, arg2: str) -> str:
-    return f"{arg1} {arg2}"
-
-
-pipeline = Pipeline([test_function])
-
-
 def test_function_pickling() -> None:
+    from .helpers import pipeline_test_function
+
     # Get the _PipelineAsFunc instance from the pipeline
-    func = pipeline.func("test_function")
+    func = pipeline_test_function.func("test_function")
 
     # Pickle the _PipelineAsFunc instance
     pickled_func = pickle.dumps(func)
@@ -840,3 +834,52 @@ def test_adding_duplicates_output_name_tuple() -> None:
         ),
     ):
         pipeline.add(g)
+
+
+def test_double_output_then_iterate_over_single_axis():
+    def f1(x, y):
+        return x, y
+
+    def f2(a):
+        return 1
+
+    pipeline = Pipeline(
+        [
+            PipeFunc(
+                f1,
+                ("a", "b"),
+                mapspec="x[i], y[j] -> a[i, j], b[i, j]",
+            ),
+            PipeFunc(f2, "c", mapspec="a[:, j] -> c[j]"),
+        ],
+    )
+    pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    assert pipeline.mapspec_axes == {
+        "a": ("i", "j"),
+        "b": ("i", "j"),
+        "c": ("j",),
+        "x": ("i",),
+        "y": ("j",),
+    }
+
+
+def test_double_output_then_iterate_over_single_axis_gen_job():
+    def f1(x, y):
+        return list(range(10)), list(range(10))
+
+    def f2(a):
+        return a
+
+    pipeline = Pipeline(
+        [
+            PipeFunc(
+                f1,
+                ("a", "b"),
+                mapspec="x[i], y[j] -> a[i, j, k], b[i, j, k]",
+                internal_shape=(10,),
+            ),
+            PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
+        ],
+    )
+    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    assert results["c"].output.shape == (3, 10)
