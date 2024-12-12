@@ -124,7 +124,7 @@ def test_2d_internal_shape(tmp_path: Path) -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
     before = counters.copy()
     # Should use existing results
-    results = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False, cleanup=False)
+    _ = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False, cleanup=False)
     assert before == counters
 
 
