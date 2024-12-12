@@ -279,6 +279,6 @@ T = TypeVar("T")
 
 
 def first(x: T | tuple[T, ...]) -> T:
-    if isinstance(x, tuple):
+    if isinstance(x, tuple):  # pragma: no cover
         return x[0]
     return x
