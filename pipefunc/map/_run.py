@@ -518,8 +518,8 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-    for array, _output in zip(arrays, outputs):
-        if not array.full_shape_is_resolved:
+    for i, (array, _output) in enumerate(zip(arrays, outputs)):
+        if i == 0 and not array.full_shape_is_resolved:
             _set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
@@ -619,7 +619,6 @@ class _MapSpecArgs:
     existing: list[int]
     missing: list[int]
     result_arrays: list[np.ndarray] | None
-    shape: ShapeTuple
     mask: tuple[bool, ...]
     arrays: list[StorageBase]
 
@@ -648,7 +647,7 @@ def _prepare_submit_map_spec(
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
-    return _MapSpecArgs(process_index, existing, missing, result_arrays, shape, mask, arrays)
+    return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
 
 
 def _mask_fixed_axes(
@@ -984,24 +983,26 @@ def _output_from_mapspec_task(
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
-    arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
+    arrays: tuple[StorageBase, ...] = tuple(
+        store[name]  # type: ignore[misc]
+        for name in at_least_tuple(func.output_name)
+    )
+
     for i, (index, outputs) in enumerate(zip(args.missing, outputs_list)):
         if i == 0:
-            _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
         assert args.result_arrays is not None
-        assert shape_is_resolved(args.shape)
-        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-        _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
+
     for i, index in enumerate(args.existing):
         outputs = [array.get_from_index(index) for array in args.arrays]
         if i == 0:
-            _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
         assert args.result_arrays is not None
-        assert shape_is_resolved(args.shape)
-        _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-    assert args.result_arrays is not None
-    assert shape_is_resolved(args.shape)
-    return tuple(x.reshape(args.shape) for x in args.result_arrays)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+
+    return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
@@ -1063,7 +1064,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
-) -> None:
+) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
         assert isinstance(array, StorageBase)
@@ -1072,7 +1073,7 @@ def _maybe_resolve_shapes_from_map(
     assert isinstance(array, StorageBase)
     if args.result_arrays is None:
         args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
-    args.shape = array.full_shape
+    return array.full_shape
 
 
 async def _process_task_async(
