@@ -120,7 +120,7 @@ addopts = """
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
-    "if TYPE_CHECKING:",
+    "if TYPE_CHECKING",
     "if __name__ == .__main__.:",
 ]
 
