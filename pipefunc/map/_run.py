@@ -14,14 +14,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import (
-    at_least_tuple,
-    dump,
-    handle_error,
-    is_running_in_ipynb,
-    load,
-    prod,
-)
+from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -34,11 +27,7 @@ from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result
 from ._run_info import requires_mapping
-from ._shapes import (
-    external_shape_from_mask,
-    internal_shape_from_mask,
-    shape_is_resolved,
-)
+from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
