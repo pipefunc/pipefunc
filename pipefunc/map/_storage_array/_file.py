@@ -12,7 +12,6 @@ import cloudpickle
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import (
     StorageBase,
@@ -68,12 +67,10 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> tuple[int | slice, ...]:
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
         return normalize_key(
             key,
-            self.shape,
-            self.internal_shape,
+            self.resolved_shape,
+            self.resolved_internal_shape,
             self.shape_mask,
             for_dump=for_dump,
         )
@@ -97,8 +94,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        assert shape_is_resolved(self.shape)
-        return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
+        return (self._key_to_file(x) for x in iterate_shape_indices(self.resolved_shape))
 
     def _slice_indices(
         self,
@@ -106,14 +102,12 @@ class FileArray(StorageBase):
         *,
         for_dump: bool = False,
     ) -> list[range]:
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
         slice_indices = []
         shape_index = 0
         internal_shape_index = 0
         normalized_key = self._normalize_key(key, for_dump=for_dump)
         for k, m in zip(normalized_key, self.shape_mask):
-            shape = self.shape if m else self.internal_shape
+            shape = self.resolved_shape if m else self.resolved_internal_shape
             index = shape_index if m else internal_shape_index
 
             if isinstance(k, slice):
@@ -195,10 +189,8 @@ class FileArray(StorageBase):
             The array containing all the data.
 
         """
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
         if splat_internal is None:
-            splat_internal = bool(self.internal_shape)
+            splat_internal = bool(self.resolved_internal_shape)
 
         items = _load_all(map(self._index_to_file, range(self.size)))
 
@@ -206,27 +198,27 @@ class FileArray(StorageBase):
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
             mask = self.mask_linear()
-            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.shape)
+            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.resolved_shape)
 
-        if not self.internal_shape:
+        if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
         arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in iterate_shape_indices(self.shape):
+        for external_index in iterate_shape_indices(self.resolved_shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                for internal_index in iterate_shape_indices(self.internal_shape):
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in iterate_shape_indices(self.internal_shape):
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True

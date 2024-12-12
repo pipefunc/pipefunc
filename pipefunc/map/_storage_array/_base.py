@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from pipefunc.map._types import ShapeTuple
 
-_IS_PYTEST = os.getenv("PYTEST_CURRENT_TEST")
+_IS_PYTEST: bool = os.getenv("PYTEST_CURRENT_TEST") is not None
 
 storage_registry = {}
 
@@ -125,27 +125,22 @@ class StorageBase(abc.ABC):
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
-        assert shape_is_resolved(self.shape)
-        return prod(self.shape)
+        return prod(self.resolved_shape)
 
     @property
     def rank(self) -> int:
         """Return the rank of the array."""
-        assert shape_is_resolved(self.shape)
-        return len(self.shape)
+        return len(self.resolved_shape)
 
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
-        return select_by_mask(self.shape_mask, self.shape, self.internal_shape)
+        return select_by_mask(self.shape_mask, self.resolved_shape, self.resolved_internal_shape)
 
     @functools.cached_property
     def strides(self) -> tuple[int, ...]:
         """Return the strides of the array."""
-        assert shape_is_resolved(self.shape)
-        return shape_to_strides(self.shape)
+        return shape_to_strides(self.resolved_shape)
 
     def persist(self) -> None:  # noqa: B027
         """Save a memory-based storage to disk."""

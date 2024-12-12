@@ -15,7 +15,6 @@ from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs.registry import register_codec
 
 from pipefunc._utils import prod
-from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import StorageBase, register_storage, select_by_mask
 
@@ -84,8 +83,7 @@ class ZarrFileArray(StorageBase):
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
-        assert shape_is_resolved(self.shape)
-        return prod(self.shape)
+        return prod(self.resolved_shape)
 
     @property
     def rank(self) -> int:
@@ -94,8 +92,7 @@ class ZarrFileArray(StorageBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
-        assert shape_is_resolved(self.shape)
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         full_index = select_by_mask(
             self.shape_mask,
             np_index,
@@ -105,8 +102,7 @@ class ZarrFileArray(StorageBase):
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
-        assert shape_is_resolved(self.shape)
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         return not self._mask[np_index]
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
@@ -212,9 +208,8 @@ class ZarrFileArray(StorageBase):
         self._mask[key] = False
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
-        assert shape_is_resolved(self.shape)
         slice_indices = []
-        for size, k in zip(self.shape, key):
+        for size, k in zip(self.resolved_shape, key):
             if isinstance(k, slice):
                 slice_indices.append(range(*k.indices(size)))
             else:

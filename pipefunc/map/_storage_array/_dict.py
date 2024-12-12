@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from pipefunc._utils import dump, load
-from pipefunc.map._shapes import shape_is_resolved
 
 from ._base import StorageBase, normalize_key, register_storage, select_by_mask
 
@@ -54,14 +53,12 @@ class DictArray(StorageBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
-        assert shape_is_resolved(self.shape)
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         return self._dict[np_index]  # type: ignore[index]
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
-        assert shape_is_resolved(self.shape)
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         return np_index in self._dict
 
     def _internal_mask(self) -> np.ma.MaskedArray:
@@ -71,9 +68,7 @@ class DictArray(StorageBase):
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
         """Return the data associated with the given key."""
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
-        key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask)
+        key = normalize_key(key, self.resolved_shape, self.resolved_internal_shape, self.shape_mask)
         assert len(key) == len(self.full_shape)
         if any(isinstance(k, slice) for k in key):
             shape = tuple(
@@ -130,18 +125,16 @@ class DictArray(StorageBase):
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
         """Return the array as a NumPy masked array."""
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
         if splat_internal is None:
-            splat_internal = bool(self.internal_shape)
+            splat_internal = bool(self.resolved_internal_shape)
         if not splat_internal:
-            data: np.ndarray = _masked_empty(self.shape)
-            mask: np.ndarray = np.full(self.shape, fill_value=True, dtype=bool)
+            data: np.ndarray = _masked_empty(self.resolved_shape)
+            mask: np.ndarray = np.full(self.resolved_shape, fill_value=True, dtype=bool)
             for external_index, value in self._dict.items():
                 data[external_index] = value
                 mask[external_index] = False
             return np.ma.MaskedArray(data, mask=mask, dtype=object)
-        if not self.internal_shape:
+        if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
@@ -151,7 +144,7 @@ class DictArray(StorageBase):
             full_index = select_by_mask(
                 self.shape_mask,
                 external_index,
-                (slice(None),) * len(self.internal_shape),
+                (slice(None),) * len(self.resolved_internal_shape),
             )
             data[full_index] = value
             mask[full_index] = False
@@ -160,8 +153,7 @@ class DictArray(StorageBase):
     @property
     def mask(self) -> np.ma.core.MaskedArray:
         """Return the mask associated with the array."""
-        assert shape_is_resolved(self.shape)
-        mask: np.ndarray = np.full(self.shape, fill_value=True, dtype=bool)
+        mask: np.ndarray = np.full(self.resolved_shape, fill_value=True, dtype=bool)
         for external_index in self._dict:
             mask[external_index] = False
         return np.ma.MaskedArray(mask, mask=mask, dtype=bool)
@@ -179,14 +171,18 @@ class DictArray(StorageBase):
         >>> arr.dump((2, 1, 5), dict(a=1, b=2))
 
         """
-        assert shape_is_resolved(self.shape)
-        assert shape_is_resolved(self.internal_shape)
-        key = normalize_key(key, self.shape, self.internal_shape, self.shape_mask, for_dump=True)
+        key = normalize_key(
+            key,
+            self.resolved_shape,
+            self.resolved_internal_shape,
+            self.shape_mask,
+            for_dump=True,
+        )
         if any(isinstance(k, slice) for k in key):
-            for external_index in itertools.product(*self._slice_indices(key, self.shape)):
-                if self.internal_shape:
+            for external_index in itertools.product(*self._slice_indices(key, self.resolved_shape)):
+                if self.resolved_internal_shape:
                     value = np.asarray(value)  # in case it's a list
-                    assert value.shape == self.internal_shape
+                    assert value.shape == self.resolved_internal_shape
                     self._dict[external_index] = value
                 else:
                     self._dict[external_index] = value

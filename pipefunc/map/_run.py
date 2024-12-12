@@ -515,7 +515,7 @@ def _update_array(
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
     for array, _output in zip(arrays, outputs):
-        if not array.resolved_shape:
+        if not array.full_shape_is_resolved:
             _set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
@@ -567,7 +567,6 @@ def _update_result_array(
     mask: tuple[bool, ...],
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
-        assert result_array.shape == shape
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
             _set_output(result_array, _output, index, shape, mask)
@@ -757,7 +756,7 @@ def _load_from_store(
     for name in at_least_tuple(output_name):
         storage = store[name]
         if isinstance(storage, StorageBase):
-            assert storage.resolved_shape
+            assert storage.full_shape_is_resolved
             outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
