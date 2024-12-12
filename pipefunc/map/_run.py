@@ -509,7 +509,7 @@ def _update_array(
     output_key = None
     for i, (array, _output) in enumerate(zip(arrays, outputs)):
         if i == 0 and not array.full_shape_is_resolved:
-            _set_internal_shape(_output, array)
+            _maybe_set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -977,7 +977,6 @@ def _output_from_mapspec_task(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
     )
-
     for i, (index, outputs) in enumerate(zip(args.missing, outputs_list)):
         if i == 0:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
@@ -999,7 +998,7 @@ def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
     return np.shape(output)[: len(storage.internal_shape)]
 
 
-def _set_internal_shape(output: Any, storage: StorageBase) -> None:
+def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
     if not shape_is_resolved(storage.internal_shape):
         internal_shape = _internal_shape(output, storage)
         storage.internal_shape = internal_shape
@@ -1058,7 +1057,7 @@ def _maybe_resolve_shapes_from_map(
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
         assert isinstance(array, StorageBase)
-        _set_internal_shape(output, array)
+        _maybe_set_internal_shape(output, array)
     # Outside the loop above, just needs to do this once ⬇️
     assert isinstance(array, StorageBase)
     if args.result_arrays is None:
