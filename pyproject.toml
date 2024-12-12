@@ -137,7 +137,6 @@ target-version = "py310"
 select = ["ALL"]
 ignore = [
     "T20",     # flake8-print
-    "ANN101",  # Missing type annotation for {name} in method
     "S101",    # Use of assert detected
     "PD901",   # df is a bad variable name. Be kinder to your future self.
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}

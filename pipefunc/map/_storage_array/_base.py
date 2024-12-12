@@ -9,12 +9,15 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import prod
 from pipefunc.map._mapspec import shape_to_strides
+from pipefunc.map._shapes import shape_is_resolved
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
     import numpy as np
+
+    from pipefunc.map._types import ShapeTuple
 
 storage_registry = {}
 
@@ -45,8 +48,8 @@ def select_by_mask(
 class StorageBase(abc.ABC):
     """Base class for file-based arrays."""
 
-    shape: tuple[int, ...]
-    internal_shape: tuple[int, ...]
+    shape: ShapeTuple
+    internal_shape: ShapeTuple
     shape_mask: tuple[bool, ...]
     storage_id: str
     requires_serialization: bool
@@ -55,10 +58,26 @@ class StorageBase(abc.ABC):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
+
+    def set_shape(
+        self,
+        shape: ShapeTuple | None = None,
+        internal_shape: ShapeTuple | None = None,
+    ) -> None:
+        """Set the shape and internal shape of the array."""
+        if shape is not None:
+            self.shape = shape
+        if internal_shape is not None:
+            self.internal_shape = internal_shape
+
+    @property
+    def resolved_shape(self) -> bool:
+        """Return whether the shape is resolved."""
+        return all(isinstance(s, int) for s in self.shape + self.internal_shape)
 
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...
@@ -90,21 +109,26 @@ class StorageBase(abc.ABC):
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
+        assert shape_is_resolved(self.shape)
         return prod(self.shape)
 
     @property
     def rank(self) -> int:
         """Return the rank of the array."""
+        assert shape_is_resolved(self.shape)
         return len(self.shape)
 
     @functools.cached_property
     def full_shape(self) -> tuple[int, ...]:
         """Return the full shape of the array."""
+        assert shape_is_resolved(self.shape)
+        assert shape_is_resolved(self.internal_shape)
         return select_by_mask(self.shape_mask, self.shape, self.internal_shape)
 
     @functools.cached_property
     def strides(self) -> tuple[int, ...]:
         """Return the strides of the array."""
+        assert shape_is_resolved(self.shape)
         return shape_to_strides(self.shape)
 
     def persist(self) -> None:  # noqa: B027
