@@ -5,6 +5,7 @@ from __future__ import annotations
 import abc
 import functools
 import itertools
+import os
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import prod
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     import numpy as np
 
     from pipefunc.map._types import ShapeTuple
+
+_IS_PYTEST = os.getenv("PYTEST_CURRENT_TEST")
 
 storage_registry = {}
 
@@ -63,6 +66,19 @@ class StorageBase(abc.ABC):
         shape_mask: tuple[bool, ...] | None = None,
     ) -> None: ...
 
+    @property
+    def resolved_shape(self) -> tuple[int, ...]:
+        """Return the resolved shape of the array."""
+        if TYPE_CHECKING or _IS_PYTEST:
+            assert shape_is_resolved(self.shape)
+        return self.shape
+
+    @property
+    def resolved_internal_shape(self) -> tuple[int, ...]:
+        if TYPE_CHECKING or _IS_PYTEST:
+            assert shape_is_resolved(self.internal_shape)
+        return self.internal_shape
+
     def set_shape(
         self,
         shape: ShapeTuple | None = None,
@@ -75,7 +91,7 @@ class StorageBase(abc.ABC):
             self.internal_shape = internal_shape
 
     @property
-    def resolved_shape(self) -> bool:
+    def full_shape_is_resolved(self) -> bool:
         """Return whether the shape is resolved."""
         return all(isinstance(s, int) for s in self.shape + self.internal_shape)
 

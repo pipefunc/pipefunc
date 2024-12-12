@@ -7,9 +7,9 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import at_least_tuple, dump, equal_dicts, load
+from pipefunc._utils import at_least_tuple, dump, equal_dicts, first, load
 from pipefunc._version import __version__
 
 from ._mapspec import MapSpec
@@ -222,21 +222,12 @@ class RunInfo:
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         for name, shape in self.resolved_shapes.items():
             if not shape_is_resolved(shape):
-                mapspec = mapspecs[_first(name)]
+                mapspec = mapspecs[first(name)]
                 new_shape, _ = shape_and_mask_from_mapspec(mapspec, self.resolved_shapes, internal)
                 self.resolved_shapes[name] = new_shape
                 if not isinstance(name, tuple):
                     _update_shape_in_store(new_shape, store, name)
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
-
-
-T = TypeVar("T")
-
-
-def _first(x: T | tuple[T, ...]) -> T:
-    if isinstance(x, tuple):
-        return x[0]
-    return x
 
 
 def requires_mapping(func: PipeFunc) -> bool:

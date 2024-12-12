@@ -567,6 +567,7 @@ def _update_result_array(
     mask: tuple[bool, ...],
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
+        assert result_array.shape == shape
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
             _set_output(result_array, _output, index, shape, mask)
