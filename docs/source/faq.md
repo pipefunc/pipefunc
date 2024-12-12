@@ -1133,6 +1133,35 @@ Post-execution hooks are particularly useful for:
 Note that hooks are executed synchronously after the function returns but before the result is passed to the next function in the pipeline.
 They should be kept lightweight to avoid impacting performance.
 
+## How to aggregate results as a step in my `Pipeline`?
+
+To collect several inputs and/or outputs of different `PipeFunc`s in your `Pipeline` as an additional `PipeFunc` you could use {class}`pipefunc.helpers.aggregate_kwargs`.
+
+Here's an example:
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc, PipeFunc
+from pipefunc.helpers import aggregate_kwargs
+
+@pipefunc(output_name="out1")
+def f1(in1):
+    return in1
+
+@pipefunc(output_name="out2")
+def f2(in2, out1):
+    return in2 + out1
+
+# Creates a function with signature `aggregate(in1, out1, out2) -> dict[str, Any]`
+agg = aggregate_kwargs(("in1", "out1", "out2"), function_name="aggregate")
+f3 = PipeFunc(agg, output_name="result_dict")
+
+pipeline = Pipeline([f1, f2, f3])
+result = pipeline(in1=1, in2=2)
+assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `aggregate_kwargs`
+
+pipeline.visualize(backend="graphviz")
+```
+
 ## Parameter Sweeps
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
