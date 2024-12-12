@@ -1133,15 +1133,16 @@ Post-execution hooks are particularly useful for:
 Note that hooks are executed synchronously after the function returns but before the result is passed to the next function in the pipeline.
 They should be kept lightweight to avoid impacting performance.
 
-## How to aggregate results as a step in my `Pipeline`?
+## How to collect results as a step in my `Pipeline`?
 
-To collect several inputs and/or outputs of different `PipeFunc`s in your `Pipeline` as an additional `PipeFunc` you could use {class}`pipefunc.helpers.aggregate_kwargs`.
+Sometimes you might need to collect specific inputs and/or outputs of different `PipeFunc`s within your pipeline.
+You can achieve this by using {class}`pipefunc.helpers.collect_kwargs` to create a `PipeFunc` that gathers these values into a dictionary.
 
 Here's an example:
 
 ```{code-cell} ipython3
 from pipefunc import Pipeline, pipefunc, PipeFunc
-from pipefunc.helpers import aggregate_kwargs
+from pipefunc.helpers import collect_kwargs
 
 @pipefunc(output_name="out1")
 def f1(in1):
@@ -1152,12 +1153,12 @@ def f2(in2, out1):
     return in2 + out1
 
 # Creates a function with signature `aggregate(in1, out1, out2) -> dict[str, Any]`
-agg = aggregate_kwargs(("in1", "out1", "out2"), function_name="aggregate")
+agg = collect_kwargs(("in1", "out1", "out2"), function_name="aggregate")
 f3 = PipeFunc(agg, output_name="result_dict")
 
 pipeline = Pipeline([f1, f2, f3])
 result = pipeline(in1=1, in2=2)
-assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `aggregate_kwargs`
+assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `collect_kwargs`
 
 pipeline.visualize(backend="graphviz")
 ```

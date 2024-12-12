@@ -11,7 +11,7 @@ class _ReturnsKwargs:
         return kwargs
 
 
-def aggregate_kwargs(
+def collect_kwargs(
     parameters: tuple[str, ...],
     *,
     annotations: tuple[type, ...] | None = None,
@@ -36,7 +36,9 @@ def aggregate_kwargs(
     Examples
     --------
     This creates `def yolo(a: int, b: list[int]) -> dict[str, Any]`:
-    >>> aggregate_kwargs(("a", "b"), annotations=(int, list[int]), function_name="yolo")
+    >>> f = collect_kwargs(("a", "b"), annotations=(int, list[int]), function_name="yolo")
+    >>> f(a=1, b=2)
+    {"a": 1, "b": 2}
 
     """
     cls = _ReturnsKwargs()

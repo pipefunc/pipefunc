@@ -3,11 +3,11 @@ import inspect
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc.helpers import aggregate_kwargs
+from pipefunc.helpers import collect_kwargs
 
 
-def test_aggregate_kwargs() -> None:
-    f = aggregate_kwargs(("a", "b"), annotations=(int, list[int]), function_name="yolo")
+def test_collect_kwargs() -> None:
+    f = collect_kwargs(("a", "b"), annotations=(int, list[int]), function_name="yolo")
     assert f(a=1, b=[1]) == {"a": 1, "b": [1]}
     sig = inspect.signature(f)
     assert sig.parameters["a"].annotation is int
@@ -15,10 +15,10 @@ def test_aggregate_kwargs() -> None:
     assert f.__name__ == "yolo"
 
     with pytest.raises(ValueError, match="should have equal length"):
-        aggregate_kwargs(parameters=("a",), annotations=())
+        collect_kwargs(parameters=("a",), annotations=())
 
 
-def test_aggregate_kwargs_in_pipefunc() -> None:
+def test_collect_kwargs_in_pipefunc() -> None:
     @pipefunc(output_name="c")
     def f1(a, b):
         return a + b
@@ -32,7 +32,7 @@ def test_aggregate_kwargs_in_pipefunc() -> None:
         return c * d * x
 
     f_agg = PipeFunc(
-        aggregate_kwargs(
+        collect_kwargs(
             (
                 "a",  # input parameter
                 "d",  # output parameter
@@ -45,4 +45,4 @@ def test_aggregate_kwargs_in_pipefunc() -> None:
 
     pipeline = Pipeline([f1, f2, f3, f_agg])
     result = pipeline(a=1, b=2)
-    assert result == {"a": 1, "d": 6, "e": 18}  # same parameters as in `aggregate_kwargs`
+    assert result == {"a": 1, "d": 6, "e": 18}  # same parameters as in `collect_kwargs`
