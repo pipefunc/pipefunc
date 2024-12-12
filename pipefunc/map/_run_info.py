@@ -237,7 +237,7 @@ def requires_mapping(func: PipeFunc) -> bool:
 def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
     storage = store.get(name)
     if isinstance(storage, StorageBase):
-        storage.set_shape(shape)
+        storage.shape = shape
 
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:

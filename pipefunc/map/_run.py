@@ -649,6 +649,7 @@ def _mask_fixed_axes(
         return None
     if not shape_is_resolved(shape):
         # In principle it should be possible if the "?" axes are not in the fixed_indices
+        # however, I will implement it when it becomes necessary.
         msg = "Cannot mask fixed axes for unresolved shapes."
         raise ValueError(msg)
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)

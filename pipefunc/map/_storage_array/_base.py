@@ -75,17 +75,6 @@ class StorageBase(abc.ABC):
         assert shape_is_resolved(self.internal_shape)
         return self.internal_shape
 
-    def set_shape(
-        self,
-        shape: ShapeTuple | None = None,
-        internal_shape: ShapeTuple | None = None,
-    ) -> None:
-        """Set the shape and internal shape of the array."""
-        if shape is not None:
-            self.shape = shape
-        if internal_shape is not None:
-            self.internal_shape = internal_shape
-
     @property
     def full_shape_is_resolved(self) -> bool:
         """Return whether the shape is resolved."""
