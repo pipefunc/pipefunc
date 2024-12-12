@@ -980,18 +980,22 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
 ) -> tuple[np.ndarray, ...]:
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    if args.missing:  # Means outputs_list has entries
-        _maybe_resolve_shapes_from_map(func, store, args, outputs_list)
-    assert args.result_arrays is not None
-    assert shape_is_resolved(args.shape)
-    for index, outputs in zip(args.missing, outputs_list):
+    for i, (index, outputs) in enumerate(zip(args.missing, outputs_list)):
+        if i == 0:
+            _maybe_resolve_shapes_from_map(func, store, args, outputs)
+        assert args.result_arrays is not None
+        assert shape_is_resolved(args.shape)
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
         _update_array(func, arrays, args.shape, args.mask, index, outputs, in_post_process=True)
-
-    for index in args.existing:
+    for i, index in enumerate(args.existing):
         outputs = [array.get_from_index(index) for array in args.arrays]
+        if i == 0:
+            _maybe_resolve_shapes_from_map(func, store, args, outputs)
+        assert args.result_arrays is not None
+        assert shape_is_resolved(args.shape)
         _update_result_array(args.result_arrays, index, outputs, args.shape, args.mask)
-
+    assert args.result_arrays is not None
+    assert shape_is_resolved(args.shape)
     return tuple(x.reshape(args.shape) for x in args.result_arrays)
 
 
@@ -1053,9 +1057,9 @@ def _maybe_resolve_shapes_from_map(
     func: PipeFunc,
     store: dict[str, StoreType],
     args: _MapSpecArgs,
-    outputs_list: list[list[Any]],
+    outputs: list[Any],
 ) -> None:
-    for output, name in zip(outputs_list[0], at_least_tuple(func.output_name)):
+    for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
         assert isinstance(array, StorageBase)
         _set_internal_shape(output, array)
