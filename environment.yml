@@ -35,6 +35,7 @@ dependencies:
   - pytest-asyncio
   - pytest-codspeed
   - pytest-cov
+  - pytest-timeout
   - pytest-xdist
   - pytest
   - versioningit
