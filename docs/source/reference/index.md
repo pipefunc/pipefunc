@@ -19,6 +19,7 @@ pipefunc.map.adaptive
 pipefunc.map.xarray
 pipefunc.map.adaptive_scheduler
 pipefunc.cache
+pipefunc.helpers
 pipefunc.resources
 pipefunc.lazy
 pipefunc.sweep
