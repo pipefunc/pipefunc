@@ -272,6 +272,7 @@ def test_tuple_outputs() -> None:
         == pipeline.root_args(("g", "h"))
         == ("a", "b", "x")
     )
+    assert pipeline.root_args(None) == ("a", "b", "x")
     assert pipeline.func(("g", "h"))(a=1, b=2, x=3).g == 4
     assert pipeline.func_dependencies("i") == [("c", "_throw"), ("d", "e"), ("g", "h")]
     assert pipeline.func_dependents("c") == [("d", "e"), ("g", "h"), "i"]
