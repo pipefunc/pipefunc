@@ -1138,6 +1138,12 @@ They should be kept lightweight to avoid impacting performance.
 Sometimes you might need to collect specific inputs and/or outputs of different `PipeFunc`s within your pipeline.
 You can achieve this by using {class}`pipefunc.helpers.collect_kwargs` to create a `PipeFunc` that gathers these values into a dictionary.
 
+:::{admonition} Using `pipeline.map` automatically collects all results
+:class: note, dropdown
+When using `pipeline.map`, all results are automatically collected and returned as a dictionary of `Result` objects.
+These `Result` objects contain the `kwargs` and `output` of each function in the pipeline.
+:::
+
 Here's an example:
 
 ```{code-cell} ipython3
