@@ -188,6 +188,22 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
+    @functools.cached_property
+    def info(self) -> dict[str, Any]:
+        """Return information about inputs and outputs of the Pipeline."""
+        inputs = self.root_args()
+        outputs = tuple(sorted(n for f in self.leaf_nodes for n in at_least_tuple(f.output_name)))
+        intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
+        required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
+        optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
+        return {
+            "inputs": inputs,
+            "outputs": outputs,
+            "intermediate_outputs": intermediate_outputs,
+            "required_inputs": required_inputs,
+            "optional_inputs": optional_inputs,
+        }
+
     @property
     def profile(self) -> bool | None:
         """Flag indicating whether profiling information should be collected."""

@@ -135,6 +135,14 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
         "e": ("a", "b", "x", "xx"),
     }
 
+    assert pipeline.info == {
+        "inputs": ("a", "b", "x", "xx"),
+        "outputs": ("e",),
+        "intermediate_outputs": ("c", "d"),
+        "required_inputs": ("a", "b", "xx"),
+        "optional_inputs": ("x",),
+    }
+
 
 def test_disjoint_pipelines() -> None:
     @pipefunc(output_name="x")
