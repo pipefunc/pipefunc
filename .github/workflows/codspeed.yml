@@ -43,4 +43,4 @@ jobs:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: |
             micromamba run -n pipefunc \
-              pytest tests/test_benchmark.py --codspeed --timeout 0
+              pytest tests/test_benchmark.py --codspeed --disable-timeout

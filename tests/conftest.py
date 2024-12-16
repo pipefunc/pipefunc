@@ -1,7 +1,27 @@
 import importlib.util
 import warnings
 
+import _pytest
+
 collect_ignore_glob = []
+
+
+def pytest_addoption(parser: _pytest.config.argparsing.Parser) -> None:
+    # NOTE: This is a workaround for the fact that the pytest-timeout plugin
+    # doesn't seem to work with pytest-codspeed.
+    parser.addoption(
+        "--disable-timeout",
+        action="store_true",
+        default=False,
+        help="Disable the pytest-timeout plugin",
+    )
+
+
+def pytest_configure(config: _pytest.config.Config) -> None:
+    if config.getoption("--disable-timeout"):
+        plugin = config.pluginmanager.getplugin("timeout")
+        assert plugin is not None
+        config.pluginmanager.unregister(plugin)
 
 
 def skip_if_missing(name: str, match: str | None = None) -> None:
