@@ -190,7 +190,19 @@ class Pipeline:
 
     @functools.cached_property
     def info(self) -> dict[str, Any]:
-        """Return information about inputs and outputs of the Pipeline."""
+        """Return information about inputs and outputs of the Pipeline.
+
+        Returns
+        -------
+            A dictionary containing information about the inputs and outputs of the Pipeline.
+            With the following keys:
+            - inputs: The input arguments of the Pipeline.
+            - outputs: The output arguments of the Pipeline.
+            - intermediate_outputs: The intermediate output arguments of the Pipeline.
+            - required_inputs: The required input arguments of the Pipeline.
+            - optional_inputs: The optional input arguments of the Pipeline (see `pipeline.defaults`).
+
+        """
         inputs = self.root_args()
         outputs = tuple(sorted(n for f in self.leaf_nodes for n in at_least_tuple(f.output_name)))
         intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
