@@ -45,5 +45,7 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: |
+            set -ex
+            env
             micromamba run -n pipefunc \
               pytest tests/test_benchmark.py --codspeed
