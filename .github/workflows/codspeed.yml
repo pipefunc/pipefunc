@@ -36,6 +36,9 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install -e ".[test,all]"
+          # Otherwise, I get:
+          # INTERNALERROR> ModuleNotFoundError: No module named 'pytest_codspeed.instruments.valgrind._wrapper.dist_callgrind_wrapper'
+          pip uninstall -y pytest-timeout
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
