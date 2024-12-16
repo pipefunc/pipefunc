@@ -852,10 +852,28 @@ class Pipeline:
         self._internal_cache.arg_combinations[output_name] = arg_set
         return arg_set
 
-    def root_args(self, output_name: OUTPUT_TYPE) -> tuple[str, ...]:
-        """Return the root arguments required to compute a specific output."""
+    def root_args(self, output_name: OUTPUT_TYPE | None = None) -> tuple[str, ...]:
+        """Return the root arguments required to compute a specific (or all) output(s).
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline. If ``None``,
+            the root arguments for all outputs are returned.
+
+        Returns
+        -------
+            A tuple containing the root arguments required to compute the output.
+            The tuple is sorted in alphabetical order.
+
+        """
         if r := self._internal_cache.root_args.get(output_name):
             return r
+        if output_name is None:
+            outputs = {arg for args in self.all_root_args.values() for arg in args}
+            sorted_outputs = tuple(sorted(outputs))
+            self._internal_cache.root_args[None] = sorted_outputs
+            return sorted_outputs
         arg_combos = self.arg_combinations(output_name)
         root_args = next(
             args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
@@ -2116,6 +2134,6 @@ def _find_nodes_between(
 @dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
     arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
-    root_args: dict[OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
     func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
