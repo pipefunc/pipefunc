@@ -194,13 +194,24 @@ class Pipeline:
 
         Returns
         -------
+        dict
             A dictionary containing information about the inputs and outputs of the Pipeline.
             With the following keys:
-            - inputs: The input arguments of the Pipeline.
-            - outputs: The output arguments of the Pipeline.
-            - intermediate_outputs: The intermediate output arguments of the Pipeline.
-            - required_inputs: The required input arguments of the Pipeline.
-            - optional_inputs: The optional input arguments of the Pipeline (see `pipeline.defaults`).
+
+            - ``inputs``: The input arguments of the Pipeline.
+            - ``outputs``: The output arguments of the Pipeline.
+            - ``intermediate_outputs``: The intermediate output arguments of the Pipeline.
+            - ``required_inputs``: The required input arguments of the Pipeline.
+            - ``optional_inputs``: The optional input arguments of the Pipeline (see `Pipeline.defaults`).
+
+        See Also
+        --------
+        defaults
+            A dictionary with input name to default value mappings.
+        leaf_nodes
+            The leaf nodes of the pipeline as `PipeFunc` objects.
+        root_args
+            The root arguments (inputs) required to compute the output of the pipeline.
 
         """
         inputs = self.root_args()
