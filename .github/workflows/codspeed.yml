@@ -30,7 +30,7 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-environment: false
+          cache-environment: true
 
       - name: Install pipefunc
         shell: bash -l {0}
@@ -43,4 +43,4 @@ jobs:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: |
             micromamba run -n pipefunc \
-              pytest tests/test_benchmark.py --codspeed
+              pytest tests/test_benchmark.py --codspeed --timeout 120
