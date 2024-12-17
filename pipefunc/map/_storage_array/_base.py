@@ -77,7 +77,6 @@ class StorageBase(abc.ABC):
         assert shape_is_resolved(self.internal_shape)
         return self.internal_shape
 
-    @property
     def full_shape_is_resolved(self) -> bool:
         """Return whether the shape is resolved."""
         return all(isinstance(s, int) for s in self.shape + self.internal_shape)

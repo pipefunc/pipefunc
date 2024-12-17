@@ -504,7 +504,7 @@ def _update_array(
     first = True
     for array, _output in zip(arrays, outputs):
         if first:
-            if not array.full_shape_is_resolved:
+            if not array.full_shape_is_resolved():
                 _maybe_set_internal_shape(_output, array)
             first = False
         if force_dump or (array.dump_in_subprocess != in_post_process):
@@ -755,7 +755,7 @@ def _load_from_store(
     for name in at_least_tuple(output_name):
         storage = store[name]
         if isinstance(storage, StorageBase):
-            assert storage.full_shape_is_resolved
+            assert storage.full_shape_is_resolved()
             outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
