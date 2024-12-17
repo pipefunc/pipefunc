@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
-import os
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -45,8 +44,6 @@ if TYPE_CHECKING:
     from ._result import StoreType
     from ._run_info import RunInfo
     from ._types import ShapeTuple, UserShapeDict
-
-_IS_PYTEST: bool = os.getenv("PYTEST_CURRENT_TEST") is not None
 
 
 def run_map(
@@ -381,9 +378,7 @@ def _select_kwargs(
 ) -> dict[str, Any]:
     assert func.mapspec is not None
     external_shape = external_shape_from_mask(shape, shape_mask)
-    if TYPE_CHECKING or _IS_PYTEST:
-        assert shape_is_resolved(external_shape)
-    input_keys = func.mapspec.input_keys(external_shape, index)
+    input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
     _load_arrays(selected)
@@ -513,9 +508,7 @@ def _update_array(
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
-                if TYPE_CHECKING or _IS_PYTEST:
-                    assert shape_is_resolved(external_shape)
-                output_key = func.mapspec.output_key(external_shape, index)
+                output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
 
 

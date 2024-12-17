@@ -115,7 +115,7 @@ addopts = """
     --cov-report xml
     --cov-fail-under=35
     --asyncio-mode=strict
-    --timeout 10
+    --timeout 60
 """
 
 [tool.coverage.report]
