@@ -68,18 +68,20 @@ class StorageBase(abc.ABC):
     @functools.cached_property
     def resolved_shape(self) -> tuple[int, ...]:
         """Return the resolved shape of the array."""
-        # For performance reasons, we assume the shape is resolved
+        # This cached property (and resolved_internal_shape) only exist to help mypy.
+        # For performance reasons, we assume this is only called once the shape is resolved.
         assert shape_is_resolved(self.shape)
         return self.shape
 
     @functools.cached_property
     def resolved_internal_shape(self) -> tuple[int, ...]:
-        # For performance reasons, we assume the shape is resolved
+        # See comment in `resolved_shapes`.
         assert shape_is_resolved(self.internal_shape)
         return self.internal_shape
 
     def full_shape_is_resolved(self) -> bool:
         """Return whether the shape is resolved."""
+        # This function is called many times, so we cache the result
         if self._is_resolved:
             return True
         self._is_resolved = all(isinstance(s, int) for s in self.shape + self.internal_shape)

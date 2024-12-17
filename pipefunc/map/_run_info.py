@@ -253,7 +253,6 @@ def _maybe_run_folder(
     return Path(run_folder) if run_folder is not None else None
 
 
-# TODO: remove and make `internal_shapes` a property of RunInfo
 def _construct_internal_shapes(
     internal_shapes: UserShapeDict | None,
     pipeline: Pipeline,

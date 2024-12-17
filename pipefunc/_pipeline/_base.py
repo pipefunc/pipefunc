@@ -488,6 +488,7 @@ class Pipeline:
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self)
         for f in self.functions:
+            # `clear_pipelines=False` to avoid infinite recursion
             f._clear_internal_cache(clear_pipelines=False)
 
     def __call__(self, __output_name__: OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:

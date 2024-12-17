@@ -984,22 +984,15 @@ def _output_from_mapspec_task(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
     )
-    first = True  # micro optimization (instead of doing enumerate)
+
+    first = True
     for index, outputs in zip(args.missing, outputs_list):
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
-        _update_array(
-            func,
-            arrays,
-            shape,
-            args.mask,
-            index,
-            outputs,
-            in_post_process=True,
-        )
+        _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
     for index in args.existing:
