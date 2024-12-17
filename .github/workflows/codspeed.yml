@@ -30,14 +30,12 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          cache-environment: true
+          cache-environment: false
 
       - name: Install pipefunc
         shell: bash -l {0}
         run: |
           pip install -e ".[test,all]"
-          # TODO: remove when https://github.com/CodSpeedHQ/pytest-codspeed/issues/59 is fixed
-          micromamba remove -y pytest-timeout
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3

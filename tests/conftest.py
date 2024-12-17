@@ -1,18 +1,7 @@
 import importlib.util
-import os
 import warnings
 
-import _pytest
-
 collect_ignore_glob = []
-
-
-def pytest_addoption(parser: _pytest.config.argparsing.Parser) -> None:
-    # NOTE: This is a workaround for the fact that the pytest-timeout plugin
-    # doesn't seem to work with pytest-codspeed.
-    # TODO: remove when https://github.com/CodSpeedHQ/pytest-codspeed/issues/59 is fixed
-    if os.getenv("GITHUB_JOB") == "benchmark":
-        parser.addoption("--timeout")
 
 
 def skip_if_missing(name: str, match: str | None = None) -> None:
