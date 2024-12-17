@@ -24,7 +24,7 @@ dependencies:
   # optional-dependencies: profiling
   - psutil
   # optional-dependencies: widgets
-  - graphviz-anywidget
+  - graphviz-anywidget>=0.3.0
   - ipywidgets
   # optional-dependencies: xarray
   - xarray

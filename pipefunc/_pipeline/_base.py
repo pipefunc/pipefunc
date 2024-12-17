@@ -188,6 +188,45 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
+    @functools.cached_property
+    def info(self) -> dict[str, Any]:
+        """Return information about inputs and outputs of the Pipeline.
+
+        Returns
+        -------
+        dict
+            A dictionary containing information about the inputs and outputs of the Pipeline.
+            With the following keys:
+
+            - ``inputs``: The input arguments of the Pipeline.
+            - ``outputs``: The output arguments of the Pipeline.
+            - ``intermediate_outputs``: The intermediate output arguments of the Pipeline.
+            - ``required_inputs``: The required input arguments of the Pipeline.
+            - ``optional_inputs``: The optional input arguments of the Pipeline (see `Pipeline.defaults`).
+
+        See Also
+        --------
+        defaults
+            A dictionary with input name to default value mappings.
+        leaf_nodes
+            The leaf nodes of the pipeline as `PipeFunc` objects.
+        root_args
+            The root arguments (inputs) required to compute the output of the pipeline.
+
+        """
+        inputs = self.root_args()
+        outputs = tuple(sorted(n for f in self.leaf_nodes for n in at_least_tuple(f.output_name)))
+        intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
+        required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
+        optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
+        return {
+            "inputs": inputs,
+            "outputs": outputs,
+            "intermediate_outputs": intermediate_outputs,
+            "required_inputs": required_inputs,
+            "optional_inputs": optional_inputs,
+        }
+
     @property
     def profile(self) -> bool | None:
         """Flag indicating whether profiling information should be collected."""
@@ -852,10 +891,28 @@ class Pipeline:
         self._internal_cache.arg_combinations[output_name] = arg_set
         return arg_set
 
-    def root_args(self, output_name: OUTPUT_TYPE) -> tuple[str, ...]:
-        """Return the root arguments required to compute a specific output."""
+    def root_args(self, output_name: OUTPUT_TYPE | None = None) -> tuple[str, ...]:
+        """Return the root arguments required to compute a specific (or all) output(s).
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline. If ``None``,
+            the root arguments for all outputs are returned.
+
+        Returns
+        -------
+            A tuple containing the root arguments required to compute the output.
+            The tuple is sorted in alphabetical order.
+
+        """
         if r := self._internal_cache.root_args.get(output_name):
             return r
+        if output_name is None:
+            outputs = {arg for args in self.all_root_args.values() for arg in args}
+            sorted_outputs = tuple(sorted(outputs))
+            self._internal_cache.root_args[None] = sorted_outputs
+            return sorted_outputs
         arg_combos = self.arg_combinations(output_name)
         root_args = next(
             args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
@@ -2116,6 +2173,6 @@ def _find_nodes_between(
 @dataclass(frozen=True, slots=True)
 class _PipelineInternalCache:
     arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
-    root_args: dict[OUTPUT_TYPE, tuple[str, ...]] = field(default_factory=dict)
+    root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
     func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
