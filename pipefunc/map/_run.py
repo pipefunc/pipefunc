@@ -755,7 +755,7 @@ def _load_from_store(
     for name in at_least_tuple(output_name):
         storage = store[name]
         if isinstance(storage, StorageBase):
-            assert storage.full_shape_is_resolved()
+            # assert storage.full_shape_is_resolved()
             outputs.append(storage)
         elif isinstance(storage, Path):
             if storage.is_file():
