@@ -10,7 +10,7 @@ import itertools
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -173,7 +173,7 @@ class MapSpec:
         _validate_shapes(input_names, input_shapes, self.inputs, internal_shapes, self.output_names)
 
         internal_shapes = internal_shapes or {}
-        shape = []
+        shape: list[int | Literal["?"]] = []
         mask = []
         internal_shape_index = 0
         output = self.outputs[0]  # All outputs have the same shape
@@ -458,8 +458,8 @@ def _get_common_dim(
     arrays: list[ArraySpec],
     index: str,
     input_shapes: ShapeDict,
-) -> int:
-    def _get_dim(array: ArraySpec, index: str) -> int:
+) -> int | Literal["?"]:
+    def _get_dim(array: ArraySpec, index: str) -> int | Literal["?"]:
         axis = array.axes.index(index)
         return input_shapes[array.name][axis]
 
@@ -475,7 +475,7 @@ def _get_output_dim(
     output: ArraySpec,
     internal_shapes: ShapeDict,
     internal_shape_index: int,
-) -> int:
+) -> int | Literal["?"]:
     if output.name not in internal_shapes:
         msg = f"Internal shape for '{output.name}' is missing."
         raise ValueError(msg)
@@ -483,8 +483,8 @@ def _get_output_dim(
         msg = f"Internal shape for '{output.name}' is too short."
         raise ValueError(msg)
     dim = internal_shapes[output.name][internal_shape_index]
-    if not isinstance(dim, int):
-        msg = f"Internal shape for '{output.name}' must be a tuple of integers."
+    if not (isinstance(dim, int) or dim == "?"):
+        msg = f"Internal shape for '{output.name}' must be a tuple of integers or '?'."
         raise TypeError(msg)
     return dim
 

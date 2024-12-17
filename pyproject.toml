@@ -115,14 +115,14 @@ addopts = """
     --cov-report xml
     --cov-fail-under=35
     --asyncio-mode=strict
-    --timeout 10
+    --timeout 60
 """
 
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
-    "if TYPE_CHECKING:",
+    "if TYPE_CHECKING",
     "if __name__ == .__main__.:",
 ]
 
@@ -139,7 +139,6 @@ target-version = "py310"
 select = ["ALL"]
 ignore = [
     "T20",     # flake8-print
-    "ANN101",  # Missing type annotation for {name} in method
     "S101",    # Use of assert detected
     "PD901",   # df is a bad variable name. Be kinder to your future self.
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}

@@ -185,7 +185,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | ShapeTuple | None = None,
+        internal_shape: int | Literal["?"] | ShapeTuple | None = None,
         post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
         resources: dict
         | Resources
@@ -203,7 +203,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: int | ShapeTuple | None = internal_shape
+        self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
         self.post_execution_hook = post_execution_hook
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
@@ -518,10 +518,11 @@ class PipeFunc(Generic[T]):
         self._clear_internal_cache()
         self._validate()
 
-    def _clear_internal_cache(self) -> None:
+    def _clear_internal_cache(self, *, clear_pipelines: bool = True) -> None:
         clear_cached_properties(self, PipeFunc)
-        for pipeline in self._pipelines:
-            pipeline._clear_internal_cache()
+        if clear_pipelines:
+            for pipeline in self._pipelines:
+                pipeline._clear_internal_cache()
 
     def _validate_update(
         self,
@@ -760,6 +761,10 @@ class PipeFunc(Generic[T]):
             return dict(zip(self.output_name, get_args(hint)))
         return {name: NoAnnotation for name in self.output_name}
 
+    @functools.cached_property
+    def requires_mapping(self) -> bool:
+        return self.mapspec is not None and bool(self.mapspec.inputs)
+
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
 
@@ -888,7 +893,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | ShapeTuple | None = None,
+    internal_shape: int | Literal["?"] | ShapeTuple | None = None,
     post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
     resources: dict
     | Resources
