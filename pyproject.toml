@@ -32,7 +32,7 @@ pandas = ["pandas"]
 plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-widgets = ["graphviz-anywidget", "ipywidgets"]
+widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
 xarray = ["xarray"]
 zarr = ["zarr"]
 test = [
@@ -40,6 +40,7 @@ test = [
     "pytest-asyncio",
     "pytest-codspeed",
     "pytest-cov",
+    "pytest-timeout",
     "pytest-xdist",
     "pytest",
     "versioningit",
@@ -114,6 +115,7 @@ addopts = """
     --cov-report xml
     --cov-fail-under=35
     --asyncio-mode=strict
+    --timeout 10
 """
 
 [tool.coverage.report]
