@@ -881,8 +881,10 @@ def _update_shape_using_result(
 ) -> None:
     shape = run_info.resolved_shapes.get(name, ())
     if "?" in shape:
-        assert func.mapspec is not None
-        internal_shape = np.shape(output)  # TODO: fix len(internal_shape) consistency!
+        mapspec = func.mapspec
+        assert mapspec is not None
+        internal_shape_dim = len(mapspec.output_indices) - len(mapspec.input_indices)
+        internal_shape = np.shape(output)[:internal_shape_dim]
         run_info.resolve_downstream_shapes(store, {name: internal_shape})
 
 
