@@ -10,6 +10,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._load import load_outputs
+from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.typing import Array  # noqa: TC001
@@ -142,8 +143,8 @@ def test_internal_shape_2nd_step() -> None:
     pipeline.map({}, run_folder=None, parallel=False)
 
 
-def test_internal_shape_2nd_step2() -> None:
-    @pipefunc(output_name="x", internal_shape=("?",))
+def test_internal_shape_2nd_step2(tmp_path: Path) -> None:
+    @pipefunc(output_name="x")
     def g() -> list[int]:
         n = random.randint(1, 10)  # noqa: S311
         return list(range(n))
@@ -153,7 +154,9 @@ def test_internal_shape_2nd_step2() -> None:
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    pipeline.map({}, run_folder=None, parallel=False)
+    pipeline.map({}, run_folder=tmp_path, parallel=False)
+    run_info = RunInfo.load(tmp_path)
+    assert run_info.shapes == {"x": ("?",), "y": ("?",)}
 
 
 def test_first_returns_2d() -> None:
