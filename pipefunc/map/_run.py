@@ -501,9 +501,11 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-    for i, (array, _output) in enumerate(zip(arrays, outputs)):
-        if i == 0 and not array.full_shape_is_resolved:
+    first = True
+    for array, _output in zip(arrays, outputs):
+        if first and not array.full_shape_is_resolved:
             _maybe_set_internal_shape(_output, array)
+            first = False
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -982,17 +984,21 @@ def _output_from_mapspec_task(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
     )
-    for i, (index, outputs) in enumerate(zip(args.missing, outputs_list)):
-        if i == 0:
+    first = True  # micro optimization (instead of doing enumerate)
+    for index, outputs in zip(args.missing, outputs_list):
+        if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
-    for i, index in enumerate(args.existing):
+    first = True
+    for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
-        if i == 0:
+        if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
 
