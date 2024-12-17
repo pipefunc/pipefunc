@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -192,3 +192,42 @@ def test_first_returns_2d_but_1d_internal() -> None:
     assert isinstance(result["y"].store, StorageBase)
     assert (result["y"].store.shape) == (4,)
     assert shape_is_resolved(result["y"].store.full_shape)
+
+
+@pytest.mark.parametrize("internal_dim", [3, "?"])
+def test_dimension_mismatch_bug_with_autogen_axes(internal_dim: int | Literal["?"]) -> None:
+    # Fixes issue in https://github.com/pipefunc/pipefunc/pull/465
+    internal_shapes = {"out1": internal_dim, "selected": internal_dim}
+    jobs = [
+        {"out1": 0, "out2": 0},
+        {"out1": 0, "out2": 0},
+        {"out1": 1, "out2": 1},
+    ]
+
+    @pipefunc(output_name=("out1", "out2"))
+    def split_dicts(jobs) -> tuple[list[str], list[str]]:
+        tuples = [(job["out1"], job["out2"]) for job in jobs]
+        out1, out2 = zip(*tuples)
+        return list(out1), list(out2)
+
+    @pipefunc("selected")
+    def selected(out1) -> list[str]:
+        return out1
+
+    @pipefunc("processed", mapspec="out2[i], selected[i] -> processed[i]")
+    def process(selected, out2):
+        return f"{selected}, {out2}"
+
+    pipeline = Pipeline([split_dicts, selected, process])
+    assert pipeline.mapspecs_as_strings == [
+        "... -> out1[i], out2[i]",
+        "... -> selected[i]",
+        "out2[i], selected[i] -> processed[i]",
+    ]
+    results = pipeline.map(
+        {"jobs": jobs},
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+        storage="dict",
+    )
+    assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]
