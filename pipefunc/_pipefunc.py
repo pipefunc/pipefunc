@@ -760,6 +760,10 @@ class PipeFunc(Generic[T]):
             return dict(zip(self.output_name, get_args(hint)))
         return {name: NoAnnotation for name in self.output_name}
 
+    @functools.cached_property
+    def requires_mapping(self) -> bool:
+        return self.mapspec is not None and bool(self.mapspec.inputs)
+
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
 

@@ -24,7 +24,7 @@ from ._shapes import (
 from ._storage_array._base import StorageBase, get_storage_class
 
 if TYPE_CHECKING:
-    from pipefunc import PipeFunc, Pipeline
+    from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
 
     from ._result import StoreType
@@ -228,10 +228,6 @@ class RunInfo:
                 if not isinstance(name, tuple):
                     _update_shape_in_store(new_shape, store, name)
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
-
-
-def requires_mapping(func: PipeFunc) -> bool:
-    return func.mapspec is not None and bool(func.mapspec.inputs)
 
 
 def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
