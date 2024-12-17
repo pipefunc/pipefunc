@@ -640,15 +640,26 @@ def _mask_fixed_axes(
 ) -> np.flatiter[npt.NDArray[np.bool_]] | None:
     if fixed_indices is None:
         return None
-    if not shape_is_resolved(shape):
-        # In principle it should be possible if the "?" axes are not in the fixed_indices
-        # however, I will implement it when it becomes necessary.
-        msg = "Cannot mask fixed axes for unresolved shapes."
-        raise ValueError(msg)
+
     key = tuple(fixed_indices.get(axis, slice(None)) for axis in mapspec.output_indices)
     external_key = external_shape_from_mask(key, shape_mask)  # type: ignore[arg-type]
     external_shape = external_shape_from_mask(shape, shape_mask)
-    select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)
+
+    # external_shape must always be resolved
+    if not shape_is_resolved(external_shape):
+        unresolved_axes = [
+            mapspec.output_indices[i]
+            for i, dim in enumerate(external_shape)
+            if not isinstance(dim, int)
+        ]
+        msg = (
+            "Cannot mask fixed axes when unresolved dimensions are present in the external shape."
+            f" The following axes are unresolved: {', '.join(unresolved_axes)}"
+        )
+        raise ValueError(msg)
+
+    assert shape_is_resolved(external_shape)
+    select: npt.NDArray[np.bool_] = np.zeros(external_shape, dtype=bool)  # type: ignore[assignment]
     select[external_key] = True
     return select.flat
 

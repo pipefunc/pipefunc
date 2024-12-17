@@ -67,11 +67,13 @@ class StorageBase(abc.ABC):
     @functools.cached_property
     def resolved_shape(self) -> tuple[int, ...]:
         """Return the resolved shape of the array."""
+        # For performance reasons, we assume the shape is resolved
         assert shape_is_resolved(self.shape)
         return self.shape
 
     @functools.cached_property
     def resolved_internal_shape(self) -> tuple[int, ...]:
+        # For performance reasons, we assume the shape is resolved
         assert shape_is_resolved(self.internal_shape)
         return self.internal_shape
 
