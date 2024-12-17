@@ -173,3 +173,22 @@ def test_first_returns_2d() -> None:
     assert isinstance(result["y"].store, StorageBase)
     assert len(result["y"].store.shape) == 2
     assert shape_is_resolved(result["y"].store.full_shape)
+
+
+def test_first_returns_2d_but_1d_internal() -> None:
+    @pipefunc(output_name="x", internal_shape=("?",))
+    def g() -> npt.NDArray[np.int_]:
+        n = 4
+        m = 5
+        return np.arange(n * m).reshape(n, m)
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def h(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([g, h])
+    result = pipeline.map({}, run_folder=None, parallel=False)
+    assert np.all(result["y"].output[0] == (2 * result["x"].output[0]))
+    assert isinstance(result["y"].store, StorageBase)
+    assert (result["y"].store.shape) == (4,)
+    assert shape_is_resolved(result["y"].store.full_shape)
