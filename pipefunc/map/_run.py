@@ -645,7 +645,6 @@ def _mask_fixed_axes(
     external_key = external_shape_from_mask(key, shape_mask)  # type: ignore[arg-type]
     external_shape = external_shape_from_mask(shape, shape_mask)
 
-    # external_shape must always be resolved
     if not shape_is_resolved(external_shape):
         unresolved_axes = [
             mapspec.output_indices[i]
