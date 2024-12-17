@@ -100,3 +100,26 @@ def test_fixed_index_with_internal_shape() -> None:
     result = _mask_fixed_axes(fixed_indices, mapspec, shape, shape_mask)  # type: ignore[arg-type]
     assert isinstance(result, np.flatiter)
     assert list(result) == [False, False, True, False, False]
+
+
+def test_fixed_index_none_slice_resolved_shape() -> None:
+    mapspec = MapSpec((ArraySpec("a", ("i", "j")),), (ArraySpec("b", ("i", "j")),))
+    shape = (5, 10)
+    shape_mask = (True, True)
+    fixed_indices = {"i": 2, "j": slice(None)}  # Explicit slice(None)
+    result = _mask_fixed_axes(fixed_indices, mapspec, shape, shape_mask)  # type: ignore[arg-type]
+    assert isinstance(result, np.flatiter)
+    expected = [False] * 50
+    for j in range(10):
+        expected[2 * 10 + j] = True  # All j indices are True when i is 2
+    assert list(result) == expected
+
+
+def test_fixed_index_with_2d_internal_shape() -> None:
+    mapspec = MapSpec((ArraySpec("a", ("i", None, None)),), (ArraySpec("b", ("i",)),))
+    shape = (5, "?", "?")
+    shape_mask = (True, False, False)
+    fixed_indices = {"i": 2}
+    result = _mask_fixed_axes(fixed_indices, mapspec, shape, shape_mask)  # type: ignore[arg-type]
+    assert isinstance(result, np.flatiter)
+    assert list(result) == [False, False, True, False, False]
