@@ -493,7 +493,6 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-    first: bool = True,
 ) -> None:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
@@ -502,6 +501,7 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
+    first = True
     for array, _output in zip(arrays, outputs):
         if first:
             if not array.full_shape_is_resolved():
@@ -988,6 +988,7 @@ def _output_from_mapspec_task(
     for index, outputs in zip(args.missing, outputs_list):
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
         _update_array(
@@ -998,9 +999,7 @@ def _output_from_mapspec_task(
             index,
             outputs,
             in_post_process=True,
-            first=first,
         )
-        first = False
 
     first = True
     for index in args.existing:
