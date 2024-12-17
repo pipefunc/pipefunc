@@ -36,16 +36,13 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install -e ".[test,all]"
-          # Otherwise, I get:
-          # INTERNALERROR> ModuleNotFoundError: No module named 'pytest_codspeed.instruments.valgrind._wrapper.dist_callgrind_wrapper'
-          pip uninstall -y pytest-timeout
+          # TODO: remove when https://github.com/CodSpeedHQ/pytest-codspeed/issues/59 is fixed
+          micromamba remove -y pytest-timeout
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: |
-            set -ex
-            env
             micromamba run -n pipefunc \
               pytest tests/test_benchmark.py --codspeed
