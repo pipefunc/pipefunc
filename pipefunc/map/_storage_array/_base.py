@@ -54,6 +54,7 @@ class StorageBase(abc.ABC):
     shape_mask: tuple[bool, ...]
     storage_id: str
     requires_serialization: bool
+    _is_resolved: bool = False
 
     @abc.abstractmethod
     def __init__(
@@ -79,7 +80,10 @@ class StorageBase(abc.ABC):
 
     def full_shape_is_resolved(self) -> bool:
         """Return whether the shape is resolved."""
-        return all(isinstance(s, int) for s in self.shape + self.internal_shape)
+        if self._is_resolved:
+            return True
+        self._is_resolved = all(isinstance(s, int) for s in self.shape + self.internal_shape)
+        return self._is_resolved
 
     @abc.abstractmethod
     def get_from_index(self, index: int) -> Any: ...

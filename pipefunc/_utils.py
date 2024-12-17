@@ -9,6 +9,7 @@ import operator
 import socket
 import sys
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
