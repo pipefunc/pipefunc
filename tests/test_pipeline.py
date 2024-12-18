@@ -6,7 +6,7 @@ import importlib.util
 import pickle
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pytest
@@ -872,7 +872,8 @@ def test_double_output_then_iterate_over_single_axis():
     }
 
 
-def test_double_output_then_iterate_over_single_axis_gen_job():
+@pytest.mark.parametrize("dim", [10, "?"])
+def test_double_output_then_iterate_over_single_axis_gen_job(dim: int | Literal["?"]):
     def f1(x, y):
         return list(range(10)), list(range(10))
 
@@ -885,10 +886,10 @@ def test_double_output_then_iterate_over_single_axis_gen_job():
                 f1,
                 ("a", "b"),
                 mapspec="x[i], y[j] -> a[i, j, k], b[i, j, k]",
-                internal_shape=(10,),
+                internal_shape=(dim,),
             ),
             PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
         ],
     )
-    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False)
     assert results["c"].output.shape == (3, 10)
