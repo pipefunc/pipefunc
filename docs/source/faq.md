@@ -1169,6 +1169,51 @@ assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `coll
 pipeline.visualize(backend="graphviz")
 ```
 
+## `PipeFunc` that returns multiple things with different sizes?
+
+WIP. Not possilbe but a workaround exists.
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Status:
+    complete: list[int]
+    incomplete: list[int]
+
+@pipefunc("status")
+def get_status(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
+    return Status(mock_complete, mock_incomplete)
+
+@pipefunc("incomplete")
+def get_incomplete(status: Status) -> list[int]:
+    return status.incomplete
+
+@pipefunc("completed")
+def get_complete(status: Status) -> list[int]:
+    return status.complete
+
+@pipefunc("loaded", mapspec="complete[i] -> loaded[i]")
+def load_complete(completed: int) -> int:
+    # Pretend we loaded something
+    return completed
+
+@pipefunc("executed", mapspec="incomplete[i] -> executed[i]")
+def run_incomplete(incomplete: int) -> int:
+    # Pretend we executed something
+    return incomplete
+
+@pipefunc("result")
+def combine(completed: list[int], loaded: Array[int]) -> list[int]:
+    return completed + list(loaded)
+
+pipeline = Pipeline([get_status, get_incomplete, get_complete, load_complete, run_incomplete, combine])
+result = pipeline.map(
+    {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
+    internal_shapes={"incomplete": ("?",)},
+)
+```
+
 ## Parameter Sweeps
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
