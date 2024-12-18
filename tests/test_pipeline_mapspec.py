@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from concurrent.futures import Executor
+from typing import Literal
 
 import pytest
 
@@ -319,7 +320,8 @@ def test_mapping_over_default() -> None:
     assert r_map["out"].output.tolist() == [2, 4, 6]
 
 
-def test_calling_add_with_autogen_mapspec():
+@pytest.mark.parametrize("dim", [3, "?"])
+def test_calling_add_with_autogen_mapspec(dim: int | Literal["?"]):
     def foo(vector):
         return vector
 
@@ -339,7 +341,7 @@ def test_calling_add_with_autogen_mapspec():
 
     results = pipeline.map(
         inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
-        internal_shapes={"foo_out": (3,)},
+        internal_shapes={"foo_out": (dim,)},
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
 
