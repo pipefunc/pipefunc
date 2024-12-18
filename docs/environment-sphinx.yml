@@ -41,6 +41,7 @@ dependencies:
   - sphinx-notfound-page
   - sphinx-togglebutton
   - sphinx
+  - jupyterlite-sphinx
   - versioningit
   - nltk
   - scikit-image
