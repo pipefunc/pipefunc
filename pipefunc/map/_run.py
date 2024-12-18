@@ -501,12 +501,10 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-    first = True
+
     for array, _output in zip(arrays, outputs):
-        if first:
-            if not array.full_shape_is_resolved():
-                _maybe_set_internal_shape(_output, array)
-            first = False
+        if not array.full_shape_is_resolved():
+            _maybe_set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
