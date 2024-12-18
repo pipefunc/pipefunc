@@ -5,6 +5,7 @@
 import os
 import shutil
 import sys
+import textwrap
 from pathlib import Path
 
 package_path = Path("../..").resolve()
@@ -42,6 +43,7 @@ extensions = [
     "sphinx_togglebutton",
     "sphinx_copybutton",
     "notfound.extension",
+    "jupyterlite_sphinx",
 ]
 
 templates_path = ["_templates"]
@@ -81,6 +83,10 @@ myst_enable_extensions = [
     "html_admonition",
     "colon_fence",
 ]
+
+# Jupyterlite configuration
+jupyterlite_contents = ["notebooks/"]
+
 html_theme_options = {
     "show_toc_level": 2,
     "repository_url": "https://github.com/pipefunc/pipefunc",
@@ -196,18 +202,54 @@ def process_readme_for_sphinx_docs(readme_path: Path, docs_path: Path) -> None:
     change_alerts_to_admonitions(output_file, output_file)
 
 
+def insert_jupyterlite_dropdown(nb_md: Path) -> None:
+    text = textwrap.dedent(
+        """
+        ```{eval-rst}
+        .. dropdown:: 🧑‍🔬 This notebook can be executed online. Click this section to try it out! ✨
+            :color: success
+            .. notebooklite:: notebooks/tutorial.ipynb
+            :width: 100%
+            :height: 600px
+            :prompt: Open notebook
+        .. dropdown:: Download this notebook
+            :color: info
+            :open:
+            Please use the following links to download this notebook in various formats:
+            1. :download:`Download IPyNB (IPython Notebook) <notebooks/tutorial.ipynb>`
+            2. :download:`Download Markdown Notebook (Jupytext) <notebooks/tutorial.md>`
+        ```
+        """,
+    )
+    with nb_md.open("r") as f:
+        content = f.read()
+    with nb_md.open("w") as f:
+        lines = content.splitlines(keepends=True)
+        for i, line in enumerate(lines):
+            if line.startswith("---") and i > 0:
+                lines.insert(i + 1, text)
+                break
+        f.writelines(lines)
+
+
 # Process the README.md file for Sphinx documentation
 readme_path = package_path / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
 
 # Add the example notebook to the docs
 nb = package_path / "example.ipynb"
-convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
+nb_md = docs_path / "source" / "tutorial.md"
+convert_notebook_to_md(nb, nb_md)
 
 # Copy nb to docs/source/notebooks
 nb_docs_folder = docs_path / "source" / "notebooks"
 nb_docs_folder.mkdir(exist_ok=True)
-shutil.copy(nb, nb_docs_folder)
+shutil.copy(nb, nb_docs_folder / "tutorial.ipynb")
+# Copy md notebook before adding dropdown
+shutil.copy(nb_md, nb_docs_folder / "tutorial.md")
+
+# Add a dropdown to the tutorial.md file
+insert_jupyterlite_dropdown(nb_md)
 
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
