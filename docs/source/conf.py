@@ -244,9 +244,9 @@ convert_notebook_to_md(nb, nb_md)
 # Copy nb to docs/source/notebooks
 nb_docs_folder = docs_path / "source" / "notebooks"
 nb_docs_folder.mkdir(exist_ok=True)
-shutil.copy(nb, nb_docs_folder / "tutorial.md")
+shutil.copy(nb, nb_docs_folder / "tutorial.ipynb")
 # Copy md notebook before adding dropdown
-shutil.copy(nb_md, nb_docs_folder / "tutorial.ipynb")
+shutil.copy(nb_md, nb_docs_folder / "tutorial.md")
 
 # Add a dropdown to the tutorial.md file
 insert_jupyterlite_dropdown(nb_md)
