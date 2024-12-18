@@ -939,6 +939,7 @@ def test_pipeline_map_zero_size() -> None:
     assert result["result"].output == [0, 1, 2, 3]
 
     # Now with empty incomplete
+    # NOTE: Hits the `not args.missing and not args.existing` edge case
     result = pipeline.map(
         {"mock_complete": [0, 1, 2, 3], "mock_incomplete": []},
         internal_shapes={"incomplete": ("?",)},
