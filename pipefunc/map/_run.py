@@ -1003,6 +1003,8 @@ def _output_from_mapspec_task(
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
 
+    if not args.missing and not args.existing:  # shape variable does not exist
+        shape = args.arrays[0].full_shape
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
