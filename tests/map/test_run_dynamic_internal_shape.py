@@ -195,8 +195,13 @@ def test_first_returns_2d_but_1d_internal() -> None:
 
 
 @pytest.mark.parametrize("internal_dim", [3, "?"])
-def test_dimension_mismatch_bug_with_autogen_axes(internal_dim: int | Literal["?"]) -> None:
+@pytest.mark.parametrize("order", ["selected[i], out2[i]", "out2[i], selected[i]"])
+def test_dimension_mismatch_bug_with_autogen_axes(
+    internal_dim: int | Literal["?"],
+    order: str,
+) -> None:
     # Fixes issue in https://github.com/pipefunc/pipefunc/pull/465
+    # and afterwards https://github.com/pipefunc/pipefunc/pull/466
     internal_shapes = {"out1": internal_dim, "selected": internal_dim}
     jobs = [
         {"out1": 0, "out2": 0},
@@ -214,7 +219,7 @@ def test_dimension_mismatch_bug_with_autogen_axes(internal_dim: int | Literal["?
     def selected(out1) -> list[str]:
         return out1
 
-    @pipefunc("processed", mapspec="out2[i], selected[i] -> processed[i]")
+    @pipefunc("processed", mapspec=f"{order} -> processed[i]")
     def process(selected, out2):
         return f"{selected}, {out2}"
 
@@ -222,7 +227,7 @@ def test_dimension_mismatch_bug_with_autogen_axes(internal_dim: int | Literal["?
     assert pipeline.mapspecs_as_strings == [
         "... -> out1[i], out2[i]",
         "... -> selected[i]",
-        "out2[i], selected[i] -> processed[i]",
+        f"{order} -> processed[i]",
     ]
     results = pipeline.map(
         {"jobs": jobs},
