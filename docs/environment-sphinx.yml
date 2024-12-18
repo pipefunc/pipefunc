@@ -42,6 +42,7 @@ dependencies:
   - sphinx-togglebutton
   - sphinx
   - jupyterlite-sphinx
+  - jupyterlite-xeus
   - versioningit
   - nltk
   - scikit-image
