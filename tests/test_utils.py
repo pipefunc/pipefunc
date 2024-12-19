@@ -97,7 +97,7 @@ def test_cache_invalidation_on_file_size_change(tmp_path, modify_size):
     assert _cached_load.cache_info().misses == 2
 
 
-def test_format_args_empty():
+def test_format_args_empty() -> None:
     assert format_args(()) == ""
     assert format_args((42,)) == "42"
     assert format_args((42, "hello", [1, 2, 3])) == "42, 'hello', [1, 2, 3]"
@@ -125,7 +125,7 @@ class CustomObject:
         return False
 
 
-def test_is_equal_dict():
+def test_is_equal_dict() -> None:
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
     assert _is_equal(d1, d2)
@@ -138,7 +138,7 @@ def test_is_equal_dict():
     assert not equal_dicts({"a": [1]}, {"b": (1,)}, verbose=True)
 
 
-def test_is_equal_numpy_array():
+def test_is_equal_numpy_array() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([1, 2, 3])
     assert _is_equal(a1, a2)
@@ -151,7 +151,7 @@ def test_is_equal_numpy_array():
     assert _is_equal(a4, a5)
 
 
-def test_is_equal_set():
+def test_is_equal_set() -> None:
     s1 = {1, 2, 3}
     s2 = {1, 2, 3}
     assert _is_equal(s1, s2)
@@ -160,7 +160,7 @@ def test_is_equal_set():
     assert not _is_equal(s1, s3)
 
 
-def test_is_equal_list_and_tuple():
+def test_is_equal_list_and_tuple() -> None:
     assert not _is_equal([1, 2, 3], (1, 2, 3))
     assert _is_equal([1, 2, 3], [1, 2, 3])
     assert not _is_equal([1, 2, 3], [1, 2, 4])
@@ -168,13 +168,13 @@ def test_is_equal_list_and_tuple():
     assert not _is_equal([1], [1, 2])
 
 
-def test_is_equal_float():
+def test_is_equal_float() -> None:
     assert _is_equal(1.0, 1.0)
     assert _is_equal(1.0, 1.0000000001)
     assert not _is_equal(1.0, 1.1)
 
 
-def test_is_equal_custom_object():
+def test_is_equal_custom_object() -> None:
     obj1 = CustomObject(1)
     obj2 = CustomObject(1)
     assert _is_equal(obj1, obj2)
@@ -183,21 +183,21 @@ def test_is_equal_custom_object():
     assert not _is_equal(obj1, obj3)
 
 
-def test_is_equal_iterable():
+def test_is_equal_iterable() -> None:
     assert _is_equal([1, 2, 3], [1, 2, 3])
     assert not _is_equal([1, 2, 3], [1, 2, 4])
     assert _is_equal((1, 2, 3), (1, 2, 3))
     assert not _is_equal((1, 2, 3), (1, 2, 4))
 
 
-def test_is_equal_other_types():
+def test_is_equal_other_types() -> None:
     assert _is_equal(1, 1)
     assert not _is_equal(1, 2)
     assert _is_equal("abc", "abc")
     assert not _is_equal("abc", "def")
 
 
-def test_equal_dicts():
+def test_equal_dicts() -> None:
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
     assert equal_dicts(d1, d2, verbose=True)
@@ -239,7 +239,7 @@ def test_requires() -> None:
         requires("package_name_missing_for_sure", reason="testing", extras="test")
 
 
-def test_is_min_version():
+def test_is_min_version() -> None:
     # Basic version checks
     assert is_min_version("numpy", "1.0.0")
     assert not is_min_version("pipefunc", "999.0.0")
@@ -256,12 +256,12 @@ def test_is_min_version():
     assert not is_min_version("numpy", f"{major+1}.{minor}.{patch}")
 
 
-def function_that_raises_empty_args():
+def function_that_raises_empty_args() -> None:
     # Some exceptions can be raised with no arguments
     raise ValueError
 
 
-def test_handle_error_empty_args(capsys):
+def test_handle_error_empty_args() -> None:
     # We use a context manager to ensure the exception is raised
     with pytest.raises(ValueError) as exc_info:  # noqa: PT011, PT012
         try:
@@ -278,7 +278,7 @@ def test_handle_error_empty_args(capsys):
     assert func_name in error_message or func_name in exc_info.value.__notes__[0]
 
 
-def test_handle_error_with_args():
+def test_handle_error_with_args() -> None:
     original_message = "Original error message"
     with pytest.raises(ValueError) as exc_info:  # noqa: PT011, PT012
         try:

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_rich = importlib.util.find_spec("rich") is not None
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -137,13 +138,33 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
         "e": ("a", "b", "x", "xx"),
     }
 
-    assert pipeline.info == {
+
+@pytest.mark.skipif(not has_rich, reason="rich not installed")
+def test_pipeline_info(capsys: pytest.CaptureFixture) -> None:
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, xx):
+        return b * c * xx
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3])
+
+    assert pipeline.info() == {
         "inputs": ("a", "b", "x", "xx"),
         "outputs": ("e",),
         "intermediate_outputs": ("c", "d"),
         "required_inputs": ("a", "b", "xx"),
         "optional_inputs": ("x",),
     }
+    pipeline.info(print_table=True)
+    captured = capsys.readouterr()
+    assert "Pipeline Info" in captured.out
 
 
 def test_disjoint_pipelines() -> None:
