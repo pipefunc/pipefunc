@@ -170,7 +170,7 @@ class MapSpec:
 
         """
         input_names = set(self.input_names)
-        _validate_shapes(input_names, input_shapes, self.inputs)
+        _validate_shapes(input_names, input_shapes, self.inputs, internal_shapes, self.output_names)
 
         internal_shapes = internal_shapes or {}
         shape: list[int | Literal["?"]] = []
@@ -436,6 +436,8 @@ def _validate_shapes(
     input_names: set[str],
     input_shapes: ShapeDict,
     inputs: tuple[ArraySpec, ...],
+    internal_shapes: ShapeDict | None,
+    output_names: tuple[str, ...],
 ) -> None:
     if extra_names := input_shapes.keys() - input_names:
         msg = f"Got extra array {extra_names} that are not accepted by this map."
@@ -445,6 +447,11 @@ def _validate_shapes(
         raise ValueError(msg)
     for x in inputs:
         x.validate(input_shapes[x.name])
+    if internal_shapes:
+        for output_name in internal_shapes:
+            if output_name not in output_names:
+                msg = f"Internal shape of `{output_name}` is not accepted by this map."
+                raise ValueError(msg)
 
 
 def _get_common_dim(
@@ -473,6 +480,10 @@ def _get_output_dim(
     internal_shape_index: int,
 ) -> int | Literal["?"]:
     if output.name in internal_shapes:
+        if internal_shape_index >= len(internal_shapes[output.name]):
+            msg = f"Internal shape for '{output.name}' is too short."
+            raise ValueError(msg)
+
         dim = internal_shapes[output.name][internal_shape_index]
         if not (isinstance(dim, int) or dim == "?"):
             msg = f"Internal shape for '{output.name}' must be a tuple of integers or '?'."
