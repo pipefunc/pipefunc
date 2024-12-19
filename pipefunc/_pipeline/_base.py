@@ -194,7 +194,7 @@ class Pipeline:
         Parameters
         ----------
         print_table
-            Whether to print a rich-formatted table to the console.
+            Whether to print a rich-formatted table to the console. Requires the `rich` package.
 
         Returns
         -------
