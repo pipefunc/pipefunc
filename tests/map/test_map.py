@@ -329,9 +329,6 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
 
-    with pytest.raises(ValueError, match="Internal shape for 'x' is missing."):
-        map_shapes(pipeline, inputs)
-
     with pytest.raises(
         RuntimeError,
         match="Use `Pipeline.map` instead",

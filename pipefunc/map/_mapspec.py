@@ -479,17 +479,17 @@ def _get_output_dim(
     internal_shapes: ShapeDict,
     internal_shape_index: int,
 ) -> int | Literal["?"]:
-    if output.name not in internal_shapes:
-        msg = f"Internal shape for '{output.name}' is missing."
-        raise ValueError(msg)
-    if internal_shape_index >= len(internal_shapes[output.name]):
-        msg = f"Internal shape for '{output.name}' is too short."
-        raise ValueError(msg)
-    dim = internal_shapes[output.name][internal_shape_index]
-    if not (isinstance(dim, int) or dim == "?"):
-        msg = f"Internal shape for '{output.name}' must be a tuple of integers or '?'."
-        raise TypeError(msg)
-    return dim
+    if output.name in internal_shapes:
+        if internal_shape_index >= len(internal_shapes[output.name]):
+            msg = f"Internal shape for '{output.name}' is too short."
+            raise ValueError(msg)
+        dim = internal_shapes[output.name][internal_shape_index]
+        if not (isinstance(dim, int) or dim == "?"):
+            msg = f"Internal shape for '{output.name}' must be a tuple of integers or '?'."
+            raise TypeError(msg)
+        return dim
+    # Infer that the dimension is unknown
+    return "?"
 
 
 def _trace_dependencies(

@@ -11,6 +11,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map._load import load_outputs
+from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.map._storage_array._base import StorageBase
 from pipefunc.typing import Array  # noqa: TC001
@@ -21,12 +22,13 @@ if TYPE_CHECKING:
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
-def test_dynamic_internal_shape(tmp_path: Path) -> None:
+@pytest.mark.parametrize("dim", ["?", None])
+def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> None:
     @pipefunc(output_name="n")
     def f() -> int:
         return 4
 
-    @pipefunc(output_name="x", internal_shape=("?",))
+    @pipefunc(output_name="x", internal_shape=dim)
     def g(n: int) -> list[int]:
         return list(range(n))
 
@@ -95,7 +97,8 @@ def test_2d_internal_shape_non_dynamic() -> None:
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
-def test_2d_internal_shape(tmp_path: Path) -> None:
+@pytest.mark.parametrize("dim", ["?", None])
+def test_2d_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> None:
     counters = {"f": 0, "g": 0, "h": 0}
 
     @pipefunc(output_name="n")
@@ -103,7 +106,7 @@ def test_2d_internal_shape(tmp_path: Path) -> None:
         counters["f"] += 1
         return 4 + a
 
-    @pipefunc(output_name="x", internal_shape=("?",))
+    @pipefunc(output_name="x", internal_shape=dim)
     def g(n: int) -> list[int]:
         counters["g"] += 1
         return list(range(n))
@@ -139,8 +142,9 @@ def test_2d_internal_shape(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
-def test_internal_shape_2nd_step() -> None:
-    @pipefunc(output_name="x", internal_shape=("?",))
+@pytest.mark.parametrize("dim", ["?", None])
+def test_internal_shape_2nd_step(dim: Literal["?"] | None) -> None:
+    @pipefunc(output_name="x", internal_shape=dim)
     def g() -> list[int]:
         n = random.randint(1, 10)  # noqa: S311
         return list(range(n))
@@ -153,8 +157,9 @@ def test_internal_shape_2nd_step() -> None:
     pipeline.map({}, run_folder=None, parallel=False, show_progress=True)
 
 
-def test_internal_shape_2nd_step2() -> None:
-    @pipefunc(output_name="x", internal_shape=("?",))
+@pytest.mark.parametrize("dim", ["?", None])
+def test_internal_shape_2nd_step2(tmp_path: Path, dim: Literal["?"] | None) -> None:
+    @pipefunc(output_name="x", internal_shape=dim)
     def g() -> list[int]:
         n = random.randint(1, 10)  # noqa: S311
         return list(range(n))
@@ -164,11 +169,14 @@ def test_internal_shape_2nd_step2() -> None:
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    pipeline.map({}, run_folder=None, parallel=False)
+    pipeline.map({}, run_folder=tmp_path, parallel=False)
+    run_info = RunInfo.load(tmp_path)
+    assert run_info.shapes == {"x": ("?",), "y": ("?",)}
 
 
-def test_first_returns_2d() -> None:
-    @pipefunc(output_name="x", internal_shape=("?", "?"))
+@pytest.mark.parametrize("internal_shape", [("?", "?"), None])
+def test_first_returns_2d(internal_shape: tuple | None) -> None:
+    @pipefunc(output_name="x", internal_shape=internal_shape)
     def g() -> npt.NDArray[np.int_]:
         n = random.randint(1, 10)  # noqa: S311
         m = random.randint(1, 10)  # noqa: S311
@@ -186,8 +194,9 @@ def test_first_returns_2d() -> None:
     assert shape_is_resolved(result["y"].store.full_shape)
 
 
-def test_first_returns_2d_but_1d_internal() -> None:
-    @pipefunc(output_name="x", internal_shape=("?",))
+@pytest.mark.parametrize("dim", ["?", None])
+def test_first_returns_2d_but_1d_internal(dim: Literal["?"] | None) -> None:
+    @pipefunc(output_name="x", internal_shape=dim)
     def g() -> npt.NDArray[np.int_]:
         n = 4
         m = random.randint(1, 10)  # noqa: S311
@@ -205,15 +214,15 @@ def test_first_returns_2d_but_1d_internal() -> None:
     assert shape_is_resolved(result["y"].store.full_shape)
 
 
-@pytest.mark.parametrize("internal_dim", [3, "?"])
+@pytest.mark.parametrize("dim", [3, "?", None])
 @pytest.mark.parametrize("order", ["selected[i], out2[i]", "out2[i], selected[i]"])
 def test_dimension_mismatch_bug_with_autogen_axes(
-    internal_dim: int | Literal["?"],
+    dim: int | Literal["?"],
     order: str,
 ) -> None:
     # Fixes issue in https://github.com/pipefunc/pipefunc/pull/465
     # and afterwards https://github.com/pipefunc/pipefunc/pull/466
-    internal_shapes = {"out1": internal_dim, "selected": internal_dim}
+    internal_shapes = {"out1": dim, "selected": dim} if dim is not None else None
     jobs = [
         {"out1": 0, "out2": 0},
         {"out1": 0, "out2": 0},
