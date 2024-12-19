@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import random
 import re
 from typing import TYPE_CHECKING, Literal
@@ -16,6 +17,8 @@ from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_dynamic_internal_shape(tmp_path: Path) -> None:
@@ -91,6 +94,7 @@ def test_2d_internal_shape_non_dynamic() -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_2d_internal_shape(tmp_path: Path) -> None:
     counters = {"f": 0, "g": 0, "h": 0}
 
@@ -124,10 +128,17 @@ def test_2d_internal_shape(tmp_path: Path) -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
     before = counters.copy()
     # Should use existing results
-    _ = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False, cleanup=False)
+    _ = pipeline.map(
+        {"a": [0, 0]},
+        run_folder=tmp_path,
+        parallel=False,
+        cleanup=False,
+        show_progress=True,
+    )
     assert before == counters
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_internal_shape_2nd_step() -> None:
     @pipefunc(output_name="x", internal_shape=("?",))
     def g() -> list[int]:
@@ -139,7 +150,7 @@ def test_internal_shape_2nd_step() -> None:
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    pipeline.map({}, run_folder=None, parallel=False)
+    pipeline.map({}, run_folder=None, parallel=False, show_progress=True)
 
 
 def test_internal_shape_2nd_step2() -> None:
