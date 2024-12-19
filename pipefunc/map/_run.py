@@ -611,6 +611,7 @@ def _prepare_submit_map_spec(
     run_info: RunInfo,
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
+    status: Status | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -629,7 +630,9 @@ def _prepare_submit_map_spec(
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
-    return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
+    args = _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
+    _update_status_if_needed(status, args)
+    return args
 
 
 def _mask_fixed_axes(
@@ -696,7 +699,6 @@ def _maybe_parallel_map(
         return [_submit(process_index, ex, status, progress, i) for i in indices]
     if status is not None:
         assert progress is not None
-        _update_status_if_needed(status, indices)
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
     return [process_index(i) for i in indices]
 
@@ -930,7 +932,7 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
@@ -938,9 +940,9 @@ def _submit_func(
     return _KwargsTask(kwargs, task)
 
 
-def _update_status_if_needed(status: Status | None, missing: list[int]) -> None:
+def _update_status_if_needed(status: Status | None, args: _MapSpecArgs) -> None:
     if status is not None and status.n_total is None:
-        status.n_total = len(missing)
+        status.n_total = len(args.missing) + len(args.existing)
 
 
 def _executor_for_func(
