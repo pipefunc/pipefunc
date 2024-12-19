@@ -132,7 +132,7 @@ See the detailed usage example and more in our [example.ipynb](https://github.co
 
 > [!TIP]
 > Have [`uv` installed](https://docs.astral.sh/uv/)?
-> Run `uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/example.ipynb` to open the example notebook in your browser without the need to setup anything!
+> Run `uvx --with "pipefunc[docs]" -p 3.13 opennb pipefunc/pipefunc/example.ipynb` to open the example notebook in your browser without the need to setup anything!
 
 ## :computer: Installation
 
