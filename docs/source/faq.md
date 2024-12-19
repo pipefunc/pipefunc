@@ -1169,6 +1169,94 @@ assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `coll
 pipeline.visualize(backend="graphviz")
 ```
 
+## `PipeFunc`s with Multiple Outputs of Different Shapes
+
+**Question:** How can I use `PipeFunc` to return multiple outputs with different shapes when using `mapspec`?  It seems like `mapspec` requires all outputs to have the same dimensions.
+
+**Answer:**
+
+You're correct that `pipefunc` currently has a limitation where multiple outputs within a single `PipeFunc` using `mapspec` must share the same indices and therefore the same shape.
+In the future we might remove this requirement.
+
+**Workaround:**
+
+The recommended solution is to encapsulate your multiple outputs within a single container object (like a `dataclass`, `NamedTuple`, or even a dictionary) and return that container from your `PipeFunc`. Then, create separate `PipeFunc`s that extract the individual outputs from the container.
+
+**Example:**
+
+Let's say you have a function that processes some data and needs to return two lists, "complete" and "incomplete", which will likely have different lengths. Here's how you can structure it using a `dataclass` and subsequent functions to access each list:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from pipefunc import Pipeline, pipefunc
+from pipefunc.typing import Array
+
+@dataclass
+class Status:
+    complete: list[int]
+    incomplete: list[int]
+
+@pipefunc("status")
+def get_status(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
+    return Status(mock_complete, mock_incomplete)
+
+@pipefunc("incomplete")
+def get_incomplete(status: Status) -> list[int]:
+    return status.incomplete
+
+@pipefunc("complete")
+def get_complete(status: Status) -> list[int]:
+    return status.complete
+
+@pipefunc("loaded", mapspec="complete[i] -> loaded[i]")
+def load_complete(complete: int) -> int:
+    # Pretend we loaded something
+    return complete
+
+@pipefunc("executed", mapspec="incomplete[j] -> executed[j]")
+def run_incomplete(incomplete: int) -> int:
+    # Pretend we executed something
+    return incomplete
+
+@pipefunc("result")
+def combine(loaded: Array[int], executed: Array[int]) -> list[int]:
+    return list(loaded) + list(executed)
+
+pipeline = Pipeline(
+    [
+        get_status,
+        get_incomplete,
+        get_complete,
+        load_complete,
+        run_incomplete,
+        combine,
+    ]
+)
+result = pipeline.map(
+    {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
+    internal_shapes={"incomplete": ("?",), "complete": ("?",)},
+    parallel=False,
+)
+
+print(result["result"].output)
+```
+
+**Explanation:**
+
+1. **`Status` Dataclass:** We define a `Status` dataclass to hold the `complete` and `incomplete` lists as a single object.
+2. **`get_status` Function:** This function now returns a `Status` object. Because it does not have a `mapspec` it will only run once.
+3. **`get_incomplete` and `get_complete` Functions:** These helper functions extract the individual lists from the `Status` object.
+4. **`load_complete` and `run_incomplete` Functions:** These functions can now use `mapspec` to iterate over the `complete` and `incomplete` lists, respectively.
+5. **`combine` Function:** This function now takes `completed` and `executed` and combines them with the `complete` list.
+6. **`pipeline.map`:** We call `pipeline.map` as before, but now we only need to specify the `internal_shapes` of the lists, not the shape of the status. The `internal_shapes` argument is only needed when you return a list, and it cannot be inferred from the inputs.
+
+This pattern provides a clean and manageable way to work with functions that logically produce multiple outputs of varying shapes within the current capabilities of `pipefunc`.
+
 ## Parameter Sweeps
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.

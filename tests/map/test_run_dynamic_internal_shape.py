@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 import random
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -17,6 +18,8 @@ from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_dynamic_internal_shape(tmp_path: Path) -> None:
@@ -92,6 +95,7 @@ def test_2d_internal_shape_non_dynamic() -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_2d_internal_shape(tmp_path: Path) -> None:
     counters = {"f": 0, "g": 0, "h": 0}
 
@@ -125,10 +129,17 @@ def test_2d_internal_shape(tmp_path: Path) -> None:
     assert results["y"].output.tolist() == [[0, 0], [2, 2], [4, 4], [6, 6]]
     before = counters.copy()
     # Should use existing results
-    _ = pipeline.map({"a": [0, 0]}, run_folder=tmp_path, parallel=False, cleanup=False)
+    _ = pipeline.map(
+        {"a": [0, 0]},
+        run_folder=tmp_path,
+        parallel=False,
+        cleanup=False,
+        show_progress=True,
+    )
     assert before == counters
 
 
+@pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 def test_internal_shape_2nd_step() -> None:
     @pipefunc(output_name="x", internal_shape=("?",))
     def g() -> list[int]:
@@ -140,7 +151,7 @@ def test_internal_shape_2nd_step() -> None:
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    pipeline.map({}, run_folder=None, parallel=False)
+    pipeline.map({}, run_folder=None, parallel=False, show_progress=True)
 
 
 def test_internal_shape_2nd_step2(tmp_path: Path) -> None:
@@ -195,3 +206,47 @@ def test_first_returns_2d_but_1d_internal() -> None:
     assert isinstance(result["y"].store, StorageBase)
     assert (result["y"].store.shape) == (4,)
     assert shape_is_resolved(result["y"].store.full_shape)
+
+
+@pytest.mark.parametrize("internal_dim", [3, "?"])
+@pytest.mark.parametrize("order", ["selected[i], out2[i]", "out2[i], selected[i]"])
+def test_dimension_mismatch_bug_with_autogen_axes(
+    internal_dim: int | Literal["?"],
+    order: str,
+) -> None:
+    # Fixes issue in https://github.com/pipefunc/pipefunc/pull/465
+    # and afterwards https://github.com/pipefunc/pipefunc/pull/466
+    internal_shapes = {"out1": internal_dim, "selected": internal_dim}
+    jobs = [
+        {"out1": 0, "out2": 0},
+        {"out1": 0, "out2": 0},
+        {"out1": 1, "out2": 1},
+    ]
+
+    @pipefunc(output_name=("out1", "out2"))
+    def split_dicts(jobs) -> tuple[list[str], list[str]]:
+        tuples = [(job["out1"], job["out2"]) for job in jobs]
+        out1, out2 = zip(*tuples)
+        return list(out1), list(out2)
+
+    @pipefunc("selected")
+    def selected(out1) -> list[str]:
+        return out1
+
+    @pipefunc("processed", mapspec=f"{order} -> processed[i]")
+    def process(selected, out2):
+        return f"{selected}, {out2}"
+
+    pipeline = Pipeline([split_dicts, selected, process])
+    assert pipeline.mapspecs_as_strings == [
+        "... -> out1[i], out2[i]",
+        "... -> selected[i]",
+        f"{order} -> processed[i]",
+    ]
+    results = pipeline.map(
+        {"jobs": jobs},
+        internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+        storage="dict",
+    )
+    assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]

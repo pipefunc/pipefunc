@@ -501,12 +501,10 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-    first = True
+
     for array, _output in zip(arrays, outputs):
-        if first:
-            if not array.full_shape_is_resolved():
-                _maybe_set_internal_shape(_output, array)
-            first = False
+        if not array.full_shape_is_resolved():
+            _maybe_set_internal_shape(_output, array)
         if force_dump or (array.dump_in_subprocess != in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
@@ -613,6 +611,7 @@ def _prepare_submit_map_spec(
     run_info: RunInfo,
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
+    status: Status | None,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -631,6 +630,7 @@ def _prepare_submit_map_spec(
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
+    _update_status_if_needed(status, existing, missing)
     return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
 
 
@@ -887,8 +887,7 @@ def _update_shape_using_result(
     if "?" in shape:
         mapspec = func.mapspec
         assert mapspec is not None
-        internal_shape_dim = len(mapspec.output_indices) - len(mapspec.input_indices)
-        internal_shape = np.shape(output)[:internal_shape_dim]
+        internal_shape = internal_shape_from_mask(np.shape(output), run_info.shape_masks[name])
         run_info.resolve_downstream_shapes(store, {name: internal_shape})
 
 
@@ -932,12 +931,21 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
         task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _update_status_if_needed(
+    status: Status | None,
+    existing: list[int],
+    missing: list[int],
+) -> None:
+    if status is not None and status.n_total is None:
+        status.n_total = len(missing) + len(existing)
 
 
 def _executor_for_func(
@@ -1003,6 +1011,8 @@ def _output_from_mapspec_task(
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
 
+    if not args.missing and not args.existing:  # shape variable does not exist
+        shape = args.arrays[0].full_shape
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 

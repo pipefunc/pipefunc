@@ -456,7 +456,10 @@ def _get_common_dim(
         axis = array.axes.index(index)
         return input_shapes[array.name][axis]
 
-    dim, *rest = (_get_dim(x, index) for x in arrays)
+    dims = [dim for x in arrays if (dim := _get_dim(x, index)) != "?"]
+    if not dims:
+        return "?"
+    dim, *rest = dims
     if any(dim != x for x in rest):
         arrs = ", ".join(x.name for x in arrays)
         msg = f"Dimension mismatch for arrays `{arrs}` along `{index}` axis."
