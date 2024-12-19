@@ -9,8 +9,7 @@ LABEL maintainer="Bas Nijholt <bas@nijho.lt>"
 # hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    # For OpenCV etc...
-    libgl1 graphviz \
+    graphviz \
     # To remove the image size, it is recommended refresh the package cache as follows
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
