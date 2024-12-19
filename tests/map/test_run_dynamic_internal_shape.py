@@ -145,7 +145,7 @@ def test_internal_shape_2nd_step() -> None:
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    pipeline.map({}, run_folder=None, parallel=False)
+    pipeline.map({}, run_folder=None, parallel=False, show_progress=True)
 
 
 def test_internal_shape_2nd_step2() -> None:
