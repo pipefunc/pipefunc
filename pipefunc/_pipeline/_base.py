@@ -28,6 +28,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_installed,
     is_running_in_ipynb,
     requires,
 )
@@ -68,6 +69,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
     import ipywidgets
+    from rich.table import Table
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
@@ -234,20 +236,7 @@ class Pipeline:
         }
         if not print_table:
             return info
-        requires("rich", reason="print_table=True", extras="rich")
-        import rich
-        from rich.table import Table
-
-        table = Table(title="Pipeline Info", box=rich.box.DOUBLE)
-        table.add_column("Category", style="dim", width=20)
-        table.add_column("Items")
-
-        for category, items in info.items():
-            styles = {"required_inputs": "bold green", "optional_inputs": "bold yellow"}
-            table.add_row(category, ", ".join(items), style=styles.get(category))
-
-        console = rich.get_console()
-        console.print(table)
+        _ = _rich_info_table(info, prints=True)
         return None
 
     @property
@@ -1371,14 +1360,6 @@ class Pipeline:
             Create a directed graph using HoloViews (``backend="holoviews"``).
 
         """
-
-        def is_installed(name: str) -> bool:
-            try:
-                __import__(name)
-                return True  # noqa: TRY300
-            except ImportError:  # pragma: no cover
-                return False
-
         if backend is None:  # pragma: no cover
             if os.getenv("READTHEDOCS") is not None:
                 # Set a default visualization backend in the docs
@@ -1946,6 +1927,20 @@ class Pipeline:
 
         return pipeline
 
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:  # pragma: no cover
+        """Display the pipeline widget."""
+        if is_running_in_ipynb() and is_installed("rich"):
+            info = self.info()
+            assert isinstance(info, dict)
+            table = _rich_info_table(info)
+            return table._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
+
 
 class Generations(NamedTuple):
     root_args: list[str]
@@ -2206,3 +2201,21 @@ class _PipelineInternalCache:
     root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
     func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+
+
+def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
+    """Create a rich table from a dictionary of information."""
+    requires("rich", reason="print_table=True", extras="rich")
+    import rich.table
+
+    table = rich.table.Table(title="Pipeline Info", box=rich.box.DOUBLE)
+    table.add_column("Category", style="dim", width=20)
+    table.add_column("Items")
+
+    for category, items in info.items():
+        styles = {"required_inputs": "bold green", "optional_inputs": "bold yellow"}
+        table.add_row(category, ", ".join(items), style=styles.get(category))
+    if prints:
+        console = rich.get_console()
+        console.print(table)
+    return table
