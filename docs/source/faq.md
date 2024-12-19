@@ -1218,7 +1218,7 @@ def load_complete(complete: int) -> int:
     # Pretend we loaded something
     return complete
 
-@pipefunc("executed", mapspec="incomplete[i] -> executed[i]")
+@pipefunc("executed", mapspec="incomplete[j] -> executed[j]")
 def run_incomplete(incomplete: int) -> int:
     # Pretend we executed something
     return incomplete
