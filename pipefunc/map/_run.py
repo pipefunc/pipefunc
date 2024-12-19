@@ -77,7 +77,9 @@ def run_map(
         is created or no folder is used, depending on whether the storage class requires serialization.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
-        You will receive an exception if the shapes cannot be inferred and need to be provided.
+        If not provided, the shapes will be inferred from the first execution of the function.
+        If provided, the shapes will be validated against the actual shapes of the outputs.
+        The values can be either integers or "?" for unknown dimensions.
         The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
         If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
@@ -222,7 +224,9 @@ def run_map_async(
         is created or no folder is used, depending on whether the storage class requires serialization.
     internal_shapes
         The shapes for intermediary outputs that cannot be inferred from the inputs.
-        You will receive an exception if the shapes cannot be inferred and need to be provided.
+        If not provided, the shapes will be inferred from the first execution of the function.
+        If provided, the shapes will be validated against the actual shapes of the outputs.
+        The values can be either integers or "?" for unknown dimensions.
         The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
         If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
