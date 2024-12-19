@@ -483,7 +483,6 @@ def _get_output_dim(
         if internal_shape_index >= len(internal_shapes[output.name]):
             msg = f"Internal shape for '{output.name}' is too short."
             raise ValueError(msg)
-
         dim = internal_shapes[output.name][internal_shape_index]
         if not (isinstance(dim, int) or dim == "?"):
             msg = f"Internal shape for '{output.name}' must be a tuple of integers or '?'."
