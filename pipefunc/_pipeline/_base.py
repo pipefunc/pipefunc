@@ -243,7 +243,8 @@ class Pipeline:
         table.add_column("Items")
 
         for category, items in info.items():
-            table.add_row(category, ", ".join(items))
+            styles = {"required_inputs": "bold green", "optional_inputs": "bold yellow"}
+            table.add_row(category, ", ".join(items), style=styles.get(category))
 
         console = rich.get_console()
         console.print(table)
