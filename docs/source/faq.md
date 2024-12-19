@@ -1171,46 +1171,76 @@ pipeline.visualize(backend="graphviz")
 
 ## `PipeFunc` that returns multiple things with different sizes?
 
-WIP. Not possilbe but a workaround exists.
+Sometimes you might want to return multiple outputs with different sizes and loop over them in later functions.
+
+Something like
+```python
+@pipefunc(("complete", "incomplete"), mapspec="... -> complete[i], incomplete[j]")
+def get_complete_and_incomplete() -> tuple[list[Any], list[Any]]:
+    # Do something
+    complete = [0, 1]
+    incomplete = [2, 3, 4]
+    return complete, incomplete
+```
+
+However, unfortunately currently there is a limitation that the multiple outputs must all share the exact same indices, and therefore have the exact same shape.
+
+However, there is a simple workaround. Just return it as a single object and have other functions extract the relevant list.
+
+See this full example:
 
 ```python
+from pipefunc import PipeFunc, Pipeline, pipefunc
+
 from dataclasses import dataclass
+from pipefunc.typing import Array
+
 
 @dataclass
 class Status:
     complete: list[int]
     incomplete: list[int]
 
+
 @pipefunc("status")
 def get_status(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
     return Status(mock_complete, mock_incomplete)
+
 
 @pipefunc("incomplete")
 def get_incomplete(status: Status) -> list[int]:
     return status.incomplete
 
-@pipefunc("completed")
+
+@pipefunc("complete")
 def get_complete(status: Status) -> list[int]:
     return status.complete
 
+
 @pipefunc("loaded", mapspec="complete[i] -> loaded[i]")
-def load_complete(completed: int) -> int:
+def load_complete(complete: int) -> int:
     # Pretend we loaded something
-    return completed
+    return complete
+
 
 @pipefunc("executed", mapspec="incomplete[i] -> executed[i]")
 def run_incomplete(incomplete: int) -> int:
     # Pretend we executed something
     return incomplete
 
-@pipefunc("result")
-def combine(completed: list[int], loaded: Array[int]) -> list[int]:
-    return completed + list(loaded)
 
-pipeline = Pipeline([get_status, get_incomplete, get_complete, load_complete, run_incomplete, combine])
+@pipefunc("result")
+def combine(complete: list[int], loaded: Array[int]) -> list[int]:
+    return complete + list(loaded)
+
+
+pipeline = Pipeline(
+    [get_status, get_incomplete, get_complete, load_complete, run_incomplete, combine]
+)
 result = pipeline.map(
     {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
-    internal_shapes={"incomplete": ("?",)},
+    internal_shapes={"incomplete": ("?",), "complete": "?"},
+    parallel=False,
 )
 ```
 
