@@ -146,6 +146,10 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
+    def update_n_total(self, output_name: OUTPUT_TYPE, new_total: int) -> None:
+        """Update the total number of tasks for a given output."""
+        self.progress_dict[output_name].n_total = new_total
+
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]

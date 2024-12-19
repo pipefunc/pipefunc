@@ -930,11 +930,23 @@ def _submit_func(
     cache = cache if func.cache else None
     if func.requires_mapping:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
+        _update_status_if_needed(func, status, progress, args)
         r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
         task = r, args
     else:
         task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
     return _KwargsTask(kwargs, task)
+
+
+def _update_status_if_needed(
+    func: PipeFunc,
+    status: Status | None,
+    progress: ProgressTracker | None,
+    args: _MapSpecArgs,
+) -> None:
+    if status is not None and progress is not None and status.n_total is None:
+        size = len(args.missing)
+        progress.update_n_total(func.output_name, size)
 
 
 def _executor_for_func(
