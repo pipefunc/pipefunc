@@ -96,12 +96,15 @@ class PipeFunc(Generic[T]):
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        Specifies the shape of the returned value(s). This parameters is required only
-        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
-        be derived from the inputs. The shape can be a single integer or a tuple of
-        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
-        provide the shape for one of the outputs. This works because the shape of all
-        outputs are required to be identical.
+        The shape of the output produced by this function *when it is used within a
+        ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
+        dimensions, or a tuple with a mix of both. If not provided, the shape will be
+        inferred from the first execution of the function. If provided, the shape will be
+        validated against the actual shape of the output. This parameters is required only
+        when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
+        derived from the inputs. In case there are multiple outputs, provide the shape for
+        one of the outputs. This works because the shape of all outputs are required to be
+        identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
         The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
@@ -940,12 +943,15 @@ def pipefunc(
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        Specifies the shape of the returned value(s). This parameters is required only
-        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
-        be derived from the inputs. The shape can be a single integer or a tuple of
-        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
-        provide the shape for one of the outputs. This works because the shape of all
-        outputs are required to be identical.
+        The shape of the output produced by this function *when it is used within a
+        ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
+        dimensions, or a tuple with a mix of both. If not provided, the shape will be
+        inferred from the first execution of the function. If provided, the shape will be
+        validated against the actual shape of the output. This parameters is required only
+        when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
+        derived from the inputs. In case there are multiple outputs, provide the shape for
+        one of the outputs. This works because the shape of all outputs are required to be
+        identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
         The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
