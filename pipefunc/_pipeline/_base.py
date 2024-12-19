@@ -188,21 +188,27 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
-    @functools.cached_property
-    def info(self) -> dict[str, Any]:
+    def info(self, *, print_table: bool = False) -> dict[str, Any] | None:
         """Return information about inputs and outputs of the Pipeline.
+
+        Parameters
+        ----------
+        print_table
+            Whether to print a rich-formatted table to the console. Requires the `rich` package.
 
         Returns
         -------
-        dict
-            A dictionary containing information about the inputs and outputs of the Pipeline.
-            With the following keys:
+        dict or None
+            If `print_table` is False, returns a dictionary containing information about
+            the inputs and outputs of the Pipeline, with the following keys:
 
             - ``inputs``: The input arguments of the Pipeline.
             - ``outputs``: The output arguments of the Pipeline.
             - ``intermediate_outputs``: The intermediate output arguments of the Pipeline.
             - ``required_inputs``: The required input arguments of the Pipeline.
             - ``optional_inputs``: The optional input arguments of the Pipeline (see `Pipeline.defaults`).
+
+            If `print_table` is True, prints a rich-formatted table to the console and returns None.
 
         See Also
         --------
@@ -219,13 +225,30 @@ class Pipeline:
         intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
-        return {
+        info = {
             "inputs": inputs,
             "outputs": outputs,
             "intermediate_outputs": intermediate_outputs,
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
         }
+        if not print_table:
+            return info
+        requires("rich", reason="print_table=True", extras="rich")
+        import rich
+        from rich.table import Table
+
+        table = Table(title="Pipeline Info", box=rich.box.DOUBLE)
+        table.add_column("Category", style="dim", width=20)
+        table.add_column("Items")
+
+        for category, items in info.items():
+            styles = {"required_inputs": "bold green", "optional_inputs": "bold yellow"}
+            table.add_row(category, ", ".join(items), style=styles.get(category))
+
+        console = rich.get_console()
+        console.print(table)
+        return None
 
     @property
     def profile(self) -> bool | None:
