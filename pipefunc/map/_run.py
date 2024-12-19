@@ -630,9 +630,8 @@ def _prepare_submit_map_spec(
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
-    args = _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
-    _update_status_if_needed(status, args)
-    return args
+    _update_status_if_needed(status, existing, missing)
+    return _MapSpecArgs(process_index, existing, missing, result_arrays, mask, arrays)
 
 
 def _mask_fixed_axes(
@@ -940,9 +939,13 @@ def _submit_func(
     return _KwargsTask(kwargs, task)
 
 
-def _update_status_if_needed(status: Status | None, args: _MapSpecArgs) -> None:
+def _update_status_if_needed(
+    status: Status | None,
+    existing: list[int],
+    missing: list[int],
+) -> None:
     if status is not None and status.n_total is None:
-        status.n_total = len(args.missing) + len(args.existing)
+        status.n_total = len(missing) + len(existing)
 
 
 def _executor_for_func(
