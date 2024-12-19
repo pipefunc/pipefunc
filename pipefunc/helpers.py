@@ -35,7 +35,8 @@ def collect_kwargs(
 
     Examples
     --------
-    This creates `def yolo(a: int, b: list[int]) -> dict[str, Any]`:
+    This creates ``def yolo(a: int, b: list[int]) -> dict[str, Any]``:
+
     >>> f = collect_kwargs(("a", "b"), annotations=(int, list[int]), function_name="yolo")
     >>> f(a=1, b=2)
     {"a": 1, "b": 2}
