@@ -23,6 +23,8 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
+  # optional-dependencies: rich
+  - rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.3.0
   - ipywidgets
