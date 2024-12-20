@@ -3,7 +3,7 @@ import inspect
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc.helpers import collect_kwargs
+from pipefunc.helpers import collect_kwargs, get_attribute_factory
 
 
 def test_collect_kwargs() -> None:
@@ -46,3 +46,74 @@ def test_collect_kwargs_in_pipefunc() -> None:
     pipeline = Pipeline([f1, f2, f3, f_agg])
     result = pipeline(a=1, b=2)
     assert result == {"a": 1, "d": 6, "e": 18}  # same parameters as in `collect_kwargs`
+
+
+class MyClass:
+    def __init__(self, data: int, name: str) -> None:
+        self.data = data
+        self.name = name
+
+
+class MyOtherClass:
+    def __init__(self, value: float) -> None:
+        self.value = value
+
+
+def test_get_attribute_factory_basic() -> None:
+    f = get_attribute_factory("data")
+    obj = MyClass(data=123, name="test")
+    assert f(obj) == 123
+
+
+def test_get_attribute_factory_custom_names() -> None:
+    f = get_attribute_factory("name", parameter_name="my_object", function_name="get_name")
+    obj = MyClass(data=123, name="test")
+    assert f(my_object=obj) == "test"  # type: ignore[call-arg]
+    assert f.__name__ == "get_name"
+
+
+def test_get_attribute_factory_annotations() -> None:
+    f = get_attribute_factory("value", parameter_annotation=MyOtherClass, return_annotation=float)
+    sig = inspect.signature(f)
+    assert sig.parameters["obj"].annotation is MyOtherClass
+    assert sig.return_annotation is float
+    obj = MyOtherClass(value=3.14)
+    assert f(obj) == 3.14
+
+
+def test_get_attribute_factory_in_pipefunc() -> None:
+    @pipefunc(output_name="extracted_data")
+    def extract_data(obj: MyClass):
+        f = get_attribute_factory("data", parameter_annotation=MyClass, return_annotation=int)
+        return f(obj)
+
+    pipeline = Pipeline([extract_data])
+    result = pipeline(obj=MyClass(data=42, name="example"))
+    assert result == 42
+
+
+def test_get_attribute_factory_invalid_attribute() -> None:
+    f = get_attribute_factory("invalid_attribute")
+    obj = MyClass(data=123, name="test")
+    with pytest.raises(AttributeError):
+        f(obj)
+
+
+def test_get_attribute_factory_no_parameter_name() -> None:
+    f = get_attribute_factory("data")
+    with pytest.raises(TypeError, match="missing a required argument: 'obj'"):
+        f()  # type: ignore[call-arg]
+
+
+def test_get_attribute_factory_with_defaults() -> None:
+    f = get_attribute_factory("data")
+    obj = MyClass(data=123, name="test")
+    assert f(obj=obj) == 123  # type: ignore[call-arg]
+
+
+def test_get_attribute_factory_return_annotation_inference() -> None:
+    f = get_attribute_factory("data", parameter_annotation=MyClass)
+    sig = inspect.signature(f)
+    assert sig.return_annotation == inspect.Parameter.empty
+    obj = MyClass(data=42, name="example")
+    assert f(obj) == 42
