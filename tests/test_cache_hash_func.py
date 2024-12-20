@@ -1,8 +1,12 @@
+import importlib.util
 import os
 
 import numpy as np
+import pytest
 
 from pipefunc.cache import _get_dependency_source_code, _get_external_dependencies, hash_func
+
+has_numpy = importlib.util.find_spec("numpy") is not None
 
 
 def test_get_dependency_source_code():
@@ -50,6 +54,7 @@ def test_hash_func_bound_args():
     assert hash_func(f, bound_args={"b": 1}) != hash_func(f, bound_args={"b": 2})
 
 
+@pytest.mark.skipif(not has_numpy, reason="requires numpy")
 def test_hash_func_external_dependencies():
     def f():
         return np.array([1, 2, 3])
@@ -57,7 +62,15 @@ def test_hash_func_external_dependencies():
     def g():
         return np.array([4, 5, 6])
 
-    assert hash_func(f) == hash_func(g)  # They have the same dependencies
+    # Hashes should be different initially because of different function bodies
+    assert hash_func(f) != hash_func(g)
+
+    # Change an external dependency (e.g., by using a different numpy function)
+    def h():
+        return np.array([1, 2, 3, 4])
+
+    # Hashes should be different due to the changed dependency
+    assert hash_func(f) != hash_func(h)
 
 
 def test_hash_func_pipefunc_version(monkeypatch):
