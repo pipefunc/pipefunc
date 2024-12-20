@@ -60,7 +60,7 @@ class MyOtherClass:
 
 
 def test_get_attribute_factory_basic() -> None:
-    f = get_attribute_factory("data")
+    f = get_attribute_factory("data", "obj")
     obj = MyClass(data=123, name="test")
     assert f(obj) == 123
 
@@ -73,7 +73,12 @@ def test_get_attribute_factory_custom_names() -> None:
 
 
 def test_get_attribute_factory_annotations() -> None:
-    f = get_attribute_factory("value", parameter_annotation=MyOtherClass, return_annotation=float)
+    f = get_attribute_factory(
+        "value",
+        "obj",
+        parameter_annotation=MyOtherClass,
+        return_annotation=float,
+    )
     sig = inspect.signature(f)
     assert sig.parameters["obj"].annotation is MyOtherClass
     assert sig.return_annotation is float
@@ -84,7 +89,12 @@ def test_get_attribute_factory_annotations() -> None:
 def test_get_attribute_factory_in_pipefunc() -> None:
     @pipefunc(output_name="extracted_data")
     def extract_data(obj: MyClass):
-        f = get_attribute_factory("data", parameter_annotation=MyClass, return_annotation=int)
+        f = get_attribute_factory(
+            "data",
+            "obj",
+            parameter_annotation=MyClass,
+            return_annotation=int,
+        )
         return f(obj)
 
     pipeline = Pipeline([extract_data])
@@ -93,26 +103,26 @@ def test_get_attribute_factory_in_pipefunc() -> None:
 
 
 def test_get_attribute_factory_invalid_attribute() -> None:
-    f = get_attribute_factory("invalid_attribute")
+    f = get_attribute_factory("invalid_attribute", "obj")
     obj = MyClass(data=123, name="test")
     with pytest.raises(AttributeError):
         f(obj)
 
 
 def test_get_attribute_factory_no_parameter_name() -> None:
-    f = get_attribute_factory("data")
+    f = get_attribute_factory("data", "obj")
     with pytest.raises(TypeError, match="missing a required argument: 'obj'"):
         f()  # type: ignore[call-arg]
 
 
 def test_get_attribute_factory_with_defaults() -> None:
-    f = get_attribute_factory("data")
+    f = get_attribute_factory("data", "obj")
     obj = MyClass(data=123, name="test")
     assert f(obj=obj) == 123  # type: ignore[call-arg]
 
 
 def test_get_attribute_factory_return_annotation_inference() -> None:
-    f = get_attribute_factory("data", parameter_annotation=MyClass)
+    f = get_attribute_factory("data", "obj", parameter_annotation=MyClass)
     sig = inspect.signature(f)
     assert sig.return_annotation == inspect.Parameter.empty
     obj = MyClass(data=42, name="example")
