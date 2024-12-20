@@ -67,7 +67,7 @@ def collect_kwargs(
 
 def get_attribute_factory(
     attribute_name: str,
-    parameter_name: str = "obj",
+    parameter_name: str,
     parameter_annotation: type = inspect.Parameter.empty,
     return_annotation: type = inspect.Parameter.empty,
     function_name: str = "get_attribute",
