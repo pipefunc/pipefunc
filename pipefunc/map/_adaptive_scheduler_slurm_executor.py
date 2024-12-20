@@ -157,12 +157,12 @@ def _map_slurm_executor_kwargs(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
     seq: list[int],
-) -> dict[str, tuple[Any, ...]]:
-    kwargs = {}
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
     size_per_learner = 1 if func.resources_scope == "element" else None
     kwargs["size_per_learner"] = size_per_learner
-    if not func.resources:
-        return kwargs
+    if func.resources is None:  # type: ignore[has-type]
+        return kwargs  # type: ignore[return-value]
     resources_list: list[dict[str, Any]] = []
     resources = process_index.keywords["func"].resources
     assert resources is not None
