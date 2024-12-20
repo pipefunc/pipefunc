@@ -7,10 +7,12 @@ import array
 import collections
 import functools
 import hashlib
+import inspect
 import pickle
 import sys
 import time
 import warnings
+from collections.abc import Callable
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -768,3 +770,59 @@ class UnhashableError(TypeError):
             f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
         )
         super().__init__(self.message)
+
+
+def _get_dependency_source_code(func: Callable, memo: set) -> str:
+    """Recursively get the source code of all functions called by the given function."""
+    source_code = ""
+    try:
+        source_code += inspect.getsource(func)
+        for _name, obj in inspect.getmembers(func):
+            if inspect.isfunction(obj) and obj.__module__ == func.__module__:  # noqa: SIM102
+                if obj not in memo:  # Avoid infinite recursion for recursive functions
+                    memo.add(obj)
+                    source_code += _get_dependency_source_code(obj, memo)
+    except TypeError:
+        pass  # Ignore objects for which source code cannot be retrieved
+    return source_code
+
+
+def _get_external_dependencies(func: Callable) -> dict[str, str]:
+    """Get the names and versions of external packages used by the function."""
+    dependencies = {}
+    try:
+        module = inspect.getmodule(func)
+        if module:
+            for val in module.__dict__.values():
+                if isinstance(val, type(sys)) and val.__name__ != "builtins":
+                    if hasattr(val, "__version__"):
+                        dependencies[val.__name__] = val.__version__
+                    elif hasattr(val, "version"):
+                        dependencies[val.__name__] = val.version
+    except (TypeError, AttributeError):
+        pass  # Ignore objects for which module or version cannot be determined
+    return dependencies
+
+
+def hash_func(func: Callable, bound_args: dict | None = None) -> str:
+    """Computes a hash of the function's source code and its dependencies."""
+    from pipefunc import __version__
+
+    source = inspect.getsource(func)
+    # Include the source code of functions called within this function
+    source += _get_dependency_source_code(func, set())
+
+    # Include the version of the current package 'pipefunc'
+    version = __version__
+
+    # Include bound arguments
+    bound_args_hashable = to_hashable(bound_args or {})
+
+    # Include external dependencies
+    external_dependencies = _get_external_dependencies(func)
+    dependencies_hashable = to_hashable(external_dependencies)
+
+    # Combine all relevant information into a single string
+    combined_info = f"{source}-{version}-{bound_args_hashable}-{dependencies_hashable}"
+
+    return hashlib.sha256(combined_info.encode("utf-8")).hexdigest()
