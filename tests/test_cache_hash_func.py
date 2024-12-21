@@ -18,7 +18,7 @@ def g1():
 
 
 def test_get_dependency_source_code():
-    source_code = extract_source_with_dependency_info(g1, set())
+    source_code = extract_source_with_dependency_info(g1)
     assert "def f1():" in source_code
     assert "def g1():" in source_code
 
@@ -94,7 +94,7 @@ def test_hash_func_recursive_function():
             return 1
         return n * factorial(n - 1)
 
-    source_code = extract_source_with_dependency_info(factorial, set())
+    source_code = extract_source_with_dependency_info(factorial)
     assert "def factorial(n):" in source_code
 
 
