@@ -27,7 +27,7 @@ classifiers = [
 dependencies = ["cloudpickle", "networkx", "numpy"]
 
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 pandas = ["pandas"]
 plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
 profiling = ["psutil"]
