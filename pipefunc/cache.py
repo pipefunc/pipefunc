@@ -773,7 +773,8 @@ class UnhashableError(TypeError):
         super().__init__(self.message)
 
 
-def extract_source_with_dependency_info(func: Callable, memo: set | None = None) -> str:
+@functools.lru_cache(maxsize=256)
+def extract_source_with_dependency_info(func: Callable) -> str:
     r"""Recursively get the source code or file info of a function and its dependencies.
 
     For internal dependencies (functions defined within the same module), the
@@ -785,9 +786,6 @@ def extract_source_with_dependency_info(func: Callable, memo: set | None = None)
     ----------
     func
         The function for which to retrieve the source code and dependency information.
-    memo
-        A set used to keep track of processed functions and avoid infinite recursion.
-        If not provided, an empty set is created.
 
     Returns
     -------
@@ -838,8 +836,13 @@ def extract_source_with_dependency_info(func: Callable, memo: set | None = None)
     # numpy-1.23.0-/path/to/site-packages/numpy/__init__.py-<hash>
 
     """
-    if memo is None:
-        memo = set()
+    # A set used to keep track of processed functions and avoid infinite recursion.
+    # If not provided, an empty set is created.
+    memo: set[Callable] = set()
+    return _extract_source_with_dependency_info(func, memo)
+
+
+def _extract_source_with_dependency_info(func: Callable, memo: set) -> str:
     source_code = ""
     module = inspect.getmodule(func)
 
@@ -857,7 +860,7 @@ def extract_source_with_dependency_info(func: Callable, memo: set | None = None)
                     if inspect.isfunction(obj) and obj.__module__ == module.__name__:
                         if obj not in memo:
                             memo.add(obj)
-                            source_code += extract_source_with_dependency_info(obj, memo)
+                            source_code += _extract_source_with_dependency_info(obj, memo)
                     elif inspect.ismodule(obj):
                         if obj.__name__ in sys.stdlib_module_names:
                             continue
