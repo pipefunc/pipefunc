@@ -161,10 +161,11 @@ def _map_slurm_executor_kwargs(
     kwargs: dict[str, Any] = {}
     size_per_learner = 1 if func.resources_scope == "element" else None
     kwargs["size_per_learner"] = size_per_learner
-    if func.resources is None:  # type: ignore[has-type]
+    resources = func.resources  # type: ignore[has-type]
+    if resources is None:
         return kwargs  # type: ignore[return-value]
     resources_list: list[dict[str, Any]] = []
-    resources = process_index.keywords["func"].resources
+
     assert resources is not None
     if not callable(resources):
         kwargs = _adaptive_scheduler_resource_dict(resources)
