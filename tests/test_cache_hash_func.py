@@ -4,30 +4,32 @@ import os
 import numpy as np
 import pytest
 
-from pipefunc.cache import _get_dependency_source_code, _get_external_dependencies, hash_func
+from pipefunc.cache import extract_source_with_dependency_info, hash_func
 
 has_numpy = importlib.util.find_spec("numpy") is not None
 
 
+def f1():
+    return 1
+
+
+def g1():
+    return f1()
+
+
 def test_get_dependency_source_code():
-    def f():
-        return 1
+    source_code = extract_source_with_dependency_info(g1, set())
+    assert "def f1():" in source_code
+    assert "def g1():" in source_code
 
-    def g():
-        return f()
 
-    source_code = _get_dependency_source_code(g, set())
-    assert "def f():" in source_code
-    assert "def g():" in source_code
+def f2():
+    return np.array([1, 2, 3])
 
 
 def test_get_external_dependencies():
-    def f():
-        return np.array([1, 2, 3])
-
-    dependencies = _get_external_dependencies(f)
-    assert "numpy" in dependencies
-    assert dependencies["numpy"] == np.__version__
+    source = extract_source_with_dependency_info(f2)
+    assert "numpy" in source
 
 
 def test_hash_func_different_functions():
@@ -86,34 +88,30 @@ def test_hash_func_pipefunc_version(monkeypatch):
     assert original_hash != new_hash  # Hash should change with different version
 
 
-def test_hash_func_no_external_dependencies():
-    def f():
-        return 1
-
-    dependencies = _get_external_dependencies(f)
-    assert dependencies == {}
-    assert hash_func(f) == hash_func(f)
-
-
 def test_hash_func_recursive_function():
     def factorial(n):
         if n == 0:
             return 1
         return n * factorial(n - 1)
 
-    source_code = _get_dependency_source_code(factorial, set())
+    source_code = extract_source_with_dependency_info(factorial, set())
     assert "def factorial(n):" in source_code
 
 
-def test_hash_func_ignore_internal_functions():
+def test_hash_func_ignore_closure():
+    """This test highlights a limitation of the current implementation of hash_func.
+
+    There is no easy was to get the source code of a closure function, so we cannot hash it.
+    """
+
     def internal_function():
         return "internal"
 
     def f():
         return internal_function()
 
-    dependencies = _get_external_dependencies(f)
-    assert "internal_function" not in dependencies
+    source = extract_source_with_dependency_info(f)
+    assert "def internal_function" not in source
 
 
 def test_hash_func_lambda():
@@ -127,8 +125,8 @@ def test_hash_func_builtin_module():
     def f():
         return os.path.join("a", "b")  # noqa: PTH118
 
-    dependencies = _get_external_dependencies(f)
-    assert "os" not in dependencies
+    source = extract_source_with_dependency_info(f)
+    assert "os-" not in source
 
 
 def test_hash_func_class_methods():
