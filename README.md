@@ -12,7 +12,7 @@
 [![Documentation](https://readthedocs.org/projects/pipefunc/badge/?version=latest)](https://pipefunc.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://img.shields.io/conda/dn/conda-forge/pipefunc.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![GitHub](https://img.shields.io/github/stars/pipefunc/pipefunc.svg?style=social)](https://github.com/pipefunc/pipefunc/stargazers)
-[![Discord](https://img.shields.io/discord/1320459922596565103)](https://discord.gg/cBbxusZR)
+[![Discord](https://img.shields.io/discord/1320459922596565103.svg?label=Discord&logo=discord)](https://discord.gg/cBbxusZR)
 
 ![](https://user-images.githubusercontent.com/6897215/253785642-cf2a6941-2ea6-41b0-8225-b3e52e94c4de.png)
 
