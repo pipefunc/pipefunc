@@ -19,6 +19,67 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
+## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.?
+
+pipefunc fills a unique niche in the Python workflow ecosystem.
+
+### Key Differentiators
+
+What makes pipefunc unique:
+
+1. **Simplicity**: Pure Python implementation with minimal dependencies, allowing standard debuggers and profiling tools to work without modification
+2. **Flexibility**: Easy to modify pipelines and add parameter sweeps with minimal boilerplate
+3. **HPC Integration**: First-class support for traditional HPC clusters
+4. **Resource Management**: Fine-grained control over computational resources per function
+5. **Development Speed**: Rapid prototyping without infrastructure setup
+
+pipefunc is particularly well-suited for scientists and researchers who need to:
+
+- Quickly prototype and iterate on computational workflows
+- Run parameter sweeps across multiple dimensions
+- Manage varying computational requirements between pipeline steps
+- Work with traditional HPC systems
+- Maintain readable and maintainable Python code
+
+Let's break down the comparison by categories:
+
+### Low-Level Parallel Computing Tools (e.g., [Dask](https://www.dask.org/))
+
+Dask and pipefunc serve different purposes and can be complementary:
+
+- Dask provides low-level control over parallelization, letting you decide exactly what and how to parallelize
+- pipefunc automatically handles parallelization based on pipeline structure and `mapspec` definitions
+- Dask can serve as a computational backend for pipefunc
+- pipefunc provides higher-level abstractions for parameter sweeps without requiring explicit parallel programming
+
+In summary, Dask is a powerful parallel computing library, while pipefunc helps you build and manage scientific workflows with less boilerplate and takes care of parallelization and data saving for you.
+
+### Scientific Workflow Tools (e.g., [AiiDA](https://aiida.readthedocs.io/), [Pydra](https://pydra.readthedocs.io/en/latest/))
+
+Compared to scientific workflow managers, pipefunc provides:
+
+- Lighter weight setup with no external dependencies (unlike AiiDA which requires a daemon, PostgreSQL and RabbitMQ)
+- More intuitive Python-native interface with automatic graph construction from function signatures
+- Simpler debugging as code runs in the same Python process by default
+- Built-in parameter sweeps with automatic parallelization
+- Dynamic resource allocation based on input parameters
+
+### ETL and Production Workflow Tools (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/), [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
+
+
+These tools excel at production data pipelines with features like scheduling, monitoring, and reliability, but are architected for cloud-based execution (e.g., Kubernetes, cloud functions, containerized workloads).
+While some offer HPC support, it's typically an afterthought and doesn't align well with traditional scientific computing workflows.
+pipefunc offers distinct advantages for scientific computing:
+
+- No mandatory project structure (unlike Kedro which enforces specific layouts)
+- Direct in-memory data passing between functions (while Airflow and Luigi primarily work with serialized data)
+- Native support for parameter sweeps (which would require custom implementations in Airflow/Luigi)
+- Designed for traditional HPC environments (SLURM, PBS, etc.) rather than cloud-first architectures (but runs in local kernel too)
+- Simple integration with existing Python code
+- Focus on rapid prototyping and iteration
+
+While other tools may be better suited for production ETL pipelines or specific scientific domains, pipefunc excels at flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
+
 ## How to handle defaults?
 
 You can provide defaults in
@@ -1168,6 +1229,94 @@ assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `coll
 
 pipeline.visualize(backend="graphviz")
 ```
+
+## `PipeFunc`s with Multiple Outputs of Different Shapes
+
+**Question:** How can I use `PipeFunc` to return multiple outputs with different shapes when using `mapspec`?  It seems like `mapspec` requires all outputs to have the same dimensions.
+
+**Answer:**
+
+You're correct that `pipefunc` currently has a limitation where multiple outputs within a single `PipeFunc` using `mapspec` must share the same indices and therefore the same shape.
+In the future we might remove this requirement.
+
+**Workaround:**
+
+The recommended solution is to encapsulate your multiple outputs within a single container object (like a `dataclass`, `NamedTuple`, or even a dictionary) and return that container from your `PipeFunc`. Then, create separate `PipeFunc`s that extract the individual outputs from the container.
+
+**Example:**
+
+Let's say you have a function that processes some data and needs to return two lists, "complete" and "incomplete", which will likely have different lengths. Here's how you can structure it using a `dataclass` and subsequent functions to access each list:
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from pipefunc import Pipeline, pipefunc
+from pipefunc.typing import Array
+
+@dataclass
+class Status:
+    complete: list[int]
+    incomplete: list[int]
+
+@pipefunc("status")
+def get_status(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
+    return Status(mock_complete, mock_incomplete)
+
+@pipefunc("incomplete")
+def get_incomplete(status: Status) -> list[int]:
+    return status.incomplete
+
+@pipefunc("complete")
+def get_complete(status: Status) -> list[int]:
+    return status.complete
+
+@pipefunc("loaded", mapspec="complete[i] -> loaded[i]")
+def load_complete(complete: int) -> int:
+    # Pretend we loaded something
+    return complete
+
+@pipefunc("executed", mapspec="incomplete[j] -> executed[j]")
+def run_incomplete(incomplete: int) -> int:
+    # Pretend we executed something
+    return incomplete
+
+@pipefunc("result")
+def combine(loaded: Array[int], executed: Array[int]) -> list[int]:
+    return list(loaded) + list(executed)
+
+pipeline = Pipeline(
+    [
+        get_status,
+        get_incomplete,
+        get_complete,
+        load_complete,
+        run_incomplete,
+        combine,
+    ]
+)
+result = pipeline.map(
+    {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
+    internal_shapes={"incomplete": ("?",), "complete": ("?",)},
+    parallel=False,
+)
+
+print(result["result"].output)
+```
+
+**Explanation:**
+
+1. **`Status` Dataclass:** We define a `Status` dataclass to hold the `complete` and `incomplete` lists as a single object.
+2. **`get_status` Function:** This function now returns a `Status` object. Because it does not have a `mapspec` it will only run once.
+3. **`get_incomplete` and `get_complete` Functions:** These helper functions extract the individual lists from the `Status` object.
+4. **`load_complete` and `run_incomplete` Functions:** These functions can now use `mapspec` to iterate over the `complete` and `incomplete` lists, respectively.
+5. **`combine` Function:** This function now takes `completed` and `executed` and combines them with the `complete` list.
+6. **`pipeline.map`:** We call `pipeline.map` as before, but now we only need to specify the `internal_shapes` of the lists, not the shape of the status. The `internal_shapes` argument is only needed when you return a list, and it cannot be inferred from the inputs.
+
+This pattern provides a clean and manageable way to work with functions that logically produce multiple outputs of varying shapes within the current capabilities of `pipefunc`.
 
 ## Parameter Sweeps
 

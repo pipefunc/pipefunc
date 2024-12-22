@@ -13,7 +13,7 @@ dependencies:
   - numpy
   # optional-dependencies: adaptive
   - adaptive
-  - adaptive-scheduler>=2.13.3
+  - adaptive-scheduler>=2.14.0
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -23,6 +23,8 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
+  # optional-dependencies: rich
+  - rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.3.0
   - ipywidgets

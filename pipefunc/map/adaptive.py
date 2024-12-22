@@ -12,6 +12,7 @@ import numpy as np
 from adaptive import Learner1D, Learner2D, LearnerND, SequenceLearner, runner
 
 from pipefunc._utils import at_least_tuple, prod
+from pipefunc.map._shapes import shape_is_resolved
 
 from ._mapspec import MapSpec
 from ._prepare import _reduced_axes, _validate_fixed_indices
@@ -135,7 +136,7 @@ class LearnersDict(LearnersDictType):
         )
         if returns == "namedtuple":
             if slurm_run_kwargs:
-                msg = "Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'."
+                msg = "Cannot pass `slurm_run_kwargs` when `returns='namedtuple'`."
                 raise ValueError(msg)
             return details
         kwargs = details.kwargs()
@@ -223,7 +224,7 @@ def create_learners(
     See Also
     --------
     LearnersDict.to_slurm_run
-        Convert the learners to variables that can be passed to `adaptive_scheduler.RunManager`.
+        Convert the learners to variables that can be passed to `adaptive_scheduler.slurm_run`.
 
     Returns
     -------
@@ -251,9 +252,11 @@ def create_learners(
         split_independent_axes,
         run_info.internal_shapes,
     )
+
     for _fixed_indices in iterator:
         key = _key(_fixed_indices)
         for gen in pipeline.topological_generations.function_lists:
+            _validate_no_dynamic_shapes(run_info, gen)
             gen_learners = []
             for func in gen:
                 learner = _learner(
@@ -273,6 +276,14 @@ def create_learners(
     return learners
 
 
+def _validate_no_dynamic_shapes(run_info: RunInfo, generation: list[PipeFunc]) -> None:
+    for func in generation:
+        shape = run_info.resolved_shapes.get(func.output_name, ())
+        if not shape_is_resolved(shape):
+            msg = "Dynamic `internal_shapes` not supported in `create_learners`."
+            raise ValueError(msg)
+
+
 def _split_sequence_learner(learner: SequenceLearner) -> list[SequenceLearner]:
     """Split a `SequenceLearner` into multiple learners."""
     if len(learner.sequence) == 1:
@@ -289,7 +300,7 @@ def _learner(
     *,
     return_output: bool,
 ) -> SequenceLearner:
-    if func.mapspec and func.mapspec.inputs:
+    if func.requires_mapping:
         f = functools.partial(
             _execute_iteration_in_map_spec,
             func=func,
@@ -298,18 +309,20 @@ def _learner(
             return_output=return_output,
             cache=cache,
         )
-        shape = run_info.shapes[func.output_name]
+        shape = run_info.resolved_shapes[func.output_name]
+        assert shape_is_resolved(shape)
         mask = run_info.shape_masks[func.output_name]
+        assert func.mapspec is not None
         sequence = _sequence(fixed_indices, func.mapspec, shape, mask)
-    else:
-        f = functools.partial(
-            _execute_iteration_in_single,
-            func=func,
-            run_info=run_info,
-            store=store,
-            return_output=return_output,
-        )
-        sequence = [None]  # type: ignore[list-item,assignment]
+        return SequenceLearner(f, sequence)
+    f = functools.partial(
+        _execute_iteration_in_single,
+        func=func,
+        run_info=run_info,
+        store=store,
+        return_output=return_output,
+    )
+    sequence = [None]  # type: ignore[list-item,assignment]
     return SequenceLearner(f, sequence)
 
 
@@ -379,7 +392,8 @@ def _execute_iteration_in_map_spec(
     # Otherwise, run the function
     assert isinstance(func.mapspec, MapSpec)
     kwargs = _func_kwargs(func, run_info, store)
-    shape = run_info.shapes[func.output_name]
+    shape = run_info.resolved_shapes[func.output_name]
+    assert shape_is_resolved(shape)
     mask = run_info.shape_masks[func.output_name]
     outputs = _run_iteration_and_process(
         index,
@@ -505,7 +519,7 @@ def _iterate_axes(
     mapspec_axes: dict[str, tuple[str, ...]],
     shapes: dict[OUTPUT_TYPE, ShapeTuple],
 ) -> Generator[dict[str, Any], None, None]:
-    shape: list[int] = []
+    shape: list[int | Literal["?"]] = []
     for axis in independent_axes:
         parameter, dim = next(
             (p, axes.index(axis))
@@ -513,8 +527,10 @@ def _iterate_axes(
             if axis in axes and p in inputs
         )
         shape.append(shapes[parameter][dim])
-
-    for indices in iterate_shape_indices(tuple(shape)):
+    new_shape = tuple(shape)
+    # We can assert this because the internal_shapes should never appear as independent axes
+    assert shape_is_resolved(new_shape)
+    for indices in iterate_shape_indices(new_shape):
         yield dict(zip(independent_axes, indices))
 
 

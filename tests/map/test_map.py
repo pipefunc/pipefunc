@@ -4,7 +4,7 @@ import importlib.util
 import re
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pytest
@@ -329,9 +329,6 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
 
-    with pytest.raises(ValueError, match="Internal shape for 'x' is missing."):
-        map_shapes(pipeline, inputs)
-
     with pytest.raises(
         RuntimeError,
         match="Use `Pipeline.map` instead",
@@ -435,7 +432,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     assert results["sum"].output == 21.0
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
-    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"array": (1, 2, 3), "vector": (1,)}
     assert masks == {"array": (False, False, False), "vector": (True,)}
     load_xarray_dataset(run_folder=tmp_path)
@@ -1459,8 +1456,9 @@ def test_map_func_exception():
         pipeline.map({"x": 1}, None, parallel=False)
 
 
-def test_internal_shape_in_pipefunc():
-    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(3,))
+@pytest.mark.parametrize("dim", [3, "?"])
+def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(dim,))
     def f(x):
         return [x] * 3
 
@@ -1687,11 +1685,15 @@ def test_map_range():
         assert not r["y"].store.mask.all()
 
 
-def test_pipeline_loading_existing_results_with_internal_shape(tmp_path: Path) -> None:
+@pytest.mark.parametrize("dim", [10, "?"])
+def test_pipeline_loading_existing_results_with_internal_shape(
+    tmp_path: Path,
+    dim: int | Literal["?"],
+) -> None:
     # Modified from `test_pipeline_loading_existing_results`
     counters = {"f": 0, "g": 0}
 
-    @pipefunc(output_name="z", internal_shape=(10,))
+    @pipefunc(output_name="z", internal_shape=(dim,))
     def f(x: int) -> list[int]:
         counters["f"] += 1
         return list(range(10))

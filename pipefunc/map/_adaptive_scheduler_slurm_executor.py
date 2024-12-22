@@ -104,7 +104,7 @@ def _slurm_executor_for_map(
     indices: list[int],
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     func = process_index.keywords["func"]
-    executor_kwargs = _map_slurm_executor_kwargs(process_index, indices) if func.resources else {}
+    executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
     executor_kwargs["name"] = _slurm_name(func.output_name)  # type: ignore[assignment]
     return _new_slurm_executor(executor, **executor_kwargs)
 
@@ -127,7 +127,7 @@ def _adaptive_scheduler_imported() -> bool:
     if "adaptive_scheduler" not in sys.modules:  # pragma: no cover
         return False
     # The SlurmExecutor was introduced in version 2.13.3
-    min_version = "2.13.3"
+    min_version = "2.14.0"
     if not is_min_version("adaptive_scheduler", min_version):  # pragma: no cover
         msg = f"The 'adaptive_scheduler' package must be at least version {min_version}."
         raise ImportError(msg)
@@ -154,11 +154,18 @@ def _slurm_name(output_name: OUTPUT_TYPE) -> str:
 
 
 def _map_slurm_executor_kwargs(
+    func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
     seq: list[int],
-) -> dict[str, tuple[Any, ...]]:
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    size_per_learner = 1 if func.resources_scope == "element" else None
+    kwargs["size_per_learner"] = size_per_learner
+    resources = func.resources  # type: ignore[has-type]
+    if resources is None:
+        return kwargs  # type: ignore[return-value]
     resources_list: list[dict[str, Any]] = []
-    resources = process_index.keywords["func"].resources
+
     assert resources is not None
     if not callable(resources):
         kwargs = _adaptive_scheduler_resource_dict(resources)
@@ -168,7 +175,9 @@ def _map_slurm_executor_kwargs(
         evaluated_resources = _resources_from_process_index(process_index, i)
         scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
         resources_list.append(scheduler_resources)
-    return _list_of_dicts_to_dict_of_tuples(resources_list)
+    dict_of_tuples = _list_of_dicts_to_dict_of_tuples(resources_list)
+    kwargs.update(dict_of_tuples)
+    return kwargs
 
 
 def _new_slurm_executor(

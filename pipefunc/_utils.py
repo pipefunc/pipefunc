@@ -10,7 +10,7 @@ import socket
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 import cloudpickle
 import numpy as np
@@ -273,3 +273,12 @@ def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
     import pydantic
 
     return issubclass(x, pydantic.BaseModel)
+
+
+T = TypeVar("T")
+
+
+def first(x: T | tuple[T, ...]) -> T:
+    if isinstance(x, tuple):  # pragma: no cover
+        return x[0]
+    return x

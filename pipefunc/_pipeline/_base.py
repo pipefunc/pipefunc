@@ -28,6 +28,7 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     handle_error,
+    is_installed,
     is_running_in_ipynb,
     requires,
 )
@@ -68,6 +69,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
     import ipywidgets
+    from rich.table import Table
 
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
@@ -188,21 +190,27 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
-    @functools.cached_property
-    def info(self) -> dict[str, Any]:
+    def info(self, *, print_table: bool = False) -> dict[str, Any] | None:
         """Return information about inputs and outputs of the Pipeline.
+
+        Parameters
+        ----------
+        print_table
+            Whether to print a rich-formatted table to the console. Requires the `rich` package.
 
         Returns
         -------
-        dict
-            A dictionary containing information about the inputs and outputs of the Pipeline.
-            With the following keys:
+        dict or None
+            If `print_table` is False, returns a dictionary containing information about
+            the inputs and outputs of the Pipeline, with the following keys:
 
             - ``inputs``: The input arguments of the Pipeline.
             - ``outputs``: The output arguments of the Pipeline.
             - ``intermediate_outputs``: The intermediate output arguments of the Pipeline.
             - ``required_inputs``: The required input arguments of the Pipeline.
             - ``optional_inputs``: The optional input arguments of the Pipeline (see `Pipeline.defaults`).
+
+            If `print_table` is True, prints a rich-formatted table to the console and returns None.
 
         See Also
         --------
@@ -219,13 +227,17 @@ class Pipeline:
         intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
-        return {
+        info = {
             "inputs": inputs,
             "outputs": outputs,
             "intermediate_outputs": intermediate_outputs,
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
         }
+        if not print_table:
+            return info
+        _ = _rich_info_table(info, prints=True)
+        return None
 
     @property
     def profile(self) -> bool | None:
@@ -487,6 +499,9 @@ class Pipeline:
 
     def _clear_internal_cache(self) -> None:
         clear_cached_properties(self)
+        for f in self.functions:
+            # `clear_pipelines=False` to avoid infinite recursion
+            f._clear_internal_cache(clear_pipelines=False)
 
     def __call__(self, __output_name__: OUTPUT_TYPE | None = None, /, **kwargs: Any) -> Any:
         """Call the pipeline for a specific return value.
@@ -698,7 +713,9 @@ class Pipeline:
             is created or no folder is used, depending on whether the storage class requires serialization.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
-            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            If not provided, the shapes will be inferred from the first execution of the function.
+            If provided, the shapes will be validated against the actual shapes of the outputs.
+            The values can be either integers or "?" for unknown dimensions.
             The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
             If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
@@ -814,7 +831,9 @@ class Pipeline:
             is created or no folder is used, depending on whether the storage class requires serialization.
         internal_shapes
             The shapes for intermediary outputs that cannot be inferred from the inputs.
-            You will receive an exception if the shapes cannot be inferred and need to be provided.
+            If not provided, the shapes will be inferred from the first execution of the function.
+            If provided, the shapes will be validated against the actual shapes of the outputs.
+            The values can be either integers or "?" for unknown dimensions.
             The ``internal_shape`` can also be provided via the ``PipeFunc(..., internal_shape=...)`` argument.
             If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
         output_names
@@ -1365,14 +1384,6 @@ class Pipeline:
             Create a directed graph using HoloViews (``backend="holoviews"``).
 
         """
-
-        def is_installed(name: str) -> bool:
-            try:
-                __import__(name)
-                return True  # noqa: TRY300
-            except ImportError:  # pragma: no cover
-                return False
-
         if backend is None:  # pragma: no cover
             if os.getenv("READTHEDOCS") is not None:
                 # Set a default visualization backend in the docs
@@ -1940,6 +1951,20 @@ class Pipeline:
 
         return pipeline
 
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:  # pragma: no cover
+        """Display the pipeline widget."""
+        if is_running_in_ipynb() and is_installed("rich"):
+            info = self.info()
+            assert isinstance(info, dict)
+            table = _rich_info_table(info)
+            return table._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
+
 
 class Generations(NamedTuple):
     root_args: list[str]
@@ -2200,3 +2225,21 @@ class _PipelineInternalCache:
     root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
     func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
+
+
+def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
+    """Create a rich table from a dictionary of information."""
+    requires("rich", reason="print_table=True", extras="rich")
+    import rich.table
+
+    table = rich.table.Table(title="Pipeline Info", box=rich.box.DOUBLE)
+    table.add_column("Category", style="dim", width=20)
+    table.add_column("Items")
+
+    for category, items in info.items():
+        styles = {"required_inputs": "bold green", "optional_inputs": "bold yellow"}
+        table.add_row(category, ", ".join(items), style=styles.get(category))
+    if prints:
+        console = rich.get_console()
+        console.print(table)
+    return table

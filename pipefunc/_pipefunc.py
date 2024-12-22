@@ -96,12 +96,15 @@ class PipeFunc(Generic[T]):
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        Specifies the shape of the returned value(s). This parameters is required only
-        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
-        be derived from the inputs. The shape can be a single integer or a tuple of
-        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
-        provide the shape for one of the outputs. This works because the shape of all
-        outputs are required to be identical.
+        The shape of the output produced by this function *when it is used within a
+        ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
+        dimensions, or a tuple with a mix of both. If not provided, the shape will be
+        inferred from the first execution of the function. If provided, the shape will be
+        validated against the actual shape of the output. This parameters is required only
+        when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
+        derived from the inputs. In case there are multiple outputs, provide the shape for
+        one of the outputs. This works because the shape of all outputs are required to be
+        identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
         The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.
@@ -185,7 +188,7 @@ class PipeFunc(Generic[T]):
         debug: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
-        internal_shape: int | ShapeTuple | None = None,
+        internal_shape: int | Literal["?"] | ShapeTuple | None = None,
         post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
         resources: dict
         | Resources
@@ -203,7 +206,7 @@ class PipeFunc(Generic[T]):
         self.debug = debug
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
-        self.internal_shape: int | ShapeTuple | None = internal_shape
+        self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
         self.post_execution_hook = post_execution_hook
         self._output_picker: Callable[[Any, str], Any] | None = output_picker
         self.profile = profile
@@ -518,10 +521,11 @@ class PipeFunc(Generic[T]):
         self._clear_internal_cache()
         self._validate()
 
-    def _clear_internal_cache(self) -> None:
+    def _clear_internal_cache(self, *, clear_pipelines: bool = True) -> None:
         clear_cached_properties(self, PipeFunc)
-        for pipeline in self._pipelines:
-            pipeline._clear_internal_cache()
+        if clear_pipelines:
+            for pipeline in self._pipelines:
+                pipeline._clear_internal_cache()
 
     def _validate_update(
         self,
@@ -760,6 +764,10 @@ class PipeFunc(Generic[T]):
             return dict(zip(self.output_name, get_args(hint)))
         return {name: NoAnnotation for name in self.output_name}
 
+    @functools.cached_property
+    def requires_mapping(self) -> bool:
+        return self.mapspec is not None and bool(self.mapspec.inputs)
+
     def _maybe_profiler(self) -> contextlib.AbstractContextManager:
         """Maybe get profiler.
 
@@ -888,7 +896,7 @@ def pipefunc(
     debug: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
-    internal_shape: int | ShapeTuple | None = None,
+    internal_shape: int | Literal["?"] | ShapeTuple | None = None,
     post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
     resources: dict
     | Resources
@@ -935,12 +943,15 @@ def pipefunc(
         be merged together. If ``None``, the default behavior is that the input directly
         maps to the output.
     internal_shape
-        Specifies the shape of the returned value(s). This parameters is required only
-        when a `mapspec` like ``... -> out[i]`` is used, indicating that the shape cannot
-        be derived from the inputs. The shape can be a single integer or a tuple of
-        integers, for example: ``3`` or ``(5, 3)``. In case there are multiple outputs,
-        provide the shape for one of the outputs. This works because the shape of all
-        outputs are required to be identical.
+        The shape of the output produced by this function *when it is used within a
+        ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
+        dimensions, or a tuple with a mix of both. If not provided, the shape will be
+        inferred from the first execution of the function. If provided, the shape will be
+        validated against the actual shape of the output. This parameters is required only
+        when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
+        derived from the inputs. In case there are multiple outputs, provide the shape for
+        one of the outputs. This works because the shape of all outputs are required to be
+        identical.
     post_execution_hook
         A callback function that is invoked after the function is executed.
         The callback signature is ``hook(func: PipeFunc, result: Any, kwargs: dict) -> None``.

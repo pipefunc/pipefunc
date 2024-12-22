@@ -6,18 +6,21 @@ import importlib.util
 import pickle
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_rich = importlib.util.find_spec("rich") is not None
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -135,13 +138,33 @@ def test_pipeline_and_all_arg_combinations_rename(f2):
         "e": ("a", "b", "x", "xx"),
     }
 
-    assert pipeline.info == {
+
+@pytest.mark.skipif(not has_rich, reason="rich not installed")
+def test_pipeline_info(capsys: pytest.CaptureFixture) -> None:
+    @pipefunc(output_name="c")
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(b, c, xx):
+        return b * c * xx
+
+    @pipefunc(output_name="e")
+    def f3(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f1, f2, f3])
+
+    assert pipeline.info() == {
         "inputs": ("a", "b", "x", "xx"),
         "outputs": ("e",),
         "intermediate_outputs": ("c", "d"),
         "required_inputs": ("a", "b", "xx"),
         "optional_inputs": ("x",),
     }
+    pipeline.info(print_table=True)
+    captured = capsys.readouterr()
+    assert "Pipeline Info" in captured.out
 
 
 def test_disjoint_pipelines() -> None:
@@ -872,7 +895,8 @@ def test_double_output_then_iterate_over_single_axis():
     }
 
 
-def test_double_output_then_iterate_over_single_axis_gen_job():
+@pytest.mark.parametrize("dim", [10, "?"])
+def test_double_output_then_iterate_over_single_axis_gen_job(dim: int | Literal["?"]):
     def f1(x, y):
         return list(range(10)), list(range(10))
 
@@ -885,10 +909,60 @@ def test_double_output_then_iterate_over_single_axis_gen_job():
                 f1,
                 ("a", "b"),
                 mapspec="x[i], y[j] -> a[i, j, k], b[i, j, k]",
-                internal_shape=(10,),
+                internal_shape=(dim,),
             ),
             PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
         ],
     )
-    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False)
     assert results["c"].output.shape == (3, 10)
+
+
+@dataclass
+class Status:
+    complete: list[int]
+    incomplete: list[int]
+
+
+def test_pipeline_map_zero_size() -> None:
+    @pipefunc("status")
+    def f1(mock_complete: list[int], mock_incomplete: list[int]) -> Status:
+        return Status(mock_complete, mock_incomplete)
+
+    @pipefunc("incomplete")
+    def get_incomplete(status: Status) -> list[int]:
+        return status.incomplete
+
+    @pipefunc("completed")
+    def load_complete(status: Status) -> list[int]:
+        # Not actually doing anything
+        return status.complete
+
+    @pipefunc("executed", mapspec="incomplete[i] -> executed[i]")
+    def run_incomplete(incomplete: int) -> int:
+        return incomplete
+
+    @pipefunc("result")
+    def combine(completed: list[int], executed: Array[int]) -> list[int]:
+        return completed + list(executed)
+
+    pipeline = Pipeline([f1, get_incomplete, load_complete, run_incomplete, combine])
+    result = pipeline.map(
+        {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
+        internal_shapes={"incomplete": ("?",)},
+    )
+    assert result["result"].output == [0, 1, 2, 3]
+    # Now with empty complete
+    result = pipeline.map(
+        {"mock_complete": [], "mock_incomplete": [0, 1, 2, 3]},
+        internal_shapes={"incomplete": ("?",)},
+    )
+    assert result["result"].output == [0, 1, 2, 3]
+
+    # Now with empty incomplete
+    # NOTE: Hits the `not args.missing and not args.existing` edge case
+    result = pipeline.map(
+        {"mock_complete": [0, 1, 2, 3], "mock_incomplete": []},
+        internal_shapes={"incomplete": ("?",)},
+    )
+    assert result["result"].output == [0, 1, 2, 3]

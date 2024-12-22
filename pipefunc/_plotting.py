@@ -303,7 +303,7 @@ def visualize_graphviz(  # noqa: PLR0912
             {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
         "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
-        "NestedPipeFunction": (
+        "NestedPipeFunc": (
             nodes.nested_func,
             {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
         ),

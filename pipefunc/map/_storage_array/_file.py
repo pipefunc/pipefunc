@@ -24,6 +24,7 @@ from ._base import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pipefunc.map._types import ShapeTuple
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -41,8 +42,8 @@ class FileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         filename_template: str = FILENAME_TEMPLATE,
@@ -68,8 +69,8 @@ class FileArray(StorageBase):
     ) -> tuple[int | slice, ...]:
         return normalize_key(
             key,
-            self.shape,
-            self.internal_shape,
+            self.resolved_shape,
+            self.resolved_internal_shape,
             self.shape_mask,
             for_dump=for_dump,
         )
@@ -93,7 +94,7 @@ class FileArray(StorageBase):
 
     def _files(self) -> Iterator[Path]:
         """Yield all the filenames that constitute the data in this array."""
-        return (self._key_to_file(x) for x in iterate_shape_indices(self.shape))
+        return (self._key_to_file(x) for x in iterate_shape_indices(self.resolved_shape))
 
     def _slice_indices(
         self,
@@ -106,7 +107,7 @@ class FileArray(StorageBase):
         internal_shape_index = 0
         normalized_key = self._normalize_key(key, for_dump=for_dump)
         for k, m in zip(normalized_key, self.shape_mask):
-            shape = self.shape if m else self.internal_shape
+            shape = self.resolved_shape if m else self.resolved_internal_shape
             index = shape_index if m else internal_shape_index
 
             if isinstance(k, slice):
@@ -189,7 +190,7 @@ class FileArray(StorageBase):
 
         """
         if splat_internal is None:
-            splat_internal = bool(self.internal_shape)
+            splat_internal = bool(self.resolved_internal_shape)
 
         items = _load_all(map(self._index_to_file, range(self.size)))
 
@@ -197,27 +198,27 @@ class FileArray(StorageBase):
             arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
             arr[:] = items
             mask = self.mask_linear()
-            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.shape)
+            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.resolved_shape)
 
-        if not self.internal_shape:
+        if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
             raise ValueError(msg)
 
         arr = np.empty(self.full_shape, dtype=object)  # type: ignore[var-annotated]
         full_mask = np.empty(self.full_shape, dtype=bool)  # type: ignore[var-annotated]
 
-        for external_index in iterate_shape_indices(self.shape):
+        for external_index in iterate_shape_indices(self.resolved_shape):
             file = self._key_to_file(external_index)
 
             if file.is_file():
                 sub_array = load(file)
                 sub_array = np.asarray(sub_array)  # could be a list
-                for internal_index in iterate_shape_indices(self.internal_shape):
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = sub_array[internal_index]
                     full_mask[full_index] = False
             else:
-                for internal_index in iterate_shape_indices(self.internal_shape):
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
                     arr[full_index] = np.ma.masked
                     full_mask[full_index] = True
