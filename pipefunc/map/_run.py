@@ -1054,8 +1054,10 @@ async def _process_task_async(
     if func.mapspec and func.mapspec.inputs:
         r, args = task
         futs = [_result_async(x, loop) for x in r]
-        outputs_list = await asyncio.gather(*futs)
-        output = _output_from_mapspec_task(func, store, args, outputs_list)
+        chunk_outputs_list = await asyncio.gather(*futs)
+        # Flatten the list of chunked outputs
+        chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
