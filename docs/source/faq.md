@@ -19,6 +19,63 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
+## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.?
+
+pipefunc fills a unique niche in the Python workflow ecosystem.
+
+### Key Differentiators
+
+What makes pipefunc unique:
+
+1. **Simplicity**: Pure Python implementation with minimal dependencies (debugger and profiling tools just work)
+2. **Flexibility**: Easy to modify pipelines and add parameter sweeps with minimal boilerplate
+3. **HPC Integration**: First-class support for traditional HPC clusters
+4. **Resource Management**: Fine-grained control over computational resources
+5. **Development Speed**: Rapid prototyping without infrastructure setup
+
+pipefunc is particularly well-suited for scientists and researchers who need to:
+
+- Quickly prototype and iterate on computational workflows
+- Run parameter sweeps across multiple dimensions
+- Manage varying computational requirements between pipeline steps
+- Work with traditional HPC systems
+- Maintain readable and maintainable Python code
+
+While other tools may be better suited for production ETL pipelines or specific scientific domains, pipefunc excels at flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
+
+Let's break down the comparison by categories:
+
+### Low-Level Parallel Computing Tools (e.g., Dask)
+
+While Dask provides powerful low-level control over parallelization, pipefunc operates at a higher level:
+
+- Dask gives you fine-grained control over what and how to parallelize, requiring explicit loop construction for parameter sweeps
+- pipefunc automatically handles parallelization based on the pipeline structure and `mapspec` definitions
+- Dask is excellent as a computational backend (which pipefunc can use)
+- pipefunc provides higher-level abstractions for common patterns like parameter sweeps
+
+In summary, Dask is a powerful parallel computing library, while pipefunc helps you build and manage scientific workflows with less boilerplate and takes care of parallelization and data saving for you.
+
+### Scientific Workflow Tools (e.g., AiiDA, Pydra)
+
+Compared to scientific workflow managers, pipefunc provides:
+
+- Lighter weight setup with no database requirements (AiiDA needs a daemon, PostgreSQL and RabbitMQ)
+- More intuitive Python-native interface (AiiDA and Pydra's graph construction require a lot of boilerplate compared to pipefunc's automatic graph construction)
+- Runs in code in the same Python environment (AiiDA and Pydra have special ways to run code making debugging harder)
+- Flexible parameter sweeps with automatic parallelization
+- Dynamic resource allocation based on input parameters
+
+### ETL and Production Workflow Tools (e.g., Airflow, Luigi, Kedro)
+
+While these tools excel at production data pipelines, pipefunc offers advantages for scientific computing:
+
+- No boilerplate or project structure requirements (Kedro requires a specific project layout)
+- Direct in-memory data passing between functions (Airflow and Luigi require serialization and deserialization)
+- Built-in parameter sweep capabilities (Airflow and Luigi require custom task definitions)
+- Simple integration with existing Python code
+- Focus on rapid prototyping and iteration
+
 ## How to handle defaults?
 
 You can provide defaults in
