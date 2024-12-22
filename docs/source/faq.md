@@ -45,7 +45,7 @@ While other tools may be better suited for production ETL pipelines or specific 
 
 Let's break down the comparison by categories:
 
-### Low-Level Parallel Computing Tools (e.g., Dask)
+### Low-Level Parallel Computing Tools (e.g., [Dask](https://www.dask.org/))
 
 While Dask provides powerful low-level control over parallelization, pipefunc operates at a higher level:
 
@@ -56,7 +56,7 @@ While Dask provides powerful low-level control over parallelization, pipefunc op
 
 In summary, Dask is a powerful parallel computing library, while pipefunc helps you build and manage scientific workflows with less boilerplate and takes care of parallelization and data saving for you.
 
-### Scientific Workflow Tools (e.g., AiiDA, Pydra)
+### Scientific Workflow Tools (e.g., [AiiDA](https://aiida.readthedocs.io/), [Pydra](https://pydra.readthedocs.io/en/latest/))
 
 Compared to scientific workflow managers, pipefunc provides:
 
@@ -66,7 +66,7 @@ Compared to scientific workflow managers, pipefunc provides:
 - Flexible parameter sweeps with automatic parallelization
 - Dynamic resource allocation based on input parameters
 
-### ETL and Production Workflow Tools (e.g., Airflow, Luigi, Kedro)
+### ETL and Production Workflow Tools (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/), [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
 
 While these tools excel at production data pipelines, pipefunc offers advantages for scientific computing:
 
