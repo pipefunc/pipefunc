@@ -734,12 +734,12 @@ class Pipeline:
 
             If parallel is ``False``, this argument is ignored.
         mapspec_chunksizes
-            The chunk sizes to use for batching `MapSpec` computations on parallel execution. 
+            The chunk sizes to use for batching `MapSpec` computations on parallel execution.
             You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
             By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
 
             Can be specified as a dictionary which maps output names to integer chunk sizes as values.
-            Instead of integer chunksizes you can also provide a callable that takes the total number of 
+            Instead of integer chunksizes you can also provide a callable that takes the total number of
             function executions resulting from the `MapSpec` and returns the chunk size.
 
             Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
@@ -848,12 +848,12 @@ class Pipeline:
                - Use output names as keys and `~concurrent.futures.Executor` instances as values.
                - Use an empty string ``""`` as a key to set a default executor.
         mapspec_chunksizes
-            The chunk sizes to use for batching `MapSpec` computations on parallel execution. 
+            The chunk sizes to use for batching `MapSpec` computations on parallel execution.
             You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
             By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
 
             Can be specified as a dictionary which maps output names to integer chunk sizes as values.
-            Instead of integer chunksizes you can also provide a callable that takes the total number of 
+            Instead of integer chunksizes you can also provide a callable that takes the total number of
             function executions resulting from the `MapSpec` and returns the chunk size.
 
             Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.

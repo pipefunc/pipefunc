@@ -1006,7 +1006,15 @@ def _submit_func(
     cache = cache if func.cache else None
     if func.requires_mapping:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
-        r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(
+            func,
+            args.process_index,
+            args.missing,
+            executor,
+            mapspec_chunksizes,
+            status,
+            progress,
+        )
         task = r, args
     else:
         task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)

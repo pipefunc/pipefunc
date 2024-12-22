@@ -1665,7 +1665,7 @@ def test_pipeline_with_heterogeneous_chunksize():
 
     with pytest.raises(
         ValueError,
-        match=re.escape(f"Invalid chunksize -1 for z"),
+        match=re.escape("Invalid chunksize -1 for z"),
     ):
         pipeline.map(inputs, mapspec_chunksizes={"z": -1})
 
