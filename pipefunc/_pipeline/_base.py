@@ -691,7 +691,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        mapspec_chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+        chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -733,7 +733,7 @@ class Pipeline:
                - Use an empty string ``""`` as a key to set a default executor.
 
             If parallel is ``False``, this argument is ignored.
-        mapspec_chunksizes
+        chunksizes
             The chunk sizes to use for batching `MapSpec` computations on parallel execution.
             You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
             By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
@@ -790,7 +790,7 @@ class Pipeline:
             output_names=output_names,
             parallel=parallel,
             executor=executor,
-            mapspec_chunksizes=mapspec_chunksizes,
+            chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
@@ -807,7 +807,7 @@ class Pipeline:
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        mapspec_chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+        chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -847,7 +847,7 @@ class Pipeline:
 
                - Use output names as keys and `~concurrent.futures.Executor` instances as values.
                - Use an empty string ``""`` as a key to set a default executor.
-        mapspec_chunksizes
+        chunksizes
             The chunk sizes to use for batching `MapSpec` computations on parallel execution.
             You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
             By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
@@ -903,7 +903,7 @@ class Pipeline:
             internal_shapes=internal_shapes,
             output_names=output_names,
             executor=executor,
-            mapspec_chunksizes=mapspec_chunksizes,
+            chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,

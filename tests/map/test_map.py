@@ -1658,7 +1658,7 @@ def test_pipeline_with_heterogeneous_chunksize():
         "h": lambda x: x // 2,
         "": 1,
     }
-    results = pipeline.map(inputs, mapspec_chunksizes=chunksizes)
+    results = pipeline.map(inputs, chunksizes=chunksizes)
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["y2"].output.tolist() == [2, 3, 4]
@@ -1667,7 +1667,7 @@ def test_pipeline_with_heterogeneous_chunksize():
         ValueError,
         match=re.escape("Invalid chunksize -1 for z"),
     ):
-        pipeline.map(inputs, mapspec_chunksizes={"z": -1})
+        pipeline.map(inputs, chunksizes={"z": -1})
 
 
 def test_map_range():
