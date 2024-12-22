@@ -675,6 +675,9 @@ def _process_chunk(
 
 
 def _chunk_indices(indices: list[int], chunksize: int = 1) -> Iterable[tuple[int, ...]]:
+    # The same implementation as outlined in the itertools.batched() documentation
+    # https://docs.python.org/3/library/itertools.html#itertools.batched
+    # but itertools.batched() is was only added in python 3.12
     assert chunksize >= 1
 
     iterator = iter(indices)
@@ -999,7 +1002,7 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = [_result(x) for x in r]
+        outputs_list = [list(itertools.accumulate(_result(x))) for x in r]
         output = _output_from_mapspec_task(func, store, args, outputs_list)
     else:
         r = _result(task)
