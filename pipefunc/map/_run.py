@@ -102,6 +102,16 @@ def run_map(
            - Use an empty string ``""`` as a key to set a default executor.
 
         If parallel is ``False``, this argument is ignored.
+    mapspec_chunksizes
+        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+        Instead of integer chunksizes you can also provide a callable that takes the total number of
+        function executions resulting from the `MapSpec` and returns the chunk size.
+
+        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -245,6 +255,16 @@ def run_map_async(
 
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
+    mapspec_chunksizes
+        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+        Instead of integer chunksizes you can also provide a callable that takes the total number of
+        function executions resulting from the `MapSpec` and returns the chunk size.
+
+        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -699,7 +719,10 @@ def _chunksize_for_func(
         if chunksize is None:
             chunksize = mapspec_chunksizes.get("", 1)
         if callable(chunksize):
-            return chunksize(num_iterations)
+            chunksize = chunksize(num_iterations)
+        if not isinstance(chunksize, int) or chunksize <= 0:
+            msg = f"Invalid chunksize {chunksize} for {func.output_name}"
+            raise ValueError(msg)
         return chunksize
     return 1
 
@@ -935,7 +958,13 @@ def _submit_func(
     if func.mapspec and func.mapspec.inputs:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, cache)
         r = _maybe_parallel_map(
-            func, args.process_index, args.missing, executor, mapspec_chunksizes, status, progress
+            func,
+            args.process_index,
+            args.missing,
+            executor,
+            mapspec_chunksizes,
+            status,
+            progress,
         )
         task = r, args
     else:
@@ -974,7 +1003,14 @@ def _submit_generation(
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
         func: _submit_func(
-            func, run_info, store, fixed_indices, executor, mapspec_chunksizes, progress, cache
+            func,
+            run_info,
+            store,
+            fixed_indices,
+            executor,
+            mapspec_chunksizes,
+            progress,
+            cache,
         )
         for func in generation
     }
