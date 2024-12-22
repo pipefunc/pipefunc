@@ -66,11 +66,15 @@ Compared to scientific workflow managers, pipefunc provides:
 
 ### ETL and Production Workflow Tools (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/), [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
 
-These tools excel at production data pipelines with features like scheduling, monitoring, and reliability, but pipefunc offers advantages for scientific computing:
+
+These tools excel at production data pipelines with features like scheduling, monitoring, and reliability, but are architected for cloud-based execution (e.g., Kubernetes, cloud functions, containerized workloads).
+While some offer HPC support, it's typically an afterthought and doesn't align well with traditional scientific computing workflows.
+pipefunc offers distinct advantages for scientific computing:
 
 - No mandatory project structure (unlike Kedro which enforces specific layouts)
 - Direct in-memory data passing between functions (while Airflow and Luigi primarily work with serialized data)
 - Native support for parameter sweeps (which would require custom implementations in Airflow/Luigi)
+- Designed for traditional HPC environments (SLURM, PBS, etc.) rather than cloud-first architectures (but runs in local kernel too)
 - Simple integration with existing Python code
 - Focus on rapid prototyping and iteration
 
