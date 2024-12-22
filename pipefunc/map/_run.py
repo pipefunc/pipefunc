@@ -667,6 +667,21 @@ def _submit(
     return fut
 
 
+def _process_chunk(
+    chunk: list[int],
+    process_index: functools.partial[tuple[Any, ...]],
+) -> list[Any]:
+    return list(map(process_index, chunk))
+
+
+def _chunk_indices(indices: list[int], chunksize: int = 1) -> Iterable[tuple[int, ...]]:
+    assert chunksize >= 1
+
+    iterator = iter(indices)
+    while batch := tuple(itertools.islice(iterator, chunksize)):
+        yield batch
+
+
 def _maybe_parallel_map(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
@@ -679,7 +694,9 @@ def _maybe_parallel_map(
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        return [_submit(process_index, ex, status, progress, i) for i in indices]
+        chunks = _chunk_indices(indices)
+        process_chunk = functools.partial(_process_chunk, process_index=process_index)
+        return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
