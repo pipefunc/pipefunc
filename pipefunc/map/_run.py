@@ -674,7 +674,7 @@ def _process_chunk(
     return list(map(process_index, chunk))
 
 
-def _chunk_indices(indices: list[int], chunksize: int = 1) -> Iterable[tuple[int, ...]]:
+def _chunk_indices(indices: list[int], chunksize: int = 3) -> Iterable[tuple[int, ...]]:
     # The same implementation as outlined in the itertools.batched() documentation
     # https://docs.python.org/3/library/itertools.html#itertools.batched
     # but itertools.batched() is was only added in python 3.12
@@ -697,13 +697,14 @@ def _maybe_parallel_map(
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        chunks = _chunk_indices(indices)
+        chunks = list(_chunk_indices(indices))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
-    return [process_index(i) for i in indices]
+    # Put the process_index result in a tuple to have consistent shapes when func has mapspec
+    return [(process_index(i), ) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -1002,8 +1003,10 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.mapspec and func.mapspec.inputs:
         r, args = task
-        outputs_list = [list(itertools.accumulate(_result(x))) for x in r]
-        output = _output_from_mapspec_task(func, store, args, outputs_list)
+        chunk_outputs_list = [_result(x) for x in r]
+        # Flatten the list of chunked outputs 
+        chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
