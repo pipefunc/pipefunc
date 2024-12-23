@@ -80,9 +80,9 @@ These tools provide frameworks for building data pipelines with a focus on data 
 
 **`pipefunc` vs. Data Pipelines:**
 
-* **Structure:** `pipefunc` is less opinionated about project structure than Kedro, which enforces a specific layout. Prefect is more flexible but still geared towards defining data flows.
-* **Scope:** `pipefunc` is more focused on the computational aspects of pipelines, while Kedro and Prefect offer more features for data management, versioning, and deployment.
-* **Flexibility:** `pipefunc` offers more flexibility in how pipelines are defined and executed, while Kedro and Prefect provide more structure and standardization.
+- **Structure:** `pipefunc` is less opinionated about project structure than Kedro, which enforces a specific layout. Prefect is more flexible but still geared towards defining data flows.
+- **Scope:** `pipefunc` is more focused on the computational aspects of pipelines, while Kedro and Prefect offer more features for data management, versioning, and deployment.
+- **Flexibility:** `pipefunc` offers more flexibility in how pipelines are defined and executed, while Kedro and Prefect provide more structure and standardization.
 
 ### Workflow Definition Languages (e.g., [Snakemake](https://snakemake.readthedocs.io/))
 
@@ -91,10 +91,10 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 **`pipefunc` vs. Snakemake:**
 
-* **Workflow Definition:** `pipefunc` uses Python code with decorators. Snakemake uses a `Snakefile` with a specialized syntax.
-* **Focus:** `pipefunc` is designed for Python-centric workflows and automatic parallelization within Python. Snakemake is language-agnostic and handles the execution of diverse tools and steps, potentially in different environments.
-* **Flexibility:** `pipefunc` offers more flexibility in defining complex logic within Python functions. Snakemake provides a more rigid, rule-based approach.
-* **Learning Curve:** `pipefunc` is generally easier to learn for Python users. Snakemake requires understanding its DSL.
+- **Workflow Definition:** `pipefunc` uses Python code with decorators. Snakemake uses a `Snakefile` with a specialized syntax.
+- **Focus:** `pipefunc` is designed for Python-centric workflows and automatic parallelization within Python. Snakemake is language-agnostic and handles the execution of diverse tools and steps, potentially in different environments.
+- **Flexibility:** `pipefunc` offers more flexibility in defining complex logic within Python functions. Snakemake provides a more rigid, rule-based approach.
+- **Learning Curve:** `pipefunc` is generally easier to learn for Python users. Snakemake requires understanding its DSL.
 
 **`pipefunc` within Snakemake:**
 
@@ -109,9 +109,9 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 You can provide defaults in
 
 - The original function definition (the normal way)
-- The `pipefunc` decorator `@`{class}`pipefunc.pipefunc``(..., defaults={...})`
-- Update the defaults of a `PipeFunc` object (a wrapped function) via {class}`pipefunc.PipeFunc.update_defaults``({...})`
-- Update the defaults of an entire pipeline via {class}`pipefunc.Pipeline.update_defaults``({...})`
+- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., defaults={...}) `
+- Update the defaults of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_defaults``({...}) `
+- Update the defaults of an entire pipeline via {class}` pipefunc.Pipeline.update_defaults``({...}) `
 
 Some examples in code:
 
@@ -128,14 +128,14 @@ This function `f` has a default value for `x` set to 2.
 :::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
 :class: note, dropdown
 
-   ```python
-   from pipefunc import PipeFunc
+```python
+from pipefunc import PipeFunc
 
-   def f(a, x):
-       return a * x
+def f(a, x):
+    return a * x
 
-   f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
-   ```
+f_func = PipeFunc(f, output_name="y", defaults={"x": 2})
+```
 
 :::
 
@@ -185,8 +185,8 @@ Instead of using defaults, you can bind parameters to a fixed value using the `b
 
 See:
 
-- The `pipefunc` decorator `@`{class}`pipefunc.pipefunc``(..., bound={...})`
-- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}`pipefunc.PipeFunc.update_bound``({...})`
+- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., bound={...}) `
+- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_bound``({...}) `
 
 ```{code-cell} ipython3
 @pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
@@ -199,14 +199,14 @@ f(a=1, x=999)  # x is ignored and replaced by the bound value
 :::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
 :class: note, dropdown
 
-   ```python
-   from pipefunc import PipeFunc
+```python
+from pipefunc import PipeFunc
 
-   def f(a, x):
-      return a + x
+def f(a, x):
+   return a + x
 
-   f_func = PipeFunc(f, output_name="y", bound={"x": 2})
-   ```
+f_func = PipeFunc(f, output_name="y", bound={"x": 2})
+```
 
 :::
 
@@ -270,7 +270,6 @@ add_func.update_renames({"x": "c", "y": "d"}, update_from="current")
 
 This updates the current renames `{"a": "x", "b": "y"}` to `{"a": "c", "b": "d"}`.
 
-
 4. By updating the renames of an entire pipeline:
 
 ```{code-cell} ipython3
@@ -283,18 +282,17 @@ When specifying renames, you can choose to update from the original argument nam
 :::{admonition} We can also update the <code>output_name</code>
 :class: note, dropdown
 
-   ```{code-cell} ipython3
-   @pipefunc(output_name=("i", "j"))
-   def f(a, b):
-       return a, b
+```{code-cell} ipython3
+@pipefunc(output_name=("i", "j"))
+def f(a, b):
+    return a, b
 
-   # renames must be in terms of individual output strings
-   f.update_renames({"i": "ii"}, update_from="current")
-   assert f.output_name == ("ii", "j")
-   ```
+# renames must be in terms of individual output strings
+f.update_renames({"i": "ii"}, update_from="current")
+assert f.output_name == ("ii", "j")
+```
 
 :::
-
 
 Some key things to note:
 
@@ -472,6 +470,7 @@ Array[int]
 ```
 
 (run-vs-map)=
+
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 
 These methods are used to execute the pipeline but have different use cases:
@@ -494,8 +493,8 @@ Here is a table summarizing the differences between `pipeline.run` and `pipeline
 | ------------------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Execution mode                                         | Sequential                                                                       | Parallel (any {class}`~concurrent.futures.Executor` class) or sequential                                               |
 | Map-reduce support (via {class}`pipefunc.map.MapSpec`) | No                                                                               | Yes                                                                                                                    |
-| Input arguments                                        | Can provide *any* input arguments for any function in the pipeline               | Requires the root arguments (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph)                            |
-| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates *all* function nodes in the entire pipeline (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph) |
+| Input arguments                                        | Can provide _any_ input arguments for any function in the pipeline               | Requires the root arguments (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph)                            |
+| Output arguments                                       | Can request the output of any function in the pipeline                           | Calculates _all_ function nodes in the entire pipeline (use {class}`~pipefunc.Pipeline.subpipeline` to get a subgraph) |
 | Intermediate results storage                           | In-memory dictionary                                                             | Configurable storage ({class}`~pipefunc.map.StorageBase`), e.g., on disk, cloud, or in (shared-)memory                 |
 | Use case                                               | Executing the pipeline as a regular function, going from any input to any output | Optimized for parallel execution and map-reduce operations                                                             |
 | Calling syntax                                         | `pipeline.run(output_name, kwargs)` or `pipeline(output_name, **kwargs)`         | `pipeline.map(inputs, ...)`                                                                                            |
@@ -567,7 +566,7 @@ Some key things to note:
 - Setting a scope prefixes parameter and output names with `{scope}.`, e.g., `x` becomes `foo.x` if the scope is "foo".
 - You can selectively include or exclude certain inputs/outputs when updating the scope using the `inputs`, `outputs` and `exclude` arguments.
 - Updating the scope of a pipeline updates the scopes of its functions, propagating the changes.
-- Applying a scope to a parameter that is already in a scope will *replace* the existing scope with the new one.
+- Applying a scope to a parameter that is already in a scope will _replace_ the existing scope with the new one.
 - Using scopes makes it possible to use the same parameter names in different contexts without conflicts.
 - Scopes are purely a naming mechanism and do not affect the actual function execution.
 
@@ -607,8 +606,8 @@ We can confirm this by inspecting the `PipeFunc` objects:
 :::{admonition} Get the <code>PipeFunc</code> objects using <code>pipeline[output_name]</code>
 :class: note, dropdown
 
-   The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified.
-   Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
+The functions passed to the `Pipeline` constructor are copied using `PipeFunc.copy()`, so the original functions are not modified.
+Therefore, to get the `PipeFunc` objects from the pipeline, you can use `pipeline[output_name]` to retrieve the functions by their output names.
 
 :::
 
@@ -861,6 +860,7 @@ The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about
 **Usage:**
 
 1. **Accessing Snapshots**:
+
    ```python
    result = my_pipefunc_or_pipeline(args)
    if my_pipefunc_or_pipeline.error_snapshot:
@@ -868,6 +868,7 @@ The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about
    ```
 
 2. **Reproducing Errors**:
+
    ```python
    error_snapshot = my_pipefunc_or_pipeline.error_snapshot
    if error_snapshot:
@@ -1256,7 +1257,7 @@ pipeline.visualize(backend="graphviz")
 
 ## `PipeFunc`s with Multiple Outputs of Different Shapes
 
-**Question:** How can I use `PipeFunc` to return multiple outputs with different shapes when using `mapspec`?  It seems like `mapspec` requires all outputs to have the same dimensions.
+**Question:** How can I use `PipeFunc` to return multiple outputs with different shapes when using `mapspec`? It seems like `mapspec` requires all outputs to have the same dimensions.
 
 **Answer:**
 
