@@ -5,6 +5,7 @@ import functools
 import itertools
 import math
 import time
+import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -795,7 +796,8 @@ def _get_optimal_chunk_size(
     """
     try:
         n_cores = get_ncores(executor)
-    except TypeError:
+    except TypeError as e:
+        warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
         n_cores = 1
 
     if total_items < n_cores * 2:
