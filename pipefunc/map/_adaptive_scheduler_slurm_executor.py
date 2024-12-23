@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
-from pipefunc._utils import at_least_tuple, is_min_version
+from pipefunc._utils import at_least_tuple, is_imported, is_min_version
 
 if TYPE_CHECKING:
     import functools
@@ -124,7 +123,7 @@ def _slurm_executor_for_single(
 
 def _adaptive_scheduler_imported() -> bool:
     """Check if the adaptive_scheduler package is imported and at the correct version."""
-    if "adaptive_scheduler" not in sys.modules:  # pragma: no cover
+    if not is_imported("adaptive_scheduler"):  # pragma: no cover
         return False
     # The SlurmExecutor was introduced in version 2.13.3
     min_version = "2.14.0"

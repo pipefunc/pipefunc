@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import math
 import time
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
@@ -13,7 +14,15 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    get_ncores,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
+)
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -735,6 +744,7 @@ def _chunksize_for_func(
     func: PipeFunc,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     num_iterations: int,
+    executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
@@ -748,7 +758,34 @@ def _chunksize_for_func(
             msg = f"Invalid chunksize {chunksize} for {func.output_name}"
             raise ValueError(msg)
         return chunksize
-    return 1
+    return _get_optimal_chunk_size(num_iterations, executor)
+
+
+def _get_optimal_chunk_size(
+    total_items: int,
+    executor: Executor,
+    min_chunks_per_worker: int = 20,
+) -> int:
+    """Calculate an optimal chunk size for parallel processing.
+
+    Parameters
+    ----------
+    total_items
+        Total number of items to process
+    executor
+        The executor to use for parallel processing
+    min_chunks_per_worker
+        Minimum number of chunks each worker should process. Default of 20 provides good
+        balance between load distribution and overhead for most workloads
+
+    """
+    n_cores = get_ncores(executor)
+
+    if total_items < n_cores * 2:
+        return 1
+
+    chunk_size = math.ceil(total_items / (n_cores * min_chunks_per_worker))
+    return max(1, chunk_size)
 
 
 def _maybe_parallel_map(
@@ -764,7 +801,7 @@ def _maybe_parallel_map(
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        chunksize = _chunksize_for_func(func, chunksizes, len(indices))
+        chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]

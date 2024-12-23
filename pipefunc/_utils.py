@@ -9,6 +9,7 @@ import operator
 import socket
 import sys
 import warnings
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
@@ -266,7 +267,7 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if "pydantic" not in sys.modules:
+    if not is_imported("pydantic"):  # pragma: no cover
         return False
     if not inspect.isclass(x):
         return False
@@ -282,3 +283,38 @@ def first(x: T | tuple[T, ...]) -> T:
     if isinstance(x, tuple):  # pragma: no cover
         return x[0]
     return x
+
+
+def is_imported(package: str) -> bool:
+    """Check if a package is imported."""
+    return package in sys.modules
+
+
+def get_ncores(ex: Executor) -> int:
+    """Return the maximum number of cores that an executor can use."""
+    if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
+        return ex._max_workers  # type: ignore[union-attr]
+    if is_imported("ipyparallel"):
+        import ipyparallel
+
+        if isinstance(ex, ipyparallel.client.view.ViewExecutor):
+            return len(ex.view)
+    if is_imported("loky"):
+        import loky
+
+        if isinstance(ex, loky.reusable_executor._ReusablePoolExecutor):
+            return ex._max_workers
+    if is_imported("distributed"):
+        import distributed
+
+        if isinstance(ex, distributed.cfexecutor.ClientExecutor):
+            return sum(n for n in ex._client.ncores().values())
+    if is_imported("mpi4py"):
+        import mpi4py.futures
+
+        if isinstance(ex, mpi4py.futures.MPIPoolExecutor):
+            ex.bootup()  # wait until all workers are up and running
+            return ex._pool.size  # not public API!
+
+    msg = f"Cannot get number of cores for {ex.__class__}"
+    raise TypeError(msg)
