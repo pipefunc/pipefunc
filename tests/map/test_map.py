@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -28,6 +29,11 @@ has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
 
 storage_options = list(storage_registry)
+
+try:
+    has_gil = sys._is_gil_enabled()  # type: ignore[attr-defined]
+except AttributeError:
+    has_gil = True
 
 
 def xarray_dataset_from_results(*args, **kwargs):
@@ -1483,6 +1489,8 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
+    if not has_gil:
+        pytest.skip("Sometimes hang forever in 3.13t CI")
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
@@ -1636,6 +1644,41 @@ def test_pipeline_with_heterogeneous_executor() -> None:
     process_names = r["z"].output.tolist()
     assert all("Process-" in name for name in process_names)
     assert r["y2"].output.tolist() == [2, 3, 4]
+
+
+@pytest.mark.parametrize(
+    "chunksizes",
+    [
+        {("y1", "y2"): 2, "h": lambda x: x // 2, "": 1},
+        1,
+        10000,
+    ],
+)
+def test_pipeline_with_heterogeneous_chunksize(chunksizes):
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        return x - 1, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="h", mapspec="x[i] -> h[i]")
+    def h(x):
+        return x + 1
+
+    pipeline = Pipeline([f, g, h])
+    inputs = {"x": [1, 2, 3]}
+    results = pipeline.map(inputs, chunksizes=chunksizes)
+    assert results["y1"].output.tolist() == [0, 1, 2]
+    assert results["z"].output.tolist() == [2, 3, 4]
+    assert results["y2"].output.tolist() == [2, 3, 4]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Invalid chunksize -1 for z"),
+    ):
+        pipeline.map(inputs, chunksizes={"z": -1})
 
 
 def test_map_range():
