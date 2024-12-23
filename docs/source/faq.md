@@ -19,7 +19,7 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
-## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.?
+## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, Snakemake, etc.?
 
 pipefunc fills a unique niche in the Python workflow ecosystem.
 
@@ -79,6 +79,43 @@ pipefunc offers distinct advantages for scientific computing:
 - Focus on rapid prototyping and iteration
 
 While other tools may be better suited for production ETL pipelines or specific scientific domains, pipefunc excels at flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
+
+### Snakemake
+
+**`pipefunc` and Snakemake** both manage computational workflows but differ in their approach and ideal use cases.
+
+**Snakemake** defines workflows at a higher level using a domain-specific language. It excels at orchestrating diverse tools and scripts, often in separate environments, through a dedicated workflow definition file (`Snakefile`).
+
+**`pipefunc`**, a Python library, focuses on building pipelines composed of Python functions. It automatically manages execution order based on function dependencies and intelligently parallelizes operations where possible. It's designed for Python-centric workflows, streamlining development by reducing boilerplate code related to function chaining and parameter sweeps.
+
+**Key Differences:**
+
+| Feature          | `pipefunc`                                                                  | Snakemake                                                                        |
+| ---------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Workflow Definition | Python code with decorators                                               | `Snakefile` (domain-specific language)                                          |
+| Focus            | Python functions, automatic dependency resolution, parallelization         | Orchestration of diverse tools, potentially in different environments         |
+| Execution        | Primarily within a single Python process (with parallelization options) | Steps often executed as separate processes                                    |
+| Dependencies     | Minimal Python dependencies                                                   | Requires Snakemake installation, may require others based on workflow needs   |
+| Project Structure | No enforced structure                                                     | Often uses a specific directory structure for rules, inputs, and output files |
+
+**Choose `pipefunc` when:**
+
+*   Your workflow is primarily composed of Python functions.
+*   You want automatic dependency resolution and simplified parallelization.
+*   You prefer defining workflows directly in Python without a separate language.
+*   You need to perform parameter sweeps or optimizations within your Python code.
+
+**Choose Snakemake when:**
+
+*   Your workflow involves diverse tools, scripts, or programs (not just Python).
+*   Different steps require different software environments.
+*   You need a higher-level workflow definition, potentially involving external commands.
+*   You are comfortable with Snakemake's domain-specific language.
+
+**`pipefunc` within Snakemake:**
+
+`pipefunc` can be integrated into a Snakemake workflow. You could have a Snakemake rule that executes a Python script containing a `pipefunc` pipeline, combining the strengths of both tools.
+
 
 ## How to handle defaults?
 
