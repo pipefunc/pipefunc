@@ -108,16 +108,23 @@ def run_map(
 
         If parallel is ``False``, this argument is ignored.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -264,16 +271,23 @@ def run_map_async(
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
