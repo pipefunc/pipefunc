@@ -691,6 +691,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -732,6 +733,16 @@ class Pipeline:
                - Use an empty string ``""`` as a key to set a default executor.
 
             If parallel is ``False``, this argument is ignored.
+        chunksizes
+            The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+            You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+            By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+            Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+            Instead of integer chunksizes you can also provide a callable that takes the total number of
+            function executions resulting from the `MapSpec` and returns the chunk size.
+
+            Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
         storage
             The storage class to use for storing intermediate and final results.
             Can be specified as:
@@ -779,6 +790,7 @@ class Pipeline:
             output_names=output_names,
             parallel=parallel,
             executor=executor,
+            chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,
@@ -795,6 +807,7 @@ class Pipeline:
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+        chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
@@ -834,6 +847,16 @@ class Pipeline:
 
                - Use output names as keys and `~concurrent.futures.Executor` instances as values.
                - Use an empty string ``""`` as a key to set a default executor.
+        chunksizes
+            The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+            You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+            By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+            Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+            Instead of integer chunksizes you can also provide a callable that takes the total number of
+            function executions resulting from the `MapSpec` and returns the chunk size.
+
+            Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
         storage
             The storage class to use for storing intermediate and final results.
             Can be specified as:
@@ -880,6 +903,7 @@ class Pipeline:
             internal_shapes=internal_shapes,
             output_names=output_names,
             executor=executor,
+            chunksizes=chunksizes,
             storage=storage,
             persist_memory=persist_memory,
             cleanup=cleanup,

@@ -1638,6 +1638,38 @@ def test_pipeline_with_heterogeneous_executor() -> None:
     assert r["y2"].output.tolist() == [2, 3, 4]
 
 
+def test_pipeline_with_heterogeneous_chunksize():
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        return x - 1, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="h", mapspec="x[i] -> h[i]")
+    def h(x):
+        return x + 1
+
+    pipeline = Pipeline([f, g, h])
+    inputs = {"x": [1, 2, 3]}
+    chunksizes = {
+        ("y1", "y2"): 2,
+        "h": lambda x: x // 2,
+        "": 1,
+    }
+    results = pipeline.map(inputs, chunksizes=chunksizes)
+    assert results["y1"].output.tolist() == [0, 1, 2]
+    assert results["z"].output.tolist() == [2, 3, 4]
+    assert results["y2"].output.tolist() == [2, 3, 4]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Invalid chunksize -1 for z"),
+    ):
+        pipeline.map(inputs, chunksizes={"z": -1})
+
+
 def test_map_range():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):

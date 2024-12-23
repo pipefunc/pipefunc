@@ -54,6 +54,7 @@ def run_map(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -97,6 +98,16 @@ def run_map(
            - Use an empty string ``""`` as a key to set a default executor.
 
         If parallel is ``False``, this argument is ignored.
+    chunksizes
+        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+        Instead of integer chunksizes you can also provide a callable that takes the total number of
+        function executions resulting from the `MapSpec` and returns the chunk size.
+
+        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -152,6 +163,7 @@ def run_map(
                 outputs=outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
+                chunksizes=chunksizes,
                 progress=progress,
                 cache=pipeline.cache,
             )
@@ -199,6 +211,7 @@ def run_map_async(
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -240,6 +253,16 @@ def run_map_async(
 
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
+    chunksizes
+        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
+        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
+        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+
+        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
+        Instead of integer chunksizes you can also provide a callable that takes the total number of
+        function executions resulting from the `MapSpec` and returns the chunk size.
+
+        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -298,6 +321,7 @@ def run_map_async(
                     outputs=outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
+                    chunksizes=chunksizes,
                     progress=progress,
                     cache=pipeline.cache,
                     multi_run_manager=multi_run_manager,
@@ -687,11 +711,48 @@ def _submit(
     return fut
 
 
+def _process_chunk(
+    chunk: list[int],
+    process_index: functools.partial[tuple[Any, ...]],
+) -> list[Any]:
+    return list(map(process_index, chunk))
+
+
+def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ...]]:
+    # The same implementation as outlined in the itertools.batched() documentation
+    # https://docs.python.org/3/library/itertools.html#itertools.batched
+    # but itertools.batched() was only added in python 3.12
+    assert chunksize >= 1
+
+    iterator = iter(indices)
+    while batch := tuple(itertools.islice(iterator, chunksize)):
+        yield batch
+
+
+def _chunksize_for_func(
+    func: PipeFunc,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    num_iterations: int,
+) -> int:
+    if chunksizes is not None:
+        chunksize = chunksizes.get(func.output_name, None)
+        if chunksize is None:
+            chunksize = chunksizes.get("", 1)
+        if callable(chunksize):
+            chunksize = chunksize(num_iterations)
+        if not isinstance(chunksize, int) or chunksize <= 0:
+            msg = f"Invalid chunksize {chunksize} for {func.output_name}"
+            raise ValueError(msg)
+        return chunksize
+    return 1
+
+
 def _maybe_parallel_map(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -699,11 +760,15 @@ def _maybe_parallel_map(
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        return [_submit(process_index, ex, status, progress, i) for i in indices]
+        chunksize = _chunksize_for_func(func, chunksizes, len(indices))
+        chunks = list(_chunk_indices(indices, chunksize))
+        process_chunk = functools.partial(_process_chunk, process_index=process_index)
+        return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
-    return [process_index(i) for i in indices]
+    # Put the process_index result in a tuple to have consistent shapes when func has mapspec
+    return [(process_index(i),) for i in indices]
 
 
 def _wrap_with_status_update(
@@ -831,6 +896,7 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -840,6 +906,7 @@ def _run_and_process_generation(
         store,
         fixed_indices,
         executor,
+        chunksizes,
         progress,
         cache,
     )
@@ -853,6 +920,7 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -863,6 +931,7 @@ async def _run_and_process_generation_async(
         store,
         fixed_indices,
         executor,
+        chunksizes,
         progress,
         cache,
     )
@@ -928,6 +997,7 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -936,7 +1006,15 @@ def _submit_func(
     cache = cache if func.cache else None
     if func.requires_mapping:
         args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
-        r = _maybe_parallel_map(func, args.process_index, args.missing, executor, status, progress)
+        r = _maybe_parallel_map(
+            func,
+            args.process_index,
+            args.missing,
+            executor,
+            chunksizes,
+            status,
+            progress,
+        )
         task = r, args
     else:
         task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
@@ -977,11 +1055,21 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
+    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
-        func: _submit_func(func, run_info, store, fixed_indices, executor, progress, cache)
+        func: _submit_func(
+            func,
+            run_info,
+            store,
+            fixed_indices,
+            executor,
+            chunksizes,
+            progress,
+            cache,
+        )
         for func in generation
     }
 
@@ -1066,8 +1154,10 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
-        outputs_list = [_result(x) for x in r]
-        output = _output_from_mapspec_task(func, store, args, outputs_list)
+        chunk_outputs_list = [_result(x) for x in r]
+        # Flatten the list of chunked outputs
+        chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
@@ -1101,8 +1191,10 @@ async def _process_task_async(
     if func.requires_mapping:
         r, args = task
         futs = [_result_async(x, loop) for x in r]
-        outputs_list = await asyncio.gather(*futs)
-        output = _output_from_mapspec_task(func, store, args, outputs_list)
+        chunk_outputs_list = await asyncio.gather(*futs)
+        # Flatten the list of chunked outputs
+        chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
