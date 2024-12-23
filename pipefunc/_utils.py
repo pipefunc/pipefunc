@@ -267,7 +267,7 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if not is_imported("pydantic"):  # pragma: no cover
+    if not is_imported("pydantic"):
         return False
     if not inspect.isclass(x):
         return False
