@@ -54,7 +54,7 @@ def run_map(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -102,12 +102,13 @@ def run_map(
         The chunk sizes to use for batching `MapSpec` computations on parallel execution.
         You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
         By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Can be specified as:
 
-        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
-        Instead of integer chunksizes you can also provide a callable that takes the total number of
-        function executions resulting from the `MapSpec` and returns the chunk size.
-
-        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
+        1. An integer: Use the same chunk size for all outputs.
+        2. A dictionary: Specify different chunk sizes for different outputs.
+            - Use output names as keys and integer chunk sizes or callables as values.
+            - Use an empty string ``""`` as a key to set a default chunk size.
+            - Callables should take the total number of function executions as input and return the chunk size.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -211,7 +212,7 @@ def run_map_async(
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: str | dict[OUTPUT_TYPE, str] = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -257,12 +258,13 @@ def run_map_async(
         The chunk sizes to use for batching `MapSpec` computations on parallel execution.
         You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
         By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Can be specified as:
 
-        Can be specified as a dictionary which maps output names to integer chunk sizes as values.
-        Instead of integer chunksizes you can also provide a callable that takes the total number of
-        function executions resulting from the `MapSpec` and returns the chunk size.
-
-        Use an empty string ``""`` as a key to set a default chunk size for mapspec operations.
+        1. An integer: Use the same chunk size for all outputs.
+        2. A dictionary: Specify different chunk sizes for different outputs.
+            - Use output names as keys and integer chunk sizes or callables as values.
+            - Use an empty string ``""`` as a key to set a default chunk size.
+            - Callables should take the total number of function executions as input and return the chunk size.
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -731,9 +733,11 @@ def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ..
 
 def _chunksize_for_func(
     func: PipeFunc,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     num_iterations: int,
 ) -> int:
+    if isinstance(chunksizes, int):
+        return chunksizes
     if chunksizes is not None:
         chunksize = chunksizes.get(func.output_name, None)
         if chunksize is None:
@@ -752,7 +756,7 @@ def _maybe_parallel_map(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -896,7 +900,7 @@ def _run_and_process_generation(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -920,7 +924,7 @@ async def _run_and_process_generation_async(
     outputs: dict[str, Result],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -997,7 +1001,7 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     progress: ProgressTracker | None = None,
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -1055,7 +1059,7 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:

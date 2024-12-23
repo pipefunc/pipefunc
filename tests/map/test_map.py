@@ -1638,7 +1638,15 @@ def test_pipeline_with_heterogeneous_executor() -> None:
     assert r["y2"].output.tolist() == [2, 3, 4]
 
 
-def test_pipeline_with_heterogeneous_chunksize():
+@pytest.mark.parametrize(
+    "chunksizes",
+    [
+        {("y1", "y2"): 2, "h": lambda x: x // 2, "": 1},
+        1,
+        10000,
+    ],
+)
+def test_pipeline_with_heterogeneous_chunksize(chunksizes):
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
         return x - 1, x + 1
@@ -1653,11 +1661,6 @@ def test_pipeline_with_heterogeneous_chunksize():
 
     pipeline = Pipeline([f, g, h])
     inputs = {"x": [1, 2, 3]}
-    chunksizes = {
-        ("y1", "y2"): 2,
-        "h": lambda x: x // 2,
-        "": 1,
-    }
     results = pipeline.map(inputs, chunksizes=chunksizes)
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
