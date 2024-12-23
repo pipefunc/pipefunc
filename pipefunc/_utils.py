@@ -294,22 +294,22 @@ def get_ncores(ex: Executor) -> int:
     """Return the maximum number of cores that an executor can use."""
     if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
         return ex._max_workers  # type: ignore[union-attr]
-    if is_imported("ipyparallel"):
+    if is_imported("ipyparallel"):  # pragma: no cover
         import ipyparallel
 
         if isinstance(ex, ipyparallel.client.view.ViewExecutor):
             return len(ex.view)
-    if is_imported("loky"):
+    if is_imported("loky"):  # pragma: no cover
         import loky
 
         if isinstance(ex, loky.reusable_executor._ReusablePoolExecutor):
             return ex._max_workers
-    if is_imported("distributed"):
+    if is_imported("distributed"):  # pragma: no cover
         import distributed
 
         if isinstance(ex, distributed.cfexecutor.ClientExecutor):
             return sum(n for n in ex._client.ncores().values())
-    if is_imported("mpi4py"):
+    if is_imported("mpi4py"):  # pragma: no cover
         import mpi4py.futures
 
         if isinstance(ex, mpi4py.futures.MPIPoolExecutor):
