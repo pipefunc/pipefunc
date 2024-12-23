@@ -1,3 +1,4 @@
+import math
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import pytest
@@ -116,5 +117,9 @@ def test_get_ncores_invalid() -> None:
     class DummyExecutor:
         pass
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Cannot get number of cores for"):
         get_ncores(DummyExecutor())  # type: ignore[arg-type]
+
+    with pytest.warns(UserWarning, match="Automatic chunksize calculation failed"):
+        n = _get_optimal_chunk_size(1000, DummyExecutor())  # type: ignore[arg-type]
+    assert n == math.ceil(1000 / 20) == 50
