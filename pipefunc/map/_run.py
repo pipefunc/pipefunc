@@ -779,7 +779,10 @@ def _get_optimal_chunk_size(
         balance between load distribution and overhead for most workloads
 
     """
-    n_cores = get_ncores(executor)
+    try:
+        n_cores = get_ncores(executor)
+    except TypeError:
+        n_cores = 1
 
     if total_items < n_cores * 2:
         return 1
