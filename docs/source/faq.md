@@ -66,7 +66,7 @@ Compared to scientific workflow managers, `pipefunc` provides:
 
 ### Job Schedulers/Runners (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/))
 
-These tools are designed for scheduling and running tasks, often in a distributed environment. They are well-suited for production ETL pipelines and managing dependencies between jobs.
+These tools are designed for scheduling and running tasks, often in a distributed environment. They are well-suited for production ETL pipelines and managing dependencies between jobs. Unlike `pipefunc`, they often rely on serialized data or external storage for data exchange between tasks and require custom implementations for parameter sweeps.
 
 **`pipefunc` vs. Job Schedulers:**
 
@@ -87,6 +87,7 @@ These tools provide frameworks for building data pipelines with a focus on data 
 ### Workflow Definition Languages (e.g., [Snakemake](https://snakemake.readthedocs.io/))
 
 Snakemake uses a domain-specific language (DSL) to define workflows as a set of rules with dependencies. It excels at orchestrating diverse tools and scripts, often in separate environments, through a dedicated workflow definition file (`Snakefile`).
+Unlike pipefunc, Snakemake primarily works with serialized data and may require custom implementations for parameter sweeps within the Python code.
 
 **`pipefunc` vs. Snakemake:**
 
@@ -102,23 +103,6 @@ Snakemake uses a domain-specific language (DSL) to define workflows as a set of 
 **In essence:**
 
 `pipefunc` provides a simpler, more Pythonic approach for workflows primarily based on Python functions. It excels at streamlining development, reducing boilerplate, and automatically handling parallelization within the familiar Python ecosystem. While other tools may be better suited for production ETL pipelines, managing complex dependencies, or workflows involving diverse non-Python tools, `pipefunc` is ideal for flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
-
-
-### ETL and Production Workflow Tools (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/), [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
-
-
-These tools excel at production data pipelines with features like scheduling, monitoring, and reliability, but are architected for cloud-based execution (e.g., Kubernetes, cloud functions, containerized workloads).
-While some offer HPC support, it's typically an afterthought and doesn't align well with traditional scientific computing workflows.
-pipefunc offers distinct advantages for scientific computing:
-
-- No mandatory project structure (unlike Kedro which enforces specific layouts)
-- Direct in-memory data passing between functions (while Airflow and Luigi primarily work with serialized data)
-- Native support for parameter sweeps (which would require custom implementations in Airflow/Luigi)
-- Designed for traditional HPC environments (SLURM, PBS, etc.) rather than cloud-first architectures (but runs in local kernel too)
-- Simple integration with existing Python code
-- Focus on rapid prototyping and iteration
-
-While other tools may be better suited for production ETL pipelines or specific scientific domains, pipefunc excels at flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
 
 ## How to handle defaults?
 
