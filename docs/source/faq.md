@@ -104,6 +104,56 @@ Unlike pipefunc, Snakemake primarily works with serialized data and may require 
 
 `pipefunc` provides a simpler, more Pythonic approach for workflows primarily based on Python functions. It excels at streamlining development, reducing boilerplate, and automatically handling parallelization within the familiar Python ecosystem. While other tools may be better suited for production ETL pipelines, managing complex dependencies, or workflows involving diverse non-Python tools, `pipefunc` is ideal for flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
 
+## How is this different from Hamilton?
+
+On the surface, `pipefunc` and [Hamilton](https://github.com/dagworks-inc/hamilton) might appear very similar.
+Both are Python libraries that enable you to build computational workflows (or dataflows) by writing regular Python functions.
+They both automatically construct a directed acyclic graph (DAG) from these functions, determining the execution order based on the function signatures (inputs and outputs).
+This shared core idea of automatically connecting functions based on their dependencies is a powerful way to create modular, maintainable, and understandable dataflows.
+
+However, despite these similarities, `pipefunc` and Hamilton have distinct focuses and cater to different use cases.
+
+**Key Differences between `pipefunc` and Hamilton:**
+
+| Feature                     | `pipefunc`                                                                                                                                            | Hamilton                                                                                                                                                                                          |
+| :-------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Primary Focus**           | Scientific workflows, parameter sweeps, multi-dimensional data, HPC integration, fine-grained resource management, parallelization                    | General-purpose dataflows, with strengths in data loading, feature engineering, and building maintainable data pipelines, particularly with pandas.                                               |
+| **Input/Output Types**      | Supports arbitrary Python objects, multi-dimensional arrays (with `mapspec`), and structured data (e.g., xarray Datasets)                             | Supports arbitrary Python objects, but is particularly well-optimized for pandas DataFrames and Series                                                                                            |
+| **Parameter Sweeps**        | Built-in support for multi-dimensional parameter sweeps with `mapspec` and `add_mapspec_axis`                                                         | Not a primary focus, can be achieved through custom implementations or external libraries                                                                                                         |
+| **Parallelization**         | Flexible parallelization options (e.g., multiprocessing, threading, custom executors), including distributed computing with SLURM and PBS             | Supports parallel execution through adapters (e.g., Ray, Dask, Polars), but more geared towards data processing tasks                                                                             |
+| **Resource Management**     | Fine-grained control over resources (CPU, memory, GPUs, time) per function, even dynamically based on input parameters (with `resources_variable`)    | Resource management is typically handled at the level of the execution framework (e.g., Ray, Dask) and not on a per-function basis.                                                               |
+| **Workflow Definition**     | Uses `PipeFunc` wrapper or `@pipefunc` decorator for any Python function. Allows renaming inputs/outputs for flexible connections.                    | Requires functions to be defined with specific input/output type hints to construct the DAG. Function names are used as node identifiers, and parameter names must match upstream function names. |
+| **Target Audience**         | Scientists, researchers, and engineers working on complex, computationally intensive Python workflows                                                 | Data scientists, machine learning engineers, and anyone working with data pipelines, especially those using pandas.                                                                               |
+| **Visualization**           | Built-in, highly customizable DAG visualization capabilities to understand, debug and optimize workflows.                                             | Separate Hamilton UI for visualization, offering a different set of features and requiring additional setup.                                                                                      |
+| **Data Validation**         | Supports data validation by ensuring type annotations between steps are correct. Custom data validation can be implemented via `post_execution_hook`. | Offers built-in mechanisms for validating the structure of dataflows.                                                                                                                             |
+| **Caching**                 | Supports caching with configurable backends, allowing for efficient reuse of intermediate results.                                                    | TODO                                                                                                                                                                                              |
+| **Error Handling**          | Provides detailed error snapshots for debugging, including the state of the pipeline at the point of failure.                                         | Error handling is more general, focusing on the execution of the DAG rather than detailed introspection of function states.                                                                       |
+| **Community and Ecosystem** | Growing community, particularly in scientific and research domains, with ongoing development towards more advanced features.                          | Strong community support, particularly in data science and machine learning, with a focus on improving code maintainability and collaboration.                                                    |
+
+**When to choose `pipefunc`:**
+
+- Your workflow involves complex multi-dimensional parameter sweeps and map-reduce operations, especially in scientific computing or research settings.
+- You need fine-grained control over resource allocation for each function in your pipeline, allowing for optimization based on specific computational needs.
+- You are working with multi-dimensional array-like data and require structured, labeled outputs (e.g., using xarray).
+- You need to execute parts of your workflow on HPC clusters with job schedulers like SLURM.
+- You want a high degree of flexibility in how you define and execute your pipeline, with minimal boilerplate code.
+
+**When to choose Hamilton:**
+
+- Your workflow primarily involves data loading, transformation, and feature engineering, especially with pandas DataFrames.
+- You prefer a framework that offers more built-in features for data validation and visualization, with a focus on improving code maintainability and collaboration.
+- You are working with workflows that can be easily parallelized using frameworks like Ray or Dask, without needing the intricate resource management capabilities of `pipefunc`.
+- You want a tool that helps structure your data processing code in a way that's easy to understand and modify, by naturally creating a DAG from function signatures.
+
+**In summary:**
+
+`pipefunc` is tailored for scientific and research workflows that demand complex parameter sweeps, detailed resource management, and seamless integration with HPC environments.
+Hamilton, while offering a broader set of features for general-purpose data workflows, focuses on enhancing the development experience with pandas and other data science tools.
+Both tools emphasize modularity, readability, and maintainability but cater to different needs within the data science and engineering landscape.
+
+Hamilton's design encourages placing related functions in a single module for better organization, while `pipefunc` allows greater flexibility in connecting functions from various modules.
+Hamilton also uses function and parameter names directly as node identifiers, whereas `pipefunc` allows for renaming to avoid naming conflicts.
+
 ## How to handle defaults?
 
 You can provide defaults in
@@ -876,6 +926,7 @@ The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about
    ```
 
 3. **Saving and Loading**:
+
    ```python
    error_snapshot.save_to_file("snapshot.pkl")
    loaded_snapshot = ErrorSnapshot.load_from_file("snapshot.pkl")
