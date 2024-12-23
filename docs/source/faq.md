@@ -19,13 +19,13 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
-## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.?
+## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, Snakemake, etc.?
 
-pipefunc fills a unique niche in the Python workflow ecosystem.
+`pipefunc` fills a unique niche in the Python workflow ecosystem.
 
 ### Key Differentiators
 
-What makes pipefunc unique:
+What makes `pipefunc` unique:
 
 1. **Simplicity**: Pure Python implementation with minimal dependencies, allowing standard debuggers and profiling tools to work without modification
 2. **Flexibility**: Easy to modify pipelines and add parameter sweeps with minimal boilerplate
@@ -33,7 +33,7 @@ What makes pipefunc unique:
 4. **Resource Management**: Fine-grained control over computational resources per function
 5. **Development Speed**: Rapid prototyping without infrastructure setup
 
-pipefunc is particularly well-suited for scientists and researchers who need to:
+`pipefunc` is particularly well-suited for scientists and researchers who need to:
 
 - Quickly prototype and iterate on computational workflows
 - Run parameter sweeps across multiple dimensions
@@ -45,40 +45,64 @@ Let's break down the comparison by categories:
 
 ### Low-Level Parallel Computing Tools (e.g., [Dask](https://www.dask.org/))
 
-Dask and pipefunc serve different purposes and can be complementary:
+Dask and `pipefunc` serve different purposes and can be complementary:
 
 - Dask provides low-level control over parallelization, letting you decide exactly what and how to parallelize
-- pipefunc automatically handles parallelization based on pipeline structure and `mapspec` definitions
-- Dask can serve as a computational backend for pipefunc
-- pipefunc provides higher-level abstractions for parameter sweeps without requiring explicit parallel programming
+- `pipefunc` automatically handles parallelization based on pipeline structure and `mapspec` definitions
+- Dask can serve as a computational backend for `pipefunc`
+- `pipefunc` provides higher-level abstractions for parameter sweeps without requiring explicit parallel programming
 
 In summary, Dask is a powerful parallel computing library, while pipefunc helps you build and manage scientific workflows with less boilerplate and takes care of parallelization and data saving for you.
 
 ### Scientific Workflow Tools (e.g., [AiiDA](https://aiida.readthedocs.io/), [Pydra](https://pydra.readthedocs.io/en/latest/))
 
-Compared to scientific workflow managers, pipefunc provides:
+Compared to scientific workflow managers, `pipefunc` provides:
 
-- Lighter weight setup with no external dependencies (unlike AiiDA which requires a daemon, PostgreSQL and RabbitMQ)
-- More intuitive Python-native interface with automatic graph construction from function signatures
-- Simpler debugging as code runs in the same Python process by default
-- Built-in parameter sweeps with automatic parallelization
-- Dynamic resource allocation based on input parameters
+- Lighter weight setup with no external dependencies (unlike AiiDA, which requires a daemon, PostgreSQL, and RabbitMQ).
+- More intuitive Python-native interface with automatic graph construction from function signatures.
+- Simpler debugging as code runs in the same Python process by default.
+- Built-in parameter sweeps with automatic parallelization.
+- Dynamic resource allocation based on input parameters.
 
-### ETL and Production Workflow Tools (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/), [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
+### Job Schedulers/Runners (e.g., [Airflow](https://airflow.apache.org/), [Luigi](https://luigi.readthedocs.io/))
 
+These tools are designed for scheduling and running tasks, often in a distributed environment. They are well-suited for production ETL pipelines and managing dependencies between jobs. Unlike `pipefunc`, they often rely on serialized data or external storage for data exchange between tasks and require custom implementations for parameter sweeps.
 
-These tools excel at production data pipelines with features like scheduling, monitoring, and reliability, but are architected for cloud-based execution (e.g., Kubernetes, cloud functions, containerized workloads).
-While some offer HPC support, it's typically an afterthought and doesn't align well with traditional scientific computing workflows.
-pipefunc offers distinct advantages for scientific computing:
+**`pipefunc` vs. Job Schedulers:**
 
-- No mandatory project structure (unlike Kedro which enforces specific layouts)
-- Direct in-memory data passing between functions (while Airflow and Luigi primarily work with serialized data)
-- Native support for parameter sweeps (which would require custom implementations in Airflow/Luigi)
-- Designed for traditional HPC environments (SLURM, PBS, etc.) rather than cloud-first architectures (but runs in local kernel too)
-- Simple integration with existing Python code
-- Focus on rapid prototyping and iteration
+- **Focus:** `pipefunc` focuses on creating reusable, composable Python functions within a pipeline. Job schedulers focus on scheduling and executing independent tasks.
+- **Complexity:** `pipefunc` is simpler to set up and use for Python-centric workflows. Job schedulers have more features but a steeper learning curve.
+- **Flexibility:** `pipefunc` allows for dynamic, data-driven workflows within Python. Job schedulers are more rigid but offer robust scheduling and monitoring.
 
-While other tools may be better suited for production ETL pipelines or specific scientific domains, pipefunc excels at flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
+### Data Pipelines (e.g., [Kedro](https://kedro.org/), [Prefect](https://www.prefect.io/))
+
+These tools provide frameworks for building data pipelines with a focus on data engineering best practices, such as modularity, versioning, and testing.
+
+**`pipefunc` vs. Data Pipelines:**
+
+* **Structure:** `pipefunc` is less opinionated about project structure than Kedro, which enforces a specific layout. Prefect is more flexible but still geared towards defining data flows.
+* **Scope:** `pipefunc` is more focused on the computational aspects of pipelines, while Kedro and Prefect offer more features for data management, versioning, and deployment.
+* **Flexibility:** `pipefunc` offers more flexibility in how pipelines are defined and executed, while Kedro and Prefect provide more structure and standardization.
+
+### Workflow Definition Languages (e.g., [Snakemake](https://snakemake.readthedocs.io/))
+
+Snakemake uses a domain-specific language (DSL) to define workflows as a set of rules with dependencies. It excels at orchestrating diverse tools and scripts, often in separate environments, through a dedicated workflow definition file (`Snakefile`).
+Unlike pipefunc, Snakemake primarily works with serialized data and may require custom implementations for parameter sweeps within the Python code.
+
+**`pipefunc` vs. Snakemake:**
+
+* **Workflow Definition:** `pipefunc` uses Python code with decorators. Snakemake uses a `Snakefile` with a specialized syntax.
+* **Focus:** `pipefunc` is designed for Python-centric workflows and automatic parallelization within Python. Snakemake is language-agnostic and handles the execution of diverse tools and steps, potentially in different environments.
+* **Flexibility:** `pipefunc` offers more flexibility in defining complex logic within Python functions. Snakemake provides a more rigid, rule-based approach.
+* **Learning Curve:** `pipefunc` is generally easier to learn for Python users. Snakemake requires understanding its DSL.
+
+**`pipefunc` within Snakemake:**
+
+`pipefunc` can be integrated into a Snakemake workflow. You could have a Snakemake rule that executes a Python script containing a `pipefunc` pipeline, combining the strengths of both tools.
+
+**In essence:**
+
+`pipefunc` provides a simpler, more Pythonic approach for workflows primarily based on Python functions. It excels at streamlining development, reducing boilerplate, and automatically handling parallelization within the familiar Python ecosystem. While other tools may be better suited for production ETL pipelines, managing complex dependencies, or workflows involving diverse non-Python tools, `pipefunc` is ideal for flexible scientific computing workflows where rapid development and easy parameter exploration are priorities.
 
 ## How to handle defaults?
 
