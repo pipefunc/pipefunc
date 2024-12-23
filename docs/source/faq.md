@@ -130,6 +130,8 @@ However, despite these similarities, `pipefunc` and Hamilton have distinct focus
 | **Error Handling**          | Provides detailed error snapshots for debugging, including the state of the pipeline at the point of failure.                                         | Error handling is more general, focusing on the execution of the DAG rather than detailed introspection of function states.                                                                       |
 | **Community and Ecosystem** | Growing community, particularly in scientific and research domains, with ongoing development towards more advanced features.                          | Strong community support, particularly in data science and machine learning, with a focus on improving code maintainability and collaboration.                                                    |
 
+TODO: mention Hamilton's parallelization limitations and pickle vs cloudpickle
+
 **When to choose `pipefunc`:**
 
 - Your workflow involves complex multi-dimensional parameter sweeps and map-reduce operations, especially in scientific computing or research settings.
