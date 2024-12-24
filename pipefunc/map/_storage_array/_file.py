@@ -195,10 +195,10 @@ class FileArray(StorageBase):
         items = _load_all(map(self._index_to_file, range(self.size)))
 
         if not splat_internal:
-            arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
-            arr[:] = items
+            ma_arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
+            ma_arr[:] = items
             mask = self.mask_linear()
-            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.resolved_shape)
+            return np.ma.MaskedArray(ma_arr, mask=mask, dtype=object).reshape(self.resolved_shape)
 
         if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"
