@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+
 import cloudpickle
 import numpy as np
 import pytest
@@ -13,9 +15,12 @@ from pipefunc._utils import (
     format_kwargs,
     handle_error,
     is_min_version,
+    is_pydantic_base_model,
     load,
     requires,
 )
+
+has_pydantic = importlib.util.find_spec("pydantic") is not None
 
 
 @pytest.fixture(autouse=True)  # Automatically use in all tests
@@ -290,3 +295,19 @@ def test_handle_error_with_args() -> None:
     assert original_message in error_message
     msg = "Error occurred while executing function"
     assert msg in error_message or msg in exc_info.value.__notes__[0]
+
+
+@pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
+def test_is_pydantic_base_model() -> None:
+    from pydantic import BaseModel
+
+    class CustomModel(BaseModel):
+        pass
+
+    class Foo:
+        pass
+
+    assert is_pydantic_base_model(BaseModel)
+    assert is_pydantic_base_model(CustomModel)
+    assert not is_pydantic_base_model(Foo)
+    assert not is_pydantic_base_model(lambda x: x)

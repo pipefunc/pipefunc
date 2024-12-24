@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import math
 import time
+import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -13,7 +15,15 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    get_ncores,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
+)
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -99,16 +109,23 @@ def run_map(
 
         If parallel is ``False``, this argument is ignored.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -255,16 +272,23 @@ def run_map_async(
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -735,6 +759,7 @@ def _chunksize_for_func(
     func: PipeFunc,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     num_iterations: int,
+    executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
@@ -748,7 +773,38 @@ def _chunksize_for_func(
             msg = f"Invalid chunksize {chunksize} for {func.output_name}"
             raise ValueError(msg)
         return chunksize
-    return 1
+    return _get_optimal_chunk_size(num_iterations, executor)
+
+
+def _get_optimal_chunk_size(
+    total_items: int,
+    executor: Executor,
+    min_chunks_per_worker: int = 20,
+) -> int:
+    """Calculate an optimal chunk size for parallel processing.
+
+    Parameters
+    ----------
+    total_items
+        Total number of items to process
+    executor
+        The executor to use for parallel processing
+    min_chunks_per_worker
+        Minimum number of chunks each worker should process. Default of 20 provides good
+        balance between load distribution and overhead for most workloads
+
+    """
+    try:
+        n_cores = get_ncores(executor)
+    except TypeError as e:
+        warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
+        n_cores = 1
+
+    if total_items < n_cores * 2:
+        return 1
+
+    chunk_size = math.ceil(total_items / (n_cores * min_chunks_per_worker))
+    return max(1, chunk_size)
 
 
 def _maybe_parallel_map(
@@ -764,7 +820,7 @@ def _maybe_parallel_map(
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        chunksize = _chunksize_for_func(func, chunksizes, len(indices))
+        chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
