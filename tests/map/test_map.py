@@ -414,7 +414,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
 
     @pipefunc(output_name="sum")
     def norm(vector: np.ndarray) -> np.float64:
-        return np.linalg.norm(vector)
+        return np.linalg.norm(vector)  # type: ignore[return-value]
 
     pipeline = Pipeline(
         [
