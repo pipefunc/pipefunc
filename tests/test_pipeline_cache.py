@@ -182,6 +182,7 @@ def test_sharing_defaults() -> None:
 
     pipeline = Pipeline([f, g], cache_type="simple")
     assert pipeline("d", a=1) == 3
+
     assert pipeline.cache is not None
     assert pipeline.cache.cache == {
         (f._cache_id, (("a", 1), ("b", 1))): 2,
