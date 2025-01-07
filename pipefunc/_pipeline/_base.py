@@ -585,7 +585,7 @@ class Pipeline:
         if use_cache:
             assert cache is not None
             cache_key = compute_cache_key(
-                func.output_name,
+                func._cache_id,
                 self._func_defaults(func) | flat_scope_kwargs | func._bound,
                 root_args,
             )

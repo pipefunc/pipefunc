@@ -884,6 +884,11 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+    @functools.cached_property
+    def _cache_id(self) -> str:
+        """Return a unique identifier for the function used in cache keys."""
+        return f"{self.output_name}-{hash(self.func)}"
+
 
 def pipefunc(
     output_name: OUTPUT_TYPE,
