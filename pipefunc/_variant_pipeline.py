@@ -1,0 +1,216 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import Any, Literal
+
+from pipefunc import PipeFunc, Pipeline
+from pipefunc._utils import assert_complete_kwargs
+
+
+class VariantPipeline:
+    """A pipeline that can have multiple variants.
+
+    Parameters
+    ----------
+    functions
+        List of `PipeFunc`s.
+    default_variant
+        Default variant to use if none is specified in `with_variant`.
+        Either a single variant name or a dictionary mapping variant
+        groups to variants.
+    lazy
+        Flag indicating whether the pipeline should be lazy.
+    debug
+        Flag indicating whether debug information should be printed.
+        If ``None``, the value of each PipeFunc's debug attribute is used.
+    profile
+        Flag indicating whether profiling information should be collected.
+        If ``None``, the value of each PipeFunc's profile attribute is used.
+    cache_type
+        The type of cache to use. See the notes below for more *important* information.
+    cache_kwargs
+        Keyword arguments passed to the cache constructor.
+    validate_type_annotations
+        Flag indicating whether type validation should be performed. If ``True``,
+        the type annotations of the functions are validated during the pipeline
+        initialization. If ``False``, the type annotations are not validated.
+    scope
+        If provided, *all* parameter names and output names of the pipeline functions will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `Pipeline.update_scope` method.
+
+        When providing parameter values for pipelines that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `Pipeline` instance with scope "foo" and "bar", the parameters
+        can be provided as:
+        ``pipeline(output_name, foo=dict(a=1, b=2), bar=dict(a=3, b=4))`` or
+        ``pipeline(output_name, **{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    default_resources
+        Default resources to use for the pipeline functions. If ``None``,
+        the resources are not set. Either a dict or a `pipefunc.resources.Resources`
+        instance can be provided. If provided, the resources in the `PipeFunc`
+        instances are updated with the default resources.
+
+    """
+
+    def __init__(
+        self,
+        functions: list[PipeFunc],
+        *,
+        default_variant: str | dict[str, str] | None = None,
+        lazy: bool = False,
+        debug: bool | None = None,
+        profile: bool | None = None,
+        cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
+        cache_kwargs: dict[str, Any] | None = None,
+        validate_type_annotations: bool = True,
+        scope: str | None = None,
+        default_resources: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize a VariantPipeline."""
+        self.functions = functions
+        self.default_variant = default_variant
+        self.lazy = lazy
+        self.debug = debug
+        self.profile = profile
+        self.cache_type = cache_type
+        self.cache_kwargs = cache_kwargs
+        self.validate_type_annotations = validate_type_annotations
+        self.scope = scope
+        self.default_resources = default_resources
+
+    def variants(self) -> dict[str, set[str]]:
+        """Return a dictionary of variant groups and their variants."""
+        variant_groups = defaultdict(set)
+        for function in self.functions:
+            variant_groups[function.variant_group].add(function.variant)
+        return dict(variant_groups)
+
+    def variants_inversed(self) -> dict[str, set[str]]:
+        """Return a dictionary of variants and their variant groups."""
+        variants = defaultdict(set)
+        for function in self.functions:
+            variants[function.variant].add(function.variant_group)
+        return dict(variants)
+
+    def with_variant(self, variant: str | None = None, **kwargs: str) -> Pipeline | VariantPipeline:
+        """Create a new Pipeline or VariantPipeline with the specified variant selected.
+
+        Parameters
+        ----------
+        variant
+            Name of the variant to select. If not provided, `default_variant` is used.
+            If `variant` is a string, it selects a single variant if no ambiguity exists.
+            If `variant` is a dictionary, it selects a variant for each variant group, where
+            the keys are variant group names and the values are variant names.
+        kwargs
+            Keyword arguments for changing the parameters for a Pipeline or VariantPipeline.
+
+        Returns
+        -------
+            A new Pipeline or VariantPipeline with the selected variant(s).
+            If variants remain, a VariantPipeline is returned.
+            If no variants remain, a Pipeline is returned.
+
+        Raises
+        ------
+        ValueError
+            TODO
+
+        """
+        inv = self.variants_inversed()
+        if variant is None:
+            variant = {} if self.default_variant is None else self.default_variant
+        if isinstance(variant, str):
+            group = inv.get(variant, set())
+            if len(group) > 1:
+                msg = f"Ambiguous variant: `{variant}`, could be in either `{group}`"
+                raise ValueError(msg)
+            if not group:
+                msg = f"Unknown variant: `{variant}`"
+                raise ValueError(msg)
+            variant = {group.pop(): variant}
+        elif not isinstance(variant, dict):
+            msg = f"Invalid variant type: `{type(variant)}`. Expected `str` or `dict`."
+            raise TypeError(msg)
+        assert isinstance(variant, dict)
+        _validate_variants_exist(self.variants(), variant)
+
+        new_functions = []
+        for function in self.functions:
+            if function.variant_group in variant:
+                if function.variant == variant[function.variant_group]:
+                    new_functions.append(function)
+            else:
+                new_functions.append(function)
+        left_over = defaultdict(set)
+        for function in new_functions:
+            left_over[function.variant_group].add(function.variant)
+        variants_remain = any(len(variants) > 1 for variants in left_over.values())
+        if variants_remain:
+            return self.copy(functions=new_functions)
+
+        # No variants left, return a regular Pipeline
+        return Pipeline(
+            new_functions,
+            lazy=self.lazy,
+            debug=self.debug,
+            profile=self.profile,
+            cache_type=self.cache_type,
+            cache_kwargs=self.cache_kwargs,
+            validate_type_annotations=self.validate_type_annotations,
+            scope=self.scope,
+            default_resources=self.default_resources,
+        )
+
+    def copy(self, **kwargs: Any) -> VariantPipeline:
+        """Return a copy of the pipeline.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments passed to the `VariantPipeline` constructor instead of the
+            original values.
+
+        """
+        original_kwargs = {
+            "functions": self.functions,
+            "lazy": self.lazy,
+            "debug": self.debug,
+            "profile": self.profile,
+            "cache_type": self.cache_type,
+            "cache_kwargs": self.cache_kwargs,
+            "validate_type_annotations": self.validate_type_annotations,
+            "scope": self.scope,
+            "default_resources": self.default_resources,
+            "default_variant": self.default_variant,
+        }
+        assert_complete_kwargs(original_kwargs, VariantPipeline.__init__, skip={"self"})
+        original_kwargs.update(kwargs)
+        return VariantPipeline(**original_kwargs)
+
+    def __getattr__(self, name: str) -> None:
+        if name in Pipeline.__dict__:
+            msg = (
+                "This is a `VariantPipeline`, not a `Pipeline`."
+                " Use `pipeline.with_variant(...)` to select a variant first."
+                f" Then call `variant_pipeline.{name}` again."
+            )
+            raise AttributeError(msg)
+        default_msg = f"'VariantPipeline' object has no attribute '{name}'"
+        raise AttributeError(default_msg)
+
+
+def _validate_variants_exist(all_variants: dict[str, set[str]], selection: dict[str, str]) -> None:
+    """Validate that the specified variants exist."""
+    for group, variant_name in selection.items():
+        if group not in all_variants:
+            msg = f"Unknown variant group: `{group}`. Use one of: `{', '.join(all_variants)}`"
+            raise ValueError(msg)
+        if variant_name not in all_variants[group]:
+            msg = f"Unknown variant: `{variant_name}` in group `{group}`. Use one of: `{', '.join(all_variants[group])}`"
+            raise ValueError(msg)

@@ -3,6 +3,7 @@
 from pipefunc import cache, lazy, resources, sweep, testing
 from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, pipefunc
 from pipefunc._pipeline import Pipeline
+from pipefunc._variant_pipeline import VariantPipeline
 from pipefunc._version import __version__
 
 __all__ = [
@@ -10,6 +11,7 @@ __all__ = [
     "NestedPipeFunc",
     "PipeFunc",
     "Pipeline",
+    "VariantPipeline",
     "__version__",
     "cache",
     "lazy",

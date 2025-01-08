@@ -196,6 +196,8 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
+        variant: str | None = None,
+        variant_group: str | None = None,
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -216,6 +218,8 @@ class PipeFunc(Generic[T]):
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.resources_scope: Literal["map", "element"] = resources_scope
+        self.variant: str | None = variant
+        self.variant_group: str | None = variant_group
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -617,6 +621,8 @@ class PipeFunc(Generic[T]):
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
+            "variant": self.variant,
+            "variant_group": self.variant_group,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -905,6 +911,8 @@ def pipefunc(
     resources_variable: str | None = None,
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
+    variant: str | None = None,
+    variant_group: str = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -994,6 +1002,10 @@ def pipefunc(
         a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    variant
+        TODO
+    variant_group
+        TODO
 
     Returns
     -------
@@ -1048,6 +1060,8 @@ def pipefunc(
             resources=resources,
             resources_variable=resources_variable,
             resources_scope=resources_scope,
+            variant=variant,
+            variant_group=variant_group,
             scope=scope,
         )
 
