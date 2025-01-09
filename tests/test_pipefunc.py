@@ -569,3 +569,20 @@ def test_defaults_dataclass_factory() -> None:
     pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
     assert pf2.defaults["x0"] == [4, 5, 6]
     assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
+
+
+def test_equality() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="c")
+    def g(a, b):
+        return a + b
+
+    assert f == f
+    assert f != g
+    assert f != 1
+    assert f != "f"
+    assert f != None  # noqa: E711
+    assert f == f.copy()

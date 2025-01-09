@@ -343,6 +343,23 @@ class VariantPipeline:
         default_msg = f"'VariantPipeline' object has no attribute '{name}'"
         raise AttributeError(default_msg)
 
+    @classmethod
+    def from_pipelines(cls, *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline]):
+        """Create a new VariantPipeline from multiple Pipelines."""
+        common_functions = []
+        functions = []
+        default_variant = {}
+        for item in variant_pipeline:
+            if len(item) == 3:
+                variant_group, variant, pipeline = item
+            else:
+                variant, pipeline = item
+                variant_group = None
+            functions.extend(pipeline.functions)
+            if variant is not None:
+                default_variant[variant_group] = variant
+        return cls(functions, default_variant=default_variant)
+
 
 def _validate_variants_exist(
     variants_mapping: dict[str | None, set[str]],
@@ -362,3 +379,17 @@ def _validate_variants_exist(
                 f" Use one of: `{', '.join(variants_mapping[group])}`"
             )
             raise ValueError(msg)
+
+
+def _same_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
+    """Compare with another PipeFunc instance for equality.
+
+    Note: This is not implemented as PipeFunc.__eq__ to avoid
+    hashing issues.
+    """
+    for attr, value in first.__dict__.items():
+        if attr == "_pipelines":
+            continue
+        if value != second.__dict__[attr]:
+            return False
+    return True
