@@ -8,7 +8,7 @@ from pipefunc.map._storage_array._zarr import CloudPickleCodec, ZarrFileArray, s
 
 def test_zarr_array_init():
     shape = (2, 3, 4)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     assert arr.shape == shape
     assert arr.strides == (12, 4, 1)
@@ -16,7 +16,7 @@ def test_zarr_array_init():
 
 def test_zarr_array_properties():
     shape = (2, 3, 4)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     assert arr.size == 24
     assert arr.rank == 3
@@ -25,7 +25,7 @@ def test_zarr_array_properties():
 
 def test_zarr_array_getitem():
     shape = (2, 3)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     arr.dump((0, 0), {"a": 1})
     arr.dump((1, 2), {"b": 2})
@@ -40,7 +40,7 @@ def test_zarr_array_getitem():
 
 def test_zarr_array_to_array():
     shape = (2, 3)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     arr.dump((0, 0), {"a": 1})
     arr.dump((1, 2), {"b": 2})
@@ -55,7 +55,7 @@ def test_zarr_array_to_array():
 
 def test_zarr_array_dump():
     shape = (2, 3)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     arr.dump((0, 0), {"a": 1})
     arr.dump((1, 2), {"b": 2})
@@ -67,7 +67,7 @@ def test_zarr_array_dump():
 
 def test_zarr_array_getitem_with_slicing():
     shape = (2, 3, 4)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
     arr.dump((0, 0, 0), {"a": 1})
     arr.dump((0, 1, 0), {"b": 2})
@@ -93,7 +93,7 @@ def test_zarr_array_getitem_with_slicing():
 
 
 def test_zarr_array_with_internal_arrays():
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -135,7 +135,7 @@ def test_zarr_array_with_internal_arrays():
 
 
 def test_zarr_array_with_internal_arrays_slicing():
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
@@ -180,7 +180,7 @@ def test_zarr_array_with_internal_arrays_slicing():
 
 def test_zarr_array_set_and_get_single_item():
     shape = (2, 3)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
 
     arr.dump((0, 0), {"a": 1})
@@ -194,7 +194,7 @@ def test_zarr_array_set_and_get_single_item_with_internal_shape():
     shape = (2, 2)
     internal_shape = (3, 3)
     shape_mask = (True, True, False, False)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(
         folder=None,
         store=store,
@@ -216,7 +216,7 @@ def test_zarr_array_set_and_get_single_item_with_internal_shape_and_indexing():
     shape = (2, 2)
     internal_shape = (3, 3)
     shape_mask = (True, True, False, False)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(
         folder=None,
         store=store,
@@ -236,7 +236,7 @@ def test_zarr_array_set_and_get_single_item_with_internal_shape_and_indexing():
 
 def test_zarr_array_set_and_get_slice():
     shape = (2, 3, 4)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(folder=None, store=store, shape=shape)
 
     data1 = 42
@@ -252,7 +252,7 @@ def test_zarr_array_set_and_get_slice_with_internal_shape():
     shape = (2, 2)
     internal_shape = (3, 3, 4)
     shape_mask = (True, True, False, False, False)
-    store = zarr.MemoryStore()
+    store = zarr.storage.MemoryStore()
     arr = ZarrFileArray(
         folder=None,
         store=store,
