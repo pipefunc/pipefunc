@@ -8,12 +8,25 @@ from pipefunc._utils import assert_complete_kwargs
 
 
 class VariantPipeline:
-    """A pipeline that can have multiple variants.
+    """A pipeline container that supports multiple implementations (variants) of functions.
+
+    `VariantPipeline` allows you to define multiple implementations of functions and
+    select which variant to use at runtime. This is particularly useful for:
+
+    - A/B testing different implementations
+    - Experimenting with algorithm variations
+    - Managing multiple processing options
+    - Creating configurable pipelines
+
+    The pipeline can have multiple variant groups, where each group contains alternative
+    implementations of a function. Functions can be assigned to a variant group using
+    the ``variant_group`` parameter and identified within that group using the ``variant``
+    parameter.
 
     Parameters
     ----------
     functions
-        List of `PipeFunc`s.
+        List of `PipeFunc` instances.
     default_variant
         Default variant to use if none is specified in `with_variant`.
         Either a single variant name or a dictionary mapping variant
@@ -54,6 +67,76 @@ class VariantPipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+
+    Example
+    -------
+    Simple variant selection:
+
+        >>> @pipefunc(output_name="c", variant="add")
+        ... def f(a, b):
+        ...     return a + b
+        ...
+        >>> @pipefunc(output_name="c", variant="sub")
+        ... def f_alt(a, b):
+        ...     return a - b
+        ...
+        >>> @pipefunc(output_name="d")
+        ... def g(b, c):
+        ...     return b * c
+        ...
+        >>> pipeline = VariantPipeline([f, f_alt, g], default_variant="add")
+        >>> pipeline_add = pipeline.with_variant()  # Uses default variant
+        >>> pipeline_sub = pipeline.with_variant(select="sub")
+        >>> pipeline_add(a=2, b=3)  # (2 + 3) * 3 = 15
+        15
+        >>> pipeline_sub(a=2, b=3)  # (2 - 3) * 3 = -3
+        -3
+
+    Multiple variant groups:
+
+        >>> @pipefunc(output_name="c", variant_group="method", variant="add")
+        ... def f1(a, b):
+        ...     return a + b
+        ...
+        >>> @pipefunc(output_name="c", variant_group="method", variant="sub")
+        ... def f2(a, b):
+        ...     return a - b
+        ...
+        >>> @pipefunc(output_name="d", variant_group="analysis", variant="mul")
+        ... def g1(b, c):
+        ...     return b * c
+        ...
+        >>> @pipefunc(output_name="d", variant_group="analysis", variant="div")
+        ... def g2(b, c):
+        ...     return b / c
+        ...
+        >>> pipeline = VariantPipeline(
+        ...     [f1, f2, g1, g2],
+        ...     default_variant={"method": "add", "analysis": "mul"}
+        ... )
+        >>> # Select specific variants for each group
+        >>> pipeline_sub_div = pipeline.with_variant(
+        ...     select={"method": "sub", "analysis": "div"}
+        ... )
+
+    Notes
+    -----
+    - Functions without variants can be included in the pipeline and will be used
+      regardless of variant selection.
+    - When using ``with_variant()``, if all variants are resolved, a regular `~pipefunc.Pipeline`
+      is returned. If some variants remain unselected, another `VariantPipeline` is
+      returned.
+    - The ``default_variant`` can be a single string (if there's only one variant group)
+      or a dictionary mapping variant groups to their default variants.
+    - Variants in the same group can have different output names, allowing for
+      flexible pipeline structures.
+
+    See Also
+    --------
+    pipefunc.Pipeline
+        The base pipeline class.
+    pipefunc.PipeFunc
+        Function wrapper that supports variants.
 
     """
 
