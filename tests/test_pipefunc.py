@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_pydantic = importlib.util.find_spec("pydantic") is not None
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
@@ -569,3 +570,29 @@ def test_defaults_dataclass_factory() -> None:
     pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
     assert pf2.defaults["x0"] == [4, 5, 6]
     assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
+
+
+def test_default_and_bound() -> None:
+    @pipefunc("c", bound={"a": 2})
+    def f(a=1):
+        return a
+
+    f.copy()
+
+    @dataclass
+    class Foo:
+        a: int = 1
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    f.copy()
+
+
+@pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
+def test_default_and_bound_pydantic() -> None:
+    import pydantic
+
+    class Foo(pydantic.BaseModel):
+        a: int = 1
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    f.copy()
