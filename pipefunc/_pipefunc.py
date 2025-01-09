@@ -1508,6 +1508,7 @@ def _pydantic_defaults(
 ) -> dict[str, Any]:
     import pydantic
 
+    defaults = defaults.copy()  # Make a copy to avoid modifying the original
     if pydantic.__version__.split(".", 1)[0] == "1":  # pragma: no cover
         msg = "Pydantic version 1 defaults cannot be extracted."
         warnings.warn(msg, UserWarning, stacklevel=2)
