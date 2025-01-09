@@ -4,7 +4,7 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.16.1
+    jupytext_version: 1.16.4
 kernelspec:
   display_name: Python 3 (ipykernel)
   language: python
@@ -1063,7 +1063,6 @@ That includes:
 We can get a handle for each function using the `func` method on the pipeline, passing the output name of the function we want.
 
 ```{code-cell} ipython3
-
 @pipefunc(output_name="c")
 def f(a, b):
     return a + b
@@ -1226,7 +1225,7 @@ def analyze_B(b, c):
     return b / c
 
 pipeline = VariantPipeline(
-    [process_A, process_B, analyze_A, analyze_B],
+    [process_A, process_B1, process_B2, analyze_A, analyze_B],
     default_variant={"method": "add", "analysis": "mul"}
 )
 
