@@ -344,16 +344,20 @@ def run_map_async(
         show_progress=show_progress,
         in_async=True,
     )
-
+    print("1", flush=True)
     multi_run_manager = maybe_multi_run_manager(executor_dict)
-    executor = None
-
+    executor_ref = {"executor": None}  # Shared dictionary
+    print("2", flush=True)
     async def _run_pipeline() -> OrderedDict[str, Result]:
-        nonlocal executor
+        print("3", flush=True)
+        nonlocal executor_ref
         with _maybe_executor(executor_dict, parallel=True) as ex:
+            print("4", flush=True)
             assert ex is not None
-            executor = ex
+            print(f"Running pipeline with executor: {ex}", flush=True)
+            executor_ref["executor"] = ex
             for gen in pipeline.topological_generations.function_lists:
+                print("5", flush=True)
                 await _run_and_process_generation_async(
                     generation=gen,
                     run_info=run_info,
@@ -366,7 +370,9 @@ def run_map_async(
                     cache=pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
+        print("6", flush=True)
         _maybe_persist_memory(store, persist_memory)
+        print("7", flush=True)
         return outputs
 
     def done_callback(task: asyncio.Task[OrderedDict[str, Result]]) -> None:
@@ -375,21 +381,25 @@ def run_map_async(
             print("Task finished successfully", flush=True)
         except asyncio.CancelledError:
             print("Task was cancelled", flush=True)
-            print(f"Cancelling executor: {executor}", flush=True)
-            if isinstance(executor, ProcessPoolExecutor):
-                _kill_process_pool(executor)
+            print(f"Cancelling executor: {executor_ref["executor"]}", flush=True)
+            if isinstance(executor_ref["executor"], ProcessPoolExecutor):
+                _kill_process_pool(executor_ref["executor"])
         except Exception:
             raise
-
+    print("8", flush=True)
     task = asyncio.create_task(_run_pipeline())
     task.add_done_callback(done_callback)
+    print("9", flush=True)
     if progress is not None:
         progress.attach_task(task)
+    print("10", flush=True)
     if is_running_in_ipynb():  # pragma: no cover
+        print("11", flush=True)
         if progress is not None:
             progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
+    print("12", flush=True)
     return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
