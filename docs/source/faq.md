@@ -1209,8 +1209,12 @@ For more complex cases, you can group variants using `variant_group`:
 def process_A(a, b):
     return a + b
 
+@pipefunc(output_name="b", variant_group="method", variant="sub")
+def process_B1(a):
+    return a
+
 @pipefunc(output_name="c", variant_group="method", variant="sub")
-def process_B(a, b):
+def process_B2(a, b):
     return a - b
 
 @pipefunc(output_name="d", variant_group="analysis", variant="mul")
@@ -1231,6 +1235,8 @@ sub_div_pipeline = pipeline.with_variant(
     select={"method": "sub", "analysis": "div"}
 )
 ```
+
+Here, we see that the `variant_group="method"` in for `variant="add"` will result in a pipeline that takes `a` and `b`, whereas `variant="sub"` will take only `a`.
 
 You can inspect available variants using `variants_mapping()`:
 
