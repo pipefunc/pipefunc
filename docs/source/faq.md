@@ -1171,87 +1171,13 @@ This is the same behavior as with regular Python functions.
 
 ## What is `VariantPipeline` and how to use it?
 
-`VariantPipeline` allows creating pipelines with alternative execution paths (variants).
-This is useful when you need to experiment with different implementations of a function or steps within a pipeline without creating entirely separate pipelines.
+`VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
 
-**Key Features:**
+Here's a simple example:
 
-- Define multiple implementations (variants) of a function within a single pipeline.
-- Easily switch between variants using the `with_variant` method.
-- Specify a default variant to be used if none is explicitly selected.
-- Group variants using the `variant_group` parameter for easier management of multiple variant types.
-- Return a regular `Pipeline` when no variants remain after using `with_variant`.
-- `VariantPipeline` has the same API as `Pipeline` for all other methods.
-- No changes required to your existing `PipeFunc` functions.
-
-**How to Use:**
-
-1. **Define variants:** Use the `variant` and `variant_group` parameters in `@pipefunc` to specify alternative implementations. You can also include functions without variants, which will always be part of the pipeline.
-
-```{code-cell} ipython3
+```python
 from pipefunc import VariantPipeline, pipefunc
 
-# A function without a variant
-@pipefunc(output_name="input_data")
-def load_data(path: str):
-    # Load data from a file
-    ...
-    return data
-
-# Functions with variants for different processing methods
-@pipefunc(output_name="processed_data", variant_group="method", variant="A")
-def process_data_A(data):
-    # Implementation of processing method A
-    return ...
-
-@pipefunc(output_name="processed_data", variant_group="method", variant="B")
-def process_data_B(data):
-    # Implementation of processing method B
-    return ...
-
-# Functions with variants for different analysis techniques,
-# demonstrating that variants in the same group can have different output_names
-@pipefunc(output_name="stats_result", variant_group="analysis", variant="stats")
-def analyze_stats(data):
-    # Perform statistical analysis
-    return ...
-
-@pipefunc(output_name="ml_result", variant_group="analysis", variant="ml")
-def analyze_ml(data):
-    # Perform machine learning analysis
-    return ...
-```
-
-2. **Create a `VariantPipeline`:**
-
-```{code-cell} ipython3
-pipeline = VariantPipeline(
-    [load_data, process_data_A, process_data_B, analyze_stats, analyze_ml],
-    default_variant={"method": "A", "analysis": "stats"},
-)
-```
-
-3. **Select a variant:**
-
-```{code-cell} ipython3
-# Use the default variants ("A" for method, "stats" for analysis)
-pipeline_default = pipeline.with_variant()
-
-# Explicitly select variant "B" for method and "ml" for analysis
-pipeline_B_ml = pipeline.with_variant(select={"method": "B", "analysis": "ml"})
-
-# You can now use pipeline_default and pipeline_B_ml as regular `Pipeline` objects.
-# The appropriate output name must be chosen based on the selected variant.
-result_default = pipeline_default("stats_result", path="my_data.txt")
-result_B_ml = pipeline_B_ml("ml_result", path="my_data.txt")
-```
-
-4.  **Omit the `variant_group` parameter**:
-
-If you do not specify a `variant_group`, the variants will be grouped together.
-In this example, `variant` `A` can be selected:
-
-```{code-cell} ipython3
 @pipefunc(output_name="c", variant="A")
 def f(a, b):
     return a + b
@@ -1263,25 +1189,96 @@ def f_alt(a, b):
 @pipefunc(output_name="d")
 def g(b, c):
     return b * c
+
+# Create pipeline with default variant
+pipeline = VariantPipeline([f, f_alt, g], default_variant="A")
+
+# Get a regular Pipeline with variant A
+pipeline_A = pipeline.with_variant()  # uses default variant
+result_A = pipeline_A(a=2, b=3)  # (2 + 3) * 3 = 15
+
+# Get a regular Pipeline with variant B
+pipeline_B = pipeline.with_variant(select="B")
+result_B = pipeline_B(a=2, b=3)  # (2 - 3) * 3 = -3
 ```
 
-If only variant A is selected then only `f` and `g` will be executed and `f_alt` will not.
+For more complex cases, you can group variants using `variant_group`:
 
-**Notes:**
+```{code-cell} ipython3
+@pipefunc(output_name="c", variant_group="method", variant="add")
+def process_A(a, b):
+    return a + b
 
-- **Multiple variant groups:** You can define multiple variant groups to control different aspects of your pipeline independently. The example above now demonstrates this with `method` and `analysis` groups.
-- **Default variant per group:** When creating a `VariantPipeline`, you can specify a dictionary for `default_variant` to set default variants for each group. The example shows how to set default variants for both groups.
-- **Chaining `with_variant` calls**: You can chain multiple `with_variant` calls to progressively select variants, optionally ending with a `Pipeline` object.
-- **Inspecting variants:** Use the `variants_mapping` method to see available variant groups and their variants.
+@pipefunc(output_name="c", variant_group="method", variant="sub")
+def process_B(a, b):
+    return a - b
 
-**When to Use `VariantPipeline`:**
+@pipefunc(output_name="d", variant_group="analysis", variant="mul")
+def analyze_A(b, c):
+    return b * c
 
-- Experimenting with different algorithms or implementations of a processing step.
-- A/B testing different pipeline configurations.
-- Creating pipelines that can adapt to different input data or conditions.
-- Managing complex pipelines with multiple optional steps.
+@pipefunc(output_name="d", variant_group="analysis", variant="div")
+def analyze_B(b, c):
+    return b / c
 
-`VariantPipeline` makes it easy to define and switch between different configurations, making your pipeline more flexible and adaptable.
+pipeline = VariantPipeline(
+    [process_A, process_B, analyze_A, analyze_B],
+    default_variant={"method": "add", "analysis": "mul"}
+)
+
+# Select specific variants for each group
+result = pipeline.with_variant(
+    select={"method": "sub", "analysis": "div"}
+)
+```
+
+You can inspect available variants using `variants_mapping()`:
+
+```{code-cell} ipython3
+pipeline.variants_mapping()
+# Returns: {'method': {'add', 'sub'}, 'analysis': {'mul', 'div'}}
+```
+
+Variants in the same group can have different output names:
+
+```{code-cell} ipython3
+@pipefunc(output_name="stats_result", variant_group="analysis", variant="stats")
+def analyze_stats(data):
+    # Perform statistical analysis
+    return stats_result
+
+@pipefunc(output_name="ml_result", variant_group="analysis", variant="ml")
+def analyze_ml(data):
+    # Perform machine learning analysis
+    return ml_result
+
+# The output name to use depends on which variant is selected
+pipeline_stats = pipeline.with_variant(select={"analysis": "stats"})
+result = pipeline_stats("stats_result", data=my_data)
+
+pipeline_ml = pipeline.with_variant(select={"analysis": "ml"})
+result = pipeline_ml("ml_result", data=my_data)
+```
+
+Key features:
+
+- Define multiple implementations of a function using the `variant` parameter
+- Group related variants using `variant_group`
+- Specify defaults with `default_variant`
+- Get a regular `Pipeline` when variants are selected
+- No changes required to your existing functions
+
+The `with_variant()` method returns either:
+
+- A regular `Pipeline` if all variants are resolved
+- Another `VariantPipeline` if some variants remain unselected
+
+This makes `VariantPipeline` ideal for:
+
+- A/B testing different implementations
+- Experimenting with algorithm variations
+- Managing multiple processing options
+- Creating flexible, configurable pipelines
 
 ## How to use post-execution hooks?
 
@@ -1300,7 +1297,7 @@ The hook function receives three arguments:
 
 Here's an example:
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
 def my_hook(func, result, kwargs):
