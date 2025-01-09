@@ -348,6 +348,7 @@ def run_map_async(
     multi_run_manager = maybe_multi_run_manager(executor_dict)
     executor_ref = {"executor": None}  # Shared dictionary
     print("2", flush=True)
+
     async def _run_pipeline() -> OrderedDict[str, Result]:
         print("3", flush=True)
         nonlocal executor_ref
@@ -386,6 +387,7 @@ def run_map_async(
                 _kill_process_pool(executor_ref["executor"])
         except Exception:
             raise
+
     print("8", flush=True)
     task = asyncio.create_task(_run_pipeline())
     task.add_done_callback(done_callback)
