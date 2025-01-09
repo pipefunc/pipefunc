@@ -4,6 +4,8 @@ import asyncio
 import functools
 import itertools
 import math
+import os
+import signal
 import time
 import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
@@ -221,6 +223,15 @@ class AsyncMap(NamedTuple):
             print("⚠️ Display is only supported in Jupyter notebooks.")
 
 
+def _kill_process_pool(pool: ProcessPoolExecutor) -> None:
+    for pid in pool._processes:
+        print(f"Killing process {pid}", flush=True)
+        os.kill(pid, signal.SIGINT)
+    print("Waiting for processes to terminate", flush=True)
+    pool.shutdown(wait=True)
+    print("Processes terminated", flush=True)
+
+
 def run_map_async(
     pipeline: Pipeline,
     inputs: dict[str, Any],
@@ -335,10 +346,13 @@ def run_map_async(
     )
 
     multi_run_manager = maybe_multi_run_manager(executor_dict)
+    executor = None
 
     async def _run_pipeline() -> OrderedDict[str, Result]:
+        nonlocal executor
         with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
+            executor = ex
             for gen in pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
                     generation=gen,
@@ -355,7 +369,20 @@ def run_map_async(
         _maybe_persist_memory(store, persist_memory)
         return outputs
 
+    def done_callback(task: asyncio.Task[OrderedDict[str, Result]]) -> None:
+        try:
+            task.result()
+            print("Task finished successfully", flush=True)
+        except asyncio.CancelledError:
+            print("Task was cancelled", flush=True)
+            print(f"Cancelling executor: {executor}", flush=True)
+            if isinstance(executor, ProcessPoolExecutor):
+                _kill_process_pool(executor)
+        except Exception:
+            raise
+
     task = asyncio.create_task(_run_pipeline())
+    task.add_done_callback(done_callback)
     if progress is not None:
         progress.attach_task(task)
     if is_running_in_ipynb():  # pragma: no cover
