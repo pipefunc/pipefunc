@@ -31,7 +31,7 @@ dependencies:
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
-  - zarr
+  - zarr>=2,<3
   # optional-dependencies: docs
   - emoji
   - jupytext
