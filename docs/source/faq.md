@@ -1179,27 +1179,24 @@ Here's a simple example:
 from pipefunc import VariantPipeline, pipefunc
 
 @pipefunc(output_name="c", variant="A")
-def f(a, b):
-    return a + b
+def f1(a):
+    ...
+
+@pipefunc(output_name="x", variant="A")
+def f2(a, b):
+    ...
 
 @pipefunc(output_name="c", variant="B")
 def f_alt(a, b):
-    return a - b
+    ...
 
 @pipefunc(output_name="d")
-def g(b, c):
+def g(b, c, x=1):
     return b * c
 
-# Create pipeline with default variant
-pipeline = VariantPipeline([f, f_alt, g], default_variant="A")
-
-# Get a regular Pipeline with variant A
+pipeline = VariantPipeline([f1, f2, f_alt, g], default_variant="A")
 pipeline_A = pipeline.with_variant()  # uses default variant
-result_A = pipeline_A(a=2, b=3)  # (2 + 3) * 3 = 15
-
-# Get a regular Pipeline with variant B
 pipeline_B = pipeline.with_variant(select="B")
-result_B = pipeline_B(a=2, b=3)  # (2 - 3) * 3 = -3
 ```
 
 For more complex cases, you can group variants using `variant_group`:
@@ -1209,8 +1206,12 @@ For more complex cases, you can group variants using `variant_group`:
 def process_A(a, b):
     return a + b
 
+@pipefunc(output_name="b", variant_group="method", variant="sub")
+def process_B1(a):
+    return a
+
 @pipefunc(output_name="c", variant_group="method", variant="sub")
-def process_B(a, b):
+def process_B2(a, b):
     return a - b
 
 @pipefunc(output_name="d", variant_group="analysis", variant="mul")
@@ -1231,6 +1232,8 @@ sub_div_pipeline = pipeline.with_variant(
     select={"method": "sub", "analysis": "div"}
 )
 ```
+
+Here, we see that the `variant_group="method"` in for `variant="add"` will result in a pipeline that takes `a` and `b`, whereas `variant="sub"` will take only `a`.
 
 You can inspect available variants using `variants_mapping()`:
 
