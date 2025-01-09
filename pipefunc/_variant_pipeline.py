@@ -23,6 +23,10 @@ class VariantPipeline:
     the ``variant_group`` parameter and identified within that group using the ``variant``
     parameter.
 
+    All parameters below (except ``functions`` and ``default_variant``) are simply passed to
+    the `~pipefunc.Pipeline` constructor when creating a new pipeline with the selected
+    variant(s) using the `with_variant` method.
+
     Parameters
     ----------
     functions
@@ -303,7 +307,7 @@ class VariantPipeline:
         return any(len(variants) > 1 for variants in left_over.values())
 
     def copy(self, **kwargs: Any) -> VariantPipeline:
-        """Return a copy of the pipeline.
+        """Return a copy of the VariantPipeline.
 
         Parameters
         ----------
