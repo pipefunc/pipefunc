@@ -73,24 +73,23 @@ class ZarrFileArray(StorageBase):
 
         chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
         zarr_kwargs = {"mode": "a"} if _ZARR_MAJOR < 3 else {}  # noqa: PLR2004
+        name_path = "path" if _ZARR_MAJOR < 3 else "name"  # noqa: PLR2004
         self.array = create_array(
             self.store,
-            name="/array",
             shape=self.full_shape,
             dtype=object,
             object_codec=object_codec,
             chunks=chunks,
-            **zarr_kwargs,
+            **dict({name_path: "array"}, **zarr_kwargs),
         )
         self._mask = create_array(
             self.store,
-            name="/mask",
             shape=self.shape,
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
             chunks=1,
-            **zarr_kwargs,
+            **dict({name_path: "mask"}, **zarr_kwargs),
         )
 
     @property
