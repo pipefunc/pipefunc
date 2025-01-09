@@ -555,8 +555,8 @@ class PipeFunc(Generic[T]):
         self._validate_mapspec()
         if self.variant is None and self.variant_group is not None:
             msg = (
-                f"The `variant_group={self.variant_group!r}` cannot be set without"
-                f" a corresponding `variant={self.variant!r}`."
+                f"`variant_group={self.variant_group!r}` cannot be set without"
+                f" a corresponding `variant`."
             )
             raise ValueError(msg)
 

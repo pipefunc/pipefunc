@@ -83,7 +83,7 @@ class VariantPipeline:
         self.scope = scope
         self.default_resources = default_resources
 
-    def _variants_mapping(self) -> dict[str | None, set[str]]:
+    def variants_mapping(self) -> dict[str | None, set[str]]:
         """Return a dictionary of variant groups and their variants."""
         variant_groups: dict[str | None, set[str]] = {}
         for function in self.functions:
@@ -105,7 +105,7 @@ class VariantPipeline:
             groups.add(function.variant_group)
         return variants
 
-    def with_variant(
+    def with_variant(  # noqa: PLR0912
         self,
         select: str | dict[str | None, str] | None = None,
         **kwargs: Any,
@@ -150,10 +150,13 @@ class VariantPipeline:
             msg = f"Invalid variant type: `{type(select)}`. Expected `str` or `dict`."
             raise TypeError(msg)
         assert isinstance(select, dict)
-        _validate_variants_exist(self._variants_mapping(), select)
+        _validate_variants_exist(self.variants_mapping(), select)
 
         new_functions: list[PipeFunc] = []
         for function in self.functions:
+            if function.variant is None:
+                new_functions.append(function)
+                continue
             if function.variant_group in select:
                 if function.variant == select[function.variant_group]:
                     new_functions.append(function)
@@ -163,7 +166,8 @@ class VariantPipeline:
                 new_functions.append(function)
         left_over = defaultdict(set)
         for function in new_functions:
-            left_over[function.variant_group].add(function.variant)
+            if function.variant is not None:
+                left_over[function.variant_group].add(function.variant)
         variants_remain = any(len(variants) > 1 for variants in left_over.values())
         if variants_remain:
             return self.copy(functions=new_functions, **kwargs)
