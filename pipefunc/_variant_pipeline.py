@@ -82,6 +82,9 @@ class VariantPipeline:
         self.validate_type_annotations = validate_type_annotations
         self.scope = scope
         self.default_resources = default_resources
+        if not self.variants_mapping():
+            msg = "No variants found in the pipeline. Use a regular `Pipeline` instead."
+            raise ValueError(msg)
 
     def variants_mapping(self) -> dict[str | None, set[str]]:
         """Return a dictionary of variant groups and their variants."""
@@ -105,7 +108,7 @@ class VariantPipeline:
             groups.add(function.variant_group)
         return variants
 
-    def with_variant(  # noqa: PLR0912
+    def with_variant(
         self,
         select: str | dict[str | None, str] | None = None,
         **kwargs: Any,
@@ -131,44 +134,28 @@ class VariantPipeline:
         Raises
         ------
         ValueError
-            TODO
+            If the specified variant is ambiguous or unknown, or if an invalid variant type is provided.
+        TypeError
+            If `select` is not a string or a dictionary.
 
         """
-        inv = self._variants_mapping_inverse()
         if select is None:
-            select = {} if self.default_variant is None else self.default_variant
+            if self.default_variant is None:
+                msg = "No variant selected and no default variant provided."
+                raise ValueError(msg)
+            select = self.default_variant
+
         if isinstance(select, str):
-            group = inv.get(select, set())
-            if len(group) > 1:
-                msg = f"Ambiguous variant: `{select}`, could be in either `{group}`"
-                raise ValueError(msg)
-            if not group:
-                msg = f"Unknown variant: `{select}`"
-                raise ValueError(msg)
-            select = {group.pop(): select}
+            select = self._resolve_single_variant(select)
         elif not isinstance(select, dict):
             msg = f"Invalid variant type: `{type(select)}`. Expected `str` or `dict`."
             raise TypeError(msg)
         assert isinstance(select, dict)
         _validate_variants_exist(self.variants_mapping(), select)
 
-        new_functions: list[PipeFunc] = []
-        for function in self.functions:
-            if function.variant is None:
-                new_functions.append(function)
-                continue
-            if function.variant_group in select:
-                if function.variant == select[function.variant_group]:
-                    new_functions.append(function)
-                else:
-                    continue
-            else:
-                new_functions.append(function)
-        left_over = defaultdict(set)
-        for function in new_functions:
-            if function.variant is not None:
-                left_over[function.variant_group].add(function.variant)
-        variants_remain = any(len(variants) > 1 for variants in left_over.values())
+        new_functions = self._select_functions(select)
+        variants_remain = self._check_remaining_variants(new_functions)
+
         if variants_remain:
             return self.copy(functions=new_functions, **kwargs)
 
@@ -187,6 +174,50 @@ class VariantPipeline:
             scope=kwargs.get("scope", self.scope),
             default_resources=kwargs.get("default_resources", self.default_resources),
         )
+
+    def _resolve_single_variant(self, select: str) -> dict[str | None, str]:
+        """Resolve a single variant string to a dictionary.
+
+        Raises:
+            ValueError: If the variant is ambiguous or unknown.
+
+        """
+        inv = self._variants_mapping_inverse()
+        group = inv.get(select, set())
+        if len(group) > 1:
+            msg = f"Ambiguous variant: `{select}`, could be in either `{group}`"
+            raise ValueError(msg)
+        if not group:
+            msg = f"Unknown variant: `{select}`"
+            raise ValueError(msg)
+        return {group.pop(): select}
+
+    def _select_functions(
+        self,
+        select: dict[str | None, str],
+    ) -> list[PipeFunc]:
+        """Select functions based on the given variant selection."""
+        new_functions: list[PipeFunc] = []
+        for function in self.functions:
+            if function.variant is None:
+                new_functions.append(function)
+                continue
+            if function.variant_group in select:
+                if function.variant == select[function.variant_group]:
+                    new_functions.append(function)
+                else:
+                    continue
+            else:
+                new_functions.append(function)
+        return new_functions
+
+    def _check_remaining_variants(self, functions: list[PipeFunc]) -> bool:
+        """Check if any variants remain after selection."""
+        left_over = defaultdict(set)
+        for function in functions:
+            if function.variant is not None:
+                left_over[function.variant_group].add(function.variant)
+        return any(len(variants) > 1 for variants in left_over.values())
 
     def copy(self, **kwargs: Any) -> VariantPipeline:
         """Return a copy of the pipeline.

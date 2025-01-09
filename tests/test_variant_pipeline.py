@@ -94,6 +94,8 @@ def test_lazy_debug_profile_cache() -> None:
         cache_type="simple",
         cache_kwargs={"arg": "val"},
     )
+    with pytest.raises(ValueError, match="No variant selected and no default variant provided"):
+        pipeline.with_variant()
     pipeline_add = pipeline.with_variant(select="add")
 
     assert isinstance(pipeline_add, Pipeline)
@@ -410,17 +412,11 @@ def test_variant_pipeline_with_no_variants() -> None:
     def g(b, c):
         return b * c
 
-    pipeline = VariantPipeline([f, g])
-
-    # with_variant should return a Pipeline directly since there are no variants
-    result_pipeline = pipeline.with_variant()
-    assert isinstance(result_pipeline, Pipeline)
-    assert result_pipeline(a=1, b=2) == 6  # (1 + 2) * 2
-
-    # Test copy method with no variants
-    pipeline_copy = pipeline.copy()
-    assert isinstance(pipeline_copy, VariantPipeline)
-    assert pipeline_copy.functions == pipeline.functions
+    with pytest.raises(
+        ValueError,
+        match="No variants found in the pipeline. Use a regular `Pipeline` instead.",
+    ):
+        VariantPipeline([f, g])
 
 
 def test_variant_pipeline_with_only_some_functions_having_variants() -> None:
