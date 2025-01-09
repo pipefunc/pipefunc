@@ -1169,6 +1169,117 @@ So if you are using mutable defaults, make sure to not mutate the value in the f
 This is the same behavior as with regular Python functions.
 :::
 
+## What is `VariantPipeline` and how to use it?
+
+{class}`pipefunc.VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
+
+Here's a simple example:
+
+```{code-cell} ipython3
+from pipefunc import VariantPipeline, pipefunc
+
+@pipefunc(output_name="c", variant="A")
+def f(a, b):
+    return a + b
+
+@pipefunc(output_name="c", variant="B")
+def f_alt(a, b):
+    return a - b
+
+@pipefunc(output_name="d")
+def g(b, c):
+    return b * c
+
+# Create pipeline with default variant
+pipeline = VariantPipeline([f, f_alt, g], default_variant="A")
+
+# Get a regular Pipeline with variant A
+pipeline_A = pipeline.with_variant()  # uses default variant
+result_A = pipeline_A(a=2, b=3)  # (2 + 3) * 3 = 15
+
+# Get a regular Pipeline with variant B
+pipeline_B = pipeline.with_variant(select="B")
+result_B = pipeline_B(a=2, b=3)  # (2 - 3) * 3 = -3
+```
+
+For more complex cases, you can group variants using `variant_group`:
+
+```{code-cell} ipython3
+@pipefunc(output_name="c", variant_group="method", variant="add")
+def process_A(a, b):
+    return a + b
+
+@pipefunc(output_name="c", variant_group="method", variant="sub")
+def process_B(a, b):
+    return a - b
+
+@pipefunc(output_name="d", variant_group="analysis", variant="mul")
+def analyze_A(b, c):
+    return b * c
+
+@pipefunc(output_name="d", variant_group="analysis", variant="div")
+def analyze_B(b, c):
+    return b / c
+
+pipeline = VariantPipeline(
+    [process_A, process_B, analyze_A, analyze_B],
+    default_variant={"method": "add", "analysis": "mul"}
+)
+
+# Select specific variants for each group
+sub_div_pipeline = pipeline.with_variant(
+    select={"method": "sub", "analysis": "div"}
+)
+```
+
+You can inspect available variants using `variants_mapping()`:
+
+```{code-cell} ipython3
+pipeline.variants_mapping()
+```
+
+Variants in the same group can have different output names:
+
+```{code-cell} ipython3
+@pipefunc(output_name="stats_result", variant_group="analysis", variant="stats")
+def analyze_stats(data):
+    # Perform statistical analysis
+    return ...
+
+@pipefunc(output_name="ml_result", variant_group="analysis", variant="ml")
+def analyze_ml(data):
+    # Perform machine learning analysis
+    return ...
+
+# The output name to use depends on which variant is selected
+pipeline = VariantPipeline([analyze_stats, analyze_ml])
+pipeline_stats = pipeline.with_variant(select={"analysis": "stats"})
+result = pipeline_stats("stats_result", data={...})
+
+pipeline_ml = pipeline.with_variant(select={"analysis": "ml"})
+result = pipeline_ml("ml_result", data={...})
+```
+
+Key features:
+
+- Define multiple implementations of a function using the `variant` parameter
+- Group related variants using `variant_group`
+- Specify defaults with `default_variant`
+- Get a regular `Pipeline` when variants are selected
+- No changes required to your existing functions
+
+The `with_variant()` method returns either:
+
+- A regular `Pipeline` if all variants are resolved
+- Another `VariantPipeline` if some variants remain unselected
+
+This makes `VariantPipeline` ideal for:
+
+- A/B testing different implementations
+- Experimenting with algorithm variations
+- Managing multiple processing options
+- Creating flexible, configurable pipelines
+
 ## How to use post-execution hooks?
 
 Post-execution hooks allow you to execute custom code after a function completes. This is useful for logging, debugging, or collecting statistics about function execution.
@@ -1186,7 +1297,7 @@ The hook function receives three arguments:
 
 Here's an example:
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
 def my_hook(func, result, kwargs):

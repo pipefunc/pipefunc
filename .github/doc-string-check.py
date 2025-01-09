@@ -237,3 +237,11 @@ if __name__ == "__main__":
             "func_node_colors",
         ],
     )
+
+    # Pipeline and VariantsPipeline
+    compare_param_descriptions(
+        pipefunc.Pipeline,
+        pipefunc.VariantPipeline,
+        allow_missing=["default_variant"],
+        allow_discrepancy=["functions"],
+    )
