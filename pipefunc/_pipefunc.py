@@ -1095,6 +1095,13 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
+    variant
+        The variant of the function. Variants allow selecting between different
+        implementations of a function within a `pipefunc.VariantPipeline`.
+    variant_group
+        The group of the variant. This is a string identifier that groups
+        logically related variants. If not provided, the variant group is
+        set to ``None``.
 
     Attributes
     ----------
@@ -1119,6 +1126,8 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        variant: str | None = None,
+        variant_group: str | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -1132,6 +1141,8 @@ class NestedPipeFunc(PipeFunc):
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
+        self.variant = variant
+        self.variant_group = variant_group
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}
