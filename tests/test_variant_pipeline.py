@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, VariantPipeline, pipefunc
+
+has_psutil = importlib.util.find_spec("psutil") is not None
 
 
 def test_variant_pipeline_single_group() -> None:
@@ -74,6 +78,7 @@ def test_variant_pipeline_multiple_groups() -> None:
     assert pipeline_add(a=1, b=2) == (2 * (1 + 2) * 3) * (1 + 2) * 3
 
 
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_lazy_debug_profile_cache() -> None:
     # We just check that these parameters are passed through to the Pipeline
     # No need to test the actual functionality of these parameters,
