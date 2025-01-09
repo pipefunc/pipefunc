@@ -61,7 +61,7 @@ class VariantPipeline:
         self,
         functions: list[PipeFunc],
         *,
-        default_variant: str | dict[str, str] | None = None,
+        default_variant: str | dict[str | None, str] | None = None,
         lazy: bool = False,
         debug: bool | None = None,
         profile: bool | None = None,
@@ -83,29 +83,41 @@ class VariantPipeline:
         self.scope = scope
         self.default_resources = default_resources
 
-    def variants(self) -> dict[str, set[str]]:
+    def _variants_mapping(self) -> dict[str | None, set[str]]:
         """Return a dictionary of variant groups and their variants."""
-        variant_groups = defaultdict(set)
+        variant_groups: dict[str | None, set[str]] = {}
         for function in self.functions:
-            variant_groups[function.variant_group].add(function.variant)
-        return dict(variant_groups)
+            if function.variant is None:
+                assert function.variant_group is None
+                continue
+            variants = variant_groups.setdefault(function.variant_group, set())
+            variants.add(function.variant)
+        return variant_groups
 
-    def variants_inversed(self) -> dict[str, set[str]]:
+    def _variants_mapping_inverse(self) -> dict[str, set[str | None]]:
         """Return a dictionary of variants and their variant groups."""
-        variants = defaultdict(set)
+        variants: dict[str, set[str | None]] = {}
         for function in self.functions:
-            variants[function.variant].add(function.variant_group)
-        return dict(variants)
+            if function.variant is None:
+                assert function.variant_group is None
+                continue
+            groups = variants.setdefault(function.variant, set())
+            groups.add(function.variant_group)
+        return variants
 
-    def with_variant(self, variant: str | None = None, **kwargs: str) -> Pipeline | VariantPipeline:
+    def with_variant(
+        self,
+        select: str | dict[str | None, str] | None = None,
+        **kwargs: Any,
+    ) -> Pipeline | VariantPipeline:
         """Create a new Pipeline or VariantPipeline with the specified variant selected.
 
         Parameters
         ----------
-        variant
+        select
             Name of the variant to select. If not provided, `default_variant` is used.
-            If `variant` is a string, it selects a single variant if no ambiguity exists.
-            If `variant` is a dictionary, it selects a variant for each variant group, where
+            If `select` is a string, it selects a single variant if no ambiguity exists.
+            If `select` is a dictionary, it selects a variant for each variant group, where
             the keys are variant group names and the values are variant names.
         kwargs
             Keyword arguments for changing the parameters for a Pipeline or VariantPipeline.
@@ -122,29 +134,31 @@ class VariantPipeline:
             TODO
 
         """
-        inv = self.variants_inversed()
-        if variant is None:
-            variant = {} if self.default_variant is None else self.default_variant
-        if isinstance(variant, str):
-            group = inv.get(variant, set())
+        inv = self._variants_mapping_inverse()
+        if select is None:
+            select = {} if self.default_variant is None else self.default_variant
+        if isinstance(select, str):
+            group = inv.get(select, set())
             if len(group) > 1:
-                msg = f"Ambiguous variant: `{variant}`, could be in either `{group}`"
+                msg = f"Ambiguous variant: `{select}`, could be in either `{group}`"
                 raise ValueError(msg)
             if not group:
-                msg = f"Unknown variant: `{variant}`"
+                msg = f"Unknown variant: `{select}`"
                 raise ValueError(msg)
-            variant = {group.pop(): variant}
-        elif not isinstance(variant, dict):
-            msg = f"Invalid variant type: `{type(variant)}`. Expected `str` or `dict`."
+            select = {group.pop(): select}
+        elif not isinstance(select, dict):
+            msg = f"Invalid variant type: `{type(select)}`. Expected `str` or `dict`."
             raise TypeError(msg)
-        assert isinstance(variant, dict)
-        _validate_variants_exist(self.variants(), variant)
+        assert isinstance(select, dict)
+        _validate_variants_exist(self._variants_mapping(), select)
 
-        new_functions = []
+        new_functions: list[PipeFunc] = []
         for function in self.functions:
-            if function.variant_group in variant:
-                if function.variant == variant[function.variant_group]:
+            if function.variant_group in select:
+                if function.variant == select[function.variant_group]:
                     new_functions.append(function)
+                else:
+                    continue
             else:
                 new_functions.append(function)
         left_over = defaultdict(set)
@@ -152,19 +166,22 @@ class VariantPipeline:
             left_over[function.variant_group].add(function.variant)
         variants_remain = any(len(variants) > 1 for variants in left_over.values())
         if variants_remain:
-            return self.copy(functions=new_functions)
+            return self.copy(functions=new_functions, **kwargs)
 
         # No variants left, return a regular Pipeline
         return Pipeline(
-            new_functions,
-            lazy=self.lazy,
-            debug=self.debug,
-            profile=self.profile,
-            cache_type=self.cache_type,
-            cache_kwargs=self.cache_kwargs,
-            validate_type_annotations=self.validate_type_annotations,
-            scope=self.scope,
-            default_resources=self.default_resources,
+            new_functions,  # type: ignore[arg-type]
+            lazy=kwargs.get("lazy", self.lazy),
+            debug=kwargs.get("debug", self.debug),
+            profile=kwargs.get("profile", self.profile),
+            cache_type=kwargs.get("cache_type", self.cache_type),
+            cache_kwargs=kwargs.get("cache_kwargs", self.cache_kwargs),
+            validate_type_annotations=kwargs.get(
+                "validate_type_annotations",
+                self.validate_type_annotations,
+            ),
+            scope=kwargs.get("scope", self.scope),
+            default_resources=kwargs.get("default_resources", self.default_resources),
         )
 
     def copy(self, **kwargs: Any) -> VariantPipeline:
@@ -191,7 +208,7 @@ class VariantPipeline:
         }
         assert_complete_kwargs(original_kwargs, VariantPipeline.__init__, skip={"self"})
         original_kwargs.update(kwargs)
-        return VariantPipeline(**original_kwargs)
+        return VariantPipeline(**original_kwargs)  # type: ignore[arg-type]
 
     def __getattr__(self, name: str) -> None:
         if name in Pipeline.__dict__:
@@ -205,12 +222,21 @@ class VariantPipeline:
         raise AttributeError(default_msg)
 
 
-def _validate_variants_exist(all_variants: dict[str, set[str]], selection: dict[str, str]) -> None:
+def _validate_variants_exist(
+    variants_mapping: dict[str | None, set[str]],
+    selection: dict[str | None, str],
+) -> None:
     """Validate that the specified variants exist."""
     for group, variant_name in selection.items():
-        if group not in all_variants:
-            msg = f"Unknown variant group: `{group}`. Use one of: `{', '.join(all_variants)}`"
+        if group not in variants_mapping:
+            msg = f"Unknown variant group: `{group}`."
+            if variants_mapping:
+                groups = (str(k) for k in variants_mapping)
+                msg += f" Use one of: `{', '.join(groups)}`"
             raise ValueError(msg)
-        if variant_name not in all_variants[group]:
-            msg = f"Unknown variant: `{variant_name}` in group `{group}`. Use one of: `{', '.join(all_variants[group])}`"
+        if variant_name not in variants_mapping[group]:
+            msg = (
+                f"Unknown variant: `{variant_name}` in group `{group}`."
+                " Use one of: `{', '.join(variants_mapping[group])}`"
+            )
             raise ValueError(msg)

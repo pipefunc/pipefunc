@@ -553,6 +553,12 @@ class PipeFunc(Generic[T]):
     def _validate(self) -> None:
         self._validate_names()
         self._validate_mapspec()
+        if self.variant is None and self.variant_group is not None:
+            msg = (
+                f"The `variant_group={self.variant_group!r}` cannot be set without"
+                f" a corresponding `variant={self.variant!r}`."
+            )
+            raise ValueError(msg)
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -912,7 +918,7 @@ def pipefunc(
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
     variant: str | None = None,
-    variant_group: str = None,
+    variant_group: str | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -1003,9 +1009,12 @@ def pipefunc(
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
-        TODO
+        The variant of the function. Variants allow selecting between different
+        implementations of a function within a `pipefunc.VariantPipeline`.
     variant_group
-        TODO
+        The group of the variant. This is a string identifier that groups
+        logically related variants. If not provided, the variant group is
+        set to ``None``.
 
     Returns
     -------
