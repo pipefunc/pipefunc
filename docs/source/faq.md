@@ -1175,7 +1175,7 @@ This is the same behavior as with regular Python functions.
 
 Here's a simple example:
 
-```python
+```{code-cell} ipython3
 from pipefunc import VariantPipeline, pipefunc
 
 @pipefunc(output_name="c", variant="A")
@@ -1227,7 +1227,7 @@ pipeline = VariantPipeline(
 )
 
 # Select specific variants for each group
-result = pipeline.with_variant(
+sub_div_pipeline = pipeline.with_variant(
     select={"method": "sub", "analysis": "div"}
 )
 ```
@@ -1236,7 +1236,6 @@ You can inspect available variants using `variants_mapping()`:
 
 ```{code-cell} ipython3
 pipeline.variants_mapping()
-# Returns: {'method': {'add', 'sub'}, 'analysis': {'mul', 'div'}}
 ```
 
 Variants in the same group can have different output names:
@@ -1245,19 +1244,20 @@ Variants in the same group can have different output names:
 @pipefunc(output_name="stats_result", variant_group="analysis", variant="stats")
 def analyze_stats(data):
     # Perform statistical analysis
-    return stats_result
+    return ...
 
 @pipefunc(output_name="ml_result", variant_group="analysis", variant="ml")
 def analyze_ml(data):
     # Perform machine learning analysis
-    return ml_result
+    return ...
 
 # The output name to use depends on which variant is selected
+pipeline = VariantPipeline([analyze_stats, analyze_ml])
 pipeline_stats = pipeline.with_variant(select={"analysis": "stats"})
-result = pipeline_stats("stats_result", data=my_data)
+result = pipeline_stats("stats_result", data={...})
 
 pipeline_ml = pipeline.with_variant(select={"analysis": "ml"})
-result = pipeline_ml("ml_result", data=my_data)
+result = pipeline_ml("ml_result", data={...})
 ```
 
 Key features:

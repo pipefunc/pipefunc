@@ -272,6 +272,6 @@ def _validate_variants_exist(
         if variant_name not in variants_mapping[group]:
             msg = (
                 f"Unknown variant: `{variant_name}` in group `{group}`."
-                " Use one of: `{', '.join(variants_mapping[group])}`"
+                f" Use one of: `{', '.join(variants_mapping[group])}`"
             )
             raise ValueError(msg)
