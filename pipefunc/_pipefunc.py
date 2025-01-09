@@ -147,6 +147,18 @@ class PipeFunc(Generic[T]):
         a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+    variant
+        Identifies this function as an alternative implementation in a
+        `VariantPipeline`. When multiple functions share the same `output_name`,
+        the variant allows selecting which implementation to use (e.g., "fast"
+        vs "accurate"). Only one variant can be selected for execution in
+        the pipeline.
+    variant_group
+        Groups related variants together, allowing independent selection of
+        variants from different groups. For example, you might have a "preprocess"
+        group with variants "v1"/"v2" and a "compute" group with variants
+        "fast"/"accurate". If not provided and `variant` is specified, the variant
+        is placed in an unnamed group (None).
 
     Returns
     -------
@@ -1009,12 +1021,17 @@ def pipefunc(
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
-        The variant of the function. Variants allow selecting between different
-        implementations of a function within a `pipefunc.VariantPipeline`.
+        Identifies this function as an alternative implementation in a
+        `VariantPipeline`. When multiple functions share the same `output_name`,
+        the variant allows selecting which implementation to use (e.g., "fast"
+        vs "accurate"). Only one variant can be selected for execution in
+        the pipeline.
     variant_group
-        The group of the variant. This is a string identifier that groups
-        logically related variants. If not provided, the variant group is
-        set to ``None``.
+        Groups related variants together, allowing independent selection of
+        variants from different groups. For example, you might have a "preprocess"
+        group with variants "v1"/"v2" and a "compute" group with variants
+        "fast"/"accurate". If not provided and `variant` is specified, the variant
+        is placed in an unnamed group (None).
 
     Returns
     -------
@@ -1096,12 +1113,17 @@ class NestedPipeFunc(PipeFunc):
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
     variant
-        The variant of the function. Variants allow selecting between different
-        implementations of a function within a `pipefunc.VariantPipeline`.
+        Identifies this function as an alternative implementation in a
+        `VariantPipeline`. When multiple functions share the same `output_name`,
+        the variant allows selecting which implementation to use (e.g., "fast"
+        vs "accurate"). Only one variant can be selected for execution in
+        the pipeline.
     variant_group
-        The group of the variant. This is a string identifier that groups
-        logically related variants. If not provided, the variant group is
-        set to ``None``.
+        Groups related variants together, allowing independent selection of
+        variants from different groups. For example, you might have a "preprocess"
+        group with variants "v1"/"v2" and a "compute" group with variants
+        "fast"/"accurate". If not provided and `variant` is specified, the variant
+        is placed in an unnamed group (None).
 
     Attributes
     ----------
