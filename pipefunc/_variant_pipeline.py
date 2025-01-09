@@ -72,8 +72,8 @@ class VariantPipeline:
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
 
-    Example
-    -------
+    Examples
+    --------
     Simple variant selection:
 
         >>> @pipefunc(output_name="c", variant="add")
