@@ -1171,7 +1171,7 @@ This is the same behavior as with regular Python functions.
 
 ## What is `VariantPipeline` and how to use it?
 
-`VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
+{class}`pipefunc.VariantPipeline` allows creating pipelines with alternative implementations (variants) of functions. This is useful when you want to experiment with different implementations without creating separate pipelines.
 
 Here's a simple example:
 
