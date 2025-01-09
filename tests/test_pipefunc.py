@@ -577,6 +577,7 @@ def test_default_and_bound() -> None:
     def f(a=1):
         return a
 
+    _ = f.defaults
     f.copy()
 
     @dataclass
@@ -584,15 +585,18 @@ def test_default_and_bound() -> None:
         a: int = 1
 
     f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults
     f.copy()
 
 
 @pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
 def test_default_and_bound_pydantic() -> None:
+    # Fixed in https://github.com/pipefunc/pipefunc/pull/525
     import pydantic
 
     class Foo(pydantic.BaseModel):
-        a: int = 1
+        a: int = pydantic.Field(default=1)
 
     f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults  # accessing defaults should not modify state! (issue #525)
     f.copy()
