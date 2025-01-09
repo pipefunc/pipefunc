@@ -347,18 +347,26 @@ class VariantPipeline:
     def from_pipelines(cls, *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline]):
         """Create a new VariantPipeline from multiple Pipelines."""
         common_functions = []
-        functions = []
-        default_variant = {}
-        for item in variant_pipeline:
+        unique_functions_lists: list[list[PipeFunc]] = []
+        for *_, pipeline in variant_pipeline:
+            unique_functions_lists.append([])
+            for function in pipeline.functions:
+                if not any(_same_pipefunc(function, f) for f in common_functions):
+                    common_functions.append(function)
+                else:
+                    unique_functions_lists[-1].append(function)
+
+        functions = common_functions.copy()
+        for unique_functions, item in zip(unique_functions_lists, variant_pipeline):
             if len(item) == 3:
                 variant_group, variant, pipeline = item
             else:
                 variant, pipeline = item
                 variant_group = None
-            functions.extend(pipeline.functions)
-            if variant is not None:
-                default_variant[variant_group] = variant
-        return cls(functions, default_variant=default_variant)
+            for function in unique_functions:
+                new_function = function.copy(variant_group=variant_group, variant=variant)
+                functions.append(new_function)
+        return cls(functions)
 
 
 def _validate_variants_exist(
