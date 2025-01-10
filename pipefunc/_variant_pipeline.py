@@ -349,15 +349,38 @@ class VariantPipeline:
         *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline],
     ) -> VariantPipeline:
         """Create a new VariantPipeline from multiple Pipelines."""
-        common_functions: list[PipeFunc] = []
-        unique_functions_lists: list[list[PipeFunc]] = []
+        all_functions: list[list[PipeFunc]] = []
         for *_, pipeline in variant_pipeline:
-            unique_functions_lists.append([])
-            for function in pipeline.functions:
-                if not any(_same_pipefunc(function, f) for f in common_functions):
-                    common_functions.append(function)
-                else:
-                    unique_functions_lists[-1].append(function)
+            all_functions.append(pipeline.functions)
+
+        common_functions: list[PipeFunc] = []
+        for i, functions_i in enumerate(all_functions):
+            for f_i in functions_i:
+                is_common = True
+                for j, functions_j in enumerate(all_functions):
+                    if i == j:
+                        continue  # Don't compare a pipeline against itself
+
+                    found_match = False
+                    for f_j in functions_j:
+                        if _same_pipefunc(f_i, f_j):
+                            found_match = True
+                            break
+
+                    if not found_match:
+                        is_common = False
+                        break
+
+                if is_common:  # noqa: SIM102
+                    if not any(_same_pipefunc(f_i, cf) for cf in common_functions):
+                        common_functions.append(f_i)
+
+        unique_functions_lists: list[list[PipeFunc]] = []
+        for functions in all_functions:
+            unique_list = [
+                f for f in functions if not any(_same_pipefunc(f, cf) for cf in common_functions)
+            ]
+            unique_functions_lists.append(unique_list)
 
         functions = common_functions.copy()
         for unique_functions, item in zip(unique_functions_lists, variant_pipeline):
@@ -367,7 +390,10 @@ class VariantPipeline:
                 variant, pipeline = item
                 variant_group = None
             for function in unique_functions:
-                new_function = function.copy(variant_group=variant_group, variant=variant)
+                new_function = function.copy(
+                    variant_group=variant_group,
+                    variant=variant,
+                )
                 functions.append(new_function)
         return cls(functions)
 
