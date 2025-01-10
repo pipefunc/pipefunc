@@ -433,10 +433,10 @@ class VariantPipeline:
         for func in all_funcs[0]:
             is_common = True
             for other_funcs in all_funcs[1:]:
-                if not any(is_identical_pipefunc(func, f) for f in other_funcs):
+                if not _pipefunc_in_list(func, other_funcs):
                     is_common = False
                     break
-            if is_common and not any(is_identical_pipefunc(func, f) for f in common_funcs):
+            if is_common and not _pipefunc_in_list(func, common_funcs):
                 common_funcs.append(func)
 
         functions: list[PipeFunc] = common_funcs[:]
@@ -447,7 +447,7 @@ class VariantPipeline:
             unique_funcs = [
                 func.copy(variant_group=variant_group, variant=variant)
                 for func in funcs
-                if not any(is_identical_pipefunc(func, f) for f in common_funcs)
+                if not _pipefunc_in_list(func, common_funcs)
             ]
             functions.extend(unique_funcs)
 
@@ -472,6 +472,11 @@ def _validate_variants_exist(
                 f" Use one of: `{', '.join(variants_mapping[group])}`"
             )
             raise ValueError(msg)
+
+
+def _pipefunc_in_list(func: PipeFunc, funcs: list[PipeFunc]) -> bool:
+    """Check if a PipeFunc instance is in a list of PipeFunc instances."""
+    return any(is_identical_pipefunc(func, f) for f in funcs)
 
 
 def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
