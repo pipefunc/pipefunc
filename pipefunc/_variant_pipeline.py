@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from typing import Any, Literal
 
@@ -343,6 +344,115 @@ class VariantPipeline:
         default_msg = f"'VariantPipeline' object has no attribute '{name}'"
         raise AttributeError(default_msg)
 
+    @classmethod
+    def from_pipelines(
+        cls,
+        *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline],
+    ) -> VariantPipeline:
+        """Create a new `VariantPipeline` from multiple `Pipeline` instances.
+
+        This method constructs a `VariantPipeline` by combining functions from
+        multiple `Pipeline` instances, identifying common functions and assigning
+        variant groups and names based on the input tuples.
+
+        Each input tuple can either be a 2-tuple or a 3-tuple.
+        - A 2-tuple contains: ``(variant_name, pipeline)``.
+        - A 3-tuple contains: ``(variant_group, variant_name, pipeline)``.
+
+        Functions that are identical across all input pipelines (as determined by
+        the `is_identical_pipefunc` function) are considered "common" and are added to
+        the resulting `VariantPipeline` without any variant information.
+
+        Functions that are unique to a specific pipeline are added with their
+        corresponding variant group and variant name (if provided in the input tuple).
+
+        Parameters
+        ----------
+        *variant_pipeline
+            Variable number of tuples, where each tuple represents a pipeline and its
+            associated variant information. Each tuple can be either:
+            - `(variant_name, pipeline)`: Specifies the variant name for all functions
+            in the pipeline. The variant group will be set to `None`.
+            - `(variant_group, variant_name, pipeline)`: Specifies both the variant
+            group and variant name for all functions in the pipeline.
+
+        Returns
+        -------
+            A new `VariantPipeline` instance containing the combined functions from
+            the input pipelines, with appropriate variant assignments.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="x")
+        ... def f(a, b):
+        ...     return a + b
+        ...
+        >>> @pipefunc(output_name="y")
+        ... def g(x, c):
+        ...     return x * c
+        ...
+        >>> pipeline1 = Pipeline([f, g])
+        >>> pipeline2 = Pipeline([f, g.copy(func=lambda x, c: x / c)])
+        >>> variant_pipeline = VariantPipeline.from_pipelines(
+        ...     ("add_mul", pipeline1),
+        ...     ("add_div", pipeline2)
+        ... )
+        >>> add_mul_pipeline = variant_pipeline.with_variant(select="add_mul")
+        >>> add_div_pipeline = variant_pipeline.with_variant(select="add_div")
+        >>> add_mul_pipeline(a=1, b=2, c=3)  # (1 + 2) * 3 = 9
+        9
+        >>> add_div_pipeline(a=1, b=2, c=3)  # (1 + 2) / 3 = 1.0
+        1.0
+
+        Notes
+        -----
+        - The `is_identical_pipefunc` function is used to determine if two `PipeFunc`
+          instances are identical.
+        - If multiple pipelines contain the same function but with different variant
+          information, the function will be included multiple times in the
+          resulting `VariantPipeline`, each with its respective variant assignment.
+
+        """
+        if len(variant_pipeline) < 2:  # noqa: PLR2004
+            msg = "At least 2 pipelines must be provided."
+            raise ValueError(msg)
+        all_funcs: list[list[PipeFunc]] = []
+        variant_info: list[tuple[str | None, str]] = []
+
+        for item in variant_pipeline:
+            if len(item) == 3:  # noqa: PLR2004
+                variant_group, variant, pipeline = item
+            else:
+                variant, pipeline = item
+                variant_group = None
+            all_funcs.append(pipeline.functions)
+            variant_info.append((variant_group, variant))
+
+        # Find common functions using is_identical_pipefunc
+        common_funcs: list[PipeFunc] = []
+        for func in all_funcs[0]:
+            is_common = True
+            for other_funcs in all_funcs[1:]:
+                if not _pipefunc_in_list(func, other_funcs):
+                    is_common = False
+                    break
+            if is_common and not _pipefunc_in_list(func, common_funcs):
+                common_funcs.append(func)
+
+        functions: list[PipeFunc] = common_funcs[:]
+
+        # Add unique functions with variant information
+        for i, funcs in enumerate(all_funcs):
+            variant_group, variant = variant_info[i]
+            unique_funcs = [
+                func.copy(variant_group=variant_group, variant=variant)
+                for func in funcs
+                if not _pipefunc_in_list(func, common_funcs)
+            ]
+            functions.extend(unique_funcs)
+
+        return cls(functions)
+
 
 def _validate_variants_exist(
     variants_mapping: dict[str | None, set[str]],
@@ -362,3 +472,25 @@ def _validate_variants_exist(
                 f" Use one of: `{', '.join(variants_mapping[group])}`"
             )
             raise ValueError(msg)
+
+
+def _pipefunc_in_list(func: PipeFunc, funcs: list[PipeFunc]) -> bool:
+    """Check if a PipeFunc instance is in a list of PipeFunc instances."""
+    return any(is_identical_pipefunc(func, f) for f in funcs)
+
+
+def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
+    """Check if two PipeFunc instances are identical.
+
+    Note: This is not implemented as PipeFunc.__eq__ to avoid
+    hashing issues.
+    """
+    cls = type(first)
+    for attr, value in first.__dict__.items():
+        if isinstance(getattr(cls, attr, None), functools.cached_property):
+            continue
+        if attr == "_pipelines":
+            continue
+        if value != second.__dict__[attr]:
+            return False
+    return True

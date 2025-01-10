@@ -1278,6 +1278,8 @@ The `with_variant()` method returns either:
 - A regular `Pipeline` if all variants are resolved
 - Another `VariantPipeline` if some variants remain unselected
 
+Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variant` and `variant_group` for each function.
+
 This makes `VariantPipeline` ideal for:
 
 - A/B testing different implementations
