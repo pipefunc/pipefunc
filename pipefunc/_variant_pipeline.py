@@ -360,7 +360,7 @@ class VariantPipeline:
         - A 3-tuple contains: ``(variant_group, variant_name, pipeline)``.
 
         Functions that are identical across all input pipelines (as determined by
-        the `pipefuncs_equivalent` function) are considered "common" and are added to
+        the `is_identical_pipefunc` function) are considered "common" and are added to
         the resulting `VariantPipeline` without any variant information.
 
         Functions that are unique to a specific pipeline are added with their
@@ -406,13 +406,16 @@ class VariantPipeline:
 
         Notes
         -----
-        - The `pipefuncs_equivalent` function is used to determine if two `PipeFunc`
+        - The `is_identical_pipefunc` function is used to determine if two `PipeFunc`
           instances are identical.
         - If multiple pipelines contain the same function but with different variant
           information, the function will be included multiple times in the
           resulting `VariantPipeline`, each with its respective variant assignment.
 
         """
+        if len(variant_pipeline) < 2:  # noqa: PLR2004
+            msg = "At least 2 pipelines must be provided."
+            raise ValueError(msg)
         all_funcs: list[list[PipeFunc]] = []
         variant_info: list[tuple[str | None, str]] = []
 
@@ -425,7 +428,7 @@ class VariantPipeline:
             all_funcs.append(pipeline.functions)
             variant_info.append((variant_group, variant))
 
-        # Find common functions using pipefuncs_equivalent
+        # Find common functions using is_identical_pipefunc
         common_funcs: list[PipeFunc] = []
         if all_funcs:  # Handle the case of empty input
             for func in all_funcs[0]:
