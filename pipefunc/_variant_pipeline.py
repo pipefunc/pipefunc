@@ -430,15 +430,14 @@ class VariantPipeline:
 
         # Find common functions using is_identical_pipefunc
         common_funcs: list[PipeFunc] = []
-        if all_funcs:  # Handle the case of empty input
-            for func in all_funcs[0]:
-                is_common = True
-                for other_funcs in all_funcs[1:]:
-                    if not any(is_identical_pipefunc(func, f) for f in other_funcs):
-                        is_common = False
-                        break
-                if is_common and not any(is_identical_pipefunc(func, f) for f in common_funcs):
-                    common_funcs.append(func)
+        for func in all_funcs[0]:
+            is_common = True
+            for other_funcs in all_funcs[1:]:
+                if not any(is_identical_pipefunc(func, f) for f in other_funcs):
+                    is_common = False
+                    break
+            if is_common and not any(is_identical_pipefunc(func, f) for f in common_funcs):
+                common_funcs.append(func)
 
         functions: list[PipeFunc] = common_funcs[:]
 

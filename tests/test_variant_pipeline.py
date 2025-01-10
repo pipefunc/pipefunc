@@ -543,3 +543,8 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
     assert is_identical_pipefunc(variant_pipeline.functions[0], f)  # The common function f
     assert variant_pipeline.functions[1].variant == "add_mul"
     assert variant_pipeline.functions[2].variant == "add_div"
+
+
+def test_exception_no_pipelines() -> None:
+    with pytest.raises(ValueError, match="At least 2 pipelines must be provided"):
+        VariantPipeline.from_pipelines()
