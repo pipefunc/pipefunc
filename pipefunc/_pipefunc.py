@@ -1175,6 +1175,7 @@ class NestedPipeFunc(PipeFunc):
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.post_execution_hook = None
+        self.internal_shape = None
         self.mapspec = self._combine_mapspecs() if mapspec is None else _maybe_mapspec(mapspec)
         for f in self.pipeline.functions:
             f.mapspec = None  # MapSpec is handled by the NestedPipeFunc

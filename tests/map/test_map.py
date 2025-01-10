@@ -1727,3 +1727,23 @@ def test_pipeline_loading_existing_results_with_internal_shape(
     pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
     assert counters["f"] == 2
     assert counters["g"] == 20
+
+
+def test_nested_pipefunc_map() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def h(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f, g, h])
+    results_before = pipeline.map({"a": 1, "b": 2})
+    pipeline.nest_funcs({"c", "d"})
+    results_after = pipeline.map({"a": 1, "b": 2})
+    assert results_after["e"].output == results_before["e"].output
