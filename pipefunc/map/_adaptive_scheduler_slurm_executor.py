@@ -25,7 +25,7 @@ def validate_slurm_executor(
         return
     for ex in executor.values():
         if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
-            msg = "Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.run_async` instead."
+            msg = "Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.map_async` instead."
             raise ValueError(msg)
 
 
