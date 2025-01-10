@@ -1751,8 +1751,8 @@ def test_nested_pipefunc_map_no_mapspec() -> None:
 
 def test_nested_pipefunc_map_with_mapspec() -> None:
     @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
-    def f(a: int, b: int) -> int:
-        return a + b
+    def f(a: int, b: int, x: int = 0) -> int:
+        return a + b + x
 
     @pipefunc(output_name="d", mapspec="b[i], c[i] -> d[i]")
     def g(b: int, c: int) -> int:
@@ -1764,6 +1764,7 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
 
     pipeline = Pipeline([f, g, h])
     results_before = pipeline.map({"a": [1, 2], "b": [3, 4]})
-    pipeline.nest_funcs({"c", "d"})
+    nested = pipeline.nest_funcs({"c", "d"})
     results_after = pipeline.map({"a": [1, 2], "b": [3, 4]})
     assert results_after["e"].output == results_before["e"].output
+    assert str(nested.mapspec) == "a[i], b[i] -> c[i], d[i]"

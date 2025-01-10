@@ -1201,7 +1201,7 @@ class NestedPipeFunc(PipeFunc):
         _validate_combinable_mapspecs(mapspecs)
         axes = mapspec_axes(mapspecs)  # type: ignore[arg-type]
         return MapSpec(
-            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
+            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters) if n in axes),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
             _is_generated=True,
         )
@@ -1419,13 +1419,15 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
     for m in mapspecs:
         assert m is not None
         if m.input_indices != set(m.output_indices):
-            msg = "Cannot combine MapSpecs with different input and output mappings."
+            msg = (
+                f"Cannot combine MapSpecs with different input and output mappings. Mapspec: `{m}`"
+            )
             raise ValueError(msg)
         if m.input_indices != first.input_indices:
-            msg = "Cannot combine MapSpecs with different input mappings."
+            msg = f"Cannot combine MapSpecs with different input mappings. Mapspec: `{m}`"
             raise ValueError(msg)
         if m.output_indices != first.output_indices:
-            msg = "Cannot combine MapSpecs with different output mappings."
+            msg = f"Cannot combine MapSpecs with different output mappings. Mapspec: `{m}`"
             raise ValueError(msg)
 
 
