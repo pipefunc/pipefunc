@@ -611,3 +611,4 @@ def test_nested_pipefunc_function_name() -> None:
 
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], function_name="my_func")
     assert nf.__name__ == "my_func"
+    nf.copy()

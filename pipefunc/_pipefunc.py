@@ -1197,6 +1197,8 @@ class NestedPipeFunc(PipeFunc):
             "renames": self._renames,
             "mapspec": self.mapspec,
             "resources": self.resources,
+            "variant": self.variant,
+            "variant_group": self.variant_group,
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
