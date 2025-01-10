@@ -1246,7 +1246,7 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
         func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
-        return _NestedFuncWrapper(func.call_full_output, self.output_name, self.function_name)
+        return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
     @functools.cached_property
     def __name__(self) -> str:  # type: ignore[override]

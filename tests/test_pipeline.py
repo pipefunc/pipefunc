@@ -966,3 +966,40 @@ def test_pipeline_map_zero_size() -> None:
         internal_shapes={"incomplete": ("?",)},
     )
     assert result["result"].output == [0, 1, 2, 3]
+
+
+def test_run_for_output_name_that_does_not_exist() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("No function with output name `d` in the pipeline, only `c`."),
+    ):
+        pipeline("d", a=1, b=2)
+
+
+def test_nested_pipefunc_in_pipeline_renames() -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int) -> int:
+        return 2 + n
+
+    @pipefunc(output_name="y")
+    def fb(x: int) -> int:
+        return 2 * x
+
+    # Run without nesting first
+    pipeline_base = Pipeline([fa, fb], scope="test")
+    assert pipeline_base.run("test.y", kwargs={"test.n": 2}) == 8
+
+    pipeline = Pipeline([NestedPipeFunc([fa, fb], ("x", "y"))], scope="test")
+    func = pipeline.output_to_func["test.x"]
+    assert func.renames == {"n": "test.n", "x": "test.x", "y": "test.y"}
+    assert isinstance(func, NestedPipeFunc)
+    assert func.pipeline.functions[0].renames == {}
+    r = pipeline.run("test.y", kwargs={"test.n": 2})
+    assert r == 8
+    r = pipeline.map(inputs={"test.n": 2})
+    assert r["test.y"].output == 8

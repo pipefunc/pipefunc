@@ -647,6 +647,16 @@ class Pipeline:
             names to their return values if ``full_output`` is ``True``.
 
         """
+        if output_name in kwargs:
+            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
+            raise ValueError(msg)
+        if output_name not in self.output_to_func:
+            available = ", ".join(k for k in self.output_to_func if isinstance(k, str))
+            msg = (
+                f"No function with output name `{output_name}` in the pipeline, only `{available}`."
+            )
+            raise ValueError(msg)
+
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
             inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
@@ -654,10 +664,6 @@ class Pipeline:
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
             )
             raise RuntimeError(msg)
-
-        if output_name in kwargs:
-            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
-            raise ValueError(msg)
 
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
