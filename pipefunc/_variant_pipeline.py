@@ -344,9 +344,12 @@ class VariantPipeline:
         raise AttributeError(default_msg)
 
     @classmethod
-    def from_pipelines(cls, *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline]):
+    def from_pipelines(
+        cls,
+        *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline],
+    ) -> VariantPipeline:
         """Create a new VariantPipeline from multiple Pipelines."""
-        common_functions = []
+        common_functions: list[PipeFunc] = []
         unique_functions_lists: list[list[PipeFunc]] = []
         for *_, pipeline in variant_pipeline:
             unique_functions_lists.append([])
@@ -358,7 +361,7 @@ class VariantPipeline:
 
         functions = common_functions.copy()
         for unique_functions, item in zip(unique_functions_lists, variant_pipeline):
-            if len(item) == 3:
+            if len(item) == 3:  # noqa: PLR2004
                 variant_group, variant, pipeline = item
             else:
                 variant, pipeline = item

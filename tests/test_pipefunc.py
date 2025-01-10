@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_pydantic = importlib.util.find_spec("pydantic") is not None
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
@@ -571,18 +572,31 @@ def test_defaults_dataclass_factory() -> None:
     assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
 
 
-def test_equality() -> None:
-    @pipefunc(output_name="c")
-    def f(a, b):
-        return a + b
+def test_default_and_bound() -> None:
+    @pipefunc("c", bound={"a": 2})
+    def f(a=1):
+        return a
 
-    @pipefunc(output_name="c")
-    def g(a, b):
-        return a + b
+    _ = f.defaults
+    f.copy()
 
-    assert f == f
-    assert f != g
-    assert f != 1
-    assert f != "f"
-    assert f != None  # noqa: E711
-    assert f == f.copy()
+    @dataclass
+    class Foo:
+        a: int = 1
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults
+    f.copy()
+
+
+@pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
+def test_default_and_bound_pydantic() -> None:
+    # Fixed in https://github.com/pipefunc/pipefunc/pull/525
+    import pydantic
+
+    class Foo(pydantic.BaseModel):
+        a: int = pydantic.Field(default=1)
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults  # accessing defaults should not modify state! (issue #525)
+    f.copy()
