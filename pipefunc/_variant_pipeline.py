@@ -30,7 +30,7 @@ class VariantPipeline:
     Parameters
     ----------
     functions
-        List of `PipeFunc` instances.
+        list of `PipeFunc` instances.
     default_variant
         Default variant to use if none is specified in `with_variant`.
         Either a single variant name or a dictionary mapping variant
@@ -349,45 +349,42 @@ class VariantPipeline:
         *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline],
     ) -> VariantPipeline:
         """Create a new VariantPipeline from multiple Pipelines."""
-        all_functions: list[list[PipeFunc]] = []
-        for *_, pipeline in variant_pipeline:
-            all_functions.append(pipeline.functions)
+        all_funcs: list[list[PipeFunc]] = []
+        variant_info: list[tuple[str | None, str]] = []
 
-        common_functions: list[PipeFunc] = []
-        unique_functions_lists: list[list[PipeFunc]] = []
-
-        for pipeline_index, functions in enumerate(all_functions):
-            unique_functions: list[PipeFunc] = []
-            for func in functions:
-                is_common = all(
-                    any(_same_pipefunc(func, other_func) for other_func in other_functions)
-                    for other_pipeline_index, other_functions in enumerate(all_functions)
-                    if pipeline_index != other_pipeline_index
-                )
-
-                if is_common:
-                    if not any(
-                        _same_pipefunc(func, common_func) for common_func in common_functions
-                    ):
-                        common_functions.append(func)
-                else:
-                    unique_functions.append(func)
-
-            unique_functions_lists.append(unique_functions)
-
-        functions = common_functions.copy()
-        for unique_functions, item in zip(unique_functions_lists, variant_pipeline):
+        for item in variant_pipeline:
             if len(item) == 3:  # noqa: PLR2004
                 variant_group, variant, pipeline = item
             else:
                 variant, pipeline = item
                 variant_group = None
-            for function in unique_functions:
-                new_function = function.copy(
-                    variant_group=variant_group,
-                    variant=variant,
-                )
-                functions.append(new_function)
+            all_funcs.append(pipeline.functions)
+            variant_info.append((variant_group, variant))
+
+        # Find common functions using _same_pipefunc
+        common_funcs: list[PipeFunc] = []
+        if all_funcs:  # Handle the case of empty input
+            for func in all_funcs[0]:
+                is_common = True
+                for other_funcs in all_funcs[1:]:
+                    if not any(_same_pipefunc(func, f) for f in other_funcs):
+                        is_common = False
+                        break
+                if is_common and not any(_same_pipefunc(func, f) for f in common_funcs):
+                    common_funcs.append(func)
+
+        functions: list[PipeFunc] = common_funcs[:]
+
+        # Add unique functions with variant information
+        for i, funcs in enumerate(all_funcs):
+            variant_group, variant = variant_info[i]
+            unique_funcs = [
+                func.copy(variant_group=variant_group, variant=variant)
+                for func in funcs
+                if not any(_same_pipefunc(func, f) for f in common_funcs)
+            ]
+            functions.extend(unique_funcs)
+
         return cls(functions)
 
 
