@@ -360,7 +360,7 @@ class VariantPipeline:
         - A 3-tuple contains: ``(variant_group, variant_name, pipeline)``.
 
         Functions that are identical across all input pipelines (as determined by
-        the `_same_pipefunc` function) are considered "common" and are added to
+        the `pipefuncs_equivalent` function) are considered "common" and are added to
         the resulting `VariantPipeline` without any variant information.
 
         Functions that are unique to a specific pipeline are added with their
@@ -406,7 +406,7 @@ class VariantPipeline:
 
         Notes
         -----
-        - The `_same_pipefunc` function is used to determine if two `PipeFunc`
+        - The `pipefuncs_equivalent` function is used to determine if two `PipeFunc`
           instances are identical.
         - If multiple pipelines contain the same function but with different variant
           information, the function will be included multiple times in the
@@ -425,16 +425,16 @@ class VariantPipeline:
             all_funcs.append(pipeline.functions)
             variant_info.append((variant_group, variant))
 
-        # Find common functions using _same_pipefunc
+        # Find common functions using pipefuncs_equivalent
         common_funcs: list[PipeFunc] = []
         if all_funcs:  # Handle the case of empty input
             for func in all_funcs[0]:
                 is_common = True
                 for other_funcs in all_funcs[1:]:
-                    if not any(_same_pipefunc(func, f) for f in other_funcs):
+                    if not any(is_identical_pipefunc(func, f) for f in other_funcs):
                         is_common = False
                         break
-                if is_common and not any(_same_pipefunc(func, f) for f in common_funcs):
+                if is_common and not any(is_identical_pipefunc(func, f) for f in common_funcs):
                     common_funcs.append(func)
 
         functions: list[PipeFunc] = common_funcs[:]
@@ -445,7 +445,7 @@ class VariantPipeline:
             unique_funcs = [
                 func.copy(variant_group=variant_group, variant=variant)
                 for func in funcs
-                if not any(_same_pipefunc(func, f) for f in common_funcs)
+                if not any(is_identical_pipefunc(func, f) for f in common_funcs)
             ]
             functions.extend(unique_funcs)
 
@@ -472,15 +472,15 @@ def _validate_variants_exist(
             raise ValueError(msg)
 
 
-def _same_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
-    """Compare with another PipeFunc instance for equality.
+def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
+    """Check if two PipeFunc instances are identical.
 
     Note: This is not implemented as PipeFunc.__eq__ to avoid
     hashing issues.
     """
     cls = type(first)
     for attr, value in first.__dict__.items():
-        if hasattr(cls, attr) and isinstance(getattr(cls, attr), functools.cached_property):
+        if isinstance(getattr(cls, attr, None), functools.cached_property):
             continue
         if attr == "_pipelines":
             continue
