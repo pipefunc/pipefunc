@@ -1201,7 +1201,7 @@ class NestedPipeFunc(PipeFunc):
         _validate_combinable_mapspecs(mapspecs)
         axes = mapspec_axes(mapspecs)  # type: ignore[arg-type]
         return MapSpec(
-            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters)),
+            tuple(ArraySpec(n, axes[n]) for n in sorted(self.parameters) if n in axes),
             tuple(ArraySpec(n, axes[n]) for n in sorted(at_least_tuple(self.output_name))),
             _is_generated=True,
         )
