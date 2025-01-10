@@ -651,7 +651,7 @@ class Pipeline:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
         if output_name not in self.output_to_func:
-            available = ", ".join(self.output_to_func)
+            available = ", ".join(k for k in self.output_to_func if isinstance(k, str))
             msg = (
                 f"No function with output name `{output_name}` in the pipeline, only `{available}`."
             )
