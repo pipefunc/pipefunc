@@ -31,7 +31,7 @@ class VariantPipeline:
     Parameters
     ----------
     functions
-        list of `PipeFunc` instances.
+        List of `PipeFunc` instances.
     default_variant
         Default variant to use if none is specified in `with_variant`.
         Either a single variant name or a dictionary mapping variant
