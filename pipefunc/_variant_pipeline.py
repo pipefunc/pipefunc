@@ -348,7 +348,70 @@ class VariantPipeline:
         cls,
         *variant_pipeline: tuple[str, str, Pipeline] | tuple[str, Pipeline],
     ) -> VariantPipeline:
-        """Create a new VariantPipeline from multiple Pipelines."""
+        """Create a new `VariantPipeline` from multiple `Pipeline` instances.
+
+        This method constructs a `VariantPipeline` by combining functions from
+        multiple `Pipeline` instances, identifying common functions and assigning
+        variant groups and names based on the input tuples.
+
+        Each input tuple can either be a 2-tuple or a 3-tuple.
+        - A 2-tuple contains: ``(variant_name, pipeline)``.
+        - A 3-tuple contains: ``(variant_group, variant_name, pipeline)``.
+
+        Functions that are identical across all input pipelines (as determined by
+        the `_same_pipefunc` function) are considered "common" and are added to
+        the resulting `VariantPipeline` without any variant information.
+
+        Functions that are unique to a specific pipeline are added with their
+        corresponding variant group and variant name (if provided in the input tuple).
+
+        Parameters
+        ----------
+        *variant_pipeline
+            Variable number of tuples, where each tuple represents a pipeline and its
+            associated variant information. Each tuple can be either:
+            - `(variant_name, pipeline)`: Specifies the variant name for all functions
+            in the pipeline. The variant group will be set to `None`.
+            - `(variant_group, variant_name, pipeline)`: Specifies both the variant
+            group and variant name for all functions in the pipeline.
+
+        Returns
+        -------
+            A new `VariantPipeline` instance containing the combined functions from
+            the input pipelines, with appropriate variant assignments.
+
+        Examples
+        --------
+        >>> @pipefunc(output_name="x")
+        ... def f(a, b):
+        ...     return a + b
+        ...
+        >>> @pipefunc(output_name="y")
+        ... def g(x, c):
+        ...     return x * c
+        ...
+        >>> pipeline1 = Pipeline([f, g])
+        >>> pipeline2 = Pipeline([f, g.copy(func=lambda x, c: x / c)])
+        >>> variant_pipeline = VariantPipeline.from_pipelines(
+        ...     ("add_mul", pipeline1),
+        ...     ("add_div", pipeline2)
+        ... )
+        >>> add_mul_pipeline = variant_pipeline.with_variant(select="add_mul")
+        >>> add_div_pipeline = variant_pipeline.with_variant(select="add_div")
+        >>> add_mul_pipeline(a=1, b=2, c=3)  # (1 + 2) * 3 = 9
+        9
+        >>> add_div_pipeline(a=1, b=2, c=3)  # (1 + 2) / 3 = 1.0
+        1.0
+
+        Notes
+        -----
+        - The `_same_pipefunc` function is used to determine if two `PipeFunc`
+          instances are identical.
+        - If multiple pipelines contain the same function but with different variant
+          information, the function will be included multiple times in the
+          resulting `VariantPipeline`, each with its respective variant assignment.
+
+        """
         all_funcs: list[list[PipeFunc]] = []
         variant_info: list[tuple[str | None, str]] = []
 
