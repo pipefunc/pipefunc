@@ -1726,6 +1726,7 @@ class Pipeline:
         self,
         output_names: set[OUTPUT_TYPE] | Literal["*"],
         new_output_name: OUTPUT_TYPE | None = None,
+        function_name: str | None = None,
     ) -> NestedPipeFunc:
         """Replaces a set of output names with a single nested function inplace.
 
@@ -1736,7 +1737,11 @@ class Pipeline:
             in the pipeline into a single `NestedPipeFunc`.
         new_output_name
             The identifier for the output of the wrapped function. If ``None``, it is automatically
-            constructed from all the output names of the `PipeFunc` instances.
+            constructed from all the output names of the `PipeFunc` instances. Must be a subset of
+            the output names of the `PipeFunc` instances.
+        function_name
+            The name of the nested function, if ``None`` the name will be set
+            to ``"NestedPipeFunc_{output_name[0]}_{output_name[...]}"``.
 
         Returns
         -------
@@ -1750,7 +1755,11 @@ class Pipeline:
 
         for f in funcs:
             self.drop(f=f)
-        nested_func = NestedPipeFunc(funcs, output_name=new_output_name)
+        nested_func = NestedPipeFunc(
+            funcs,
+            output_name=new_output_name,
+            function_name=function_name,
+        )
         self.add(nested_func)
         return nested_func
 

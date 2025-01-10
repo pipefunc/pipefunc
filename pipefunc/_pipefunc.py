@@ -1103,7 +1103,11 @@ class NestedPipeFunc(PipeFunc):
         A sequence of at least 2 `PipeFunc` instances to combine into a single function.
     output_name
         The identifier for the output of the wrapped function. If ``None``, it is automatically
-        constructed from all the output names of the `PipeFunc` instances.
+        constructed from all the output names of the `PipeFunc` instances. Must be a subset of
+        the output names of the `PipeFunc` instances.
+    function_name
+        The name of the nested function, if ``None`` the name will be set
+        to ``"NestedPipeFunc_{output_name[0]}_{output_name[...]}"``.
     mapspec
         `~pipefunc.map.MapSpec` for the joint function. If ``None``, the mapspec is inferred
         from the individual `PipeFunc` instances. None of the `MapsSpec` instances should
@@ -1144,6 +1148,7 @@ class NestedPipeFunc(PipeFunc):
         self,
         pipefuncs: list[PipeFunc],
         output_name: OUTPUT_TYPE | None = None,
+        function_name: str | None = None,
         *,
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
@@ -1161,6 +1166,7 @@ class NestedPipeFunc(PipeFunc):
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
+        self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
         self.variant = variant
@@ -1187,10 +1193,14 @@ class NestedPipeFunc(PipeFunc):
         kwargs = {
             "pipefuncs": self.pipeline.functions,
             "output_name": self._output_name,
+            "function_name": self.function_name,
             "renames": self._renames,
             "mapspec": self.mapspec,
             "resources": self.resources,
+            "variant": self.variant,
+            "variant_group": self.variant_group,
         }
+        assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
         return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
 
@@ -1236,7 +1246,7 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
         func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
-        return _NestedFuncWrapper(func.call_full_output, self.output_name)
+        return _NestedFuncWrapper(func.call_full_output, self.output_name, self.function_name)
 
     @functools.cached_property
     def __name__(self) -> str:  # type: ignore[override]
@@ -1270,10 +1280,18 @@ class _NestedFuncWrapper:
     order specified by the output_name.
     """
 
-    def __init__(self, func: Callable[..., dict[str, Any]], output_name: OUTPUT_TYPE) -> None:
+    def __init__(
+        self,
+        func: Callable[..., dict[str, Any]],
+        output_name: OUTPUT_TYPE,
+        function_name: str | None = None,
+    ) -> None:
         self.func: Callable[..., dict[str, Any]] = func
         self.output_name: OUTPUT_TYPE = output_name
-        self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
+        if function_name is not None:
+            self.__name__ = function_name
+        else:
+            self.__name__ = f"NestedPipeFunc_{'_'.join(at_least_tuple(output_name))}"
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         result_dict = self.func(*args, **kwds)

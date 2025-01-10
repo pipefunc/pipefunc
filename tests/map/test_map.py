@@ -1763,8 +1763,14 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
         return sum(c) + sum(d)
 
     pipeline = Pipeline([f, g, h])
-    results_before = pipeline.map({"a": [1, 2], "b": [3, 4]})
+    pipeline_copy = pipeline.copy()
+    results_before = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
     nested = pipeline.nest_funcs({"c", "d"})
-    results_after = pipeline.map({"a": [1, 2], "b": [3, 4]})
+    results_after = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
     assert results_after["e"].output == results_before["e"].output
     assert str(nested.mapspec) == "a[i], b[i] -> c[i], d[i]"
+    pipeline_copy.add_mapspec_axis("x", axis="j")
+    pipeline.add_mapspec_axis("x", axis="j")
+    results_before = pipeline_copy.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
+    results_after = pipeline.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
+    assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
