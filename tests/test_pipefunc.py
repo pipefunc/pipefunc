@@ -600,3 +600,14 @@ def test_default_and_bound_pydantic() -> None:
     f = PipeFunc(Foo, "d", bound={"a": 2})
     _ = f.defaults  # accessing defaults should not modify state! (issue #525)
     f.copy()
+
+
+def test_nested_pipefunc_function_name() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], function_name="my_func")
+    assert nf.__name__ == "my_func"
