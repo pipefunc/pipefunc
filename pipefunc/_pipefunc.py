@@ -1103,7 +1103,8 @@ class NestedPipeFunc(PipeFunc):
         A sequence of at least 2 `PipeFunc` instances to combine into a single function.
     output_name
         The identifier for the output of the wrapped function. If ``None``, it is automatically
-        constructed from all the output names of the `PipeFunc` instances.
+        constructed from all the output names of the `PipeFunc` instances. Must be a subset of
+        the output names of the `PipeFunc` instances.
     function_name
         The name of the nested function, if ``None`` the name will be set
         to ``"NestedPipeFunc_{output_name[0]}_{output_name[...]}"``.
