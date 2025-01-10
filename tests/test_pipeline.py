@@ -997,6 +997,8 @@ def test_nested_pipefunc_in_pipeline_renames() -> None:
     pipeline = Pipeline([NestedPipeFunc([fa, fb], ("x", "y"))], scope="test")
     func = pipeline.output_to_func["test.x"]
     assert func.renames == {"n": "test.n", "x": "test.x", "y": "test.y"}
+    assert isinstance(func, NestedPipeFunc)
+    assert func.pipeline.functions[0].renames == {"n": "test.n"}
     r = pipeline.run("test.y", kwargs={"test.n": 2})
     assert r == 8
     r = pipeline.map(inputs={"test.n": 2})

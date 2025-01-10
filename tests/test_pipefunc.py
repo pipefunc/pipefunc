@@ -621,7 +621,21 @@ def test_nested_pipefunc_renames() -> None:
     def g(f):
         return f
 
+    # Rename output
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"f": "f1"})
+    assert nf.renames == {"f": "f1"}
+    nf.copy()
+    assert nf(a=1, b=2) == (3, 3)
+
+    # Rename input
     nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"a": "a1"})
     assert nf.renames == {"a": "a1"}
     nf.copy()
     assert nf(a1=1, b=2) == (3, 3)
+
+    # Rename both input and output (with scope)
+    nf = NestedPipeFunc(
+        [PipeFunc(f, "f"), PipeFunc(g, "g")],
+        renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
+    )
+    assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
