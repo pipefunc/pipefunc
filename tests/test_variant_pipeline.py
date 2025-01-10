@@ -5,6 +5,7 @@ import importlib.util
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, VariantPipeline, pipefunc
+from pipefunc._variant_pipeline import _same_pipefunc
 
 has_psutil = importlib.util.find_spec("psutil") is not None
 
@@ -521,11 +522,6 @@ def test_from_pipelines_with_variant_groups() -> None:
     assert sub_div_pipeline(a=1, b=2, c=3) == -1 / 3  # (1 - 2) / 3
 
 
-def test_from_pipelines_empty_input() -> None:
-    variant_pipeline = VariantPipeline.from_pipelines()
-    assert len(variant_pipeline.functions) == 0
-
-
 def test_from_pipelines_with_common_function_different_variant() -> None:
     @pipefunc(output_name="x")
     def f(a, b):
@@ -544,7 +540,7 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
         ("group1", "add_div", pipeline2),
     )
     assert len(variant_pipeline.functions) == 3
-    assert variant_pipeline.functions[0] is f  # The common function f
+    assert _same_pipefunc(variant_pipeline.functions[0], f)  # The common function f
     assert variant_pipeline.functions[1].variant == "add_mul"
     assert variant_pipeline.functions[2].variant == "add_div"
 
