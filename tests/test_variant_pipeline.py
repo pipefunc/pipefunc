@@ -5,7 +5,7 @@ import importlib.util
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, VariantPipeline, pipefunc
-from pipefunc._variant_pipeline import _same_pipefunc
+from pipefunc._variant_pipeline import is_identical_pipefunc
 
 has_psutil = importlib.util.find_spec("psutil") is not None
 
@@ -540,6 +540,6 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
         ("group1", "add_div", pipeline2),
     )
     assert len(variant_pipeline.functions) == 3
-    assert _same_pipefunc(variant_pipeline.functions[0], f)  # The common function f
+    assert is_identical_pipefunc(variant_pipeline.functions[0], f)  # The common function f
     assert variant_pipeline.functions[1].variant == "add_mul"
     assert variant_pipeline.functions[2].variant == "add_div"
