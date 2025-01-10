@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from typing import Any, Literal
 
@@ -477,7 +478,10 @@ def _same_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
     Note: This is not implemented as PipeFunc.__eq__ to avoid
     hashing issues.
     """
+    cls = type(first)
     for attr, value in first.__dict__.items():
+        if hasattr(cls, attr) and isinstance(getattr(cls, attr), functools.cached_property):
+            continue
         if attr == "_pipelines":
             continue
         if value != second.__dict__[attr]:

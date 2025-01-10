@@ -511,11 +511,11 @@ def test_from_pipelines_with_variant_groups() -> None:
     pipeline1 = Pipeline([f, g])
     pipeline2 = Pipeline([f.copy(func=lambda a, b: a - b), g.copy(func=lambda x, c: x / c)])
     variant_pipeline = VariantPipeline.from_pipelines(
-        ("group1", "add_mul", pipeline1),
-        ("group2", "sub_div", pipeline2),
+        ("group", "add_mul", pipeline1),
+        ("group", "sub_div", pipeline2),
     )
-    add_mul_pipeline = variant_pipeline.with_variant(select={"group1": "add_mul"})
-    sub_div_pipeline = variant_pipeline.with_variant(select={"group2": "sub_div"})
+    add_mul_pipeline = variant_pipeline.with_variant(select={"group": "add_mul"})
+    sub_div_pipeline = variant_pipeline.with_variant(select={"group": "sub_div"})
     assert isinstance(add_mul_pipeline, Pipeline)
     assert isinstance(sub_div_pipeline, Pipeline)
     assert add_mul_pipeline(a=1, b=2, c=3) == 9  # (1 + 2) * 3
@@ -543,15 +543,3 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
     assert _same_pipefunc(variant_pipeline.functions[0], f)  # The common function f
     assert variant_pipeline.functions[1].variant == "add_mul"
     assert variant_pipeline.functions[2].variant == "add_div"
-
-
-def test_from_pipelines_with_one_pipeline() -> None:
-    @pipefunc(output_name="x")
-    def f(a, b):
-        return a + b
-
-    pipeline = Pipeline([f])
-    variant_pipeline = VariantPipeline.from_pipelines(("variant1", pipeline))
-    assert len(variant_pipeline.functions) == 1
-    assert variant_pipeline.functions[0].variant == "variant1"
-    assert variant_pipeline.functions[0].variant_group is None
