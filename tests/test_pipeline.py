@@ -1022,3 +1022,24 @@ def test_run_multiple_outputs() -> None:
     pipeline = Pipeline([f, g])
     r = pipeline.run(("z"), kwargs={"a": 2}, full_output=True)
     assert r == {"a": 2, "x": 2, "y": 4, "z": 6}
+
+
+def test_run_multiple_outputs_not_return_all() -> None:
+    @pipefunc(output_name=("x", "y", "z"))
+    def f(a: int) -> tuple[int, int, int]:
+        return a, 2 * a, 3 * a
+
+    pipeline = Pipeline([f])
+    r = pipeline.run(("x", "y", "z"), kwargs={"a": 2}, full_output=True)
+    assert r == {"a": 2, ("x", "y", "z"): (2, 4, 6), "x": 2, "y": 4, "z": 6}
+
+    r2 = pipeline.run("x", kwargs={"a": 2}, full_output=True)
+    assert r2 == {"a": 2, "x": 2, "y": 4, "z": 6}
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("No function with output name `('x', 'y')` in the pipeline"),
+    ):
+        # This currently is not possible because we only allow string output OR
+        # full exact tuple output_name.
+        pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
