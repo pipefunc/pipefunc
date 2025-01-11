@@ -2136,26 +2136,32 @@ def _update_all_results(
     all_results: dict[OUTPUT_TYPE, Any],
     lazy: bool,  # noqa: FBT001
 ) -> None:
-    if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
-        # Function produces multiple outputs, but only one is requested
-        assert func.output_picker is not None
-        for name in func.output_name:
-            all_results[name] = (
-                _LazyFunction(func.output_picker, args=(r, name))
-                if lazy
-                else func.output_picker(r, name)
-            )
+    if isinstance(func.output_name, tuple):
+        if isinstance(output_name, tuple):
+            # Function produces multiple outputs and multiple outputs are requested
+            if func.output_picker is None:
+                for name, value in zip(func.output_name, r):
+                    all_results[name] = value  # noqa: PERF403
+            else:
+                for name in func.output_name:
+                    all_results[name] = (
+                        _LazyFunction(func.output_picker, args=(r, name))
+                        if lazy
+                        else func.output_picker(r, name)
+                    )
+            # TODO: Still add the full tuple here, because _run will need it
+            all_results[func.output_name] = r
+        else:
+            # Function produces multiple outputs, but only one is requested
+            assert func.output_picker is not None
+            for name in func.output_name:
+                all_results[name] = (
+                    _LazyFunction(func.output_picker, args=(r, name))
+                    if lazy
+                    else func.output_picker(r, name)
+                )
     else:
         all_results[func.output_name] = r
-
-    # Unpack tuple outputs into individual keys
-    if isinstance(func.output_name, tuple):
-        if func.output_picker is None:
-            for name, value in zip(func.output_name, r):
-                all_results[name] = value
-        else:
-            for name in func.output_name:
-                all_results[name] = func.output_picker(r, name)
 
 
 def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
