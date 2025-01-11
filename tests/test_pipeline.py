@@ -1016,7 +1016,8 @@ def test_run_multiple_outputs() -> None:
 
     pipeline = Pipeline([f])
     r = pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
-    # TODO: Now unpacks the tuple but still also has the tuple?
+    # NOTE: Now unpacks the tuple but still also has the tuple.
+    # Changed in #536 to fix a real issue.
     assert r == {"a": 2, ("x", "y"): (2, 4), "x": 2, "y": 4}
 
     pipeline = Pipeline([f, g])
