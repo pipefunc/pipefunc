@@ -2136,8 +2136,7 @@ def _update_all_results(
     all_results: dict[OUTPUT_TYPE, Any],
     lazy: bool,  # noqa: FBT001
 ) -> None:
-    if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
-        # Function produces multiple outputs, but only one is requested
+    if isinstance(func.output_name, tuple):
         assert func.output_picker is not None
         for name in func.output_name:
             all_results[name] = (
@@ -2145,6 +2144,10 @@ def _update_all_results(
                 if lazy
                 else func.output_picker(r, name)
             )
+        if isinstance(output_name, tuple):
+            # Also assign the full name because `_run` will need it
+            # This duplicates the result but it's a small overhead
+            all_results[func.output_name] = r
     else:
         all_results[func.output_name] = r
 
