@@ -2145,7 +2145,8 @@ def _update_all_results(
                 else func.output_picker(r, name)
             )
         if isinstance(output_name, tuple):
-            # Still add the full tuple here, because _run will need it
+            # Also assign the full name because `_run` will need it
+            # This duplicates the result but it's a small overhead
             all_results[func.output_name] = r
     else:
         all_results[func.output_name] = r
