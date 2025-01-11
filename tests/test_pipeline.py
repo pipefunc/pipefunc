@@ -1003,3 +1003,22 @@ def test_nested_pipefunc_in_pipeline_renames() -> None:
     assert r == 8
     r = pipeline.map(inputs={"test.n": 2})
     assert r["test.y"].output == 8
+
+
+def test_run_multiple_outputs() -> None:
+    @pipefunc(output_name=("x", "y"))
+    def f(a: int) -> tuple[int, int]:
+        return a, 2 * a
+
+    @pipefunc(output_name="z")
+    def g(x: int, y: int) -> int:
+        return x + y
+
+    pipeline = Pipeline([f])
+    r = pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
+    # TODO: Now unpacks the tuple but still also has the tuple?
+    assert r == {"a": 2, ("x", "y"): (2, 4), "x": 2, "y": 4}
+
+    pipeline = Pipeline([f, g])
+    r = pipeline.run(("z"), kwargs={"a": 2}, full_output=True)
+    assert r == {"a": 2, "x": 2, "y": 4, "z": 6}

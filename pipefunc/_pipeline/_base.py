@@ -2148,6 +2148,15 @@ def _update_all_results(
     else:
         all_results[func.output_name] = r
 
+    # Unpack tuple outputs into individual keys
+    if isinstance(func.output_name, tuple):
+        if func.output_picker is None:
+            for name, value in zip(func.output_name, r):
+                all_results[name] = value
+        else:
+            for name in func.output_name:
+                all_results[name] = func.output_picker(r, name)
+
 
 def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
     if lazy:
