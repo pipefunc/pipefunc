@@ -2,10 +2,19 @@ from __future__ import annotations
 
 import functools
 from collections import defaultdict
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc import PipeFunc, Pipeline
-from pipefunc._utils import assert_complete_kwargs
+from pipefunc._pipefunc import PipeFunc
+from pipefunc._utils import (
+    assert_complete_kwargs,
+    is_installed,
+    is_running_in_ipynb,
+    requires,
+)
+
+if TYPE_CHECKING:
+    import ipywidgets
 
 
 class VariantPipeline:
@@ -453,6 +462,32 @@ class VariantPipeline:
 
         return cls(functions)
 
+    def visualize(self, **kwargs: Any) -> Any:
+        """Visualize the VariantPipeline with interactive variant selection.
+
+        Returns
+        -------
+            The output of the widget.
+
+        """
+        requires("ipywidgets", reason="show_progress", extras="ipywidgets")
+
+        return _visualize_variant_pipeline(self, **kwargs)
+
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:  # pragma: no cover
+        """Display the VariantPipeline widget or a text representation.
+
+        Also displays a rich table of information if `rich` is installed.
+        """
+        if is_running_in_ipynb() and is_installed("rich") and is_installed("ipywidgets"):
+            return _display_pipeline(self)._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
+
 
 def _validate_variants_exist(
     variants_mapping: dict[str | None, set[str]],
@@ -494,3 +529,92 @@ def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
         if value != second.__dict__[attr]:
             return False
     return True
+
+
+def _visualize_variant_pipeline(vp: VariantPipeline, **kwargs: Any) -> ipywidgets.VBox:
+    """Create a widget for visualizing a VariantPipeline with interactive variant selection.
+
+    Parameters
+    ----------
+    vp
+        The VariantPipeline to visualize.
+    kwargs
+        Additional keyword arguments passed to the `Pipeline.visualize` method.
+
+    Returns
+    -------
+        A widget containing dropdown menus for variant selection and the pipeline visualization.
+
+    """
+    import ipywidgets
+    from IPython.display import display
+
+    dropdowns = {}
+    output = ipywidgets.Output()
+
+    def update_visualization(change: dict | None = None) -> None:  # noqa: ARG001
+        """Update the visualization with the selected variants."""
+        selected_variants = {group: dropdowns[group].value for group in vp.variants_mapping()}
+        pipeline = vp.with_variant(select=selected_variants)
+        with output:
+            output.clear_output()
+            # Use the same backend as the variant pipeline
+            backend = kwargs.pop("backend", "graphviz_widget")
+            # Call visualize on the new pipeline with the selected variants
+            viz = pipeline.visualize(backend=backend, **kwargs)
+            if viz is not None:
+                # Some backends don't support `display`, so we check if the
+                # result is not None. This is the case for `graphviz_widget`.
+                display(viz)
+
+    for group, variants in vp.variants_mapping().items():
+        dropdown = ipywidgets.Dropdown(
+            options=list(variants),
+            value=list(variants)[0],  # Select first variant by default
+            description=f"{group}:",
+            disabled=False,
+        )
+        dropdown.observe(update_visualization, names="value")
+        dropdowns[group] = dropdown
+
+    # Initial visualization
+    update_visualization()
+
+    return ipywidgets.VBox([*dropdowns.values(), output])
+
+
+def _display_pipeline(
+    vp: VariantPipeline,
+) -> dict[str, str] | None:  # pragma: no cover
+    """Display the VariantPipeline widget.
+
+    Also displays a rich table of information if `rich` is installed.
+    """
+    import ipywidgets
+    from IPython.display import display
+
+    output = ipywidgets.Output()
+
+    def update_repr_mimebundle(change: dict | None = None) -> None:
+        """Update the displayed output with the selected variant's mimebundle."""
+        selected_variants = {group: dropdowns[group].value for group in vp.variants_mapping()}
+        pipeline = vp.with_variant(select=selected_variants)
+        with output:
+            output.clear_output(wait=True)
+            display(pipeline)
+
+    dropdowns = {}
+    for group, variants in vp.variants_mapping().items():
+        dropdown = ipywidgets.Dropdown(
+            options=list(variants),
+            value=list(variants)[0],  # Select first variant by default
+            description=f"{group}:",
+            disabled=False,
+        )
+        dropdown.observe(update_repr_mimebundle, names="value")
+        dropdowns[group] = dropdown
+
+    # Initial display
+    update_repr_mimebundle()
+
+    return ipywidgets.VBox([*dropdowns.values(), output])
