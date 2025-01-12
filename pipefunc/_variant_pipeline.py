@@ -13,6 +13,8 @@ from pipefunc._utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import ipywidgets
 
     from pipefunc._pipefunc import PipeFunc
@@ -541,7 +543,7 @@ def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
 
 def _create_variant_selection_widget(
     vp: VariantPipeline,
-    update_func: callable,
+    update_func: Callable[[Pipeline, ipywidgets.Output, Any], None],
     **kwargs: Any,
 ) -> ipywidgets.VBox:
     """Create a widget for interactive variant selection.
@@ -563,13 +565,14 @@ def _create_variant_selection_widget(
     """
     import ipywidgets
 
-    dropdowns = {}
+    dropdowns: dict[str | None, ipywidgets.Dropdown] = {}
     output = ipywidgets.Output()
 
-    def wrapped_update_func(change: dict | None = None) -> None:
+    def wrapped_update_func(_change: dict | None = None) -> None:
         """Update the output with the selected variants."""
         selected_variants = {group: dropdowns[group].value for group in vp.variants_mapping()}
         pipeline = vp.with_variant(select=selected_variants)
+        assert isinstance(pipeline, Pipeline)
         update_func(pipeline, output, **kwargs)
 
     for group, variants in vp.variants_mapping().items():
@@ -590,7 +593,7 @@ def _create_variant_selection_widget(
 
 
 def _update_visualization(
-    pipeline: Pipeline | VariantPipeline,
+    pipeline: Pipeline,
     output: ipywidgets.Output,
     **kwargs: Any,
 ) -> None:
@@ -610,9 +613,9 @@ def _update_visualization(
 
 
 def _update_repr_mimebundle(
-    pipeline: Pipeline | VariantPipeline,
+    pipeline: Pipeline,
     output: ipywidgets.Output,
-    **kwargs: Any,
+    **kwargs: Any,  # noqa: ARG001
 ) -> None:
     """Update the displayed output with the selected variant's mimebundle."""
     from IPython.display import display
