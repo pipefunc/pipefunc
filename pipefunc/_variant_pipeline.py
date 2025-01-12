@@ -476,7 +476,11 @@ class VariantPipeline:
         """
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
 
-        return _create_variant_selection_widget(self, _update_visualization, **kwargs)
+        return _create_variant_selection_widget(
+            self,
+            _update_visualization,  # type: ignore[arg-type]
+            **kwargs,
+        )
 
     def _repr_mimebundle_(
         self,
@@ -488,7 +492,10 @@ class VariantPipeline:
         Also displays a rich table of information if `rich` is installed.
         """
         if is_running_in_ipynb() and is_installed("rich") and is_installed("ipywidgets"):
-            widget = _create_variant_selection_widget(self, _update_repr_mimebundle)
+            widget = _create_variant_selection_widget(
+                self,
+                _update_repr_mimebundle,  # type: ignore[arg-type]
+            )
             return widget._repr_mimebundle_(include=include, exclude=exclude)
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
@@ -568,7 +575,7 @@ def _create_variant_selection_widget(
         selected_variants = {group: dropdowns[group].value for group in vp.variants_mapping()}
         pipeline = vp.with_variant(select=selected_variants)
         assert isinstance(pipeline, Pipeline)
-        update_func(pipeline, output, **kwargs)
+        update_func(pipeline, output, **kwargs)  # type: ignore[call-arg]
 
     for group, variants in vp.variants_mapping().items():
         dropdown = ipywidgets.Dropdown(

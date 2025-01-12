@@ -220,6 +220,10 @@ def get_local_ip() -> str:
 def is_running_in_ipynb() -> bool:
     """Check if the code is running in a Jupyter notebook."""
     try:
+        from IPython import get_ipython
+    except ImportError:
+        return False
+    try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
     except NameError:
         return False  # Probably standard Python interpreter
