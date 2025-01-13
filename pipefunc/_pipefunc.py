@@ -771,8 +771,6 @@ class PipeFunc(Generic[T]):
     def output_annotation(self) -> dict[str, Any]:
         """Return the type annotation of the wrapped function's output."""
         func = self.func
-        if isinstance(func, _NestedFuncWrapper):
-            func = func.func
         if inspect.isclass(func) and isinstance(self.output_name, str):
             return {self.output_name: func}
         if self._output_picker is None:
@@ -1228,6 +1226,12 @@ class NestedPipeFunc(PipeFunc):
             )
             for k in sorted(parameters)
         }
+
+    @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+       if isinstance(self._output_name, str):
+            return self.pipeline[self._output_name].output_annotation
+       return tuple([self.pipeline[name].output_annotation for name in at_least_tuple(self._output_name)])
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
