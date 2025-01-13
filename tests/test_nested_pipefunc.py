@@ -328,3 +328,21 @@ def test_nested_pipefunc_variant_different_output_name() -> None:
     pipeline2 = vp2.with_variant({"op": "sub"})
     assert isinstance(pipeline2, Pipeline)
     assert pipeline2(a=1, b=2) == -0.5
+
+
+def test_nested_pipefunc_output_annotation() -> None:
+    @pipefunc(output_name="c")
+    def f1(a, b) -> int:
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(c) -> int:
+        return c * 2
+
+    funcs = [f1, f2]
+    nf1 = NestedPipeFunc(funcs, output_name="d")
+    assert nf1.output_annotation == {"d": int}
+    nf1 = NestedPipeFunc(funcs, output_name="c")
+    assert nf1.output_annotation == {"c": int}
+    nf1 = NestedPipeFunc(funcs, output_name=("c", "d"))
+    assert nf1.output_annotation == {"c": int, "d": int}
