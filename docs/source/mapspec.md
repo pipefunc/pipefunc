@@ -240,8 +240,9 @@ print(result["r"].output)
 **Diagram:**
 
 ```{mermaid}
-graph TD
+graph LR
     subgraph "Zipped Inputs (x[a], y[a], z[b] -> r[a,b])"
+        direction LR
         %% Style definitions
         classDef xNodes fill:#fff3d4,stroke:#d68a00,stroke-width:2px,color:#000
         classDef yNodes fill:#d4f3e6,stroke:#2d8659,stroke-width:2px,color:#000
