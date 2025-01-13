@@ -2,10 +2,22 @@ from __future__ import annotations
 
 import functools
 from collections import defaultdict
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc import PipeFunc, Pipeline
-from pipefunc._utils import assert_complete_kwargs
+from pipefunc._utils import (
+    assert_complete_kwargs,
+    is_installed,
+    is_running_in_ipynb,
+    requires,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import ipywidgets
+
+    from pipefunc._pipefunc import PipeFunc
 
 
 class VariantPipeline:
@@ -266,7 +278,8 @@ class VariantPipeline:
     def _resolve_single_variant(self, select: str) -> dict[str | None, str]:
         """Resolve a single variant string to a dictionary.
 
-        Raises:
+        Raises
+        ------
             ValueError: If the variant is ambiguous or unknown.
 
         """
@@ -332,17 +345,6 @@ class VariantPipeline:
         assert_complete_kwargs(original_kwargs, VariantPipeline.__init__, skip={"self"})
         original_kwargs.update(kwargs)
         return VariantPipeline(**original_kwargs)  # type: ignore[arg-type]
-
-    def __getattr__(self, name: str) -> None:
-        if name in Pipeline.__dict__:
-            msg = (
-                "This is a `VariantPipeline`, not a `Pipeline`."
-                " Use `pipeline.with_variant(...)` to select a variant first."
-                f" Then call `variant_pipeline.{name}` again."
-            )
-            raise AttributeError(msg)
-        default_msg = f"'VariantPipeline' object has no attribute '{name}'"
-        raise AttributeError(default_msg)
 
     @classmethod
     def from_pipelines(
@@ -453,6 +455,56 @@ class VariantPipeline:
 
         return cls(functions)
 
+    def visualize(self, **kwargs: Any) -> Any:
+        """Visualize the VariantPipeline with interactive variant selection.
+
+        Parameters
+        ----------
+        kwargs
+            Additional keyword arguments passed to the `pipefunc.Pipeline.visualize` method.
+
+        Returns
+        -------
+            The output of the widget.
+
+        """
+        requires("ipywidgets", reason="show_progress", extras="ipywidgets")
+
+        return _create_variant_selection_widget(
+            self,
+            _update_visualization,  # type: ignore[arg-type]
+            **kwargs,
+        )
+
+    def _repr_mimebundle_(
+        self,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, str]:  # pragma: no cover
+        """Display the VariantPipeline widget or a text representation.
+
+        Also displays a rich table of information if `rich` is installed.
+        """
+        if is_running_in_ipynb() and is_installed("rich") and is_installed("ipywidgets"):
+            widget = _create_variant_selection_widget(
+                self,
+                _update_repr_mimebundle,  # type: ignore[arg-type]
+            )
+            return widget._repr_mimebundle_(include=include, exclude=exclude)
+        # Return a plaintext representation of the object
+        return {"text/plain": repr(self)}
+
+    def __getattr__(self, name: str) -> None:
+        if name in Pipeline.__dict__:
+            msg = (
+                "This is a `VariantPipeline`, not a `Pipeline`."
+                " Use `pipeline.with_variant(...)` to select a variant first."
+                f" Then call `variant_pipeline.{name}` again."
+            )
+            raise AttributeError(msg)
+        default_msg = f"'VariantPipeline' object has no attribute '{name}'"
+        raise AttributeError(default_msg)
+
 
 def _validate_variants_exist(
     variants_mapping: dict[str | None, set[str]],
@@ -494,3 +546,83 @@ def is_identical_pipefunc(first: PipeFunc, second: PipeFunc) -> bool:
         if value != second.__dict__[attr]:
             return False
     return True
+
+
+def _create_variant_selection_widget(
+    vp: VariantPipeline,
+    update_func: Callable[[Pipeline, ipywidgets.Output, Any], None],
+    **kwargs: Any,
+) -> ipywidgets.VBox:
+    """Create a widget for interactive variant selection.
+
+    Parameters
+    ----------
+    vp
+        The VariantPipeline.
+    update_func
+        The function to call when the selected variant changes.
+    kwargs
+        Additional keyword arguments passed to the `Pipeline.visualize` method
+        in `update_visualization`.
+
+    Returns
+    -------
+        A widget containing dropdown menus for variant selection.
+
+    """
+    import ipywidgets
+
+    dropdowns: dict[str | None, ipywidgets.Dropdown] = {}
+    output = ipywidgets.Output()
+
+    def wrapped_update_func(_change: dict | None = None) -> None:
+        """Update the output with the selected variants."""
+        selected_variants = {group: dropdowns[group].value for group in vp.variants_mapping()}
+        pipeline = vp.with_variant(select=selected_variants)
+        assert isinstance(pipeline, Pipeline)
+        update_func(pipeline, output, **kwargs)  # type: ignore[call-arg]
+
+    for group, variants in vp.variants_mapping().items():
+        dropdown = ipywidgets.Dropdown(
+            options=list(variants),
+            # Select first variant by default
+            value=list(variants)[0],  # noqa: RUF015
+            description=f"{group}:",
+            disabled=False,
+        )
+        dropdown.observe(wrapped_update_func, names="value")
+        dropdowns[group] = dropdown
+
+    # Initial update
+    wrapped_update_func()
+
+    return ipywidgets.VBox([*dropdowns.values(), output])
+
+
+def _update_visualization(
+    pipeline: Pipeline,
+    output: ipywidgets.Output,
+    **kwargs: Any,
+) -> None:
+    """Update the visualization with the selected variants."""
+    from IPython.display import display
+
+    with output:
+        output.clear_output()
+        backend = kwargs.pop("backend", "graphviz")
+        viz = pipeline.visualize(backend=backend, **kwargs)
+        if viz is not None:
+            display(viz)
+
+
+def _update_repr_mimebundle(
+    pipeline: Pipeline,
+    output: ipywidgets.Output,
+    **kwargs: Any,
+) -> None:  # pragma: no cover
+    """Update the displayed output with the selected variant's mimebundle."""
+    from IPython.display import display
+
+    with output:
+        output.clear_output(wait=True)
+        display(pipeline, **kwargs)

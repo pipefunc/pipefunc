@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import shutil
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -13,8 +14,6 @@ from pipefunc import NestedPipeFunc, Pipeline, pipefunc
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Check for required libraries
-import importlib
 
 has_matplotlib = importlib.util.find_spec("matplotlib") is not None
 has_holoviews = importlib.util.find_spec("holoviews") is not None
