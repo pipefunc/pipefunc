@@ -35,7 +35,7 @@ Let's explore common `mapspec` patterns with examples and Mermaid diagrams to il
 
 **Example:** Doubling each element of an array.
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 import numpy as np
 
@@ -73,7 +73,7 @@ graph LR
 
 **Example:** Computing the outer product of two vectors.
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 import numpy as np
 
@@ -130,7 +130,7 @@ graph LR
 
 **Example:** Summing the rows of a matrix.
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 import numpy as np
 
@@ -182,7 +182,7 @@ graph LR
 
 **Example:** Creating a list of items.
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
 @pipefunc("x", mapspec="... -> x[i]")
@@ -190,7 +190,7 @@ def generate_items(n):
     return list(range(n))
 
 pipeline = Pipeline([generate_items])
-result = pipeline.map({}, internal_shapes={"x": (5,)})
+result = pipeline.map({"n": 5}, internal_shapes={"x": (5,)})  # internal_shapes is optional
 print(result["x"].output)
 ```
 
@@ -224,7 +224,7 @@ graph LR
 
 **Example:**
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 import numpy as np
 
