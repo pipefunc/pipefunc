@@ -273,8 +273,8 @@ graph LR
 
         I["r[0,0] = 11"]:::rNodes
         J["r[0,1] = 12"]:::rNodes
-        K["r[1,0] = 18"]:::rNodes
-        L["r[1,1] = 19"]:::rNodes
+        K["r[1,0] = 17"]:::rNodes
+        L["r[1,1] = 18"]:::rNodes
         M["r[2,0] = 25"]:::rNodes
         N["r[2,1] = 26"]:::rNodes
 
