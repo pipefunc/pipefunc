@@ -296,7 +296,134 @@ graph LR
 
 ## `pipeline.add_mapspec_axis()` method
 
-TODO: Add content
+The `pipeline.add_mapspec_axis()` method offers a streamlined way to dynamically introduce or alter dimensions (axes) within your pipeline's `mapspec` without manually editing each function's `mapspec` string.
+It automatically propagates these dimensional changes across selected functions, making it ideal for handling different multi-dimensional sweeps for different simulations.
+
+**Example 1: Adding Axes to a Pipeline with No Initial `mapspec`**
+
+Let's start with a simple pipeline that performs basic arithmetic operations without any `mapspec` defined:
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+
+@pipefunc(output_name="c")
+def f(a, b):
+    return a + b
+
+@pipefunc(output_name="d")
+def g(b, c, x=1):
+    return b * c * x
+
+@pipefunc(output_name="e")
+def h(c, d, x=1):
+    return c * d * x
+
+pipeline = Pipeline([f, g, h])
+pipeline.visualize()
+```
+
+Initially, this pipeline processes single values. Now, let's say we want to introduce dimensions to our inputs and process arrays of data. We can use `add_mapspec_axis()` to add axes to `a` and `b` (zipping them together) and another independent axis to `x`.
+
+```{code-cell} ipython3
+# Add a zipped axis to "a" and "b"
+pipeline.add_mapspec_axis("a", "b", axis="i")
+
+# Add an independent axis to "x"
+pipeline.add_mapspec_axis("x", axis="j")
+
+# Check the generated mapspec strings
+print(pipeline.mapspecs_as_strings)
+pipeline.visualize()
+```
+
+**Explanation:**
+
+1. **No Initial `mapspec`:** The functions `f`, `g`, and `h` initially operate on single values.
+2. **`add_mapspec_axis("a", "b", axis="i")`:** This adds a new dimension indexed by `i` to both `a` and `b`, and since they are zipped, they will share the same index `i`. The `mapspec` strings are updated accordingly. For example, `f` now has `mapspec="a[i], b[i] -> c[i]"`.
+3. **`add_mapspec_axis("x", axis="j")`:** This adds another dimension indexed by `j` to `x`. The `mapspec` of `g` and `h` are updated to include `x[j]`.
+4. **Resulting `mapspec`:** The functions in the pipeline now have `mapspec` strings that reflect the added dimensions:
+   - `f`: `"a[i], b[i] -> c[i]"`
+   - `g`: `"b[i], c[i], x[j] -> d[i, j]"`
+   - `h`: `"c[i], d[i, j], x[j] -> e[i, j]"`
+
+Now, the pipeline can process 1D arrays of `a`, `b` and `x` values. The `i` index will iterate through the zipped `a` and `b` arrays, and the `j` index will iterate through the `x` array. The output `e` will be a 2D array with shape `(len(a), len(x))`.
+
+**Running the Pipeline:**
+
+```{code-cell} ipython3
+import numpy as np
+
+result = pipeline.map(
+    {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
+    run_folder="example1_run",
+)
+print(result["e"].output)
+```
+
+This will produce a 2x2 output array `e` where each element `e[i, j]` is the result of the pipeline operations on `a[i]`, `b[i]`, and `x[j]`.
+
+**Example 2: Adding an Axis to a Variable Not Initially in `mapspec`**
+
+Consider this pipeline, which involves doubling an input array `x` and then summing the results, with an additional parameter `b` not initially involved in the `mapspec`:
+
+```{code-cell} ipython3
+import numpy as np
+from pipefunc import Pipeline, pipefunc
+from pipefunc.typing import Array
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def double_it(x: int, b: int) -> int:
+    assert isinstance(x, int)
+    return 2 * x + b
+
+@pipefunc(output_name="sum")  # no mapspec, so receives y[:] as input
+def take_sum(y: Array[int]) -> int:
+    assert isinstance(y, np.ndarray)
+    return sum(y)
+
+pipeline_map = Pipeline([double_it, take_sum])
+pipeline_map.visualize()
+```
+
+Now, let's say we want to perform this operation for multiple values of `b`, effectively adding a new dimension to our computation. We can use `add_mapspec_axis()` to add an axis to `b`:
+
+```{code-cell} ipython3
+# Add an axis to "b"
+pipeline_map.add_mapspec_axis("b", axis="j")
+
+# Check the generated mapspec strings
+print(pipeline_map.mapspecs_as_strings)
+pipeline_map.visualize()
+```
+
+**Explanation:**
+
+1. **Initial `mapspec`:** The `double_it` function has `mapspec="x[i] -> y[i]"`, indicating an element-wise operation on `x`. The `take_sum` function has no `mapspec`, so it receives the entire `y` array.
+2. **`add_mapspec_axis("b", axis="j")`:** This adds a new dimension indexed by `j` to `b`. The `mapspec` strings are updated:
+   - `double_it`: `"x[i], b[j] -> y[i, j]"`
+   - `take_sum`: `"y[i, j] -> sum[j]"`
+3. **New `mapspec` Behavior:** The pipeline now expects a 1D array of `b` values. The `double_it` function will iterate through `x` with index `i` and `b` with index `j`, producing a 2D output array `y` with shape `(len(x), len(b))`. The `take_sum` function will then sum the `y` array along the `i` axis, for each value of `j`, resulting in a 1D output array `sum` with shape `(len(b),)`.
+
+**Running the Pipeline:**
+
+```{code-cell} ipython3
+result = pipeline_map.map(
+    {"x": np.array([1, 2, 3]), "b": np.array([10, 20])},
+    run_folder="example2_run",
+)
+print(result["y"].output)
+print(result["sum"].output)
+```
+
+This will produce:
+
+- A 2D array `y` where each element `y[i, j]` is `2 * x[i] + b[j]`.
+- A 1D array `sum` where each element `sum[j]` is the sum of `y` values along the `i` axis for the corresponding `b[j]`.
+
+**Key Takeaway:**
+
+`add_mapspec_axis()` simplifies introducing or modifying dimensions, especially when dealing with pipelines that have many functions or high-dimensional data.
+It allows for easy extension of your pipeline's capabilities to handle multi-dimensional data by automatically managing `mapspec` changes, making your code more concise and adaptable.
 
 ## Tips and Best Practices
 
