@@ -43,6 +43,7 @@ dependencies:
   - sphinx-notfound-page
   - sphinx-togglebutton
   - sphinx
+  - sphinxcontrib-mermaid
   - versioningit
   - nltk
   - scikit-image
