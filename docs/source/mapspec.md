@@ -373,7 +373,6 @@ from pipefunc.typing import Array
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def double_it(x: int, b: int) -> int:
-    assert isinstance(x, int)
     return 2 * x + b
 
 @pipefunc(output_name="sum")  # no mapspec, so receives y[:] as input
