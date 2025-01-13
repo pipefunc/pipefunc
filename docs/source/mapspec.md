@@ -89,8 +89,9 @@ print(result["z"].output)
 **Diagram:**
 
 ```{mermaid}
-graph TD
+graph LR
     subgraph "Multi-dimensional Mapping (x[i], y[j] -> z[i,j])"
+        direction LR
         %% Style definitions
         classDef xNodes fill:#fff3d4,stroke:#d68a00,stroke-width:2px,color:#000
         classDef yNodes fill:#d4f3e6,stroke:#2d8659,stroke-width:2px,color:#000
