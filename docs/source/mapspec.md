@@ -1,3 +1,16 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+    format_version: 0.13
+    jupytext_version: 1.16.4
+kernelspec:
+  display_name: Python 3 (ipykernel)
+  language: python
+  name: python3
+---
+
 # Understanding `mapspec`
 
 `mapspec` is a powerful string-based syntax within `pipefunc` that defines how data is mapped between functions in a pipeline, especially when dealing with arrays or lists of inputs.
