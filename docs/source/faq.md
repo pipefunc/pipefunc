@@ -1246,6 +1246,7 @@ pipeline.visualize(backend="graphviz")
 This will include dropdowns for each variant group, allowing you to select the specific variant you want to visualize.
 
 :::{admonition} The interactive widgets do not work in the documentation
+They are only functional in live Jupyter environments.
 :::
 
 You can inspect available variants using `variants_mapping()`:
