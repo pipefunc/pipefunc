@@ -336,13 +336,13 @@ def test_nested_pipefunc_output_annotation() -> None:
         return a + b
 
     @pipefunc(output_name="d")
-    def f2(c) -> int:
-        return c * 2
+    def f2(c) -> float:
+        return c / 2
 
     funcs = [f1, f2]
     nf1 = NestedPipeFunc(funcs, output_name="d")
-    assert nf1.output_annotation == {"d": int}
+    assert nf1.output_annotation == {"d": float}
     nf1 = NestedPipeFunc(funcs, output_name="c")
     assert nf1.output_annotation == {"c": int}
     nf1 = NestedPipeFunc(funcs, output_name=("c", "d"))
-    assert nf1.output_annotation == {"c": int, "d": int}
+    assert nf1.output_annotation == {"c": int, "d": float}
