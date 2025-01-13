@@ -16,6 +16,13 @@ kernelspec:
 `mapspec` is a powerful string-based syntax within `pipefunc` that defines how data is mapped between functions in a pipeline, especially when dealing with arrays or lists of inputs.
 It allows you to express element-wise operations, reductions, and even the creation of new dimensions, enabling **parallel computations**.
 
+:::{admonition} Go through the main tutorial first!
+:class: warning, dropdown
+
+We recommend going through the main [pipefunc tutorial](./tutorial) before diving into `mapspec`, as it provides a comprehensive overview of the `pipefunc` library and its core concepts.
+
+:::
+
 ## Basic Syntax
 
 The general format of a `mapspec` string is:
