@@ -618,7 +618,7 @@ def _update_repr_mimebundle(
     pipeline: Pipeline,
     output: ipywidgets.Output,
     **kwargs: Any,
-) -> None:
+) -> None:  # pragma: no cover
     """Update the displayed output with the selected variant's mimebundle."""
     from IPython.display import display
 

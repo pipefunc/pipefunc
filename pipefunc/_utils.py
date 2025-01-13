@@ -221,7 +221,7 @@ def is_running_in_ipynb() -> bool:
     """Check if the code is running in a Jupyter notebook."""
     try:
         from IPython import get_ipython
-    except ImportError:
+    except ImportError:  # pragma: no cover
         return False
     try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
