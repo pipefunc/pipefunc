@@ -353,10 +353,7 @@ Now, the pipeline can process 1D arrays of `a`, `b` and `x` values. The `i` inde
 ```{code-cell} ipython3
 import numpy as np
 
-result = pipeline.map(
-    {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
-    run_folder="example1_run",
-)
+result = pipeline.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]})
 print(result["e"].output)
 ```
 
@@ -406,10 +403,7 @@ pipeline_map.visualize()
 **Running the Pipeline:**
 
 ```{code-cell} ipython3
-result = pipeline_map.map(
-    {"x": np.array([1, 2, 3]), "b": np.array([10, 20])},
-    run_folder="example2_run",
-)
+result = pipeline_map.map({"x": np.array([1, 2, 3]), "b": np.array([10, 20])})
 print(result["y"].output)
 print(result["sum"].output)
 ```
