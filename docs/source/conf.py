@@ -73,10 +73,6 @@ intersphinx_mapping = {
 
 autodoc_member_order = "bysource"
 
-# Mermaid
-
-mermaid_params = ["--theme", "forest"]
-
 # myst-nb configuration
 nb_execution_mode = "cache"
 nb_execution_timeout = 180
