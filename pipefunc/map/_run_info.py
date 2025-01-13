@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import shutil
 import tempfile
 import warnings
@@ -248,8 +249,9 @@ def _maybe_run_folder(
 ) -> Path | None:
     if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
-        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
-        warnings.warn(msg, stacklevel=2)
+        if os.getenv("READTHEDOCS") is None:
+            msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
+            warnings.warn(msg, stacklevel=2)
     return Path(run_folder) if run_folder is not None else None
 
 
