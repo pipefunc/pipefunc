@@ -281,14 +281,9 @@ graph LR
     end
 ```
 
-## Limitations within `NestedPipeFunc`
+## `pipeline.add_mapspec_axis()` method
 
-When using `mapspec` within functions nested inside a {class}`~pipefunc.NestedPipeFunc` (created using {meth}`~pipefunc.Pipeline.nest_funcs`), the following restrictions apply:
-
-- **No Reductions:** You cannot use `mapspec` patterns that reduce dimensions (e.g., `x[i, j] -> y[i]`).
-- **No Dynamic Axis Generation:** You cannot use `mapspec` patterns that dynamically generate new axes (e.g., `... -> x[i]`) or have an `internal_shape`.
-
-These limitations exist because a nested pipeline is treated as a single unit, and its internal `mapspec` operations are not directly visible to the outer pipeline.
+TODO: Add content
 
 ## Tips and Best Practices
 
@@ -300,4 +295,5 @@ These limitations exist because a nested pipeline is treated as a single unit, a
 
 ## Conclusion
 
-`mapspec` is a powerful tool for defining data mappings in `pipefunc` pipelines. By understanding its syntax and common patterns, you can create efficient and expressive parallel computations. Remember to consider the limitations when using `mapspec` within nested pipelines, and use the visualization tools and diagrams to help you design and debug your workflows.
+`mapspec` is a powerful tool for defining data mappings in `pipefunc` pipelines.
+By understanding its syntax and common patterns, you can create efficient and expressive parallel computations.
