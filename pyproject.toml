@@ -57,6 +57,7 @@ docs = [
     "sphinx-notfound-page",
     "sphinx-togglebutton",
     "sphinx",
+    "sphinxcontrib-mermaid",
     "versioningit",
     # Used for the example notebook
     "nltk",

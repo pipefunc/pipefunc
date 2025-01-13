@@ -42,6 +42,7 @@ extensions = [
     "sphinx_togglebutton",
     "sphinx_copybutton",
     "notfound.extension",
+    "sphinxcontrib.mermaid",
 ]
 
 templates_path = ["_templates"]
@@ -71,6 +72,10 @@ intersphinx_mapping = {
 }
 
 autodoc_member_order = "bysource"
+
+# Mermaid
+
+mermaid_params = ["--theme", "forest"]
 
 # myst-nb configuration
 nb_execution_mode = "cache"
