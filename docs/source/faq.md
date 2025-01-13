@@ -1237,6 +1237,17 @@ sub_div_pipeline = pipeline.with_variant(
 
 Here, we see that the `variant_group="method"` in for `variant="add"` will result in a pipeline that takes `a` and `b`, whereas `variant="sub"` will take only `a`.
 
+You can visualize the pipelines using the `visualize` method:
+
+```{code-cell} ipython3
+pipeline.visualize(backend="graphviz")
+```
+
+This will include dropdowns for each variant group, allowing you to select the specific variant you want to visualize.
+
+:::{admonition} The interactive widgets do not work in the documentation
+:::
+
 You can inspect available variants using `variants_mapping()`:
 
 ```{code-cell} ipython3
