@@ -253,7 +253,9 @@ def process_zipped(x, y, z):
     return x * y + z
 
 pipeline = Pipeline([process_zipped])
-result = pipeline.map({"x": np.array([1, 2, 3]), "y": np.array([4, 5, 6]), "z": np.array([7, 8])})
+result = pipeline.map(
+    {"x": np.array([1, 2, 3]), "y": np.array([4, 5, 6]), "z": np.array([7, 8])},
+)
 print(result["r"].output)
 ```
 
