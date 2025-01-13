@@ -147,7 +147,7 @@ graph LR
 from pipefunc import pipefunc, Pipeline
 import numpy as np
 
-@pipefunc("y", mapspec="x[i, j] -> y[i]")
+@pipefunc("y", mapspec="x[i, :] -> y[i]")
 def sum_rows(x):
     return np.sum(x) # sum across the columns
 
