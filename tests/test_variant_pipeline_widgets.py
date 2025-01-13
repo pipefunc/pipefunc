@@ -25,6 +25,7 @@ def patched_show():
         yield mock_show
 
 
+@pytest.mark.skipif(not has_graphviz, reason="requires graphviz")
 def test_visualize_default_backend() -> None:
     @pipefunc(output_name="c", variant_group="op1", variant="add")
     def f(a, b):

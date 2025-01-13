@@ -458,6 +458,11 @@ class VariantPipeline:
     def visualize(self, **kwargs: Any) -> Any:
         """Visualize the VariantPipeline with interactive variant selection.
 
+        Parameters
+        ----------
+        kwargs
+            Additional keyword arguments passed to the `pipefunc.Pipeline.visualize` method.
+
         Returns
         -------
             The output of the widget.
@@ -604,13 +609,9 @@ def _update_visualization(
 
     with output:
         output.clear_output()
-        # Use the same backend as the variant pipeline
-        backend = kwargs.pop("backend", "graphviz_widget")
-        # Call visualize on the new pipeline with the selected variants
+        backend = kwargs.pop("backend", "graphviz")
         viz = pipeline.visualize(backend=backend, **kwargs)
         if viz is not None:
-            # Some backends don't support `display`, so we check if the
-            # result is not None. This is the case for `graphviz_widget`.
             display(viz)
 
 
