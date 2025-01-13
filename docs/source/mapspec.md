@@ -149,7 +149,7 @@ import numpy as np
 
 @pipefunc("y", mapspec="x[i, :] -> y[i]")
 def sum_rows(x):
-    return np.sum(x) # sum across the columns
+    return np.sum(x) # sum across the rows
 
 pipeline = Pipeline([sum_rows])
 result = pipeline.map({"x": np.array([[1, 2, 3], [4, 5, 6]])})
