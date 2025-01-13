@@ -3,6 +3,7 @@ import pytest
 from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
 from pipefunc.map._mapspec import ArraySpec
 from pipefunc.resources import Resources
+from pipefunc.typing import NoAnnotation
 
 
 def test_nested_pipefunc_defaults() -> None:
@@ -11,7 +12,7 @@ def test_nested_pipefunc_defaults() -> None:
         return a + b
 
     @pipefunc(output_name="d")
-    def g(c):
+    def g(c) -> int:
         return c
 
     nf = NestedPipeFunc([f, g])
@@ -21,6 +22,7 @@ def test_nested_pipefunc_defaults() -> None:
     nf.update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
+    assert nf.output_annotation == {"c": NoAnnotation, "d": int}
 
 
 def test_nested_pipefunc_multiple_outputs_defaults() -> None:
@@ -29,12 +31,13 @@ def test_nested_pipefunc_multiple_outputs_defaults() -> None:
         return x, y
 
     @pipefunc(output_name=("out1", "out2"))
-    def i(e, f):
+    def i(e, f) -> tuple[int, int]:
         return e, f
 
     nf2 = NestedPipeFunc([h, i], output_name=("out1", "out2"))
     assert nf2.defaults == {"y": 10}
     assert nf2(x=5) == (5, 10)
+    assert nf2.output_annotation == {"out1": int, "out2": int}
 
 
 def test_nested_pipefunc_bound() -> None:
