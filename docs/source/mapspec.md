@@ -20,7 +20,7 @@ It allows you to express element-wise operations, reductions, and even the creat
 
 The general format of a `mapspec` string is:
 
-```
+```python
 "input1[index1, index2, ...], input2[index3, ...] -> output1[index4, ...], output2[index4, ...]"
 ```
 
@@ -137,7 +137,7 @@ graph LR
 
 ### 3. Reductions
 
-**Pattern:** `x[i, j] -> y[i]`
+**Pattern:** `x[i, :] -> y[i]`
 
 **Description:** This pattern reduces a dimension in the output by combining elements across a particular index.
 
@@ -160,7 +160,7 @@ print(result["y"].output)
 
 ```{mermaid}
 graph LR
-    subgraph "Reduction across j (x[i,j] -> y[i])"
+    subgraph "Reduction across j (x[i, :] -> y[i])"
         direction LR
         %% Style definitions
         classDef xNodes fill:#fff3d4,stroke:#d68a00,stroke-width:2px,color:#000
@@ -397,7 +397,7 @@ pipeline_map.visualize()
 1. **Initial `mapspec`:** The `double_it` function has `mapspec="x[i] -> y[i]"`, indicating an element-wise operation on `x`. The `take_sum` function has no `mapspec`, so it receives the entire `y` array.
 2. **`add_mapspec_axis("b", axis="j")`:** This adds a new dimension indexed by `j` to `b`. The `mapspec` strings are updated:
    - `double_it`: `"x[i], b[j] -> y[i, j]"`
-   - `take_sum`: `"y[i, j] -> sum[j]"`
+   - `take_sum`: `"y[:, j] -> sum[j]"`
 3. **New `mapspec` Behavior:** The pipeline now expects a 1D array of `b` values. The `double_it` function will iterate through `x` with index `i` and `b` with index `j`, producing a 2D output array `y` with shape `(len(x), len(b))`. The `take_sum` function will then sum the `y` array along the `i` axis, for each value of `j`, resulting in a 1D output array `sum` with shape `(len(b),)`.
 
 **Running the Pipeline:**
@@ -415,7 +415,7 @@ This will produce:
 
 **Key Takeaway:**
 
-`add_mapspec_axis()` simplifies introducing or modifying dimensions, especially when dealing with pipelines that have many functions or high-dimensional data.
+{meth}`~pipefunc.Pipeline.add_mapspec_axis` simplifies introducing or modifying dimensions, especially when dealing with pipelines that have many functions or high-dimensional data.
 It allows for easy extension of your pipeline's capabilities to handle multi-dimensional data by automatically managing `mapspec` changes, making your code more concise and adaptable.
 
 ## Tips and Best Practices
