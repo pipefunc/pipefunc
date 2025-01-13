@@ -346,17 +346,6 @@ class VariantPipeline:
         original_kwargs.update(kwargs)
         return VariantPipeline(**original_kwargs)  # type: ignore[arg-type]
 
-    def __getattr__(self, name: str) -> None:
-        if name in Pipeline.__dict__:
-            msg = (
-                "This is a `VariantPipeline`, not a `Pipeline`."
-                " Use `pipeline.with_variant(...)` to select a variant first."
-                f" Then call `variant_pipeline.{name}` again."
-            )
-            raise AttributeError(msg)
-        default_msg = f"'VariantPipeline' object has no attribute '{name}'"
-        raise AttributeError(default_msg)
-
     @classmethod
     def from_pipelines(
         cls,
@@ -499,6 +488,17 @@ class VariantPipeline:
             return widget._repr_mimebundle_(include=include, exclude=exclude)
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
+
+    def __getattr__(self, name: str) -> None:
+        if name in Pipeline.__dict__:
+            msg = (
+                "This is a `VariantPipeline`, not a `Pipeline`."
+                " Use `pipeline.with_variant(...)` to select a variant first."
+                f" Then call `variant_pipeline.{name}` again."
+            )
+            raise AttributeError(msg)
+        default_msg = f"'VariantPipeline' object has no attribute '{name}'"
+        raise AttributeError(default_msg)
 
 
 def _validate_variants_exist(
