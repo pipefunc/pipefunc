@@ -381,7 +381,7 @@ def visualize_graphviz(  # noqa: PLR0912
             del attribs["margin"]  # Remove margin for legend nodes, to make them more compact
             legend_subgraph.node(node_name, **attribs)
             if i > 0:
-                legend_subgraph.edge(f"legend_{i-1}", node_name, style="invis")
+                legend_subgraph.edge(f"legend_{i - 1}", node_name, style="invis")
 
         digraph.subgraph(legend_subgraph)
 
