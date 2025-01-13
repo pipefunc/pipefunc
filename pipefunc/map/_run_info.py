@@ -249,7 +249,7 @@ def _maybe_run_folder(
 ) -> Path | None:
     if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
-        if os.getenv("READTHEDOCS") is not None:
+        if os.getenv("READTHEDOCS") is None:
             msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
             warnings.warn(msg, stacklevel=2)
     return Path(run_folder) if run_folder is not None else None
