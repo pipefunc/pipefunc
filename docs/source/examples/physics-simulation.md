@@ -17,7 +17,7 @@ kernelspec:
 :::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
 :class: tip, dropdown
 
-If you have `uv` installed, you can run this tutorial with a single command without installing anything:
+If you have `uv` installed, you can run this section with a single command without installing anything:
 
 ```bash
 uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/physics-simulation.md
