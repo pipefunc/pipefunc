@@ -1230,7 +1230,6 @@ class NestedPipeFunc(PipeFunc):
                 # default=...,  # noqa: ERA001
             )
             for k in sorted(parameters)
-            if not _argument_in_any_bound_only(k, self.pipeline.functions)
         }
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
@@ -1564,11 +1563,3 @@ def _pydantic_defaults(
         elif field_.default is not PydanticUndefined:
             defaults[new_name] = field_.default
     return defaults
-
-
-def _argument_in_any_bound_only(name: str, pipefuncs: list[PipeFunc]) -> bool:
-    """Whether the name exists in any of the bound arguments of the PipeFuncs but not as a non-bound argument."""
-    for f in pipefuncs:
-        if name in f.parameters and name not in f._bound:
-            return False
-    return any(name in f._bound for f in pipefuncs)

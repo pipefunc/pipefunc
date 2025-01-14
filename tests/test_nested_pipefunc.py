@@ -89,14 +89,11 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
 
     nf = NestedPipeFunc([fa, fb], ("x", "y"))
     assert nf(n_=1) == (3, 6)
-    with pytest.raises(ValueError, match="Unexpected keyword arguments"):
-        # In a NestedPipeFunc, the bound parameter is no longer part of the
-        # function signature. It is bound in the child PipeFunc.
-        nf(n_=1, b_=10000000)
     assert nf.defaults == {}
     assert nf.bound == {}
     pipeline_nested_test = Pipeline([nf])
     assert pipeline_nested_test(n_=1)
+    assert nf(n_=1, b_=10000000) == (3, 6)
 
 
 def test_nested_pipefunc_multiple_outputs_bound() -> None:
