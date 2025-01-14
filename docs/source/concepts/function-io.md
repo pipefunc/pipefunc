@@ -13,7 +13,7 @@ kernelspec:
 
 # Function Inputs and Outputs
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 
