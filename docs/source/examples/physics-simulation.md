@@ -14,6 +14,17 @@ kernelspec:
 
 # Physics Based Example
 
+:::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
+:class: tip, dropdown
+
+If you have `uv` installed, you can run this section with a single command without installing anything:
+
+```bash
+uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/physics-simulation.md
+```
+This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.
+:::
+
 This example demonstrates using the `pipefunc` for a physics-based simulation. The goal is to create a pipeline for geometry creation, meshing, material assignment, and electrostatics calculations, culminating in computing the average charge.
 
 > Note: this example is based on the [`aiida-dynamic-workflows` tutorial](https://github.com/microsoft/aiida-dynamic-workflows/blob/4d452ed3be4192dc5b2c8f40690f82c3afcaa7a8/examples/02-workflows.md).
