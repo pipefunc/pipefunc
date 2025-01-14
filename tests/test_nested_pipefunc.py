@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
@@ -432,5 +434,7 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
     assert nf(a=1, b=1) == 1 + (1 + 2) == 4
     pipeline2 = Pipeline([nf])
     assert pipeline2(a=1, b=1) == 4
+    with pytest.raises(ValueError, match=re.escape("Missing value for argument `b`")):
+        pipeline2(a=1)
     pipeline2.update_defaults({"b": 10})
     assert pipeline2(a=1) == 10 + (1 + 2) == 13
