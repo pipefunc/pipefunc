@@ -1233,8 +1233,21 @@ class NestedPipeFunc(PipeFunc):
         }
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update the bound arguments for the function that are fixed.
+
+        Parameters
+        ----------
+        bound
+            A dictionary of bound arguments for the function.
+        overwrite
+            Whether to overwrite the existing bound arguments. If ``False``, the new
+            bound arguments will be added to the existing bound arguments.
+
+        """
         super().update_bound(bound, overwrite=overwrite)
         # We keep the bound arguments in sync with the individual PipeFuncs
+        # TODO: If someone changes the `bound` of child PipeFuncs, it will not
+        # be reflected in the NestedPipeFunc! Reconsider this design.
         for f in self.pipeline.functions:
             f_bound = {k: v for k, v in bound.items() if k in f.parameters}
             if f_bound or overwrite:
