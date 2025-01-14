@@ -231,11 +231,6 @@ replace_rtd_links_with_local(
     docs_path / "source" / "tutorial.md",
 )
 
-# Copy nb to docs/source/notebooks
-nb_docs_folder = docs_path / "source" / "notebooks"
-nb_docs_folder.mkdir(exist_ok=True)
-shutil.copy(nb, nb_docs_folder)
-
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
 
