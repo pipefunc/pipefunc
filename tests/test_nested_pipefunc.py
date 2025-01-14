@@ -58,6 +58,35 @@ def test_nested_pipefunc_bound() -> None:
     assert nf(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
 
 
+def test_nested_pipefunc_bound_in_nest() -> None:
+    @pipefunc(output_name="c", bound={"b": 2})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c
+
+    nf = NestedPipeFunc([f, g], output_name="d")
+    assert nf(a=1, b=100000) == 3
+
+
+def test_nested_pipefunc_bound_in_pipeline() -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int) -> int:
+        return 2 + n
+
+    @pipefunc(output_name="y", bound={"b": 1})
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    nf = NestedPipeFunc([fa, fb], ("x", "y"))
+    assert nf(n=1) == (3, 6)
+    assert nf(n=1, b=10000000) == (3, 6)
+    pipeline_nested_test = Pipeline([nf])
+    assert pipeline_nested_test(n=1)
+
+
 def test_nested_pipefunc_multiple_outputs_bound() -> None:
     # Test with multiple outputs
     @pipefunc(output_name=("e", "f"))
