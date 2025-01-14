@@ -16,13 +16,18 @@ def test_nested_pipefunc_defaults() -> None:
         return c
 
     nf = NestedPipeFunc([f, g])
+    pipeline = Pipeline([nf])
     assert nf.defaults == {"b": 2}
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)
+    assert pipeline(a=1) == (3, 3)
     nf.update_defaults({"a": 5, "b": 10})
+    # Need to do the same on the pipeline (since the nf is copied)
+    pipeline.functions[0].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
+    assert pipeline() == (15, 15)
 
 
 def test_nested_pipefunc_multiple_outputs_defaults() -> None:
@@ -50,11 +55,13 @@ def test_nested_pipefunc_bound() -> None:
         return c
 
     nf = NestedPipeFunc([f, g], output_name="d")
-    nf.update_bound({"a": 1})
-    assert nf.bound == {"a": 1}
+    nf.pipeline["c"].update_bound({"a": 1})
+    assert nf.bound == {}  # bound is not set in the NestedPipeFunc!
+    assert nf.pipeline["c"].bound == {"a": 1}
     assert nf(a=10, b=2) == 3  # a is bound to 1, so input a=10 is ignored
-    nf.update_bound({"b": 5})
-    assert nf.bound == {"a": 1, "b": 5}
+    nf.pipeline["c"].update_bound({"b": 5})
+    assert nf.pipeline["c"].bound == {"a": 1, "b": 5}
+    assert nf.bound == {}
     assert nf(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
 
 
@@ -68,7 +75,7 @@ def test_nested_pipefunc_bound_in_nest() -> None:
         return c
 
     nf = NestedPipeFunc([f, g], output_name="d")
-    assert nf(a=1, b=100000) == 3
+    assert nf(a=1) == 3
 
 
 def test_nested_pipefunc_bound_in_pipeline() -> None:
@@ -103,8 +110,9 @@ def test_nested_pipefunc_multiple_outputs_bound() -> None:
         return e, f
 
     nf2 = NestedPipeFunc([h, i], output_name=("e", "out2"))
-    nf2.update_bound({"x": 1})
-    assert nf2.bound == {"x": 1}
+    nf2.pipeline["e"].update_bound({"x": 1})
+    assert nf2.bound == {}
+    assert nf2.pipeline["e"].bound == {"x": 1}
     assert nf2(x=5, y=10) == (1, 10)
 
 
