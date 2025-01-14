@@ -349,3 +349,30 @@ def test_nested_pipefunc_output_annotation() -> None:
     assert nf1.output_annotation == {"c": int}
     nf1 = NestedPipeFunc(funcs, output_name=("c", "d"))
     assert nf1.output_annotation == {"c": int, "d": float}
+
+
+def test_join_pipeline_with_nested_preserves_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 2})
+    def f(a, b=1):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c):
+        return c + 1
+
+    @pipefunc(output_name="e")
+    def h(d):
+        return d + 1
+
+    pipeline1 = Pipeline([NestedPipeFunc([f, g], output_name="d")])
+    pipeline1.update_renames({"b": "scope.b"})
+    assert pipeline1["d"].renames == {"b": "scope.b"}
+    assert pipeline1["d"].defaults == {"scope.b": 2}
+    assert pipeline1.defaults == {"scope.b": 2}
+    assert pipeline1("d", a=1) == 4
+    pipeline2 = Pipeline([h])
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline["d"].renames == {"b": "scope.b"}
+    assert pipeline["d"].defaults == {"scope.b": 2}
+    assert pipeline.defaults == {"b": 2}
+    assert pipeline("e", a=1) == 5
