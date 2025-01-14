@@ -226,7 +226,7 @@ This section has been moved to [Error Handling](./concepts/error-handling.md).
 
 ## What is the overhead / efficiency / performance of `pipefunc`?
 
-This section has been moved to [Benchmarking](./concepts/benchmarking.md).
+This section has been moved to [Overhead and Efficiency](./concepts/overhead-and-efficiency.md).
 
 ## How to mock functions in a pipeline for testing?
 
