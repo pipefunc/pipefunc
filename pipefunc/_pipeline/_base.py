@@ -228,11 +228,11 @@ class Pipeline:
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
         info = {
-            "inputs": inputs,
-            "outputs": outputs,
-            "intermediate_outputs": intermediate_outputs,
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
+            "inputs": inputs,
+            "intermediate_outputs": intermediate_outputs,
+            "outputs": outputs,
         }
         if not print_table:
             return info
