@@ -34,14 +34,14 @@ def h(c, d, x=1):
     return c * d * x
 
 pipeline = Pipeline([f, g, h])
-result = pipeline("e", a=2, b=3)  # Alternatively: pipeline.run("e", kwargs={"a": 2, "b": 3})
+result = pipeline("e", a=2, b=3)  # Or: pipeline.run("e", kwargs={"a": 2, "b": 3})
 print(result)
 ```
 
 ## Explanation
 
 1. **Function Definition:** We define three simple functions, `f`, `g`, and `h`. Each function is decorated with `@pipefunc`, which makes it a "pipeable" function that can be used within a `Pipeline`. The `output_name` argument specifies the name of the output produced by each function.
-2. **Pipeline Creation:** We create a `Pipeline` object, passing a list of the pipeable functions: `[f, g, h]`. The order of the functions in the list determines the order in which they will be executed in the pipeline.
+2. **Pipeline Creation:** We create a `Pipeline` object, passing a list of the pipeable functions: `[f, g, h]`. The order of the functions in the list is unimportant.
 3. **Pipeline Execution:** We execute the pipeline using `pipeline("e", a=2, b=3)`.
    - `"e"` specifies that we want the output of function `h` (which has `output_name="e"`).
    - `a=2, b=3` are the input arguments to the pipeline.
