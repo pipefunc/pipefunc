@@ -415,3 +415,22 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline["d"].defaults == {"scope.b": 2}
     assert pipeline.defaults == {"scope.b": 2}
     assert pipeline("e", a=1) == 5
+
+
+def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -> None:
+    @pipefunc(output_name="c", bound={"b": 2})
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(b, c):
+        return b + c
+
+    pipeline = Pipeline([f, g])
+    assert pipeline(a=1, b=1) == (1 + (1 + 2)) == 4
+    nf = NestedPipeFunc([f, g], output_name="d")
+    assert nf(a=1, b=1) == 1 + (1 + 2) == 4
+    pipeline2 = Pipeline([nf])
+    assert pipeline2(a=1, b=1) == 4
+    pipeline2.update_defaults({"b": 10})
+    assert pipeline2(a=1) == 10 + (1 + 2) == 13
