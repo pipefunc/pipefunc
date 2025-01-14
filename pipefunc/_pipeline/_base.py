@@ -551,7 +551,7 @@ class Pipeline:
                 )
             elif arg in self.defaults:
                 value = self.defaults[arg]
-            elif _is_nested_pipefunc_and_argument_exclusively_bound(arg, func):
+            elif _is_arg_bound_in_any_nested_pipefunc(arg, func):
                 continue
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
@@ -2281,17 +2281,7 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
     return table
 
 
-def _is_nested_pipefunc_and_argument_exclusively_bound(
-    arg: str,
-    func: NestedPipeFunc | PipeFunc,
-) -> bool:
-    """Whether the arg exists in any of the bound args of the PipeFuncs but not as a non-bound argument."""
+def _is_arg_bound_in_any_nested_pipefunc(arg: str, func: NestedPipeFunc | PipeFunc) -> bool:
     if not isinstance(func, NestedPipeFunc):
         return False
-    for f in func.pipeline.functions:
-        if arg in f.parameters and arg not in f._bound:
-            # This never occurs in `Pipeline._run` because this function is never called
-            # if the argument is not bound, as the argument will have to be provided in
-            # the `kwargs` argument.
-            return False  # pragma: no cover
     return any(arg in f._bound for f in func.pipeline.functions)
