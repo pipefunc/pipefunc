@@ -50,6 +50,10 @@ result = pipeline("e", a=2, b=3)  # Or: pipeline.run("e", kwargs={"a": 2, "b": 3
 print(result)
 ```
 
+```{code-cell} ipython3
+pipeline.visualize()
+```
+
 ## Explanation
 
 1. **Define Pipeable Functions:** We define three functions, `f`, `g`, and `h`. Each is decorated with `@pipefunc`, making it usable within a `Pipeline`. `output_name` assigns a name to each function's output.
