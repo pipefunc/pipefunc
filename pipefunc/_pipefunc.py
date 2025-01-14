@@ -1232,9 +1232,10 @@ class NestedPipeFunc(PipeFunc):
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
         super().update_bound(bound, overwrite=overwrite)
+        # We keep the bound arguments in sync with the individual PipeFuncs
         for f in self.pipeline.functions:
             f_bound = {k: v for k, v in bound.items() if k in f.parameters}
-            if f_bound:
+            if f_bound or overwrite:
                 f.update_bound(f_bound, overwrite=overwrite)
 
     @functools.cached_property

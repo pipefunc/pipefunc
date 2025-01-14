@@ -55,13 +55,13 @@ def test_nested_pipefunc_bound() -> None:
         return c
 
     nf = NestedPipeFunc([f, g], output_name="d")
-    nf.pipeline["c"].update_bound({"a": 1})
-    assert nf.bound == {}  # bound is not set in the NestedPipeFunc!
+    nf.update_bound({"a": 1})
+    assert nf.bound == {"a": 1}
     assert nf.pipeline["c"].bound == {"a": 1}
     assert nf(a=10, b=2) == 3  # a is bound to 1, so input a=10 is ignored
-    nf.pipeline["c"].update_bound({"b": 5})
+    nf.update_bound({"b": 5})
     assert nf.pipeline["c"].bound == {"a": 1, "b": 5}
-    assert nf.bound == {}
+    assert nf.bound == {"a": 1, "b": 5}
     assert nf(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
 
 
@@ -110,8 +110,8 @@ def test_nested_pipefunc_multiple_outputs_bound() -> None:
         return e, f
 
     nf2 = NestedPipeFunc([h, i], output_name=("e", "out2"))
-    nf2.pipeline["e"].update_bound({"x": 1})
-    assert nf2.bound == {}
+    nf2.update_bound({"x": 1})
+    assert nf2.bound == {"x": 1}
     assert nf2.pipeline["e"].bound == {"x": 1}
     assert nf2(x=5, y=10) == (1, 10)
 
