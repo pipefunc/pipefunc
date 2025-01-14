@@ -10,3 +10,9 @@ kernelspec:
   language: python
   name: python3
 ---
+
+# Simplifying Pipelines
+
+```{contents} ToC – Questions
+:depth: 3
+```

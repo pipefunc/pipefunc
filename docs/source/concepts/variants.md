@@ -11,6 +11,11 @@ kernelspec:
   name: python3
 ---
 
+# Variants
+
+```{contents} ToC – Questions
+:depth: 3
+```
 
 ## What is `VariantPipeline` and how to use it?
 

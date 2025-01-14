@@ -11,6 +11,12 @@ kernelspec:
   name: python3
 ---
 
+# Mapspec Explained
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 # Understanding `mapspec`
 
 `mapspec` is a powerful string-based syntax within `pipefunc` that defines how data is mapped between functions in a pipeline, especially when dealing with arrays or lists of inputs.

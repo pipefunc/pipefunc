@@ -11,6 +11,12 @@ kernelspec:
   name: python3
 ---
 
+# Parameter Scopes
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 ## How to use parameter scopes (namespaces)?
 
 Parameter scopes, also known as namespaces, allow you to group related parameters together and avoid naming conflicts when multiple functions in a pipeline have parameters with the same name.

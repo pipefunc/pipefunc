@@ -11,6 +11,12 @@ kernelspec:
   name: python3
 ---
 
+# Benchmarking
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 ## What is the overhead / efficiency / performance of `pipefunc`?
 
 ```{note}

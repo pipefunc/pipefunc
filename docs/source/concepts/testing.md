@@ -11,6 +11,12 @@ kernelspec:
   name: python3
 ---
 
+# Testing
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 ## How to mock functions in a pipeline for testing?
 
 When mocking a function within a `Pipeline` for testing purposes, you can use the {class}`pipefunc.testing.patch` utility.

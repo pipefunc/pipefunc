@@ -10,6 +10,13 @@ kernelspec:
   language: python
   name: python3
 ---
+
+# Parallelism and Execution
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 (run-vs-map)=
 ## What is the difference between `pipeline.run` and `pipeline.map`?
 

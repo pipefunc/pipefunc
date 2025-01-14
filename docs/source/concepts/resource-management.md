@@ -11,6 +11,11 @@ kernelspec:
   name: python3
 ---
 
+# Resource Management
+
+```{contents} ToC – Questions
+:depth: 3
+```
 
 ## How to inspect the `Resources` inside a `PipeFunc`?
 

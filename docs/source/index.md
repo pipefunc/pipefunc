@@ -19,7 +19,7 @@ start-after: <!-- toc-end -->
 
 🏠 Home <self>
 🚀 Usage tutorial <tutorial>
-🗺️ Concepts <concepts/index>
+🧠 Concepts <concepts/index>
 ❓ FAQ <faq>
 ```
 

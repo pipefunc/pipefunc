@@ -11,6 +11,12 @@ kernelspec:
   name: python3
 ---
 
+# Error Handling
+
+```{contents} ToC – Questions
+:depth: 3
+```
+
 ## What is the `ErrorSnapshot` feature in `pipefunc`?
 
 The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
