@@ -29,6 +29,7 @@ Here's an example of `pipefunc` raising a `TypeError` when the types don't match
 
 ```{code-cell} ipython3
 :tags: [raises-exception]
+from pipefunc import Pipeline, pipefunc
 
 # All type hints that are not relevant for this example are omitted!
 
