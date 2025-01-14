@@ -12,7 +12,14 @@ kernelspec:
   name: python3
 ---
 
-# Run Adaptive Sweeps in 1D, 2D, 3D, ND
+# Adaptive integration
+
+> Run Adaptive Sweeps in 1D, 2D, 3D, ND
+
+
+```{contents} ToC – Questions
+:depth: 3
+```
 
 Using Adaptive sweeps instead of regular sweeps can save a lot of time.
 Currently, there is no deep integration in `pipefunc` to do adaptive sweeps.
