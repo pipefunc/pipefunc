@@ -1231,11 +1231,11 @@ class NestedPipeFunc(PipeFunc):
         }
 
     def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
-        msg = (
-            "The `update_bound` method is not supported for `NestedPipeFunc` instances."
-            " Call `update_bound` on the individual child `PipeFunc` instances instead."
-        )
-        raise NotImplementedError(msg)
+        super().update_bound(bound, overwrite=overwrite)
+        for f in self.pipeline.functions:
+            f_bound = {k: v for k, v in bound.items() if k in f.parameters}
+            if f_bound:
+                f.update_bound(f_bound, overwrite=overwrite)
 
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
