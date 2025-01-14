@@ -197,6 +197,28 @@ def process_readme_for_sphinx_docs(readme_path: Path, docs_path: Path) -> None:
     change_alerts_to_admonitions(output_file, output_file)
 
 
+def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
+    """Replace ReadTheDocs links with local markdown links in a file.
+
+    Parameters
+    ----------
+    input_file
+        Path to the input file
+    output_file
+        Path to the output file where the modified content will be written
+    """
+    with open(input_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Replace the RTD links with local markdown links
+    base_url = "https://pipefunc.readthedocs.io/en/latest/"
+    content = content.replace(f"{base_url}examples/", "./examples/")
+    content = content.replace(".html", ".md")
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 # Process the README.md file for Sphinx documentation
 readme_path = package_path / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
@@ -204,11 +226,10 @@ process_readme_for_sphinx_docs(readme_path, docs_path)
 # Add the example notebook to the docs
 nb = package_path / "example.ipynb"
 convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
-
-# Copy nb to docs/source/notebooks
-nb_docs_folder = docs_path / "source" / "notebooks"
-nb_docs_folder.mkdir(exist_ok=True)
-shutil.copy(nb, nb_docs_folder)
+replace_rtd_links_with_local(
+    docs_path / "source" / "tutorial.md",
+    docs_path / "source" / "tutorial.md",
+)
 
 # Group into single streams to prevent multiple output boxes
 nb_merge_streams = True
