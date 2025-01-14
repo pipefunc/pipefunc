@@ -2290,5 +2290,8 @@ def _is_nested_pipefunc_and_argument_exclusively_bound(
         return False
     for f in func.pipeline.functions:
         if arg in f.parameters and arg not in f._bound:
-            return False
+            # This never occurs in `Pipeline._run` because this function is never called
+            # if the argument is not bound, as the argument will have to be provided in
+            # the `kwargs` argument.
+            return False  # pragma: no cover
     return any(arg in f._bound for f in func.pipeline.functions)
