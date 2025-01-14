@@ -4,7 +4,7 @@
 :hidden:
 
 Function Inputs and Outputs <function-io>
-Mapspec Explained <mapspec-explained>
+Understanding mapspec <mapspec>
 Parallelism and Execution <execution-and-parallelism>
 Variants <variants>
 Type Checking <type-checking>
@@ -35,7 +35,7 @@ Whether you're looking to understand the intricacies of data flow with `mapspec`
 Below are the key concepts discussed in this section. Click on any topic to learn more:
 
 - **[Function Inputs and Outputs](./function-io):** Manage inputs, outputs, defaults, renaming, and multiple returns. Use with `dataclasses` and `pydantic`.
-- **[Mapspec Explained](./mapspec-explained):** Define data mappings with `mapspec` for element-wise operations, reductions, and parallelization.
+- **[Understanding `mapspec`](mapspec.md):** Define data mappings with `mapspec` for element-wise operations, reductions, and parallelization.
 - **[Parameter Scopes](./parameter-scopes):** Organize pipelines and avoid naming conflicts using parameter scopes.
 - **[Execution and Parallelism](./execution-and-parallelism):** Control pipeline execution: sequential and parallel, with mixed executors and storage. Includes post-execution hooks.
 - **[Simplifying Pipelines](./simplifying-pipelines):** Merge nodes with `simplified_pipeline` and `NestedPipeFunc`. Understand the trade-offs.

@@ -92,57 +92,6 @@ print(g.defaults)  # remaining original default from signature
 
 This will remove the defaults that pipefunc has set for the function `g`, and leave the original defaults in the function signature (`b=1`).
 
-## How to bind parameters to a fixed value?
-
-Instead of using defaults, you can bind parameters to a fixed value using the `bound` argument.
-
-See:
-
-- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., bound={...}) `
-- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_bound``({...}) `
-
-```{code-cell} ipython3
-@pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
-def f(a, x):
-    return a + x
-
-f(a=1, x=999)  # x is ignored and replaced by the bound value
-```
-
-:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
-:class: note, dropdown
-
-```python
-from pipefunc import PipeFunc
-
-def f(a, x):
-   return a + x
-
-f_func = PipeFunc(f, output_name="y", bound={"x": 2})
-```
-
-:::
-
-Bound arguments show as red hexagons in the pipeline visualization.
-
-```{code-cell} ipython3
-pipeline = Pipeline([f])
-pipeline.visualize()
-```
-
-We can update the bound arguments with
-
-```{code-cell} ipython3
-f.update_bound({"x": 3})
-```
-
-or remove them with
-
-```{code-cell} ipython3
-f.update_bound({}, overwrite=True)
-f(a=1, x=999)  # no longer fixed
-```
-
 ## How to rename inputs and outputs?
 
 The `renames` attribute in `@`{class}`~pipefunc.pipefunc` and {class}`~pipefunc.PipeFunc` allows you to rename the inputs and outputs of a function before passing them to the next step in the pipeline.
@@ -294,6 +243,56 @@ Handling multiple outputs allows for more modular and reusable functions in your
 It's particularly useful when a function computes multiple related values that might be used independently by different downstream functions.
 This way, you can avoid recomputing the same values multiple times and can mix and match the outputs as needed.
 
+## How to bind parameters to a fixed value?
+
+Instead of using defaults, you can bind parameters to a fixed value using the `bound` argument.
+
+See:
+
+- The `pipefunc` decorator `@`{class}` pipefunc.pipefunc``(..., bound={...}) `
+- Update the bound arguments of a `PipeFunc` object (a wrapped function) via {class}` pipefunc.PipeFunc.update_bound``({...}) `
+
+```{code-cell} ipython3
+@pipefunc(output_name="y", bound={"x": 2})  # x is now fixed to 2
+def f(a, x):
+    return a + x
+
+f(a=1, x=999)  # x is ignored and replaced by the bound value
+```
+
+:::{admonition} Do the same by constructing a <code>PipeFunc</code> object directly
+:class: note, dropdown
+
+```python
+from pipefunc import PipeFunc
+
+def f(a, x):
+   return a + x
+
+f_func = PipeFunc(f, output_name="y", bound={"x": 2})
+```
+
+:::
+
+Bound arguments show as red hexagons in the pipeline visualization.
+
+```{code-cell} ipython3
+pipeline = Pipeline([f])
+pipeline.visualize()
+```
+
+We can update the bound arguments with
+
+```{code-cell} ipython3
+f.update_bound({"x": 3})
+```
+
+or remove them with
+
+```{code-cell} ipython3
+f.update_bound({}, overwrite=True)
+f(a=1, x=999)  # no longer fixed
+```
 
 ## Get a function handle for a specific pipeline output (`pipeline.func`)
 
@@ -405,7 +404,6 @@ So if you are using mutable defaults, make sure to not mutate the value in the f
 This is the same behavior as with regular Python functions.
 :::
 
-
 ## How to collect results as a step in my `Pipeline`?
 
 Sometimes you might need to collect specific inputs and/or outputs of different `PipeFunc`s within your pipeline.
@@ -441,7 +439,6 @@ assert result == {"in1": 1, "out1": 1, "out2": 3}  # same parameters as in `coll
 
 pipeline.visualize(backend="graphviz")
 ```
-
 
 ## `PipeFunc`s with Multiple Outputs of Different Shapes
 
@@ -530,77 +527,3 @@ print(result["result"].output)
 6. **`pipeline.map`:** We call `pipeline.map` as before, but now we only need to specify the `internal_shapes` of the lists, not the shape of the status. The `internal_shapes` argument is only needed when you return a list, and it cannot be inferred from the inputs.
 
 This pattern provides a clean and manageable way to work with functions that logically produce multiple outputs of varying shapes within the current capabilities of `pipefunc`.
-
-
-## Simplifying Pipelines
-
-This section is about {meth}`pipefunc.Pipeline.simplified_pipeline`, which is a convenient way to simplify a pipeline by merging multiple nodes into a single node (creating a {class}`pipefunc.NestedPipeFunc`).
-Consider the following pipeline (look at the `visualize()` output to see the structure of the pipeline):
-
-```{code-cell} ipython3
-from pipefunc import Pipeline
-
-
-def f1(a, b, c, d):
-    return a + b + c + d
-
-
-def f2(a, b, e):
-    return a + b + e
-
-
-def f3(a, b, f1):
-    return a + b + f1
-
-
-def f4(f1, f3):
-    return f1 + f3
-
-
-def f5(f1, f4):
-    return f1 + f4
-
-
-def f6(b, f5):
-    return b + f5
-
-
-def f7(a, f2, f6):
-    return a + f2 + f6
-
-
-# If the functions are not decorated with @pipefunc,
-# they will be wrapped and the output_name will be the function name
-pipeline_complex = Pipeline([f1, f2, f3, f4, f5, f6, f7])
-pipeline_complex("f7", a=1, b=2, c=3, d=4, e=5)
-pipeline_complex.visualize_matplotlib(
-    color_combinable=True,
-)  # combinable functions have the same color
-```
-
-In the example code above, the complex pipeline composed of multiple functions (`f1`, `f2`, `f3`, `f4`, `f5`, `f6`, `f7`) can be simplified by merging the nodes `f1`, `f3`, `f4`, `f5`, `f6` into a single node.
-This merging process simplifies the pipeline and allows to reduce the number of functions that need to be cached/saved.
-
-The method `reduced_pipeline` from the `Pipeline` class is used to generate this simplified version of the pipeline.
-
-```{code-cell} ipython3
-simplified_pipeline_complex = pipeline_complex.simplified_pipeline("f7")
-simplified_pipeline_complex.visualize()  # A `NestedPipeFunc` will have a red edge
-```
-
-However, simplifying a pipeline comes with a trade-off. The simplification process removes intermediate nodes that may be necessary for debugging or inspection.
-
-For instance, if a developer wants to monitor the output of `f3` while processing the pipeline, they would not be able to do so in the simplified pipeline as `f3` has been merged into a {class}`pipefunc.NestedPipeFunc`.
-+++
-
-The simplified pipeline now contains a {class}`pipefunc.NestedPipeFunc` object, which is a subclass of {class}`~pipefunc.PipeFunc` but contains an internal pipeline.
-
-```{code-cell} ipython3
-simplified_pipeline_complex.functions
-```
-
-```{code-cell} ipython3
-nested_func = simplified_pipeline_complex.functions[-1]
-print(f"{nested_func.parameters=}, {nested_func.output_name=}, {nested_func(a=1, b=2, c=3, d=4)=}")
-nested_func.pipeline.visualize()
-```
