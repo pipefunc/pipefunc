@@ -3,16 +3,19 @@
 ```{toctree}
 :hidden:
 
-Mapspec Explained <mapspec-explained>
 Function Inputs and Outputs <function-io>
+Mapspec Explained <mapspec-explained>
+Parallelism and Execution <parallelism>
 Variants <variants>
+Type Checking <type-checking>
 Error Handling <error-handling>
 Resource Management <resource-management>
-Parallelism and Execution <parallelism>
 Parameter Scopes <parameter-scopes>
 Simplifying Pipelines <simplifying-pipelines>
+Adaptive integration <adaptive-integration>
 Testing <testing>
 Benchmarking <benchmarking>
+Parameter Sweeps <parameter-sweeps>
 ```
 
 Welcome to the Concepts section of the `pipefunc` documentation.
