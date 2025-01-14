@@ -1044,3 +1044,19 @@ def test_run_multiple_outputs_not_return_all() -> None:
         # This currently is not possible because we only allow string output OR
         # full exact tuple output_name.
         pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
+
+
+def test_join_pipeline_preserves_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 2})
+    def f(a, b=1):
+        return a + b
+
+    @pipefunc(output_name="x.d", renames={"c": "x.c"})
+    def g(c):
+        return c + 1
+
+    pipeline1 = Pipeline([f], scope="x")
+    pipeline2 = Pipeline([g])
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline.run("x.d", kwargs={"x.a": 1}) == 4
+    assert pipeline.defaults == {"x.b": 2}
