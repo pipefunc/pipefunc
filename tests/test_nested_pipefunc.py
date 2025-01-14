@@ -374,5 +374,5 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     pipeline = pipeline1.join(pipeline2)
     assert pipeline["d"].renames == {"b": "scope.b"}
     assert pipeline["d"].defaults == {"scope.b": 2}
-    assert pipeline.defaults == {"b": 2}
+    assert pipeline.defaults == {"scope.b": 2}
     assert pipeline("e", a=1) == 5

@@ -1200,7 +1200,10 @@ class NestedPipeFunc(PipeFunc):
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
-        return NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
+        f = NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
+        f._defaults = self._defaults.copy()
+        f._bound = self._bound.copy()
+        return f
 
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
