@@ -23,7 +23,7 @@ It allows you to express element-wise operations, reductions, and even the creat
 :::{admonition} Go through the main tutorial first!
 :class: warning, dropdown
 
-We recommend going through the main [pipefunc tutorial](./tutorial) before diving into `mapspec`, as it provides a comprehensive overview of the `pipefunc` library and its core concepts.
+We recommend going through the main [pipefunc tutorial](../tutorial) before diving into `mapspec`, as it provides a comprehensive overview of the `pipefunc` library and its core concepts.
 
 :::
 
