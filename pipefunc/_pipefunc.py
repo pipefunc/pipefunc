@@ -1175,8 +1175,6 @@ class NestedPipeFunc(PipeFunc):
         self._defaults: dict[str, Any] = {
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
-        # Bound arguments are handled by the individual PipeFuncs and cannot
-        # be set for the NestedPipeFunc as a whole
         self._bound: dict[str, Any] = {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None

@@ -551,7 +551,7 @@ class Pipeline:
                 )
             elif arg in self.defaults:
                 value = self.defaults[arg]
-            elif isinstance(func, NestedPipeFunc) and _is_argument_exclusively_bound(arg, func):
+            elif _is_nested_pipefunc_and_argument_exclusively_bound(arg, func):
                 continue
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
@@ -2281,8 +2281,13 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
     return table
 
 
-def _is_argument_exclusively_bound(arg: str, func: NestedPipeFunc) -> bool:
+def _is_nested_pipefunc_and_argument_exclusively_bound(
+    arg: str,
+    func: NestedPipeFunc | PipeFunc,
+) -> bool:
     """Whether the arg exists in any of the bound args of the PipeFuncs but not as a non-bound argument."""
+    if not isinstance(func, NestedPipeFunc):
+        return False
     for f in func.pipeline.functions:
         if arg in f.parameters and arg not in f._bound:
             return False
