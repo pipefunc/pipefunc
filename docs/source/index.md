@@ -19,6 +19,7 @@ start-after: <!-- toc-end -->
 
 🏠 Home <self>
 🚀 Usage tutorial <tutorial>
+📚 Examples <examples/index>
 🧠 Concepts <concepts/index>
 ❓ FAQ <faq>
 ```
