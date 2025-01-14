@@ -22,7 +22,7 @@ If you have `uv` installed, you can run this tutorial with a single command with
 ```bash
 uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/physics-simulation.md
 ```
-This will create a temporary environment and open the tutorial in your browser in a Jupyter notebook in a few seconds.
+This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.
 :::
 
 This example demonstrates using the `pipefunc` for a physics-based simulation. The goal is to create a pipeline for geometry creation, meshing, material assignment, and electrostatics calculations, culminating in computing the average charge.

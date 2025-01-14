@@ -23,7 +23,7 @@ If you have `uv` installed, you can run this tutorial with a single command with
 uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/sensor-data-processing.md
 ```
 
-This will create a temporary environment and open the tutorial in your browser in a Jupyter notebook in a few seconds.
+This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.
 :::
 
 ```{note}
