@@ -14,7 +14,7 @@ Parameter Scopes <parameter-scopes>
 Simplifying Pipelines <simplifying-pipelines>
 Adaptive integration <adaptive-integration>
 Testing <testing>
-Overhead and Efficiency <overhead.md>
+Overhead and Efficiency <overhead-and-efficiency.md>
 Parameter Sweeps <parameter-sweeps>
 ```
 
@@ -45,7 +45,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Type Checking](./type-checking):** How `pipefunc` uses type hints for static and runtime type checking to ensure data integrity.
 - **[Adaptive Integration](./adaptive-integration):** Optimize parameter space exploration with `adaptive` library integration.
 - **[Testing](./testing):** Best practices for testing, including mocking functions in pipelines.
-- **[Overhead and Efficiency](./overhead.md):** Measure the performance overhead of `pipefunc`.
+- **[Overhead and Efficiency](./overhead-and-efficiency):** Measure the performance overhead of `pipefunc`.
 - **[Parameter Sweeps](./parameter-sweeps):** Construct parameter sweeps and optimize execution with `pipefunc.sweep`.
 
 ## Contributing
