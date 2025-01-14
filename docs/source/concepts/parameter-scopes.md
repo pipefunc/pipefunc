@@ -21,6 +21,8 @@ Here are a few ways to use parameter scopes:
 1. Set the scope when defining a `PipeFunc`:
 
 ```{code-cell} ipython3
+from pipefunc import pipefunc, Pipeline
+
 @pipefunc(output_name="y", scope="foo")
 def f(a, b):
     return a + b

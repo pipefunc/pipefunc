@@ -29,16 +29,19 @@ Whether you're looking to understand the intricacies of data flow with `mapspec`
 
 Below are the key concepts discussed in this section. Click on any topic to learn more:
 
-- **[mapspec Explained](./mapspec-explained)**: Learn how to use the powerful `mapspec` syntax to define data mappings between functions, enabling element-wise operations, reductions, and parallel computations in your pipelines.
 - **[Function Inputs and Outputs](./function-io)**: Discover how `pipefunc` handles function inputs and outputs, including default values, parameter binding, renaming, and managing multiple outputs. Also covers collecting results and using `dataclasses` and `pydantic.BaseModel` with `PipeFunc`.
-- **[Variants](./variants)**: Explore the concept of `VariantPipeline` and how to use it to create and manage different implementations of functions within a single pipeline, facilitating experimentation and A/B testing.
-- **[Error Handling](./error-handling)**: Understand how `pipefunc` handles errors during pipeline execution and how to use the `ErrorSnapshot` feature to capture detailed error information for debugging.
-- **[Resource Management](./resource-management)**: Learn how to specify resource requirements for individual functions, inspect allocated resources, and dynamically allocate resources based on input parameters.
-- **[Parallelism and Execution](./parallelism)**: Dive into the different ways to execute pipelines in parallel, including mixing executors and storage backends, and how type checking works in parallel execution scenarios. Also, learn how to use post-execution hooks.
+- **[Mapspec Explained](./mapspec-explained)**: Learn how to use the powerful `mapspec` syntax to define data mappings between functions, enabling element-wise operations, reductions, and parallel computations in your pipelines.
 - **[Parameter Scopes](./parameter-scopes)**: Master the use of parameter scopes to organize your pipelines, avoid naming conflicts, and manage complex data flows.
+- **[Parallelism and Execution](execution-and-parallelism.md)**: Dive into the different ways to execute pipelines in parallel, including mixing executors and storage backends, and how type checking works in parallel execution scenarios. Also, learn how to use post-execution hooks.
 - **[Simplifying Pipelines](./simplifying-pipelines)**: Understand how to use `simplified_pipeline` to merge nodes and create `NestedPipeFunc` objects, along with the associated trade-offs.
+- **[Resource Management](./resource-management)**: Learn how to specify resource requirements for individual functions, inspect allocated resources, and dynamically allocate resources based on input parameters.
+- **[Error Handling](./error-handling)**: Understand how `pipefunc` handles errors during pipeline execution and how to use the `ErrorSnapshot` feature to capture detailed error information for debugging.
+- **[Variants](./variants)**: Explore the concept of `VariantPipeline` and how to use it to create and manage different implementations of functions within a single pipeline, facilitating experimentation and A/B testing.
+- **[Type Checking](./type-checking)**: Learn how `pipefunc` uses type hints for static type checking during pipeline construction and runtime type checking for `MapSpec` operations, ensuring data integrity.
+- **[Adaptive Integration](./adaptive-integration)**: Discover how to leverage the `adaptive` library for adaptive sweeps in `pipefunc`, optimizing your parameter space exploration.
 - **[Testing](./testing)**: Learn best practices for testing `pipefunc` pipelines, including how to mock functions for controlled testing environments.
 - **[Benchmarking](./benchmarking)**: Understand the overhead introduced by the library itself.
+- **[Parameter Sweeps](./parameter-sweeps)**: Explore convenient ways to construct parameter sweeps using `pipefunc.sweep`, and optimize execution with caching.
 
 ## Getting Started
 

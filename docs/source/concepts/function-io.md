@@ -419,7 +419,7 @@ from pipefunc.helpers import collect_kwargs
 
 @pipefunc(output_name="out1")
 def f1(in1):
-return in1
+    return in1
 
 @pipefunc(output_name="out2")
 def f2(in2, out1):

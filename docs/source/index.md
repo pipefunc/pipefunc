@@ -19,8 +19,8 @@ start-after: <!-- toc-end -->
 
 🏠 Home <self>
 🚀 Usage tutorial <tutorial>
-❓ FAQ <faq>
 🗺️ Concepts <concepts/index>
+❓ FAQ <faq>
 ```
 
 ```{toctree}

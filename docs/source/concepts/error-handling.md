@@ -48,6 +48,8 @@ The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about
 **Example:**
 
 ```{code-cell} ipython3
+from pipefunc import pipefunc
+
 @pipefunc(output_name="c")
 def faulty_function(a, b):
     # Simulate an error
