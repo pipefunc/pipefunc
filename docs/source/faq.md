@@ -112,7 +112,7 @@ We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages
 
 There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive sweeps over parameter spaces.
 Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
-See [this tutorial](concepts/adaptive.md) for a detailed example of how to use `adaptive` with `pipefunc`.
+See [this tutorial](concepts/adaptive) for a detailed example of how to use `adaptive` with `pipefunc`.
 
 ## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
 
@@ -180,38 +180,90 @@ kwargs = learners_dict.to_slurm_run(
 # kwargs can be passed to `adaptive_scheduler.slurm_run(**kwargs)`
 ```
 
+## How to handle defaults?
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#how-to-handle-defaults).
+
+## How to bind parameters to a fixed value?
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#how-to-bind-parameters-to-a-fixed-value).
+
+## How to rename inputs and outputs?
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#how-to-rename-inputs-and-outputs).
+
+## How to handle multiple outputs?
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#how-to-handle-multiple-outputs).
+
+## How does type checking work in `pipefunc`?
+
+This section has been moved to [Type Checking](./concepts/type-checking.md).
+
+## What is the difference between `pipeline.run` and `pipeline.map`?
+
+This section has been moved to [Parallelism and Execution](./concepts/execution-and-parallelism.md#run-vs-map).
+
+## How to use parameter scopes (namespaces)?
+
+This section has been moved to [Parameter Scopes](./concepts/parameter-scopes.md).
+
+## How to inspect the `Resources` inside a `PipeFunc`?
+
+This section has been moved to [Resource Management](./concepts/resource-management.md#how-to-inspect-the-resources-inside-a-pipefunc).
+
+## How to set the `Resources` dynamically, based on the input arguments?
+
+This section has been moved to [Resource Management](./concepts/resource-management.md#how-to-set-the-resources-dynamically-based-on-the-input-arguments).
+
+## How to use `adaptive` with `pipefunc`?
+
+This section has been moved to [Adaptive integration](./concepts/adaptive-integration.md).
+
+## What is the `ErrorSnapshot` feature in `pipefunc`?
+
+This section has been moved to [Error Handling](./concepts/error-handling.md).
+
+## What is the overhead / efficiency / performance of `pipefunc`?
+
+This section has been moved to [Benchmarking](./concepts/benchmarking.md).
+
+## How to mock functions in a pipeline for testing?
+
+This section has been moved to [Testing](./concepts/testing.md).
+
+## Mixing executors and storage backends for I/O-bound and CPU-bound work
+
+This section has been moved to [Parallelism and Execution](./concepts/execution-and-parallelism.md#mixing-executors-and-storage-backends-for-io-bound-and-cpu-bound-work).
+
+## Get a function handle for a specific pipeline output (`pipeline.func`)
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#get-a-function-handle-for-a-specific-pipeline-output-pipelinefunc).
+
+## `dataclasses` and `pydantic.BaseModel` as `PipeFunc`
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#dataclasses-and-pydanticbasemodel-as-pipefunc).
+
+## What is `VariantPipeline` and how to use it?
+
+This section has been moved to [Variants](./concepts/variants.md).
+
+## How to use post-execution hooks?
+
+This section has been moved to [Parallelism and Execution](./concepts/execution-and-parallelism.md#how-to-use-post-execution-hooks).
+
+## How to collect results as a step in my `Pipeline`?
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#how-to-collect-results-as-a-step-in-my-pipeline).
+
+## `PipeFunc`s with Multiple Outputs of Different Shapes
+
+This section has been moved to [Function Inputs and Outputs](./concepts/function-io.md#pipefuncs-with-multiple-outputs-of-different-shapes).
+
+## Simplifying Pipelines
+
+This section has been moved to [Simplifying Pipelines](./concepts/simplifying-pipelines.md).
+
 ## Parameter Sweeps
 
-The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.
-It was developed before `pipeline.map` which can perform sweep operations in parallel.
-However, by itself {class}`pipefunc.sweep.Sweep` might still be useful for cases where you have a pipeline that has no `mapspec`.
-
-```{code-cell} ipython3
-from pipefunc.sweep import Sweep
-
-combos = {
-    "a": [0, 1, 2],
-    "b": [0, 1, 2],
-    "c": [0, 1, 2],
-}
-# This means a Cartesian product of all the values in the lists
-# while zipping ("a", "b").
-sweep = Sweep(combos, dims=[("a", "b"), "c"])
-sweep.list()[:10]  # show the first 10 combinations
-```
-
-The function `set_cache_for_sweep` then enables caching for nodes in the pipeline that are expected to be executed two or more times during the parameter sweep.
-
-```python
-from pipefunc.sweep import set_cache_for_sweep
-
-set_cache_for_sweep(output_name, pipeline, sweep, min_executions=2, verbose=True)
-```
-
-We can now run the sweep using e.g.,
-
-```python
-results = [
-    pipeline.run(output_name, kwargs=combo, full_output=True) for combo in sweep.list()
-]
-```
+This section has been moved to [Parameter Sweeps](./concepts/parameter-sweeps.md).
