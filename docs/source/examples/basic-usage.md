@@ -40,16 +40,16 @@ print(result)
 
 ## Explanation
 
-1. **Function Definition:** We define three simple functions, `f`, `g`, and `h`. Each function is decorated with `@pipefunc`, which makes it a "pipeable" function that can be used within a `Pipeline`. The `output_name` argument specifies the name of the output produced by each function.
-2. **Pipeline Creation:** We create a `Pipeline` object, passing a list of the pipeable functions: `[f, g, h]`. The order of the functions in the list is unimportant.
-3. **Pipeline Execution:** We execute the pipeline using `pipeline("e", a=2, b=3)`.
-   - `"e"` specifies that we want the output of function `h` (which has `output_name="e"`).
-   - `a=2, b=3` are the input arguments to the pipeline.
-   - The pipeline automatically determines the execution order based on the dependencies between the functions and their inputs/outputs.
-4. **Sequential Execution:** In this basic example, the functions are executed sequentially:
-   - First, `f` is called with `a=2` and `b=3`, producing `c=5`.
-   - Next, `g` is called with `b=3`, `c=5` (the output of `f`), and the default `x=1`, producing `d=15`.
-   - Finally, `h` is called with `c=5`, `d=15`, and `x=1`, producing `e=75`.
+1. **Define Pipeable Functions:** We define three functions, `f`, `g`, and `h`. Each is decorated with `@pipefunc`, making it usable within a `Pipeline`. `output_name` assigns a name to each function's output.
+2. **Create Pipeline:** A `Pipeline` object is created using `Pipeline([f, g, h])`. The order of functions in this list does **not** affect execution order.
+3. **Execute Pipeline:** The pipeline is run using `pipeline("e", a=2, b=3)`.
+   - `"e"` indicates that we want the output of function `h` (which has `output_name="e"`).
+   - `a=2, b=3` provide input arguments.
+   - The pipeline automatically determines the correct execution order based on function dependencies.
+4. **Sequential Execution:** In this example, the functions are executed sequentially based on their dependencies:
+   - `f(a=2, b=3)` produces `c=5`.
+   - `g(b=3, c=5, x=1)` produces `d=15`.
+   - `h(c=5, d=15, x=1)` produces `e=75`.
 
 **Features Demonstrated:**
 
