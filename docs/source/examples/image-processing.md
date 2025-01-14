@@ -14,6 +14,18 @@ kernelspec:
 
 # Image Processing Workflow
 
+:::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
+:class: tip, dropdown
+
+If you have `uv` installed, you can run this tutorial with a single command without installing anything:
+
+```bash
+uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/image-processing.md
+```
+
+This will create a temporary environment and open the tutorial in your browser in a Jupyter notebook in a few seconds.
+:::
+
 ```{note}
 This example uses `scikit-image` for image processing. If you don't have it installed, you can install it using `pip install scikit-image`.
 ```

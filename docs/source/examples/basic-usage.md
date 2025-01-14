@@ -14,6 +14,18 @@ kernelspec:
 
 # Basic Usage
 
+:::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
+:class: tip, dropdown
+
+If you have `uv` installed, you can run this tutorial with a single command without installing anything:
+
+```bash
+uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/basic-usage.md
+```
+
+This will create a temporary environment and open the tutorial in your browser in a Jupyter notebook in a few seconds.
+:::
+
 This example demonstrates a simple pipeline using the {func}`@pipefunc <pipefunc.pipefunc>` decorator and the {class}`~pipefunc.Pipeline` class. It showcases a basic workflow with sequential execution.
 
 ## Code
