@@ -23,7 +23,7 @@ def test_nested_pipefunc_defaults() -> None:
     assert pipeline(a=1) == (3, 3)
     nf.update_defaults({"a": 5, "b": 10})
     # Need to do the same on the pipeline (since the nf is copied)
-    pipeline.functions[0].update_defaults({"a": 5, "b": 10})
+    pipeline["c"].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
