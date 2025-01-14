@@ -1175,6 +1175,8 @@ class NestedPipeFunc(PipeFunc):
         self._defaults: dict[str, Any] = {
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
+        # Bound arguments are handled by the individual PipeFuncs and cannot
+        # be set for the NestedPipeFunc as a whole
         self._bound: dict[str, Any] = {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
@@ -1225,7 +1227,58 @@ class NestedPipeFunc(PipeFunc):
                 # default=...,  # noqa: ERA001
             )
             for k in sorted(parameters)
+            if not _argument_in_any_bound_only(k, self.pipeline.functions)
         }
+
+    def update_renames(
+        self,
+        renames: dict[str, str],
+        *,
+        update_from: Literal["current", "original"] = "current",
+        overwrite: bool = False,
+    ) -> None:
+        """Update renames to function arguments and ``output_name`` for the wrapped function.
+
+        When renaming the ``output_name`` and if it is a tuple of strings, the
+        renames must be provided as individual strings in the tuple.
+
+        Parameters
+        ----------
+        renames
+            A dictionary of renames for the function arguments or ``output_name``.
+        update_from
+            Whether to update the renames from the ``"current"`` parameter names
+            (`PipeFunc.parameters`) or from the ``"original"`` parameter names as
+            in the function signature (`PipeFunc.original_parameters`). If also updating
+            the ``output_name``, original means the name that was provided to the
+            `PipeFunc` instance.
+        overwrite
+            Whether to overwrite the existing renames. If ``False``, the new
+            renames will be added to the existing renames.
+
+        """
+        self.pipeline.update_renames(renames, update_from=update_from, overwrite=overwrite)
+
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+        """Update defaults to the provided keyword arguments.
+
+        Parameters
+        ----------
+        defaults
+            A dictionary of default values for the keyword arguments.
+        overwrite
+            Whether to overwrite the existing defaults. If ``False``, the new
+            defaults will be added to the existing defaults.
+
+        """
+        self.pipeline.update_defaults(defaults, overwrite=overwrite)
+
+    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
+        msg = (
+            "The `update_bound` method is not supported for `NestedPipeFunc` instances."
+            " Call `update_bound` on the individual child `PipeFunc` instances instead."
+        )
+        raise NotImplementedError(msg)
 
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
@@ -1550,3 +1603,11 @@ def _pydantic_defaults(
         elif field_.default is not PydanticUndefined:
             defaults[new_name] = field_.default
     return defaults
+
+
+def _argument_in_any_bound_only(name: str, pipefuncs: list[PipeFunc]) -> bool:
+    """Whether the name exists in any of the bound arguments of the PipeFuncs but not as a non-bound argument."""
+    for f in pipefuncs:
+        if name in f.parameters and name not in f._bound:
+            return False
+    return any(name in f._bound for f in pipefuncs)
