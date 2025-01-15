@@ -909,15 +909,25 @@ class PipeFunc(Generic[T]):
     def _is_nested_pipefunc_and_argument_exclusively_bound(self, arg: str) -> bool:
         """Checks if an argument `arg` is bound in *all* nested `PipeFunc`s that use it.
 
-        This function is called by `Pipeline._run` only when `arg` is NOT found in the provided `kwargs`.
+        This function is called by `Pipeline._run` and `Pipeline.map` only when `arg`
+        is NOT found in the provided `kwargs`.
         """
         if not isinstance(self, NestedPipeFunc):
             return False
-        for f in self.pipeline.functions:  # type: ignore[has-type]
-            if arg in f.parameters and arg not in f._bound:
-                # Is only ever triggered if the user forgot to provide `arg`
-                return False
-        return any(arg in f._bound for f in self.pipeline.functions)  # type: ignore[has-type]
+        return arg in self._exclusively_bound_in_nested_pipefunc()
+
+    def _exclusively_bound_in_nested_pipefunc(self) -> set[str]:
+        """Return the arguments that are exclusively bound in all nested `PipeFunc`s."""
+        if not isinstance(self, NestedPipeFunc):
+            return set()
+        return {
+            arg
+            for arg in self.parameters
+            if any(arg in f._bound for f in self.pipeline.functions)
+            and not any(
+                arg in f.parameters and arg not in f._bound for f in self.pipeline.functions
+            )
+        }
 
 
 def pipefunc(
