@@ -560,8 +560,6 @@ class Pipeline:
                 )
             elif arg in self.defaults:
                 value = self.defaults[arg]
-            elif func._is_nested_pipefunc_and_argument_exclusively_bound(arg):
-                continue
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
                 raise ValueError(msg)
