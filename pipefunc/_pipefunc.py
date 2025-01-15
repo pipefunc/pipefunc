@@ -13,6 +13,7 @@ import dataclasses
 import datetime
 import functools
 import getpass
+import hashlib
 import inspect
 import os
 import platform
@@ -842,7 +843,7 @@ class PipeFunc(Generic[T]):
         state = {
             k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines", "resources")
         }
-        state["func"] = cloudpickle.dumps(self.func)
+        state["func"] = self._func_serialized
         state["resources"] = (
             cloudpickle.dumps(self.resources) if self.resources is not None else None
         )
@@ -905,6 +906,17 @@ class PipeFunc(Generic[T]):
                 f" `{mapspec_output_names} != {output_names}`."
             )
             raise ValueError(msg)
+
+    @functools.cached_property
+    def _func_serialized(self) -> bytes:
+        """Return the pickled representation of the function."""
+        return cloudpickle.dumps(self.func)
+
+    @functools.cached_property
+    def _cache_id(self) -> str:
+        """Return a unique identifier for the function used in cache keys."""
+        func_hash = hashlib.sha256(self._func_serialized).hexdigest()
+        return f"{self.output_name}-{func_hash}"
 
 
 def pipefunc(

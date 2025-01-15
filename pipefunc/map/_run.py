@@ -481,7 +481,7 @@ def _get_or_set_cache(
 ) -> Any:
     if cache is None:
         return compute_fn()
-    cache_key = (func.output_name, to_hashable(kwargs))
+    cache_key = (func._cache_id, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
