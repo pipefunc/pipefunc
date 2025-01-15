@@ -15,6 +15,12 @@ This section provides a collection of practical examples demonstrating various u
 
 ## Basic Usage
 
+```{admonition} Skip this if you did the [tutorial](../tutorial)!
+:class: tip, dropdown
+
+We recommend to look at the [Physics Simulation](physics-simulation.md) example after the [tutorial](../tutorial) to get a hands-on introduction to the library.
+```
+
 - [Basic Pipeline](basic-usage.md): A simple example showing how to create and run a basic pipeline.
   - **Uses:** {func}`~pipefunc.pipefunc`, {class}`~pipefunc.Pipeline`, sequential execution (`pipeline()`, {meth}`~pipefunc.Pipeline.run`)
 
