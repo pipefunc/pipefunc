@@ -414,6 +414,8 @@ def _func_kwargs(func: PipeFunc, run_info: RunInfo, store: dict[str, StoreType])
             kwargs[p] = _load_from_store(p, store).value
         elif p in run_info.defaults and p not in run_info.all_output_names:
             kwargs[p] = run_info.defaults[p]
+        elif func._is_nested_pipefunc_and_argument_exclusively_bound(p):
+            continue
         else:  # pragma: no cover
             # In principle it should not be possible to reach this point because of
             # the checks in `run` and `_validate_complete_inputs`.

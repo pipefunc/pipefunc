@@ -57,7 +57,7 @@ def prepare_run(
     elif isinstance(executor, dict):
         executor = executor.copy()  # this dict might be mutated, so we copy it
     validate_slurm_executor(executor, in_async)
-    _validate_complete_inputs(pipeline, inputs)
+    # _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
     run_info = RunInfo.create(

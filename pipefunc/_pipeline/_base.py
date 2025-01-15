@@ -21,7 +21,12 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import (
+    ErrorSnapshot,
+    NestedPipeFunc,
+    PipeFunc,
+    _maybe_mapspec,
+)
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
@@ -41,7 +46,11 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._run import (
+    AsyncMap,
+    run_map,
+    run_map_async,
+)
 from pipefunc.resources import Resources
 
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
@@ -551,7 +560,7 @@ class Pipeline:
                 )
             elif arg in self.defaults:
                 value = self.defaults[arg]
-            elif _is_nested_pipefunc_and_argument_exclusively_bound(arg, func):
+            elif func._is_nested_pipefunc_and_argument_exclusively_bound(arg):
                 continue
             else:
                 msg = f"Missing value for argument `{arg}` in `{func}`."
@@ -2279,20 +2288,3 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
         console = rich.get_console()
         console.print(table)
     return table
-
-
-def _is_nested_pipefunc_and_argument_exclusively_bound(
-    arg: str,
-    func: NestedPipeFunc | PipeFunc,
-) -> bool:
-    """Checks if an argument `arg` is bound in *all* nested `PipeFunc`s that use it.
-
-    This function is called by `Pipeline._run` only when `arg` is NOT found in the provided `kwargs`.
-    """
-    if not isinstance(func, NestedPipeFunc):
-        return False
-    for f in func.pipeline.functions:
-        if arg in f.parameters and arg not in f._bound:
-            # Is only ever triggered if the user forgot to provide `arg`
-            return False
-    return any(arg in f._bound for f in func.pipeline.functions)
