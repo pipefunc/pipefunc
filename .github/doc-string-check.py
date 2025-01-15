@@ -195,6 +195,10 @@ if __name__ == "__main__":
         allow_discrepancy=["output_name", "profile", "cache"],
         allow_missing=["func"],
     )
+    compare_param_descriptions(
+        pipefunc.PipeFunc.update_bound,
+        pipefunc.NestedPipeFunc.update_bound,
+    )
 
     # map vs map_async
     compare_param_descriptions(
