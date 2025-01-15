@@ -23,6 +23,9 @@ def test_nested_pipefunc_defaults() -> None:
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)
     assert pipeline(a=1) == (3, 3)
+    r = pipeline.map(inputs={"a": 1})
+    assert r["c"].output == 3
+    assert r["d"].output == 3
     nf.update_defaults({"a": 5, "b": 10})
     # Need to do the same on the pipeline (since the nf is copied)
     pipeline["c"].update_defaults({"a": 5, "b": 10})
@@ -96,6 +99,9 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
     pipeline_nested_test = Pipeline([nf])
     assert pipeline_nested_test(n_=1)
     assert nf(n_=1, b_=10000000) == (3, 6)
+    r = pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
+    assert r["x"].output == 3
+    assert r["y"].output == 6
 
 
 def test_nested_pipefunc_multiple_outputs_bound() -> None:
@@ -411,12 +417,16 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline1["d"].defaults == {"scope.b": 2}
     assert pipeline1.defaults == {"scope.b": 2}
     assert pipeline1("d", a=1) == 4
+    r = pipeline1.map(inputs={"a": 1})
+    assert r["d"].output == 4
     pipeline2 = Pipeline([h])
     pipeline = pipeline1.join(pipeline2)
     assert pipeline["d"].renames == {"b": "scope.b"}
     assert pipeline["d"].defaults == {"scope.b": 2}
     assert pipeline.defaults == {"scope.b": 2}
     assert pipeline("e", a=1) == 5
+    r = pipeline.map(inputs={"a": 1})
+    assert r["e"].output == 5
 
 
 def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -> None:
@@ -430,11 +440,43 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
 
     pipeline = Pipeline([f, g])
     assert pipeline(a=1, b=1) == (1 + (1 + 2)) == 4
+    r = pipeline.map(inputs={"a": 1, "b": 1})
+    assert r["d"].output == 4
     nf = NestedPipeFunc([f, g], output_name="d")
     assert nf(a=1, b=1) == 1 + (1 + 2) == 4
     pipeline2 = Pipeline([nf])
     assert pipeline2(a=1, b=1) == 4
+    r = pipeline2.map(inputs={"a": 1, "b": 1})
+    assert r["d"].output == 4
     with pytest.raises(ValueError, match=re.escape("Missing value for argument `b`")):
         pipeline2(a=1)
+    with pytest.raises(ValueError, match=re.escape("Missing inputs: `b`.")):
+        pipeline2.map(inputs={"a": 1})
     pipeline2.update_defaults({"b": 10})
     assert pipeline2(a=1) == 10 + (1 + 2) == 13
+    r = pipeline2.map(inputs={"a": 1})
+    assert r["d"].output == 13
+
+
+@pytest.mark.parametrize("scope", ["scope.", ""])
+def test_nest_bound(scope: str) -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int, m: int = 0) -> int:
+        return 2 + n + m
+
+    @pipefunc(output_name="y", bound={"b": 1})
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    scope = "scope."
+    scope = ""
+    pipeline_nested_test = Pipeline(
+        [
+            NestedPipeFunc([fa, fb], ("x", "y"), function_name="my function"),
+        ],
+        scope=scope[:-1] if scope else None,
+    )
+    y = 2 * (2 + 4 + 0) * 1
+    assert pipeline_nested_test.run(f"{scope}y", kwargs={f"{scope}n": 4}) == y
+    r = pipeline_nested_test.map(inputs={f"{scope}n": 4})
+    assert r[f"{scope}y"] == y
