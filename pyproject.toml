@@ -46,6 +46,7 @@ test = [
     "pytest",
     "versioningit",
 ]
+autodoc = ["griffe"]
 docs = [
     "emoji",
     "jupytext",
