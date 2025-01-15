@@ -82,4 +82,4 @@ print(result)
 **Further Exploration:**
 
 - For more details on creating pipelines, see the [main tutorial](../tutorial.md).
-- To learn about parallel execution, refer to the {ref}`execution and parallelism <execution-and-parallelism>` concept.
+- Already familiar with the basics? Check out the [Physics Based Example](./physics-simulation.md) for an example using some awesome `pipefunc` features!
