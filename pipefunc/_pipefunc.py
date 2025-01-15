@@ -914,20 +914,19 @@ class PipeFunc(Generic[T]):
         """
         if not isinstance(self, NestedPipeFunc):
             return False
-        return arg in self._exclusively_bound_in_nested_pipefunc()
+        return arg in _exclusively_bound_in_nested_pipefunc(self)
 
-    def _exclusively_bound_in_nested_pipefunc(self) -> set[str]:
-        """Return the arguments that are exclusively bound in all nested `PipeFunc`s."""
-        if not isinstance(self, NestedPipeFunc):
-            return set()
-        return {
-            arg
-            for arg in self.parameters
-            if any(arg in f._bound for f in self.pipeline.functions)
-            and not any(
-                arg in f.parameters and arg not in f._bound for f in self.pipeline.functions
-            )
-        }
+
+def _exclusively_bound_in_nested_pipefunc(func: NestedPipeFunc) -> dict[str, Any]:
+    """Return the arguments that are exclusively bound in all nested `PipeFunc`s."""
+    if not isinstance(func, NestedPipeFunc):
+        return {}
+    return {
+        arg: func._bound[arg]
+        for arg in func.parameters
+        if any(arg in f._bound for f in func.pipeline.functions)
+        and not any(arg in f.parameters and arg not in f._bound for f in func.pipeline.functions)
+    }
 
 
 def pipefunc(
@@ -1137,6 +1136,10 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
+    bound
+        Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
+        that are fixed. Even when providing different values, the bound values will be
+        used. Must be in terms of the renamed argument names.
     variant
         Identifies this function as an alternative implementation in a
         `VariantPipeline`. When multiple functions share the same `output_name`,
@@ -1174,6 +1177,7 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        bound: dict[str, Any] | None = None,
         variant: str | None = None,
         variant_group: str | None = None,
     ) -> None:
@@ -1198,7 +1202,7 @@ class NestedPipeFunc(PipeFunc):
         self._defaults: dict[str, Any] = {
             k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
         }
-        self._bound: dict[str, Any] = {}
+        self._bound: dict[str, Any] = bound or {}
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.post_execution_hook = None
@@ -1216,6 +1220,7 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "function_name": self.function_name,
             "renames": self._renames,
+            "bound": self._bound,
             "mapspec": self.mapspec,
             "resources": self.resources,
             "variant": self.variant,
@@ -1253,27 +1258,6 @@ class NestedPipeFunc(PipeFunc):
             for k in sorted(parameters)
         }
 
-    def update_bound(self, bound: dict[str, Any], *, overwrite: bool = False) -> None:
-        """Update the bound arguments for the function that are fixed.
-
-        Parameters
-        ----------
-        bound
-            A dictionary of bound arguments for the function.
-        overwrite
-            Whether to overwrite the existing bound arguments. If ``False``, the new
-            bound arguments will be added to the existing bound arguments.
-
-        """
-        super().update_bound(bound, overwrite=overwrite)
-        # We keep the bound arguments in sync with the individual PipeFuncs
-        # TODO: If someone changes the `bound` of child PipeFuncs, it will not
-        # be reflected in the NestedPipeFunc! Reconsider this design.
-        for f in self.pipeline.functions:
-            f_bound = {k: v for k, v in bound.items() if k in f.parameters}
-            if f_bound or overwrite:
-                f.update_bound(f_bound, overwrite=overwrite)
-
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         return {
@@ -1292,7 +1276,8 @@ class NestedPipeFunc(PipeFunc):
     def _all_inputs(self) -> tuple[str, ...]:
         inputs: set[str] = set()
         for f in self.pipeline.functions:
-            inputs.update(f.parameters)
+            parameters_excluding_bound = set(f.parameters) - set(f._bound)
+            inputs.update(parameters_excluding_bound)
         return tuple(sorted(inputs))
 
     @functools.cached_property

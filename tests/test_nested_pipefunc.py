@@ -61,11 +61,12 @@ def test_nested_pipefunc_bound() -> None:
 
     nf = NestedPipeFunc([f, g], output_name="d")
     nf.update_bound({"a": 1})
+    assert nf.parameters == ("a", "b")
     assert nf.bound == {"a": 1}
-    assert nf.pipeline["c"].bound == {"a": 1}
+    assert nf.pipeline["c"].bound == {}
     assert nf(a=10, b=2) == 3  # a is bound to 1, so input a=10 is ignored
     nf.update_bound({"b": 5})
-    assert nf.pipeline["c"].bound == {"a": 1, "b": 5}
+    assert nf.pipeline["c"].bound == {}
     assert nf.bound == {"a": 1, "b": 5}
     assert nf(a=100, b=200) == 6  # a and b are bound to 1 and 5 respectively
 
@@ -98,8 +99,17 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
     assert nf.bound == {}
     pipeline_nested_test = Pipeline([nf])
     assert pipeline_nested_test(n_=1)
-    assert nf(n_=1, b_=10000000) == (3, 6)
-    r = pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
+    with pytest.raises(ValueError, match=re.escape("Unexpected keyword arguments")):
+        # if the child functions have bound, they are not parameters of the nested pipefunc!
+        nf(n_=1, b_=10000000)
+    assert nf.pipeline["y"](x=3) == 6
+    assert nf(n_=1) == (3, 6)
+    with pytest.raises(ValueError, match=re.escape("Unexpected keyword arguments")):
+        pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
+    r = pipeline_nested_test.map(inputs={"n_": 1})
+    assert r["x"].output == 3
+    assert r["y"].output == 6
+    r = pipeline_nested_test.map(inputs={"n_": 1})
     assert r["x"].output == 3
     assert r["y"].output == 6
 
@@ -117,7 +127,7 @@ def test_nested_pipefunc_multiple_outputs_bound() -> None:
     nf2 = NestedPipeFunc([h, i], output_name=("e", "out2"))
     nf2.update_bound({"x": 1})
     assert nf2.bound == {"x": 1}
-    assert nf2.pipeline["e"].bound == {"x": 1}
+    assert nf2.pipeline["e"].bound == {}
     assert nf2(x=5, y=10) == (1, 10)
 
 
