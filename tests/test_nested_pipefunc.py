@@ -475,13 +475,7 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
     assert r["d"].output == 13
 
 
-@pytest.mark.parametrize(
-    "scope",
-    [
-        "scope.",
-        "",
-    ],
-)
+@pytest.mark.parametrize("scope", ["scope.", ""])
 def test_nest_bound(scope: str) -> None:
     @pipefunc(output_name="x")
     def fa(n: int, m: int = 0) -> int:
@@ -507,6 +501,6 @@ def test_nest_bound(scope: str) -> None:
         pipeline_nested_test.run(f"{scope}y", kwargs={})
     with pytest.raises(
         ValueError,
-        match=re.escape(f"Parameter `{scope}n` not found in inputs, outputs, bound or defaults."),
+        match=re.escape(f"Missing inputs: `{scope}n`."),
     ):
         pipeline_nested_test.map(inputs={})
