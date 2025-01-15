@@ -466,7 +466,7 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
         pipeline2(a=1)
     with pytest.raises(
         ValueError,
-        match=re.escape("Parameter `b` not found in inputs, outputs, bound or defaults"),
+        match=re.escape("Missing inputs: `b`"),
     ):
         pipeline2.map(inputs={"a": 1})
     pipeline2.update_defaults({"b": 10})
