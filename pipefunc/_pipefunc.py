@@ -924,8 +924,8 @@ def _exclusively_bound_in_nested_pipefunc(func: NestedPipeFunc) -> dict[str, Any
     return {
         arg: func._bound[arg]
         for arg in func.parameters
-        if any(arg in f._bound for f in func.pipeline.functions)
-        and not any(arg in f.parameters and arg not in f._bound for f in func.pipeline.functions)
+        if any(arg in f._bound for f in func.pipeline.functions)  # type: ignore[has-type]
+        and not any(arg in f.parameters and arg not in f._bound for f in func.pipeline.functions)  # type: ignore[has-type]
     }
 
 

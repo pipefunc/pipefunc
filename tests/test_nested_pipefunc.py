@@ -104,7 +104,11 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
         nf(n_=1, b_=10000000)
     assert nf.pipeline["y"](x=3) == 6
     assert nf(n_=1) == (3, 6)
-    with pytest.raises(ValueError, match=re.escape("Unexpected keyword arguments")):
+    assert pipeline_nested_test.topological_generations.root_args == ["n_"]
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Got extra inputs: `b_` that are not accepted by this pipeline"),
+    ):
         pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
     r = pipeline_nested_test.map(inputs={"n_": 1})
     assert r["x"].output == 3
