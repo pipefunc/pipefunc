@@ -2282,10 +2282,14 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
 
 
 def _is_arg_bound_in_any_nested_pipefunc(arg: str, func: NestedPipeFunc | PipeFunc) -> bool:
-    # This function checks if an argument `arg` is bound within a (potentially nested) `PipeFunc`.
-    # It's called by `Pipeline._run` only when `arg` is NOT found in the provided `kwargs`.
-    # Because of this, we don't need to handle the case where one nested function binds `arg`
-    # and another nested function uses it unbound.
+    """Checks if an argument `arg` is bound in *all* nested `PipeFunc`s that use it.
+
+    This function is called by `Pipeline._run` only when `arg` is NOT found in the provided `kwargs`.
+    """
     if not isinstance(func, NestedPipeFunc):
         return False
+    for f in func.pipeline.functions:
+        if arg in f.parameters and arg not in f._bound:
+            # Is only ever triggered if the user forgot to provide `arg`
+            return False
     return any(arg in f._bound for f in func.pipeline.functions)
