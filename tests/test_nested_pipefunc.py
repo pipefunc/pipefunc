@@ -485,8 +485,6 @@ def test_nest_bound(scope: str) -> None:
     def fb(x: int, b: int) -> int:
         return 2 * x * b
 
-    scope = "scope."
-    scope = ""
     pipeline_nested_test = Pipeline(
         [
             NestedPipeFunc([fa, fb], ("x", "y"), function_name="my function"),
