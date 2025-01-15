@@ -21,12 +21,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import (
-    ErrorSnapshot,
-    NestedPipeFunc,
-    PipeFunc,
-    _maybe_mapspec,
-)
+from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
@@ -46,11 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import (
-    AsyncMap,
-    run_map,
-    run_map_async,
-)
+from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
