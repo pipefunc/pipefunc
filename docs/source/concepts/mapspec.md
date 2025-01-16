@@ -13,7 +13,7 @@ kernelspec:
 
 # Understanding `mapspec`
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

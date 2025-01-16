@@ -13,7 +13,7 @@ kernelspec:
 
 # Resource Management
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 
