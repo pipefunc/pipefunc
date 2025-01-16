@@ -33,7 +33,7 @@ def array_type(request, tmp_path: Path):
 
             from pipefunc.map import ZarrFileArray
 
-            store = zarr.MemoryStore()
+            store = zarr.storage.MemoryStore()
             return ZarrFileArray(None, shape, internal_shape, shape_mask, store=store)
     elif request.param == "dict":
 

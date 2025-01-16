@@ -21,6 +21,18 @@ from ._base import StorageBase, register_storage, select_by_mask
 if TYPE_CHECKING:
     from pipefunc.map._types import ShapeTuple
 
+# get zarr version
+_ZARR_VERSION = zarr.__version__
+_ZARR_MAJOR = int(_ZARR_VERSION.split(".", 1)[0])
+if _ZARR_MAJOR < 3:  # noqa: PLR2004
+    from zarr import open as create_array
+    from zarr.storage import DirectoryStore as LocalStore
+    from zarr.storage import Store
+else:
+    from zarr import create_array
+    from zarr.abc.store import Store
+    from zarr.storage import LocalStore
+
 
 class ZarrFileArray(StorageBase):
     """Array interface to a Zarr store.
@@ -38,7 +50,7 @@ class ZarrFileArray(StorageBase):
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        store: zarr.storage.Store | str | Path | None = None,
+        store: Store | str | Path | None = None,
         object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrFileArray."""
@@ -49,8 +61,8 @@ class ZarrFileArray(StorageBase):
             msg = "shape_mask must have the same length as shape + internal_shape"
             raise ValueError(msg)
         self.folder = Path(folder) if folder is not None else folder
-        if not isinstance(store, zarr.storage.Store):
-            store = zarr.DirectoryStore(str(self.folder))
+        if not isinstance(store, Store):
+            store = LocalStore(str(self.folder))
         self.store = store
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
@@ -60,24 +72,24 @@ class ZarrFileArray(StorageBase):
             object_codec = CloudPickleCodec()
 
         chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
-        self.array = zarr.open(
+        zarr_kwargs = {"mode": "a"} if _ZARR_MAJOR < 3 else {}  # noqa: PLR2004
+        name_path = "path" if _ZARR_MAJOR < 3 else "name"  # noqa: PLR2004
+        self.array = create_array(
             self.store,
-            mode="a",
-            path="/array",
             shape=self.full_shape,
             dtype=object,
             object_codec=object_codec,
             chunks=chunks,
+            **dict({name_path: "array"}, **zarr_kwargs),
         )
-        self._mask = zarr.open(
+        self._mask = create_array(
             self.store,
-            mode="a",
-            path="/mask",
             shape=self.shape,
             dtype=bool,
             fill_value=True,
             object_codec=object_codec,
             chunks=1,
+            **dict({name_path: "mask"}, **zarr_kwargs),
         )
 
     @property
@@ -222,7 +234,7 @@ class ZarrFileArray(StorageBase):
         return True
 
 
-class _SharedDictStore(zarr.storage.KVStore):
+class _SharedDictStore(Store):
     """Custom Store subclass using a shared dictionary."""
 
     def __init__(self, shared_dict: multiprocessing.managers.DictProxy | None = None) -> None:
@@ -256,12 +268,12 @@ class ZarrMemoryArray(ZarrFileArray):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        store: zarr.storage.Store | None = None,
+        store: Store | None = None,
         object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrMemoryArray."""
         if store is None:
-            store = zarr.MemoryStore()
+            store = zarr.storage.MemoryStore()
         super().__init__(
             folder=folder,
             shape=shape,
@@ -273,11 +285,11 @@ class ZarrMemoryArray(ZarrFileArray):
         self.load()
 
     @property
-    def persistent_store(self) -> zarr.storage.Store | None:
+    def persistent_store(self) -> Store | None:
         """Return the persistent store."""
         if self.folder is None:  # pragma: no cover
             return None
-        return zarr.DirectoryStore(self.folder)
+        return LocalStore(self.folder)
 
     def persist(self) -> None:
         """Persist the memory storage to disk."""
@@ -315,7 +327,7 @@ class ZarrSharedMemoryArray(ZarrMemoryArray):
         internal_shape: tuple[int, ...] | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
-        store: zarr.storage.Store | None = None,
+        store: Store | None = None,
         object_codec: Any = None,
     ) -> None:
         """Initialize the ZarrSharedMemoryArray."""

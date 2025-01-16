@@ -35,7 +35,7 @@ pydantic = ["pydantic"]
 rich = ["rich"]
 widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr>=2,<3"]
+zarr = ["zarr"]
 test = [
     "coverage",
     "pytest-asyncio",
