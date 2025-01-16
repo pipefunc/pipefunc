@@ -13,7 +13,7 @@ kernelspec:
 
 # Variants
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

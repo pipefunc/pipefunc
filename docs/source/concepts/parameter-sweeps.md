@@ -13,7 +13,7 @@ kernelspec:
 
 # Parameter Sweeps
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

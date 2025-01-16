@@ -13,7 +13,7 @@ kernelspec:
 
 # Parallelism and Execution
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

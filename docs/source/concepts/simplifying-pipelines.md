@@ -13,7 +13,7 @@ kernelspec:
 
 # Simplifying Pipelines
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

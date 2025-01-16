@@ -13,7 +13,7 @@ kernelspec:
 
 # Type Checking
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 
