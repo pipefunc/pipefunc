@@ -17,7 +17,7 @@ kernelspec:
 ```
 
 ```{contents} ToC
-:depth: 3
+:depth: 2
 ```
 
 (run-vs-map)=
