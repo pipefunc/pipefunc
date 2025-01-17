@@ -13,7 +13,7 @@ kernelspec:
 
 # Variants
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

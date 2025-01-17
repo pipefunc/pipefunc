@@ -13,7 +13,7 @@ kernelspec:
 
 # Parallelism and Execution
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

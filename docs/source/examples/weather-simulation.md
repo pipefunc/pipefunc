@@ -14,7 +14,7 @@ kernelspec:
 
 # Weather Simulation and Analysis Pipeline
 
-```{uvtip}
+```{try-notebook}
 ```
 
 In this example, we'll generate temperature data for multiple cities over several days, compute statistics like mean and variance, and then use `xarray` to load and visualize the results.

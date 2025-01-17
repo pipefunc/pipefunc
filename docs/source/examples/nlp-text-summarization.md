@@ -14,7 +14,7 @@ kernelspec:
 
 # Natural Language Processing Pipeline for Text Summarization
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{note}

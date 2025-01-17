@@ -13,7 +13,7 @@ kernelspec:
 
 # Error Handling
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

@@ -14,7 +14,7 @@ kernelspec:
 
 # Sensor Data Processing Pipeline
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{note}

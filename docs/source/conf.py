@@ -99,7 +99,7 @@ html_theme_options = {
 }
 
 
-class UVTip(SphinxDirective):
+class TryNotebookWithUV(SphinxDirective):
     """Render a tip box with the opennb command to open the current page in a Jupyter notebook."""
 
     has_content = True
@@ -132,7 +132,7 @@ class UVTip(SphinxDirective):
 
 
 def setup(app):
-    app.add_directive("uvtip", UVTip)
+    app.add_directive("try-notebook", TryNotebookWithUV)
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
@@ -275,4 +275,4 @@ nb_merge_streams = True
 
 
 def setup(app) -> None:
-    app.add_directive("uvtip", UVTip)
+    app.add_directive("try-notebook", TryNotebookWithUV)

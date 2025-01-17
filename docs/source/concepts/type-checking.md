@@ -13,7 +13,7 @@ kernelspec:
 
 # Type Checking
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC
