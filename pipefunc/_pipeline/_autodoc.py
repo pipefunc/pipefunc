@@ -21,6 +21,7 @@ class PipelineDoc:
     returns: dict[OUTPUT_TYPE, str]
     defaults: dict[str, Any]
     annotations: dict[str, Any]
+    root_args: list[str]
 
 
 class RichStyle:
@@ -37,6 +38,7 @@ def format_pipeline_docs(
     *,
     borders: bool = False,
     skip_optional: bool = False,
+    skip_intermediate: bool = True,
     description_table: bool = True,
     parameters_table: bool = True,
     returns_table: bool = True,
@@ -52,6 +54,8 @@ def format_pipeline_docs(
         Whether to include borders in the tables.
     skip_optional
         Whether to skip optional parameters.
+    skip_intermediate
+        Whether to skip intermediate outputs and only show root parameters.
     description_table
         Whether to generate the function description table.
     parameters_table
@@ -77,7 +81,7 @@ def format_pipeline_docs(
         tables.append(table_desc)
 
     if parameters_table:
-        table_params = _create_parameters_table(doc, box, skip_optional)
+        table_params = _create_parameters_table(doc, box, skip_optional, skip_intermediate)
         tables.append(table_params)
 
     if returns_table:
@@ -111,6 +115,7 @@ def _create_parameters_table(
     doc: PipelineDoc,
     box: Any,
     skip_optional: bool,  # noqa: FBT001
+    skip_intermediate: bool,  # noqa: FBT001
 ) -> Table:
     """Creates the parameters table."""
     table_params = Table(
@@ -130,6 +135,8 @@ def _create_parameters_table(
     table_params.add_column("Description", style=RichStyle.GREEN)
     for param, param_descs in sorted(doc.parameters.items()):
         if skip_optional and param in doc.defaults:
+            continue
+        if skip_intermediate and param not in doc.root_args:
             continue
         default = doc.defaults.get(param)
         annotation = type_as_string(doc.annotations.get(param))

@@ -2015,6 +2015,7 @@ class Pipeline:
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
         annotations: dict[str, set[Any]] = defaultdict(set)
+        root_args = self.topological_generations.root_args
         for f in self.functions:
             doc = extract_docstrings(f.func)
             ann = f.parameter_annotations
@@ -2038,6 +2039,7 @@ class Pipeline:
             returns,
             defaults=self.defaults,
             annotations=annotations,
+            root_args=root_args,
         )
 
     def print_doc(
@@ -2045,6 +2047,7 @@ class Pipeline:
         *,
         borders: bool = False,
         skip_optional: bool = False,
+        skip_intermediate: bool = True,
         description_table: bool = True,
         parameters_table: bool = True,
         returns_table: bool = True,
@@ -2057,6 +2060,8 @@ class Pipeline:
             Whether to include borders in the tables.
         skip_optional
             Whether to skip optional parameters.
+        skip_intermediate
+            Whether to skip intermediate outputs and only show root parameters.
         description_table
             Whether to generate the function description table.
         parameters_table
@@ -2069,6 +2074,7 @@ class Pipeline:
         format_pipeline_docs(
             self.doc(),
             skip_optional=skip_optional,
+            skip_intermediate=skip_intermediate,
             borders=borders,
             description_table=description_table,
             parameters_table=parameters_table,
