@@ -288,15 +288,30 @@ def test_pipeline_doc_return_type_annotation(pipeline: Pipeline) -> None:
     assert doc.r_annotations["c"] == list[int]
 
 
-def test_pipeline_doc_return_type_annotation_multiple_outputs(pipeline: Pipeline) -> None:
+def test_pipeline_doc_return_type_annotation_multiple_outputs(
+    pipeline: Pipeline,
+    capsys: CaptureFixture,
+) -> None:
     @pipefunc(output_name=("c", "d"))
     def f_multiple(a: int, b: int) -> tuple[list[int], set[str]]:
+        """Yolo.
+
+        Args:
+            a: Parameter a.
+            b: Parameter b.
+
+        Returns:
+            Description of the return.
+        """
+
         return [a + b], {str(a + b)}
 
     pipeline = Pipeline([f_multiple])
     doc = pipeline.doc()
     assert doc.r_annotations["c"] == list[int]
     assert doc.r_annotations["d"] == set[str]
+    pipeline.print_doc()
+    assert "Yolo. (type c: list) (type d: set)" in capsys.readouterr().out
 
 
 def test_pipeline_doc_return_type_annotation_multiple_outputs_same_type(

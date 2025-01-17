@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pipefunc._utils import at_least_tuple
 from pipefunc.typing import type_as_string
 
 if TYPE_CHECKING:
@@ -112,7 +113,14 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     table_desc.add_column("Output Name", style=RichStyle.BOLD_RED, no_wrap=True)
     table_desc.add_column("Description", style=RichStyle.GREEN)
     for output_name, desc in sorted(doc.descriptions.items()):
-        table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
+        desc_text = f"{desc}"
+        for name in at_least_tuple(output_name):
+            if name not in doc.r_annotations:
+                continue
+            annotation = type_as_string(doc.r_annotations[name])
+            annotation_str = f" [italic bold](type {name}: {annotation})[/]"
+            desc_text += annotation_str
+        table_desc.add_row(Text.from_markup(f"{output_name}"), desc_text)
     return table_desc
 
 
