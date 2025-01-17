@@ -164,9 +164,11 @@ def _create_parameter_row(
     annotation_str = f" [italic bold](type: {annotation})[/]" if param in annotations else ""
     param_text = Text.from_markup(f"{param}")
     default_col = Text.from_markup("❌" if param in defaults else "✅")
-    desc_text = Text.from_markup(
-        "\n".join(f"- {d}" for d in param_descs) + default_str + annotation_str,
-    )
+    if len(param_descs) == 1:
+        param_desc_text = param_descs[0]
+    else:
+        param_desc_text = "\n".join(f"{i}. {d}" for i, d in enumerate(param_descs, start=1))
+    desc_text = Text.from_markup(param_desc_text + default_str + annotation_str)
     return [param_text, desc_text] if skip_optional else [param_text, default_col, desc_text]
 
 
