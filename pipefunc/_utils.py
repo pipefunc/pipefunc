@@ -363,17 +363,19 @@ def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[Do
     requires("griffe", reason="extracting docstrings", extras="autodoc")
     from griffe import Docstring, Parser
 
+    options = get_args(ParserType)
     if docstring_parser == "auto":
         # Poor man's "auto" parser selection because griffe has this as a paid feature
         # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
         results = [
             _docstring_sections(docstring, parser)  # type: ignore[arg-type]
-            for parser in ("google", "numpy", "sphinx")
+            for parser in options
+            if parser != "auto"
         ]
         return max(results, key=len)
 
-    if docstring_parser not in get_args(ParserType):
-        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(get_args(ParserType))}"
+    if docstring_parser not in options:
+        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(options)}"
         raise ValueError(msg)
 
     parser = Parser(docstring_parser)
