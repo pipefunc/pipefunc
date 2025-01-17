@@ -20,7 +20,7 @@ kernelspec:
 ```
 
 ```{contents} ToC
-:depth: 3
+:depth: 2
 ```
 
 Using Adaptive sweeps instead of regular sweeps can save a lot of time.

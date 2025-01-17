@@ -17,7 +17,7 @@ kernelspec:
 ```
 
 ```{contents} ToC
-:depth: 3
+:depth: 2
 ```
 
 This section is about {meth}`pipefunc.Pipeline.simplified_pipeline`, which is a convenient way to simplify a pipeline by merging multiple nodes into a single node (creating a {class}`pipefunc.NestedPipeFunc`).
