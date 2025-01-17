@@ -1161,7 +1161,7 @@ class Pipeline:
             outputs = all_outputs
         if exclude is None:
             exclude = set()
-
+        changed_any = False
         for f in self.functions:
             parameters = set(f.parameters)
             f_inputs = (
@@ -1176,7 +1176,13 @@ class Pipeline:
                 else outputs
             )
             if f_inputs or f_outputs:
+                changed_any = True
                 f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        if not changed_any:
+            msg = (
+                "No inputs or outputs found to update the scope, provide `inputs` and/or `outputs`."
+            )
+            raise ValueError(msg)
         self._clear_internal_cache()
         self._validate()
 
