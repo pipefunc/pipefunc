@@ -3,14 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from rich.box import HEAVY_HEAD
-from rich.console import Console
-from rich.table import Table
-from rich.text import Text
-
 from pipefunc.typing import type_as_string
 
 if TYPE_CHECKING:
+    from rich.table import Table
+    from rich.text import Text
+
     from ._types import OUTPUT_TYPE
 
 
@@ -73,6 +71,9 @@ def format_pipeline_docs(
         Otherwise, prints the tables to the console.
 
     """
+    from rich.box import HEAVY_HEAD
+    from rich.console import Console
+
     box = None if not borders else HEAVY_HEAD
 
     tables: list[Table] = []
@@ -99,6 +100,9 @@ def format_pipeline_docs(
 
 def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the description table."""
+    from rich.table import Table
+    from rich.text import Text
+
     table_desc = Table(
         title=f"[{RichStyle.BOLD_RED}]Function Output Descriptions[/]",
         box=box,
@@ -119,6 +123,8 @@ def _create_parameters_table(
     skip_intermediate: bool,  # noqa: FBT001
 ) -> Table:
     """Creates the parameters table."""
+    from rich.table import Table
+
     table_params = Table(
         title=f"[{RichStyle.BOLD_YELLOW}]Parameters[/]",
         box=box,
@@ -159,6 +165,8 @@ def _create_parameter_row(
     skip_optional: bool,  # noqa: FBT001
 ) -> list[Text]:
     """Creates a row for the parameters table."""
+    from rich.text import Text
+
     default = defaults.get(param)
     annotation = type_as_string(p_annotations.get(param))
     default_str = f" [italic bold](default: {default})[/]" if param in defaults else ""
@@ -175,6 +183,9 @@ def _create_parameter_row(
 
 def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the returns table."""
+    from rich.table import Table
+    from rich.text import Text
+
     table_returns = Table(
         title=f"[{RichStyle.BOLD_MAGENTA}]Return Values[/]",
         box=box,
