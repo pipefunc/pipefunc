@@ -13,6 +13,9 @@ kernelspec:
 
 # Simplifying Pipelines
 
+```{uvtip}
+```
+
 ```{contents} ToC
 :depth: 3
 ```

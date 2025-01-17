@@ -13,6 +13,9 @@ kernelspec:
 
 # Error Handling
 
+```{uvtip}
+```
+
 ```{contents} ToC
 :depth: 3
 ```
