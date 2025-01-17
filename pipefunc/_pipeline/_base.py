@@ -16,6 +16,7 @@ import functools
 import inspect
 import os
 import time
+import warnings
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
@@ -2013,8 +2014,16 @@ class Pipeline:
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
+        annotations: dict[str, set[Any]] = defaultdict(set)
         for f in self.functions:
             doc = extract_docstrings(f.func)
+            ann = f.parameter_annotations
+            if ann:
+                for p, v in ann.items():
+                    if p in annotations and annotations[p] != v:
+                        msg = f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
+                        warnings.warn(msg, stacklevel=2)
+                    annotations[p] = v
             if doc.description:
                 descriptions[f.output_name] = doc.description
             if doc.returns:
@@ -2022,7 +2031,14 @@ class Pipeline:
             for p, v in doc.parameters.items():
                 if v not in parameters[p]:
                     parameters[p].append(v)
-        return PipelineDoc(descriptions, dict(parameters), returns)
+
+        return PipelineDoc(
+            descriptions,
+            dict(parameters),
+            returns,
+            defaults=self.defaults,
+            annotations=annotations,
+        )
 
     def print_doc(self) -> None:
         """Print the documentation for the pipeline as a table formatted with Rich."""

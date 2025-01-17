@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from pipefunc.typing import type_as_string
 
 if TYPE_CHECKING:
     import rich
@@ -16,6 +18,8 @@ class PipelineDoc:
     descriptions: dict[OUTPUT_TYPE, str]
     parameters: dict[str, list[str]]
     returns: dict[OUTPUT_TYPE, str]
+    defaults: dict[str, Any]
+    annotations: dict[str, Any]
 
 
 def format_pipeline_docs(
@@ -66,16 +70,19 @@ def format_pipeline_docs(
     table_params.add_column("Required", style="bold yellow", no_wrap=True)
     table_params.add_column("Description", style="green")
     for param, param_descs in sorted(doc.parameters.items()):
-        default = pipeline.defaults.get(param)
-        default_text = (
-            f" [italic bold](default: {default})[/]" if param in pipeline.defaults else ""
-        )  # Add default to description
+        parameters_text = "\n".join(f"- {d}" for d in param_descs)
+        default = doc.defaults.get(param)
+        annotation = type_as_string(doc.annotations.get(param))
+        default_text = f" [italic bold](default: {default})[/]" if param in doc.defaults else ""
+        annotation_text = (
+            f" [italic bold](type: {annotation})[/]" if param in doc.annotations else ""
+        )
         table_params.add_row(
             Text.from_markup(f"{param}"),
             # "✅" if optional, "❌" if required
-            Text.from_markup("❌" if param in pipeline.defaults else "✅"),
+            Text.from_markup("❌" if param in doc.defaults else "✅"),
             Text.from_markup(
-                "\n".join(f"- {d}" for d in param_descs) + default_text,  # type: ignore[operator]
+                parameters_text + default_text + annotation_text,
             ),
         )
 
