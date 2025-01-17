@@ -13,7 +13,7 @@ kernelspec:
 
 # Overhead and Efficiency
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

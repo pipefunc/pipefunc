@@ -16,7 +16,7 @@ kernelspec:
 :::{uvtip}
 :::
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

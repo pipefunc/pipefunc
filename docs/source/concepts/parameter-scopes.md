@@ -13,7 +13,7 @@ kernelspec:
 
 # Parameter Scopes
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 

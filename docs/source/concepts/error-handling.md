@@ -13,7 +13,7 @@ kernelspec:
 
 # Error Handling
 
-```{contents} ToC – Questions
+```{contents} ToC
 :depth: 3
 ```
 
