@@ -1144,6 +1144,11 @@ class Pipeline:
             Names to exclude from the scope. Both inputs and outputs can be excluded.
             Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
 
+        Raises
+        ------
+        ValueError
+            If no function's scope was updated, e.g., when both ``inputs=None`` and ``outputs=None``.
+
         Examples
         --------
         >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
