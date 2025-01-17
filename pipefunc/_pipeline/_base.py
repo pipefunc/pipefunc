@@ -47,7 +47,6 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
-from ._autodoc import PipelineDoc, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -79,6 +78,7 @@ if TYPE_CHECKING:
     from pipefunc.map._result import Result
     from pipefunc.map._types import UserShapeDict
 
+    from ._autodoc import PipelineDoc
     from ._types import OUTPUT_TYPE
 
 
@@ -2011,6 +2011,8 @@ class Pipeline:
 
     def doc(self) -> PipelineDoc:
         """Return the documentation for the pipeline."""
+        from ._autodoc import PipelineDoc
+
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
@@ -2077,7 +2079,9 @@ class Pipeline:
             Whether to generate the function returns table.
 
         """
-        requires("rich", reason="print_doc", extras="rich")
+        requires("rich", "griffe", reason="print_doc", extras="autodoc")
+        from ._autodoc import format_pipeline_docs
+
         format_pipeline_docs(
             self.doc(),
             skip_optional=skip_optional,
