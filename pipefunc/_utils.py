@@ -427,7 +427,10 @@ def extract_docstrings(
             for parameter in section.value:
                 parameters[parameter.name] = parameter.description
         if section.kind.name == "returns":
-            returns += section.value
+            for return_value in section.value:
+                if return_value.description or return_value.annotation:
+                    # If numpy style without types, the description is the annotation
+                    returns += return_value.description or return_value.annotation.lstrip()
         if section.kind.name == "text":
             description += section.value
 

@@ -11,6 +11,9 @@ def my_google_style_function(a: int, b: str = "hello", c: float = 3.14):
         a: The first parameter.
         b: The second parameter.
         c: The third parameter.
+
+    Returns:
+        Description of the return value.
     """
 
 
@@ -26,6 +29,11 @@ def my_numpy_style_function(a: int, b: str = "hello", c: float = 3.14):
         The second parameter.
     c : float, optional
         The third parameter.
+
+    Returns
+    -------
+    int
+        Description of the return value.
     """
 
 
@@ -41,6 +49,10 @@ def my_numpydoc_style_function_no_types(a: int, b: str = "hello", c: float = 3.1
         The second parameter.
     c
         The third parameter.
+
+    Returns
+    -------
+        Description of the return value.
     """
 
 
@@ -51,6 +63,8 @@ def my_sphinx_style_function(a: int, b: str = "hello", c: float = 3.14):
     :param a: The first parameter.
     :param b: The second parameter.
     :param c: The third parameter.
+
+    :return: Description of the return value.
     """
 
 
@@ -65,17 +79,20 @@ def my_sphinx_style_function(a: int, b: str = "hello", c: float = 3.14):
 )
 def test_extract_docstring(function, style) -> None:
     doc = extract_docstrings(function, docstring_parser=style)
+    expected_description = "This is my function."
     expected_parameters = {
         "a": "The first parameter.",
         "b": "The second parameter.",
         "c": "The third parameter.",
     }
+    expected_return = "Description of the return value."
     assert doc.parameters == expected_parameters
-    expected_description = "This is my function."
     assert doc.description == expected_description
+    assert doc.returns == expected_return
     doc_auto = extract_docstrings(function)  # default is "auto"
     assert doc_auto.parameters == expected_parameters
     assert doc_auto.description == expected_description
+    assert doc_auto.returns == expected_return
 
 
 def test_exception_wrong_parser() -> None:
