@@ -13,7 +13,7 @@ kernelspec:
 
 # Function Inputs and Outputs
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

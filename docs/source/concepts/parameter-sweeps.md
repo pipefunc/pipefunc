@@ -13,7 +13,7 @@ kernelspec:
 
 # Parameter Sweeps
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

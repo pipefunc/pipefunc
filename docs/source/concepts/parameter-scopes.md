@@ -13,7 +13,7 @@ kernelspec:
 
 # Parameter Scopes
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

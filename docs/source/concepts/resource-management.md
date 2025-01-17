@@ -13,7 +13,7 @@ kernelspec:
 
 # Resource Management
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

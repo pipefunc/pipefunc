@@ -14,7 +14,7 @@ kernelspec:
 
 # Image Processing Workflow
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{note}

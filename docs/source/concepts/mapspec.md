@@ -13,7 +13,7 @@ kernelspec:
 
 # Understanding `mapspec`
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

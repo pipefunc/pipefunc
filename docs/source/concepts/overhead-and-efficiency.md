@@ -13,7 +13,7 @@ kernelspec:
 
 # Overhead and Efficiency
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC

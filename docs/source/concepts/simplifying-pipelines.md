@@ -13,7 +13,7 @@ kernelspec:
 
 # Simplifying Pipelines
 
-```{uvtip}
+```{try-notebook}
 ```
 
 ```{contents} ToC
