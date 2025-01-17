@@ -14,6 +14,9 @@ kernelspec:
 
 # Adaptive integration
 
+```{uvtip}
+```
+
 > Run Adaptive Sweeps in 1D, 2D, 3D, ND
 
 

@@ -13,6 +13,9 @@ kernelspec:
 
 # Type Checking
 
+:::{uvtip}
+:::
+
 ```{contents} ToC – Questions
 :depth: 3
 ```

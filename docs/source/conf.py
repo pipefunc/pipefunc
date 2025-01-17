@@ -7,6 +7,11 @@ import shutil
 import sys
 from pathlib import Path
 
+from docutils import nodes
+from docutils.parsers.rst import Directive
+from sphinx.util.docutils import SphinxDirective
+from docutils.statemachine import StringList
+
 package_path = Path("../..").resolve()
 sys.path.insert(0, str(package_path))
 os.environ["PYTHONPATH"] = ":".join(
@@ -94,6 +99,40 @@ html_theme_options = {
     "use_download_button": True,
     "navigation_with_keys": False,
 }
+
+
+class UVTip(SphinxDirective):
+    has_content = True
+
+    def run(self):
+        source_path = os.path.relpath(self.get_source_info()[0], self.env.srcdir)
+
+        lines = [
+            ":::{admonition} Have `uv`? ⚡",
+            ":class: tip, dropdown",
+            "",
+            "If you have `uv` installed, you can run this section with a single command without installing anything:",
+            "",
+            f"`bash uvx --with \"pipefunc[docs]\" opennb {source_path}`",
+            "",
+            "This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.",
+            ":::"
+        ]
+
+        # Convert lines to StringList with proper source information
+        source_info = self.get_source_info()
+        string_list = StringList(lines, source=(source_info[0], source_info[1]))
+
+        # Parse the content
+        node = nodes.Element()
+        self.state.nested_parse(string_list, 0, node)
+
+        return node.children
+
+
+
+def setup(app):
+    app.add_directive("uvtip", UVTip)
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
@@ -236,4 +275,4 @@ nb_merge_streams = True
 
 
 def setup(app) -> None:
-    pass
+        app.add_directive('uvtip', UVTip)
