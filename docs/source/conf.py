@@ -107,10 +107,10 @@ class UVTip(SphinxDirective):
     def run(self):
         source_path = os.path.relpath(self.get_source_info()[0], PACKAGE_PATH)
         lines = [
-            ":::{admonition} Have `uv`? ⚡",
+            ":::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡",
             ":class: tip, dropdown",
             "",
-            "If you have `uv` installed, you can instantly open this page as a Jupyter notebook:",
+            "If you have [`uv`](https://docs.astral.sh/uv/) installed, you can instantly open this page as a Jupyter notebook [using `opennb`](https://github.com/basnijholt/opennb):",
             "",
             f'`uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}`',
             "",
