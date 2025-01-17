@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from pipefunc.typing import type_as_string
 
 if TYPE_CHECKING:
-    import rich
+    from rich.table import Table
 
     from ._types import OUTPUT_TYPE
 
@@ -24,14 +24,20 @@ def format_pipeline_docs(
     doc: PipelineDoc,
     *,
     borders: bool = False,
+    skip_optional: bool = False,
+    function_description_table: bool = True,
+    function_parameters_table: bool = True,
+    function_returns_table: bool = True,
     print_table: bool = True,
-) -> tuple[rich.Table, rich.Table, rich.Table] | None:
+) -> tuple[Table, ...] | None:
     """Formats pipeline documentation into three separate rich tables.
 
     Parameters
     ----------
     doc
         The pipeline documentation object.
+    skip_optional
+        Whether to skip optional parameters.
     borders
         Whether to include borders in the tables.
     print_table
@@ -74,23 +80,26 @@ def format_pipeline_docs(
         show_lines=True,
     )
     table_params.add_column("Parameter", style=bold_yellow, no_wrap=True)
-    table_params.add_column("Required", style=bold_yellow, no_wrap=True)
+    if not skip_optional:
+        table_params.add_column("Required", style=bold_yellow, no_wrap=True)
     table_params.add_column("Description", style=green)
     for param, param_descs in sorted(doc.parameters.items()):
-        parameters_text = "\n".join(f"- {d}" for d in param_descs)
+        parameters_str = "\n".join(f"- {d}" for d in param_descs)
+        if skip_optional and param in doc.defaults:
+            continue
         default = doc.defaults.get(param)
         annotation = type_as_string(doc.annotations.get(param))
-        default_text = f" [italic bold](default: {default})[/]" if param in doc.defaults else ""
-        annotation_text = (
+        default_str = f" [italic bold](default: {default})[/]" if param in doc.defaults else ""
+        annotation_str = (
             f" [italic bold](type: {annotation})[/]" if param in doc.annotations else ""
         )
+        param_text = Text.from_markup(f"{param}")
+        default_col = Text.from_markup("❌" if param in doc.defaults else "✅")
+        desc_text = Text.from_markup(
+            parameters_str + default_str + annotation_str,
+        )
         table_params.add_row(
-            Text.from_markup(f"{param}"),
-            # "✅" if optional, "❌" if required
-            Text.from_markup("❌" if param in doc.defaults else "✅"),
-            Text.from_markup(
-                parameters_text + default_text + annotation_text,
-            ),
+            *([param_text, desc_text] if skip_optional else [param_text, default_col, desc_text]),
         )
 
     # Returns Table
