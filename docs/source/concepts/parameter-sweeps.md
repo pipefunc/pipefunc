@@ -13,8 +13,11 @@ kernelspec:
 
 # Parameter Sweeps
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 The `pipefunc.sweep` module provides a convenient way to contruct parameter sweeps.

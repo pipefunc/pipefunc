@@ -13,8 +13,11 @@ kernelspec:
 
 # Parallelism and Execution
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 (run-vs-map)=

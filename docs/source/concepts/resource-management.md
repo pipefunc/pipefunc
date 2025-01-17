@@ -13,8 +13,11 @@ kernelspec:
 
 # Resource Management
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## How to inspect the `Resources` inside a `PipeFunc`?

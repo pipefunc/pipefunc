@@ -13,8 +13,11 @@ kernelspec:
 
 # Variants
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## What is `VariantPipeline` and how to use it?

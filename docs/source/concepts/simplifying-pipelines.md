@@ -13,8 +13,11 @@ kernelspec:
 
 # Simplifying Pipelines
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 This section is about {meth}`pipefunc.Pipeline.simplified_pipeline`, which is a convenient way to simplify a pipeline by merging multiple nodes into a single node (creating a {class}`pipefunc.NestedPipeFunc`).

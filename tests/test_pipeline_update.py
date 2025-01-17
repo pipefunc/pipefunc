@@ -146,6 +146,16 @@ def test_pipeline_scope() -> None:
     assert pipeline(**{"x.b": 1, "x": {"a": 1}}) == 2
 
 
+def test_pipeline_scope_no_selected_exception() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(ValueError, match="No function's scope was updated"):
+        pipeline.update_scope("myscope")
+
+
 def test_pipeline_scope_partial() -> None:
     @pipefunc(output_name="c")
     def f(a, b):

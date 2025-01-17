@@ -13,8 +13,11 @@ kernelspec:
 
 # Error Handling
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## What is the `ErrorSnapshot` feature in `pipefunc`?

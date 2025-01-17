@@ -13,8 +13,11 @@ kernelspec:
 
 # Understanding `mapspec`
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 `mapspec` is a powerful string-based syntax within `pipefunc` that defines how data is mapped between functions in a pipeline, especially when dealing with arrays or lists of inputs.

@@ -13,8 +13,11 @@ kernelspec:
 
 # Overhead and Efficiency
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## What is the overhead / efficiency / performance of `pipefunc`?

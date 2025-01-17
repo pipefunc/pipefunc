@@ -13,8 +13,11 @@ kernelspec:
 
 # Type Checking
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## How does type checking work in `pipefunc`?

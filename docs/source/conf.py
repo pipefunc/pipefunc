@@ -3,14 +3,17 @@
 #
 
 import os
-import shutil
 import sys
 from pathlib import Path
 
-package_path = Path("../..").resolve()
-sys.path.insert(0, str(package_path))
+from docutils import nodes
+from sphinx.util.docutils import SphinxDirective
+from docutils.statemachine import StringList
+
+PACKAGE_PATH = Path("../..").resolve()
+sys.path.insert(0, str(PACKAGE_PATH))
 os.environ["PYTHONPATH"] = ":".join(
-    (str(package_path), os.environ.get("PYTHONPATH", "")),
+    (str(PACKAGE_PATH), os.environ.get("PYTHONPATH", "")),
 )
 docs_path = Path("..").resolve()
 sys.path.insert(1, str(docs_path))
@@ -94,6 +97,42 @@ html_theme_options = {
     "use_download_button": True,
     "navigation_with_keys": False,
 }
+
+
+class TryNotebookWithUV(SphinxDirective):
+    """Render a tip box with the opennb command to open the current page in a Jupyter notebook."""
+
+    has_content = True
+
+    def run(self):
+        source_path = os.path.relpath(self.get_source_info()[0], PACKAGE_PATH)
+        lines = [
+            ":::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡",
+            ":class: tip, dropdown",
+            "",
+            "If you have [`uv`](https://docs.astral.sh/uv/) installed, you can instantly open this page as a Jupyter notebook [using `opennb`](https://github.com/basnijholt/opennb):",
+            "",
+            "```bash",
+            f'uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}',
+            "```",
+            "",
+            "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
+            ":::",
+        ]
+
+        # Convert lines to StringList with proper source information
+        source_info = self.get_source_info()
+        string_list = StringList(lines, source=(source_info[0], source_info[1]))
+
+        # Parse the content
+        node = nodes.Element()
+        self.state.nested_parse(string_list, 0, node)
+
+        return node.children
+
+
+def setup(app):
+    app.add_directive("try-notebook", TryNotebookWithUV)
 
 
 def replace_named_emojis(input_file: Path, output_file: Path) -> None:
@@ -220,11 +259,11 @@ def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
 
 
 # Process the README.md file for Sphinx documentation
-readme_path = package_path / "README.md"
+readme_path = PACKAGE_PATH / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
 
 # Add the example notebook to the docs
-nb = package_path / "example.ipynb"
+nb = PACKAGE_PATH / "example.ipynb"
 convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
 replace_rtd_links_with_local(
     docs_path / "source" / "tutorial.md",
@@ -236,4 +275,4 @@ nb_merge_streams = True
 
 
 def setup(app) -> None:
-    pass
+    app.add_directive("try-notebook", TryNotebookWithUV)

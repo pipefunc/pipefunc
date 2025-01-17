@@ -14,17 +14,8 @@ kernelspec:
 
 # Weather Simulation and Analysis Pipeline
 
-:::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
-:class: tip, dropdown
-
-If you have `uv` installed, you can run this section with a single command without installing anything:
-
-```bash
-uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/weather-simulation.md
+```{try-notebook}
 ```
-
-This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.
-:::
 
 In this example, we'll generate temperature data for multiple cities over several days, compute statistics like mean and variance, and then use `xarray` to load and visualize the results.
 

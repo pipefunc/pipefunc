@@ -13,8 +13,11 @@ kernelspec:
 
 # Function Inputs and Outputs
 
-```{contents} ToC – Questions
-:depth: 3
+```{try-notebook}
+```
+
+```{contents} ToC
+:depth: 2
 ```
 
 ## How to handle defaults?

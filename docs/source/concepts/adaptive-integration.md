@@ -16,9 +16,11 @@ kernelspec:
 
 > Run Adaptive Sweeps in 1D, 2D, 3D, ND
 
+```{try-notebook}
+```
 
-```{contents} ToC – Questions
-:depth: 3
+```{contents} ToC
+:depth: 2
 ```
 
 Using Adaptive sweeps instead of regular sweeps can save a lot of time.

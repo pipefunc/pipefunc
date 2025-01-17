@@ -973,15 +973,15 @@ class Pipeline:
         """
         if r := self._internal_cache.root_args.get(output_name):
             return r
+
         if output_name is None:
-            outputs = {arg for args in self.all_root_args.values() for arg in args}
-            sorted_outputs = tuple(sorted(outputs))
-            self._internal_cache.root_args[None] = sorted_outputs
-            return sorted_outputs
-        arg_combos = self.arg_combinations(output_name)
-        root_args = next(
-            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
-        )
+            root_args = tuple(sorted(self.topological_generations.root_args))
+        else:
+            all_root_args = set(self.topological_generations.root_args)
+            ancestors = nx.ancestors(self.graph, self.output_to_func[output_name])
+            root_args_set = {n for n in self.graph.nodes if n in all_root_args and n in ancestors}
+            root_args = tuple(sorted(root_args_set))
+
         self._internal_cache.root_args[output_name] = root_args
         return root_args
 
@@ -1144,6 +1144,11 @@ class Pipeline:
             Names to exclude from the scope. Both inputs and outputs can be excluded.
             Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
 
+        Raises
+        ------
+        ValueError
+            If no function's scope was updated, e.g., when both ``inputs=None`` and ``outputs=None``.
+
         Examples
         --------
         >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
@@ -1161,7 +1166,7 @@ class Pipeline:
             outputs = all_outputs
         if exclude is None:
             exclude = set()
-
+        changed_any = False
         for f in self.functions:
             parameters = set(f.parameters)
             f_inputs = (
@@ -1176,7 +1181,11 @@ class Pipeline:
                 else outputs
             )
             if f_inputs or f_outputs:
+                changed_any = True
                 f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        if not changed_any:
+            msg = "No function's scope was updated. Ensure `inputs` and/or `outputs` are specified correctly."
+            raise ValueError(msg)
         self._clear_internal_cache()
         self._validate()
 
