@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
     import pydantic
+    from griffe import DocstringSection
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -358,6 +359,19 @@ def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
 ParserType = Literal["google", "numpy", "sphinx", "auto"]
 
 
+def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[DocstringSection]:
+    requires("griffe", reason="extracting docstrings", extras="autodoc")
+    from griffe import Docstring, Parser
+
+    if docstring_parser not in get_args(ParserType):
+        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(get_args(ParserType))}"
+        raise ValueError(msg)
+
+    parser = Parser(docstring_parser)
+    with temporarily_disable_logger("griffe"):
+        return Docstring(docstring).parse(parser)
+
+
 def extract_docstrings(
     func: Callable[..., Any],
     docstring_parser: ParserType = "auto",
@@ -379,25 +393,18 @@ def extract_docstrings(
         A dictionary mapping parameter names to their docstrings.
 
     """
-    requires("griffe", reason="extracting docstrings", extras="autodoc")
     if docstring_parser == "auto":
         # Poor man's "auto" parser selection because griffe has this as a paid feature
         # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
         results = [extract_docstrings(func, parser) for parser in ("google", "numpy", "sphinx")]  # type: ignore[arg-type]
         return max(results, key=len)
-    from griffe import Docstring, Parser
 
-    if docstring_parser not in get_args(ParserType):
-        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(get_args(ParserType))}"
-        raise ValueError(msg)
-    parser = Parser(docstring_parser)
     docstring = inspect.getdoc(func)
     if not docstring:
         return {}
 
     param_docs = {}
-    with temporarily_disable_logger("griffe"):
-        sections = Docstring(docstring).parse(parser)
+    sections = _docstring_sections(docstring, docstring_parser)
     for section in sections:
         if section.kind.name == "parameters":
             for parameter in section.value:

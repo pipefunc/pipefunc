@@ -73,3 +73,11 @@ def test_extract_docstring(function, style) -> None:
     assert docstring == expected
     docstring_auto = extract_docstrings(function)
     assert docstring == docstring_auto
+
+
+def test_exception_wrong_parser() -> None:
+    with pytest.raises(ValueError, match="Invalid docstring parser"):
+        extract_docstrings(
+            my_google_style_function,
+            docstring_parser="wrong",  # type: ignore[arg-type]
+        )
