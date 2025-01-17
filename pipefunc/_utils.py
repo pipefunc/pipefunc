@@ -419,8 +419,8 @@ def extract_docstrings(
         return Doc(None, {}, None)
 
     parameters = {}
-    returns = ""
-    description = ""
+    returns = []
+    description = []
     sections = _docstring_sections(docstring, docstring_parser)
     for section in sections:
         if section.kind.name == "parameters":
@@ -430,8 +430,9 @@ def extract_docstrings(
             for return_value in section.value:
                 if return_value.description or return_value.annotation:
                     # If numpy style without types, the description is the annotation
-                    returns += return_value.description or return_value.annotation.lstrip()
+                    value = return_value.description or return_value.annotation.lstrip()
+                    returns.append(value)
         if section.kind.name == "text":
-            description += section.value
+            description.append(section.value)
 
-    return Doc(description, parameters, returns)
+    return Doc("\n".join(description), parameters, "\n".join(returns))
