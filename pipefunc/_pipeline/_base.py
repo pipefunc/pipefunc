@@ -973,15 +973,15 @@ class Pipeline:
         """
         if r := self._internal_cache.root_args.get(output_name):
             return r
+
         if output_name is None:
-            outputs = {arg for args in self.all_root_args.values() for arg in args}
-            sorted_outputs = tuple(sorted(outputs))
-            self._internal_cache.root_args[None] = sorted_outputs
-            return sorted_outputs
-        arg_combos = self.arg_combinations(output_name)
-        root_args = next(
-            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
-        )
+            root_args = tuple(sorted(self.topological_generations.root_args))
+        else:
+            all_root_args = set(self.topological_generations.root_args)
+            ancestors = nx.ancestors(self.graph, self.output_to_func[output_name])
+            root_args_set = {n for n in self.graph.nodes if n in all_root_args and n in ancestors}
+            root_args = tuple(sorted(root_args_set))
+
         self._internal_cache.root_args[output_name] = root_args
         return root_args
 
