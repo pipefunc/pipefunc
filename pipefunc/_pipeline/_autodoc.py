@@ -23,6 +23,15 @@ class PipelineDoc:
     annotations: dict[str, Any]
 
 
+class RichStyle:
+    # Colors from the Python REPL:
+    # https://github.com/python/cpython/blob/13c4def692228f09df0b30c5f93bc515e89fc77f/Lib/_colorize.py#L8-L19
+    GREEN = "#00aa00"
+    BOLD_RED = "bold #ff0000"
+    BOLD_YELLOW = "bold #aaaa00"
+    BOLD_MAGENTA = "bold #ff00ff"
+
+
 def format_pipeline_docs(
     doc: PipelineDoc,
     *,
@@ -59,30 +68,20 @@ def format_pipeline_docs(
         Otherwise, prints the tables to the console.
 
     """
-    green = "#00aa00"
-    bold_red = "bold #ff0000"
-    bold_yellow = "bold #aaaa00"
-    bold_magenta = "bold #ff00ff"
     box = None if not borders else HEAVY_HEAD
 
     tables: list[Table] = []
 
     if function_description_table:
-        table_desc = _create_description_table(doc, box, bold_red, green)
+        table_desc = _create_description_table(doc, box)
         tables.append(table_desc)
 
     if function_parameters_table:
-        table_params = _create_parameters_table(
-            doc,
-            box,
-            bold_yellow,
-            green,
-            skip_optional,
-        )
+        table_params = _create_parameters_table(doc, box, skip_optional)
         tables.append(table_params)
 
     if function_returns_table:
-        table_returns = _create_returns_table(doc, box, bold_magenta, green)
+        table_returns = _create_returns_table(doc, box)
         tables.append(table_returns)
 
     if print_table:
@@ -93,21 +92,16 @@ def format_pipeline_docs(
     return tuple(tables)
 
 
-def _create_description_table(
-    doc: PipelineDoc,
-    box: Any,
-    bold_red: str,
-    green: str,
-) -> Table:
+def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the description table."""
     table_desc = Table(
-        title=f"[{bold_red}]Function Output Descriptions[/]",
+        title=f"[{RichStyle.BOLD_RED}]Function Output Descriptions[/]",
         box=box,
         expand=True,
         show_lines=True,
     )
-    table_desc.add_column("Output Name", style=bold_red, no_wrap=True)
-    table_desc.add_column("Description", style=green)
+    table_desc.add_column("Output Name", style=RichStyle.BOLD_RED, no_wrap=True)
+    table_desc.add_column("Description", style=RichStyle.GREEN)
     for output_name, desc in sorted(doc.descriptions.items()):
         table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
     return table_desc
@@ -116,21 +110,19 @@ def _create_description_table(
 def _create_parameters_table(
     doc: PipelineDoc,
     box: Any,
-    bold_yellow: str,
-    green: str,
     skip_optional: bool,  # noqa: FBT001
 ) -> Table:
     """Creates the parameters table."""
     table_params = Table(
-        title=f"[{bold_yellow}]Parameters[/]",
+        title=f"[{RichStyle.BOLD_YELLOW}]Parameters[/]",
         box=box,
         expand=True,
         show_lines=True,
     )
-    table_params.add_column("Parameter", style=bold_yellow, no_wrap=True)
+    table_params.add_column("Parameter", style=RichStyle.BOLD_YELLOW, no_wrap=True)
     if not skip_optional:
-        table_params.add_column("Required", style=bold_yellow, no_wrap=True)
-    table_params.add_column("Description", style=green)
+        table_params.add_column("Required", style=RichStyle.BOLD_YELLOW, no_wrap=True)
+    table_params.add_column("Description", style=RichStyle.GREEN)
     for param, param_descs in sorted(doc.parameters.items()):
         if skip_optional and param in doc.defaults:
             continue
@@ -151,21 +143,16 @@ def _create_parameters_table(
     return table_params
 
 
-def _create_returns_table(
-    doc: PipelineDoc,
-    box: Any,
-    bold_magenta: str,
-    green: str,
-) -> Table:
+def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the returns table."""
     table_returns = Table(
-        title=f"[{bold_magenta}]Return Values[/]",
+        title=f"[{RichStyle.BOLD_MAGENTA}]Return Values[/]",
         box=box,
         expand=True,
         show_lines=True,
     )
-    table_returns.add_column("Output Name", style=bold_magenta, no_wrap=True)
-    table_returns.add_column("Description", style=green)
+    table_returns.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
+    table_returns.add_column("Description", style=RichStyle.GREEN)
     for output_name, ret_desc in sorted(doc.returns.items()):
         table_returns.add_row(Text.from_markup(f"{output_name}"), ret_desc)
     return table_returns
