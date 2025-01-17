@@ -418,9 +418,9 @@ def extract_docstrings(
     if not docstring:
         return Doc(None, {}, None)
 
-    parameters = {}
-    returns = []
-    description = []
+    parameters: dict[str, str] = {}
+    returns: list[str] = []
+    description: list[str] = []
     sections = _docstring_sections(docstring, docstring_parser)
     for section in sections:
         if section.kind.name == "parameters":
