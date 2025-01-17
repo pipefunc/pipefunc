@@ -10,6 +10,7 @@ import operator
 import socket
 import sys
 import warnings
+from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar
@@ -355,7 +356,7 @@ def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
 
 
 def extract_docstrings(
-    func: callable,
+    func: Callable[..., Any],
     docstring_parser: Literal["google", "numpy", "sphinx"] = "numpy",
 ) -> dict[str, str]:
     """Extract parameter docstrings from a function's docstring.
