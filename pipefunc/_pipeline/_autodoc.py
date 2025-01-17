@@ -63,12 +63,13 @@ def format_pipeline_docs(
         show_lines=True,
     )
     table_params.add_column("Parameter", style="bold yellow", no_wrap=True)
-    table_params.add_column("Has default", style="bold yellow", no_wrap=True)
+    table_params.add_column("Required", style="bold yellow", no_wrap=True)
     table_params.add_column("Description", style="green")
     for param, param_descs in sorted(doc.parameters.items()):
         table_params.add_row(
             Text.from_markup(f"{param}"),
-            Text.from_markup("✅" if param in pipeline.defaults else "❌"),
+            # "✅" if optional, "❌" if required
+            Text.from_markup("❌" if param in pipeline.defaults else "✅"),
             Text.from_markup("\n".join(f"- {d}" for d in param_descs)),
         )
 
