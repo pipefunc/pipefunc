@@ -2014,17 +2014,23 @@ class Pipeline:
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
-        annotations: dict[str, set[Any]] = defaultdict(set)
+        p_annotations: dict[str, Any] = {}
+        r_annotations: dict[str, Any] = {}
         root_args = self.topological_generations.root_args
         for f in self.functions:
             doc = extract_docstrings(f.func)
-            ann = f.parameter_annotations
-            if ann:
-                for p, v in ann.items():
-                    if p in annotations and annotations[p] != v:
-                        msg = f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
+            if f.parameter_annotations:
+                for p, v in f.parameter_annotations.items():
+                    if p in p_annotations and p_annotations[p] != v:
+                        msg = f"Conflicting annotations for parameter `{p}`: `{p_annotations[p]}` != `{v}`."
                         warnings.warn(msg, stacklevel=2)
-                    annotations[p] = v
+                    p_annotations[p] = v
+            if f.output_annotation:
+                for p, v in f.output_annotation.items():
+                    if p in r_annotations and r_annotations[p] != v:
+                        msg = f"Conflicting annotations for return `{p}`: `{r_annotations[p]}` != `{v}`."
+                        warnings.warn(msg, stacklevel=2)
+                    r_annotations[p] = v
             if doc.description:
                 descriptions[f.output_name] = doc.description
             if doc.returns:
@@ -2038,7 +2044,8 @@ class Pipeline:
             dict(parameters),
             returns,
             defaults=self.defaults,
-            annotations=annotations,
+            p_annotations=p_annotations,
+            r_annotations=r_annotations,
             root_args=root_args,
         )
 

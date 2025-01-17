@@ -20,7 +20,8 @@ class PipelineDoc:
     parameters: dict[str, list[str]]
     returns: dict[OUTPUT_TYPE, str]
     defaults: dict[str, Any]
-    annotations: dict[str, Any]
+    p_annotations: dict[str, Any]
+    r_annotations: dict[str, Any]
     root_args: list[str]
 
 
@@ -143,7 +144,7 @@ def _create_parameters_table(
                 param,
                 param_descs,
                 doc.defaults,
-                doc.annotations,
+                doc.p_annotations,
                 skip_optional,
             ),
         )
@@ -154,14 +155,14 @@ def _create_parameter_row(
     param: str,
     param_descs: list[str],
     defaults: dict[str, Any],
-    annotations: dict[str, Any],
+    p_annotations: dict[str, Any],
     skip_optional: bool,  # noqa: FBT001
 ) -> list[Text]:
     """Creates a row for the parameters table."""
     default = defaults.get(param)
-    annotation = type_as_string(annotations.get(param))
+    annotation = type_as_string(p_annotations.get(param))
     default_str = f" [italic bold](default: {default})[/]" if param in defaults else ""
-    annotation_str = f" [italic bold](type: {annotation})[/]" if param in annotations else ""
+    annotation_str = f" [italic bold](type: {annotation})[/]" if param in p_annotations else ""
     param_text = Text.from_markup(f"{param}")
     default_col = Text.from_markup("❌" if param in defaults else "✅")
     if len(param_descs) == 1:
