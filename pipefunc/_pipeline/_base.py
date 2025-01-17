@@ -16,6 +16,7 @@ import functools
 import inspect
 import os
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -27,6 +28,7 @@ from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
+    extract_docstrings,
     handle_error,
     is_installed,
     is_running_in_ipynb,
@@ -2004,6 +2006,22 @@ class Pipeline:
             return table._repr_mimebundle_(include=include, exclude=exclude)
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
+
+    def doc(self) -> tuple[dict[OUTPUT_TYPE, str], dict[OUTPUT_TYPE, str], dict[str, list[str]]]:
+        """Return a markdown-formatted documentation string for the pipeline."""
+        descriptions: dict[OUTPUT_TYPE, str] = {}
+        returns: dict[OUTPUT_TYPE, str] = {}
+        parameters: dict[str, list[str]] = defaultdict(list)
+        for f in self.functions:
+            doc = extract_docstrings(f.func)
+            if doc.description:
+                descriptions[f.output_name] = doc.description
+            if doc.returns:
+                returns[f.output_name] = doc.returns
+            for p, v in doc.parameters.items():
+                if v not in parameters[p]:
+                    parameters[p].append(v)
+        return descriptions, returns, dict(parameters)
 
 
 class Generations(NamedTuple):
