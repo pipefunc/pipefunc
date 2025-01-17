@@ -2043,12 +2043,37 @@ class Pipeline:
     def print_doc(
         self,
         *,
-        skip_optional: bool = False,
         borders: bool = False,
+        skip_optional: bool = False,
+        description_table: bool = True,
+        parameters_table: bool = True,
+        returns_table: bool = True,
     ) -> None:
-        """Print the documentation for the pipeline as a table formatted with Rich."""
+        """Print the documentation for the pipeline as a table formatted with Rich.
+
+        Parameters
+        ----------
+        borders
+            Whether to include borders in the tables.
+        skip_optional
+            Whether to skip optional parameters.
+        description_table
+            Whether to generate the function description table.
+        parameters_table
+            Whether to generate the function parameters table.
+        returns_table
+            Whether to generate the function returns table.
+
+        """
         requires("rich", reason="print_doc", extras="rich")
-        format_pipeline_docs(self.doc(), skip_optional=skip_optional, borders=borders)
+        format_pipeline_docs(
+            self.doc(),
+            skip_optional=skip_optional,
+            borders=borders,
+            description_table=description_table,
+            parameters_table=parameters_table,
+            returns_table=returns_table,
+        )
 
 
 class Generations(NamedTuple):

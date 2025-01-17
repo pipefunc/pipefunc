@@ -37,9 +37,9 @@ def format_pipeline_docs(
     *,
     borders: bool = False,
     skip_optional: bool = False,
-    function_description_table: bool = True,
-    function_parameters_table: bool = True,
-    function_returns_table: bool = True,
+    description_table: bool = True,
+    parameters_table: bool = True,
+    returns_table: bool = True,
     print_table: bool = True,
 ) -> tuple[Table, ...] | None:
     """Formats pipeline documentation into rich tables.
@@ -52,11 +52,11 @@ def format_pipeline_docs(
         Whether to include borders in the tables.
     skip_optional
         Whether to skip optional parameters.
-    function_description_table
+    description_table
         Whether to generate the function description table.
-    function_parameters_table
+    parameters_table
         Whether to generate the function parameters table.
-    function_returns_table
+    returns_table
         Whether to generate the function returns table.
     print_table
         Whether to print the table to the console.
@@ -72,15 +72,15 @@ def format_pipeline_docs(
 
     tables: list[Table] = []
 
-    if function_description_table:
+    if description_table:
         table_desc = _create_description_table(doc, box)
         tables.append(table_desc)
 
-    if function_parameters_table:
+    if parameters_table:
         table_params = _create_parameters_table(doc, box, skip_optional)
         tables.append(table_params)
 
-    if function_returns_table:
+    if returns_table:
         table_returns = _create_returns_table(doc, box)
         tables.append(table_returns)
 
@@ -121,7 +121,12 @@ def _create_parameters_table(
     )
     table_params.add_column("Parameter", style=RichStyle.BOLD_YELLOW, no_wrap=True)
     if not skip_optional:
-        table_params.add_column("Required", style=RichStyle.BOLD_YELLOW, no_wrap=True)
+        table_params.add_column(
+            "Required",
+            style=RichStyle.BOLD_YELLOW,
+            no_wrap=True,
+            justify="center",
+        )
     table_params.add_column("Description", style=RichStyle.GREEN)
     for param, param_descs in sorted(doc.parameters.items()):
         if skip_optional and param in doc.defaults:
