@@ -182,6 +182,56 @@ def test_slurm_executor_map_exception(
 ) -> None:
     with pytest.raises(
         ValueError,
-        match="Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.run_async` instead.",
+        match="Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.map_async` instead.",
     ):
         pipeline.map({}, tmp_path, executor=MockSlurmExecutor(cores_per_node=1))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("use_mock", [True, False])
+@pytest.mark.parametrize("use_instance", [True, False])
+async def test_pipeline_no_resources(
+    tmp_path: Path,
+    use_mock: bool,  # noqa: FBT001
+    use_instance: bool,  # noqa: FBT001
+) -> None:
+    if not has_slurm and not use_mock:
+        pytest.skip("Slurm not available")
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        assert isinstance(x, int)
+        return 2 * x
+
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+    )
+    def add_one(y):
+        return y + 1
+
+    @pipefunc(output_name="z_sum")
+    def sum_it(z):
+        return sum(z)
+
+    pipeline = Pipeline([double_it, add_one, sum_it])
+    inputs = {"x": range(10)}
+    if use_mock:
+        ex = MockSlurmExecutor() if use_instance else MockSlurmExecutor
+    else:
+        ex = SlurmExecutor(cores_per_node=1) if use_instance else SlurmExecutor
+    run_folder = tmp_path / "my_run_folder"
+    runner = pipeline.map_async(
+        inputs,
+        run_folder,
+        executor=ex,  # type: ignore[arg-type]
+        show_progress=True,
+    )
+    result = await runner.task
+    assert isinstance(result, dict)
+    assert len(result) == 3
+    assert result["z_sum"].output == 100
+    assert result["y"].output[0] == 0
+    assert result["y"].output[-1] == 18
+    assert result["z"].output[0] == 1
+    assert result["z"].output[-1] == 19

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple, requires
 
+from ._shapes import shape_is_resolved
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 class Status:
     """A class to keep track of the progress of a function."""
 
-    n_total: int
+    n_total: int | None
     n_in_progress: int = 0
     n_completed: int = 0
     n_failed: int = 0
@@ -28,7 +29,7 @@ class Status:
 
     @property
     def n_left(self) -> int:
-        return self.n_total - self.n_completed - self.n_failed
+        return self.n_total - self.n_completed - self.n_failed  # type: ignore[operator]
 
     def mark_in_progress(self) -> None:
         if self.start_time is None:
@@ -43,6 +44,8 @@ class Status:
 
     @property
     def progress(self) -> float:
+        if self.n_total is None:
+            return 0.0
         return self.n_completed / self.n_total
 
     def elapsed_time(self) -> float:
@@ -67,6 +70,12 @@ def init_tracker(
     for func in functions:
         name, *_ = at_least_tuple(func.output_name)  # if multiple, the have equal size
         s = store[name]
-        size = s.size if isinstance(s, StorageBase) else 1
+        if isinstance(s, StorageBase):
+            if shape_is_resolved(s.shape):  # noqa: SIM108
+                size = s.size
+            else:
+                size = None  # Defer size calculation until shape is resolved
+        else:
+            size = 1
         progress[func.output_name] = Status(n_total=size)
     return ProgressTracker(progress, None, display=False, in_async=in_async)

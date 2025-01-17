@@ -9,7 +9,7 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
 from pipefunc.map.adaptive_scheduler import AdaptiveSchedulerDetails, _or, slurm_run_setup
 from pipefunc.resources import Resources
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -70,7 +70,7 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
 
     with pytest.raises(
         ValueError,
-        match="Cannot pass `slurm_run_kwargs` when `returns` is 'namedtuple'.",
+        match="Cannot pass `slurm_run_kwargs` when `returns='namedtuple'`.",
     ):
         learners_dict.to_slurm_run(
             default_resources=Resources(cpus_per_node=2, nodes=1),
@@ -513,3 +513,16 @@ def test_independent_axes_2(tmp_path: Path) -> None:
     assert len(info.learners) == 2
     assert len(info.fnames) == 2
     run(info)
+
+
+def test_dynamic_shapes(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=("?",))
+    def f(n):
+        return list(range(n))
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match="Dynamic `internal_shapes` not supported in `create_learners`.",
+    ):
+        create_learners(pipeline, {"n": 10}, tmp_path, split_independent_axes=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# Is set during `onbuild` if normally `pip install pipefunc` is used
+# Is set during `onbuild` if `pip install pipefunc` is used
 __version__ = ""
 
 if not __version__:

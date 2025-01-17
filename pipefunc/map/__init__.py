@@ -13,16 +13,16 @@ from ._storage_array._file import FileArray
 __all__ = [
     "DictArray",
     "FileArray",
-    "load_outputs",
-    "load_xarray_dataset",
     "MapSpec",
-    "register_storage",
-    "run_map_async",
-    "run_map",
     "RunInfo",
     "SharedMemoryDictArray",
-    "storage_registry",
     "StorageBase",
+    "load_outputs",
+    "load_xarray_dataset",
+    "register_storage",
+    "run_map",
+    "run_map_async",
+    "storage_registry",
 ]
 
 with _suppress(ImportError):

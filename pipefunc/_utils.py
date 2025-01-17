@@ -9,8 +9,9 @@ import operator
 import socket
 import sys
 import warnings
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 import cloudpickle
 import numpy as np
@@ -85,8 +86,9 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     """Handle an error that occurred while executing a function."""
     call_str = format_function_call(func.__name__, (), kwargs)
     msg = f"Error occurred while executing function `{call_str}`."
-    if sys.version_info <= (3, 11):  # pragma: no cover
-        raise type(e)(e.args[0] + msg) from e
+    if sys.version_info < (3, 11):  # pragma: no cover
+        original_msg = e.args[0] if e.args else ""
+        raise type(e)(original_msg + msg) from e
     e.add_note(msg)
     raise  # noqa: PLE0704
 
@@ -218,6 +220,10 @@ def get_local_ip() -> str:
 def is_running_in_ipynb() -> bool:
     """Check if the code is running in a Jupyter notebook."""
     try:
+        from IPython import get_ipython
+    except ImportError:  # pragma: no cover
+        return False
+    try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
     except NameError:
         return False  # Probably standard Python interpreter
@@ -230,7 +236,7 @@ def is_installed(package: str) -> bool:
 
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
-    conda_name_mapping = {"graphviz": "python-graphviz"}
+    conda_name_mapping = {"graphviz": "python-graphviz", "graphviz_anywidget": "graphviz-anywidget"}
 
     for package in packages:
         if is_installed(package):
@@ -265,10 +271,54 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if "pydantic" not in sys.modules:
+    if not is_imported("pydantic"):
         return False
     if not inspect.isclass(x):
         return False
     import pydantic
 
     return issubclass(x, pydantic.BaseModel)
+
+
+T = TypeVar("T")
+
+
+def first(x: T | tuple[T, ...]) -> T:
+    if isinstance(x, tuple):  # pragma: no cover
+        return x[0]
+    return x
+
+
+def is_imported(package: str) -> bool:
+    """Check if a package is imported."""
+    return package in sys.modules
+
+
+def get_ncores(ex: Executor) -> int:
+    """Return the maximum number of cores that an executor can use."""
+    if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
+        return ex._max_workers  # type: ignore[union-attr]
+    if is_imported("ipyparallel"):  # pragma: no cover
+        import ipyparallel
+
+        if isinstance(ex, ipyparallel.client.view.ViewExecutor):
+            return len(ex.view)
+    if is_imported("loky"):  # pragma: no cover
+        import loky
+
+        if isinstance(ex, loky.reusable_executor._ReusablePoolExecutor):
+            return ex._max_workers
+    if is_imported("distributed"):  # pragma: no cover
+        import distributed
+
+        if isinstance(ex, distributed.cfexecutor.ClientExecutor):
+            return sum(n for n in ex._client.ncores().values())
+    if is_imported("mpi4py"):  # pragma: no cover
+        import mpi4py.futures
+
+        if isinstance(ex, mpi4py.futures.MPIPoolExecutor):
+            ex.bootup()  # wait until all workers are up and running
+            return ex._pool.size  # not public API!
+
+    msg = f"Cannot get number of cores for {ex.__class__}"
+    raise TypeError(msg)

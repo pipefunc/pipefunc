@@ -32,10 +32,10 @@ MAX_LABEL_LENGTH = 20
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
     """Gets the layout of the graph using Graphviz if available, otherwise defaults to a spring layout."""
     try:
-        return graphviz_layout(graph, prog="dot")
+        return graphviz_layout(graph, prog="dot")  # requires pygraphviz
     except ImportError:  # pragma: no cover
         warnings.warn(
-            "Graphviz is not installed. Using spring layout instead.",
+            "pygraphviz is not installed. Using spring layout instead.",
             ImportWarning,
             stacklevel=2,
         )
@@ -303,7 +303,7 @@ def visualize_graphviz(  # noqa: PLR0912
             {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
         ),
         "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
-        "NestedPipeFunction": (
+        "NestedPipeFunc": (
             nodes.nested_func,
             {"fillcolor": blue, "shape": "box", "style": "filled,rounded", "color": _COLORS["red"]},
         ),
@@ -381,7 +381,7 @@ def visualize_graphviz(  # noqa: PLR0912
             del attribs["margin"]  # Remove margin for legend nodes, to make them more compact
             legend_subgraph.node(node_name, **attribs)
             if i > 0:
-                legend_subgraph.edge(f"legend_{i-1}", node_name, style="invis")
+                legend_subgraph.edge(f"legend_{i - 1}", node_name, style="invis")
 
         digraph.subgraph(legend_subgraph)
 
