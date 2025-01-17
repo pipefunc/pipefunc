@@ -1179,9 +1179,7 @@ class Pipeline:
                 changed_any = True
                 f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
         if not changed_any:
-            msg = (
-                "No inputs or outputs found to update the scope, provide `inputs` and/or `outputs`."
-            )
+            msg = "No function's scope was updated. Ensure `inputs` and/or `outputs` are specified correctly."
             raise ValueError(msg)
         self._clear_internal_cache()
         self._validate()

@@ -152,7 +152,7 @@ def test_pipeline_scope_no_selected_exception() -> None:
         return a + b
 
     pipeline = Pipeline([f])
-    with pytest.raises(ValueError, match="No inputs or outputs found to update the scope"):
+    with pytest.raises(ValueError, match="No function's scope was updated"):
         pipeline.update_scope("myscope")
 
 
