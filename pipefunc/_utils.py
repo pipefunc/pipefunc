@@ -372,7 +372,7 @@ def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[Do
         return Docstring(docstring).parse(parser)
 
 
-def extract_docstrings(
+def extract_parameter_docstrings(
     func: Callable[..., Any],
     docstring_parser: ParserType = "auto",
 ) -> dict[str, str]:
@@ -396,7 +396,10 @@ def extract_docstrings(
     if docstring_parser == "auto":
         # Poor man's "auto" parser selection because griffe has this as a paid feature
         # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
-        results = [extract_docstrings(func, parser) for parser in ("google", "numpy", "sphinx")]  # type: ignore[arg-type]
+        results = [
+            extract_parameter_docstrings(func, parser)  # type: ignore[arg-type]
+            for parser in ("google", "numpy", "sphinx")
+        ]
         return max(results, key=len)
 
     docstring = inspect.getdoc(func)
