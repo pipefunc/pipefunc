@@ -138,21 +138,36 @@ def _create_parameters_table(
             continue
         if skip_intermediate and param not in doc.root_args:
             continue
-        default = doc.defaults.get(param)
-        annotation = type_as_string(doc.annotations.get(param))
-        default_str = f" [italic bold](default: {default})[/]" if param in doc.defaults else ""
-        annotation_str = (
-            f" [italic bold](type: {annotation})[/]" if param in doc.annotations else ""
-        )
-        param_text = Text.from_markup(f"{param}")
-        default_col = Text.from_markup("❌" if param in doc.defaults else "✅")
-        desc_text = Text.from_markup(
-            "\n".join(f"- {d}" for d in param_descs) + default_str + annotation_str,
-        )
         table_params.add_row(
-            *([param_text, desc_text] if skip_optional else [param_text, default_col, desc_text]),
+            *_create_parameter_row(
+                param,
+                param_descs,
+                doc.defaults,
+                doc.annotations,
+                skip_optional,
+            ),
         )
     return table_params
+
+
+def _create_parameter_row(
+    param: str,
+    param_descs: list[str],
+    defaults: dict[str, Any],
+    annotations: dict[str, Any],
+    skip_optional: bool,  # noqa: FBT001
+) -> list[Text]:
+    """Creates a row for the parameters table."""
+    default = defaults.get(param)
+    annotation = type_as_string(annotations.get(param))
+    default_str = f" [italic bold](default: {default})[/]" if param in defaults else ""
+    annotation_str = f" [italic bold](type: {annotation})[/]" if param in annotations else ""
+    param_text = Text.from_markup(f"{param}")
+    default_col = Text.from_markup("❌" if param in defaults else "✅")
+    desc_text = Text.from_markup(
+        "\n".join(f"- {d}" for d in param_descs) + default_str + annotation_str,
+    )
+    return [param_text, desc_text] if skip_optional else [param_text, default_col, desc_text]
 
 
 def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
