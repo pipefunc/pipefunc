@@ -411,7 +411,7 @@ def extract_docstrings(
 
     Returns
     -------
-        A dictionary mapping parameter names to their docstrings.
+        A `Doc` object containing the extracted docstrings.
 
     """
     docstring = inspect.getdoc(func)
