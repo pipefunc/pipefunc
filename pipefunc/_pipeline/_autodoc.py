@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from rich.console import Console
-from rich.table import Table
-from rich.text import Text
-
 if TYPE_CHECKING:
+    import rich
+
     from pipefunc import Pipeline
 
     from ._types import OUTPUT_TYPE
@@ -20,7 +18,11 @@ class PipelineDoc:
     returns: dict[OUTPUT_TYPE, str]
 
 
-def format_pipeline_docs(pipeline: Pipeline, *, print_table: bool = True) -> Table:
+def format_pipeline_docs(
+    pipeline: Pipeline,
+    *,
+    print_table: bool = True,
+) -> tuple[rich.Table, rich.Table, rich.Table] | None:
     """Formats pipeline documentation into three separate rich tables.
 
     Parameters
@@ -36,6 +38,10 @@ def format_pipeline_docs(pipeline: Pipeline, *, print_table: bool = True) -> Tab
         print_table is False. Otherwise, prints the tables to the console.
 
     """
+    from rich.console import Console
+    from rich.table import Table
+    from rich.text import Text
+
     doc = pipeline.doc()
     # Descriptions Table
     table_desc = Table(
@@ -57,10 +63,12 @@ def format_pipeline_docs(pipeline: Pipeline, *, print_table: bool = True) -> Tab
         show_lines=True,
     )
     table_params.add_column("Parameter", style="bold yellow", no_wrap=True)
+    table_params.add_column("Has default", style="bold yellow", no_wrap=True)
     table_params.add_column("Description", style="green")
     for param, param_descs in sorted(doc.parameters.items()):
         table_params.add_row(
             Text.from_markup(f"{param}"),
+            Text.from_markup("✅" if param in pipeline.defaults else "❌"),
             Text.from_markup("\n".join(f"- {d}" for d in param_descs)),
         )
 

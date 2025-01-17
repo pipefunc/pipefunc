@@ -2029,6 +2029,8 @@ class Pipeline:
         return PipelineDoc(descriptions, dict(parameters), returns)
 
     def print_doc(self) -> None:
+        """Print the documentation for the pipeline as a table formatted with Rich."""
+        requires("rich", reason="print_doc", extras="rich")
         format_pipeline_docs(self)
 
 
