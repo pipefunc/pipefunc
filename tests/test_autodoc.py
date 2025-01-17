@@ -63,8 +63,8 @@ def my_sphinx_style_function(a: int, b: str = "hello", c: float = 3.14):
         (my_sphinx_style_function, "sphinx"),
     ],
 )
-def test_extract_docstring(function) -> None:
-    docstring = extract_docstrings(function)
+def test_extract_docstring(function, style) -> None:
+    docstring = extract_docstrings(function, docstring_parser=style)
     assert docstring == {
         "a": "The first parameter.",
         "b": "The second parameter.",
