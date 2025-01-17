@@ -46,7 +46,7 @@ test = [
     "pytest",
     "versioningit",
 ]
-autodoc = ["griffe"]
+autodoc = ["griffe", "rich"]
 docs = [
     "emoji",
     "jupytext",
@@ -67,7 +67,7 @@ docs = [
     "pipefunc[all]",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,pandas,plotting,profiling,rich,widgets,xarray,zarr]"]
+all = ["pipefunc[adaptive,autodoc,pandas,plotting,profiling,rich,widgets,xarray,zarr]"]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
