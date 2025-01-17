@@ -112,7 +112,7 @@ class UVTip(SphinxDirective):
             "",
             "If you have `uv` installed, you can instantly open this page as a Jupyter notebook:",
             "",
-            f'`bash uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}`',
+            f'`uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}`',
             "",
             "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
             ":::",

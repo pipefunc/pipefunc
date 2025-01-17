@@ -14,8 +14,8 @@ kernelspec:
 
 # Image Processing Workflow
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{note}
 This example uses `scikit-image` for image processing. If you don't have it installed, you can install it using `pip install scikit-image`.

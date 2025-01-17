@@ -13,8 +13,8 @@ kernelspec:
 
 # Variants
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

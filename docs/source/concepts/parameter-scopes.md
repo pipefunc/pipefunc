@@ -13,8 +13,8 @@ kernelspec:
 
 # Parameter Scopes
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

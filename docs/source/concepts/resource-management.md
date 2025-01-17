@@ -13,8 +13,8 @@ kernelspec:
 
 # Resource Management
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

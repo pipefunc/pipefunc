@@ -13,8 +13,8 @@ kernelspec:
 
 # Parallelism and Execution
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

@@ -14,8 +14,8 @@ kernelspec:
 
 # Sensor Data Processing Pipeline
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{note}
 This example uses `scipy` and `seaborn` libraries for data processing and visualization. Make sure to install these libraries before running the code.

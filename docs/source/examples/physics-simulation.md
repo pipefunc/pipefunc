@@ -14,8 +14,8 @@ kernelspec:
 
 # Physics Based Example
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 This example demonstrates using the `pipefunc` for a physics-based simulation. The goal is to create a pipeline for geometry creation, meshing, material assignment, and electrostatics calculations, culminating in computing the average charge.
 

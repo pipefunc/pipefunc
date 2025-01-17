@@ -13,8 +13,8 @@ kernelspec:
 
 # Type Checking
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

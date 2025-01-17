@@ -13,8 +13,8 @@ kernelspec:
 
 # Testing
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

@@ -14,8 +14,8 @@ kernelspec:
 
 # Natural Language Processing Pipeline for Text Summarization
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{note}
 This example uses `nltk` for text processing. If you don't have it installed, you can install it using `pip install nltk`.

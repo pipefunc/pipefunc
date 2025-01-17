@@ -13,8 +13,8 @@ kernelspec:
 
 # Parameter Sweeps
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3

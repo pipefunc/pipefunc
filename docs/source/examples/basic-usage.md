@@ -14,8 +14,8 @@ kernelspec:
 
 # Basic Usage
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 This example demonstrates a simple pipeline using the {func}`@pipefunc <pipefunc.pipefunc>` decorator and the {class}`~pipefunc.Pipeline` class. It showcases a basic workflow with sequential execution.
 

@@ -13,8 +13,8 @@ kernelspec:
 
 # Overhead and Efficiency
 
-:::{uvtip}
-:::
+```{uvtip}
+```
 
 ```{contents} ToC
 :depth: 3
