@@ -4,6 +4,7 @@ import contextlib
 import functools
 import importlib.util
 import inspect
+import logging
 import math
 import operator
 import socket
@@ -11,13 +12,13 @@ import sys
 import warnings
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable
 
     import pydantic
 
@@ -322,3 +323,72 @@ def get_ncores(ex: Executor) -> int:
 
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
+
+
+@contextlib.contextmanager
+def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
+    """Temporarily disable a logger within a context manager scope.
+
+    Upon entering, disables the specified logger.
+    Upon exiting, restores the logger to its original enabled/disabled state.
+
+    Parameters
+    ----------
+    logger_name
+        Name of the logger to temporarily disable
+
+    Examples
+    --------
+    >>> with temporarily_disable_logger("my_logger"):
+    ...     # Logger is disabled here
+    ...     perform_noisy_operation()
+    ... # Logger is restored to original state here
+
+    """
+    logger = logging.getLogger(name=logger_name)
+    original_state = logger.disabled
+    try:
+        logger.disabled = True
+        yield
+    finally:
+        logger.disabled = original_state
+
+
+def extract_docstrings(
+    func: callable,
+    docstring_parser: Literal["google", "numpy", "sphinx"] = "numpy",
+) -> dict[str, str]:
+    """Extract parameter docstrings from a function's docstring.
+
+    Supports Google, NumPy, and standard Python docstring formats,
+    using the `griffe` library for parsing.
+
+    Parameters
+    ----------
+    func
+        The function to extract docstrings from.
+    docstring_parser
+        The docstring parser to use.
+
+    Returns
+    -------
+        A dictionary mapping parameter names to their docstrings.
+
+    """
+    requires("griffe", reason="extracting docstrings", extras="autodoc")
+    from griffe import Docstring, Parser
+
+    parser = Parser(docstring_parser)
+    docstring = inspect.getdoc(func)
+    if not docstring:
+        return {}
+
+    param_docs = {}
+    with temporarily_disable_logger("griffe"):
+        sections = Docstring(docstring).parse(parser)
+    for section in sections:
+        if section.kind.name == "parameters":
+            for parameter in section.value:
+                param_docs[parameter.name] = parameter.description
+
+    return param_docs
