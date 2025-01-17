@@ -8,8 +8,6 @@ from pipefunc.typing import type_as_string
 if TYPE_CHECKING:
     import rich
 
-    from pipefunc import Pipeline
-
     from ._types import OUTPUT_TYPE
 
 
@@ -23,16 +21,19 @@ class PipelineDoc:
 
 
 def format_pipeline_docs(
-    pipeline: Pipeline,
+    doc: PipelineDoc,
     *,
+    borders: bool = False,
     print_table: bool = True,
 ) -> tuple[rich.Table, rich.Table, rich.Table] | None:
     """Formats pipeline documentation into three separate rich tables.
 
     Parameters
     ----------
-    pipeline
-        The pipeline to format documentation for.
+    doc
+        The pipeline documentation object.
+    borders
+        Whether to include borders in the tables.
     print_table
         Whether to print the table to the console.
 
@@ -42,33 +43,39 @@ def format_pipeline_docs(
         print_table is False. Otherwise, prints the tables to the console.
 
     """
+    from rich.box import HEAVY_HEAD
     from rich.console import Console
     from rich.table import Table
     from rich.text import Text
 
-    doc = pipeline.doc()
+    green = "#00aa00"
+    bold_red = "bold #ff0000"
+    bold_yellow = "bold #aaaa00"
+    bold_magenta = "bold #ff00ff"
+    box = None if not borders else HEAVY_HEAD
+
     # Descriptions Table
     table_desc = Table(
-        title="[bold red]Function Output Descriptions[/]",
-        box=None,
+        title=f"[{bold_red}]Function Output Descriptions[/]",
+        box=box,
         expand=True,
         show_lines=True,
     )
-    table_desc.add_column("Output Name", style="bold red", no_wrap=True)
-    table_desc.add_column("Description", style="green")
+    table_desc.add_column("Output Name", style=bold_red, no_wrap=True)
+    table_desc.add_column("Description", style=green)
     for output_name, desc in sorted(doc.descriptions.items()):
         table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
 
     # Parameters Table
     table_params = Table(
-        title="[bold yellow]Parameters[/]",
-        box=None,
+        title=f"[{bold_yellow}]Parameters[/]",
+        box=box,
         expand=True,
         show_lines=True,
     )
-    table_params.add_column("Parameter", style="bold yellow", no_wrap=True)
-    table_params.add_column("Required", style="bold yellow", no_wrap=True)
-    table_params.add_column("Description", style="green")
+    table_params.add_column("Parameter", style=bold_yellow, no_wrap=True)
+    table_params.add_column("Required", style=bold_yellow, no_wrap=True)
+    table_params.add_column("Description", style=green)
     for param, param_descs in sorted(doc.parameters.items()):
         parameters_text = "\n".join(f"- {d}" for d in param_descs)
         default = doc.defaults.get(param)
@@ -88,13 +95,13 @@ def format_pipeline_docs(
 
     # Returns Table
     table_returns = Table(
-        title="[bold magenta]Return Values[/]",
-        box=None,
+        title=f"[{bold_magenta}]Return Values[/]",
+        box=box,
         expand=True,
         show_lines=True,
     )
-    table_returns.add_column("Output Name", style="bold magenta", no_wrap=True)
-    table_returns.add_column("Description", style="green")
+    table_returns.add_column("Output Name", style=bold_magenta, no_wrap=True)
+    table_returns.add_column("Description", style=green)
     for output_name, ret_desc in sorted(doc.returns.items()):
         table_returns.add_row(Text.from_markup(f"{output_name}"), ret_desc)
 

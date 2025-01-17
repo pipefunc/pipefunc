@@ -2040,10 +2040,14 @@ class Pipeline:
             annotations=annotations,
         )
 
-    def print_doc(self) -> None:
+    def print_doc(
+        self,
+        *,
+        borders: bool = False,
+    ) -> None:
         """Print the documentation for the pipeline as a table formatted with Rich."""
         requires("rich", reason="print_doc", extras="rich")
-        format_pipeline_docs(self)
+        format_pipeline_docs(self.doc(), borders=borders)
 
 
 class Generations(NamedTuple):
