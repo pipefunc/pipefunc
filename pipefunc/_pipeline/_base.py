@@ -977,15 +977,9 @@ class Pipeline:
         if output_name is None:
             root_args = tuple(sorted(self.topological_generations.root_args))
         else:
-            # Efficiently find root_args for a specific output_name
             all_root_args = set(self.topological_generations.root_args)
             ancestors = nx.ancestors(self.graph, self.output_to_func[output_name])
-            root_args_set = {
-                node
-                for node in self.graph.nodes
-                if node in all_root_args
-                and (node in ancestors or node == self.output_to_func[output_name])
-            }
+            root_args_set = {n for n in self.graph.nodes if n in all_root_args and n in ancestors}
             root_args = tuple(sorted(root_args_set))
 
         self._internal_cache.root_args[output_name] = root_args
