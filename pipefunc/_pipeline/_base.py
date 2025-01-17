@@ -46,6 +46,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
+from ._autodoc import PipelineDoc, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -53,7 +54,11 @@ from ._mapspec import (
     find_non_root_axes,
     replace_none_in_axes,
 )
-from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
+from ._simplify import (
+    _func_node_colors,
+    _identify_combinable_nodes,
+    simplified_pipeline,
+)
 from ._validation import (
     validate_consistent_defaults,
     validate_consistent_type_annotations,
@@ -2007,8 +2012,8 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def doc(self) -> tuple[dict[OUTPUT_TYPE, str], dict[OUTPUT_TYPE, str], dict[str, list[str]]]:
-        """Return a markdown-formatted documentation string for the pipeline."""
+    def doc(self) -> PipelineDoc:
+        """Return the documentation for the pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
@@ -2021,7 +2026,10 @@ class Pipeline:
             for p, v in doc.parameters.items():
                 if v not in parameters[p]:
                     parameters[p].append(v)
-        return descriptions, returns, dict(parameters)
+        return PipelineDoc(descriptions, dict(parameters), returns)
+
+    def print_doc(self) -> None:
+        format_pipeline_docs(self)
 
 
 class Generations(NamedTuple):
