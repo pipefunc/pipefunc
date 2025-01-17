@@ -13,7 +13,7 @@ import warnings
 from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
 import cloudpickle
 import numpy as np
@@ -355,9 +355,12 @@ def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
         logger.disabled = original_state
 
 
+ParserType = Literal["google", "numpy", "sphinx", "auto"]
+
+
 def extract_docstrings(
     func: Callable[..., Any],
-    docstring_parser: Literal["google", "numpy", "sphinx"] = "numpy",
+    docstring_parser: ParserType = "auto",
 ) -> dict[str, str]:
     """Extract parameter docstrings from a function's docstring.
 
@@ -377,8 +380,16 @@ def extract_docstrings(
 
     """
     requires("griffe", reason="extracting docstrings", extras="autodoc")
+    if docstring_parser == "auto":
+        # Poor man's "auto" parser selection because griffe has this as a paid feature
+        # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
+        results = [extract_docstrings(func, parser) for parser in ("google", "numpy", "sphinx")]  # type: ignore[arg-type]
+        return max(results, key=len)
     from griffe import Docstring, Parser
 
+    if docstring_parser not in get_args(ParserType):
+        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(get_args(ParserType))}"
+        raise ValueError(msg)
     parser = Parser(docstring_parser)
     docstring = inspect.getdoc(func)
     if not docstring:
