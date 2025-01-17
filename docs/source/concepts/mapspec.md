@@ -13,6 +13,9 @@ kernelspec:
 
 # Understanding `mapspec`
 
+:::{uvtip}
+:::
+
 ```{contents} ToC
 :depth: 3
 ```

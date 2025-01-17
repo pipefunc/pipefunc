@@ -13,6 +13,9 @@ kernelspec:
 
 # Function Inputs and Outputs
 
+:::{uvtip}
+:::
+
 ```{contents} ToC
 :depth: 3
 ```

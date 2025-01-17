@@ -14,16 +14,7 @@ kernelspec:
 
 # Sensor Data Processing Pipeline
 
-:::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡
-:class: tip, dropdown
-
-If you have `uv` installed, you can run this section with a single command without installing anything:
-
-```bash
-uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/docs/source/examples/sensor-data-processing.md
-```
-
-This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.
+:::{uvtip}
 :::
 
 ```{note}

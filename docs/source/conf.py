@@ -3,19 +3,17 @@
 #
 
 import os
-import shutil
 import sys
 from pathlib import Path
 
 from docutils import nodes
-from docutils.parsers.rst import Directive
 from sphinx.util.docutils import SphinxDirective
 from docutils.statemachine import StringList
 
-package_path = Path("../..").resolve()
-sys.path.insert(0, str(package_path))
+PACKAGE_PATH = Path("../..").resolve()
+sys.path.insert(0, str(PACKAGE_PATH))
 os.environ["PYTHONPATH"] = ":".join(
-    (str(package_path), os.environ.get("PYTHONPATH", "")),
+    (str(PACKAGE_PATH), os.environ.get("PYTHONPATH", "")),
 )
 docs_path = Path("..").resolve()
 sys.path.insert(1, str(docs_path))
@@ -102,21 +100,22 @@ html_theme_options = {
 
 
 class UVTip(SphinxDirective):
+    """Render a tip box with the opennb command to open the current page in a Jupyter notebook."""
+
     has_content = True
 
     def run(self):
-        source_path = os.path.relpath(self.get_source_info()[0], self.env.srcdir)
-
+        source_path = os.path.relpath(self.get_source_info()[0], PACKAGE_PATH)
         lines = [
             ":::{admonition} Have `uv`? ⚡",
             ":class: tip, dropdown",
             "",
-            "If you have `uv` installed, you can run this section with a single command without installing anything:",
+            "If you have `uv` installed, you can instantly open this page as a Jupyter notebook:",
             "",
-            f"`bash uvx --with \"pipefunc[docs]\" opennb {source_path}`",
+            f'`bash uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}`',
             "",
-            "This will create a temporary environment and open this page in your browser in a Jupyter notebook in a few seconds.",
-            ":::"
+            "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
+            ":::",
         ]
 
         # Convert lines to StringList with proper source information
@@ -128,7 +127,6 @@ class UVTip(SphinxDirective):
         self.state.nested_parse(string_list, 0, node)
 
         return node.children
-
 
 
 def setup(app):
@@ -259,11 +257,11 @@ def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
 
 
 # Process the README.md file for Sphinx documentation
-readme_path = package_path / "README.md"
+readme_path = PACKAGE_PATH / "README.md"
 process_readme_for_sphinx_docs(readme_path, docs_path)
 
 # Add the example notebook to the docs
-nb = package_path / "example.ipynb"
+nb = PACKAGE_PATH / "example.ipynb"
 convert_notebook_to_md(nb, docs_path / "source" / "tutorial.md")
 replace_rtd_links_with_local(
     docs_path / "source" / "tutorial.md",
@@ -275,4 +273,4 @@ nb_merge_streams = True
 
 
 def setup(app) -> None:
-        app.add_directive('uvtip', UVTip)
+    app.add_directive("uvtip", UVTip)
