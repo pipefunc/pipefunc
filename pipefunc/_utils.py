@@ -12,6 +12,7 @@ import sys
 import warnings
 from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
@@ -383,10 +384,19 @@ def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[Do
         return Docstring(docstring).parse(parser)
 
 
-def extract_parameter_docstrings(
+@dataclass
+class Doc:
+    """A class to store a function's docstring and its extracted parameter docstrings."""
+
+    description: str | None
+    parameters: dict[str, str]
+    returns: str | None
+
+
+def extract_docstrings(
     func: Callable[..., Any],
     docstring_parser: ParserType = "auto",
-) -> dict[str, str]:
+) -> Doc:
     """Extract parameter docstrings from a function's docstring.
 
     Supports Google, NumPy, and standard Python docstring formats,
@@ -406,13 +416,19 @@ def extract_parameter_docstrings(
     """
     docstring = inspect.getdoc(func)
     if not docstring:
-        return {}
+        return Doc(None, {}, None)
 
-    param_docs = {}
+    parameters = {}
+    returns = ""
+    description = ""
     sections = _docstring_sections(docstring, docstring_parser)
     for section in sections:
         if section.kind.name == "parameters":
             for parameter in section.value:
-                param_docs[parameter.name] = parameter.description
+                parameters[parameter.name] = parameter.description
+        if section.kind.name == "returns":
+            returns += section.value
+        if section.kind.name == "text":
+            description += section.value
 
-    return param_docs
+    return Doc(description, parameters, returns)

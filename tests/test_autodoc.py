@@ -1,6 +1,6 @@
 import pytest
 
-from pipefunc._utils import extract_parameter_docstrings
+from pipefunc._utils import extract_docstrings
 
 
 def my_google_style_function(a: int, b: str = "hello", c: float = 3.14):
@@ -64,20 +64,23 @@ def my_sphinx_style_function(a: int, b: str = "hello", c: float = 3.14):
     ],
 )
 def test_extract_docstring(function, style) -> None:
-    docstring = extract_parameter_docstrings(function, docstring_parser=style)
-    expected = {
+    doc = extract_docstrings(function, docstring_parser=style)
+    expected_parameters = {
         "a": "The first parameter.",
         "b": "The second parameter.",
         "c": "The third parameter.",
     }
-    assert docstring == expected
-    docstring_auto = extract_parameter_docstrings(function)
-    assert docstring == docstring_auto
+    assert doc.parameters == expected_parameters
+    expected_description = "This is my function."
+    assert doc.description == expected_description
+    doc_auto = extract_docstrings(function)  # default is "auto"
+    assert doc_auto.parameters == expected_parameters
+    assert doc_auto.description == expected_description
 
 
 def test_exception_wrong_parser() -> None:
     with pytest.raises(ValueError, match="Invalid docstring parser"):
-        extract_parameter_docstrings(
+        extract_docstrings(
             my_google_style_function,
             docstring_parser="wrong",  # type: ignore[arg-type]
         )
