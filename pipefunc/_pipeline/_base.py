@@ -54,11 +54,7 @@ from ._mapspec import (
     find_non_root_axes,
     replace_none_in_axes,
 )
-from ._simplify import (
-    _func_node_colors,
-    _identify_combinable_nodes,
-    simplified_pipeline,
-)
+from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from ._validation import (
     validate_consistent_defaults,
     validate_consistent_type_annotations,
