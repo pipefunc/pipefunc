@@ -77,7 +77,7 @@ def make_geometry(x: float, y: float) -> Geometry:
 def make_mesh(
     geo: Geometry,
     mesh_size: float,
-    coarse_mesh_size: float,
+    coarse_mesh_size: float = 0.1,
 ) -> tuple[Mesh, Mesh]:
     """Create fine and coarse meshes for the given geometry.
 
