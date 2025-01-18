@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._utils import at_least_tuple
 from pipefunc.typing import type_as_string
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from rich.table import Table
     from rich.text import Text
 
@@ -22,6 +24,7 @@ class PipelineDoc:
     defaults: dict[str, Any]
     p_annotations: dict[str, Any]
     r_annotations: dict[str, Any]
+    topological_order: list[OUTPUT_TYPE]
     root_args: list[str]
 
 
@@ -43,6 +46,7 @@ def format_pipeline_docs(
     description_table: bool = True,
     parameters_table: bool = True,
     returns_table: bool = True,
+    order: Literal["topological", "alphabetical"] = "topological",
     print_table: bool = True,
 ) -> tuple[Table, ...] | None:
     """Formats pipeline documentation into rich tables.
@@ -65,6 +69,12 @@ def format_pipeline_docs(
         Whether to generate the function returns table.
     print_table
         Whether to print the table to the console.
+    order
+        The order in which to display the functions in the documentation.
+        Options are:
+
+        * ``topological``: Display functions in topological order.
+        * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
 
     Returns
     -------
@@ -85,11 +95,11 @@ def format_pipeline_docs(
         tables.append(table_params)
 
     if description_table:
-        table_desc = _create_description_table(doc, box)
+        table_desc = _create_description_table(doc, box, order)
         tables.append(table_desc)
 
     if returns_table:
-        table_returns = _create_returns_table(doc, box)
+        table_returns = _create_returns_table(doc, box, order)
         tables.append(table_returns)
 
     if print_table:
@@ -100,7 +110,11 @@ def format_pipeline_docs(
     return tuple(tables)
 
 
-def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
+def _create_description_table(
+    doc: PipelineDoc,
+    box: Any,
+    order: Literal["topological", "alphabetical"],
+) -> Table:
     """Creates the description table."""
     from rich.table import Table
 
@@ -113,11 +127,22 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     table_desc.add_column("Function Name", style=RichStyle.BOLD_RED, no_wrap=True)
     table_desc.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
     table_desc.add_column("Description", style=RichStyle.GREEN)
-    for output_name in sorted(doc.descriptions, key=at_least_tuple):
+    for output_name in _sort(doc.descriptions, doc.topological_order, order):
         desc = doc.descriptions[output_name]
         name = doc.function_names[output_name]
         table_desc.add_row(name, _output_name_text(output_name), desc)
     return table_desc
+
+
+def _sort(
+    output_names: Iterable[OUTPUT_TYPE],
+    topological_order: list[OUTPUT_TYPE],
+    order: Literal["topological", "alphabetical"],
+) -> list[OUTPUT_TYPE]:
+    """Sorts the output names based on the specified order."""
+    if order == "alphabetical":
+        return sorted(output_names, key=at_least_tuple)
+    return [n for n in topological_order if n in output_names]
 
 
 def _output_name_text(output_name: OUTPUT_TYPE) -> Text:
@@ -192,7 +217,11 @@ def _create_parameter_row(
     return [param_text, desc_text] if skip_optional else [param_text, default_col, desc_text]
 
 
-def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
+def _create_returns_table(
+    doc: PipelineDoc,
+    box: Any,
+    order: Literal["topological", "alphabetical"],
+) -> Table:
     """Creates the returns table."""
     from rich.table import Table
 
@@ -205,7 +234,7 @@ def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     table_returns.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
     table_returns.add_column("Description", style=RichStyle.GREEN)
 
-    for output_name in sorted(doc.returns, key=at_least_tuple):
+    for output_name in _sort(doc.returns, doc.topological_order, order):
         desc = doc.returns[output_name]
         desc_text = f"{desc}"
         output_tuple = at_least_tuple(output_name)

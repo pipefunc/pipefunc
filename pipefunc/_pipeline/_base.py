@@ -2047,6 +2047,7 @@ class Pipeline:
             defaults=self.defaults,
             p_annotations=p_annotations,
             r_annotations=r_annotations,
+            topological_order=[f.output_name for f in self.sorted_functions],
             root_args=root_args,
         )
 
@@ -2059,6 +2060,7 @@ class Pipeline:
         description_table: bool = True,
         parameters_table: bool = True,
         returns_table: bool = True,
+        order: Literal["topological", "alphabetical"] = "topological",
     ) -> None:
         """Print the documentation for the pipeline as a table formatted with Rich.
 
@@ -2076,6 +2078,12 @@ class Pipeline:
             Whether to generate the function parameters table.
         returns_table
             Whether to generate the function returns table.
+        order
+            The order in which to display the functions in the documentation.
+            Options are:
+
+            * ``topological``: Display functions in topological order.
+            * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
 
         """
         requires("rich", "griffe", reason="print_doc", extras="autodoc")
@@ -2088,6 +2096,7 @@ class Pipeline:
             description_table=description_table,
             parameters_table=parameters_table,
             returns_table=returns_table,
+            order=order,
         )
 
 
