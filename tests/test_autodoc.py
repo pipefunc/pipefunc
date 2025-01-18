@@ -438,3 +438,11 @@ def test_pipeline_doc_annotations(pipeline: Pipeline) -> None:
         "d": int,
         "e": int,
     }
+
+
+def test_autodoc_no_docstring(pipeline: Pipeline, capsys: CaptureFixture) -> None:
+    for f in pipeline.functions:
+        f.func.__doc__ = ""
+    pipeline.print_doc()
+    captured = capsys.readouterr()
+    assert "(type: int)" in captured.out
