@@ -311,7 +311,7 @@ def test_pipeline_doc_return_type_annotation_multiple_outputs(
     assert doc.r_annotations["c"] == list[int]
     assert doc.r_annotations["d"] == set[str]
     pipeline.print_doc()
-    assert "Yolo. (type c: list) (type d: set)" in capsys.readouterr().out
+    assert "Description of the return. (type c: list) (type d: set)" in capsys.readouterr().out
 
 
 def test_pipeline_doc_return_type_annotation_multiple_outputs_same_type(

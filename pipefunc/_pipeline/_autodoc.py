@@ -79,13 +79,13 @@ def format_pipeline_docs(
 
     tables: list[Table] = []
 
-    if description_table:
-        table_desc = _create_description_table(doc, box)
-        tables.append(table_desc)
-
     if parameters_table:
         table_params = _create_parameters_table(doc, box, skip_optional, skip_intermediate)
         tables.append(table_params)
+
+    if description_table:
+        table_desc = _create_description_table(doc, box)
+        tables.append(table_desc)
 
     if returns_table:
         table_returns = _create_returns_table(doc, box)
@@ -113,14 +113,7 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     table_desc.add_column("Output Name", style=RichStyle.BOLD_RED, no_wrap=True)
     table_desc.add_column("Description", style=RichStyle.GREEN)
     for output_name, desc in sorted(doc.descriptions.items()):
-        desc_text = f"{desc}"
-        for name in at_least_tuple(output_name):
-            if name not in doc.r_annotations:
-                continue
-            annotation = type_as_string(doc.r_annotations[name])
-            annotation_str = f" [italic bold](type {name}: {annotation})[/]"
-            desc_text += annotation_str
-        table_desc.add_row(Text.from_markup(f"{output_name}"), desc_text)
+        table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
     return table_desc
 
 
@@ -202,6 +195,19 @@ def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     )
     table_returns.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
     table_returns.add_column("Description", style=RichStyle.GREEN)
-    for output_name, ret_desc in sorted(doc.returns.items()):
-        table_returns.add_row(Text.from_markup(f"{output_name}"), ret_desc)
+
+    for output_name, desc in sorted(doc.returns.items()):
+        desc_text = f"{desc}"
+        output_tuple = at_least_tuple(output_name)
+        for name in output_tuple:
+            if name not in doc.r_annotations:
+                continue
+            annotation = type_as_string(doc.r_annotations[name])
+            if len(output_tuple) > 1:
+                annotation_str = f" [italic bold](type {name}: {annotation})[/]"
+            else:
+                annotation_str = f" [italic bold](type: {annotation})[/]"
+            desc_text += annotation_str
+        table_returns.add_row(Text.from_markup(f"{output_name}"), desc_text)
+
     return table_returns
