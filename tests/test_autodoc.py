@@ -306,7 +306,18 @@ def test_pipeline_doc_return_type_annotation_multiple_outputs(
 
         return [a + b], {str(a + b)}
 
-    pipeline = Pipeline([f_multiple])
+    @pipefunc(output_name="e")
+    def g_single(c: list[int], d: set[str]) -> int:
+        """Foo.
+
+        :param c: Parameter c.
+        :param d: Parameter d.
+
+        :return: Description of the return.
+        """
+        return 1
+
+    pipeline = Pipeline([f_multiple, g_single])
     doc = pipeline.doc()
     assert doc.r_annotations["c"] == list[int]
     assert doc.r_annotations["d"] == set[str]
