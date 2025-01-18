@@ -112,7 +112,8 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     )
     table_desc.add_column("Output Name", style=RichStyle.BOLD_RED, no_wrap=True)
     table_desc.add_column("Description", style=RichStyle.GREEN)
-    for output_name, desc in sorted(doc.descriptions.items()):
+    for output_name in sorted(doc.descriptions, key=at_least_tuple):
+        desc = doc.descriptions[output_name]
         table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
     return table_desc
 
@@ -196,7 +197,8 @@ def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     table_returns.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
     table_returns.add_column("Description", style=RichStyle.GREEN)
 
-    for output_name, desc in sorted(doc.returns.items()):
+    for output_name in sorted(doc.returns, key=at_least_tuple):
+        desc = doc.returns[output_name]
         desc_text = f"{desc}"
         output_tuple = at_least_tuple(output_name)
         for name in output_tuple:
