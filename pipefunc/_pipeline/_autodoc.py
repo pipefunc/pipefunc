@@ -18,6 +18,7 @@ class PipelineDoc:
     descriptions: dict[OUTPUT_TYPE, str]
     parameters: dict[str, list[str]]
     returns: dict[OUTPUT_TYPE, str]
+    function_names: dict[OUTPUT_TYPE, str]
     defaults: dict[str, Any]
     p_annotations: dict[str, Any]
     r_annotations: dict[str, Any]
@@ -109,11 +110,13 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
         expand=True,
         show_lines=True,
     )
-    table_desc.add_column("Output Name", style=RichStyle.BOLD_RED, no_wrap=True)
+    table_desc.add_column("Function Name", style=RichStyle.BOLD_RED, no_wrap=True)
+    table_desc.add_column("Output Name", style=RichStyle.BOLD_MAGENTA, no_wrap=True)
     table_desc.add_column("Description", style=RichStyle.GREEN)
     for output_name in sorted(doc.descriptions, key=at_least_tuple):
         desc = doc.descriptions[output_name]
-        table_desc.add_row(_output_name_text(output_name), desc)
+        name = doc.function_names[output_name]
+        table_desc.add_row(name, _output_name_text(output_name), desc)
     return table_desc
 
 

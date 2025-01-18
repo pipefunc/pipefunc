@@ -2040,9 +2040,10 @@ class Pipeline:
                     parameters[p].append(v)
 
         return PipelineDoc(
-            descriptions,
-            dict(parameters),
-            returns,
+            descriptions=descriptions,
+            parameters=dict(parameters),
+            returns=returns,
+            function_names={f.output_name: f.func.__name__ for f in self.functions},
             defaults=self.defaults,
             p_annotations=p_annotations,
             r_annotations=r_annotations,
