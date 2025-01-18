@@ -102,7 +102,6 @@ def format_pipeline_docs(
 def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the description table."""
     from rich.table import Table
-    from rich.text import Text
 
     table_desc = Table(
         title=f"[{RichStyle.BOLD_RED}]Function Output Descriptions[/]",
@@ -114,8 +113,15 @@ def _create_description_table(doc: PipelineDoc, box: Any) -> Table:
     table_desc.add_column("Description", style=RichStyle.GREEN)
     for output_name in sorted(doc.descriptions, key=at_least_tuple):
         desc = doc.descriptions[output_name]
-        table_desc.add_row(Text.from_markup(f"{output_name}"), desc)
+        table_desc.add_row(_output_name_text(output_name), desc)
     return table_desc
+
+
+def _output_name_text(output_name: OUTPUT_TYPE) -> Text:
+    """Creates a Text object for the output name."""
+    from rich.text import Text
+
+    return Text.from_markup(f"{', '.join(at_least_tuple(output_name))}")
 
 
 def _create_parameters_table(
@@ -186,7 +192,6 @@ def _create_parameter_row(
 def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
     """Creates the returns table."""
     from rich.table import Table
-    from rich.text import Text
 
     table_returns = Table(
         title=f"[{RichStyle.BOLD_MAGENTA}]Return Values[/]",
@@ -210,6 +215,6 @@ def _create_returns_table(doc: PipelineDoc, box: Any) -> Table:
             else:
                 annotation_str = f" [italic bold](type: {annotation})[/]"
             desc_text += annotation_str
-        table_returns.add_row(Text.from_markup(f"{output_name}"), desc_text)
+        table_returns.add_row(_output_name_text(output_name), desc_text)
 
     return table_returns
