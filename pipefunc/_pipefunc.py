@@ -1211,6 +1211,75 @@ class NestedPipeFunc(PipeFunc):
         f._bound = self._bound.copy()
         return f
 
+    @classmethod
+    def add_processing_step(
+        cls,
+        pre: Callable[..., Any] | None = None,
+        post: Callable[..., Any] | None = None,
+    ) -> Callable[[PipeFunc], NestedPipeFunc]:
+        if pre is None and post is None:
+            msg = "At least one of `pre` or `post` must be provided."
+            raise ValueError(msg)
+
+        def wrapper(func: PipeFunc) -> NestedPipeFunc:
+            func_renames = {}
+            wrap_funcs = []
+
+            if pre is not None:
+                pre_process_parameters = tuple(
+                    set(inspect.signature(pre).parameters) & set(func.parameters),
+                )
+
+                # TODO: Look for a renaming that can not conflict with pre parameters.
+                # For instance when func accepts arr and arr_processed and pre accepts arr, renaming arr to arr_processed
+                # would fail.
+                pre_process_renames = tuple(
+                    f"{param}_processed" for param in pre_process_parameters
+                )
+
+                pre_func = PipeFunc(
+                    pre,
+                    pre_process_renames if len(pre_process_renames) > 1 else pre_process_renames[0],
+                )
+
+                func_renames.update(dict(zip(pre_process_parameters, pre_process_renames)))
+                wrap_funcs.append(pre_func)
+
+            if post is not None:
+                post_process_outputs = tuple(
+                    set(inspect.signature(post).parameters) & set(at_least_tuple(func.output_name)),
+                )
+                post_process_placeholders = tuple(
+                    f"{param}_placeholder" for param in post_process_outputs
+                )
+                post_process_renames = tuple(
+                    f"{param}_unprocessed" for param in post_process_outputs
+                )
+
+                post_func = PipeFunc(
+                    post,
+                    post_process_placeholders
+                    if len(post_process_placeholders) > 1
+                    else post_process_placeholders[0],
+                )
+
+                post_func.update_renames(
+                    {
+                        **dict(zip(post_process_placeholders, post_process_outputs)),
+                        **dict(zip(post_process_outputs, post_process_renames)),
+                    },
+                )
+
+                func_renames.update(dict(zip(post_process_outputs, post_process_renames)))
+                wrap_funcs.append(post_func)
+
+            return NestedPipeFunc(
+                [*wrap_funcs, func.copy(renames=func_renames)],
+                output_name=func.output_name,
+            )
+
+        return wrapper
+
     def _combine_mapspecs(self) -> MapSpec | None:
         mapspecs = [f.mapspec for f in self.pipeline.functions]
         if all(m is None for m in mapspecs):
