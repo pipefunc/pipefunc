@@ -325,6 +325,7 @@ def test_pipeline_doc_return_type_annotation_multiple_outputs_same_type(
     doc = pipeline.doc()
     assert doc.r_annotations["c"] is int
     assert doc.r_annotations["d"] is int
+    pipeline.print_doc()  # just to check no errors
 
 
 def test_pipeline_doc_return_type_annotation_no_type(pipeline: Pipeline) -> None:
@@ -334,8 +335,9 @@ def test_pipeline_doc_return_type_annotation_no_type(pipeline: Pipeline) -> None
 
     pipeline = Pipeline([f_multiple])
     doc = pipeline.doc()
-    assert "return_c" not in doc.p_annotations
-    assert "return_d" not in doc.p_annotations
+    assert "c" not in doc.p_annotations
+    assert "d" not in doc.p_annotations
+    pipeline.print_doc()  # just to check no errors
 
 
 def test_pipeline_doc_parameter_annotation_multiple_outputs(pipeline: Pipeline) -> None:
