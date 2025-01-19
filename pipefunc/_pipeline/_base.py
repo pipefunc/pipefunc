@@ -16,6 +16,8 @@ import functools
 import inspect
 import os
 import time
+import warnings
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -27,6 +29,7 @@ from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
+    extract_docstrings,
     handle_error,
     is_installed,
     is_running_in_ipynb,
@@ -44,6 +47,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
+from ._autodoc import PipelineDoc, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -2004,6 +2008,96 @@ class Pipeline:
             return table._repr_mimebundle_(include=include, exclude=exclude)
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
+
+    def docs(self) -> PipelineDoc:
+        """Return the documentation for the pipeline."""
+        descriptions: dict[OUTPUT_TYPE, str] = {}
+        returns: dict[OUTPUT_TYPE, str] = {}
+        parameters: dict[str, list[str]] = defaultdict(list)
+        p_annotations: dict[str, Any] = {}
+        r_annotations: dict[str, Any] = {}
+
+        for f in self.sorted_functions:
+            doc = extract_docstrings(f.func)
+            if f.parameter_annotations:
+                for p, v in f.parameter_annotations.items():
+                    if p in p_annotations and p_annotations[p] != v:
+                        msg = f"Conflicting annotations for parameter `{p}`: `{p_annotations[p]}` != `{v}`."
+                        warnings.warn(msg, stacklevel=2)
+                    p_annotations[p] = v
+            if f.output_annotation:
+                for p, v in f.output_annotation.items():
+                    if p in r_annotations and r_annotations[p] != v:
+                        msg = f"Conflicting annotations for return `{p}`: `{r_annotations[p]}` != `{v}`."
+                        warnings.warn(msg, stacklevel=2)
+                    r_annotations[p] = v
+            if doc.description:
+                descriptions[f.output_name] = doc.description
+            if doc.returns:
+                returns[f.output_name] = doc.returns
+            for p, v in doc.parameters.items():
+                if v not in parameters[p]:
+                    parameters[p].append(v)
+
+        return PipelineDoc(
+            descriptions=descriptions,
+            parameters=dict(parameters),
+            returns=returns,
+            function_names={f.output_name: f.func.__name__ for f in self.functions},
+            defaults=self.defaults,
+            p_annotations=p_annotations,
+            r_annotations=r_annotations,
+            topological_order=[f.output_name for f in self.sorted_functions],
+            root_args=self.topological_generations.root_args,
+        )
+
+    def print_docs(
+        self,
+        *,
+        borders: bool = False,
+        skip_optional: bool = False,
+        skip_intermediate: bool = True,
+        description_table: bool = True,
+        parameters_table: bool = True,
+        returns_table: bool = True,
+        order: Literal["topological", "alphabetical"] = "topological",
+    ) -> None:
+        """Print the documentation for the pipeline as a table formatted with Rich.
+
+        Parameters
+        ----------
+        borders
+            Whether to include borders in the tables.
+        skip_optional
+            Whether to skip optional parameters.
+        skip_intermediate
+            Whether to skip intermediate outputs and only show root parameters.
+        description_table
+            Whether to generate the function description table.
+        parameters_table
+            Whether to generate the function parameters table.
+        returns_table
+            Whether to generate the function returns table.
+        order
+            The order in which to display the functions in the documentation.
+            Options are:
+
+            * ``topological``: Display functions in topological order.
+            * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+
+        """
+        requires("rich", "griffe", reason="print_doc", extras="autodoc")
+
+        format_pipeline_docs(
+            self.docs(),
+            skip_optional=skip_optional,
+            skip_intermediate=skip_intermediate,
+            borders=borders,
+            description_table=description_table,
+            parameters_table=parameters_table,
+            returns_table=returns_table,
+            order=order,
+        )
 
 
 class Generations(NamedTuple):
