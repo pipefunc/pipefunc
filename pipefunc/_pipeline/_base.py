@@ -2009,15 +2009,15 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def doc(self) -> PipelineDoc:
+    def docs(self) -> PipelineDoc:
         """Return the documentation for the pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
         p_annotations: dict[str, Any] = {}
         r_annotations: dict[str, Any] = {}
-        root_args = self.topological_generations.root_args
-        for f in self.functions:
+
+        for f in self.sorted_functions:
             doc = extract_docstrings(f.func)
             if f.parameter_annotations:
                 for p, v in f.parameter_annotations.items():
@@ -2048,10 +2048,10 @@ class Pipeline:
             p_annotations=p_annotations,
             r_annotations=r_annotations,
             topological_order=[f.output_name for f in self.sorted_functions],
-            root_args=root_args,
+            root_args=self.topological_generations.root_args,
         )
 
-    def print_doc(
+    def print_docs(
         self,
         *,
         borders: bool = False,
@@ -2089,7 +2089,7 @@ class Pipeline:
         requires("rich", "griffe", reason="print_doc", extras="autodoc")
 
         format_pipeline_docs(
-            self.doc(),
+            self.docs(),
             skip_optional=skip_optional,
             skip_intermediate=skip_intermediate,
             borders=borders,
