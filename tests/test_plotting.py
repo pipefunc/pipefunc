@@ -189,9 +189,10 @@ def test_visualize_graphviz(
 def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     # Note: Not sure how to test this properly, just make sure it runs
     widget = everything_pipeline.visualize(backend="graphviz_widget")
-    first, second, widget = widget.children
-    reset_button, direction_selector = first.children
-    search_input, search_type_selector, case_toggle = second.children
+    first, second = widget.children
+    reset_button, freeze, direction_selector, search_input, search_type_selector, case_toggle = (
+        first.children
+    )
     reset_button.click()
     direction_selector.value = "downstream"
     search_input.value = "c"
