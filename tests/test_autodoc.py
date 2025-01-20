@@ -495,3 +495,22 @@ def test_renames(pipeline: Pipeline, capsys: CaptureFixture) -> None:
     assert "alpha" in out
     assert "beta" in out
     assert "epsilon" in out
+
+
+def test_no_annotations(pipeline: Pipeline, capsys: CaptureFixture) -> None:
+    pipeline = pipeline.copy()
+
+    @pipefunc(output_name="c")
+    def f1(a, b):  # Sphinx style
+        """This is function f1.
+
+        :param a: Parameter a.
+        """
+        return a + b
+
+    pipeline.replace(f1)
+    pipeline.update_defaults({"b": 2})
+    pipeline.print_docs()
+    captured = capsys.readouterr()
+    assert "— (type: NoAnnotation)" in captured.out
+    assert "Parameter b. (default: 2) (type: int)" in captured.out
