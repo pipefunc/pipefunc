@@ -2009,7 +2009,7 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def docs(self) -> PipelineDoc:
+    def docs(self) -> PipelineDoc:  # noqa: PLR0912
         """Return the documentation for the pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
@@ -2038,6 +2038,18 @@ class Pipeline:
             for p, v in doc.parameters.items():
                 if v not in parameters[p]:
                     parameters[p].append(v)
+
+        # Add emdash to dicts where docs are missing
+        info = self.info()
+        assert info is not None
+        for p in info["inputs"]:
+            if p not in parameters:
+                parameters[p].append("—")
+        for f in self.functions:
+            if f.output_name not in returns:
+                returns[f.output_name] = "—"
+            if f.output_name not in descriptions:
+                descriptions[f.output_name] = "—"
 
         return PipelineDoc(
             descriptions=descriptions,

@@ -395,7 +395,7 @@ def test_pipeline_doc_descriptions_empty_dict_when_no_descriptions(pipeline: Pip
     for f in pipeline.functions:
         f.func.__doc__ = ""
     doc = pipeline.docs()
-    assert doc.descriptions == {}
+    assert doc.descriptions == {"c": "—", "d": "—", "e": "—"}
 
 
 def test_pipeline_doc_defaults(pipeline: Pipeline) -> None:
@@ -459,3 +459,22 @@ def test_autodoc_no_docstring(pipeline: Pipeline, capsys: CaptureFixture) -> Non
     pipeline.print_docs()
     captured = capsys.readouterr()
     assert "(type: int)" in captured.out
+
+
+def test_autodoc_missing_parameter_and_return(capsys: CaptureFixture) -> None:
+    @pipefunc(output_name="c")
+    def f1(a: int, b: int) -> float:
+        """This is function f1.
+
+        :param a: Parameter a.
+        """
+        return (a + b) / 2
+
+    pipeline = Pipeline([f1])
+
+    pipeline.print_docs()
+    captured = capsys.readouterr()
+    assert "— (type: int)" in captured.out  # missing parameter b
+    assert "— (type: float)" in captured.out  # missing return value
+    assert "This is function f1." in captured.out
+    assert "Parameter a." in captured.out
