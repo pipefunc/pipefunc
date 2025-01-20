@@ -514,3 +514,28 @@ def test_no_annotations(pipeline: Pipeline, capsys: CaptureFixture) -> None:
     captured = capsys.readouterr()
     assert "— (type: NoAnnotation)" in captured.out
     assert "Parameter b. (default: 2) (type: int)" in captured.out
+
+
+def test_bound_parameter_is_not_in_docstring(
+    pipeline: Pipeline,
+    capsys: CaptureFixture,
+) -> None:
+    @pipefunc(output_name="c", bound={"b": 10})
+    def f1(a: int, b: int = 2) -> int:
+        """This is function f1.
+
+        :param a: Parameter a.
+        :param b: Parameter b.
+        """
+        return a + b
+
+    pipeline = Pipeline([f1])
+    info = pipeline.info()
+    assert info is not None
+    inputs = info["inputs"]
+    assert "a" in inputs
+    assert "b" not in inputs
+    pipeline.print_docs()
+    captured = capsys.readouterr()
+    assert "Parameter a" in captured.out
+    assert "Parameter b" not in captured.out

@@ -2033,6 +2033,8 @@ class Pipeline:
                 returns[f.output_name] = doc.returns
             for p, v in doc.parameters.items():
                 p_renamed = f.renames.get(p, p)
+                if p_renamed in f.bound:
+                    continue
                 if v not in parameters[p_renamed]:
                     parameters[p_renamed].append(v)
 
