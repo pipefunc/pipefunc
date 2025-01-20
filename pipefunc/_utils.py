@@ -229,7 +229,7 @@ def is_running_in_ipynb() -> bool:
         return False
     try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
-    except NameError:
+    except NameError:  # pragma: no cover
         return False  # Probably standard Python interpreter
 
 
@@ -275,7 +275,7 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if not is_imported("pydantic"):
+    if not is_imported("pydantic"):  # pragma: no cover
         return False
     if not inspect.isclass(x):
         return False
