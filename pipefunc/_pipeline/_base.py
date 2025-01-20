@@ -47,7 +47,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
-from ._autodoc import PipelineDoc, format_pipeline_docs
+from ._autodoc import PipelineDocumentation, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -2009,7 +2009,7 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def docs(self) -> PipelineDoc:  # noqa: PLR0912
+    def docs(self) -> PipelineDocumentation:  # noqa: PLR0912
         """Return the documentation for the pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
@@ -2050,7 +2050,7 @@ class Pipeline:
             if f.output_name not in descriptions:
                 descriptions[f.output_name] = "—"
 
-        return PipelineDoc(
+        return PipelineDocumentation(
             descriptions=descriptions,
             parameters=dict(parameters),
             returns=returns,

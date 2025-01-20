@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class PipelineDoc:
+class PipelineDocumentation:
     descriptions: dict[OUTPUT_TYPE, str]
     parameters: dict[str, list[str]]
     returns: dict[OUTPUT_TYPE, str]
@@ -38,7 +38,7 @@ class RichStyle:
 
 
 def format_pipeline_docs(
-    doc: PipelineDoc,
+    doc: PipelineDocumentation,
     *,
     borders: bool = False,
     skip_optional: bool = False,
@@ -111,7 +111,7 @@ def format_pipeline_docs(
 
 
 def _create_description_table(
-    doc: PipelineDoc,
+    doc: PipelineDocumentation,
     box: Any,
     order: Literal["topological", "alphabetical"],
 ) -> Table:
@@ -153,7 +153,7 @@ def _output_name_text(output_name: OUTPUT_TYPE) -> Text:
 
 
 def _create_parameters_table(
-    doc: PipelineDoc,
+    doc: PipelineDocumentation,
     box: Any,
     skip_optional: bool,  # noqa: FBT001
     skip_intermediate: bool,  # noqa: FBT001
@@ -218,7 +218,7 @@ def _create_parameter_row(
 
 
 def _create_returns_table(
-    doc: PipelineDoc,
+    doc: PipelineDocumentation,
     box: Any,
     order: Literal["topological", "alphabetical"],
 ) -> Table:

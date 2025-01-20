@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._pipeline._autodoc import format_pipeline_docs
 from pipefunc._utils import extract_docstrings
 from pipefunc.typing import NoAnnotation
@@ -592,3 +593,25 @@ def test_output_annotation_multiple_outputs(pipeline: Pipeline) -> None:
     doc = pipeline.docs()
     assert doc.r_annotations["c"] == NoAnnotation
     assert doc.r_annotations["d"] == NoAnnotation
+
+
+def test_dataclass_docstring(capsys: CaptureFixture) -> None:
+    @dataclass
+    class Foo:
+        """
+        This is a Foo class.
+
+        :param a: The first parameter.
+        :param b: The second parameter.
+        """
+
+        a: int
+        b: str
+
+    pipeline = Pipeline([PipeFunc(Foo, "foo")])
+    doc = pipeline.docs()
+    assert doc.parameters == {"a": ["The first parameter."], "b": ["The second parameter."]}
+    pipeline.print_docs()
+    out = capsys.readouterr().out
+    assert "This is a Foo class." in out
+    assert "— (type: Foo)" in out  # returns section
