@@ -39,7 +39,7 @@ jobs:
         shell: bash -l {0}
         run: |
           python -c "import pipefunc; print(pipefunc.__version__)"
-          pytest
+          pytest -nauto
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
