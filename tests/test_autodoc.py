@@ -7,7 +7,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._pipeline._autodoc import format_pipeline_docs
-from pipefunc._utils import extract_docstrings
+from pipefunc._utils import parse_function_docstring
 from pipefunc.typing import NoAnnotation
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ def my_sphinx_style_function(a: int, b: str = "hello", c: float = 3.14):
     ],
 )
 def test_extract_docstring(function, style) -> None:
-    doc = extract_docstrings(function, docstring_parser=style)
+    doc = parse_function_docstring(function, docstring_parser=style)
     expected_description = "This is my function."
     expected_parameters = {
         "a": "The first parameter.",
@@ -100,7 +100,7 @@ def test_extract_docstring(function, style) -> None:
     assert doc.parameters == expected_parameters
     assert doc.description == expected_description
     assert doc.returns == expected_return
-    doc_auto = extract_docstrings(function)  # default is "auto"
+    doc_auto = parse_function_docstring(function)  # default is "auto"
     assert doc_auto.parameters == expected_parameters
     assert doc_auto.description == expected_description
     assert doc_auto.returns == expected_return
@@ -108,7 +108,7 @@ def test_extract_docstring(function, style) -> None:
 
 def test_exception_wrong_parser() -> None:
     with pytest.raises(ValueError, match="Invalid docstring parser"):
-        extract_docstrings(
+        parse_function_docstring(
             my_google_style_function,
             docstring_parser="wrong",  # type: ignore[arg-type]
         )

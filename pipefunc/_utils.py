@@ -357,19 +357,22 @@ def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
         logger.disabled = original_state
 
 
-ParserType = Literal["google", "numpy", "sphinx", "auto"]
+DocstringStyle = Literal["google", "numpy", "sphinx", "auto"]
 
 
-def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[DocstringSection]:
+def _parse_docstring_sections(
+    docstring: str,
+    docstring_parser: DocstringStyle,
+) -> list[DocstringSection]:
     requires("griffe", reason="extracting docstrings", extras="autodoc")
     from griffe import Docstring, Parser
 
-    options = get_args(ParserType)
+    options = get_args(DocstringStyle)
     if docstring_parser == "auto":
         # Poor man's "auto" parser selection because griffe has this as a paid feature
         # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
         results = [
-            _docstring_sections(docstring, parser)  # type: ignore[arg-type]
+            _parse_docstring_sections(docstring, parser)  # type: ignore[arg-type]
             for parser in options
             if parser != "auto"
         ]
@@ -385,7 +388,7 @@ def _docstring_sections(docstring: str, docstring_parser: ParserType) -> list[Do
 
 
 @dataclass
-class Doc:
+class DocstringInfo:
     """A class to store a function's docstring and its extracted parameter docstrings."""
 
     description: str | None
@@ -393,14 +396,15 @@ class Doc:
     returns: str | None
 
 
-def extract_docstrings(
+def parse_function_docstring(
     func: Callable[..., Any],
-    docstring_parser: ParserType = "auto",
-) -> Doc:
-    """Extract parameter docstrings from a function's docstring.
+    docstring_parser: DocstringStyle = "auto",
+) -> DocstringInfo:
+    """Parse a function's docstring into structured components.
 
-    Supports Google, NumPy, and standard Python docstring formats,
-    using the `griffe` library for parsing.
+    Extracts the main description, parameter descriptions, and return description
+    from a function's docstring. Supports Google, NumPy, and standard Python
+    docstring formats using the `griffe` library for parsing.
 
     Parameters
     ----------
@@ -416,12 +420,12 @@ def extract_docstrings(
     """
     docstring = inspect.getdoc(func)
     if not docstring:
-        return Doc(None, {}, None)
+        return DocstringInfo(None, {}, None)
 
     parameters: dict[str, str] = {}
     returns: list[str] = []
     description: list[str] = []
-    sections = _docstring_sections(docstring, docstring_parser)
+    sections = _parse_docstring_sections(docstring, docstring_parser)
     for section in sections:
         if section.kind.name == "parameters":
             for parameter in section.value:
@@ -435,4 +439,4 @@ def extract_docstrings(
         if section.kind.name == "text":
             description.append(section.value)
 
-    return Doc("\n".join(description), parameters, "\n".join(returns))
+    return DocstringInfo("\n".join(description), parameters, "\n".join(returns))

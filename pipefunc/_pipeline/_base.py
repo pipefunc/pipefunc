@@ -29,10 +29,10 @@ from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
-    extract_docstrings,
     handle_error,
     is_installed,
     is_running_in_ipynb,
+    parse_function_docstring,
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
@@ -2018,7 +2018,7 @@ class Pipeline:
         r_annotations: dict[str, Any] = {}
 
         for f in self.sorted_functions:
-            doc = extract_docstrings(f.func)
+            doc = parse_function_docstring(f.func)
             if f.parameter_annotations:
                 for p, v in f.parameter_annotations.items():
                     if p in p_annotations and p_annotations[p] != v:
