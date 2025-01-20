@@ -79,7 +79,7 @@ if TYPE_CHECKING:
     from pipefunc.map._result import Result
     from pipefunc.map._types import UserShapeDict
 
-    from ._types import OUTPUT_TYPE
+    from ._types import OUTPUT_TYPE, StorageType
 
 
 class Pipeline:
@@ -702,7 +702,7 @@ class Pipeline:
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+        storage: StorageType = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -826,7 +826,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+        storage: StorageType = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
