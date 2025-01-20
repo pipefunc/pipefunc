@@ -2009,7 +2009,7 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def docs(self) -> PipelineDocumentation:  # noqa: PLR0912
+    def _docs(self) -> PipelineDocumentation:  # noqa: PLR0912
         """Return the documentation for the pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
@@ -2100,7 +2100,7 @@ class Pipeline:
         requires("rich", "griffe", reason="print_doc", extras="autodoc")
 
         format_pipeline_docs(
-            self.docs(),
+            self._docs(),
             skip_optional=skip_optional,
             skip_intermediate=skip_intermediate,
             borders=borders,
