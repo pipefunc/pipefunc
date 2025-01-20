@@ -409,13 +409,15 @@ def parse_function_docstring(
     Parameters
     ----------
     func
-        The function to extract docstrings from.
+        The function whose docstring should be parsed.
     docstring_parser
-        The docstring parser to use.
+        The docstring style to use for parsing. Can be 'google', 'numpy',
+        'sphinx', or 'auto' to automatically detect the style.
 
     Returns
     -------
-        A `Doc` object containing the extracted docstrings.
+        A structured representation of the docstring containing the main description,
+        parameter descriptions, and return description.
 
     """
     docstring = inspect.getdoc(func)
