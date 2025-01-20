@@ -2062,7 +2062,7 @@ class Pipeline:
             root_args=self.topological_generations.root_args,
         )
 
-    def print_docs(
+    def print_documentation(
         self,
         *,
         borders: bool = False,

@@ -165,7 +165,7 @@ def pipeline() -> Pipeline:
 
 
 def test_print_doc_default(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(order="alphabetical")
+    pipeline.print_documentation(order="alphabetical")
     captured = capsys.readouterr()
     assert "Function Output Descriptions" in captured.out
     assert "Parameters" in captured.out
@@ -173,7 +173,7 @@ def test_print_doc_default(pipeline: Pipeline, capsys: CaptureFixture) -> None:
 
 
 def test_print_doc_no_borders(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(borders=False)
+    pipeline.print_documentation(borders=False)
     captured = capsys.readouterr()
     assert "─" not in captured.out
     assert "│" not in captured.out
@@ -181,7 +181,7 @@ def test_print_doc_no_borders(pipeline: Pipeline, capsys: CaptureFixture) -> Non
 
 
 def test_print_doc_borders(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(borders=True)
+    pipeline.print_documentation(borders=True)
     captured = capsys.readouterr()
     assert "─" in captured.out
     assert "│" in captured.out
@@ -189,19 +189,19 @@ def test_print_doc_borders(pipeline: Pipeline, capsys: CaptureFixture) -> None:
 
 
 def test_print_doc_skip_optional(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(skip_optional=True)
+    pipeline.print_documentation(skip_optional=True)
     captured = capsys.readouterr()
     assert "x" not in captured.out
 
 
 def test_print_doc_no_skip_optional(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(skip_optional=False)
+    pipeline.print_documentation(skip_optional=False)
     captured = capsys.readouterr()
     assert " x " in captured.out
 
 
 def test_print_doc_skip_intermediate(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         skip_intermediate=True,
         description_table=False,
         parameters_table=True,
@@ -213,7 +213,7 @@ def test_print_doc_skip_intermediate(pipeline: Pipeline, capsys: CaptureFixture)
 
 
 def test_print_doc_no_skip_intermediate(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         skip_intermediate=False,
         description_table=False,
         parameters_table=True,
@@ -225,7 +225,7 @@ def test_print_doc_no_skip_intermediate(pipeline: Pipeline, capsys: CaptureFixtu
 
 
 def test_print_doc_no_tables(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         description_table=False,
         parameters_table=False,
         returns_table=False,
@@ -235,7 +235,7 @@ def test_print_doc_no_tables(pipeline: Pipeline, capsys: CaptureFixture) -> None
 
 
 def test_print_doc_description_table_only(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         description_table=True,
         parameters_table=False,
         returns_table=False,
@@ -247,7 +247,7 @@ def test_print_doc_description_table_only(pipeline: Pipeline, capsys: CaptureFix
 
 
 def test_print_doc_parameters_table_only(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         description_table=False,
         parameters_table=True,
         returns_table=False,
@@ -259,7 +259,7 @@ def test_print_doc_parameters_table_only(pipeline: Pipeline, capsys: CaptureFixt
 
 
 def test_print_doc_returns_table_only(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs(
+    pipeline.print_documentation(
         description_table=False,
         parameters_table=False,
         returns_table=True,
@@ -323,7 +323,7 @@ def test_pipeline_doc_return_type_annotation_multiple_outputs(
     doc = pipeline._docs()
     assert doc.r_annotations["c"] == list[int]
     assert doc.r_annotations["d"] == set[str]
-    pipeline.print_docs()
+    pipeline.print_documentation()
     assert "Description of the return. (type c: list) (type d: set)" in capsys.readouterr().out
 
 
@@ -338,7 +338,7 @@ def test_pipeline_doc_return_type_annotation_multiple_outputs_same_type(
     doc = pipeline._docs()
     assert doc.r_annotations["c"] is int
     assert doc.r_annotations["d"] is int
-    pipeline.print_docs()  # just to check no errors
+    pipeline.print_documentation()  # just to check no errors
 
 
 def test_pipeline_doc_return_type_annotation_no_type(pipeline: Pipeline) -> None:
@@ -350,7 +350,7 @@ def test_pipeline_doc_return_type_annotation_no_type(pipeline: Pipeline) -> None
     doc = pipeline._docs()
     assert "c" not in doc.p_annotations
     assert "d" not in doc.p_annotations
-    pipeline.print_docs()  # just to check no errors
+    pipeline.print_documentation()  # just to check no errors
 
 
 def test_pipeline_doc_parameter_annotation_multiple_outputs(pipeline: Pipeline) -> None:
@@ -458,7 +458,7 @@ def test_pipeline_doc_annotations(pipeline: Pipeline) -> None:
 def test_autodoc_no_docstring(pipeline: Pipeline, capsys: CaptureFixture) -> None:
     for f in pipeline.functions:
         f.func.__doc__ = ""
-    pipeline.print_docs()
+    pipeline.print_documentation()
     captured = capsys.readouterr()
     assert "(type: int)" in captured.out
 
@@ -474,7 +474,7 @@ def test_autodoc_missing_parameter_and_return(capsys: CaptureFixture) -> None:
 
     pipeline = Pipeline([f1])
 
-    pipeline.print_docs()
+    pipeline.print_documentation()
     captured = capsys.readouterr()
     assert "— (type: int)" in captured.out  # missing parameter b
     assert "— (type: float)" in captured.out  # missing return value
@@ -492,7 +492,7 @@ def test_renames(pipeline: Pipeline, capsys: CaptureFixture) -> None:
     assert "b" not in doc.parameters
     assert "epsilon" in doc.returns
     assert "e" not in doc.returns
-    pipeline.print_docs()
+    pipeline.print_documentation()
     out = capsys.readouterr().out
     assert "alpha" in out
     assert "beta" in out
@@ -512,7 +512,7 @@ def test_no_annotations(pipeline: Pipeline, capsys: CaptureFixture) -> None:
 
     pipeline.replace(f1)
     pipeline.update_defaults({"b": 2})
-    pipeline.print_docs()
+    pipeline.print_documentation()
     captured = capsys.readouterr()
     assert "— (type: NoAnnotation)" in captured.out
     assert "Parameter b. (default: 2) (type: int)" in captured.out
@@ -537,7 +537,7 @@ def test_bound_parameter_is_not_in_docstring(
     inputs = info["inputs"]
     assert "a" in inputs
     assert "b" not in inputs
-    pipeline.print_docs()
+    pipeline.print_documentation()
     captured = capsys.readouterr()
     assert "Parameter a" in captured.out
     assert "Parameter b" not in captured.out
@@ -567,7 +567,7 @@ def test_same_parameter_in_multiple_functions_different_doc(
     pipeline = Pipeline([f1, f2])
     doc = pipeline._docs()
     assert len(doc.parameters["a"]) == 2
-    pipeline.print_docs()
+    pipeline.print_documentation()
     out = capsys.readouterr().out
     assert "1. Foo a." in out
     assert "2. Bar a." in out
@@ -611,7 +611,7 @@ def test_dataclass_docstring(capsys: CaptureFixture) -> None:
     pipeline = Pipeline([PipeFunc(Foo, "foo")])
     doc = pipeline._docs()
     assert doc.parameters == {"a": ["The first parameter."], "b": ["The second parameter."]}
-    pipeline.print_docs()
+    pipeline.print_documentation()
     out = capsys.readouterr().out
     assert "This is a Foo class." in out
     assert "— (type: Foo)" in out  # returns section
