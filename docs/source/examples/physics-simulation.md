@@ -174,7 +174,7 @@ Make sure to install it using `pip install "pipefunc[autodoc]"`
 :::
 
 ```{code-cell} ipython3
-pipeline_charge.print_docs()
+pipeline_charge.print_documentation()
 ```
 
 Let's run the map for some inputs:
