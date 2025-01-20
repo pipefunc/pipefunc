@@ -2026,11 +2026,7 @@ class Pipeline:
                         warnings.warn(msg, stacklevel=2)
                     p_annotations[p] = v
             if f.output_annotation:
-                for p, v in f.output_annotation.items():
-                    if p in r_annotations and r_annotations[p] != v:
-                        msg = f"Conflicting annotations for return `{p}`: `{r_annotations[p]}` != `{v}`."
-                        warnings.warn(msg, stacklevel=2)
-                    r_annotations[p] = v
+                r_annotations.update(f.output_annotation)
             if doc.description:
                 descriptions[f.output_name] = doc.description
             if doc.returns:

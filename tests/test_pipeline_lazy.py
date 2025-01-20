@@ -42,6 +42,7 @@ def test_pipeline_and_all_arg_combinations_lazy() -> None:
     kw["c"] = f1(a=kw["a"], b=kw["b"])
     kw["d"] = f2(b=kw["b"], c=kw["c"])
     kw["e"] = f3(c=kw["c"], d=kw["d"], x=kw["x"])
+    assert pipeline.arg_combinations("c") == all_args["c"]
     for params in all_args["e"]:
         _kw = {k: kw[k] for k in params}
         assert fe(**_kw).evaluate() == kw["e"]
