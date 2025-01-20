@@ -163,7 +163,7 @@ def pipeline() -> Pipeline:
 
 
 def test_print_doc_default(pipeline: Pipeline, capsys: CaptureFixture) -> None:
-    pipeline.print_docs()
+    pipeline.print_docs(order="alphabetical")
     captured = capsys.readouterr()
     assert "Function Output Descriptions" in captured.out
     assert "Parameters" in captured.out
@@ -478,3 +478,20 @@ def test_autodoc_missing_parameter_and_return(capsys: CaptureFixture) -> None:
     assert "— (type: float)" in captured.out  # missing return value
     assert "This is function f1." in captured.out
     assert "Parameter a." in captured.out
+
+
+def test_renames(pipeline: Pipeline, capsys: CaptureFixture) -> None:
+    pipeline = pipeline.copy()
+    pipeline.update_renames({"a": "alpha", "b": "beta", "e": "epsilon"})
+    doc = pipeline.docs()
+    assert "alpha" in doc.parameters
+    assert "beta" in doc.parameters
+    assert "a" not in doc.parameters
+    assert "b" not in doc.parameters
+    assert "epsilon" in doc.returns
+    assert "e" not in doc.returns
+    pipeline.print_docs()
+    out = capsys.readouterr().out
+    assert "alpha" in out
+    assert "beta" in out
+    assert "epsilon" in out

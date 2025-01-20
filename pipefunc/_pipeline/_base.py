@@ -2032,8 +2032,9 @@ class Pipeline:
             if doc.returns:
                 returns[f.output_name] = doc.returns
             for p, v in doc.parameters.items():
-                if v not in parameters[p]:
-                    parameters[p].append(v)
+                p_renamed = f.renames.get(p, p)
+                if v not in parameters[p_renamed]:
+                    parameters[p_renamed].append(v)
 
         # Add emdash to dicts where docs are missing
         info = self.info()
