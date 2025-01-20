@@ -239,8 +239,6 @@ def _create_returns_table(
         desc_text = f"{desc}"
         output_tuple = at_least_tuple(output_name)
         for name in output_tuple:
-            if name not in doc.r_annotations:
-                continue
             annotation = type_as_string(doc.r_annotations[name])
             if len(output_tuple) > 1:
                 annotation_str = f" [italic bold](type {name}: {annotation})[/]"
