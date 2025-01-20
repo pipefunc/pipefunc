@@ -32,7 +32,7 @@ jobs:
       - name: Run pytest (minimal)
         run: |
           source .venv/bin/activate
-          pytest
+          pytest -nauto
 
       - name: Install pipefunc (all dependencies)
         run: |
@@ -46,4 +46,4 @@ jobs:
       - name: Run pytest (all dependencies)
         run: |
           source .venv/bin/activate
-          pytest
+          pytest -nauto
