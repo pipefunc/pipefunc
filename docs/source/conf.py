@@ -60,7 +60,6 @@ pygments_style = "sphinx"
 html_logo = "https://github.com/basnijholt/nijho.lt/raw/92b0aa820318f466388d828adf01120760255acf/content/project/pipefunc/featured.png"
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_css_files = ['custom.css']
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
