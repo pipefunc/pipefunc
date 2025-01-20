@@ -7,6 +7,7 @@ import pytest
 from pipefunc import Pipeline, pipefunc
 from pipefunc._pipeline._autodoc import format_pipeline_docs
 from pipefunc._utils import extract_docstrings
+from pipefunc.typing import NoAnnotation
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
@@ -569,3 +570,25 @@ def test_same_parameter_in_multiple_functions_different_doc(
     out = capsys.readouterr().out
     assert "1. Foo a." in out
     assert "2. Bar a." in out
+
+
+def test_output_annotation_multiple_outputs(pipeline: Pipeline) -> None:
+    # Here we cannot extract the type annotation because of the output_picker
+    @pipefunc(output_name=("c", "d"), output_picker=lambda x, key: x[key])
+    def f_multiple(a: int, b: int) -> dict[str, int]:
+        """Yolo.
+
+        Args:
+            a: Parameter a.
+            b: Parameter b.
+
+        Returns:
+            Description of the return.
+        """
+
+        return {"c": a + b, "d": a - b}
+
+    pipeline = Pipeline([f_multiple])
+    doc = pipeline.docs()
+    assert doc.r_annotations["c"] == NoAnnotation
+    assert doc.r_annotations["d"] == NoAnnotation
