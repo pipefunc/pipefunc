@@ -539,3 +539,33 @@ def test_bound_parameter_is_not_in_docstring(
     captured = capsys.readouterr()
     assert "Parameter a" in captured.out
     assert "Parameter b" not in captured.out
+
+
+def test_same_parameter_in_multiple_functions_different_doc(
+    capsys: CaptureFixture,
+) -> None:
+    @pipefunc(output_name="c")
+    def f1(a: int, b: int) -> int:
+        """This is function f1.
+
+        :param a: Foo a.
+        :param b: Parameter b.
+        """
+        return a + b
+
+    @pipefunc(output_name="d")
+    def f2(a: int, c: int) -> int:
+        """This is function f2.
+
+        :param a: Bar a.
+        :param c: Parameter c.
+        """
+        return a * c
+
+    pipeline = Pipeline([f1, f2])
+    doc = pipeline.docs()
+    assert len(doc.parameters["a"]) == 2
+    pipeline.print_docs()
+    out = capsys.readouterr().out
+    assert "1. Foo a." in out
+    assert "2. Bar a." in out
