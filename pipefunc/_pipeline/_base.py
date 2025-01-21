@@ -16,8 +16,6 @@ import functools
 import inspect
 import os
 import time
-import warnings
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -32,7 +30,6 @@ from pipefunc._utils import (
     handle_error,
     is_installed,
     is_running_in_ipynb,
-    parse_function_docstring,
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
@@ -2009,59 +2006,6 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
-    def _docs(self) -> PipelineDocumentation:  # noqa: PLR0912
-        """Return the documentation for the pipeline."""
-        descriptions: dict[OUTPUT_TYPE, str] = {}
-        returns: dict[OUTPUT_TYPE, str] = {}
-        parameters: dict[str, list[str]] = defaultdict(list)
-        p_annotations: dict[str, Any] = {}
-        r_annotations: dict[str, Any] = {}
-
-        for f in self.sorted_functions:
-            doc = parse_function_docstring(f.func)
-            if f.parameter_annotations:
-                for p, v in f.parameter_annotations.items():
-                    if p in p_annotations and p_annotations[p] != v:
-                        msg = f"Conflicting annotations for parameter `{p}`: `{p_annotations[p]}` != `{v}`."
-                        warnings.warn(msg, stacklevel=2)
-                    p_annotations[p] = v
-            if f.output_annotation:
-                r_annotations.update(f.output_annotation)
-            if doc.description:
-                descriptions[f.output_name] = doc.description
-            if doc.returns:
-                returns[f.output_name] = doc.returns
-            for p, v in doc.parameters.items():
-                p_renamed = f.renames.get(p, p)
-                if p_renamed in f.bound:
-                    continue
-                if v not in parameters[p_renamed]:
-                    parameters[p_renamed].append(v)
-
-        # Add emdash to dicts where docs are missing
-        info = self.info()
-        assert info is not None
-        for p in info["inputs"]:
-            if p not in parameters:
-                parameters[p].append("—")
-        for f in self.functions:
-            if f.output_name not in returns:
-                returns[f.output_name] = "—"
-            if f.output_name not in descriptions:
-                descriptions[f.output_name] = "—"
-
-        return PipelineDocumentation(
-            descriptions=descriptions,
-            parameters=dict(parameters),
-            returns=returns,
-            function_names={f.output_name: f.func.__name__ for f in self.functions},
-            defaults=self.defaults,
-            p_annotations=p_annotations,
-            r_annotations=r_annotations,
-            topological_order=[f.output_name for f in self.sorted_functions],
-            root_args=self.topological_generations.root_args,
-        )
-
     def print_documentation(
         self,
         *,
@@ -2098,9 +2042,9 @@ class Pipeline:
 
         """
         requires("rich", "griffe", reason="print_doc", extras="autodoc")
-
+        doc = PipelineDocumentation.from_pipeline(self)
         format_pipeline_docs(
-            self._docs(),
+            doc,
             skip_optional=skip_optional,
             skip_intermediate=skip_intermediate,
             borders=borders,
