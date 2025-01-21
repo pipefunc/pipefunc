@@ -1,4 +1,4 @@
-"""Downloads Markdown files from a GitHub repository and converts them to Jupyter Notebooks.
+"""Downloads all relevant documentation from PipeFunc's GitHub repository and converts it to Jupyter Notebooks.
 
 Run this script like
 ```bash
