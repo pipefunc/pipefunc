@@ -1,6 +1,7 @@
 # Changelog
+
 These release notes are automatically generated from commits and GitHub issues and PRs.
-If it is out of date, please run `uv run .github/generate-release-notes.py`.
+If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
 ## v0.50.0 (2025-01-21)
 

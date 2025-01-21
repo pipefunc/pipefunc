@@ -259,11 +259,13 @@ def _generate_release_notes(  # noqa: PLR0912
     all_closed_issues = _get_all_closed_issues(gh_repo)
 
     lines: list[str] = []
-    lines.append("# Changelog\n")
+    lines.append("# Changelog\n\n")
     lines.append(
         "These release notes are automatically generated from commits and GitHub issues and PRs.\n",
     )
-    lines.append("If it is out of date, please run `uv run .github/generate-release-notes.py`.\n\n")
+    lines.append(
+        "If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.\n\n",
+    )
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):
         prev_tag, prev_date = (
