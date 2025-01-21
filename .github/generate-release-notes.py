@@ -1,4 +1,15 @@
-"""Automatically generate release notes from GitHub issues and PRs."""
+"""Automatically generate release notes from GitHub issues and PRs.
+
+Run `uv run .github/generate-release-notes.py` to generate the release notes.
+"""
+# /// script
+# dependencies = [
+#   "rich",
+#   "PyGithub",
+#   "diskcache",
+#   "GitPython",
+# ]
+# ///
 
 from __future__ import annotations
 
@@ -244,6 +255,10 @@ def _generate_release_notes(  # noqa: PLR0912
 
     lines: list[str] = []
     lines.append("# Changelog\n")
+    lines.append(
+        "These are the release notes are automatically generated from commits and GitHub issues and PRs.\n",
+    )
+    lines.append("If it is out of date, please run `python .github/generate-release-notes.py`.\n\n")
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):
         prev_tag, prev_date = (
