@@ -226,7 +226,7 @@ def _get_file_stats(
     return stats
 
 
-def _generate_release_notes(
+def _generate_release_notes(  # noqa: PLR0912
     token: str,
     repo_path: str | None = None,
     remote_name: str = "origin",
@@ -242,14 +242,15 @@ def _generate_release_notes(
     # Get all closed issues once
     all_closed_issues = _get_all_closed_issues(gh_repo)
 
-    markdown = "# Changelog\n\n"
+    lines: list[str] = []
+    lines.append("# Changelog\n")
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):
         prev_tag, prev_date = (
             tags_with_dates[i + 1] if i + 1 < len(tags_with_dates) else (None, None)
         )
 
-        markdown += f"## {tag.name} ({tag_date.strftime('%Y-%m-%d')})\n\n"
+        lines.append(f"## {tag.name} ({tag_date.strftime('%Y-%m-%d')})\n\n")
 
         # Get commits
         if prev_tag is None:
@@ -269,12 +270,12 @@ def _generate_release_notes(
 
         # Add closed issues
         if issues:
-            markdown += "### Closed Issues\n\n"
+            lines.append("### Closed Issues\n\n")
             for issue in issues:
                 repo_url = "https://github.com/pipefunc/pipefunc"
                 url = f"[#{issue.number}]({repo_url}/issues/{issue.number})"
-                markdown += f"- {_get_first_line(issue.title)} ({url})\n"
-            markdown += "\n"
+                lines.append(f"- {_get_first_line(issue.title)} ({url})\n")
+            lines.append("\n")
 
         # Categorize and add commits
         commits_by_category: dict[str, list[str]] = defaultdict(list)
@@ -291,21 +292,28 @@ def _generate_release_notes(
         # Add commits by category, only if there are commits in that category
         for category, messages in commits_by_category.items():
             if messages:
-                markdown += f"### {category}\n\n"
+                lines.append(f"### {category}\n\n")
                 for msg in messages:
-                    markdown += f"- {msg}\n"
-                markdown += "\n"
+                    lines.append(f"- {msg}\n")  # noqa: PERF401
+                lines.append("\n")
 
         # Add file stats
-        markdown += "### 📊 Stats\n\n"
+        lines.append("### 📊 Stats\n\n")
         for extension, stats in file_stats.items():
-            ext = f"`.{extension}`" if extension != "other" else "other"
-            markdown += f"- {ext}: "
-            markdown += f"+{stats['added']} lines, "
-            markdown += f"-{stats['deleted']} lines\n"
-        markdown += "\n"
+            if extension == "other":
+                continue
+            _add_stats_lines(lines, f"`.{extension}`", stats)
+        if (stats := file_stats.get("other")) is not None:  # type: ignore[assignment]
+            _add_stats_lines(lines, "`other`", stats)
+        lines.append("\n")
 
-    return markdown.rstrip() + "\n"  # Ensure single newline at end of file
+    return "".join(lines).rstrip() + "\n"
+
+
+def _add_stats_lines(lines: list[str], ext: str, stats: dict[str, int]) -> None:
+    lines.append(f"- {ext}: ")
+    lines.append(f"+{stats['added']} lines, ")
+    lines.append(f"-{stats['deleted']} lines\n")
 
 
 if __name__ == "__main__":

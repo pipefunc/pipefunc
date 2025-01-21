@@ -1,5 +1,4 @@
 # Changelog
-
 ## v0.49.6 (2025-01-17)
 
 ### ✨ Enhancements
@@ -123,10 +122,10 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
 - `.md`: +85 lines, -0 lines
 - `.ipynb`: +98 lines, -164 lines
 - `.py`: +283 lines, -16 lines
+- `other`: +1 lines, -1 lines
 
 ## v0.48.2 (2025-01-11)
 
@@ -144,8 +143,8 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
 - `.py`: +378 lines, -4 lines
+- `other`: +1 lines, -1 lines
 
 ## v0.48.1 (2025-01-10)
 
@@ -163,8 +162,8 @@
 
 ### 📊 Stats
 
-- other: +6 lines, -0 lines
 - `.py`: +75 lines, -5 lines
+- `other`: +6 lines, -0 lines
 
 ## v0.48.0 (2025-01-10)
 
@@ -271,11 +270,11 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
 - `.py`: +1196 lines, -49 lines
 - `.yml`: +4 lines, -4 lines
 - `.yaml`: +2 lines, -2 lines
 - `.md`: +201 lines, -63 lines
+- `other`: +1 lines, -1 lines
 
 ## v0.46.0 (2024-12-23)
 
@@ -334,12 +333,12 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
 - `.yml`: +4 lines, -4 lines
 - `.md`: +1 lines, -1 lines
 - `.ipynb`: +1 lines, -1 lines
 - `.py`: +205 lines, -8 lines
 - `.toml`: +1 lines, -1 lines
+- `other`: +1 lines, -1 lines
 
 ## v0.44.0 (2024-12-19)
 
@@ -356,12 +355,12 @@
 
 ### 📊 Stats
 
-- other: +18 lines, -0 lines
 - `.json`: +43 lines, -0 lines
 - `.py`: +162 lines, -75 lines
 - `.yml`: +4 lines, -0 lines
 - `.ipynb`: +138 lines, -73 lines
 - `.toml`: +2 lines, -1 lines
+- `other`: +18 lines, -0 lines
 
 ## v0.43.0 (2024-12-19)
 
@@ -475,9 +474,9 @@
 
 ### 📊 Stats
 
-- other: +3 lines, -0 lines
 - `.yaml`: +1 lines, -1 lines
 - `.py`: +143 lines, -40 lines
+- `other`: +3 lines, -0 lines
 
 ## v0.41.0 (2024-11-27)
 
@@ -696,8 +695,8 @@
 - `.yaml`: +2 lines, -2 lines
 - `.md`: +1 lines, -1 lines
 - `.py}`: +233 lines, -514 lines
-- other: +1 lines, -1 lines
 - `.toml`: +3 lines, -5 lines
+- `other`: +1 lines, -1 lines
 
 ## v0.36.1 (2024-10-17)
 
@@ -1603,9 +1602,9 @@
 - `.yml`: +3 lines, -18 lines
 - `.md`: +20 lines, -5 lines
 - `.ipynb`: +229 lines, -12 lines
-- other: +4 lines, -0 lines
 - `.toml`: +6 lines, -3 lines
 - `.cfg`: +0 lines, -5 lines
+- `other`: +4 lines, -0 lines
 
 ## v0.6.0 (2024-05-15)
 
@@ -1644,8 +1643,8 @@
 - `.md`: +1 lines, -1 lines
 - `.ipynb`: +5 lines, -5 lines
 - `.py`: +3265 lines, -522 lines
-- other: +21 lines, -0 lines
 - `.toml`: +4 lines, -2 lines
+- `other`: +21 lines, -0 lines
 
 ## v0.5.0 (2024-04-30)
 
