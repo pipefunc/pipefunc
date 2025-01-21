@@ -33,11 +33,6 @@ def _print_info(message: str) -> None:
     console.print(f"  ℹ️  {message}")  # noqa: RUF001
 
 
-def _print_warning(message: str) -> None:
-    """Print a warning message with a nice format."""
-    console.print(f"[bold orange]  ⚠️  {message}[/]")
-
-
 def _print_error(message: str) -> None:
     """Print an error message with a nice format."""
     console.print(f"[bold red]  ❌  {message}[/]")
