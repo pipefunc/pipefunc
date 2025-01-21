@@ -220,6 +220,11 @@ def _filter_issues_by_timeframe(
     return filtered
 
 
+def _get_first_line(message: str) -> str:
+    """Get the first line of a multi-line message."""
+    return message.split("\n")[0].strip()
+
+
 def _generate_release_notes(
     token: str,
     repo_path: str | None = None,
@@ -236,12 +241,12 @@ def _generate_release_notes(
     # Get all closed issues once
     all_closed_issues = _get_all_closed_issues(gh_repo)
 
-    markdown = ""
     # Add section for unreleased changes if any
     head_date = datetime.datetime.fromtimestamp(
         repo.head.commit.committed_date,
         tz=datetime.timezone.utc,
     )
+    markdown = ""
     if head_date > tags_with_dates[0][1]:
         # There are unreleased changes
         latest_tag_date = tags_with_dates[0][1]
@@ -274,7 +279,7 @@ def _generate_release_notes(
         if issues:
             markdown += "### Closed Issues\n\n"
             for issue in issues:
-                markdown += f"- {issue.title} (#{issue.number})\n"
+                markdown += f"- {_get_first_line(issue.title)} (#{issue.number})\n"
             markdown += "\n"
 
         # Categorize and add commits
@@ -282,8 +287,9 @@ def _generate_release_notes(
         for commit in commits:
             if not commit.message.startswith("Merge pull request"):
                 category = _categorize_pr_title(commit.message)
-                commits_by_category[category].append(commit.message)
+                commits_by_category[category].append(_get_first_line(commit.message))
 
+        # Add commits by category, only if there are commits in that category
         for category, messages in commits_by_category.items():
             if messages:
                 markdown += f"### {category}\n\n"
@@ -291,7 +297,7 @@ def _generate_release_notes(
                     markdown += f"- {msg}\n"
                 markdown += "\n"
 
-    return markdown
+    return markdown.rstrip() + "\n"  # Ensure single newline at end of file
 
 
 if __name__ == "__main__":
