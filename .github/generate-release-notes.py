@@ -186,6 +186,37 @@ def _get_first_line(message: str) -> str:
     return message.split("\n")[0].strip()
 
 
+def _get_file_stats(
+    repo: git.Repo,
+    start_commit: str,
+    end_commit: str,
+) -> dict[str, dict[str, int]]:
+    """Get statistics about lines added, deleted, and changed per file extension."""
+    _print_step("Getting file stats...")
+    stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    # Get the diff between the start and end commits
+    # Use --find-renames to handle renames
+    diff_index = repo.git.diff("--numstat", "--find-renames", start_commit, end_commit)
+
+    for line in diff_index.split("\n"):
+        if not line:
+            continue
+        # Parse the line
+        added, deleted, file_path = line.split("\t")
+        try:
+            name, extension = file_path.split(".", 1)
+            if name == "":
+                extension = "other"
+        except ValueError:
+            extension = "other"
+        stats[extension]["added"] += int(added)
+        stats[extension]["deleted"] += int(deleted)
+
+    _print_info(f"Found changes in {len(stats)} file extensions")
+    return stats
+
+
 def _generate_release_notes(
     token: str,
     repo_path: str | None = None,
@@ -214,8 +245,15 @@ def _generate_release_notes(
         # Get commits
         if prev_tag is None:
             commits = list(repo.iter_commits(tag.name))
+            start_commit = tag.name
+            end_commit = f"{tag.name}~1"
         else:
             commits = list(repo.iter_commits(f"{prev_tag.name}..{tag.name}"))
+            start_commit = prev_tag.name
+            end_commit = tag.name
+
+        # Get file stats
+        file_stats = _get_file_stats(repo, start_commit, end_commit)
 
         # Filter issues for this time window
         issues = _filter_issues_by_timeframe(all_closed_issues, prev_date, tag_date)
@@ -241,6 +279,15 @@ def _generate_release_notes(
                 for msg in messages:
                     markdown += f"- {msg}\n"
                 markdown += "\n"
+
+        # Add file stats
+        markdown += "### 📊 Stats\n\n"
+        for extension, stats in file_stats.items():
+            ext = f"`.{extension}`" if extension != "other" else "other"
+            markdown += f"- {ext}: "
+            markdown += f"+{stats['added']} lines, "
+            markdown += f"-{stats['deleted']} lines\n"
+        markdown += "\n"
 
     return markdown.rstrip() + "\n"  # Ensure single newline at end of file
 
