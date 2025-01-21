@@ -69,29 +69,58 @@ async def convert_to_ipynb_async(md_file: Path, ipynb_file: Path) -> None:
         )
 
 
-async def process_file(
+async def download_and_convert_file(
     session: aiohttp.ClientSession,
     github_file: ContentFile.ContentFile,
     output_base_dir: Path,
     progress: Progress,
 ) -> None:
-    """Downloads and converts a single file."""
+    """Downloads a file from GitHub and converts it to a Jupyter Notebook.
+
+    Handles both Markdown files (for conversion) and .ipynb files (direct download).
+    """
     file_url: str = github_file.download_url
-    # Extract relevant part of the path, excluding 'docs/source/'
-    sub_path: Path = Path(github_file.path.replace("docs/source/", ""))
-    folder: str = sub_path.parts[0]
+    file_name: str = github_file.name
 
-    md_file: Path = output_base_dir / sub_path
-    ipynb_file: Path = output_base_dir / folder / (Path(github_file.name).stem + ".ipynb")
+    if file_name.endswith(".md"):
+        # Markdown files: Convert to .ipynb
+        # Extract relevant part of the path, excluding 'docs/source/'
+        sub_path: Path = Path(github_file.path.replace("docs/source/", ""))
+        folder: str = sub_path.parts[0]
 
-    # Create intermediate directories for the .md file
-    md_file.parent.mkdir(parents=True, exist_ok=True)
+        md_file: Path = output_base_dir / sub_path
+        ipynb_file: Path = output_base_dir / folder / (Path(file_name).stem + ".ipynb")
 
-    task_id = progress.add_task(f"Downloading {github_file.name}", start=False)
-    await download_file_async(session, file_url, md_file, progress, task_id)
-    progress.remove_task(task_id)
-    await convert_to_ipynb_async(md_file, ipynb_file)
-    md_file.unlink()  # Remove the temporary .md file
+        # Create intermediate directories for the .md file
+        md_file.parent.mkdir(parents=True, exist_ok=True)
+
+        task_id = progress.add_task(f"Downloading {file_name}", start=False)
+        await download_file_async(session, file_url, md_file, progress, task_id)
+        progress.remove_task(task_id)
+        await convert_to_ipynb_async(md_file, ipynb_file)
+        md_file.unlink()  # Remove the temporary .md file
+    elif file_name.endswith(".ipynb"):
+        # .ipynb files: Download directly
+        destination: Path = output_base_dir / file_name
+        task_id = progress.add_task(f"Downloading {file_name}", start=False)
+        await download_file_async(session, file_url, destination, progress, task_id)
+        progress.remove_task(task_id)
+    else:
+        rich.print(f"⚠️ Skipping unsupported file type: {file_name}")
+
+
+async def download_files_from_folder(
+    session: aiohttp.ClientSession,
+    repo: "Repository",
+    folder: str,
+    output_base_dir: Path,
+    progress: Progress,
+) -> None:
+    """Downloads and converts files from a specific folder in the GitHub repository."""
+    contents: list[ContentFile.ContentFile] = repo.get_contents(f"docs/source/{folder}")
+    rich.print(f"🔍 Found {len(contents)} files in '{folder}' folder")
+    for file in contents:
+        await download_and_convert_file(session, file, output_base_dir, progress)
 
 
 async def download_root_notebook(
@@ -103,12 +132,7 @@ async def download_root_notebook(
     """Downloads the example.ipynb notebook from the root of the repository."""
     try:
         file: ContentFile.ContentFile = repo.get_contents("example.ipynb")
-        file_url: str = file.download_url
-        destination: Path = output_base_dir / file.name
-
-        task_id = progress.add_task(f"Downloading {file.name}", start=False)
-        await download_file_async(session, file_url, destination, progress, task_id)
-        progress.remove_task(task_id)
+        await download_and_convert_file(session, file, output_base_dir, progress)
     except GithubException as e:
         if e.status == 404:  # noqa: PLR2004
             rich.print("⚠️  Could not find example.ipynb in the root of the repository.")
@@ -143,16 +167,12 @@ async def main() -> None:
             # Download example.ipynb from the root
             await download_root_notebook(session, repo, output_base_dir, progress)
 
-            tasks: list[asyncio.Task] = []
-            for folder in folders:
-                contents: list[ContentFile.ContentFile] = repo.get_contents(f"docs/source/{folder}")
-                rich.print(f"🔍 Found {len(contents)} files in '{folder}' folder")
-                for file in contents:
-                    if file.name.endswith(".md"):
-                        task = asyncio.create_task(
-                            process_file(session, file, output_base_dir, progress),
-                        )
-                        tasks.append(task)
+            tasks: list[asyncio.Task] = [
+                asyncio.create_task(
+                    download_files_from_folder(session, repo, folder, output_base_dir, progress),
+                )
+                for folder in folders
+            ]
 
             await asyncio.gather(*tasks)
 
