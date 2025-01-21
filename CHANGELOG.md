@@ -6,7 +6,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Raise an exception if scope was not added to anything ([#571](https://github.com/pipefunc/pipefunc/pull/571))
+- Raise an exception if scope was not added to anything ([#571](https://github.com/pipefunc/pipefunc/pull/571))
 
 ### 📊 Stats
 
@@ -16,15 +16,15 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix using `Pipeline.arg_combinations` to calculate `root_args` ([#570](https://github.com/pipefunc/pipefunc/pull/570))
+- Fix using `Pipeline.arg_combinations` to calculate `root_args` ([#570](https://github.com/pipefunc/pipefunc/pull/570))
 
 ### 📚 Documentation
 
-- DOC: Fix admonition in example.ipynb ([#569](https://github.com/pipefunc/pipefunc/pull/569))
-- DOC: Rename `uvtip` -> `try-notebook` and use in `example.ipynb` ([#568](https://github.com/pipefunc/pipefunc/pull/568))
-- DOC: Use triple backticks around `uv` command ([#567](https://github.com/pipefunc/pipefunc/pull/567))
-- DOC: Add custom `uvtip` directive ([#566](https://github.com/pipefunc/pipefunc/pull/566))
-- DOC: Small fixes ([#555](https://github.com/pipefunc/pipefunc/pull/555))
+- Fix admonition in example.ipynb ([#569](https://github.com/pipefunc/pipefunc/pull/569))
+- Rename `uvtip` -> `try-notebook` and use in `example.ipynb` ([#568](https://github.com/pipefunc/pipefunc/pull/568))
+- Use triple backticks around `uv` command ([#567](https://github.com/pipefunc/pipefunc/pull/567))
+- Add custom `uvtip` directive ([#566](https://github.com/pipefunc/pipefunc/pull/566))
+- Small fixes ([#555](https://github.com/pipefunc/pipefunc/pull/555))
 
 ### 📊 Stats
 
@@ -36,11 +36,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix `bound` in `NestedPipeFunc` with `scope` and `map` ([#560](https://github.com/pipefunc/pipefunc/pull/560))
+- Fix `bound` in `NestedPipeFunc` with `scope` and `map` ([#560](https://github.com/pipefunc/pipefunc/pull/560))
 
 ### 📚 Documentation
 
-- DOC: Recommendations of order ([#559](https://github.com/pipefunc/pipefunc/pull/559))
+- Recommendations of order ([#559](https://github.com/pipefunc/pipefunc/pull/559))
 
 ### 📊 Stats
 
@@ -52,7 +52,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix `bound` in `NestedPipeFunc` inside `Pipeline` ([#557](https://github.com/pipefunc/pipefunc/pull/557))
+- Fix `bound` in `NestedPipeFunc` inside `Pipeline` ([#557](https://github.com/pipefunc/pipefunc/pull/557))
 
 ### 📊 Stats
 
@@ -66,18 +66,18 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Fix propagating defaults in `NestedPipeFunc` ([#558](https://github.com/pipefunc/pipefunc/pull/558))
-- DOC: Rename "Benchmarking" to "Overhead and Efficiency" ([#553](https://github.com/pipefunc/pipefunc/pull/553))
-- DOC: Add `visualize()` to `basic-usage.md` ([#552](https://github.com/pipefunc/pipefunc/pull/552))
-- DOC: Add `opennb` to all examples ([#551](https://github.com/pipefunc/pipefunc/pull/551))
-- DOC: Separate out examples into pages ([#550](https://github.com/pipefunc/pipefunc/pull/550))
-- DOC: Fix simple typo ([#549](https://github.com/pipefunc/pipefunc/pull/549))
-- DOC: Mention `uv` and `opennb` early in tutorial ([#548](https://github.com/pipefunc/pipefunc/pull/548))
-- DOC: Reoganize the docs into pages ([#545](https://github.com/pipefunc/pipefunc/pull/545))
+- Fix propagating defaults in `NestedPipeFunc` ([#558](https://github.com/pipefunc/pipefunc/pull/558))
+- Rename "Benchmarking" to "Overhead and Efficiency" ([#553](https://github.com/pipefunc/pipefunc/pull/553))
+- Add `visualize()` to `basic-usage.md` ([#552](https://github.com/pipefunc/pipefunc/pull/552))
+- Add `opennb` to all examples ([#551](https://github.com/pipefunc/pipefunc/pull/551))
+- Separate out examples into pages ([#550](https://github.com/pipefunc/pipefunc/pull/550))
+- Fix simple typo ([#549](https://github.com/pipefunc/pipefunc/pull/549))
+- Mention `uv` and `opennb` early in tutorial ([#548](https://github.com/pipefunc/pipefunc/pull/548))
+- Reoganize the docs into pages ([#545](https://github.com/pipefunc/pipefunc/pull/545))
 
 ### ✨ Enhancements
 
-- ENH: Change the order in which keys appear in `pipeline.info` ([#554](https://github.com/pipefunc/pipefunc/pull/554))
+- Change the order in which keys appear in `pipeline.info` ([#554](https://github.com/pipefunc/pipefunc/pull/554))
 
 ### 📊 Stats
 
@@ -90,11 +90,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix `NestedPipeFunction` in graph show wrong datatype ([#546](https://github.com/pipefunc/pipefunc/pull/546))
+- Fix `NestedPipeFunction` in graph show wrong datatype ([#546](https://github.com/pipefunc/pipefunc/pull/546))
 
 ### 📚 Documentation
 
-- DOC: Add a page about `mapspec` ([#543](https://github.com/pipefunc/pipefunc/pull/543))
+- Add a page about `mapspec` ([#543](https://github.com/pipefunc/pipefunc/pull/543))
 
 ### 🔄 Pre-commit
 
@@ -112,12 +112,12 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add a widget for `VariantPipeline.visualize()` and `VariantPipeline._repr_mimebundle_` ([#539](https://github.com/pipefunc/pipefunc/pull/539))
+- Add a widget for `VariantPipeline.visualize()` and `VariantPipeline._repr_mimebundle_` ([#539](https://github.com/pipefunc/pipefunc/pull/539))
 
 ### 📚 Documentation
 
-- DOC: Add `NestedPipeFunc` section to example notebooks and move `simplified_pipeline` to FAQ ([#542](https://github.com/pipefunc/pipefunc/pull/542))
-- DOC: Fix method name of `Pipeline.join` in example notebook ([#541](https://github.com/pipefunc/pipefunc/pull/541))
+- Add `NestedPipeFunc` section to example notebooks and move `simplified_pipeline` to FAQ ([#542](https://github.com/pipefunc/pipefunc/pull/542))
+- Fix method name of `Pipeline.join` in example notebook ([#541](https://github.com/pipefunc/pipefunc/pull/541))
 
 ### 📦 Dependencies
 
@@ -134,7 +134,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Add more `NestedPipeFunc` tests and fix multiple outputs issue with them ([#536](https://github.com/pipefunc/pipefunc/pull/536))
+- Add more `NestedPipeFunc` tests and fix multiple outputs issue with them ([#536](https://github.com/pipefunc/pipefunc/pull/536))
 
 ### 📦 Dependencies
 
@@ -142,7 +142,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧪 Testing
 
-- TST: Add multiple outputs to benchmarks ([#537](https://github.com/pipefunc/pipefunc/pull/537))
+- Add multiple outputs to benchmarks ([#537](https://github.com/pipefunc/pipefunc/pull/537))
 
 ### 📊 Stats
 
@@ -157,11 +157,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix scope for `NestedPipeFunc` ([#534](https://github.com/pipefunc/pipefunc/pull/534))
+- Fix scope for `NestedPipeFunc` ([#534](https://github.com/pipefunc/pipefunc/pull/534))
 
 ### 🧹 Maintenance
 
-- MAINT: Extend `.gitignore` ([#533](https://github.com/pipefunc/pipefunc/pull/533))
+- Extend `.gitignore` ([#533](https://github.com/pipefunc/pipefunc/pull/533))
 
 ### 📊 Stats
 
@@ -176,8 +176,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `VariantPipelines.from_pipelines` classmethod ([#526](https://github.com/pipefunc/pipefunc/pull/526))
-- ENH: Allow setting `NestedPipeFunc(..., function_name="customname")` ([#532](https://github.com/pipefunc/pipefunc/pull/532))
+- Add `VariantPipelines.from_pipelines` classmethod ([#526](https://github.com/pipefunc/pipefunc/pull/526))
+- Allow setting `NestedPipeFunc(..., function_name="customname")` ([#532](https://github.com/pipefunc/pipefunc/pull/532))
 
 ### 📊 Stats
 
@@ -188,7 +188,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix `combine_mapspecs` in `NestedPipeFunc` ([#531](https://github.com/pipefunc/pipefunc/pull/531))
+- Fix `combine_mapspecs` in `NestedPipeFunc` ([#531](https://github.com/pipefunc/pipefunc/pull/531))
 
 ### 📊 Stats
 
@@ -198,17 +198,17 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Set `internal_shape` for `NestedPipeFunc` ([#530](https://github.com/pipefunc/pipefunc/pull/530))
-- BUG: Fix error message about using `map_async` with Slurm ([#528](https://github.com/pipefunc/pipefunc/pull/528))
-- BUG: Fix case where bound and default are set for same parameter ([#525](https://github.com/pipefunc/pipefunc/pull/525))
+- Set `internal_shape` for `NestedPipeFunc` ([#530](https://github.com/pipefunc/pipefunc/pull/530))
+- Fix error message about using `map_async` with Slurm ([#528](https://github.com/pipefunc/pipefunc/pull/528))
+- Fix case where bound and default are set for same parameter ([#525](https://github.com/pipefunc/pipefunc/pull/525))
 
 ### 🤖 CI
 
-- CI: Set `timeout-minutes: 10` in pytest jobs to prevent stuck 6 hour jobs ([#529](https://github.com/pipefunc/pipefunc/pull/529))
+- Set `timeout-minutes: 10` in pytest jobs to prevent stuck 6 hour jobs ([#529](https://github.com/pipefunc/pipefunc/pull/529))
 
 ### 📚 Documentation
 
-- DOC: Fix FAQ `VariantPipeline` example ([#524](https://github.com/pipefunc/pipefunc/pull/524))
+- Fix FAQ `VariantPipeline` example ([#524](https://github.com/pipefunc/pipefunc/pull/524))
 
 ### 📊 Stats
 
@@ -220,11 +220,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Add example with non-unique variant names across `PipeFunc`s ([#520](https://github.com/pipefunc/pipefunc/pull/520))
+- Add example with non-unique variant names across `PipeFunc`s ([#520](https://github.com/pipefunc/pipefunc/pull/520))
 
 ### 🧹 Maintenance
 
-- MAINT: Pin `zarr>=2,<3` ([#521](https://github.com/pipefunc/pipefunc/pull/521))
+- Pin `zarr>=2,<3` ([#521](https://github.com/pipefunc/pipefunc/pull/521))
 
 ### 📊 Stats
 
@@ -240,8 +240,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `VariantPipeline` that can generate multiple `Pipeline` variants ([#518](https://github.com/pipefunc/pipefunc/pull/518))
-- ENH: Add auto-chunksize heuristic ([#505](https://github.com/pipefunc/pipefunc/pull/505))
+- Add `VariantPipeline` that can generate multiple `Pipeline` variants ([#518](https://github.com/pipefunc/pipefunc/pull/518))
+- Add auto-chunksize heuristic ([#505](https://github.com/pipefunc/pipefunc/pull/505))
 
 ### 📝 Other
 
@@ -263,13 +263,13 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Update number of required dependencies in README.md ([#506](https://github.com/pipefunc/pipefunc/pull/506))
-- DOC: Autoformat Markdown in FAQ and README ([#503](https://github.com/pipefunc/pipefunc/pull/503))
-- DOC: Add comparison with Snakemake ([#501](https://github.com/pipefunc/pipefunc/pull/501))
+- Update number of required dependencies in README.md ([#506](https://github.com/pipefunc/pipefunc/pull/506))
+- Autoformat Markdown in FAQ and README ([#503](https://github.com/pipefunc/pipefunc/pull/503))
+- Add comparison with Snakemake ([#501](https://github.com/pipefunc/pipefunc/pull/501))
 
 ### 🤖 CI
 
-- CI: Revert `pull_request_target:` ([#500](https://github.com/pipefunc/pipefunc/pull/500))
+- Revert `pull_request_target:` ([#500](https://github.com/pipefunc/pipefunc/pull/500))
 
 ### 📊 Stats
 
@@ -287,24 +287,24 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧪 Testing
 
-- TST: Explicitly set reason in `skipif` ([#499](https://github.com/pipefunc/pipefunc/pull/499))
-- TST: Skip shared memory test in CI on nogil Python (3.13t) ([#498](https://github.com/pipefunc/pipefunc/pull/498))
+- Explicitly set reason in `skipif` ([#499](https://github.com/pipefunc/pipefunc/pull/499))
+- Skip shared memory test in CI on nogil Python (3.13t) ([#498](https://github.com/pipefunc/pipefunc/pull/498))
 
 ### ✨ Enhancements
 
-- ENH: Allow providing an int to `chunksizes` ([#497](https://github.com/pipefunc/pipefunc/pull/497))
-- ENH: Add `chunksizes` argument to `Pipeline.map` and `Pipeline.map_async` ([#493](https://github.com/pipefunc/pipefunc/pull/493))
+- Allow providing an int to `chunksizes` ([#497](https://github.com/pipefunc/pipefunc/pull/497))
+- Add `chunksizes` argument to `Pipeline.map` and `Pipeline.map_async` ([#493](https://github.com/pipefunc/pipefunc/pull/493))
 
 ### 🤖 CI
 
-- CI: Revert `pull_request_target:` for CodSpeed ([#495](https://github.com/pipefunc/pipefunc/pull/495))
-- CI: Use `pull_request_target:` to trigger CI on fork ([#494](https://github.com/pipefunc/pipefunc/pull/494))
+- Revert `pull_request_target:` for CodSpeed ([#495](https://github.com/pipefunc/pipefunc/pull/495))
+- Use `pull_request_target:` to trigger CI on fork ([#494](https://github.com/pipefunc/pipefunc/pull/494))
 
 ### 📚 Documentation
 
-- DOC: Mention HPC vs cloud based running ([#492](https://github.com/pipefunc/pipefunc/pull/492))
-- DOC: How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.? ([#491](https://github.com/pipefunc/pipefunc/pull/491))
-- DOC: Add Discord shield ([#490](https://github.com/pipefunc/pipefunc/pull/490))
+- Mention HPC vs cloud based running ([#492](https://github.com/pipefunc/pipefunc/pull/492))
+- How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.? ([#491](https://github.com/pipefunc/pipefunc/pull/491))
+- Add Discord shield ([#490](https://github.com/pipefunc/pipefunc/pull/490))
 
 ### 📊 Stats
 
@@ -320,8 +320,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `size_per_learner` for `SlurmExecutor` ([#486](https://github.com/pipefunc/pipefunc/pull/486))
-- ENH: Add `helpers.get_attribute_factory` ([#481](https://github.com/pipefunc/pipefunc/pull/481))
+- Add `size_per_learner` for `SlurmExecutor` ([#486](https://github.com/pipefunc/pipefunc/pull/486))
+- Add `helpers.get_attribute_factory` ([#481](https://github.com/pipefunc/pipefunc/pull/481))
 
 ### 📦 Dependencies
 
@@ -330,9 +330,9 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Set Python version to 3.13 in README `opennb` example ([#479](https://github.com/pipefunc/pipefunc/pull/479))
-- DOC: Fix header level of "Dynamic Output Shapes and `internal_shapes`" ([#478](https://github.com/pipefunc/pipefunc/pull/478))
-- DOC: Small formatting fix in example in doc-string ([#477](https://github.com/pipefunc/pipefunc/pull/477))
+- Set Python version to 3.13 in README `opennb` example ([#479](https://github.com/pipefunc/pipefunc/pull/479))
+- Fix header level of "Dynamic Output Shapes and `internal_shapes`" ([#478](https://github.com/pipefunc/pipefunc/pull/478))
+- Small formatting fix in example in doc-string ([#477](https://github.com/pipefunc/pipefunc/pull/477))
 
 ### 📊 Stats
 
@@ -347,14 +347,14 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `Pipeline._repr_mimebundle_` ([#476](https://github.com/pipefunc/pipefunc/pull/476))
-- ENH: Allow printing rich-formatted table with `pipeline.info()` ([#475](https://github.com/pipefunc/pipefunc/pull/475))
-- ENH: Automatically set `internal_shape=("?", ...)` ([#463](https://github.com/pipefunc/pipefunc/pull/463))
-- ENH: Add a `.devcontainer` for VS Code based on `uv` ([#473](https://github.com/pipefunc/pipefunc/pull/473))
+- Add `Pipeline._repr_mimebundle_` ([#476](https://github.com/pipefunc/pipefunc/pull/476))
+- Allow printing rich-formatted table with `pipeline.info()` ([#475](https://github.com/pipefunc/pipefunc/pull/475))
+- Automatically set `internal_shape=("?", ...)` ([#463](https://github.com/pipefunc/pipefunc/pull/463))
+- Add a `.devcontainer` for VS Code based on `uv` ([#473](https://github.com/pipefunc/pipefunc/pull/473))
 
 ### 📚 Documentation
 
-- DOC: Update documentation about dynamic `internal_shapes` ([#474](https://github.com/pipefunc/pipefunc/pull/474))
+- Update documentation about dynamic `internal_shapes` ([#474](https://github.com/pipefunc/pipefunc/pull/474))
 
 ### 📊 Stats
 
@@ -373,20 +373,20 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Enable `show_progress` when using dynamic shapes ([#471](https://github.com/pipefunc/pipefunc/pull/471))
-- ENH: Automatically set `internal_shape` ([#448](https://github.com/pipefunc/pipefunc/pull/448))
+- Enable `show_progress` when using dynamic shapes ([#471](https://github.com/pipefunc/pipefunc/pull/471))
+- Automatically set `internal_shape` ([#448](https://github.com/pipefunc/pipefunc/pull/448))
 
 ### 📚 Documentation
 
-- DOC: Add workaround for multiple returns with different sizes ([#470](https://github.com/pipefunc/pipefunc/pull/470))
-- DOC: Add `opennb` tip ([#464](https://github.com/pipefunc/pipefunc/pull/464))
+- Add workaround for multiple returns with different sizes ([#470](https://github.com/pipefunc/pipefunc/pull/470))
+- Add `opennb` tip ([#464](https://github.com/pipefunc/pipefunc/pull/464))
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix case where there is no size ([#467](https://github.com/pipefunc/pipefunc/pull/467))
-- BUG: Ensure to resolve shapes for all arrays in `_update_array` and fix `internal_shape` calculation ([#469](https://github.com/pipefunc/pipefunc/pull/469))
-- BUG: Fix case where first dim is "?" ([#466](https://github.com/pipefunc/pipefunc/pull/466))
-- BUG: Fix autogenerated `mapspec` issue with mismatching dims check ([#465](https://github.com/pipefunc/pipefunc/pull/465))
+- Fix case where there is no size ([#467](https://github.com/pipefunc/pipefunc/pull/467))
+- Ensure to resolve shapes for all arrays in `_update_array` and fix `internal_shape` calculation ([#469](https://github.com/pipefunc/pipefunc/pull/469))
+- Fix case where first dim is "?" ([#466](https://github.com/pipefunc/pipefunc/pull/466))
+- Fix autogenerated `mapspec` issue with mismatching dims check ([#465](https://github.com/pipefunc/pipefunc/pull/465))
 
 ### 📊 Stats
 
@@ -399,11 +399,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧪 Testing
 
-- TST: Use `pytest-timeout` plugin to prevent handing tests ([#459](https://github.com/pipefunc/pipefunc/pull/459))
+- Use `pytest-timeout` plugin to prevent handing tests ([#459](https://github.com/pipefunc/pipefunc/pull/459))
 
 ### ✨ Enhancements
 
-- ENH: Add `Pipeline.info()` that returns input and output info ([#462](https://github.com/pipefunc/pipefunc/pull/462))
+- Add `Pipeline.info()` that returns input and output info ([#462](https://github.com/pipefunc/pipefunc/pull/462))
 
 ### 📊 Stats
 
@@ -415,8 +415,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `pipefunc.helpers.collect_kwargs` helper function ([#457](https://github.com/pipefunc/pipefunc/pull/457))
-- ENH: Allow `pipeline.root_args(None)` (default) that returns all inputs ([#461](https://github.com/pipefunc/pipefunc/pull/461))
+- Add `pipefunc.helpers.collect_kwargs` helper function ([#457](https://github.com/pipefunc/pipefunc/pull/457))
+- Allow `pipeline.root_args(None)` (default) that returns all inputs ([#461](https://github.com/pipefunc/pipefunc/pull/461))
 
 ### 🔄 Pre-commit
 
@@ -432,7 +432,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Only use the cache when `cache=True` instead of always in `pipeline.map` ([#458](https://github.com/pipefunc/pipefunc/pull/458))
+- Only use the cache when `cache=True` instead of always in `pipeline.map` ([#458](https://github.com/pipefunc/pipefunc/pull/458))
 
 ### 📊 Stats
 
@@ -442,7 +442,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix `internal_shapes` coming from `PipeFunc` constructor and `cleanup=False` ([#455](https://github.com/pipefunc/pipefunc/pull/455))
+- Fix `internal_shapes` coming from `PipeFunc` constructor and `cleanup=False` ([#455](https://github.com/pipefunc/pipefunc/pull/455))
 
 ### 📊 Stats
 
@@ -460,11 +460,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix case with multiple output then iterate over single axis ([#454](https://github.com/pipefunc/pipefunc/pull/454))
+- Fix case with multiple output then iterate over single axis ([#454](https://github.com/pipefunc/pipefunc/pull/454))
 
 ### 🧹 Maintenance
 
-- MAINT: Small formatting changes and tiny refactors (from #448) ([#453](https://github.com/pipefunc/pipefunc/pull/453))
+- Small formatting changes and tiny refactors (from #448) ([#453](https://github.com/pipefunc/pipefunc/pull/453))
 
 ### 🔄 Pre-commit
 
@@ -485,11 +485,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `post_execution_hook` for `PipeFunc` ([#306](https://github.com/pipefunc/pipefunc/pull/306))
+- Add `post_execution_hook` for `PipeFunc` ([#306](https://github.com/pipefunc/pipefunc/pull/306))
 
 ### 📚 Documentation
 
-- DOC: Set default plotting backend in docs to graphviz ([#441](https://github.com/pipefunc/pipefunc/pull/441))
+- Set default plotting backend in docs to graphviz ([#441](https://github.com/pipefunc/pipefunc/pull/441))
 
 ### 📊 Stats
 
@@ -501,8 +501,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧹 Maintenance
 
-- MAINT: Add `pipefunc[all]` to docs extras and remove `pydantic` from `[all]` ([#440](https://github.com/pipefunc/pipefunc/pull/440))
-- MAINT: Fix typo ([#439](https://github.com/pipefunc/pipefunc/pull/439))
+- Add `pipefunc[all]` to docs extras and remove `pydantic` from `[all]` ([#440](https://github.com/pipefunc/pipefunc/pull/440))
+- Fix typo ([#439](https://github.com/pipefunc/pipefunc/pull/439))
 
 ### 📊 Stats
 
@@ -514,7 +514,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Use `hatch` instead of `setuptools` ([#438](https://github.com/pipefunc/pipefunc/pull/438))
+- Use `hatch` instead of `setuptools` ([#438](https://github.com/pipefunc/pipefunc/pull/438))
 
 ### 🔄 Pre-commit
 
@@ -522,7 +522,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Fix admonition in example notebook ([#437](https://github.com/pipefunc/pipefunc/pull/437))
+- Fix admonition in example notebook ([#437](https://github.com/pipefunc/pipefunc/pull/437))
 
 ### 📊 Stats
 
@@ -539,24 +539,24 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Add a dropdown with interactive widget explanation ([#436](https://github.com/pipefunc/pipefunc/pull/436))
+- Add a dropdown with interactive widget explanation ([#436](https://github.com/pipefunc/pipefunc/pull/436))
 
 ### ✨ Enhancements
 
-- ENH: Add interactive version of `visualize_graphviz` ([#326](https://github.com/pipefunc/pipefunc/pull/326))
-- ENH: Remove pygraphviz dependency, was only used in matplotlib plotting backend ([#433](https://github.com/pipefunc/pipefunc/pull/433))
+- Add interactive version of `visualize_graphviz` ([#326](https://github.com/pipefunc/pipefunc/pull/326))
+- Remove pygraphviz dependency, was only used in matplotlib plotting backend ([#433](https://github.com/pipefunc/pipefunc/pull/433))
 
 ### 🧹 Maintenance
 
-- MAINT: Sort the dependencies alphabetically ([#435](https://github.com/pipefunc/pipefunc/pull/435))
+- Sort the dependencies alphabetically ([#435](https://github.com/pipefunc/pipefunc/pull/435))
 
 ### 🤖 CI
 
-- CI: Test with plotting in uv now that `pygraphviz` is no longer required ([#434](https://github.com/pipefunc/pipefunc/pull/434))
+- Test with plotting in uv now that `pygraphviz` is no longer required ([#434](https://github.com/pipefunc/pipefunc/pull/434))
 
 ### 🧪 Testing
 
-- TST: Fix pygraphviz <-> python-graphviz mixup in tests ([#432](https://github.com/pipefunc/pipefunc/pull/432))
+- Fix pygraphviz <-> python-graphviz mixup in tests ([#432](https://github.com/pipefunc/pipefunc/pull/432))
 
 ### 📊 Stats
 
@@ -569,18 +569,18 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🐛 Bug Fixes
 
-- BUG: Fix Python≤3.11 case for `handle_error` ([#431](https://github.com/pipefunc/pipefunc/pull/431))
+- Fix Python≤3.11 case for `handle_error` ([#431](https://github.com/pipefunc/pipefunc/pull/431))
 
 ### 🧹 Maintenance
 
-- MAINT: Install myst-nb with conda ([#428](https://github.com/pipefunc/pipefunc/pull/428))
-- MAINT: Remove `LazySequenceLearner` because of alternative in #381 ([#419](https://github.com/pipefunc/pipefunc/pull/419))
+- Install myst-nb with conda ([#428](https://github.com/pipefunc/pipefunc/pull/428))
+- Remove `LazySequenceLearner` because of alternative in #381 ([#419](https://github.com/pipefunc/pipefunc/pull/419))
 
 ### ✨ Enhancements
 
-- ENH: Avoid duplicate dependencies in .github/update-environment.py script ([#427](https://github.com/pipefunc/pipefunc/pull/427))
-- ENH: Add support for `pydantic.BaseModel` ([#420](https://github.com/pipefunc/pipefunc/pull/420))
-- ENH: Allow using memory based storages in parallel too ([#416](https://github.com/pipefunc/pipefunc/pull/416))
+- Avoid duplicate dependencies in .github/update-environment.py script ([#427](https://github.com/pipefunc/pipefunc/pull/427))
+- Add support for `pydantic.BaseModel` ([#420](https://github.com/pipefunc/pipefunc/pull/420))
+- Allow using memory based storages in parallel too ([#416](https://github.com/pipefunc/pipefunc/pull/416))
 
 ### 📦 Dependencies
 
@@ -594,9 +594,9 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Fix zarr API docs page ([#422](https://github.com/pipefunc/pipefunc/pull/422))
-- DOC: Add section with `dataclass` and `pydantic.BaseModel` ([#421](https://github.com/pipefunc/pipefunc/pull/421))
-- DOC: Add ultra-fast bullet point ([#417](https://github.com/pipefunc/pipefunc/pull/417))
+- Fix zarr API docs page ([#422](https://github.com/pipefunc/pipefunc/pull/422))
+- Add section with `dataclass` and `pydantic.BaseModel` ([#421](https://github.com/pipefunc/pipefunc/pull/421))
+- Add ultra-fast bullet point ([#417](https://github.com/pipefunc/pipefunc/pull/417))
 
 ### 📊 Stats
 
@@ -615,14 +615,14 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Factor out `SlurmExecutor` logic from `_run.py` ([#415](https://github.com/pipefunc/pipefunc/pull/415))
-- ENH: Rename _submit_single to _execute_single to avoid confusion with ex.submit ([#413](https://github.com/pipefunc/pipefunc/pull/413))
-- ENH: Allow non-parallel progress bar ([#412](https://github.com/pipefunc/pipefunc/pull/412))
-- ENH: Allow using `adaptive_scheduler.SlurmExecutor` ([#395](https://github.com/pipefunc/pipefunc/pull/395))
-- ENH: Make `executor` a dict internally always ([#410](https://github.com/pipefunc/pipefunc/pull/410))
-- ENH: Prevent duplicates from `PipeFunc`s that return multiple ([#409](https://github.com/pipefunc/pipefunc/pull/409))
-- ENH: Add a `StoreType` ([#408](https://github.com/pipefunc/pipefunc/pull/408))
-- ENH: Prevent adding functions with same `output_name` ([#404](https://github.com/pipefunc/pipefunc/pull/404))
+- Factor out `SlurmExecutor` logic from `_run.py` ([#415](https://github.com/pipefunc/pipefunc/pull/415))
+- Rename _submit_single to _execute_single to avoid confusion with ex.submit ([#413](https://github.com/pipefunc/pipefunc/pull/413))
+- Allow non-parallel progress bar ([#412](https://github.com/pipefunc/pipefunc/pull/412))
+- Allow using `adaptive_scheduler.SlurmExecutor` ([#395](https://github.com/pipefunc/pipefunc/pull/395))
+- Make `executor` a dict internally always ([#410](https://github.com/pipefunc/pipefunc/pull/410))
+- Prevent duplicates from `PipeFunc`s that return multiple ([#409](https://github.com/pipefunc/pipefunc/pull/409))
+- Add a `StoreType` ([#408](https://github.com/pipefunc/pipefunc/pull/408))
+- Prevent adding functions with same `output_name` ([#404](https://github.com/pipefunc/pipefunc/pull/404))
 
 ### 📝 Other
 
@@ -631,7 +631,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧪 Testing
 
-- TST: Omit `pipefunc/map/_types.py` from coverage ([#411](https://github.com/pipefunc/pipefunc/pull/411))
+- Omit `pipefunc/map/_types.py` from coverage ([#411](https://github.com/pipefunc/pipefunc/pull/411))
 
 ### 🔄 Pre-commit
 
@@ -639,7 +639,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧹 Maintenance
 
-- MAINT: Move `LazySequenceLearner` to separate module ([#407](https://github.com/pipefunc/pipefunc/pull/407))
+- Move `LazySequenceLearner` to separate module ([#407](https://github.com/pipefunc/pipefunc/pull/407))
 
 ### 📊 Stats
 
@@ -657,10 +657,10 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Specially treat dataclasses with a default factory (closes #402) ([#403](https://github.com/pipefunc/pipefunc/pull/403))
-- ENH: Update progress bar every second for first 30 seconds ([#401](https://github.com/pipefunc/pipefunc/pull/401))
-- ENH: Include class name in `PipeFunc.__name__` ([#389](https://github.com/pipefunc/pipefunc/pull/389))
-- ENH: Add `LazySequenceLearner` ([#385](https://github.com/pipefunc/pipefunc/pull/385))
+- Specially treat dataclasses with a default factory (closes #402) ([#403](https://github.com/pipefunc/pipefunc/pull/403))
+- Update progress bar every second for first 30 seconds ([#401](https://github.com/pipefunc/pipefunc/pull/401))
+- Include class name in `PipeFunc.__name__` ([#389](https://github.com/pipefunc/pipefunc/pull/389))
+- Add `LazySequenceLearner` ([#385](https://github.com/pipefunc/pipefunc/pull/385))
 
 ### 🔄 Pre-commit
 
@@ -669,18 +669,18 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧹 Maintenance
 
-- MAINT: Split up `_pipeline.py` into modules ([#399](https://github.com/pipefunc/pipefunc/pull/399))
-- MAINT: Use relative imports in `pipefunc.map` ([#398](https://github.com/pipefunc/pipefunc/pull/398))
-- MAINT: pipefunc.map module reorganization ([#397](https://github.com/pipefunc/pipefunc/pull/397))
-- MAINT: Move storage related modules to `map/_storage` ([#396](https://github.com/pipefunc/pipefunc/pull/396))
+- Split up `_pipeline.py` into modules ([#399](https://github.com/pipefunc/pipefunc/pull/399))
+- Use relative imports in `pipefunc.map` ([#398](https://github.com/pipefunc/pipefunc/pull/398))
+- pipefunc.map module reorganization ([#397](https://github.com/pipefunc/pipefunc/pull/397))
+- Move storage related modules to `map/_storage` ([#396](https://github.com/pipefunc/pipefunc/pull/396))
 
 ### 📚 Documentation
 
-- DOC: Fix url in shield ([#391](https://github.com/pipefunc/pipefunc/pull/391))
+- Fix url in shield ([#391](https://github.com/pipefunc/pipefunc/pull/391))
 
 ### 🤖 CI
 
-- CI: Rename GitHub Actions workflows and test with minimal dependencies ([#390](https://github.com/pipefunc/pipefunc/pull/390))
+- Rename GitHub Actions workflows and test with minimal dependencies ([#390](https://github.com/pipefunc/pipefunc/pull/390))
 
 ### 📝 Other
 
@@ -688,7 +688,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧪 Testing
 
-- TST: Make optional deps also optional in tests ([#388](https://github.com/pipefunc/pipefunc/pull/388))
+- Make optional deps also optional in tests ([#388](https://github.com/pipefunc/pipefunc/pull/388))
 
 ### 📊 Stats
 
@@ -705,7 +705,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧹 Maintenance
 
-- MAINT: Enable Python 3.13 in CI ([#384](https://github.com/pipefunc/pipefunc/pull/384))
+- Enable Python 3.13 in CI ([#384](https://github.com/pipefunc/pipefunc/pull/384))
 
 ### 📝 Other
 
@@ -724,11 +724,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Simplify example in README.md ([#379](https://github.com/pipefunc/pipefunc/pull/379))
-- DOC: Add `html_theme_options` ([#371](https://github.com/pipefunc/pipefunc/pull/371))
-- DOC: More improvements ([#370](https://github.com/pipefunc/pipefunc/pull/370))
-- DOC: Reorder and reorganize docs ([#364](https://github.com/pipefunc/pipefunc/pull/364))
-- DOC: Add `sphinx-notfound-page` for 404 ([#369](https://github.com/pipefunc/pipefunc/pull/369))
+- Simplify example in README.md ([#379](https://github.com/pipefunc/pipefunc/pull/379))
+- Add `html_theme_options` ([#371](https://github.com/pipefunc/pipefunc/pull/371))
+- More improvements ([#370](https://github.com/pipefunc/pipefunc/pull/370))
+- Reorder and reorganize docs ([#364](https://github.com/pipefunc/pipefunc/pull/364))
+- Add `sphinx-notfound-page` for 404 ([#369](https://github.com/pipefunc/pipefunc/pull/369))
 
 ### 🔄 Pre-commit
 
@@ -740,7 +740,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🧹 Maintenance
 
-- MAINT: Move `ProgressTracker` widget a `_widgets` folder ([#373](https://github.com/pipefunc/pipefunc/pull/373))
+- Move `ProgressTracker` widget a `_widgets` folder ([#373](https://github.com/pipefunc/pipefunc/pull/373))
 
 ### 📊 Stats
 
@@ -756,8 +756,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Allow pickling `DiskCache` without LRU Cache ([#368](https://github.com/pipefunc/pipefunc/pull/368))
-- ENH: Allow `range(...)` as input in `map` ([#365](https://github.com/pipefunc/pipefunc/pull/365))
+- Allow pickling `DiskCache` without LRU Cache ([#368](https://github.com/pipefunc/pipefunc/pull/368))
+- Allow `range(...)` as input in `map` ([#365](https://github.com/pipefunc/pipefunc/pull/365))
 
 ### 🔄 Pre-commit
 
@@ -765,9 +765,9 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Use Ruff badge instead of Black ([#367](https://github.com/pipefunc/pipefunc/pull/367))
-- DOC: Improve intro in README ([#363](https://github.com/pipefunc/pipefunc/pull/363))
-- DOC: New title and tag line ([#362](https://github.com/pipefunc/pipefunc/pull/362))
+- Use Ruff badge instead of Black ([#367](https://github.com/pipefunc/pipefunc/pull/367))
+- Improve intro in README ([#363](https://github.com/pipefunc/pipefunc/pull/363))
+- New title and tag line ([#362](https://github.com/pipefunc/pipefunc/pull/362))
 
 ### 📊 Stats
 
@@ -779,17 +779,17 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Inline `mapspec` in physics based example ([#361](https://github.com/pipefunc/pipefunc/pull/361))
-- DOC: Rely on latest release of MyST ([#360](https://github.com/pipefunc/pipefunc/pull/360))
-- DOC: Add FAQ entry about mixing executors and storages ([#359](https://github.com/pipefunc/pipefunc/pull/359))
-- DOC: Fix list formatting in Sphinx docs ([#358](https://github.com/pipefunc/pipefunc/pull/358))
+- Inline `mapspec` in physics based example ([#361](https://github.com/pipefunc/pipefunc/pull/361))
+- Rely on latest release of MyST ([#360](https://github.com/pipefunc/pipefunc/pull/360))
+- Add FAQ entry about mixing executors and storages ([#359](https://github.com/pipefunc/pipefunc/pull/359))
+- Fix list formatting in Sphinx docs ([#358](https://github.com/pipefunc/pipefunc/pull/358))
 
 ### ✨ Enhancements
 
-- ENH: Allow a different `Executor` per `PipeFunc` ([#357](https://github.com/pipefunc/pipefunc/pull/357))
-- ENH: Allow setting a `storage` per `PipeFunc` ([#356](https://github.com/pipefunc/pipefunc/pull/356))
-- ENH: Fallback to serialization for cache keys ([#355](https://github.com/pipefunc/pipefunc/pull/355))
-- ENH: Set `fallback_to_str` to False by default for caching ([#354](https://github.com/pipefunc/pipefunc/pull/354))
+- Allow a different `Executor` per `PipeFunc` ([#357](https://github.com/pipefunc/pipefunc/pull/357))
+- Allow setting a `storage` per `PipeFunc` ([#356](https://github.com/pipefunc/pipefunc/pull/356))
+- Fallback to serialization for cache keys ([#355](https://github.com/pipefunc/pipefunc/pull/355))
+- Set `fallback_to_str` to False by default for caching ([#354](https://github.com/pipefunc/pipefunc/pull/354))
 
 ### 📊 Stats
 
@@ -803,18 +803,18 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add more space between `:` and name in `visualize_graphviz` ([#353](https://github.com/pipefunc/pipefunc/pull/353))
-- ENH: Add `pipefunc.testing.patch` ([#352](https://github.com/pipefunc/pipefunc/pull/352))
-- ENH: Include mapspec axis in the outputs of `PipeFunc` directly ([#349](https://github.com/pipefunc/pipefunc/pull/349))
-- ENH: Keep mapspec in argument nodes in `visualize_graphviz` ([#348](https://github.com/pipefunc/pipefunc/pull/348))
+- Add more space between `:` and name in `visualize_graphviz` ([#353](https://github.com/pipefunc/pipefunc/pull/353))
+- Add `pipefunc.testing.patch` ([#352](https://github.com/pipefunc/pipefunc/pull/352))
+- Include mapspec axis in the outputs of `PipeFunc` directly ([#349](https://github.com/pipefunc/pipefunc/pull/349))
+- Keep mapspec in argument nodes in `visualize_graphviz` ([#348](https://github.com/pipefunc/pipefunc/pull/348))
 
 ### 📚 Documentation
 
-- DOC: Add mapspec plots to tutorial ([#351](https://github.com/pipefunc/pipefunc/pull/351))
+- Add mapspec plots to tutorial ([#351](https://github.com/pipefunc/pipefunc/pull/351))
 
 ### 🧹 Maintenance
 
-- MAINT: Remove trailing commas to have arg lists on single line ([#350](https://github.com/pipefunc/pipefunc/pull/350))
+- Remove trailing commas to have arg lists on single line ([#350](https://github.com/pipefunc/pipefunc/pull/350))
 
 ### 📊 Stats
 
@@ -826,12 +826,12 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `pipeline.map_async` and a progress bar ([#333](https://github.com/pipefunc/pipefunc/pull/333))
-- ENH: Raise an error with a helpful error message for missing dependencies ([#347](https://github.com/pipefunc/pipefunc/pull/347))
-- ENH: Add optimized `FileArray.mask_linear` ([#346](https://github.com/pipefunc/pipefunc/pull/346))
-- ENH: Refactor `pipeline.map.run` to prepare for async implementation ([#334](https://github.com/pipefunc/pipefunc/pull/334))
-- ENH: Speedup code by 40% via simple change ([#337](https://github.com/pipefunc/pipefunc/pull/337))
-- ENH: Improve missing plotting backend error message ([#332](https://github.com/pipefunc/pipefunc/pull/332))
+- Add `pipeline.map_async` and a progress bar ([#333](https://github.com/pipefunc/pipefunc/pull/333))
+- Raise an error with a helpful error message for missing dependencies ([#347](https://github.com/pipefunc/pipefunc/pull/347))
+- Add optimized `FileArray.mask_linear` ([#346](https://github.com/pipefunc/pipefunc/pull/346))
+- Refactor `pipeline.map.run` to prepare for async implementation ([#334](https://github.com/pipefunc/pipefunc/pull/334))
+- Speedup code by 40% via simple change ([#337](https://github.com/pipefunc/pipefunc/pull/337))
+- Improve missing plotting backend error message ([#332](https://github.com/pipefunc/pipefunc/pull/332))
 
 ### 📦 Dependencies
 
@@ -839,12 +839,12 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 🤖 CI
 
-- CI: Remove unused steps from pytest pipeline ([#345](https://github.com/pipefunc/pipefunc/pull/345))
+- Remove unused steps from pytest pipeline ([#345](https://github.com/pipefunc/pipefunc/pull/345))
 
 ### 🧪 Testing
 
-- TST: Add a CI pipeline that checks for matching doc-strings ([#343](https://github.com/pipefunc/pipefunc/pull/343))
-- TST: Add benchmark from FAQ to test suite ([#338](https://github.com/pipefunc/pipefunc/pull/338))
+- Add a CI pipeline that checks for matching doc-strings ([#343](https://github.com/pipefunc/pipefunc/pull/343))
+- Add benchmark from FAQ to test suite ([#338](https://github.com/pipefunc/pipefunc/pull/338))
 
 ### 🔄 Pre-commit
 
@@ -856,7 +856,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Add FAQ question about overhead/performance ([#335](https://github.com/pipefunc/pipefunc/pull/335))
+- Add FAQ question about overhead/performance ([#335](https://github.com/pipefunc/pipefunc/pull/335))
 
 ### 📊 Stats
 
@@ -884,10 +884,10 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Allow `pipeline.map` to run without disk ([#327](https://github.com/pipefunc/pipefunc/pull/327))
-- ENH: Make Graphviz PipeFunc nodes rounded ([#329](https://github.com/pipefunc/pipefunc/pull/329))
-- ENH: Implement `graphviz` based visualization ([#323](https://github.com/pipefunc/pipefunc/pull/323))
-- ENH: Allow `visualize` to take an int for `figsize` (square) ([#322](https://github.com/pipefunc/pipefunc/pull/322))
+- Allow `pipeline.map` to run without disk ([#327](https://github.com/pipefunc/pipefunc/pull/327))
+- Make Graphviz PipeFunc nodes rounded ([#329](https://github.com/pipefunc/pipefunc/pull/329))
+- Implement `graphviz` based visualization ([#323](https://github.com/pipefunc/pipefunc/pull/323))
+- Allow `visualize` to take an int for `figsize` (square) ([#322](https://github.com/pipefunc/pipefunc/pull/322))
 
 ### 🔄 Pre-commit
 
@@ -895,8 +895,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Explain what a pipeline is ([#321](https://github.com/pipefunc/pipefunc/pull/321))
-- DOC: Use `DiskCache` to prevent #317 ([#318](https://github.com/pipefunc/pipefunc/pull/318))
+- Explain what a pipeline is ([#321](https://github.com/pipefunc/pipefunc/pull/321))
+- Use `DiskCache` to prevent #317 ([#318](https://github.com/pipefunc/pipefunc/pull/318))
 
 ### 📊 Stats
 
@@ -911,7 +911,7 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📚 Documentation
 
-- DOC: Add a FAQ question about `ErrorSnapshot` and improve IP getting ([#316](https://github.com/pipefunc/pipefunc/pull/316))
+- Add a FAQ question about `ErrorSnapshot` and improve IP getting ([#316](https://github.com/pipefunc/pipefunc/pull/316))
 
 ### 📝 Other
 
@@ -927,13 +927,13 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add function going from `Results` to xarray with `xarray_dataset_from_results` ([#314](https://github.com/pipefunc/pipefunc/pull/314))
-- ENH: Attach `ErrorSnapshot` for debugging ([#313](https://github.com/pipefunc/pipefunc/pull/313))
-- ENH: Use pickle for cache key, inspired by `python-diskcache` package ([#310](https://github.com/pipefunc/pipefunc/pull/310))
+- Add function going from `Results` to xarray with `xarray_dataset_from_results` ([#314](https://github.com/pipefunc/pipefunc/pull/314))
+- Attach `ErrorSnapshot` for debugging ([#313](https://github.com/pipefunc/pipefunc/pull/313))
+- Use pickle for cache key, inspired by `python-diskcache` package ([#310](https://github.com/pipefunc/pipefunc/pull/310))
 
 ### 📚 Documentation
 
-- DOC: Add additional examples to the tutorial ([#311](https://github.com/pipefunc/pipefunc/pull/311))
+- Add additional examples to the tutorial ([#311](https://github.com/pipefunc/pipefunc/pull/311))
 
 ### 🔄 Pre-commit
 
@@ -956,11 +956,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add `internal_shape` to `PipeFunc` ([#302](https://github.com/pipefunc/pipefunc/pull/302))
+- Add `internal_shape` to `PipeFunc` ([#302](https://github.com/pipefunc/pipefunc/pull/302))
 
 ### 📚 Documentation
 
-- DOC: Show triangulation on top of `Learner2D` plot ([#301](https://github.com/pipefunc/pipefunc/pull/301))
+- Show triangulation on top of `Learner2D` plot ([#301](https://github.com/pipefunc/pipefunc/pull/301))
 
 ### 📊 Stats
 
@@ -978,11 +978,11 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Add call to action ([#300](https://github.com/pipefunc/pipefunc/pull/300))
-- ENH: Add ToC of questions to FAQ ([#298](https://github.com/pipefunc/pipefunc/pull/298))
-- ENH: Add tl;dr note in API docs ([#297](https://github.com/pipefunc/pipefunc/pull/297))
-- ENH: Skip parallelization if pointless ([#293](https://github.com/pipefunc/pipefunc/pull/293))
-- ENH: Simpler example with `output_picker` ([#287](https://github.com/pipefunc/pipefunc/pull/287))
+- Add call to action ([#300](https://github.com/pipefunc/pipefunc/pull/300))
+- Add ToC of questions to FAQ ([#298](https://github.com/pipefunc/pipefunc/pull/298))
+- Add tl;dr note in API docs ([#297](https://github.com/pipefunc/pipefunc/pull/297))
+- Skip parallelization if pointless ([#293](https://github.com/pipefunc/pipefunc/pull/293))
+- Simpler example with `output_picker` ([#287](https://github.com/pipefunc/pipefunc/pull/287))
 
 ### 📝 Other
 
@@ -1011,8 +1011,8 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### ✨ Enhancements
 
-- ENH: Small type annotation fix in `memoize` ([#285](https://github.com/pipefunc/pipefunc/pull/285))
-- ENH: Improve caching and add a `memoize` decorator ([#283](https://github.com/pipefunc/pipefunc/pull/283))
+- Small type annotation fix in `memoize` ([#285](https://github.com/pipefunc/pipefunc/pull/285))
+- Improve caching and add a `memoize` decorator ([#283](https://github.com/pipefunc/pipefunc/pull/283))
 
 ### 🔄 Pre-commit
 

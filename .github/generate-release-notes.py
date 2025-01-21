@@ -303,7 +303,7 @@ def _generate_release_notes(  # noqa: PLR0912
                     ref = commit.hexsha[:7]
                     link = f"[{ref}]({REPO_URL}/commit/{ref})"
                     line = f"{line} ({link})"
-                commits_by_category[category].append(line)
+                commits_by_category[category].append(line[n_skip:])
 
         # Add commits by category, only if there are commits in that category
         for category, messages in commits_by_category.items():
