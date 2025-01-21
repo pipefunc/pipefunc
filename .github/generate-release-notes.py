@@ -237,7 +237,7 @@ def _get_file_stats(
 
 
 def _generate_release_notes(  # noqa: PLR0912
-    token: str,
+    token: str | None = None,
     repo_path: str | None = None,
     remote_name: str = "origin",
 ) -> str:
@@ -334,8 +334,12 @@ def _add_stats_lines(lines: list[str], ext: str, stats: dict[str, int]) -> None:
 
 if __name__ == "__main__":
     # Replace with your GitHub token
-    with open("GITHUB_TOKEN") as f:  # noqa: PTH123
-        github_token = f.read().strip()
+    token_file = REPO_ROOT / ".github" / "GITHUB_TOKEN"
+    if token_file.exists():
+        with token_file.open() as f:
+            github_token = f.read().strip()
+    else:
+        github_token = None  # type: ignore[assignment]
     notes = _generate_release_notes(github_token)
     console.print(notes)
     with open(REPO_ROOT / "CHANGELOG.md", "w") as f:  # noqa: PTH123
