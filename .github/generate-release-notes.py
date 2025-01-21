@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import functools
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -177,6 +178,16 @@ def _filter_issues_by_timeframe(
     return filtered
 
 
+def _get_pr_nr(line: str) -> str | None:
+    pattern = r"\(#(\d+)\)$"  # The regex pattern
+
+    match = re.search(pattern, line)
+
+    if match:
+        return match.group(1)
+    return None
+
+
 def _get_first_line(message: str) -> str:
     """Get the first line of a multi-line message."""
     return message.split("\n")[0].strip()
@@ -270,7 +281,12 @@ def _generate_release_notes(
         for commit in commits:
             if not commit.message.startswith("Merge pull request"):
                 category = _categorize_pr_title(commit.message)
-                commits_by_category[category].append(_get_first_line(commit.message))
+                line = _get_first_line(commit.message)
+                if (pr_nr := _get_pr_nr(line)) is not None:
+                    repo_url = "https://github.com/pipefunc/pipefunc"
+                    link = f"([#{pr_nr}]({repo_url}/pull/{pr_nr}))"
+                    line = line.replace(f"(#{pr_nr})", link)
+                commits_by_category[category].append(line)
 
         # Add commits by category, only if there are commits in that category
         for category, messages in commits_by_category.items():
