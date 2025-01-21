@@ -60,14 +60,21 @@ async def convert_to_ipynb_async(md_file: Path, ipynb_file: Path) -> None:
         str(md_file),
         "-o",
         str(ipynb_file),
+        stdout=asyncio.subprocess.PIPE,  # Redirect stdout to a pipe
+        stderr=asyncio.subprocess.PIPE,  # Redirect stderr to a pipe
     )
     await proc.wait()
+
     if proc.returncode == 0:
         rich.print(f"🔄 Converted: {md_file} -> {ipynb_file}")
     else:
+        assert proc.stderr is not None
+        stderr = await proc.stderr.read()
         rich.print(
             f"[bold red]❌ Error converting {md_file}: Exit code {proc.returncode}[/bold red]",
         )
+        if stderr:
+            rich.print(f"[bold red]Stderr: {stderr.decode()}[/bold red]")
 
 
 async def download_and_convert_file(
