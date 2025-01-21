@@ -145,8 +145,9 @@ def _get_commits_between(
     _print_step(
         f"Getting commits between {start_tag.name} and {end_tag.name if end_tag else 'HEAD'}",
     )
-    end_commit = repo.head.commit if end_tag is None else end_tag.commit
-    commits = list(repo.iter_commits(f"{start_tag.commit}..{end_commit}"))
+    # Use start_tag as the end point for the first iteration
+    end_commit = start_tag.commit if end_tag is None else end_tag.commit
+    commits = list(repo.iter_commits(f"{end_commit}...{start_tag.commit}"))
     _print_info(f"Found {len(commits)} commits")
     return commits
 
@@ -236,10 +237,12 @@ def _generate_release_notes(
 
     markdown = ""
     for i, (tag, tag_date) in enumerate(tags_with_dates):
+        # Handle the first tag (no previous tag)
         prev_tag = tags_with_dates[i + 1][0] if i + 1 < len(tags_with_dates) else None
         prev_tag_date = tags_with_dates[i + 1][1] if i + 1 < len(tags_with_dates) else None
 
-        commits = _get_commits_between(repo, prev_tag, tag)
+        # Use current tag and HEAD for the first iteration
+        commits = _get_commits_between(repo, tag, prev_tag)
 
         tag_version = version.parse(tag.name)
         markdown += f"## Version {tag_version} ({tag_date.strftime('%Y-%m-%d')})\n\n"
@@ -247,10 +250,10 @@ def _generate_release_notes(
         # Get closed issues
         closed_issues = _get_closed_issues_between_tags(
             gh_repo,
-            prev_tag,
             tag,
-            prev_tag_date,
-            tag_date,
+            prev_tag,
+            tag_date,  # Use current tag's date for the first iteration
+            prev_tag_date,  # Use previous tag's date (or None) for subsequent iterations
         )
         if closed_issues:
             markdown += "### Closed Issues\n\n"
@@ -258,22 +261,26 @@ def _generate_release_notes(
                 markdown += f"- {issue.title} (#{issue.number})\n"
             markdown += "\n"
 
-        # Categorize PRs
-        prs_by_category = defaultdict(list)
+        # Categorize commits (or PRs)
+        commits_by_category: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for commit in track(commits, description="Processing commits..."):
             pr_number = _extract_pr_number(commit.message)
             if pr_number:
                 pr_details = _get_pr_details(gh_repo, pr_number)
                 if pr_details:
-                    pr_title, pr_body, pr_merge_date = pr_details
+                    pr_title, pr_body, _ = pr_details
                     category = _categorize_pr_title(pr_title)
-                    prs_by_category[category].append((pr_title, pr_body, pr_merge_date, pr_number))
+                    commits_by_category[category].append((pr_title, f"(#{pr_number})"))
+            else:
+                # Handle direct commits
+                category = _categorize_pr_title(commit.message)
+                commits_by_category[category].append((commit.message, ""))
 
-        # Add PRs to markdown
-        for category, prs in prs_by_category.items():
+        # Add commits to markdown
+        for category, commits_in_category in commits_by_category.items():
             markdown += f"### {category}\n\n"
-            for pr_title, _pr_body, pr_merge_date, pr_number in prs:
-                markdown += f"- {pr_title} (#{pr_number}) {pr_merge_date.strftime('%Y-%m-%d')}\n"
+            for commit_message, pr_link in commits_in_category:
+                markdown += f"- {commit_message} {pr_link}\n"
             markdown += "\n"
 
     return markdown
