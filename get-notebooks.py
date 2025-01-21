@@ -1,4 +1,14 @@
-"""Downloads Markdown files from a GitHub repository and converts them to Jupyter Notebooks."""
+"""Downloads Markdown files from a GitHub repository and converts them to Jupyter Notebooks.
+
+Run this script like
+```bash
+uv run get-notebooks.py
+```
+or
+```bash
+uv run https://github.com/pipefunc/pipefunc/blob/main/get-notebooks.py
+```
+"""
 
 # /// script
 # dependencies = [
@@ -15,7 +25,7 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 import rich
-from github import ContentFile, Github  # PyGithub
+from github import ContentFile, Github, GithubException  # PyGithub
 from rich.progress import Progress, TaskID
 
 if TYPE_CHECKING:
@@ -84,6 +94,28 @@ async def process_file(
     md_file.unlink()  # Remove the temporary .md file
 
 
+async def download_root_notebook(
+    session: aiohttp.ClientSession,
+    repo: "Repository",
+    output_base_dir: Path,
+    progress: Progress,
+) -> None:
+    """Downloads the example.ipynb notebook from the root of the repository."""
+    try:
+        file: ContentFile.ContentFile = repo.get_contents("example.ipynb")
+        file_url: str = file.download_url
+        destination: Path = output_base_dir / file.name
+
+        task_id = progress.add_task(f"Downloading {file.name}", start=False)
+        await download_file_async(session, file_url, destination, progress, task_id)
+        progress.remove_task(task_id)
+    except GithubException as e:
+        if e.status == 404:  # noqa: PLR2004
+            rich.print("⚠️  Could not find example.ipynb in the root of the repository.")
+        else:
+            rich.print(f"[bold red]❌ Error downloading example.ipynb: {e}[/bold red]")
+
+
 async def main() -> None:
     """Downloads Markdown files from GitHub and converts them to Jupyter Notebooks."""
     rich.print("🚀 Starting conversion process...")
@@ -108,11 +140,12 @@ async def main() -> None:
     # Download and convert files concurrently
     async with aiohttp.ClientSession() as session:
         with Progress() as progress:
+            # Download example.ipynb from the root
+            await download_root_notebook(session, repo, output_base_dir, progress)
+
             tasks: list[asyncio.Task] = []
             for folder in folders:
-                contents: list[ContentFile.ContentFile] = repo.get_contents(
-                    f"docs/source/{folder}",
-                )
+                contents: list[ContentFile.ContentFile] = repo.get_contents(f"docs/source/{folder}")
                 rich.print(f"🔍 Found {len(contents)} files in '{folder}' folder")
                 for file in contents:
                     if file.name.endswith(".md"):
