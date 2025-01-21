@@ -1,5 +1,5 @@
 # Changelog
-These are the release notes are automatically generated from commits and GitHub issues and PRs.
+These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ## v0.49.6 (2025-01-17)
