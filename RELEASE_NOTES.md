@@ -78,8 +78,7 @@
 
 ### 📊 Stats
 
-- `.md => concepts/adaptive-integration.md}`: +8 lines, -1 lines
-- `.md`: +2581 lines, -1351 lines
+- `.md`: +2576 lines, -1350 lines
 - `.py`: +76 lines, -9 lines
 - `.ipynb`: +17 lines, -851 lines
 
@@ -690,19 +689,11 @@
 
 ### 📊 Stats
 
-- other: +66 lines, -9 lines
+- other: +64 lines, -7 lines
 - `.md`: +1 lines, -1 lines
 - `.yml`: +4 lines, -5 lines
-- `.py`: +1355 lines, -633 lines
-- `.py => _pipeline/_base.py}`: +82 lines, -402 lines
-- `.py => _storage_array/_base.py}`: +7 lines, -8 lines
-- `.py => _storage_array/_dict.py}`: +5 lines, -9 lines
-- `.py => _storage_array/_file.py}`: +19 lines, -22 lines
-- `.py => _storage_array/_zarr.py}`: +9 lines, -8 lines
+- `.py`: +1345 lines, -621 lines
 - `.toml`: +3 lines, -5 lines
-- `.py => storage/test_all_storage.py}`: +26 lines, -16 lines
-- `.py => storage/test_file.py}`: +2 lines, -2 lines
-- `.py => test_map.py}`: +83 lines, -47 lines
 
 ## Version v0.36.1 (2024-10-17)
 
@@ -752,7 +743,6 @@
 - `.yml`: +6 lines, -5 lines
 - `.py`: +26 lines, -10 lines
 - `.ipynb`: +758 lines, -893 lines
-- `.py => _widgets/progress.py}`: +0 lines, -0 lines
 - `.toml`: +8 lines, -6 lines
 
 ## Version v0.35.1 (2024-09-30)
@@ -1030,7 +1020,6 @@
 - other: +5 lines, -1 lines
 - `.md`: +2 lines, -0 lines
 - `.py`: +320 lines, -21 lines
-- `.py => cache.py}`: +194 lines, -1 lines
 
 ## Version v0.27.3 (2024-08-29)
 
@@ -1160,8 +1149,7 @@
 - other: +2 lines, -2 lines
 - `.md`: +15 lines, -15 lines
 - `.ipynb`: +12 lines, -5 lines
-- `.py`: +2132 lines, -1820 lines
-- `.py => test_lazy.py}`: +0 lines, -0 lines
+- `.py`: +2032 lines, -1820 lines
 
 ## Version v0.23.1 (2024-06-28)
 
@@ -1258,7 +1246,6 @@
 - `.yml`: +1 lines, -0 lines
 - `.ipynb`: +2 lines, -2 lines
 - `.py`: +397 lines, -144 lines
-- `.py => _profile.py}`: +2 lines, -2 lines
 - `.toml`: +2 lines, -1 lines
 
 ## Version v0.20.0 (2024-06-19)
@@ -1471,8 +1458,6 @@
 - `.lazy.md`: +8 lines, -0 lines
 - `.sweep.md`: +8 lines, -0 lines
 - `.ipynb`: +46 lines, -14 lines
-- `.py => lazy.py}`: +5 lines, -7 lines
-- `.py => sweep.py}`: +27 lines, -13 lines
 - `.toml`: +10 lines, -10 lines
 
 ## Version v0.12.0 (2024-05-30)
