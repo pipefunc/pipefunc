@@ -1,5 +1,3 @@
-## Unreleased Changes (2025-01-21)
-
 ## Version v0.49.6 (2025-01-17)
 
 ### ✨ Enhancements

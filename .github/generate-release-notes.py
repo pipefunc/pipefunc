@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import functools
-import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
@@ -115,12 +114,6 @@ def _get_github_repo(gh: Github, remote: git.Remote) -> Repository.Repository:
     return gh.get_repo(repo_name)
 
 
-def _extract_pr_number(commit_message: str) -> int | None:
-    """Extract the PR number from a commit message."""
-    match = re.search(r"\(#(\d+)\)", commit_message)
-    return int(match.group(1)) if match else None
-
-
 def _categorize_pr_title(pr_title: str) -> str:  # noqa: PLR0911
     """Categorize a PR title based on prefixes."""
     if pr_title.startswith("DOC:"):
@@ -156,37 +149,6 @@ def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetim
 
     # Sort by date, newest first
     return sorted(tags_with_dates, key=lambda x: x[1], reverse=True)
-
-
-@_cached_github_call
-def _get_closed_issues_in_timeframe(
-    gh_repo: Repository.Repository,
-    start_date: datetime.datetime | None,
-    end_date: datetime.datetime,
-) -> list[Github.Issue.Issue]:
-    """Get all issues closed between start_date and end_date."""
-    _print_step(
-        f"Getting issues closed between "
-        f"{start_date.strftime('%Y-%m-%d') if start_date else 'beginning'} "
-        f"and {end_date.strftime('%Y-%m-%d')}",
-    )
-
-    issues = []
-    kwargs: dict[str, Any] = {"state": "closed"}
-    if start_date is not None:
-        kwargs["since"] = start_date
-
-    for issue in gh_repo.get_issues(**kwargs):
-        if issue.closed_at > end_date:
-            continue
-        if start_date is not None and issue.closed_at < start_date:
-            break
-        if not issue.pull_request:  # Skip PRs, we only want issues
-            _print_substep(f"Found issue {issue.title} (#{issue.number})")
-            issues.append(issue)
-
-    _print_info(f"Found {len(issues)} closed issues")
-    return issues
 
 
 @_cached_github_call
@@ -240,23 +202,7 @@ def _generate_release_notes(
     # Get all closed issues once
     all_closed_issues = _get_all_closed_issues(gh_repo)
 
-    # Add section for unreleased changes if any
-    head_date = datetime.datetime.fromtimestamp(
-        repo.head.commit.committed_date,
-        tz=datetime.timezone.utc,
-    )
     markdown = ""
-    if head_date > tags_with_dates[0][1]:
-        # There are unreleased changes
-        latest_tag_date = tags_with_dates[0][1]
-        unreleased_issues = _filter_issues_by_timeframe(
-            all_closed_issues,
-            start_date=latest_tag_date,
-            end_date=head_date,
-        )
-        markdown += f"## Unreleased Changes ({head_date.strftime('%Y-%m-%d')})\n\n"
-        # ... handle unreleased changes and issues ...
-
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):
         prev_tag, prev_date = (
