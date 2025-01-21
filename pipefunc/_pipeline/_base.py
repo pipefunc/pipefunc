@@ -2042,6 +2042,11 @@ class Pipeline:
             * ``topological``: Display functions in topological order.
             * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
 
+        See Also
+        --------
+        info
+            Returns the input and output information for the pipeline.
+
         """
         requires("rich", "griffe", reason="print_doc", extras="autodoc")
         doc = PipelineDocumentation.from_pipeline(self)
