@@ -221,6 +221,8 @@ class Pipeline:
             The leaf nodes of the pipeline as `PipeFunc` objects.
         root_args
             The root arguments (inputs) required to compute the output of the pipeline.
+        print_documentation
+            Print formatted documentation of the pipeline to the console.
 
         """
         inputs = self.root_args()

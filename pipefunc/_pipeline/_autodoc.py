@@ -48,8 +48,7 @@ class PipelineDocumentation:
                         msg = f"Conflicting annotations for parameter `{p}`: `{p_annotations[p]}` != `{v}`."
                         warnings.warn(msg, stacklevel=2)
                     p_annotations[p] = v
-            if f.output_annotation:
-                r_annotations.update(f.output_annotation)
+            r_annotations.update(f.output_annotation)
             if doc.description:
                 descriptions[f.output_name] = doc.description
             if doc.returns:
