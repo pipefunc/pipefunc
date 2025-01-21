@@ -242,7 +242,7 @@ def _generate_release_notes(
     # Get all closed issues once
     all_closed_issues = _get_all_closed_issues(gh_repo)
 
-    markdown = "# Changelog"
+    markdown = "# Changelog\n\n"
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):
         prev_tag, prev_date = (
