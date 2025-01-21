@@ -12,7 +12,7 @@ import git
 from diskcache import Cache
 from github import Github, Repository, UnknownObjectException
 from packaging import version
-from rich import print  # noqa: A004
+from rich import print
 from rich.console import Console
 from rich.progress import track
 
@@ -253,38 +253,46 @@ def _generate_release_notes(
         tag_version = version.parse(tag.name)
         markdown += f"## Version {tag_version} ({tag_date.strftime('%Y-%m-%d')})\n\n"
 
-        # Filter issues locally for the current tag's date range
-        closed_issues = [
-            issue
-            for issue in all_closed_issues
-            if (
-                prev_tag_date is None
-                and issue.closed_at <= tag_date  # Include all issues up to the first tag
-                and not issue.pull_request  # Exclude PRs
-            )
-            or (
-                prev_tag_date is not None
-                and prev_tag_date < issue.closed_at <= tag_date  # Note the < instead of <=
-                and not issue.pull_request  # Exclude PRs
-            )
-        ]
+        # Separate closed issues and merged PRs
+        closed_issues = []
+        merged_prs = []
+        for issue in all_closed_issues:
+            if (prev_tag_date is None and issue.closed_at <= tag_date) or (
+                prev_tag_date is not None and prev_tag_date < issue.closed_at <= tag_date
+            ):
+                if issue.pull_request:
+                    pr_details = _get_pr_details(gh_repo, issue.number)
+                    if pr_details is not None:
+                        merged_prs.append((*pr_details, issue.number))
+                else:
+                    closed_issues.append(issue)
+
+        # Add closed issues to markdown
         if closed_issues:
             markdown += "### Closed Issues\n\n"
             for issue in closed_issues:
                 markdown += f"- {issue.title} (#{issue.number})\n"
             markdown += "\n"
 
-        # Categorize commits (or PRs)
+        # Categorize and add merged PRs to markdown
+        prs_by_category: dict[
+            str,
+            list[tuple[str, str, datetime.datetime, int]],
+        ] = defaultdict(list)
+        for pr_title, pr_body, pr_merge_date, pr_number in merged_prs:
+            category = _categorize_pr_title(pr_title)
+            prs_by_category[category].append((pr_title, pr_body, pr_merge_date, pr_number))
+        for category, prs in prs_by_category.items():
+            markdown += f"### {category}\n\n"
+            for pr_title, _, pr_merge_date, pr_number in prs:
+                markdown += f"- {pr_title} (#{pr_number})\n"
+            markdown += "\n"
+
+        # Categorize commits (excluding those that are part of merged PRs)
         commits_by_category: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for commit in track(commits, description="Processing commits..."):
             pr_number = _extract_pr_number(commit.message)
-            if pr_number:
-                pr_details = _get_pr_details(gh_repo, pr_number)
-                if pr_details:
-                    pr_title, pr_body, _ = pr_details
-                    category = _categorize_pr_title(pr_title)
-                    commits_by_category[category].append((pr_title, f"(#{pr_number})"))
-            else:
+            if pr_number is None:
                 category = _categorize_pr_title(commit.message)
                 commits_by_category[category].append((commit.message, ""))
 
@@ -293,7 +301,6 @@ def _generate_release_notes(
             markdown += f"### {category}\n\n"
             for commit_message, pr_link in commits_in_category:
                 markdown += f"- {commit_message} {pr_link}\n"
-            # Only add a newline if there are commits in the category
             if commits_in_category:
                 markdown += "\n"
 
