@@ -71,4 +71,17 @@ except Exception:
     print(snapshot)
 ```
 
+In the same way, for a {class}`~pipefunc.Pipeline` we can also access the error snapshot of the last failed function using the `error_snapshot` attribute.
+
+```{code-cell} ipython3
+from pipefunc import Pipeline
+
+pipeline = Pipeline([faulty_function])
+try:
+    pipeline(a=1, b=2)
+except Exception:
+    snapshot = pipeline.error_snapshot
+    print(snapshot)
+```
+
 {class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
