@@ -123,25 +123,23 @@ def _get_github_repo(gh: Github, remote: git.Remote) -> Repository.Repository:
     return gh.get_repo(repo_name)
 
 
-def _categorize_pr_title(pr_title: str) -> str:  # noqa: PLR0911
+def _categorize_pr_title(pr_title: str) -> tuple[int, str]:
     """Categorize a PR title based on prefixes."""
-    if pr_title.startswith("DOC:"):
-        return "📚 Documentation"
-    if pr_title.startswith("ENH:"):
-        return "✨ Enhancements"
-    if pr_title.startswith("CI:"):
-        return "🤖 CI"
-    if pr_title.startswith("TST:"):
-        return "🧪 Testing"
-    if pr_title.startswith("MAINT:"):
-        return "🧹 Maintenance"
-    if pr_title.startswith("BUG:"):
-        return "🐛 Bug Fixes"
-    if pr_title.startswith("⬆️"):
-        return "📦 Dependencies"
-    if pr_title.startswith("[pre-commit.ci]"):
-        return "🔄 Pre-commit"
-    return "📝 Other"
+    mapping = {
+        "DOC:": "📚 Documentation",
+        "ENH:": "✨ Enhancements",
+        "CI:": "🤖 CI",
+        "TST:": "🧪 Testing",
+        "MAINT:": "🧹 Maintenance",
+        "BUG:": "🐛 Bug Fixes",
+        "⬆️": "📦 Dependencies",
+        "[pre-commit.ci]": "🔄 Pre-commit",
+    }
+    for prefix, category in mapping.items():
+        if pr_title.startswith(prefix):
+            n = len(prefix) + 1 if prefix.endswith(":") else 0
+            return n, category
+    return 0, "📝 Other"
 
 
 def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetime.datetime]]:
@@ -296,7 +294,7 @@ def _generate_release_notes(  # noqa: PLR0912
         commits_by_category: dict[str, list[str]] = defaultdict(list)
         for commit in commits:
             if not commit.message.startswith("Merge pull request"):
-                category = _categorize_pr_title(commit.message)
+                n_skip, category = _categorize_pr_title(commit.message)
                 line = _get_first_line(commit.message)
                 if (pr_nr := _get_pr_nr(line)) is not None:
                     link = f"[#{pr_nr}]({REPO_URL}/pull/{pr_nr})"
