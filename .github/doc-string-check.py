@@ -6,6 +6,9 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
+import pipefunc._pipeline
+import pipefunc._pipeline._autodoc
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -248,4 +251,11 @@ if __name__ == "__main__":
         pipefunc.VariantPipeline,
         allow_missing=["default_variant"],
         allow_discrepancy=["functions"],
+    )
+
+    # map vs map_async
+    compare_param_descriptions(
+        pipefunc.Pipeline.print_documentation,
+        pipefunc._pipeline._autodoc.format_pipeline_docs,
+        allow_missing=["doc", "print_table"],
     )
