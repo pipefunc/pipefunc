@@ -121,7 +121,7 @@ class TryNotebookWithUV(SphinxDirective):
             "Alternatively, run:",
             "",
             "```bash",
-            f'uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py',
+            f"uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py",
             "```",
             "",
             "to download *all* documentation as Jupyter notebooks.",
