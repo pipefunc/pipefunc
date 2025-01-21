@@ -1,6 +1,11 @@
 """Automatically generate release notes from GitHub issues and PRs.
 
 Run `uv run .github/generate-release-notes.py` to generate the release notes.
+Or
+```bash
+GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
+```
+to use the GitHub CLI to authenticate.
 """
 # /// script
 # dependencies = [
@@ -15,6 +20,7 @@ from __future__ import annotations
 
 import datetime
 import functools
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -337,8 +343,13 @@ if __name__ == "__main__":
     token_file = REPO_ROOT / ".github" / "GITHUB_TOKEN"
     if token_file.exists():
         with token_file.open() as f:
+            _print_info("Using GitHub token from file")
             github_token = f.read().strip()
+    elif "GITHUB_TOKEN" in os.environ:
+        _print_info("Using GitHub token from environment")
+        github_token = os.environ["GITHUB_TOKEN"]
     else:
+        _print_error("No GitHub token found")
         github_token = None  # type: ignore[assignment]
     notes = _generate_release_notes(github_token)
     console.print(notes)

@@ -2,6 +2,45 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
+## v0.50.0 (2025-01-21)
+
+### Closed Issues
+
+- Automatically parse doc-strings to generate Pipeline docs ([#562](https://github.com/pipefunc/pipefunc/issues/562))
+- Create freeze button for scroll action in visualize_widget ([#561](https://github.com/pipefunc/pipefunc/issues/561))
+- Scoped pipelines cannot be nested ([#374](https://github.com/pipefunc/pipefunc/issues/374))
+
+### 📚 Documentation
+
+- Add `get-notebooks.py` script that downloads all notebooks and puts them in a folder ([#581](https://github.com/pipefunc/pipefunc/pull/581))
+- Add Raises section to `Pipeline.update_scope`'s docstring ([#572](https://github.com/pipefunc/pipefunc/pull/572))
+
+### ✨ Enhancements
+
+- Automatically generate documentation for `Pipeline`s ([#563](https://github.com/pipefunc/pipefunc/pull/563))
+- Add literals of common storage options to `map` and `map_async` annotations ([#575](https://github.com/pipefunc/pipefunc/pull/575))
+
+### 🧪 Testing
+
+- Include pydantic in the micromamba testing `environment.yaml` ([#579](https://github.com/pipefunc/pipefunc/pull/579))
+- Fix `tests/test_plotting.py::test_plotting_widget` ([#576](https://github.com/pipefunc/pipefunc/pull/576))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#577](https://github.com/pipefunc/pipefunc/pull/577))
+
+### 📦 Dependencies
+
+- ⬆️ Update release-drafter/release-drafter action to v6.1.0 ([#574](https://github.com/pipefunc/pipefunc/pull/574))
+
+### 📊 Stats
+
+- `.py`: +1333 lines, -14 lines
+- `.yaml`: +2 lines, -2 lines
+- `.yml`: +8 lines, -0 lines
+- `.md`: +73 lines, -3 lines
+- `.toml`: +2 lines, -1 lines
+
 ## v0.49.6 (2025-01-17)
 
 ### ✨ Enhancements
@@ -1416,21 +1455,21 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 - Include `pipefunc.map.adaptive` integration in docs ([#149](https://github.com/pipefunc/pipefunc/pull/149))
 - Validate inputs to `PipeFunc` ([#148](https://github.com/pipefunc/pipefunc/pull/148))
 - Add `PipeFunc.update_bound` to allow fixed parameters ([#110](https://github.com/pipefunc/pipefunc/pull/110))
-- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
-- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 
 ### 📊 Stats
 
-- `.py`: +1174 lines, -475 lines
-- `.md`: +3 lines, -3 lines
-- `.yml`: +15 lines, -3 lines
+- `.py`: +1150 lines, -466 lines
+- `.md`: +1 lines, -1 lines
+- `.yml`: +4 lines, -0 lines
 - `.ipynb`: +67 lines, -3 lines
-- `.toml`: +17 lines, -14 lines
+- `.toml`: +1 lines, -1 lines
 
 ## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
+- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
+- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now) ([a9302d7](https://github.com/pipefunc/pipefunc/commit/a9302d7))
 - Drop support for Python 3.8 and 3.9 ([#142](https://github.com/pipefunc/pipefunc/pull/142))
 - Factor out simplify functions to simplify module ([#141](https://github.com/pipefunc/pipefunc/pull/141))
@@ -1457,12 +1496,12 @@ If it is out of date, please run `uv run .github/generate-release-notes.py`.
 
 ### 📊 Stats
 
-- `.py`: +1771 lines, -875 lines
-- `.yml`: +11 lines, -21 lines
-- `.md`: +18 lines, -0 lines
+- `.py`: +1794 lines, -883 lines
+- `.yml`: +15 lines, -17 lines
+- `.md`: +20 lines, -2 lines
 - `.ipynb`: +46 lines, -14 lines
 - `.py}`: +32 lines, -20 lines
-- `.toml`: +10 lines, -10 lines
+- `.toml`: +20 lines, -17 lines
 
 ## v0.12.0 (2024-05-30)
 
