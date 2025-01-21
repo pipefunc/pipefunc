@@ -249,7 +249,7 @@ def _generate_release_notes(
             tags_with_dates[i + 1] if i + 1 < len(tags_with_dates) else (None, None)
         )
 
-        markdown += f"## Version {tag.name} ({tag_date.strftime('%Y-%m-%d')})\n\n"
+        markdown += f"## {tag.name} ({tag_date.strftime('%Y-%m-%d')})\n\n"
 
         # Get commits
         if prev_tag is None:

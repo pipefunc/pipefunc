@@ -1,6 +1,6 @@
 # Changelog
 
-## Version v0.49.6 (2025-01-17)
+## v0.49.6 (2025-01-17)
 
 ### ✨ Enhancements
 
@@ -10,7 +10,7 @@
 
 - `.py`: +15 lines, -1 lines
 
-## Version v0.49.5 (2025-01-17)
+## v0.49.5 (2025-01-17)
 
 ### 🐛 Bug Fixes
 
@@ -30,7 +30,7 @@
 - `.py`: +54 lines, -15 lines
 - `.ipynb`: +4 lines, -12 lines
 
-## Version v0.49.4 (2025-01-15)
+## v0.49.4 (2025-01-15)
 
 ### 🐛 Bug Fixes
 
@@ -46,7 +46,7 @@
 - `.ipynb`: +1 lines, -0 lines
 - `.py`: +77 lines, -46 lines
 
-## Version v0.49.3 (2025-01-15)
+## v0.49.3 (2025-01-15)
 
 ### 🐛 Bug Fixes
 
@@ -56,7 +56,7 @@
 
 - `.py`: +106 lines, -0 lines
 
-## Version v0.49.2 (2025-01-14)
+## v0.49.2 (2025-01-14)
 
 ### Closed Issues
 
@@ -84,7 +84,7 @@
 - `.py`: +76 lines, -9 lines
 - `.ipynb`: +17 lines, -851 lines
 
-## Version v0.49.1 (2025-01-13)
+## v0.49.1 (2025-01-13)
 
 ### 🐛 Bug Fixes
 
@@ -106,7 +106,7 @@
 - `.md`: +442 lines, -0 lines
 - `.toml`: +1 lines, -0 lines
 
-## Version v0.49.0 (2025-01-13)
+## v0.49.0 (2025-01-13)
 
 ### ✨ Enhancements
 
@@ -128,7 +128,7 @@
 - `.ipynb`: +98 lines, -164 lines
 - `.py`: +283 lines, -16 lines
 
-## Version v0.48.2 (2025-01-11)
+## v0.48.2 (2025-01-11)
 
 ### 🐛 Bug Fixes
 
@@ -147,7 +147,7 @@
 - other: +1 lines, -1 lines
 - `.py`: +378 lines, -4 lines
 
-## Version v0.48.1 (2025-01-10)
+## v0.48.1 (2025-01-10)
 
 ### Closed Issues
 
@@ -166,7 +166,7 @@
 - other: +6 lines, -0 lines
 - `.py`: +75 lines, -5 lines
 
-## Version v0.48.0 (2025-01-10)
+## v0.48.0 (2025-01-10)
 
 ### Closed Issues
 
@@ -182,7 +182,7 @@
 - `.md`: +2 lines, -0 lines
 - `.py`: +269 lines, -8 lines
 
-## Version v0.47.3 (2025-01-10)
+## v0.47.3 (2025-01-10)
 
 ### 🐛 Bug Fixes
 
@@ -192,7 +192,7 @@
 
 - `.py`: +10 lines, -7 lines
 
-## Version v0.47.2 (2025-01-10)
+## v0.47.2 (2025-01-10)
 
 ### 🐛 Bug Fixes
 
@@ -214,7 +214,7 @@
 - `.md`: +2 lines, -3 lines
 - `.py`: +75 lines, -2 lines
 
-## Version v0.47.1 (2025-01-09)
+## v0.47.1 (2025-01-09)
 
 ### 📚 Documentation
 
@@ -230,7 +230,7 @@
 - `.md`: +7 lines, -1 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.47.0 (2025-01-09)
+## v0.47.0 (2025-01-09)
 
 ### Closed Issues
 
@@ -277,7 +277,7 @@
 - `.yaml`: +2 lines, -2 lines
 - `.md`: +201 lines, -63 lines
 
-## Version v0.46.0 (2024-12-23)
+## v0.46.0 (2024-12-23)
 
 ### Closed Issues
 
@@ -310,7 +310,7 @@
 - `.md`: +62 lines, -1 lines
 - `.py`: +172 lines, -8 lines
 
-## Version v0.45.0 (2024-12-21)
+## v0.45.0 (2024-12-21)
 
 ### Closed Issues
 
@@ -341,7 +341,7 @@
 - `.py`: +205 lines, -8 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.44.0 (2024-12-19)
+## v0.44.0 (2024-12-19)
 
 ### ✨ Enhancements
 
@@ -363,7 +363,7 @@
 - `.ipynb`: +138 lines, -73 lines
 - `.toml`: +2 lines, -1 lines
 
-## Version v0.43.0 (2024-12-19)
+## v0.43.0 (2024-12-19)
 
 ### Closed Issues
 
@@ -393,7 +393,7 @@
 - `.py`: +868 lines, -140 lines
 - `.toml`: +2 lines, -3 lines
 
-## Version v0.42.1 (2024-12-17)
+## v0.42.1 (2024-12-17)
 
 ### 🧪 Testing
 
@@ -409,7 +409,7 @@
 - `.py`: +47 lines, -0 lines
 - `.toml`: +3 lines, -1 lines
 
-## Version v0.42.0 (2024-12-16)
+## v0.42.0 (2024-12-16)
 
 ### ✨ Enhancements
 
@@ -426,7 +426,7 @@
 - `.md`: +45 lines, -0 lines
 - `.py`: +134 lines, -3 lines
 
-## Version v0.41.3 (2024-12-13)
+## v0.41.3 (2024-12-13)
 
 ### 🐛 Bug Fixes
 
@@ -436,7 +436,7 @@
 
 - `.py`: +12 lines, -6 lines
 
-## Version v0.41.2 (2024-12-11)
+## v0.41.2 (2024-12-11)
 
 ### 🐛 Bug Fixes
 
@@ -446,7 +446,7 @@
 
 - `.py`: +31 lines, -1 lines
 
-## Version v0.41.1 (2024-12-11)
+## v0.41.1 (2024-12-11)
 
 ### Closed Issues
 
@@ -479,7 +479,7 @@
 - `.yaml`: +1 lines, -1 lines
 - `.py`: +143 lines, -40 lines
 
-## Version v0.41.0 (2024-11-27)
+## v0.41.0 (2024-11-27)
 
 ### ✨ Enhancements
 
@@ -495,7 +495,7 @@
 - `.ipynb`: +3 lines, -3 lines
 - `.py`: +94 lines, -11 lines
 
-## Version v0.40.2 (2024-11-27)
+## v0.40.2 (2024-11-27)
 
 ### 🧹 Maintenance
 
@@ -508,7 +508,7 @@
 - `.yml`: +0 lines, -4 lines
 - `.toml`: +2 lines, -1 lines
 
-## Version v0.40.1 (2024-11-27)
+## v0.40.1 (2024-11-27)
 
 ### ✨ Enhancements
 
@@ -529,7 +529,7 @@
 - `.py`: +18 lines, -20 lines
 - `.toml`: +13 lines, -16 lines
 
-## Version v0.40.0 (2024-11-26)
+## v0.40.0 (2024-11-26)
 
 ### Closed Issues
 
@@ -563,7 +563,7 @@
 - `.py`: +103 lines, -12 lines
 - `.toml`: +16 lines, -16 lines
 
-## Version v0.39.0 (2024-11-26)
+## v0.39.0 (2024-11-26)
 
 ### 🐛 Bug Fixes
 
@@ -604,7 +604,7 @@
 - `.md`: +42 lines, -10 lines
 - `.toml`: +3 lines, -1 lines
 
-## Version v0.38.0 (2024-11-07)
+## v0.38.0 (2024-11-07)
 
 ### Closed Issues
 
@@ -647,7 +647,7 @@
 - `.py`: +848 lines, -216 lines
 - `.toml`: +4 lines, -2 lines
 
-## Version v0.37.0 (2024-10-30)
+## v0.37.0 (2024-10-30)
 
 ### Closed Issues
 
@@ -699,7 +699,7 @@
 - other: +1 lines, -1 lines
 - `.toml`: +3 lines, -5 lines
 
-## Version v0.36.1 (2024-10-17)
+## v0.36.1 (2024-10-17)
 
 ### 🧹 Maintenance
 
@@ -714,7 +714,7 @@
 - `.yml`: +1 lines, -1 lines
 - `.py`: +23 lines, -1 lines
 
-## Version v0.36.0 (2024-10-16)
+## v0.36.0 (2024-10-16)
 
 ### 📝 Other
 
@@ -750,7 +750,7 @@
 - `.py}`: +0 lines, -0 lines
 - `.toml`: +8 lines, -6 lines
 
-## Version v0.35.1 (2024-09-30)
+## v0.35.1 (2024-09-30)
 
 ### ✨ Enhancements
 
@@ -773,7 +773,7 @@
 - `.md`: +6 lines, -4 lines
 - `.py`: +30 lines, -4 lines
 
-## Version v0.35.0 (2024-09-27)
+## v0.35.0 (2024-09-27)
 
 ### 📚 Documentation
 
@@ -797,7 +797,7 @@
 - `.ipynb`: +4 lines, -10 lines
 - `.toml`: +0 lines, -2 lines
 
-## Version v0.34.0 (2024-09-25)
+## v0.34.0 (2024-09-25)
 
 ### ✨ Enhancements
 
@@ -820,7 +820,7 @@
 - `.ipynb`: +88 lines, -61 lines
 - `.py`: +191 lines, -128 lines
 
-## Version v0.33.0 (2024-09-24)
+## v0.33.0 (2024-09-24)
 
 ### ✨ Enhancements
 
@@ -864,7 +864,7 @@
 - `.md`: +53 lines, -0 lines
 - `.toml`: +8 lines, -4 lines
 
-## Version v0.32.1 (2024-09-18)
+## v0.32.1 (2024-09-18)
 
 ### 📝 Other
 
@@ -874,7 +874,7 @@
 
 - `.py`: +73 lines, -8 lines
 
-## Version v0.32.0 (2024-09-18)
+## v0.32.0 (2024-09-18)
 
 ### Closed Issues
 
@@ -905,7 +905,7 @@
 - `.ipynb`: +175 lines, -122 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.31.1 (2024-09-11)
+## v0.31.1 (2024-09-11)
 
 ### 📚 Documentation
 
@@ -921,7 +921,7 @@
 - `.ipynb`: +122 lines, -112 lines
 - `.py`: +18 lines, -4 lines
 
-## Version v0.31.0 (2024-09-10)
+## v0.31.0 (2024-09-10)
 
 ### ✨ Enhancements
 
@@ -950,7 +950,7 @@
 - `.py`: +262 lines, -18 lines
 - `.toml`: +16 lines, -2 lines
 
-## Version v0.30.0 (2024-09-05)
+## v0.30.0 (2024-09-05)
 
 ### ✨ Enhancements
 
@@ -965,7 +965,7 @@
 - `.md`: +1 lines, -1 lines
 - `.py`: +63 lines, -1 lines
 
-## Version v0.29.0 (2024-09-05)
+## v0.29.0 (2024-09-05)
 
 ### Closed Issues
 
@@ -998,7 +998,7 @@
 - `.ipynb`: +6 lines, -8 lines
 - `.py`: +186 lines, -46 lines
 
-## Version v0.28.0 (2024-09-03)
+## v0.28.0 (2024-09-03)
 
 ### 📝 Other
 
@@ -1024,7 +1024,7 @@
 - `.py`: +320 lines, -21 lines
 - `.py}`: +194 lines, -1 lines
 
-## Version v0.27.3 (2024-08-29)
+## v0.27.3 (2024-08-29)
 
 ### 📝 Other
 
@@ -1037,7 +1037,7 @@
 - `.typed`: +0 lines, -0 lines
 - `.toml`: +6 lines, -3 lines
 
-## Version v0.27.2 (2024-08-29)
+## v0.27.2 (2024-08-29)
 
 ### 📝 Other
 
@@ -1047,7 +1047,7 @@
 
 - `.py`: +28 lines, -15 lines
 
-## Version v0.27.1 (2024-08-29)
+## v0.27.1 (2024-08-29)
 
 ### 📝 Other
 
@@ -1065,7 +1065,7 @@
 - `.md`: +95 lines, -7 lines
 - `.py`: +36 lines, -1 lines
 
-## Version v0.27.0 (2024-08-28)
+## v0.27.0 (2024-08-28)
 
 ### 📝 Other
 
@@ -1089,7 +1089,7 @@
 - `.py`: +1199 lines, -100 lines
 - `.toml`: +4 lines, -2 lines
 
-## Version v0.26.0 (2024-08-22)
+## v0.26.0 (2024-08-22)
 
 ### 📝 Other
 
@@ -1116,7 +1116,7 @@
 - `.ipynb`: +2 lines, -2 lines
 - `.py`: +451 lines, -51 lines
 
-## Version v0.25.0 (2024-07-19)
+## v0.25.0 (2024-07-19)
 
 ### 📝 Other
 
@@ -1129,7 +1129,7 @@
 - `.py`: +97 lines, -15 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.24.0 (2024-07-18)
+## v0.24.0 (2024-07-18)
 
 ### Closed Issues
 
@@ -1156,7 +1156,7 @@
 - `.py`: +2132 lines, -1820 lines
 - `.py}`: +0 lines, -0 lines
 
-## Version v0.23.1 (2024-06-28)
+## v0.23.1 (2024-06-28)
 
 ### 📝 Other
 
@@ -1167,7 +1167,7 @@
 
 - `.py`: +80 lines, -13 lines
 
-## Version v0.23.0 (2024-06-27)
+## v0.23.0 (2024-06-27)
 
 ### 📝 Other
 
@@ -1178,7 +1178,7 @@
 - `.md`: +237 lines, -0 lines
 - `.py`: +183 lines, -2 lines
 
-## Version v0.22.2 (2024-06-27)
+## v0.22.2 (2024-06-27)
 
 ### 📝 Other
 
@@ -1188,7 +1188,7 @@
 
 - `.py`: +87 lines, -19 lines
 
-## Version v0.22.1 (2024-06-27)
+## v0.22.1 (2024-06-27)
 
 ### 📝 Other
 
@@ -1198,7 +1198,7 @@
 
 - `.py`: +28 lines, -3 lines
 
-## Version v0.22.0 (2024-06-26)
+## v0.22.0 (2024-06-26)
 
 ### 📝 Other
 
@@ -1214,7 +1214,7 @@
 - `.md`: +142 lines, -4 lines
 - `.py`: +409 lines, -110 lines
 
-## Version v0.21.0 (2024-06-24)
+## v0.21.0 (2024-06-24)
 
 ### Closed Issues
 
@@ -1255,7 +1255,7 @@
 - `.py}`: +2 lines, -2 lines
 - `.toml`: +2 lines, -1 lines
 
-## Version v0.20.0 (2024-06-19)
+## v0.20.0 (2024-06-19)
 
 ### 📝 Other
 
@@ -1270,7 +1270,7 @@
 
 - `.py`: +159 lines, -349 lines
 
-## Version v0.19.0 (2024-06-17)
+## v0.19.0 (2024-06-17)
 
 ### 📝 Other
 
@@ -1285,7 +1285,7 @@
 - `.md`: +196 lines, -57 lines
 - `.toml`: +1 lines, -0 lines
 
-## Version v0.18.1 (2024-06-14)
+## v0.18.1 (2024-06-14)
 
 ### Closed Issues
 
@@ -1299,7 +1299,7 @@
 
 - `.py`: +2 lines, -0 lines
 
-## Version v0.18.0 (2024-06-13)
+## v0.18.0 (2024-06-13)
 
 ### Closed Issues
 
@@ -1325,7 +1325,7 @@
 - `.ipynb`: +499 lines, -246 lines
 - `.toml`: +1 lines, -0 lines
 
-## Version v0.17.0 (2024-06-11)
+## v0.17.0 (2024-06-11)
 
 ### 📝 Other
 
@@ -1344,7 +1344,7 @@
 - `.py`: +518 lines, -540 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.16.0 (2024-06-10)
+## v0.16.0 (2024-06-10)
 
 ### 📝 Other
 
@@ -1364,7 +1364,7 @@
 - `.ipynb`: +107 lines, -71 lines
 - `.py`: +387 lines, -29 lines
 
-## Version v0.15.1 (2024-06-07)
+## v0.15.1 (2024-06-07)
 
 ### 📝 Other
 
@@ -1374,7 +1374,7 @@
 
 - `.py`: +28 lines, -11 lines
 
-## Version v0.15.0 (2024-06-07)
+## v0.15.0 (2024-06-07)
 
 ### Closed Issues
 
@@ -1401,7 +1401,7 @@
 - `.py`: +1476 lines, -135 lines
 - `.toml`: +14 lines, -4 lines
 
-## Version v0.14.0 (2024-06-04)
+## v0.14.0 (2024-06-04)
 
 ### 📝 Other
 
@@ -1425,7 +1425,7 @@
 - `.ipynb`: +67 lines, -3 lines
 - `.toml`: +17 lines, -14 lines
 
-## Version v0.13.0 (2024-06-02)
+## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
@@ -1462,7 +1462,7 @@
 - `.py}`: +32 lines, -20 lines
 - `.toml`: +10 lines, -10 lines
 
-## Version v0.12.0 (2024-05-30)
+## v0.12.0 (2024-05-30)
 
 ### 📝 Other
 
@@ -1488,7 +1488,7 @@
 - `.ipynb`: +57 lines, -0 lines
 - `.toml`: +1 lines, -1 lines
 
-## Version v0.11.0 (2024-05-28)
+## v0.11.0 (2024-05-28)
 
 ### 📝 Other
 
@@ -1512,7 +1512,7 @@
 - `.py`: +1585 lines, -628 lines
 - `.toml`: +13 lines, -3 lines
 
-## Version v0.10.0 (2024-05-24)
+## v0.10.0 (2024-05-24)
 
 ### 📝 Other
 
@@ -1531,7 +1531,7 @@
 - `.ipynb`: +264 lines, -3 lines
 - `.toml`: +5 lines, -4 lines
 
-## Version v0.9.0 (2024-05-22)
+## v0.9.0 (2024-05-22)
 
 ### 📝 Other
 
@@ -1564,7 +1564,7 @@
 - `.ipynb`: +316 lines, -136 lines
 - `.py`: +2172 lines, -605 lines
 
-## Version v0.8.0 (2024-05-17)
+## v0.8.0 (2024-05-17)
 
 ### 📝 Other
 
@@ -1581,7 +1581,7 @@
 
 - `.py`: +544 lines, -57 lines
 
-## Version v0.7.0 (2024-05-15)
+## v0.7.0 (2024-05-15)
 
 ### 📝 Other
 
@@ -1607,7 +1607,7 @@
 - `.toml`: +6 lines, -3 lines
 - `.cfg`: +0 lines, -5 lines
 
-## Version v0.6.0 (2024-05-15)
+## v0.6.0 (2024-05-15)
 
 ### 📝 Other
 
@@ -1647,7 +1647,7 @@
 - other: +21 lines, -0 lines
 - `.toml`: +4 lines, -2 lines
 
-## Version v0.5.0 (2024-04-30)
+## v0.5.0 (2024-04-30)
 
 ### 📝 Other
 
@@ -1684,7 +1684,7 @@
 - `.py`: +2411 lines, -1478 lines
 - `.ipynb`: +2 lines, -2 lines
 
-## Version v0.4.0 (2024-03-11)
+## v0.4.0 (2024-03-11)
 
 ### 📝 Other
 
@@ -1701,7 +1701,7 @@
 
 - `.py`: +402 lines, -29 lines
 
-## Version v0.3.0 (2024-03-08)
+## v0.3.0 (2024-03-08)
 
 ### 📝 Other
 
@@ -1737,7 +1737,7 @@
 - `.ipynb`: +101 lines, -79 lines
 - `.toml`: +10 lines, -7 lines
 
-## Version v0.2.0 (2023-11-27)
+## v0.2.0 (2023-11-27)
 
 ### Closed Issues
 
@@ -1772,7 +1772,7 @@
 - `.py`: +410 lines, -62 lines
 - `.toml`: +2 lines, -4 lines
 
-## Version v0.1.0 (2023-07-16)
+## v0.1.0 (2023-07-16)
 
 ### 📝 Other
 
