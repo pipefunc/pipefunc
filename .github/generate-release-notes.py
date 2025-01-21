@@ -339,6 +339,7 @@ def _add_stats_lines(lines: list[str], ext: str, stats: dict[str, int]) -> None:
 
 
 if __name__ == "__main__":
+    _print_step("Generating release notes...")
     # Replace with your GitHub token
     token_file = REPO_ROOT / ".github" / "GITHUB_TOKEN"
     if token_file.exists():
