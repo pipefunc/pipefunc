@@ -43,3 +43,5 @@ dependencies:
   - pytest-xdist
   - pytest
   - versioningit
+  # optional-dependencies: autodoc
+  - griffe

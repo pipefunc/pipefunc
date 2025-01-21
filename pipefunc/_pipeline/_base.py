@@ -44,6 +44,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
+from ._autodoc import PipelineDocumentation, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -220,6 +221,8 @@ class Pipeline:
             The leaf nodes of the pipeline as `PipeFunc` objects.
         root_args
             The root arguments (inputs) required to compute the output of the pipeline.
+        print_documentation
+            Print formatted documentation of the pipeline to the console.
 
         """
         inputs = self.root_args()
@@ -2004,6 +2007,59 @@ class Pipeline:
             return table._repr_mimebundle_(include=include, exclude=exclude)
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
+
+    def print_documentation(
+        self,
+        *,
+        borders: bool = False,
+        skip_optional: bool = False,
+        skip_intermediate: bool = True,
+        description_table: bool = True,
+        parameters_table: bool = True,
+        returns_table: bool = True,
+        order: Literal["topological", "alphabetical"] = "topological",
+    ) -> None:
+        """Print the documentation for the pipeline as a table formatted with Rich.
+
+        Parameters
+        ----------
+        borders
+            Whether to include borders in the tables.
+        skip_optional
+            Whether to skip optional parameters.
+        skip_intermediate
+            Whether to skip intermediate outputs and only show root parameters.
+        description_table
+            Whether to generate the function description table.
+        parameters_table
+            Whether to generate the function parameters table.
+        returns_table
+            Whether to generate the function returns table.
+        order
+            The order in which to display the functions in the documentation.
+            Options are:
+
+            * ``topological``: Display functions in topological order.
+            * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+
+        See Also
+        --------
+        info
+            Returns the input and output information for the pipeline.
+
+        """
+        requires("rich", "griffe", reason="print_doc", extras="autodoc")
+        doc = PipelineDocumentation.from_pipeline(self)
+        format_pipeline_docs(
+            doc,
+            skip_optional=skip_optional,
+            skip_intermediate=skip_intermediate,
+            borders=borders,
+            description_table=description_table,
+            parameters_table=parameters_table,
+            returns_table=returns_table,
+            order=order,
+        )
 
 
 class Generations(NamedTuple):

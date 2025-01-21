@@ -4,22 +4,26 @@ import contextlib
 import functools
 import importlib.util
 import inspect
+import logging
 import math
 import operator
 import socket
 import sys
 import warnings
+from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable
 
     import pydantic
+    from griffe import DocstringSection
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -225,7 +229,7 @@ def is_running_in_ipynb() -> bool:
         return False
     try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
-    except NameError:
+    except NameError:  # pragma: no cover
         return False  # Probably standard Python interpreter
 
 
@@ -271,7 +275,7 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if not is_imported("pydantic"):
+    if not is_imported("pydantic"):  # pragma: no cover
         return False
     if not inspect.isclass(x):
         return False
@@ -322,3 +326,119 @@ def get_ncores(ex: Executor) -> int:
 
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
+
+
+@contextlib.contextmanager
+def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
+    """Temporarily disable a logger within a context manager scope.
+
+    Upon entering, disables the specified logger.
+    Upon exiting, restores the logger to its original enabled/disabled state.
+
+    Parameters
+    ----------
+    logger_name
+        Name of the logger to temporarily disable
+
+    Examples
+    --------
+    >>> with temporarily_disable_logger("my_logger"):
+    ...     # Logger is disabled here
+    ...     perform_noisy_operation()
+    ... # Logger is restored to original state here
+
+    """
+    logger = logging.getLogger(name=logger_name)
+    original_state = logger.disabled
+    try:
+        logger.disabled = True
+        yield
+    finally:
+        logger.disabled = original_state
+
+
+DocstringStyle = Literal["google", "numpy", "sphinx", "auto"]
+
+
+def _parse_docstring_sections(
+    docstring: str,
+    docstring_parser: DocstringStyle,
+) -> list[DocstringSection]:
+    requires("griffe", reason="extracting docstrings", extras="autodoc")
+    from griffe import Docstring, Parser
+
+    options = get_args(DocstringStyle)
+    if docstring_parser == "auto":
+        # Poor man's "auto" parser selection because griffe has this as a paid feature
+        # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
+        results = [
+            _parse_docstring_sections(docstring, parser)  # type: ignore[arg-type]
+            for parser in options
+            if parser != "auto"
+        ]
+        return max(results, key=len)
+
+    if docstring_parser not in options:
+        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(options)}"
+        raise ValueError(msg)
+
+    parser = Parser(docstring_parser)
+    with temporarily_disable_logger("griffe"):
+        return Docstring(docstring).parse(parser)
+
+
+@dataclass
+class DocstringInfo:
+    """A class to store a function's docstring and its extracted parameter docstrings."""
+
+    description: str | None
+    parameters: dict[str, str]
+    returns: str | None
+
+
+def parse_function_docstring(
+    func: Callable[..., Any],
+    docstring_parser: DocstringStyle = "auto",
+) -> DocstringInfo:
+    """Parse a function's docstring into structured components.
+
+    Extracts the main description, parameter descriptions, and return description
+    from a function's docstring. Supports Google, NumPy, and standard Python
+    docstring formats using the `griffe` library for parsing.
+
+    Parameters
+    ----------
+    func
+        The function whose docstring should be parsed.
+    docstring_parser
+        The docstring style to use for parsing. Can be 'google', 'numpy',
+        'sphinx', or 'auto' to automatically detect the style.
+
+    Returns
+    -------
+        A structured representation of the docstring containing the main description,
+        parameter descriptions, and return description.
+
+    """
+    docstring = inspect.getdoc(func)
+    if not docstring:
+        return DocstringInfo(None, {}, None)
+
+    parameters: dict[str, str] = {}
+    returns: list[str] = []
+    description: list[str] = []
+    sections = _parse_docstring_sections(docstring, docstring_parser)
+    for section in sections:
+        if section.kind.name == "parameters":
+            for parameter in section.value:
+                parameters[parameter.name] = parameter.description
+        if section.kind.name == "returns":
+            for return_value in section.value:
+                if return_value.description or return_value.annotation:
+                    # If numpy style without types, the description is the annotation
+                    value = return_value.description or return_value.annotation.lstrip()
+                    returns.append(value)
+        if section.kind.name == "text":
+            description.append(section.value)
+
+    return DocstringInfo("\n".join(description), parameters, "\n".join(returns))
