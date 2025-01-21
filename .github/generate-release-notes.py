@@ -235,26 +235,37 @@ def _generate_release_notes(
 
     tags_with_dates = _get_tags_with_dates(repo)
 
+    # Determine the earliest relevant date
+    earliest_date = min(tag_date for _, tag_date in tags_with_dates) if tags_with_dates else None
+
+    # Fetch all closed issues since the earliest date (only once!)
+    all_closed_issues = (
+        list(gh_repo.get_issues(state="closed", since=earliest_date)) if earliest_date else []
+    )
+
     markdown = ""
     for i, (tag, tag_date) in enumerate(tags_with_dates):
-        # Handle the first tag (no previous tag)
         prev_tag = tags_with_dates[i + 1][0] if i + 1 < len(tags_with_dates) else None
         prev_tag_date = tags_with_dates[i + 1][1] if i + 1 < len(tags_with_dates) else None
 
-        # Use current tag and HEAD for the first iteration
         commits = _get_commits_between(repo, tag, prev_tag)
 
         tag_version = version.parse(tag.name)
         markdown += f"## Version {tag_version} ({tag_date.strftime('%Y-%m-%d')})\n\n"
 
-        # Get closed issues
-        closed_issues = _get_closed_issues_between_tags(
-            gh_repo,
-            tag,
-            prev_tag,
-            tag_date,  # Use current tag's date for the first iteration
-            prev_tag_date,  # Use previous tag's date (or None) for subsequent iterations
-        )
+        # Filter issues locally for the current tag's date range
+        closed_issues = [
+            issue
+            for issue in all_closed_issues
+            if (
+                prev_tag_date is None
+                and issue.closed_at <= tag_date  # Include all issues up to the first tag
+            )
+            or (
+                prev_tag_date is not None
+                and prev_tag_date < issue.closed_at <= tag_date  # Note the < instead of <=
+            )
+        ]
         if closed_issues:
             markdown += "### Closed Issues\n\n"
             for issue in closed_issues:
@@ -272,7 +283,6 @@ def _generate_release_notes(
                     category = _categorize_pr_title(pr_title)
                     commits_by_category[category].append((pr_title, f"(#{pr_number})"))
             else:
-                # Handle direct commits
                 category = _categorize_pr_title(commit.message)
                 commits_by_category[category].append((commit.message, ""))
 
@@ -292,3 +302,5 @@ if __name__ == "__main__":
         github_token = f.read().strip()
     notes = _generate_release_notes(github_token)
     print(notes)
+    with open("../RELEASE_NOTES.md", "w") as f:
+        f.write(notes)
