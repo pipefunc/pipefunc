@@ -92,7 +92,6 @@ def _cached_github_call(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-@_cached_github_call
 def _get_github_repo(gh: Github, remote: git.Remote) -> Repository.Repository:
     """Get the GitHub repository."""
     _print_step("Getting GitHub repository...")
@@ -261,7 +260,7 @@ def _generate_release_notes(
         if issues:
             markdown += "### Closed Issues\n\n"
             for issue in issues:
-                markdown += f"- {_get_first_line(issue.title)} (#{issue.number})\n"
+                markdown += f"- {_get_first_line(issue.title)} ([#{issue.number}](https://github.com/pipefunc/pipefunc/issues/{issue.number}))\n"
             markdown += "\n"
 
         # Categorize and add commits

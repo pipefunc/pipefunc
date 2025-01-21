@@ -59,7 +59,7 @@
 
 ### Closed Issues
 
-- NestedPipeFunction in graph show wrong datatype (#487)
+- NestedPipeFunction in graph show wrong datatype ([#487](https://github.com/pipefunc/pipefunc/issues/487))
 
 ### 📚 Documentation
 
@@ -149,7 +149,7 @@
 
 ### Closed Issues
 
-- Add pipeline variants (#517)
+- Add pipeline variants ([#517](https://github.com/pipefunc/pipefunc/issues/517))
 
 ### 🐛 Bug Fixes
 
@@ -168,7 +168,7 @@
 
 ### Closed Issues
 
-- allow setting names of `NestedPipeFunc` by hand (#195)
+- allow setting names of `NestedPipeFunc` by hand ([#195](https://github.com/pipefunc/pipefunc/issues/195))
 
 ### ✨ Enhancements
 
@@ -232,7 +232,7 @@
 
 ### Closed Issues
 
-- Aggregating function outputs into a `dict`? (#456)
+- Aggregating function outputs into a `dict`? ([#456](https://github.com/pipefunc/pipefunc/issues/456))
 
 ### ✨ Enhancements
 
@@ -277,7 +277,7 @@
 
 ### Closed Issues
 
-- Proposal: Reduce Pipeline.map's IPC overhead with chunking (#484)
+- Proposal: Reduce Pipeline.map's IPC overhead with chunking ([#484](https://github.com/pipefunc/pipefunc/issues/484))
 
 ### 🧪 Testing
 
@@ -310,7 +310,7 @@
 
 ### Closed Issues
 
-- Add helpers.getattr (#480)
+- Add helpers.getattr ([#480](https://github.com/pipefunc/pipefunc/issues/480))
 
 ### ✨ Enhancements
 
@@ -362,7 +362,7 @@
 
 ### Closed Issues
 
-- Allow `internal_shapes` to be input names (str) with simple expressions (#197)
+- Allow `internal_shapes` to be input names (str) with simple expressions ([#197](https://github.com/pipefunc/pipefunc/issues/197))
 
 ### ✨ Enhancements
 
@@ -447,11 +447,11 @@
 
 ### Closed Issues
 
-- Callback on each transition of a good way to visualize the result of each step beyond text (#393)
-- Allow per `PipeFunc` storage (#320)
-- Allow per `PipeFunc` executor (to mix parallel and local) (#319)
-- `TypeError: 'NoneType' object cannot be interpreted as an integer` in documentation build (#317)
-- ascii art (#307)
+- Callback on each transition of a good way to visualize the result of each step beyond text ([#393](https://github.com/pipefunc/pipefunc/issues/393))
+- Allow per `PipeFunc` storage ([#320](https://github.com/pipefunc/pipefunc/issues/320))
+- Allow per `PipeFunc` executor (to mix parallel and local) ([#319](https://github.com/pipefunc/pipefunc/issues/319))
+- `TypeError: 'NoneType' object cannot be interpreted as an integer` in documentation build ([#317](https://github.com/pipefunc/pipefunc/issues/317))
+- ascii art ([#307](https://github.com/pipefunc/pipefunc/issues/307))
 
 ### 🐛 Bug Fixes
 
@@ -530,7 +530,7 @@
 
 ### Closed Issues
 
-- IndexError when handling exceptions without arguments in python<=3.11 (#430)
+- IndexError when handling exceptions without arguments in python<=3.11 ([#430](https://github.com/pipefunc/pipefunc/issues/430))
 
 ### 📚 Documentation
 
@@ -607,8 +607,8 @@
 
 ### Closed Issues
 
-- Dataclasses that use default_factory fields have buggy execution on second run (#402)
-- Pipeline.add is not idempotent (#394)
+- Dataclasses that use default_factory fields have buggy execution on second run ([#402](https://github.com/pipefunc/pipefunc/issues/402))
+- Pipeline.add is not idempotent ([#394](https://github.com/pipefunc/pipefunc/issues/394))
 
 ### ✨ Enhancements
 
@@ -650,7 +650,7 @@
 
 ### Closed Issues
 
-- All values reported in profile_stats are 0 (#392)
+- All values reported in profile_stats are 0 ([#392](https://github.com/pipefunc/pipefunc/issues/392))
 
 ### ✨ Enhancements
 
@@ -875,7 +875,7 @@
 
 ### Closed Issues
 
-- Add `pipefunc.map.Result.to_xarray` (#312)
+- Add `pipefunc.map.Result.to_xarray` ([#312](https://github.com/pipefunc/pipefunc/issues/312))
 
 ### ✨ Enhancements
 
@@ -966,10 +966,10 @@
 
 ### Closed Issues
 
-- Do type validation in pipeline definition (#266)
-- Allow caching for `map` (#264)
-- allow to inspect the resources inside the function (#192)
-- allow internal parallelization (#191)
+- Do type validation in pipeline definition ([#266](https://github.com/pipefunc/pipefunc/issues/266))
+- Allow caching for `map` ([#264](https://github.com/pipefunc/pipefunc/issues/264))
+- allow to inspect the resources inside the function ([#192](https://github.com/pipefunc/pipefunc/issues/192))
+- allow internal parallelization ([#191](https://github.com/pipefunc/pipefunc/issues/191))
 
 ### ✨ Enhancements
 
@@ -1129,7 +1129,7 @@
 
 ### Closed Issues
 
-- AssertionError raised in the case of a function without inputs. (#238)
+- AssertionError raised in the case of a function without inputs. ([#238](https://github.com/pipefunc/pipefunc/issues/238))
 
 ### 📝 Other
 
@@ -1213,7 +1213,7 @@
 
 ### Closed Issues
 
-- Changing PipeFunc should trigger Pipeline internal cache reset (#203)
+- Changing PipeFunc should trigger Pipeline internal cache reset ([#203](https://github.com/pipefunc/pipefunc/issues/203))
 
 ### 📝 Other
 
@@ -1282,7 +1282,7 @@
 
 ### Closed Issues
 
-- Rename outputs too in `update_renames` (#189)
+- Rename outputs too in `update_renames` ([#189](https://github.com/pipefunc/pipefunc/issues/189))
 
 ### 📝 Other
 
@@ -1296,8 +1296,8 @@
 
 ### Closed Issues
 
-- include single results in xarray (#188)
-- Rename mapspecs in update_remames (#184)
+- include single results in xarray ([#188](https://github.com/pipefunc/pipefunc/issues/188))
+- Rename mapspecs in update_remames ([#184](https://github.com/pipefunc/pipefunc/issues/184))
 
 ### 📝 Other
 
@@ -1371,7 +1371,7 @@
 
 ### Closed Issues
 
-- class CombinedFunc(PipeFunc) to nest pipelines (#138)
+- class CombinedFunc(PipeFunc) to nest pipelines ([#138](https://github.com/pipefunc/pipefunc/issues/138))
 
 ### 📝 Other
 
@@ -1742,7 +1742,7 @@
 
 ### Closed Issues
 
-- Header (#1)
+- Header ([#1](https://github.com/pipefunc/pipefunc/issues/1))
 
 ### 📝 Other
 
