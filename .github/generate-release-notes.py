@@ -299,11 +299,11 @@ def _generate_release_notes(  # noqa: PLR0912
                 category = _categorize_pr_title(commit.message)
                 line = _get_first_line(commit.message)
                 if (pr_nr := _get_pr_nr(line)) is not None:
-                    link = f"([#{pr_nr}]({REPO_URL}/pull/{pr_nr}))"
-                    line = line.replace(f"(#{pr_nr})", link)
+                    link = f"[#{pr_nr}]({REPO_URL}/pull/{pr_nr})"
+                    line = line.replace(f"(#{pr_nr})", f"({link})")
                 else:
                     ref = commit.hexsha[:7]
-                    link = f"([{ref}]({REPO_URL}/commit/{ref}))"
+                    link = f"[{ref}]({REPO_URL}/commit/{ref})"
                     line = f"{line} ({link})"
                 commits_by_category[category].append(line)
 
