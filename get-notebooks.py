@@ -27,6 +27,7 @@ import aiohttp
 import rich
 from github import ContentFile, Github, GithubException  # PyGithub
 from rich.progress import Progress, TaskID
+from rich.table import Table
 
 if TYPE_CHECKING:
     from github.Repository import Repository
@@ -177,6 +178,19 @@ async def main() -> None:
             await asyncio.gather(*tasks)
 
     rich.print("🎉 Finished conversion process!")
+
+    # Create a table of generated files
+    table = Table(title="Generated Notebooks")
+    table.add_column("File", justify="left", style="cyan", no_wrap=True)
+    table.add_column("Path", justify="left", style="magenta")
+
+    for root, _, files in os.walk(output_base_dir):
+        for file in files:
+            if file.endswith(".ipynb"):
+                file_path = Path(root) / file
+                table.add_row(file, str(file_path.relative_to(output_base_dir)))
+
+    rich.print(table)
 
 
 if __name__ == "__main__":
