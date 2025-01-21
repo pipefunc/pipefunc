@@ -1,4 +1,6 @@
-## Version 0.49.6 (2025-01-17)
+## Unreleased Changes (2025-01-21)
+
+## Version v0.49.6 (2025-01-17)
 
 ### Enhancements
 
@@ -6,7 +8,7 @@
 
 
 
-## Version 0.49.5 (2025-01-17)
+## Version v0.49.5 (2025-01-17)
 
 ### Bug Fixes
 
@@ -32,7 +34,7 @@
 
 
 
-## Version 0.49.4 (2025-01-15)
+## Version v0.49.4 (2025-01-15)
 
 ### Bug Fixes
 
@@ -46,7 +48,7 @@
 
 
 
-## Version 0.49.3 (2025-01-15)
+## Version v0.49.3 (2025-01-15)
 
 ### Bug Fixes
 
@@ -54,7 +56,7 @@
 
 
 
-## Version 0.49.2 (2025-01-14)
+## Version v0.49.2 (2025-01-14)
 
 ### Closed Issues
 
@@ -93,7 +95,7 @@
 
 
 
-## Version 0.49.1 (2025-01-13)
+## Version v0.49.1 (2025-01-13)
 
 ### Bug Fixes
 
@@ -126,7 +128,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
-## Version 0.49.0 (2025-01-13)
+## Version v0.49.0 (2025-01-13)
 
 ### Enhancements
 
@@ -149,7 +151,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
-## Version 0.48.2 (2025-01-11)
+## Version v0.48.2 (2025-01-11)
 
 ### Bug Fixes
 
@@ -169,7 +171,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.48.1 (2025-01-10)
+## Version v0.48.1 (2025-01-10)
 
 ### Closed Issues
 
@@ -187,7 +189,11 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.48.0 (2025-01-10)
+## Version v0.48.0 (2025-01-10)
+
+### Closed Issues
+
+- allow setting names of `NestedPipeFunc` by hand (#195)
 
 ### Enhancements
 
@@ -198,7 +204,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.47.3 (2025-01-10)
+## Version v0.47.3 (2025-01-10)
 
 ### Bug Fixes
 
@@ -206,7 +212,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.47.2 (2025-01-10)
+## Version v0.47.2 (2025-01-10)
 
 ### Bug Fixes
 
@@ -232,7 +238,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.47.1 (2025-01-09)
+## Version v0.47.1 (2025-01-09)
 
 ### Documentation
 
@@ -246,7 +252,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 Version 3.0.0 was released and breaks the zarr integration
 
-## Version 0.47.0 (2025-01-09)
+## Version v0.47.0 (2025-01-09)
 
 ### Closed Issues
 
@@ -330,7 +336,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 I misunderstood its purpose.
 
-## Version 0.46.0 (2024-12-23)
+## Version v0.46.0 (2024-12-23)
 
 ### Closed Issues
 
@@ -400,7 +406,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.45.0 (2024-12-21)
+## Version v0.45.0 (2024-12-21)
 
 ### Closed Issues
 
@@ -436,7 +442,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.44.0 (2024-12-19)
+## Version v0.44.0 (2024-12-19)
 
 ### Enhancements
 
@@ -459,7 +465,11 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.43.0 (2024-12-19)
+## Version v0.43.0 (2024-12-19)
+
+### Closed Issues
+
+- Allow `internal_shapes` to be input names (str) with simple expressions (#197)
 
 ### Enhancements
 
@@ -495,7 +505,7 @@ More general fix for https://github.com/pipefunc/pipefunc/pull/465
 
 
 
-## Version 0.42.1 (2024-12-17)
+## Version v0.42.1 (2024-12-17)
 
 ### Testing
 
@@ -509,7 +519,7 @@ More general fix for https://github.com/pipefunc/pipefunc/pull/465
 
 
 
-## Version 0.42.0 (2024-12-16)
+## Version v0.42.0 (2024-12-16)
 
 ### Enhancements
 
@@ -529,7 +539,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.41.3 (2024-12-13)
+## Version v0.41.3 (2024-12-13)
 
 ### Bug Fixes
 
@@ -537,7 +547,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 Feature and bug introduced in https://github.com/pipefunc/pipefunc/pull/291. This was never tested but uncovered during debugging by @ftripier.
 
-## Version 0.41.2 (2024-12-11)
+## Version v0.41.2 (2024-12-11)
 
 ### Bug Fixes
 
@@ -545,11 +555,15 @@ Feature and bug introduced in https://github.com/pipefunc/pipefunc/pull/291. Thi
 
 
 
-## Version 0.41.1 (2024-12-11)
+## Version v0.41.1 (2024-12-11)
 
 ### Closed Issues
 
 - Callback on each transition of a good way to visualize the result of each step beyond text (#393)
+- Allow per `PipeFunc` storage (#320)
+- Allow per `PipeFunc` executor (to mix parallel and local) (#319)
+- `TypeError: 'NoneType' object cannot be interpreted as an integer` in documentation build (#317)
+- ascii art (#307)
 
 ### Bug Fixes
 
@@ -584,7 +598,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.41.0 (2024-11-27)
+## Version v0.41.0 (2024-11-27)
 
 ### Enhancements
 
@@ -600,7 +614,7 @@ Will change it back once https://github.com/manzt/anywidget/pull/628 is merged a
 
 Currently the tutorial page is 60 MB which is prohibitively large.
 
-## Version 0.40.2 (2024-11-27)
+## Version v0.40.2 (2024-11-27)
 
 ### Maintenance
 
@@ -611,7 +625,7 @@ Currently the tutorial page is 60 MB which is prohibitively large.
 
 
 
-## Version 0.40.1 (2024-11-27)
+## Version v0.40.1 (2024-11-27)
 
 ### Enhancements
 
@@ -647,7 +661,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.40.0 (2024-11-26)
+## Version v0.40.0 (2024-11-26)
 
 ### Closed Issues
 
@@ -700,7 +714,7 @@ This dependency is also hard to install.
 
 
 
-## Version 0.39.0 (2024-11-26)
+## Version v0.39.0 (2024-11-26)
 
 ### Bug Fixes
 
@@ -762,7 +776,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.38.0 (2024-11-07)
+## Version v0.38.0 (2024-11-07)
 
 ### Closed Issues
 
@@ -827,7 +841,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 Taken from #381.
 
-## Version 0.37.0 (2024-10-30)
+## Version v0.37.0 (2024-10-30)
 
 ### Closed Issues
 
@@ -904,7 +918,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.36.1 (2024-10-17)
+## Version v0.36.1 (2024-10-17)
 
 ### Maintenance
 
@@ -918,7 +932,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.36.0 (2024-10-16)
+## Version v0.36.0 (2024-10-16)
 
 ### Other
 
@@ -966,7 +980,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.35.1 (2024-09-30)
+## Version v0.35.1 (2024-09-30)
 
 ### Enhancements
 
@@ -998,7 +1012,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.35.0 (2024-09-27)
+## Version v0.35.0 (2024-09-27)
 
 ### Documentation
 
@@ -1030,7 +1044,7 @@ https://github.com/executablebooks/MyST-NB/pull/604 was merged and made it into 
 
 
 
-## Version 0.34.0 (2024-09-25)
+## Version v0.34.0 (2024-09-25)
 
 ### Enhancements
 
@@ -1059,7 +1073,7 @@ https://github.com/executablebooks/MyST-NB/pull/604 was merged and made it into 
 
 
 
-## Version 0.33.0 (2024-09-24)
+## Version v0.33.0 (2024-09-24)
 
 ### Enhancements
 
@@ -1124,7 +1138,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.32.1 (2024-09-18)
+## Version v0.32.1 (2024-09-18)
 
 ### Other
 
@@ -1132,7 +1146,11 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.32.0 (2024-09-18)
+## Version v0.32.0 (2024-09-18)
+
+### Closed Issues
+
+- Add `pipefunc.map.Result.to_xarray` (#312)
 
 ### Enhancements
 
@@ -1169,7 +1187,7 @@ Related:
 - https://github.com/python/cpython/issues/71936#issuecomment-2164009639
 - https://github.com/python/cpython/pull/98274#issuecomment-2164011023
 
-## Version 0.31.1 (2024-09-11)
+## Version v0.31.1 (2024-09-11)
 
 ### Documentation
 
@@ -1183,7 +1201,7 @@ Related:
 
 
 
-## Version 0.31.0 (2024-09-10)
+## Version v0.31.0 (2024-09-10)
 
 ### Enhancements
 
@@ -1230,7 +1248,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.30.0 (2024-09-05)
+## Version v0.30.0 (2024-09-05)
 
 ### Enhancements
 
@@ -1244,7 +1262,14 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.29.0 (2024-09-05)
+## Version v0.29.0 (2024-09-05)
+
+### Closed Issues
+
+- Do type validation in pipeline definition (#266)
+- Allow caching for `map` (#264)
+- allow to inspect the resources inside the function (#192)
+- allow internal parallelization (#191)
 
 ### Enhancements
 
@@ -1288,7 +1313,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.28.0 (2024-09-03)
+## Version v0.28.0 (2024-09-03)
 
 ### Other
 
@@ -1434,7 +1459,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.27.3 (2024-08-29)
+## Version v0.27.3 (2024-08-29)
 
 ### Other
 
@@ -1445,7 +1470,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.27.2 (2024-08-29)
+## Version v0.27.2 (2024-08-29)
 
 ### Other
 
@@ -1453,7 +1478,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.27.1 (2024-08-29)
+## Version v0.27.1 (2024-08-29)
 
 ### Other
 
@@ -1485,7 +1510,7 @@ for more information, see https://pre-commit.ci
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.27.0 (2024-08-28)
+## Version v0.27.0 (2024-08-28)
 
 ### Other
 
@@ -1533,7 +1558,7 @@ for more information, see https://pre-commit.ci
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
-## Version 0.26.0 (2024-08-22)
+## Version v0.26.0 (2024-08-22)
 
 ### Other
 
@@ -1578,7 +1603,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.25.0 (2024-07-19)
+## Version v0.25.0 (2024-07-19)
 
 ### Other
 
@@ -1586,7 +1611,11 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.24.0 (2024-07-18)
+## Version v0.24.0 (2024-07-18)
+
+### Closed Issues
+
+- AssertionError raised in the case of a function without inputs. (#238)
 
 ### Other
 
@@ -1648,7 +1677,7 @@ updates:
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
-## Version 0.23.1 (2024-06-28)
+## Version v0.23.1 (2024-06-28)
 
 ### Other
 
@@ -1659,7 +1688,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.23.0 (2024-06-27)
+## Version v0.23.0 (2024-06-27)
 
 ### Other
 
@@ -1667,7 +1696,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.22.2 (2024-06-27)
+## Version v0.22.2 (2024-06-27)
 
 ### Other
 
@@ -1675,7 +1704,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.22.1 (2024-06-27)
+## Version v0.22.1 (2024-06-27)
 
 ### Other
 
@@ -1683,7 +1712,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.22.0 (2024-06-26)
+## Version v0.22.0 (2024-06-26)
 
 ### Other
 
@@ -1703,7 +1732,11 @@ At the moment there is no real need to keep track of the original `resources` an
 
 
 
-## Version 0.21.0 (2024-06-24)
+## Version v0.21.0 (2024-06-24)
+
+### Closed Issues
+
+- Changing PipeFunc should trigger Pipeline internal cache reset (#203)
 
 ### Other
 
@@ -1761,7 +1794,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
-## Version 0.20.0 (2024-06-19)
+## Version v0.20.0 (2024-06-19)
 
 ### Other
 
@@ -1784,7 +1817,7 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 
 
-## Version 0.19.0 (2024-06-17)
+## Version v0.19.0 (2024-06-17)
 
 ### Other
 
@@ -1814,7 +1847,11 @@ Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
 
 Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
-## Version 0.18.1 (2024-06-14)
+## Version v0.18.1 (2024-06-14)
+
+### Closed Issues
+
+- Rename outputs too in `update_renames` (#189)
 
 ### Other
 
@@ -1822,7 +1859,7 @@ Co-authored-by: Bas Nijholt <bas@nijho.lt>
 
 
 
-## Version 0.18.0 (2024-06-13)
+## Version v0.18.0 (2024-06-13)
 
 ### Closed Issues
 
@@ -1856,7 +1893,7 @@ Closes #188
 
 
 
-## Version 0.17.0 (2024-06-11)
+## Version v0.17.0 (2024-06-11)
 
 ### Other
 
@@ -1884,7 +1921,7 @@ Closes #188
 - Fix typo and add more references
 
 
-## Version 0.16.0 (2024-06-10)
+## Version v0.16.0 (2024-06-10)
 
 ### Other
 
@@ -1918,7 +1955,7 @@ Closes #188
 
 
 
-## Version 0.15.1 (2024-06-07)
+## Version v0.15.1 (2024-06-07)
 
 ### Other
 
@@ -1926,7 +1963,11 @@ Closes #188
 
 
 
-## Version 0.15.0 (2024-06-07)
+## Version v0.15.0 (2024-06-07)
+
+### Closed Issues
+
+- class CombinedFunc(PipeFunc) to nest pipelines (#138)
 
 ### Other
 
@@ -1958,7 +1999,7 @@ Closes #188
 
 
 
-## Version 0.14.0 (2024-06-04)
+## Version v0.14.0 (2024-06-04)
 
 ### Other
 
@@ -1994,7 +2035,7 @@ Closes #188
 
 
 
-## Version 0.13.0 (2024-06-02)
+## Version v0.13.0 (2024-06-02)
 
 ### Other
 
@@ -2074,7 +2115,7 @@ However, fixed by finding this comment https://github.com/sphinx-doc/sphinx/issu
 
 
 
-## Version 0.12.0 (2024-05-30)
+## Version v0.12.0 (2024-05-30)
 
 ### Other
 
@@ -2120,7 +2161,7 @@ This reverts commit 842de3d, which accidentally removed tests in #84.
 - Fix headers in API docs
 
 
-## Version 0.11.0 (2024-05-28)
+## Version v0.11.0 (2024-05-28)
 
 ### Other
 
@@ -2151,7 +2192,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.10.0 (2024-05-24)
+## Version v0.10.0 (2024-05-24)
 
 ### Other
 
@@ -2174,7 +2215,7 @@ For better support when displaying `pandas.DataFrame` and `xarray.Dataset`s.
 
 
 
-## Version 0.9.0 (2024-05-22)
+## Version v0.9.0 (2024-05-22)
 
 ### Other
 
@@ -2318,7 +2359,7 @@ Back-ported from https://github.com/basnijholt/pipefunc/pull/85.
 
 * simpler
 
-## Version 0.8.0 (2024-05-17)
+## Version v0.8.0 (2024-05-17)
 
 ### Other
 
@@ -2373,7 +2414,7 @@ Back-ported from https://github.com/basnijholt/pipefunc/pull/85.
 
 * Update _pipeline.py
 
-## Version 0.7.0 (2024-05-15)
+## Version v0.7.0 (2024-05-15)
 
 ### Other
 
@@ -2453,7 +2494,7 @@ Back-ported from https://github.com/basnijholt/pipefunc/pull/85.
 
 * Increase line length to 100
 
-## Version 0.6.0 (2024-05-15)
+## Version v0.6.0 (2024-05-15)
 
 ### Other
 
@@ -2579,7 +2620,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.5.0 (2024-04-30)
+## Version v0.5.0 (2024-04-30)
 
 ### Other
 
@@ -2676,7 +2717,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.4.0 (2024-03-11)
+## Version v0.4.0 (2024-03-11)
 
 ### Other
 
@@ -2702,7 +2743,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 
 
 
-## Version 0.3.0 (2024-03-08)
+## Version v0.3.0 (2024-03-08)
 
 ### Other
 
@@ -2767,7 +2808,7 @@ updates:
 
 Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
 
-## Version 0.2.0 (2023-11-27)
+## Version v0.2.0 (2023-11-27)
 
 ### Closed Issues
 
@@ -2813,7 +2854,7 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
 - Remove [project.scripts] section from pyproject.toml
 
 
-## Version 0.1.0 (2023-07-16)
+## Version v0.1.0 (2023-07-16)
 
 ### Other
 

@@ -10,11 +10,9 @@ from typing import TYPE_CHECKING, Any
 
 import git
 from diskcache import Cache
-from github import Github, Repository, UnknownObjectException
-from packaging import version
+from github import Github, Repository
 from rich import print
 from rich.console import Console
-from rich.progress import track
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -73,6 +71,8 @@ def _cached_github_call(func: Callable[..., Any]) -> Callable[..., Any]:
                 return obj.strftime("%Y-%m-%d")  # Use formatted date string
             if isinstance(obj, Repository.Repository):
                 return obj.full_name  # use repo full name
+            if isinstance(obj, git.Remote):
+                return obj.name
             return obj
 
         # Serialize arguments and keyword arguments for cache key
@@ -116,103 +116,10 @@ def _get_github_repo(gh: Github, remote: git.Remote) -> Repository.Repository:
     return gh.get_repo(repo_name)
 
 
-def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.Tag, datetime.datetime]]:
-    """Get a list of tags with their creation dates."""
-    _print_step("Getting tags with dates...")
-    tags_with_dates = []
-    for tag in repo.tags:
-        try:
-            tag_date = datetime.datetime.fromtimestamp(
-                tag.object.tagged_date,
-                tz=datetime.timezone.utc,
-            )
-        except AttributeError:
-            tag_date = datetime.datetime.fromtimestamp(
-                tag.object.committed_date,
-                tz=datetime.timezone.utc,
-            )
-        _print_substep(f"Found tag {tag.name} with date {tag_date.strftime('%Y-%m-%d')}")
-        tags_with_dates.append((tag, tag_date))
-    return sorted(tags_with_dates, key=lambda x: x[1], reverse=True)
-
-
-def _get_commits_between(
-    repo: git.Repo,
-    start_tag: git.Tag | None,
-    end_tag: git.Tag,
-) -> list[git.Commit]:
-    """Get a list of commits between two tags."""
-    if start_tag is None:
-        _print_step(f"Getting commits up to {end_tag.name}")
-        commits = list(repo.iter_commits(end_tag.name))
-    else:
-        _print_step(
-            f"Getting commits between {start_tag.name} and {end_tag.name if end_tag else 'HEAD'}",
-        )
-        # Use start_tag as the end point for the first iteration
-        end_commit = start_tag.commit if end_tag is None else end_tag.commit
-        commits = list(repo.iter_commits(f"{end_commit}...{start_tag.commit}"))
-    _print_info(f"Found {len(commits)} commits")
-    return commits
-
-
 def _extract_pr_number(commit_message: str) -> int | None:
     """Extract the PR number from a commit message."""
     match = re.search(r"\(#(\d+)\)", commit_message)
     return int(match.group(1)) if match else None
-
-
-@_cached_github_call
-def _get_closed_issues_between_tags(
-    gh_repo: Repository.Repository,
-    start_tag: git.Tag | None,
-    end_tag: git.Tag,
-    start_date: datetime.datetime | None,
-    end_date: datetime.datetime,
-) -> list[Github.Issue.Issue]:
-    """Get a list of closed issues between two tags."""
-    if start_tag is None:
-        _print_step(
-            f"Getting closed issues before {end_tag.name} ({end_date.strftime('%Y-%m-%d')})",
-        )
-    else:
-        _print_step(
-            f"Getting closed issues between {start_tag.name} ({start_date.strftime('%Y-%m-%d')}) "
-            f"and {end_tag.name} ({end_date.strftime('%Y-%m-%d')})",
-        )
-    issues = []
-    kwargs: dict[str, Any] = {"state": "closed"}
-    if start_date is not None:
-        kwargs["since"] = start_date
-
-    for issue in gh_repo.get_issues(**kwargs):
-        if issue.closed_at > end_date:
-            continue
-        if start_date is not None and issue.closed_at < start_date:
-            break
-        if issue.pull_request:
-            continue  # Skip PRs, we only want issues
-        _print_substep(f"Found issue {issue.title} (#{issue.number})")
-        issues.append(issue)
-    _print_info(f"Found {len(issues)} closed issues")
-    return issues
-
-
-@_cached_github_call
-def _get_pr_details(
-    gh_repo: Repository.Repository,
-    pr_number: int,
-) -> tuple[str, str, datetime.datetime] | None:
-    """Get the title, body, and merge date of a PR."""
-    _print_step(f"Getting details for PR #{pr_number}...")
-    try:
-        pr = gh_repo.get_pull(pr_number)
-    except UnknownObjectException:
-        _print_warning(f"Could not find PR #{pr_number}")
-        return None
-    else:
-        _print_info(f"Found PR: {pr.title}")
-        return pr.title, pr.body, pr.merged_at
 
 
 def _categorize_pr_title(pr_title: str) -> str:  # noqa: PLR0911
@@ -236,28 +143,81 @@ def _categorize_pr_title(pr_title: str) -> str:  # noqa: PLR0911
     return "Other"
 
 
-def _get_merged_prs_between_tags(
-    repo: git.Repo,
-    start_tag: git.Tag | None,
-    end_tag: git.Tag,
-) -> list[int]:
-    """Get a list of PR numbers that were merged between two tags."""
-    _print_step(
-        f"Getting PRs merged between {start_tag.name if start_tag else 'HEAD'} and {end_tag.name}",
-    )
-    if start_tag is None:
-        commits = list(repo.iter_commits(end_tag.name))
-    else:
-        commits = list(repo.iter_commits(f"{start_tag.name}...{end_tag.name}"))
+def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetime.datetime]]:
+    """Get all tags with their dates, sorted by date (newest first)."""
+    _print_step("Getting tags with dates...")
+    tags_with_dates = []
+    for tag in repo.tags:
+        # Get the commit date for the tag
+        commit_date = datetime.datetime.fromtimestamp(
+            tag.commit.committed_date,
+            tz=datetime.timezone.utc,
+        )
+        tags_with_dates.append((tag, commit_date))
 
-    pr_numbers: list[int] = []
-    for commit in commits:
-        if commit.message.startswith("Merge pull request"):
-            pr_number = _extract_pr_number(commit.message)
-            if pr_number:
-                pr_numbers.append(pr_number)
-    _print_info(f"Found {len(pr_numbers)} merged PRs")
-    return pr_numbers
+    # Sort by date, newest first
+    return sorted(tags_with_dates, key=lambda x: x[1], reverse=True)
+
+
+@_cached_github_call
+def _get_closed_issues_in_timeframe(
+    gh_repo: Repository.Repository,
+    start_date: datetime.datetime | None,
+    end_date: datetime.datetime,
+) -> list[Github.Issue.Issue]:
+    """Get all issues closed between start_date and end_date."""
+    _print_step(
+        f"Getting issues closed between "
+        f"{start_date.strftime('%Y-%m-%d') if start_date else 'beginning'} "
+        f"and {end_date.strftime('%Y-%m-%d')}",
+    )
+
+    issues = []
+    kwargs: dict[str, Any] = {"state": "closed"}
+    if start_date is not None:
+        kwargs["since"] = start_date
+
+    for issue in gh_repo.get_issues(**kwargs):
+        if issue.closed_at > end_date:
+            continue
+        if start_date is not None and issue.closed_at < start_date:
+            break
+        if not issue.pull_request:  # Skip PRs, we only want issues
+            _print_substep(f"Found issue {issue.title} (#{issue.number})")
+            issues.append(issue)
+
+    _print_info(f"Found {len(issues)} closed issues")
+    return issues
+
+
+@_cached_github_call
+def _get_all_closed_issues(gh_repo: Repository.Repository) -> list[Github.Issue.Issue]:
+    """Get all closed issues (non-PR) from the repository."""
+    _print_step("Getting all closed issues...")
+
+    issues = []
+    for issue in gh_repo.get_issues(state="closed"):
+        if not issue.pull_request:  # Skip PRs, we only want issues
+            _print_substep(f"Found issue {issue.title} (#{issue.number})")
+            issues.append(issue)
+
+    _print_info(f"Found {len(issues)} closed issues in total")
+    return issues
+
+
+def _filter_issues_by_timeframe(
+    issues: list[Github.Issue.Issue],
+    start_date: datetime.datetime | None,
+    end_date: datetime.datetime,
+) -> list[Github.Issue.Issue]:
+    """Filter issues that were closed between start_date and end_date."""
+    filtered = [
+        issue
+        for issue in issues
+        if issue.closed_at <= end_date and (start_date is None or issue.closed_at > start_date)
+    ]
+    _print_info(f"Found {len(filtered)} issues closed in this time window")
+    return filtered
 
 
 def _generate_release_notes(
@@ -270,62 +230,65 @@ def _generate_release_notes(
     gh = Github(token)
     gh_repo = _get_github_repo(gh, remote)
 
+    # Get all tags sorted by date
     tags_with_dates = _get_tags_with_dates(repo)
 
+    # Get all closed issues once
+    all_closed_issues = _get_all_closed_issues(gh_repo)
+
     markdown = ""
-    for i, (tag, tag_date) in enumerate(tags_with_dates):
-        prev_tag = tags_with_dates[i + 1][0] if i + 1 < len(tags_with_dates) else None
-
-        # Use Git log to get merged PRs
-        merged_pr_numbers = _get_merged_prs_between_tags(repo, prev_tag, tag)
-
-        tag_version = version.parse(tag.name)
-        markdown += f"## Version {tag_version} ({tag_date.strftime('%Y-%m-%d')})\n\n"
-
-        # Get closed issues between the two dates
-        prev_tag_date = tags_with_dates[i + 1][1] if i + 1 < len(tags_with_dates) else None
-        closed_issues = _get_closed_issues_between_tags(
-            gh_repo,
-            prev_tag,
-            tag,
-            prev_tag_date,
-            tag_date,
+    # Add section for unreleased changes if any
+    head_date = datetime.datetime.fromtimestamp(
+        repo.head.commit.committed_date,
+        tz=datetime.timezone.utc,
+    )
+    if head_date > tags_with_dates[0][1]:
+        # There are unreleased changes
+        latest_tag_date = tags_with_dates[0][1]
+        unreleased_issues = _filter_issues_by_timeframe(
+            all_closed_issues,
+            start_date=latest_tag_date,
+            end_date=head_date,
         )
-        if closed_issues:
+        markdown += f"## Unreleased Changes ({head_date.strftime('%Y-%m-%d')})\n\n"
+        # ... handle unreleased changes and issues ...
+
+    # Generate notes for each release
+    for i, (tag, tag_date) in enumerate(tags_with_dates):
+        prev_tag, prev_date = (
+            tags_with_dates[i + 1] if i + 1 < len(tags_with_dates) else (None, None)
+        )
+
+        markdown += f"## Version {tag.name} ({tag_date.strftime('%Y-%m-%d')})\n\n"
+
+        # Get commits
+        if prev_tag is None:
+            commits = list(repo.iter_commits(tag.name))
+        else:
+            commits = list(repo.iter_commits(f"{prev_tag.name}..{tag.name}"))
+
+        # Filter issues for this time window
+        issues = _filter_issues_by_timeframe(all_closed_issues, prev_date, tag_date)
+
+        # Add closed issues
+        if issues:
             markdown += "### Closed Issues\n\n"
-            for issue in closed_issues:
+            for issue in issues:
                 markdown += f"- {issue.title} (#{issue.number})\n"
             markdown += "\n"
 
-        # Categorize and add merged PRs to markdown
-        prs_by_category: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
-        for pr_number in merged_pr_numbers:
-            pr_details = _get_pr_details(gh_repo, pr_number)
-            if pr_details is not None:
-                pr_title, pr_body, _ = pr_details
-                category = _categorize_pr_title(pr_title)
-                prs_by_category[category].append((pr_title, pr_body, pr_number))
-
-        for category, prs in prs_by_category.items():
-            markdown += f"### {category}\n\n"
-            for pr_title, _, pr_number in prs:
-                markdown += f"- {pr_title} (#{pr_number})\n"
-            markdown += "\n"
-
-        # Get commits between the two tags, excluding merge commits for PRs
-        commits = _get_commits_between(repo, prev_tag, tag)
-        commits_by_category: dict[str, list[tuple[str, str]]] = defaultdict(list)
-        for commit in track(commits, description="Processing commits..."):
+        # Categorize and add commits
+        commits_by_category: dict[str, list[str]] = defaultdict(list)
+        for commit in commits:
             if not commit.message.startswith("Merge pull request"):
                 category = _categorize_pr_title(commit.message)
-                commits_by_category[category].append((commit.message, ""))
+                commits_by_category[category].append(commit.message)
 
-        # Add commits to markdown
-        for category, commits_in_category in commits_by_category.items():
-            markdown += f"### {category}\n\n"
-            for commit_message, pr_link in commits_in_category:
-                markdown += f"- {commit_message} {pr_link}\n"
-            if commits_in_category:
+        for category, messages in commits_by_category.items():
+            if messages:
+                markdown += f"### {category}\n\n"
+                for msg in messages:
+                    markdown += f"- {msg}\n"
                 markdown += "\n"
 
     return markdown
