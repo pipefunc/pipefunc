@@ -138,6 +138,7 @@ def _categorize_pr_title(pr_title: str) -> tuple[int, str]:
         "TST:": "🧪 Testing",
         "MAINT:": "🧹 Maintenance",
         "BUG:": "🐛 Bug Fixes",
+        "FIX:": "🐛 Bug Fixes",
         "⬆️": "📦 Dependencies",
         "[pre-commit.ci]": "🔄 Pre-commit",
     }

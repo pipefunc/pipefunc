@@ -22,6 +22,7 @@ start-after: <!-- toc-end -->
 📚 Examples <examples/index>
 🧠 Concepts <concepts/index>
 ❓ FAQ <faq>
+📜 Changelog <changelog>
 ```
 
 ```{toctree}
