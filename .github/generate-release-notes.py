@@ -201,7 +201,7 @@ def _get_file_stats(
         # Parse the line
         added, deleted, file_path = line.split("\t")
         try:
-            name, extension = file_path.split(".", 1)
+            name, extension = file_path.rsplit(".", 1)
             if name == "":
                 extension = "other"
             if " =>" in extension:
@@ -260,7 +260,9 @@ def _generate_release_notes(
         if issues:
             markdown += "### Closed Issues\n\n"
             for issue in issues:
-                markdown += f"- {_get_first_line(issue.title)} ([#{issue.number}](https://github.com/pipefunc/pipefunc/issues/{issue.number}))\n"
+                repo_url = "https://github.com/pipefunc/pipefunc"
+                url = f"[#{issue.number}]({repo_url}/issues/{issue.number})"
+                markdown += f"- {_get_first_line(issue.title)} ({url})\n"
             markdown += "\n"
 
         # Categorize and add commits

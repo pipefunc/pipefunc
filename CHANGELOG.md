@@ -52,8 +52,7 @@
 
 ### 📊 Stats
 
-- other: +4 lines, -0 lines
-- `.py`: +102 lines, -0 lines
+- `.py`: +106 lines, -0 lines
 
 ## Version v0.49.2 (2025-01-14)
 
@@ -78,7 +77,8 @@
 
 ### 📊 Stats
 
-- `.md`: +2589 lines, -1352 lines
+- `.md}`: +8 lines, -1 lines
+- `.md`: +2581 lines, -1351 lines
 - `.py`: +76 lines, -9 lines
 - `.ipynb`: +17 lines, -851 lines
 
@@ -98,7 +98,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.yml`: +1 lines, -0 lines
 - `.py`: +44 lines, -15 lines
 - `.md`: +442 lines, -0 lines
@@ -208,7 +208,7 @@
 
 ### 📊 Stats
 
-- other: +2 lines, -0 lines
+- `.yml`: +2 lines, -0 lines
 - `.md`: +2 lines, -3 lines
 - `.py`: +75 lines, -2 lines
 
@@ -269,9 +269,11 @@
 
 ### 📊 Stats
 
-- other: +15 lines, -7 lines
+- other: +1 lines, -1 lines
+- `.py`: +1196 lines, -49 lines
+- `.yml`: +4 lines, -4 lines
+- `.yaml`: +2 lines, -2 lines
 - `.md`: +201 lines, -63 lines
-- `.py`: +1188 lines, -49 lines
 
 ## Version v0.46.0 (2024-12-23)
 
@@ -302,7 +304,7 @@
 
 ### 📊 Stats
 
-- other: +2 lines, -2 lines
+- `.yml`: +2 lines, -2 lines
 - `.md`: +62 lines, -1 lines
 - `.py`: +172 lines, -8 lines
 
@@ -330,9 +332,9 @@
 
 ### 📊 Stats
 
-- other: +3 lines, -3 lines
+- other: +1 lines, -1 lines
+- `.yml`: +4 lines, -4 lines
 - `.md`: +1 lines, -1 lines
-- `.yml`: +2 lines, -2 lines
 - `.ipynb`: +1 lines, -1 lines
 - `.py`: +205 lines, -8 lines
 - `.toml`: +1 lines, -1 lines
@@ -352,10 +354,11 @@
 
 ### 📊 Stats
 
-- other: +71 lines, -0 lines
+- other: +18 lines, -0 lines
+- `.json`: +43 lines, -0 lines
+- `.py`: +162 lines, -75 lines
 - `.yml`: +4 lines, -0 lines
 - `.ipynb`: +138 lines, -73 lines
-- `.py`: +152 lines, -75 lines
 - `.toml`: +2 lines, -1 lines
 
 ## Version v0.43.0 (2024-12-19)
@@ -383,7 +386,7 @@
 
 ### 📊 Stats
 
-- other: +21 lines, -0 lines
+- `.json`: +21 lines, -0 lines
 - `.md`: +93 lines, -1 lines
 - `.py`: +868 lines, -140 lines
 - `.toml`: +2 lines, -3 lines
@@ -400,8 +403,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
-- `.yml`: +3 lines, -2 lines
+- `.yml`: +4 lines, -3 lines
 - `.py`: +47 lines, -0 lines
 - `.toml`: +3 lines, -1 lines
 
@@ -418,9 +420,8 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
-- `.md`: +37 lines, -0 lines
-- `.helpers.md`: +8 lines, -0 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +45 lines, -0 lines
 - `.py`: +134 lines, -3 lines
 
 ## Version v0.41.3 (2024-12-13)
@@ -472,7 +473,8 @@
 
 ### 📊 Stats
 
-- other: +4 lines, -1 lines
+- other: +3 lines, -0 lines
+- `.yaml`: +1 lines, -1 lines
 - `.py`: +143 lines, -40 lines
 
 ## Version v0.41.0 (2024-11-27)
@@ -500,9 +502,8 @@
 
 ### 📊 Stats
 
-- other: +10 lines, -3 lines
+- `.py`: +11 lines, -4 lines
 - `.yml`: +0 lines, -4 lines
-- `.py`: +1 lines, -1 lines
 - `.toml`: +2 lines, -1 lines
 
 ## Version v0.40.1 (2024-11-27)
@@ -521,7 +522,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.ipynb`: +0 lines, -1 lines
 - `.py`: +18 lines, -20 lines
 - `.toml`: +13 lines, -16 lines
@@ -555,8 +556,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -2 lines
-- `.yml`: +34 lines, -34 lines
+- `.yml`: +35 lines, -36 lines
 - `.ipynb`: +137 lines, -122 lines
 - `.py`: +103 lines, -12 lines
 - `.toml`: +16 lines, -16 lines
@@ -596,11 +596,10 @@
 
 ### 📊 Stats
 
-- other: +16 lines, -9 lines
-- `.md`: +42 lines, -2 lines
-- `.yml`: +5 lines, -2 lines
-- `.map.zarr.md`: +0 lines, -8 lines
-- `.py`: +222 lines, -200 lines
+- `.py`: +233 lines, -204 lines
+- `.yml`: +8 lines, -5 lines
+- `.yaml`: +2 lines, -2 lines
+- `.md`: +42 lines, -10 lines
 - `.toml`: +3 lines, -1 lines
 
 ## Version v0.38.0 (2024-11-07)
@@ -640,7 +639,7 @@
 
 ### 📊 Stats
 
-- other: +2 lines, -2 lines
+- `.yaml`: +2 lines, -2 lines
 - `.yml`: +2 lines, -2 lines
 - `.ipynb`: +3 lines, -3 lines
 - `.py`: +848 lines, -216 lines
@@ -689,10 +688,13 @@
 
 ### 📊 Stats
 
-- other: +66 lines, -9 lines
+- `.py`: +1367 lines, -637 lines
+- `.yml}`: +2 lines, -2 lines
+- `.yml`: +53 lines, -5 lines
+- `.yaml`: +2 lines, -2 lines
 - `.md`: +1 lines, -1 lines
-- `.yml`: +4 lines, -5 lines
-- `.py`: +1588 lines, -1147 lines
+- `.py}`: +233 lines, -514 lines
+- other: +1 lines, -1 lines
 - `.toml`: +3 lines, -5 lines
 
 ## Version v0.36.1 (2024-10-17)
@@ -707,7 +709,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yml`: +1 lines, -1 lines
 - `.py`: +23 lines, -1 lines
 
 ## Version v0.36.0 (2024-10-16)
@@ -738,11 +740,12 @@
 
 ### 📊 Stats
 
-- other: +5 lines, -5 lines
+- `.yml`: +9 lines, -8 lines
+- `.yaml`: +2 lines, -2 lines
 - `.md`: +200 lines, -35 lines
-- `.yml`: +6 lines, -5 lines
 - `.py`: +26 lines, -10 lines
 - `.ipynb`: +758 lines, -893 lines
+- `.py}`: +0 lines, -0 lines
 - `.toml`: +8 lines, -6 lines
 
 ## Version v0.35.1 (2024-09-30)
@@ -764,7 +767,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.md`: +6 lines, -4 lines
 - `.py`: +30 lines, -4 lines
 
@@ -786,11 +789,10 @@
 
 ### 📊 Stats
 
-- other: +49 lines, -9 lines
+- `.py`: +701 lines, -132 lines
 - `.yml`: +1 lines, -1 lines
 - `.md`: +66 lines, -1 lines
 - `.ipynb`: +4 lines, -10 lines
-- `.py`: +652 lines, -123 lines
 - `.toml`: +0 lines, -2 lines
 
 ## Version v0.34.0 (2024-09-25)
@@ -812,8 +814,7 @@
 
 ### 📊 Stats
 
-- `.md`: +41 lines, -0 lines
-- `.testing.md`: +8 lines, -0 lines
+- `.md`: +49 lines, -0 lines
 - `.ipynb`: +88 lines, -61 lines
 - `.py`: +191 lines, -128 lines
 
@@ -855,10 +856,10 @@
 
 ### 📊 Stats
 
-- other: +224 lines, -8 lines
-- `.yml`: +11 lines, -3 lines
+- `.py`: +1378 lines, -63 lines
+- `.yml`: +44 lines, -9 lines
+- `.yaml`: +1 lines, -1 lines
 - `.md`: +53 lines, -0 lines
-- `.py`: +1188 lines, -62 lines
 - `.toml`: +8 lines, -4 lines
 
 ## Version v0.32.1 (2024-09-18)
@@ -895,10 +896,10 @@
 
 ### 📊 Stats
 
-- other: +4 lines, -3 lines
+- `.py`: +1128 lines, -311 lines
+- `.yml`: +4 lines, -2 lines
+- `.yaml`: +1 lines, -1 lines
 - `.md`: +5 lines, -1 lines
-- `.yml`: +2 lines, -0 lines
-- `.py`: +1127 lines, -311 lines
 - `.ipynb`: +175 lines, -122 lines
 - `.toml`: +1 lines, -1 lines
 
@@ -941,7 +942,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.yml`: +3 lines, -0 lines
 - `.ipynb`: +585 lines, -50 lines
 - `.py`: +262 lines, -18 lines
@@ -991,9 +992,7 @@
 
 ### 📊 Stats
 
-- `.md`: +20 lines, -0 lines
-- `.cache.md`: +8 lines, -0 lines
-- `.typing.md`: +8 lines, -0 lines
+- `.md`: +36 lines, -0 lines
 - `.ipynb`: +6 lines, -8 lines
 - `.py`: +186 lines, -46 lines
 
@@ -1017,9 +1016,11 @@
 
 ### 📊 Stats
 
-- other: +5 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+- `.yml`: +4 lines, -0 lines
 - `.md`: +2 lines, -0 lines
-- `.py`: +514 lines, -22 lines
+- `.py`: +320 lines, -21 lines
+- `.py}`: +194 lines, -1 lines
 
 ## Version v0.27.3 (2024-08-29)
 
@@ -1058,7 +1059,7 @@
 
 ### 📊 Stats
 
-- other: +2 lines, -2 lines
+- `.yaml`: +2 lines, -2 lines
 - `.md`: +95 lines, -7 lines
 - `.py`: +36 lines, -1 lines
 
@@ -1080,7 +1081,7 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.md`: +5 lines, -3 lines
 - `.ipynb`: +26 lines, -19 lines
 - `.py`: +1199 lines, -100 lines
@@ -1108,7 +1109,8 @@
 
 ### 📊 Stats
 
-- other: +3 lines, -3 lines
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +2 lines, -2 lines
 - `.ipynb`: +2 lines, -2 lines
 - `.py`: +451 lines, -51 lines
 
@@ -1146,10 +1148,11 @@
 
 ### 📊 Stats
 
-- other: +2 lines, -2 lines
+- `.yaml`: +2 lines, -2 lines
 - `.md`: +15 lines, -15 lines
 - `.ipynb`: +12 lines, -5 lines
 - `.py`: +2132 lines, -1820 lines
+- `.py}`: +0 lines, -0 lines
 
 ## Version v0.23.1 (2024-06-28)
 
@@ -1205,7 +1208,7 @@
 
 ### 📊 Stats
 
-- other: +8 lines, -0 lines
+- `.yml`: +8 lines, -0 lines
 - `.md`: +142 lines, -4 lines
 - `.py`: +409 lines, -110 lines
 
@@ -1241,11 +1244,13 @@
 
 ### 📊 Stats
 
-- other: +85 lines, -12 lines
+- `.json`: +35 lines, -0 lines
+- `.yml`: +47 lines, -8 lines
+- `.yaml`: +4 lines, -4 lines
 - `.md`: +2 lines, -1 lines
-- `.yml`: +1 lines, -0 lines
 - `.ipynb`: +2 lines, -2 lines
-- `.py`: +399 lines, -146 lines
+- `.py`: +397 lines, -144 lines
+- `.py}`: +2 lines, -2 lines
 - `.toml`: +2 lines, -1 lines
 
 ## Version v0.20.0 (2024-06-19)
@@ -1389,9 +1394,7 @@
 ### 📊 Stats
 
 - `.yml`: +2 lines, -0 lines
-- `.md`: +2 lines, -0 lines
-- `.map.adaptive_scheduler.md`: +8 lines, -0 lines
-- `.resources.md`: +8 lines, -0 lines
+- `.md`: +18 lines, -0 lines
 - `.ipynb`: +12 lines, -6 lines
 - `.py`: +1476 lines, -135 lines
 - `.toml`: +14 lines, -4 lines
@@ -1414,10 +1417,9 @@
 
 ### 📊 Stats
 
-- other: +19 lines, -8 lines
+- `.py`: +1174 lines, -475 lines
 - `.md`: +3 lines, -3 lines
 - `.yml`: +15 lines, -3 lines
-- `.py`: +1155 lines, -467 lines
 - `.ipynb`: +67 lines, -3 lines
 - `.toml`: +17 lines, -14 lines
 
@@ -1451,13 +1453,11 @@
 
 ### 📊 Stats
 
-- other: +12 lines, -7 lines
-- `.yml`: +10 lines, -20 lines
-- `.py`: +1792 lines, -889 lines
-- `.md`: +2 lines, -0 lines
-- `.lazy.md`: +8 lines, -0 lines
-- `.sweep.md`: +8 lines, -0 lines
+- `.py`: +1771 lines, -875 lines
+- `.yml`: +11 lines, -21 lines
+- `.md`: +18 lines, -0 lines
 - `.ipynb`: +46 lines, -14 lines
+- `.py}`: +32 lines, -20 lines
 - `.toml`: +10 lines, -10 lines
 
 ## Version v0.12.0 (2024-05-30)
@@ -1481,10 +1481,8 @@
 
 ### 📊 Stats
 
-- `.md`: +9 lines, -8 lines
+- `.md`: +11 lines, -10 lines
 - `.py`: +961 lines, -191 lines
-- `.map.xarray.md`: +1 lines, -1 lines
-- `.map.zarr.md`: +1 lines, -1 lines
 - `.ipynb`: +57 lines, -0 lines
 - `.toml`: +1 lines, -1 lines
 
@@ -1505,11 +1503,9 @@
 
 ### 📊 Stats
 
-- other: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
 - `.yml`: +3 lines, -0 lines
-- `.md`: +2 lines, -0 lines
-- `.map.xarray.md`: +8 lines, -0 lines
-- `.map.zarr.md`: +8 lines, -0 lines
+- `.md`: +18 lines, -0 lines
 - `.ipynb`: +97 lines, -75 lines
 - `.py`: +1585 lines, -628 lines
 - `.toml`: +13 lines, -3 lines
@@ -1527,7 +1523,7 @@
 
 ### 📊 Stats
 
-- other: +0 lines, -1 lines
+- `.yaml`: +0 lines, -1 lines
 - `.yml`: +4 lines, -3 lines
 - `.py`: +797 lines, -286 lines
 - `.ipynb`: +264 lines, -3 lines
@@ -1562,9 +1558,7 @@
 
 ### 📊 Stats
 
-- `.md`: +53 lines, -35 lines
-- `.map.adaptive.md`: +8 lines, -0 lines
-- `.map.md`: +8 lines, -0 lines
+- `.md`: +69 lines, -35 lines
 - `.ipynb`: +316 lines, -136 lines
 - `.py`: +2172 lines, -605 lines
 
@@ -1602,11 +1596,12 @@
 
 ### 📊 Stats
 
-- other: +7 lines, -3 lines
+- `.py`: +570 lines, -346 lines
+- `.yaml`: +1 lines, -1 lines
+- `.yml`: +3 lines, -18 lines
 - `.md`: +20 lines, -5 lines
-- `.yml`: +2 lines, -17 lines
-- `.py`: +569 lines, -345 lines
 - `.ipynb`: +229 lines, -12 lines
+- other: +4 lines, -0 lines
 - `.toml`: +6 lines, -3 lines
 - `.cfg`: +0 lines, -5 lines
 
@@ -1642,11 +1637,12 @@
 
 ### 📊 Stats
 
-- other: +26 lines, -3 lines
+- `.yml`: +9 lines, -4 lines
+- `.yaml`: +1 lines, -1 lines
 - `.md`: +1 lines, -1 lines
-- `.yml`: +5 lines, -2 lines
 - `.ipynb`: +5 lines, -5 lines
 - `.py`: +3265 lines, -522 lines
+- other: +21 lines, -0 lines
 - `.toml`: +4 lines, -2 lines
 
 ## Version v0.5.0 (2024-04-30)
@@ -1680,7 +1676,8 @@
 
 ### 📊 Stats
 
-- other: +4 lines, -4 lines
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +3 lines, -3 lines
 - `.md`: +12 lines, -19 lines
 - `.py`: +2411 lines, -1478 lines
 - `.ipynb`: +2 lines, -2 lines
@@ -1731,11 +1728,11 @@
 
 ### 📊 Stats
 
-- other: +8 lines, -12 lines
+- `.py`: +366 lines, -78 lines
+- `.yaml`: +6 lines, -8 lines
 - `.md`: +2 lines, -2 lines
 - `.yml`: +2 lines, -0 lines
 - `.ipynb`: +101 lines, -79 lines
-- `.py`: +364 lines, -74 lines
 - `.toml`: +10 lines, -7 lines
 
 ## Version v0.2.0 (2023-11-27)
@@ -1768,7 +1765,7 @@
 
 ### 📊 Stats
 
-- other: +3 lines, -0 lines
+- `.yml`: +3 lines, -0 lines
 - `.md`: +11 lines, -0 lines
 - `.py`: +410 lines, -62 lines
 - `.toml`: +2 lines, -4 lines
