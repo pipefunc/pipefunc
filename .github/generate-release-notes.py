@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 import git
 from diskcache import Cache
 from github import Github, Repository
-from rich import print
 from rich.console import Console
 
 if TYPE_CHECKING:
@@ -125,22 +124,22 @@ def _extract_pr_number(commit_message: str) -> int | None:
 def _categorize_pr_title(pr_title: str) -> str:  # noqa: PLR0911
     """Categorize a PR title based on prefixes."""
     if pr_title.startswith("DOC:"):
-        return "Documentation"
+        return "📚 Documentation"
     if pr_title.startswith("ENH:"):
-        return "Enhancements"
+        return "✨ Enhancements"
     if pr_title.startswith("CI:"):
-        return "CI"
+        return "🤖 CI"
     if pr_title.startswith("TST:"):
-        return "Testing"
+        return "🧪 Testing"
     if pr_title.startswith("MAINT:"):
-        return "Maintenance"
+        return "🧹 Maintenance"
     if pr_title.startswith("BUG:"):
-        return "Bug Fixes"
+        return "🐛 Bug Fixes"
     if pr_title.startswith("⬆️"):
-        return "Dependencies"
+        return "📦 Dependencies"
     if pr_title.startswith("[pre-commit.ci]"):
-        return "Pre-commit"
-    return "Other"
+        return "🔄 Pre-commit"
+    return "📝 Other"
 
 
 def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetime.datetime]]:
@@ -305,6 +304,6 @@ if __name__ == "__main__":
     with open("GITHUB_TOKEN") as f:  # noqa: PTH123
         github_token = f.read().strip()
     notes = _generate_release_notes(github_token)
-    print(notes)
+    console.print(notes)
     with open("../RELEASE_NOTES.md", "w") as f:  # noqa: PTH123
         f.write(notes)

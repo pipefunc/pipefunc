@@ -2,17 +2,17 @@
 
 ## Version v0.49.6 (2025-01-17)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Raise an exception if scope was not added to anything (#571)
 
 ## Version v0.49.5 (2025-01-17)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix using `Pipeline.arg_combinations` to calculate `root_args` (#570)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix admonition in example.ipynb (#569)
 - DOC: Rename `uvtip` -> `try-notebook` and use in `example.ipynb` (#568)
@@ -22,17 +22,17 @@
 
 ## Version v0.49.4 (2025-01-15)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix `bound` in `NestedPipeFunc` with `scope` and `map` (#560)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Recommendations of order (#559)
 
 ## Version v0.49.3 (2025-01-15)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix `bound` in `NestedPipeFunc` inside `Pipeline` (#557)
 
@@ -42,7 +42,7 @@
 
 - NestedPipeFunction in graph show wrong datatype (#487)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix propagating defaults in `NestedPipeFunc` (#558)
 - DOC: Rename "Benchmarking" to "Overhead and Efficiency" (#553)
@@ -53,50 +53,50 @@
 - DOC: Mention `uv` and `opennb` early in tutorial (#548)
 - DOC: Reoganize the docs into pages (#545)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Change the order in which keys appear in `pipeline.info` (#554)
 
 ## Version v0.49.1 (2025-01-13)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix `NestedPipeFunction` in graph show wrong datatype (#546)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add a page about `mapspec` (#543)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#544)
 
 ## Version v0.49.0 (2025-01-13)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add a widget for `VariantPipeline.visualize()` and `VariantPipeline._repr_mimebundle_` (#539)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add `NestedPipeFunc` section to example notebooks and move `simplified_pipeline` to FAQ (#542)
 - DOC: Fix method name of `Pipeline.join` in example notebook (#541)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.18 (#538)
 
 ## Version v0.48.2 (2025-01-11)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Add more `NestedPipeFunc` tests and fix multiple outputs issue with them (#536)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.17 (#535)
 
-### Testing
+### 🧪 Testing
 
 - TST: Add multiple outputs to benchmarks (#537)
 
@@ -106,11 +106,11 @@
 
 - Add pipeline variants (#517)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix scope for `NestedPipeFunc` (#534)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Extend `.gitignore` (#533)
 
@@ -120,40 +120,40 @@
 
 - allow setting names of `NestedPipeFunc` by hand (#195)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `VariantPipelines.from_pipelines` classmethod (#526)
 - ENH: Allow setting `NestedPipeFunc(..., function_name="customname")` (#532)
 
 ## Version v0.47.3 (2025-01-10)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix `combine_mapspecs` in `NestedPipeFunc` (#531)
 
 ## Version v0.47.2 (2025-01-10)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Set `internal_shape` for `NestedPipeFunc` (#530)
 - BUG: Fix error message about using `map_async` with Slurm (#528)
 - BUG: Fix case where bound and default are set for same parameter (#525)
 
-### CI
+### 🤖 CI
 
 - CI: Set `timeout-minutes: 10` in pytest jobs to prevent stuck 6 hour jobs (#529)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix FAQ `VariantPipeline` example (#524)
 
 ## Version v0.47.1 (2025-01-09)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add example with non-unique variant names across `PipeFunc`s (#520)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Pin `zarr>=2,<3` (#521)
 
@@ -163,17 +163,17 @@
 
 - Aggregating function outputs into a `dict`? (#456)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `VariantPipeline` that can generate multiple `Pipeline` variants (#518)
 - ENH: Add auto-chunksize heuristic (#505)
 
-### Other
+### 📝 Other
 
 - Use Python 3.13 in CI where possible (#519)
 - Update Discord invite link README.md (#509)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.16 (#516)
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.15 (#514)
@@ -181,18 +181,18 @@
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.13 (#508)
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.12 (#507)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#512)
 - [pre-commit.ci] pre-commit autoupdate (#504)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Update number of required dependencies in README.md (#506)
 - DOC: Autoformat Markdown in FAQ and README (#503)
 - DOC: Add comparison with Snakemake (#501)
 
-### CI
+### 🤖 CI
 
 - CI: Revert `pull_request_target:` (#500)
 
@@ -202,22 +202,22 @@
 
 - Proposal: Reduce Pipeline.map's IPC overhead with chunking (#484)
 
-### Testing
+### 🧪 Testing
 
 - TST: Explicitly set reason in `skipif` (#499)
 - TST: Skip shared memory test in CI on nogil Python (3.13t) (#498)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Allow providing an int to `chunksizes` (#497)
 - ENH: Add `chunksizes` argument to `Pipeline.map` and `Pipeline.map_async` (#493)
 
-### CI
+### 🤖 CI
 
 - CI: Revert `pull_request_target:` for CodSpeed (#495)
 - CI: Use `pull_request_target:` to trigger CI on fork (#494)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Mention HPC vs cloud based running (#492)
 - DOC: How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, etc.? (#491)
@@ -229,17 +229,17 @@
 
 - Add helpers.getattr (#480)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `size_per_learner` for `SlurmExecutor` (#486)
 - ENH: Add `helpers.get_attribute_factory` (#481)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update astral-sh/setup-uv action to v5 (#483)
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.11 (#482)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Set Python version to 3.13 in README `opennb` example (#479)
 - DOC: Fix header level of "Dynamic Output Shapes and `internal_shapes`" (#478)
@@ -247,14 +247,14 @@
 
 ## Version v0.44.0 (2024-12-19)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `Pipeline._repr_mimebundle_` (#476)
 - ENH: Allow printing rich-formatted table with `pipeline.info()` (#475)
 - ENH: Automatically set `internal_shape=("?", ...)` (#463)
 - ENH: Add a `.devcontainer` for VS Code based on `uv` (#473)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Update documentation about dynamic `internal_shapes` (#474)
 
@@ -264,17 +264,17 @@
 
 - Allow `internal_shapes` to be input names (str) with simple expressions (#197)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Enable `show_progress` when using dynamic shapes (#471)
 - ENH: Automatically set `internal_shape` (#448)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add workaround for multiple returns with different sizes (#470)
 - DOC: Add `opennb` tip (#464)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix case where there is no size (#467)
 - BUG: Ensure to resolve shapes for all arrays in `_update_array` and fix `internal_shape` calculation (#469)
@@ -283,34 +283,34 @@
 
 ## Version v0.42.1 (2024-12-17)
 
-### Testing
+### 🧪 Testing
 
 - TST: Use `pytest-timeout` plugin to prevent handing tests (#459)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `Pipeline.info()` that returns input and output info (#462)
 
 ## Version v0.42.0 (2024-12-16)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `pipefunc.helpers.collect_kwargs` helper function (#457)
 - ENH: Allow `pipeline.root_args(None)` (default) that returns all inputs (#461)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#460)
 
 ## Version v0.41.3 (2024-12-13)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Only use the cache when `cache=True` instead of always in `pipeline.map` (#458)
 
 ## Version v0.41.2 (2024-12-11)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix `internal_shapes` coming from `PipeFunc` constructor and `cleanup=False` (#455)
 
@@ -324,51 +324,51 @@
 - `TypeError: 'NoneType' object cannot be interpreted as an integer` in documentation build (#317)
 - ascii art (#307)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix case with multiple output then iterate over single axis (#454)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Small formatting changes and tiny refactors (from #448) (#453)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#452)
 - [pre-commit.ci] pre-commit autoupdate (#445)
 
-### Other
+### 📝 Other
 
 - Add .ruff_cache to .gitignore (#449)
 
 ## Version v0.41.0 (2024-11-27)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `post_execution_hook` for `PipeFunc` (#306)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Set default plotting backend in docs to graphviz (#441)
 
 ## Version v0.40.2 (2024-11-27)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Add `pipefunc[all]` to docs extras and remove `pydantic` from `[all]` (#440)
 - MAINT: Fix typo (#439)
 
 ## Version v0.40.1 (2024-11-27)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Use `hatch` instead of `setuptools` (#438)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#429)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix admonition in example notebook (#437)
 
@@ -378,55 +378,55 @@
 
 - IndexError when handling exceptions without arguments in python<=3.11 (#430)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add a dropdown with interactive widget explanation (#436)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add interactive version of `visualize_graphviz` (#326)
 - ENH: Remove pygraphviz dependency, was only used in matplotlib plotting backend (#433)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Sort the dependencies alphabetically (#435)
 
-### CI
+### 🤖 CI
 
 - CI: Test with plotting in uv now that `pygraphviz` is no longer required (#434)
 
-### Testing
+### 🧪 Testing
 
 - TST: Fix pygraphviz <-> python-graphviz mixup in tests (#432)
 
 ## Version v0.39.0 (2024-11-26)
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
 - BUG: Fix Python≤3.11 case for `handle_error` (#431)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Install myst-nb with conda (#428)
 - MAINT: Remove `LazySequenceLearner` because of alternative in #381 (#419)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Avoid duplicate dependencies in .github/update-environment.py script (#427)
 - ENH: Add support for `pydantic.BaseModel` (#420)
 - ENH: Allow using memory based storages in parallel too (#416)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update astral-sh/setup-uv action to v4 (#426)
 - ⬆️ Update codecov/codecov-action action to v5 (#424)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#425)
 - [pre-commit.ci] pre-commit autoupdate (#418)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix zarr API docs page (#422)
 - DOC: Add section with `dataclass` and `pydantic.BaseModel` (#421)
@@ -439,7 +439,7 @@
 - Dataclasses that use default_factory fields have buggy execution on second run (#402)
 - Pipeline.add is not idempotent (#394)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Factor out `SlurmExecutor` logic from `_run.py` (#415)
 - ENH: Rename _submit_single to _execute_single to avoid confusion with ex.submit (#413)
@@ -450,20 +450,20 @@
 - ENH: Add a `StoreType` (#408)
 - ENH: Prevent adding functions with same `output_name` (#404)
 
-### Other
+### 📝 Other
 
 - FIX: Also update progress bar for single executions (#414)
 - Define `ShapeDict`, `ShapeTuple`, `UserShapeDict` types (#406)
 
-### Testing
+### 🧪 Testing
 
 - TST: Omit `pipefunc/map/_types.py` from coverage (#411)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#405)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Move `LazySequenceLearner` to separate module (#407)
 
@@ -473,58 +473,58 @@
 
 - All values reported in profile_stats are 0 (#392)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Specially treat dataclasses with a default factory (closes #402) (#403)
 - ENH: Update progress bar every second for first 30 seconds (#401)
 - ENH: Include class name in `PipeFunc.__name__` (#389)
 - ENH: Add `LazySequenceLearner` (#385)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#400)
 - [pre-commit.ci] pre-commit autoupdate (#386)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Split up `_pipeline.py` into modules (#399)
 - MAINT: Use relative imports in `pipefunc.map` (#398)
 - MAINT: pipefunc.map module reorganization (#397)
 - MAINT: Move storage related modules to `map/_storage` (#396)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Fix url in shield (#391)
 
-### CI
+### 🤖 CI
 
 - CI: Rename GitHub Actions workflows and test with minimal dependencies (#390)
 
-### Other
+### 📝 Other
 
 - Add `uv` based GitHub Actions workflow and test on free-threaded Python 3.13t (#387)
 
-### Testing
+### 🧪 Testing
 
 - TST: Make optional deps also optional in tests (#388)
 
 ## Version v0.36.1 (2024-10-17)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Enable Python 3.13 in CI (#384)
 
-### Other
+### 📝 Other
 
 - FIX: Use `internal_shapes` defined in `@pipefunc` in `create_learners` (#383)
 
 ## Version v0.36.0 (2024-10-16)
 
-### Other
+### 📝 Other
 
 - Python 3.13 support (#382)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Simplify example in README.md (#379)
 - DOC: Add `html_theme_options` (#371)
@@ -532,30 +532,30 @@
 - DOC: Reorder and reorganize docs (#364)
 - DOC: Add `sphinx-notfound-page` for 404 (#369)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#377)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update mamba-org/setup-micromamba action to v2 (#376)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Move `ProgressTracker` widget a `_widgets` folder (#373)
 
 ## Version v0.35.1 (2024-09-30)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Allow pickling `DiskCache` without LRU Cache (#368)
 - ENH: Allow `range(...)` as input in `map` (#365)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#366)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Use Ruff badge instead of Black (#367)
 - DOC: Improve intro in README (#363)
@@ -563,14 +563,14 @@
 
 ## Version v0.35.0 (2024-09-27)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Inline `mapspec` in physics based example (#361)
 - DOC: Rely on latest release of MyST (#360)
 - DOC: Add FAQ entry about mixing executors and storages (#359)
 - DOC: Fix list formatting in Sphinx docs (#358)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Allow a different `Executor` per `PipeFunc` (#357)
 - ENH: Allow setting a `storage` per `PipeFunc` (#356)
@@ -579,24 +579,24 @@
 
 ## Version v0.34.0 (2024-09-25)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add more space between `:` and name in `visualize_graphviz` (#353)
 - ENH: Add `pipefunc.testing.patch` (#352)
 - ENH: Include mapspec axis in the outputs of `PipeFunc` directly (#349)
 - ENH: Keep mapspec in argument nodes in `visualize_graphviz` (#348)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add mapspec plots to tutorial (#351)
 
-### Maintenance
+### 🧹 Maintenance
 
 - MAINT: Remove trailing commas to have arg lists on single line (#350)
 
 ## Version v0.33.0 (2024-09-24)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `pipeline.map_async` and a progress bar (#333)
 - ENH: Raise an error with a helpful error message for missing dependencies (#347)
@@ -605,34 +605,34 @@
 - ENH: Speedup code by 40% via simple change (#337)
 - ENH: Improve missing plotting backend error message (#332)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update astral-sh/setup-uv action to v3 (#344)
 
-### CI
+### 🤖 CI
 
 - CI: Remove unused steps from pytest pipeline (#345)
 
-### Testing
+### 🧪 Testing
 
 - TST: Add a CI pipeline that checks for matching doc-strings (#343)
 - TST: Add benchmark from FAQ to test suite (#338)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#340)
 
-### Other
+### 📝 Other
 
 - FIX: Load custom objects correctly in `xarray` (#336)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add FAQ question about overhead/performance (#335)
 
 ## Version v0.32.1 (2024-09-18)
 
-### Other
+### 📝 Other
 
 - FIX: Improve the parallel store compatibility checking function (#331)
 
@@ -642,60 +642,60 @@
 
 - Add `pipefunc.map.Result.to_xarray` (#312)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Allow `pipeline.map` to run without disk (#327)
 - ENH: Make Graphviz PipeFunc nodes rounded (#329)
 - ENH: Implement `graphviz` based visualization (#323)
 - ENH: Allow `visualize` to take an int for `figsize` (square) (#322)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#324)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Explain what a pipeline is (#321)
 - DOC: Use `DiskCache` to prevent #317 (#318)
 
 ## Version v0.31.1 (2024-09-11)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add a FAQ question about `ErrorSnapshot` and improve IP getting (#316)
 
-### Other
+### 📝 Other
 
 - Note (#315)
 
 ## Version v0.31.0 (2024-09-10)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add function going from `Results` to xarray with `xarray_dataset_from_results` (#314)
 - ENH: Attach `ErrorSnapshot` for debugging (#313)
 - ENH: Use pickle for cache key, inspired by `python-diskcache` package (#310)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Add additional examples to the tutorial (#311)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#308)
 
-### Other
+### 📝 Other
 
 - Use `repr` for filename key (#309)
 - TYP: Fix annotation of `output_picker` (#303)
 
 ## Version v0.30.0 (2024-09-05)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add `internal_shape` to `PipeFunc` (#302)
 
-### Documentation
+### 📚 Documentation
 
 - DOC: Show triangulation on top of `Learner2D` plot (#301)
 
@@ -708,7 +708,7 @@
 - allow to inspect the resources inside the function (#192)
 - allow internal parallelization (#191)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Add call to action (#300)
 - ENH: Add ToC of questions to FAQ (#298)
@@ -716,7 +716,7 @@
 - ENH: Skip parallelization if pointless (#293)
 - ENH: Simpler example with `output_picker` (#287)
 
-### Other
+### 📝 Other
 
 - FIX: Formatting in `is_object_array_type` doc-string (#296)
 - FIX: formatting of lists in doc-strings (#295)
@@ -728,50 +728,50 @@
 
 ## Version v0.28.0 (2024-09-03)
 
-### Other
+### 📝 Other
 
 - Rename `pipefunc._cache` to `pipefunc.cache` (#286)
 - Update `asciinema` recording (#281)
 - Add asciinema recording (#280)
 - Build `dirhtml` Sphinx docs instead of `html` (#279)
 
-### Enhancements
+### ✨ Enhancements
 
 - ENH: Small type annotation fix in `memoize` (#285)
 - ENH: Improve caching and add a `memoize` decorator (#283)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#284)
 
 ## Version v0.27.3 (2024-08-29)
 
-### Other
+### 📝 Other
 
 - FIX: Case where reduction happens and output is unresolvable (#278)
 - Add `py.typed` (PEP 561) (#277)
 
 ## Version v0.27.2 (2024-08-29)
 
-### Other
+### 📝 Other
 
 - Fix type annotation bug with autogenerated axis with internal shape (#276)
 
 ## Version v0.27.1 (2024-08-29)
 
-### Other
+### 📝 Other
 
 - Skip on `NoAnnotation` (#275)
 - Add type annotation checking documentation (#274)
 - Enforce one-to-one mapping for renames and improve validation error messages (#273)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#267)
 
 ## Version v0.27.0 (2024-08-28)
 
-### Other
+### 📝 Other
 
 - Allow disabling type validation (#271)
 - Allow types to be generics (#269)
@@ -781,33 +781,33 @@
 - Simplify Adaptive Scheduler code (#263)
 - Set Ruff Python version to 3.10 (#262)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#259)
 
 ## Version v0.26.0 (2024-08-22)
 
-### Other
+### 📝 Other
 
 - Allow single job per element inside a `MapSpec` via `resources_scope` (#260)
 - Return correct data in SequenceLearner when `return_output` (#261)
 - Add `pipeline.run` adaptive tools (#257)
 - Remove indentation level (#255)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#254)
 - [pre-commit.ci] pre-commit autoupdate (#253)
 - [pre-commit.ci] pre-commit autoupdate (#252)
 - [pre-commit.ci] pre-commit autoupdate (#250)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update CodSpeedHQ/action action to v3 (#251)
 
 ## Version v0.25.0 (2024-07-19)
 
-### Other
+### 📝 Other
 
 - Add `parallelization_mode` option (#249)
 
@@ -817,7 +817,7 @@
 
 - AssertionError raised in the case of a function without inputs. (#238)
 
-### Other
+### 📝 Other
 
 - Make Resources serializable (#247)
 - Support delayed `Resources` in Adaptive Scheduler integration (#234)
@@ -825,39 +825,39 @@
 - Split parts of `test_pipefunc.py` into several files (#242)
 - Raise an exception when parameters and output_name overlaps (#241)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#246)
 - [pre-commit.ci] pre-commit autoupdate (#244)
 
 ## Version v0.23.1 (2024-06-28)
 
-### Other
+### 📝 Other
 
 - Allow parameterless functions in a Pipeline (#240)
 - Allow passing `loss_function` to `to_adaptive_learner` (#239)
 
 ## Version v0.23.0 (2024-06-27)
 
-### Other
+### 📝 Other
 
 - Add a poor man's adaptive integration (#237)
 
 ## Version v0.22.2 (2024-06-27)
 
-### Other
+### 📝 Other
 
 - Disallow mapping over bound arguments and fix mapping over defaults (#236)
 
 ## Version v0.22.1 (2024-06-27)
 
-### Other
+### 📝 Other
 
 - Always call validate in `add` to ensure mapspec axes are autogenerated (#235)
 
 ## Version v0.22.0 (2024-06-26)
 
-### Other
+### 📝 Other
 
 - Get rid of `PipeFunc._default_resources` (#232)
 - Allow bound arguments to be unhashable (#233)
@@ -871,7 +871,7 @@
 
 - Changing PipeFunc should trigger Pipeline internal cache reset (#203)
 
-### Other
+### 📝 Other
 
 - Fix `dev` section in pyproject.toml `[project.optional-dependencies]`
 - Fix `PipeFunc` that share defaults (#230)
@@ -883,11 +883,11 @@
 - Always create a copy when calling `Pipeline.add` (#215)
 - Keep `default_resources` in `Pipeline` and rename `resources_report` to `print_profiling_stats` to avoid confusion (#213)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#228)
 
-### Dependencies
+### 📦 Dependencies
 
 - ⬆️ Update release-drafter/release-drafter action to v6 (#227)
 - ⬆️ Update github/codeql-action action to v3 (#226)
@@ -897,7 +897,7 @@
 
 ## Version v0.20.0 (2024-06-19)
 
-### Other
+### 📝 Other
 
 - Remove specialized Adaptive code, and generalize `map` (#212)
 - Remove `save_function` from `PipeFunc` and `delayed_callback` from `_LazyFunction` (#211)
@@ -908,7 +908,7 @@
 
 ## Version v0.19.0 (2024-06-17)
 
-### Other
+### 📝 Other
 
 - Introduce parameter namespacing via `scope`s (#201)
 - Make sure all cells are executed to ensure working docs (#206)
@@ -920,7 +920,7 @@
 
 - Rename outputs too in `update_renames` (#189)
 
-### Other
+### 📝 Other
 
 - Clear internal cache after renaming and re-defaulting (#202)
 
@@ -931,7 +931,7 @@
 - include single results in xarray (#188)
 - Rename mapspecs in update_remames (#184)
 
-### Other
+### 📝 Other
 
 - Allow renaming `output_name` in `update_renames` (#200)
 - Set `run_folder=None` by default (#198)
@@ -944,7 +944,7 @@
 
 ## Version v0.17.0 (2024-06-11)
 
-### Other
+### 📝 Other
 
 - Add remaining `Sweep` tests to reach 100% coverage on all code :tada: (#181)
 - Remove superseded sweep functions: `get_precalculation_order` and `get_min_sweep_sets` (#180)
@@ -957,7 +957,7 @@
 
 ## Version v0.16.0 (2024-06-10)
 
-### Other
+### 📝 Other
 
 - Add pipeline.update_rename to example
 - Add `Pipeline.update_renames` (#175)
@@ -972,7 +972,7 @@
 
 ## Version v0.15.1 (2024-06-07)
 
-### Other
+### 📝 Other
 
 - Do not add `MapSpec` axis for bound parameters (#165)
 
@@ -982,7 +982,7 @@
 
 - class CombinedFunc(PipeFunc) to nest pipelines (#138)
 
-### Other
+### 📝 Other
 
 - Make bound values actual node types in the graph (#160)
 - Fix setting `__version__` during onbuild (#164)
@@ -997,7 +997,7 @@
 
 ## Version v0.14.0 (2024-06-04)
 
-### Other
+### 📝 Other
 
 - Reorder functions, put public code at top of modules (#155)
 - Add `NestedPipeFunc` (#153)
@@ -1013,7 +1013,7 @@
 
 ## Version v0.13.0 (2024-06-02)
 
-### Other
+### 📝 Other
 
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now)
 - Drop support for Python 3.8 and 3.9 (#142)
@@ -1041,7 +1041,7 @@
 
 ## Version v0.12.0 (2024-05-30)
 
-### Other
+### 📝 Other
 
 - Add custom parallelism section to the docs (#119)
 - Add `SharedDictArray` (#118)
@@ -1060,7 +1060,7 @@
 
 ## Version v0.11.0 (2024-05-28)
 
-### Other
+### 📝 Other
 
 - Pass through storage and return `map` result as `dict[str, Result]` (#104)
 - Test all storage and remove custom `gzip` cloudpickle because `zarr` already compresses (#103)
@@ -1069,13 +1069,13 @@
 - Add `MapSpec` in `Pipeline.visualize` (#72)
 - Mention where example is based on
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#105)
 
 ## Version v0.10.0 (2024-05-24)
 
-### Other
+### 📝 Other
 
 - Add `xarray` integration (#94)
 - Make sure to only evaluate a function once when possible (#100)
@@ -1086,7 +1086,7 @@
 
 ## Version v0.9.0 (2024-05-22)
 
-### Other
+### 📝 Other
 
 - Add support for output arrays with internal structure and autogenerate MapSpecs (#85)
 - Style changes (#93)
@@ -1113,7 +1113,7 @@
 
 ## Version v0.8.0 (2024-05-17)
 
-### Other
+### 📝 Other
 
 - Increase coverage and fix Sweep bug (#71)
 - Add verbose flag (#70)
@@ -1126,7 +1126,7 @@
 
 ## Version v0.7.0 (2024-05-15)
 
-### Other
+### 📝 Other
 
 - Add pipefunc.map.adaptive to API docs
 - Better `resource_report` and add add `Sweep` with `MapSpec` tools (#62)
@@ -1141,7 +1141,7 @@
 
 ## Version v0.6.0 (2024-05-15)
 
-### Other
+### 📝 Other
 
 - Integrate `MapSpec`ed `Pipeline`s with Adaptive (#56)
 - Add functionality to run `Pipeline`s with `MapSpec`s (#55)
@@ -1164,14 +1164,14 @@
 - Several caching fixes (#38)
 - Use codecov/codecov-action@v4 (#36)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#48)
 - [pre-commit.ci] pre-commit autoupdate (#37)
 
 ## Version v0.5.0 (2024-04-30)
 
-### Other
+### 📝 Other
 
 - Make positional only (#35)
 - Format line
@@ -1191,7 +1191,7 @@
 - Add hype tag (AI)
 - Rewrite the intro in the README (#21)
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#20)
 - [pre-commit.ci] pre-commit autoupdate (#19)
@@ -1200,7 +1200,7 @@
 
 ## Version v0.4.0 (2024-03-11)
 
-### Other
+### 📝 Other
 
 - Keep functions picklable
 - Use kwargs with derivers
@@ -1213,7 +1213,7 @@
 
 ## Version v0.3.0 (2024-03-08)
 
-### Other
+### 📝 Other
 
 - Automatically set `output_name` if possible (#10)
 - Unique colors for combinable and non-combinable nodes (#9)
@@ -1234,7 +1234,7 @@
 - Update pre-commit filters
 - Fix pip install command in README.md
 
-### Pre-commit
+### 🔄 Pre-commit
 
 - [pre-commit.ci] pre-commit autoupdate (#3)
 
@@ -1244,7 +1244,7 @@
 
 - Header (#1)
 
-### Other
+### 📝 Other
 
 - Add Python 3.12 classifier
 - Fix doc-string
@@ -1268,7 +1268,7 @@
 
 ## Version v0.1.0 (2023-07-16)
 
-### Other
+### 📝 Other
 
 - Fix license in pyproject.toml
 - Set the project.readme to Markdown
