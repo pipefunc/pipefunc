@@ -433,6 +433,13 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline1("d", a=1) == 4
     r = pipeline1.map(inputs={"a": 1})
     assert r["d"].output == 4
+    assert pipeline1.info() == {  # Should not have "c"
+        "required_inputs": ("a",),
+        "optional_inputs": ("scope.b",),
+        "inputs": ("a", "scope.b"),
+        "intermediate_outputs": (),
+        "outputs": ("d",),
+    }
     pipeline2 = Pipeline([h])
     pipeline = pipeline1.join(pipeline2)
     assert pipeline["d"].renames == {"b": "scope.b"}
