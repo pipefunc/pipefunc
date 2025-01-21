@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 REPO_ROOT = Path(__file__).parent.parent
 console = Console()
+REPO_URL = "https://github.com/pipefunc/pipefunc"
 
 
 def _print_step(message: str) -> None:
@@ -287,8 +288,7 @@ def _generate_release_notes(  # noqa: PLR0912
         if issues:
             lines.append("### Closed Issues\n\n")
             for issue in issues:
-                repo_url = "https://github.com/pipefunc/pipefunc"
-                url = f"[#{issue.number}]({repo_url}/issues/{issue.number})"
+                url = f"[#{issue.number}]({REPO_URL}/issues/{issue.number})"
                 lines.append(f"- {_get_first_line(issue.title)} ({url})\n")
             lines.append("\n")
 
@@ -299,9 +299,12 @@ def _generate_release_notes(  # noqa: PLR0912
                 category = _categorize_pr_title(commit.message)
                 line = _get_first_line(commit.message)
                 if (pr_nr := _get_pr_nr(line)) is not None:
-                    repo_url = "https://github.com/pipefunc/pipefunc"
-                    link = f"([#{pr_nr}]({repo_url}/pull/{pr_nr}))"
+                    link = f"([#{pr_nr}]({REPO_URL}/pull/{pr_nr}))"
                     line = line.replace(f"(#{pr_nr})", link)
+                else:
+                    ref = commit.hexsha[:7]
+                    link = f"([{ref}]({REPO_URL}/commit/{ref}))"
+                    line = f"{line} ({link})"
                 commits_by_category[category].append(line)
 
         # Add commits by category, only if there are commits in that category
