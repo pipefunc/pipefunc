@@ -260,10 +260,12 @@ def _generate_release_notes(
             if (
                 prev_tag_date is None
                 and issue.closed_at <= tag_date  # Include all issues up to the first tag
+                and not issue.pull_request  # Exclude PRs
             )
             or (
                 prev_tag_date is not None
                 and prev_tag_date < issue.closed_at <= tag_date  # Note the < instead of <=
+                and not issue.pull_request  # Exclude PRs
             )
         ]
         if closed_issues:
@@ -291,7 +293,9 @@ def _generate_release_notes(
             markdown += f"### {category}\n\n"
             for commit_message, pr_link in commits_in_category:
                 markdown += f"- {commit_message} {pr_link}\n"
-            markdown += "\n"
+            # Only add a newline if there are commits in the category
+            if commits_in_category:
+                markdown += "\n"
 
     return markdown
 
@@ -302,5 +306,5 @@ if __name__ == "__main__":
         github_token = f.read().strip()
     notes = _generate_release_notes(github_token)
     print(notes)
-    with open("../RELEASE_NOTES.md", "w") as f:
+    with open("../RELEASE_NOTES.md", "w") as f:  # noqa: PTH123
         f.write(notes)
