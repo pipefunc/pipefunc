@@ -1,89 +1,100 @@
+# /// script
+# dependencies = [
+#   "jupytext",
+#   "PyGithub",
+#   "aiohttp",
+# ]
+# ///
+
+import asyncio
 import os
-import subprocess
 from pathlib import Path
 
-import requests
+import aiohttp
+from github import Github  # PyGithub
 
 
-def download_file(url, destination):
-    """Downloads a file from a URL to a local destination."""
-    response = requests.get(url, stream=True)
-    response.raise_for_status()  # Raise an exception for bad status codes
+async def download_file_async(session, url, destination) -> None:
+    """Downloads a file asynchronously."""
+    async with session.get(url) as response:
+        response.raise_for_status()
+        with open(destination, "wb") as file:
+            async for chunk in response.content.iter_chunked(8192):
+                file.write(chunk)
+        print(f"Downloaded: {url} -> {destination}")
 
-    with open(destination, "wb") as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            file.write(chunk)
 
-
-def convert_to_ipynb(md_file, ipynb_file):
-    """Converts a Markdown file to a Jupyter Notebook using jupytext."""
-    try:
-        subprocess.run(["jupytext", "--to", "ipynb", md_file, "-o", ipynb_file], check=True)
+async def convert_to_ipynb_async(md_file, ipynb_file) -> None:
+    """Converts a Markdown file to a Jupyter Notebook asynchronously."""
+    proc = await asyncio.create_subprocess_exec(
+        "jupytext",
+        "--to",
+        "ipynb",
+        md_file,
+        "-o",
+        ipynb_file,
+    )
+    await proc.wait()
+    if proc.returncode == 0:
         print(f"Converted: {md_file} -> {ipynb_file}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error converting {md_file}: {e}")
+    else:
+        print(f"Error converting {md_file}: Exit code {proc.returncode}")
 
 
-def main():
+async def process_file(session, github_file, output_base_dir) -> None:
+    """Downloads and converts a single file."""
+    file_url = github_file.download_url
+    # Extract relevant part of the path, excluding 'docs/source/'
+    sub_path = github_file.path.replace("docs/source/", "")
+    folder = sub_path.split("/")[0]
+
+    md_file = os.path.join(output_base_dir, sub_path)
+    ipynb_file = os.path.join(
+        output_base_dir,
+        folder,
+        Path(github_file.name).stem + ".ipynb",
+    )
+
+    # Create intermediate directories for the .md file
+    os.makedirs(os.path.dirname(md_file), exist_ok=True)
+
+    await download_file_async(session, file_url, md_file)
+    await convert_to_ipynb_async(md_file, ipynb_file)
+    os.remove(md_file)  # Remove the temporary .md file
+
+
+async def main() -> None:
     """Downloads Markdown files from GitHub and converts them to Jupyter Notebooks."""
-    repo_url = "https://raw.githubusercontent.com/pipefunc/pipefunc/main/docs/source/"  # Base URL of your repo's raw files
+    repo_name = "pipefunc/pipefunc"  # Your GitHub repository name
     folders = ["examples", "concepts"]
-    output_base_dir = "notebooks"  # Name of the output directory
+    output_base_dir = "notebooks"
+    access_token = os.environ.get(
+        "GITHUB_TOKEN",
+    )  # Highly recommended to set this environment variable
 
-    # Create the output directory structure
+    # Create output directory structure
     os.makedirs(output_base_dir, exist_ok=True)
     for folder in folders:
         os.makedirs(os.path.join(output_base_dir, folder), exist_ok=True)
 
-    # Iterate through folders and download/convert files
-    for folder in folders:
-        folder_url = os.path.join(repo_url, folder)
-        # Get the list of .md files from the GitHub directory listing (simulated)
-        # In reality, you'd need to fetch the directory listing, but we're using a direct approach for simplicity
-        if folder == "examples":
-            md_files = [
-                "basic-usage.md",
-                "image-processing.md",
-                "index.md",
-                "nlp-text-summarization.md",
-                "physics-simulation.md",
-                "sensor-data-processing.md",
-                "weather-simulation.md",
-            ]
-        elif folder == "concepts":
-            md_files = [
-                "adaptive-integration.md",
-                "error-handling.md",
-                "execution-and-parallelism.md",
-                "function-io.md",
-                "index.md",
-                "mapspec.md",
-                "overhead-and-efficiency.md",
-                "parameter-scopes.md",
-                "parameter-sweeps.md",
-                "resource-management.md",
-                "simplifying-pipelines.md",
-                "testing.md",
-                "type-checking.md",
-                "variants.md",
-            ]
-        else:
-            md_files = []
+    # GitHub API setup
+    if access_token:
+        g = Github(access_token)
+    else:
+        g = Github()  # Warning: if unauthenticated, you might hit rate limits
+    repo = g.get_repo(repo_name)
 
-        for md_file in md_files:
-            file_url = os.path.join(folder_url, md_file)
-            md_filepath = os.path.join(output_base_dir, folder, md_file)
-            ipynb_filepath = os.path.join(output_base_dir, folder, Path(md_file).stem + ".ipynb")
+    # Download and convert files concurrently
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for folder in folders:
+            contents = repo.get_contents(f"docs/source/{folder}")
+            for file in contents:
+                if file.name.endswith(".md"):
+                    tasks.append(process_file(session, file, output_base_dir))
 
-            try:
-                download_file(file_url, md_filepath)
-                print(f"Downloaded: {file_url} -> {md_filepath}")
-                convert_to_ipynb(md_filepath, ipynb_filepath)
-                # Optionally remove the downloaded Markdown file if you only need the .ipynb
-                os.remove(md_filepath)
-            except requests.exceptions.RequestException as e:
-                print(f"Error downloading {file_url}: {e}")
+        await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
