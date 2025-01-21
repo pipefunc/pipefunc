@@ -202,8 +202,8 @@ def _get_file_stats(
     for line in diff_index.split("\n"):
         if not line:
             continue
-        if "=>" in line:
-            continue
+        if "=>" in line:  # Skip renames (only because it is harder to parse)
+            continue  # TODO: Fix this
         # Parse the line
         added, deleted, file_path = line.split("\t")
         try:
