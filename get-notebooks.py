@@ -6,7 +6,7 @@ uv run get-notebooks.py
 ```
 or
 ```bash
-uv run https://github.com/pipefunc/pipefunc/blob/main/get-notebooks.py
+uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py
 ```
 """
 
