@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import functools
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import git
@@ -15,6 +16,7 @@ from rich.console import Console
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+REPO_ROOT = Path(__file__).parent.parent
 console = Console()
 
 
@@ -295,5 +297,5 @@ if __name__ == "__main__":
         github_token = f.read().strip()
     notes = _generate_release_notes(github_token)
     console.print(notes)
-    with open("../RELEASE_NOTES.md", "w") as f:  # noqa: PTH123
+    with open(REPO_ROOT / "CHANGELOG.md", "w") as f:  # noqa: PTH123
         f.write(notes)
