@@ -117,6 +117,14 @@ class TryNotebookWithUV(SphinxDirective):
             "```",
             "",
             "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
+            "",
+            "Alternatively, run:",
+            "",
+            "```bash",
+            f"uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py",
+            "```",
+            "",
+            "to download *all* documentation as Jupyter notebooks.",
             ":::",
         ]
 
