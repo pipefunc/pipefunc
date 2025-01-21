@@ -78,7 +78,7 @@
 
 ### 📊 Stats
 
-- `.md`: +2576 lines, -1350 lines
+- `.md`: +2589 lines, -1352 lines
 - `.py`: +76 lines, -9 lines
 - `.ipynb`: +17 lines, -851 lines
 
@@ -689,10 +689,10 @@
 
 ### 📊 Stats
 
-- other: +64 lines, -7 lines
+- other: +66 lines, -9 lines
 - `.md`: +1 lines, -1 lines
 - `.yml`: +4 lines, -5 lines
-- `.py`: +1345 lines, -621 lines
+- `.py`: +1588 lines, -1147 lines
 - `.toml`: +3 lines, -5 lines
 
 ## Version v0.36.1 (2024-10-17)
@@ -1019,7 +1019,7 @@
 
 - other: +5 lines, -1 lines
 - `.md`: +2 lines, -0 lines
-- `.py`: +320 lines, -21 lines
+- `.py`: +514 lines, -22 lines
 
 ## Version v0.27.3 (2024-08-29)
 
@@ -1149,7 +1149,7 @@
 - other: +2 lines, -2 lines
 - `.md`: +15 lines, -15 lines
 - `.ipynb`: +12 lines, -5 lines
-- `.py`: +2032 lines, -1820 lines
+- `.py`: +2132 lines, -1820 lines
 
 ## Version v0.23.1 (2024-06-28)
 
@@ -1245,7 +1245,7 @@
 - `.md`: +2 lines, -1 lines
 - `.yml`: +1 lines, -0 lines
 - `.ipynb`: +2 lines, -2 lines
-- `.py`: +397 lines, -144 lines
+- `.py`: +399 lines, -146 lines
 - `.toml`: +2 lines, -1 lines
 
 ## Version v0.20.0 (2024-06-19)
@@ -1453,7 +1453,7 @@
 
 - other: +12 lines, -7 lines
 - `.yml`: +10 lines, -20 lines
-- `.py`: +1760 lines, -869 lines
+- `.py`: +1792 lines, -889 lines
 - `.md`: +2 lines, -0 lines
 - `.lazy.md`: +8 lines, -0 lines
 - `.sweep.md`: +8 lines, -0 lines

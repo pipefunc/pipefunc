@@ -202,14 +202,14 @@ def _get_file_stats(
     for line in diff_index.split("\n"):
         if not line:
             continue
-        if "=>" in line:  # Skip renames (only because it is harder to parse)
-            continue  # TODO: Fix this
         # Parse the line
         added, deleted, file_path = line.split("\t")
         try:
             name, extension = file_path.split(".", 1)
             if name == "":
                 extension = "other"
+            if " =>" in extension:
+                extension = extension.split(" =>")[0]
         except ValueError:
             extension = "other"
         stats[extension]["added"] += int(added)
