@@ -664,10 +664,9 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - Add a `StoreType` ([#408](https://github.com/pipefunc/pipefunc/pull/408))
 - Prevent adding functions with same `output_name` ([#404](https://github.com/pipefunc/pipefunc/pull/404))
 
-### 📝 Other
+### 🐛 Bug Fixes
 
-- FIX: Also update progress bar for single executions ([#414](https://github.com/pipefunc/pipefunc/pull/414))
-- Define `ShapeDict`, `ShapeTuple`, `UserShapeDict` types ([#406](https://github.com/pipefunc/pipefunc/pull/406))
+- Also update progress bar for single executions ([#414](https://github.com/pipefunc/pipefunc/pull/414))
 
 ### 🧪 Testing
 
@@ -680,6 +679,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 ### 🧹 Maintenance
 
 - Move `LazySequenceLearner` to separate module ([#407](https://github.com/pipefunc/pipefunc/pull/407))
+
+### 📝 Other
+
+- Define `ShapeDict`, `ShapeTuple`, `UserShapeDict` types ([#406](https://github.com/pipefunc/pipefunc/pull/406))
 
 ### 📊 Stats
 
@@ -747,9 +750,9 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 - Enable Python 3.13 in CI ([#384](https://github.com/pipefunc/pipefunc/pull/384))
 
-### 📝 Other
+### 🐛 Bug Fixes
 
-- FIX: Use `internal_shapes` defined in `@pipefunc` in `create_learners` ([#383](https://github.com/pipefunc/pipefunc/pull/383))
+- Use `internal_shapes` defined in `@pipefunc` in `create_learners` ([#383](https://github.com/pipefunc/pipefunc/pull/383))
 
 ### 📊 Stats
 
@@ -890,9 +893,9 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 - [pre-commit.ci] pre-commit autoupdate ([#340](https://github.com/pipefunc/pipefunc/pull/340))
 
-### 📝 Other
+### 🐛 Bug Fixes
 
-- FIX: Load custom objects correctly in `xarray` ([#336](https://github.com/pipefunc/pipefunc/pull/336))
+- Load custom objects correctly in `xarray` ([#336](https://github.com/pipefunc/pipefunc/pull/336))
 
 ### 📚 Documentation
 
@@ -908,9 +911,9 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.32.1 (2024-09-18)
 
-### 📝 Other
+### 🐛 Bug Fixes
 
-- FIX: Improve the parallel store compatibility checking function ([#331](https://github.com/pipefunc/pipefunc/pull/331))
+- Improve the parallel store compatibility checking function ([#331](https://github.com/pipefunc/pipefunc/pull/331))
 
 ### 📊 Stats
 
@@ -1024,12 +1027,15 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - Skip parallelization if pointless ([#293](https://github.com/pipefunc/pipefunc/pull/293))
 - Simpler example with `output_picker` ([#287](https://github.com/pipefunc/pipefunc/pull/287))
 
+### 🐛 Bug Fixes
+
+- Formatting in `is_object_array_type` doc-string ([#296](https://github.com/pipefunc/pipefunc/pull/296))
+- formatting of lists in doc-strings ([#295](https://github.com/pipefunc/pipefunc/pull/295))
+- doc-string of `func_dependents` and `func_dependencies` ([#294](https://github.com/pipefunc/pipefunc/pull/294))
+- Correctly set cache value for `HybridCache` ([#292](https://github.com/pipefunc/pipefunc/pull/292))
+
 ### 📝 Other
 
-- FIX: Formatting in `is_object_array_type` doc-string ([#296](https://github.com/pipefunc/pipefunc/pull/296))
-- FIX: formatting of lists in doc-strings ([#295](https://github.com/pipefunc/pipefunc/pull/295))
-- FIX: doc-string of `func_dependents` and `func_dependencies` ([#294](https://github.com/pipefunc/pipefunc/pull/294))
-- FIX: Correctly set cache value for `HybridCache` ([#292](https://github.com/pipefunc/pipefunc/pull/292))
 - Allow to use cache for `Pipeline.map` ([#291](https://github.com/pipefunc/pipefunc/pull/291))
 - Add `pipefunc.cache` and `pipefunc.typing` to the reference documentation ([#290](https://github.com/pipefunc/pipefunc/pull/290))
 - Add `.cache` attribute to function using `@memoize` ([#288](https://github.com/pipefunc/pipefunc/pull/288))
@@ -1068,9 +1074,12 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.27.3 (2024-08-29)
 
+### 🐛 Bug Fixes
+
+- Case where reduction happens and output is unresolvable ([#278](https://github.com/pipefunc/pipefunc/pull/278))
+
 ### 📝 Other
 
-- FIX: Case where reduction happens and output is unresolvable ([#278](https://github.com/pipefunc/pipefunc/pull/278))
 - Add `py.typed` (PEP 561) ([#277](https://github.com/pipefunc/pipefunc/pull/277))
 
 ### 📊 Stats
