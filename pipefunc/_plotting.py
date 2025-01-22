@@ -300,7 +300,7 @@ def visualize_graphviz(  # noqa: PLR0912
     node_types: dict[str, tuple[list, dict]] = {
         "Argument": (
             nodes.arg,
-            {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled,dashed"},
+            {"fillcolor": _COLORS["lightgreen"], "shape": "rectangle", "style": "filled"},
         ),
         "PipeFunc": (nodes.func, {"fillcolor": blue, "shape": "box", "style": "filled,rounded"}),
         "NestedPipeFunc": (
@@ -338,6 +338,12 @@ def visualize_graphviz(  # noqa: PLR0912
                 include_full_mapspec,
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
+            if (
+                legend_label == "Argument"
+                and defaults is not None
+                and defaults.get(node, _empty) is not _empty
+            ):
+                attribs["style"] = "filled,dashed"
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
