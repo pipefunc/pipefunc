@@ -3,6 +3,34 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.50.1 (2025-01-23)
+
+### 🐛 Bug Fixes
+
+- Fix `map` over iterable with internal shape to `xarray` ([#587](https://github.com/pipefunc/pipefunc/pull/587))
+
+### 🤖 CI
+
+- Add PR title checking workflow ([#586](https://github.com/pipefunc/pipefunc/pull/586))
+
+### 📚 Documentation
+
+- Add CHANGELOG as a page to the documentation ([#584](https://github.com/pipefunc/pipefunc/pull/584))
+- Add example with `ErrorSnapshot` and `Pipeline` ([#585](https://github.com/pipefunc/pipefunc/pull/585))
+- Automatically generate `CHANGELOG.md` ([#580](https://github.com/pipefunc/pipefunc/pull/580))
+- Add `get-notebooks.py` to the docs ([#582](https://github.com/pipefunc/pipefunc/pull/582))
+
+### 🧪 Testing
+
+- Check that `info` for `NestedPipeFunc` has no absorbed intermediate outputs ([#583](https://github.com/pipefunc/pipefunc/pull/583))
+
+### 📊 Stats
+
+- `.py`: +405 lines, -0 lines
+- `.json`: +27 lines, -0 lines
+- `.yml`: +52 lines, -0 lines
+- `.md`: +1932 lines, -1 lines
+
 ## v0.50.0 (2025-01-21)
 
 ### Closed Issues
@@ -1355,7 +1383,7 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 ### Closed Issues
 
 - include single results in xarray ([#188](https://github.com/pipefunc/pipefunc/issues/188))
-- Rename mapspecs in update_remames ([#184](https://github.com/pipefunc/pipefunc/issues/184))
+- Rename mapspecs in update_renames ([#184](https://github.com/pipefunc/pipefunc/issues/184))
 
 ### 📝 Other
 

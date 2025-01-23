@@ -23,6 +23,7 @@ import functools
 import os
 import re
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -166,18 +167,44 @@ def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetim
 
 
 @_cached_github_call
+def _get_issue(gh_repo: Repository.Repository, number: int) -> Github.Issue.Issue | None:
+    """Get a single issue by number, with caching."""
+    try:
+        return gh_repo.get_issue(number)
+    except Exception:  # Some numbers might not exist due to deleted issues  # noqa: BLE001
+        return None
+
+
+@_cached_github_call
+def _get_latest_issue_number(gh_repo: Repository.Repository) -> int:
+    """Get the number of the latest issue."""
+    # Get the latest issue (including PRs) to get the highest number
+    latest = gh_repo.get_issues(state="all", sort="created", direction="desc")[0]
+    return latest.number
+
+
 def _get_all_closed_issues(gh_repo: Repository.Repository) -> list[Github.Issue.Issue]:
     """Get all closed issues (non-PR) from the repository."""
     _print_step("Getting all closed issues...")
 
-    issues = []
-    for issue in gh_repo.get_issues(state="closed"):
-        if not issue.pull_request:  # Skip PRs, we only want issues
-            _print_substep(f"Found issue {issue.title} (#{issue.number})")
-            issues.append(issue)
+    latest_number = _get_latest_issue_number(gh_repo)
+    _print_info(f"Latest issue number is {latest_number}")
 
-    _print_info(f"Found {len(issues)} closed issues in total")
-    return issues
+    # Fetch all issues in parallel
+    with ThreadPoolExecutor() as executor:
+        all_issues = list(
+            executor.map(_get_issue, [gh_repo] * latest_number, range(1, latest_number + 1)),
+        )
+
+    # Filter the issues
+    filtered_issues = []
+    for issue in all_issues:
+        if issue is not None and issue.state == "closed" and not issue.pull_request:
+            _print_substep(f"Found issue {issue.title} (#{issue.number})")
+            filtered_issues.append(issue)
+
+    _print_info(f"Found {len(filtered_issues)} closed issues in total")
+    return filtered_issues
 
 
 def _filter_issues_by_timeframe(
@@ -294,7 +321,7 @@ def _generate_release_notes(  # noqa: PLR0912
         # Add closed issues
         if issues:
             lines.append("### Closed Issues\n\n")
-            for issue in issues:
+            for issue in sorted(issues, key=lambda x: x.number, reverse=True):
                 url = f"[#{issue.number}]({REPO_URL}/issues/{issue.number})"
                 lines.append(f"- {_get_first_line(issue.title)} ({url})\n")
             lines.append("\n")
