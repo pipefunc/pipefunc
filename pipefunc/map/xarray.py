@@ -118,6 +118,8 @@ def _xarray(
         dims.update(axes)
         if name in inputs:
             array = inputs[name]
+            if not isinstance(array, np.ndarray):
+                array = _to_array(array, (len(array),))
         elif load_intermediate:
             array = data_loader(name)
         else:
@@ -138,6 +140,13 @@ def _xarray(
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
+
+
+def _to_array(x: list[Any], shape: tuple[int, ...]) -> np.ndarray:
+    """Convert an iterable to an array."""
+    arr = np.empty(shape, dtype=object)
+    arr[:] = x
+    return arr
 
 
 def _xarray_dataset(
