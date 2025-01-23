@@ -103,9 +103,12 @@ class TryNotebookWithUV(SphinxDirective):
     """Render a tip box with the opennb command to open the current page in a Jupyter notebook."""
 
     has_content = True
+    optional_arguments = 1
 
     def run(self):
         source_path = os.path.relpath(self.get_source_info()[0], PACKAGE_PATH)
+        notebook_url = self.arguments[0] if self.arguments else source_path
+
         lines = [
             ":::{admonition} Have [`uv`](https://docs.astral.sh/uv/)? ⚡",
             ":class: tip, dropdown",
@@ -113,7 +116,7 @@ class TryNotebookWithUV(SphinxDirective):
             "If you have [`uv`](https://docs.astral.sh/uv/) installed, you can instantly open this page as a Jupyter notebook [using `opennb`](https://github.com/basnijholt/opennb):",
             "",
             "```bash",
-            f'uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{source_path}',
+            f'uvx --with "pipefunc[docs]" opennb pipefunc/pipefunc/{notebook_url}',
             "```",
             "",
             "This command creates an ephemeral environment with all dependencies and launches the notebook in your browser in 1 second - no manual setup needed! ✨.",
