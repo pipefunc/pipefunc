@@ -72,6 +72,7 @@ if TYPE_CHECKING:
     import ipywidgets
     from rich.table import Table
 
+    from pipefunc._plotting import GraphvizStyle
     from pipefunc._profile import ProfilingStats
     from pipefunc.map._result import Result
     from pipefunc.map._types import UserShapeDict
@@ -1457,7 +1458,7 @@ class Pipeline:
         *,
         figsize: tuple[int, int] | int | None = None,
         filename: str | Path | None = None,
-        func_node_colors: str | list[str] | None = None,
+        style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
@@ -1474,8 +1475,8 @@ class Pipeline:
             If ``None``, the size will be determined automatically.
         filename
             The filename to save the figure to, if provided.
-        func_node_colors
-            The colors for function nodes.
+        style
+            Style for the graph visualization.
         orient
             Graph orientation: 'TB', 'LR', 'BT', 'RL'.
         graphviz_kwargs
@@ -1504,7 +1505,7 @@ class Pipeline:
             self.defaults,
             figsize=figsize,
             filename=filename,
-            func_node_colors=func_node_colors,
+            style=style,
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,

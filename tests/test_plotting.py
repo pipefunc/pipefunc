@@ -86,7 +86,7 @@ def test_plot_with_defaults_and_bound() -> None:
     pipeline.visualize_matplotlib(color_combinable=True)
 
 
-@pytest.mark.parametrize("backend", ["matplotlib", "holoviews"])
+@pytest.mark.parametrize("backend", ["matplotlib", "holoviews", "graphviz"])
 def test_plot_with_mapspec(tmp_path: Path, backend) -> None:
     @pipefunc("c", mapspec="a[i] -> c[i]")
     def f(a, b, x):
@@ -108,6 +108,10 @@ def test_plot_with_mapspec(tmp_path: Path, backend) -> None:
         if not has_holoviews:
             pytest.skip("holoviews not installed")
         pipeline.visualize_holoviews()
+    elif backend == "graphviz":
+        if not has_graphviz:
+            pytest.skip("graphviz not installed")
+        pipeline.visualize_graphviz()
 
 
 @pytest.mark.skipif(not has_matplotlib, reason="matplotlib not installed")
@@ -139,14 +143,14 @@ def test_plotting_resources() -> None:
 def everything_pipeline() -> Pipeline:
     @pipefunc(output_name="c")
     def f(a: int, b: int) -> int: ...  # type: ignore[empty-body]
-    @pipefunc(output_name="d")
+    @pipefunc(output_name="d", mapspec="... -> d[j]")
     def g(b: int, c: int, x: int = 1) -> int: ...  # type: ignore[empty-body]
     @pipefunc(
         output_name="e",
         bound={"x": 2},
         resources={"cpus": 1, "gpus": 1},
         resources_variable="resources",
-        mapspec="c[i] -> e[i]",
+        mapspec="c[i], d[j] -> e[i, j]",
     )
     def h(c: int, d: int, x: int = 1, *, resources) -> int: ...  # type: ignore[empty-body]
     @pipefunc(output_name="i1")
@@ -174,10 +178,13 @@ def test_visualize_graphviz(
 
     everything_pipeline.visualize(backend=backend)
     if backend == "graphviz":
+        from pipefunc._plotting import GraphvizStyle
+
         everything_pipeline.visualize_graphviz(
             filename=tmp_path / "graphviz.svg",
             figsize=10,
             include_full_mapspec=True,
+            style=GraphvizStyle(background_color="transparent"),
         )
 
 
