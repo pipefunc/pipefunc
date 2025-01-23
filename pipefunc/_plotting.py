@@ -226,23 +226,30 @@ _COLORS = {
 class GraphvizStyle:
     """Dataclass for storing style used in the graphviz visualization."""
 
+    # Nodes
     arg_node_color: str = _COLORS["lightgreen"]
     func_node_color: str = _COLORS["skyblue"]
     nested_func_node_color: str = _COLORS["red"]
     bound_node_color: str = _COLORS["red"]
     resources_node_color: str = _COLORS["orange"]
-    arg_edge_color: str | None = None
+    # Edges
+    arg_edge_color: str | None = None  # default is arg_node_color
+    output_edge_color: str | None = None  # default is func_node_color
+    bound_edge_color: str | None = None  # default is bound_node_color
+    resources_edge_color: str | None = None  # default is resources_node_color
     input_mapspec_edge_color: str = _COLORS["darkgreen"]
-    output_edge_color: str | None = None
     output_mapspec_edge_color: str = _COLORS["blue"]
-    bound_edge_color: str | None = None
-    resources_edge_color: str | None = None
+    # Font
     font_name: str = "Helvetica"
     font_size: int = 12
     edge_font_size: int = 10
     legend_font_size: int = 20
+    font_color: str = "black"
+    # Background
     legend_background_color: str = "lightgrey"
     background_color: str | None = None
+    # Other
+    legend_border_color: str = "black"
 
 
 def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
@@ -439,9 +446,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 "label": "Legend",
                 "rankdir": orient,
                 "fontsize": str(style.legend_font_size),
-                "fontcolor": "black",
+                "fontcolor": style.font_color,
                 "fontname": style.font_name,
-                "color": "black",
+                "color": style.legend_border_color,
                 "style": "filled",
                 "fillcolor": style.legend_background_color,
             },
