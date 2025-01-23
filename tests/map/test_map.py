@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
+has_psutil = importlib.util.find_spec("psutil") is not None
 
 storage_options = list(storage_registry)
 
@@ -1774,3 +1775,22 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
     results_before = pipeline_copy.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
     results_after = pipeline.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
     assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
+
+
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
+def test_profiling_and_parallel_unsupported_warning() -> None:
+    @pipefunc("a", mapspec="val[i] -> a[i]")
+    def a(val: int) -> int:
+        return val + 1
+
+    @pipefunc("a", mapspec="val[i] -> a[i]", profile=True)
+    def a_profile(val: int) -> int:
+        return val + 1
+
+    test_pipeline_with_profile_true = Pipeline([a], profile=True)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_true.map({"val": np.array([1, 2, 3])})
+
+    test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_none.map({"val": np.array([1, 2, 3])})

@@ -87,6 +87,7 @@ class PipeFunc(Generic[T]):
         the renamed argument names.
     profile
         Flag indicating whether the wrapped function should be profiled.
+        Profiling is only available for sequential execution.
     debug
         Flag indicating whether debug information should be printed.
     cache
