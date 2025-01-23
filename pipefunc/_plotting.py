@@ -237,11 +237,12 @@ class GraphvizStyle:
     output_mapspec_edge_color: str = _COLORS["blue"]
     bound_edge_color: str | None = None
     resources_edge_color: str | None = None
+    font_name: str = "Helvetica"
+    font_size: int = 12
+    edge_font_size: int = 10
+    legend_font_size: int = 20
     legend_background_color: str = "lightgrey"
     background_color: str | None = None
-    font_name: str = "Helvetica"
-    font_size: str = "12"
-    edge_font_size: str = "10"
 
 
 def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
@@ -304,7 +305,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
 
     graph_attr: dict[str, Any] = {
         "rankdir": orient,
-        "fontsize": style.font_size,
+        "fontsize": str(style.font_size),
         "fontname": style.font_name,
     }
     if figsize:
@@ -318,7 +319,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
         graph_attr=graph_attr,
-        node_attr={"shape": "rectangle", "fontname": style.font_name, "fontsize": style.font_size},
+        node_attr={
+            "shape": "rectangle",
+            "fontname": style.font_name,
+            "fontsize": str(style.font_size),
+        },
         **graphviz_kwargs,
     )
     hints = _all_type_annotations(graph)
@@ -424,7 +429,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             penwidth="1.01",
             fontcolor="transparent",
             fontname=style.font_name,
-            fontsize=style.edge_font_size,
+            fontsize=str(style.edge_font_size),
         )
 
     if show_legend and legend_items:
@@ -433,7 +438,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             graph_attr={
                 "label": "Legend",
                 "rankdir": orient,
-                "fontsize": style.font_size,
+                "fontsize": str(style.legend_font_size),
                 "fontcolor": "black",
                 "fontname": style.font_name,
                 "color": "black",
