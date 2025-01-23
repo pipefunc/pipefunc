@@ -464,7 +464,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         svg_content = digraph._repr_image_svg_xml()
         html_content = (
             f'<div id="svg-container" style="max-width: 100%;">{svg_content}</div>'
-            "<style>#svg-container svg {{max-width: 100%; height: auto;}}</style>"
+            "<style>#svg-container svg {max-width: 100%; height: auto;}</style>"
         )
 
         return HTML(html_content)
