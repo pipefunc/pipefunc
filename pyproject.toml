@@ -29,7 +29,7 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 pandas = ["pandas"]
-plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
+plotting = ["bokeh", "graphviz", "holoviews", "matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
 rich = ["rich"]
@@ -67,7 +67,9 @@ docs = [
     "pipefunc[all]",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,autodoc,pandas,plotting,profiling,rich,widgets,xarray,zarr]"]
+all = [
+    "pipefunc[adaptive,autodoc,pandas,plotting,profiling,rich,widgets,xarray,zarr]",
+]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
@@ -76,6 +78,21 @@ dev = [ # all + dev deps
     "versioningit",
     "pipefunc[all,test,docs,pydantic]",
 ]
+# matches pipefunc-extra in https://github.com/conda-forge/pipefunc-feedstock/blob/main/recipe/meta.yaml
+extra = [
+    "adaptive",
+    "graphviz",
+    "graphviz-anywidget",
+    "griffe",
+    "ipywidgets",
+    "matplotlib-base",
+    "pandas",
+    "psutil",
+    "rich",
+    "xarray",
+    "zarr",
+]
+
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
