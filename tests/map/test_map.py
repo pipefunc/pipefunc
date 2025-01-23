@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
+has_psutil = importlib.util.find_spec("psutil") is not None
 
 storage_options = list(storage_registry)
 
@@ -1776,13 +1777,8 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
     assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
 
 
-has_psutil = importlib.util.find_spec("psutil") is not None
-
-
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
 def test_profiling_and_parallel_unsupported_warning() -> None:
-    if not has_psutil:
-        pytest.skip("psutil not installed")
-
     @pipefunc("a", mapspec="val[i] -> a[i]")
     def a(val: int) -> int:
         return val + 1
