@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections import OrderedDict, defaultdict
 from typing import TYPE_CHECKING, Any
 
@@ -74,6 +75,12 @@ def prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
+    if parallel and pipeline.profile:
+        warnings.warn(
+            "`profile=True` is not supported with `parallel=True`.",
+            UserWarning,
+            stacklevel=2,
+        )
     return pipeline, run_info, store, outputs, parallel, executor, progress
 
 
