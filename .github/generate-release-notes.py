@@ -166,13 +166,36 @@ def _get_tags_with_dates(repo: git.Repo) -> list[tuple[git.TagReference, datetim
 
 
 @_cached_github_call
+def _get_issue(gh_repo: Repository.Repository, number: int) -> Github.Issue.Issue | None:
+    """Get a single issue by number, with caching."""
+    try:
+        return gh_repo.get_issue(number)
+    except Exception:  # Some numbers might not exist due to deleted issues  # noqa: BLE001
+        return None
+
+
+@_cached_github_call
+def _get_latest_issue_number(gh_repo: Repository.Repository) -> int:
+    """Get the number of the latest issue."""
+    # Get the latest issue (including PRs) to get the highest number
+    latest = gh_repo.get_issues(state="all", sort="created", direction="desc")[0]
+    return latest.number
+
+
 def _get_all_closed_issues(gh_repo: Repository.Repository) -> list[Github.Issue.Issue]:
     """Get all closed issues (non-PR) from the repository."""
     _print_step("Getting all closed issues...")
 
+    latest_number = _get_latest_issue_number(gh_repo)
+    _print_info(f"Latest issue number is {latest_number}")
+
     issues = []
-    for issue in gh_repo.get_issues(state="closed"):
-        if not issue.pull_request:  # Skip PRs, we only want issues
+    for number in range(1, latest_number + 1):
+        if (
+            (issue := _get_issue(gh_repo, number))
+            and issue.state == "closed"
+            and not issue.pull_request
+        ):
             _print_substep(f"Found issue {issue.title} (#{issue.number})")
             issues.append(issue)
 
