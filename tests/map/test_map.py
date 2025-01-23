@@ -1776,7 +1776,13 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
     assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
 
 
+has_psutil = importlib.util.find_spec("psutil") is not None
+
+
 def test_profiling_and_parallel_unsupported_warning() -> None:
+    if not has_psutil:
+        pytest.skip("psutil not installed")
+
     @pipefunc("a", mapspec="val[i] -> a[i]")
     def a(val: int) -> int:
         return val + 1
