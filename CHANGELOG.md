@@ -3,6 +3,24 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.50.2 (2025-01-23)
+
+### 🧹 Maintenance
+
+- Add `pipefunc[extra]` optional dependencies to match `pipefunc-extra` on conda-forge ([#591](https://github.com/pipefunc/pipefunc/pull/591))
+
+### 📚 Documentation
+
+- Fix URL of tutorial in uv tip ([#590](https://github.com/pipefunc/pipefunc/pull/590))
+- Update release notes and improve generation script ([#589](https://github.com/pipefunc/pipefunc/pull/589))
+
+### 📊 Stats
+
+- `.py`: +38 lines, -8 lines
+- `.md`: +29 lines, -1 lines
+- `.ipynb`: +3 lines, -3 lines
+- `.toml`: +19 lines, -2 lines
+
 ## v0.50.1 (2025-01-23)
 
 ### 🐛 Bug Fixes
