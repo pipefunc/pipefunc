@@ -223,31 +223,34 @@ _COLORS = {
 
 
 @dataclass
-class GraphvizColors:
-    """Dataclass for storing colors used in the graphviz visualization."""
+class GraphvizStyle:
+    """Dataclass for storing style used in the graphviz visualization."""
 
-    arg_node: str = _COLORS["lightgreen"]
-    func_node: str | None = None
-    nested_func_node: str = _COLORS["red"]
-    bound_node: str = _COLORS["red"]
-    resources_node: str = _COLORS["orange"]
-    arg_edge: str = _COLORS["lightgreen"]
-    input_mapspec_edge: str = _COLORS["darkgreen"]
-    output_edge: str = _COLORS["skyblue"]
-    output_mapspec_edge: str = _COLORS["blue"]
-    bound_edge: str = _COLORS["red"]
-    resources_edge: str = _COLORS["orange"]
-    legend_background: str = "lightgrey"
-    background: str | None = None
+    arg_node_color: str = _COLORS["lightgreen"]
+    func_node_color: str = _COLORS["skyblue"]
+    nested_func_node_color: str = _COLORS["red"]
+    bound_node_color: str = _COLORS["red"]
+    resources_node_color: str = _COLORS["orange"]
+    arg_edge_color: str | None = None
+    input_mapspec_edge_color: str = _COLORS["darkgreen"]
+    output_edge_color: str | None = None
+    output_mapspec_edge_color: str = _COLORS["blue"]
+    bound_edge_color: str | None = None
+    resources_edge_color: str | None = None
+    legend_background_color: str = "lightgrey"
+    background_color: str | None = None
+    font_name: str = "Helvetica"
+    font_size: str = "12"
+    edge_font_size: str = "10"
 
 
-def visualize_graphviz(  # noqa: PLR0912
+def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
     *,
     figsize: tuple[int, int] | int | None = None,
     filename: str | Path | None = None,
-    colors: GraphvizColors | None = None,
+    style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
@@ -268,8 +271,8 @@ def visualize_graphviz(  # noqa: PLR0912
         If ``None``, the size will be determined automatically.
     filename
         The filename to save the figure to, if provided.
-    colors
-        Colors for the graph visualization.
+    style
+        Style for the graph visualization.
     orient
         Graph orientation: 'TB', 'LR', 'BT', 'RL'.
     graphviz_kwargs
@@ -294,24 +297,28 @@ def visualize_graphviz(  # noqa: PLR0912
     requires("graphviz", reason="visualize_graphviz", extras="plotting")
     import graphviz
 
-    if colors is None:
-        colors = GraphvizColors()
+    if style is None:
+        style = GraphvizStyle()
     if graphviz_kwargs is None:
         graphviz_kwargs = {}
 
-    graph_attr: dict[str, Any] = {"rankdir": orient}
+    graph_attr: dict[str, Any] = {
+        "rankdir": orient,
+        "fontsize": style.font_size,
+        "fontname": style.font_name,
+    }
     if figsize:
         graph_attr["size"] = (
             f"{figsize[0]},{figsize[1]}" if isinstance(figsize, tuple) else f" {figsize},{figsize}"
         )
         graph_attr["ratio"] = "fill"
-    if colors.background:
-        graph_attr["bgcolor"] = colors.background
+    if style.background_color:
+        graph_attr["bgcolor"] = style.background_color
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
         graph_attr=graph_attr,
-        node_attr={"shape": "rectangle"},
+        node_attr={"shape": "rectangle", "fontname": style.font_name, "fontsize": style.font_size},
         **graphviz_kwargs,
     )
     hints = _all_type_annotations(graph)
@@ -319,39 +326,41 @@ def visualize_graphviz(  # noqa: PLR0912
     labels = _Labels.from_graph(graph)
 
     # Define a mapping for node configurations
-    blue = colors.func_node or _COLORS["skyblue"]
     node_types: dict[str, tuple[list, dict]] = {
         "Argument": (
             nodes.arg,
-            {"fillcolor": colors.arg_node, "shape": "rectangle", "style": "filled,dashed"},
+            {
+                "fillcolor": style.arg_node_color,
+                "shape": "rectangle",
+                "style": "filled,dashed",
+            },
         ),
         "PipeFunc": (
             nodes.func,
-            {"fillcolor": blue, "shape": "box", "style": "filled,rounded"},
+            {"fillcolor": style.func_node_color, "shape": "box", "style": "filled,rounded"},
         ),
         "NestedPipeFunc": (
             nodes.nested_func,
             {
-                "fillcolor": blue,
+                "fillcolor": style.func_node_color,
                 "shape": "box",
                 "style": "filled,rounded",
-                "color": colors.nested_func_node,
+                "color": style.nested_func_node_color,
             },
         ),
         "Bound": (
             nodes.bound,
-            {"fillcolor": colors.bound_node, "shape": "hexagon", "style": "filled"},
+            {"fillcolor": style.bound_node_color, "shape": "hexagon", "style": "filled"},
         ),
         "Resources": (
             nodes.resources,
-            {"fillcolor": colors.resources_node, "shape": "hexagon", "style": "filled"},
+            {"fillcolor": style.resources_node_color, "shape": "hexagon", "style": "filled"},
         ),
     }
     node_defaults = {
         "width": "0.75",
         "height": "0.5",
         "margin": "0.05",
-        "fontname": "Helvetica",
         "penwidth": "1",
         "color": "black",  # Border color
     }
@@ -372,26 +381,52 @@ def visualize_graphviz(  # noqa: PLR0912
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    for _labels, color in [
-        (labels.outputs, colors.output_edge),
-        (labels.outputs_mapspec, colors.output_mapspec_edge),
-        (labels.inputs, colors.arg_edge),
-        (labels.inputs_mapspec, colors.input_mapspec_edge),
-        (labels.bound, colors.bound_edge),
-        (labels.resources, colors.resources_edge),
-    ]:
-        for edge, label in _labels.items():
-            # Labels are transparent and become visible on hover in widget
-            digraph.edge(
-                str(edge[0]),
-                str(edge[1]),
-                color=color,
-                label=label,
-                tooltip=f"<<b>{html.escape(label)}</b>>",
-                penwidth="1.01",
-                fontcolor="transparent",
-                fontname="Helvetica",
-            )
+    edge_colors = {
+        "outputs": style.output_edge_color,
+        "outputs_mapspec": style.output_mapspec_edge_color,
+        "inputs": style.arg_edge_color,
+        "inputs_mapspec": style.input_mapspec_edge_color,
+        "bound": style.bound_edge_color,
+        "resources": style.resources_edge_color,
+    }
+    for edge in graph.edges:
+        a, b = edge
+        if isinstance(a, str):
+            edge_color = edge_colors["inputs"] or style.arg_node_color
+        elif isinstance(a, PipeFunc):
+            edge_color = edge_colors["outputs"] or style.func_node_color
+        elif isinstance(a, _Bound):
+            edge_color = edge_colors["bound"] or style.bound_node_color
+        else:
+            assert isinstance(a, _Resources)
+            edge_color = edge_colors["resources"] or style.resources_node_color
+
+        if edge in labels.outputs_mapspec:
+            edge_color = edge_colors["outputs_mapspec"]
+            label = labels.outputs_mapspec[edge]
+        elif edge in labels.inputs_mapspec:
+            edge_color = edge_colors["inputs_mapspec"]
+            label = labels.inputs_mapspec[edge]
+        elif edge in labels.outputs:
+            label = labels.outputs[edge]
+        elif edge in labels.inputs:
+            label = labels.inputs[edge]
+        elif edge in labels.bound:
+            label = labels.bound[edge]
+        else:
+            label = labels.resources[edge]
+
+        digraph.edge(
+            str(a),
+            str(b),
+            color=edge_color,
+            label=label,
+            tooltip=f"<<b>{html.escape(label)}</b>>",
+            penwidth="1.01",
+            fontcolor="transparent",
+            fontname=style.font_name,
+            fontsize=style.edge_font_size,
+        )
 
     if show_legend and legend_items:
         legend_subgraph = graphviz.Digraph(
@@ -399,11 +434,12 @@ def visualize_graphviz(  # noqa: PLR0912
             graph_attr={
                 "label": "Legend",
                 "rankdir": orient,
-                "fontsize": "20",
+                "fontsize": style.font_size,
                 "fontcolor": "black",
+                "fontname": style.font_name,
                 "color": "black",
                 "style": "filled",
-                "fillcolor": colors.legend_background,
+                "fillcolor": style.legend_background_color,
             },
         )
         for i, (name, config) in enumerate(legend_items.items()):
@@ -429,7 +465,7 @@ def visualize_graphviz(  # noqa: PLR0912
         svg_content = digraph._repr_image_svg_xml()
         html_content = (
             f'<div id="svg-container" style="max-width: 100%;">{svg_content}</div>'
-            "<style>#svg-container svg {max-width: 100%; height: auto;}</style>"
+            "<style>#svg-container svg {{max-width: 100%; height: auto;}}</style>"
         )
 
         return HTML(html_content)
