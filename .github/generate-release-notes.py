@@ -23,6 +23,7 @@ import functools
 import os
 import re
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -189,18 +190,21 @@ def _get_all_closed_issues(gh_repo: Repository.Repository) -> list[Github.Issue.
     latest_number = _get_latest_issue_number(gh_repo)
     _print_info(f"Latest issue number is {latest_number}")
 
-    issues = []
-    for number in range(1, latest_number + 1):
-        if (
-            (issue := _get_issue(gh_repo, number))
-            and issue.state == "closed"
-            and not issue.pull_request
-        ):
-            _print_substep(f"Found issue {issue.title} (#{issue.number})")
-            issues.append(issue)
+    # Fetch all issues in parallel
+    with ThreadPoolExecutor() as executor:
+        all_issues = list(
+            executor.map(_get_issue, [gh_repo] * latest_number, range(1, latest_number + 1)),
+        )
 
-    _print_info(f"Found {len(issues)} closed issues in total")
-    return issues
+    # Filter the issues
+    filtered_issues = []
+    for issue in all_issues:
+        if issue is not None and issue.state == "closed" and not issue.pull_request:
+            _print_substep(f"Found issue {issue.title} (#{issue.number})")
+            filtered_issues.append(issue)
+
+    _print_info(f"Found {len(filtered_issues)} closed issues in total")
+    return filtered_issues
 
 
 def _filter_issues_by_timeframe(
@@ -317,7 +321,7 @@ def _generate_release_notes(  # noqa: PLR0912
         # Add closed issues
         if issues:
             lines.append("### Closed Issues\n\n")
-            for issue in issues:
+            for issue in sorted(issues, key=lambda x: x.number, reverse=True):
                 url = f"[#{issue.number}]({REPO_URL}/issues/{issue.number})"
                 lines.append(f"- {_get_first_line(issue.title)} ({url})\n")
             lines.append("\n")

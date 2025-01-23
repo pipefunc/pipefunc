@@ -1383,7 +1383,7 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 ### Closed Issues
 
 - include single results in xarray ([#188](https://github.com/pipefunc/pipefunc/issues/188))
-- Rename mapspecs in update_remames ([#184](https://github.com/pipefunc/pipefunc/issues/184))
+- Rename mapspecs in update_renames ([#184](https://github.com/pipefunc/pipefunc/issues/184))
 
 ### 📝 Other
 
