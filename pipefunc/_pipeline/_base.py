@@ -96,6 +96,7 @@ class Pipeline:
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
+        Profiling is only available for sequential execution.
     cache_type
         The type of cache to use. See the notes below for more *important* information.
     cache_kwargs
