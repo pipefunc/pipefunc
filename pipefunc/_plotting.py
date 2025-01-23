@@ -381,7 +381,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             digraph.node(str(node), **attribs)
 
     # Add edges and labels with function outputs
-    edge_colors = {
+    edge_colors: dict[str, str | None] = {
         "outputs": style.output_edge_color,
         "outputs_mapspec": style.output_mapspec_edge_color,
         "inputs": style.arg_edge_color,
@@ -400,12 +400,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         else:
             assert isinstance(a, _Resources)
             edge_color = edge_colors["resources"] or style.resources_node_color
-
         if edge in labels.outputs_mapspec:
-            edge_color = edge_colors["outputs_mapspec"]
+            edge_color = edge_colors["outputs_mapspec"]  # type: ignore[assignment]
             label = labels.outputs_mapspec[edge]
         elif edge in labels.inputs_mapspec:
-            edge_color = edge_colors["inputs_mapspec"]
+            edge_color = edge_colors["inputs_mapspec"]  # type: ignore[assignment]
             label = labels.inputs_mapspec[edge]
         elif edge in labels.outputs:
             label = labels.outputs[edge]
