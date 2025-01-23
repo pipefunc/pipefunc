@@ -75,10 +75,7 @@ def prepare_run(
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
-    profile = pipeline.profile is not False and (
-        pipeline.profile or any(func.profile for func in pipeline.functions)
-    )
-    if parallel and profile:
+    if parallel and any(func.profile for func in pipeline.functions):
         warnings.warn(
             "`profile=True` is not supported with `parallel=True`.",
             UserWarning,
