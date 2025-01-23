@@ -76,11 +76,8 @@ def prepare_run(
         parallel = False
     _check_parallel(parallel, store, executor)
     if parallel and any(func.profile for func in pipeline.functions):
-        warnings.warn(
-            "`profile=True` is not supported with `parallel=True`.",
-            UserWarning,
-            stacklevel=2,
-        )
+        msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
+        warnings.warn(msg, UserWarning, stacklevel=2)
     return pipeline, run_info, store, outputs, parallel, executor, progress
 
 
