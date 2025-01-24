@@ -191,7 +191,8 @@ def run_map(
     return outputs
 
 
-class AsyncMap(NamedTuple):
+@dataclass
+class AsyncMap:
     task: asyncio.Task[OrderedDict[str, Result]]
     run_info: RunInfo
     progress: ProgressTracker | None
