@@ -796,7 +796,7 @@ class Pipeline:
 
         Returns
         -------
-            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            A `ResultDict` containing the results of the pipeline. The values are of type `Result`,
             use `Result.output` to get the actual result.
 
         """
