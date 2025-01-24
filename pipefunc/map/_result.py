@@ -39,9 +39,12 @@ class ResultDict(UserDict[str, Result]):
     def __repr__(self) -> str:
         text = super().__repr__()
         if len(text) > MAX_RESULT_LENGTH:
+            actual_length = len(text)
             msg = (
-                f"ResultDict is too large to display (>{MAX_RESULT_LENGTH})."
-                " Use `dict(result_dict)` to inspect the contents."
+                f"⚠️  ResultDict is too large to display completely "
+                f"({actual_length:,} characters, truncated at {MAX_RESULT_LENGTH:,} characters).\n"
+                "     To view the full contents, use `dict(result_dict)` "
+                "or access individual items by their keys."
             )
             warnings.warn(msg, UserWarning, stacklevel=2)
             return text[:MAX_RESULT_LENGTH] + "..."

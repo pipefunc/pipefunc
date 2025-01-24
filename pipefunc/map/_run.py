@@ -1203,9 +1203,7 @@ def _to_result_dict(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
-    return ResultDict(
-        data,
-    )
+    return ResultDict(data)
 
 
 # NOTE: A similar async version of this function is provided below.
