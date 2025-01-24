@@ -397,3 +397,21 @@ def test_replace_none_in_axes() -> None:
     non_root_inputs = {"a": [None, "j"]}
     replace_none_in_axes(mapspecs, non_root_inputs, {})  # type: ignore[arg-type]
     assert non_root_inputs == {"a": ["unnamed_0", "j"]}
+
+
+@pytest.mark.parametrize("show_progress", [True, False])
+def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa: FBT001
+    if show_progress and not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
+    @pipefunc(output_name="x")
+    def generate_ints() -> list[int]:
+        return []
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline_sum = Pipeline([generate_ints, double_it])
+    results = pipeline_sum.map({}, show_progress=show_progress)
+    assert results["y"].output.tolist() == []
