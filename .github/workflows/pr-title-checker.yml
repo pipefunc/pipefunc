@@ -37,9 +37,10 @@ jobs:
               * `TST:`
               * `MAINT:`
               * `BUG:`
-              * `FIX:`
               * `⬆️`
               * `[pre-commit.ci]`
+
+              The reason is that these categories are used to automatically generate the [changelog](https://github.com/pipefunc/pipefunc/blob/main/CHANGELOG.md).
 
       - name: Add comment that PR title is fixed
         if: ${{ steps.check.outputs.success == 'true'}}
