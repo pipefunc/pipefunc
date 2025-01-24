@@ -10,6 +10,7 @@ class LongRepresentation:
 
 def test_truncating_result_dict_repr() -> None:
     result = ResultDict()
+    assert repr(result) == "{}"
     result["a"] = LongRepresentation()  # type: ignore[assignment]
     with pytest.warns(UserWarning, match="ResultDict is too large to display completely"):
         text = repr(result)
