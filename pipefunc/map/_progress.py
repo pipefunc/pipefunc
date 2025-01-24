@@ -53,7 +53,6 @@ class Status:
     def elapsed_time(self) -> float:
         if self.start_time is None:  # Happens when n_total is 0
             return 0.0
-        assert self.start_time is not None
         if self.end_time is None:
             return time.monotonic() - self.start_time
         return self.end_time - self.start_time
