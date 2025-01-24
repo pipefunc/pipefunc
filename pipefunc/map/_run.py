@@ -34,12 +34,11 @@ from ._adaptive_scheduler_slurm_executor import (
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, Result
+from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable, Generator, Iterable, Sequence
 
     from adaptive_scheduler import MultiRunManager
@@ -71,7 +70,7 @@ def run_map(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
-) -> OrderedDict[str, Result]:
+) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -193,12 +192,12 @@ def run_map(
 
 @dataclass
 class AsyncMap:
-    task: asyncio.Task[OrderedDict[str, Result]]
+    task: asyncio.Task[ResultDict]
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
 
-    def result(self) -> OrderedDict[str, Result]:
+    def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -337,7 +336,7 @@ def run_map_async(
 
     multi_run_manager = maybe_multi_run_manager(executor_dict)
 
-    async def _run_pipeline() -> OrderedDict[str, Result]:
+    async def _run_pipeline() -> ResultDict:
         with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
@@ -954,7 +953,7 @@ def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -978,7 +977,7 @@ async def _run_and_process_generation_async(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -1002,7 +1001,7 @@ async def _run_and_process_generation_async(
 
 def _update_shapes_using_result(
     func: PipeFunc,
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
     store: dict[str, StoreType],
 ) -> None:
@@ -1030,7 +1029,7 @@ def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -1043,7 +1042,7 @@ async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -1192,9 +1191,9 @@ def _to_result_dict(
     kwargs: dict[str, Any],
     output: tuple[Any, ...],
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     # Note that the kwargs still contain the StorageBase objects if mapspec was used.
-    return {
+    data = {
         output_name: Result(
             function=func.__name__,
             kwargs=kwargs,
@@ -1204,6 +1203,9 @@ def _to_result_dict(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
+    return ResultDict(
+        data,
+    )
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1211,7 +1213,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
@@ -1246,7 +1248,7 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import at_least_tuple
@@ -9,6 +9,7 @@ from pipefunc._utils import at_least_tuple
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
 from ._progress import init_tracker
+from ._result import ResultDict
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets import ProgressTracker
     from pipefunc.map._types import UserShapeDict
 
-    from ._result import Result, StoreType
+    from ._result import StoreType
 
 
 def prepare_run(
@@ -42,7 +43,7 @@ def prepare_run(
     Pipeline,
     RunInfo,
     dict[str, StoreType],
-    OrderedDict[str, Result],
+    ResultDict,
     bool,
     dict[OUTPUT_TYPE, Executor] | None,
     ProgressTracker | None,
@@ -69,7 +70,7 @@ def prepare_run(
         storage=storage,
         cleanup=cleanup,
     )
-    outputs: OrderedDict[str, Result] = OrderedDict()
+    outputs = ResultDict()
     store = run_info.init_store()
     progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
