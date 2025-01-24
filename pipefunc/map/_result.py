@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import warnings
 from collections import UserDict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, NamedTuple, TypeAlias
+from typing import Any, TypeAlias
 
 from ._storage_array._base import StorageBase
 
@@ -24,7 +25,8 @@ class DirectValue:
 StoreType: TypeAlias = StorageBase | Path | DirectValue
 
 
-class Result(NamedTuple):
+@dataclass
+class Result:
     function: str
     kwargs: dict[str, Any]
     output_name: str
