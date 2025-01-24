@@ -61,7 +61,6 @@ from ._validation import (
 )
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
@@ -74,7 +73,7 @@ if TYPE_CHECKING:
 
     from pipefunc._plotting import GraphvizStyle
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._result import Result
+    from pipefunc.map._result import ResultDict
     from pipefunc.map._types import UserShapeDict
 
     from ._types import OUTPUT_TYPE, StorageType
@@ -709,7 +708,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
-    ) -> OrderedDict[str, Result]:
+    ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters
@@ -797,7 +796,7 @@ class Pipeline:
 
         Returns
         -------
-            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            A `ResultDict` containing the results of the pipeline. The values are of type `Result`,
             use `Result.output` to get the actual result.
 
         """

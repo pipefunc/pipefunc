@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+from collections import UserDict
 from pathlib import Path
 from typing import Any, NamedTuple, TypeAlias
 
@@ -28,3 +30,22 @@ class Result(NamedTuple):
     output_name: str
     output: Any
     store: StoreType
+
+
+MAX_RESULT_LENGTH = 10_000
+
+
+class ResultDict(UserDict[str, Result]):
+    def __repr__(self) -> str:
+        text = super().__repr__()
+        if len(text) > MAX_RESULT_LENGTH:
+            actual_length = len(text)
+            msg = (
+                f"⚠️  ResultDict is too large to display completely "
+                f"({actual_length:,} characters, truncated at {MAX_RESULT_LENGTH:,} characters).\n"
+                "     To view the full contents, use `dict(result_dict)` "
+                "or access individual items by their keys."
+            )
+            warnings.warn(msg, UserWarning, stacklevel=2)
+            return text[:MAX_RESULT_LENGTH] + "..."
+        return text

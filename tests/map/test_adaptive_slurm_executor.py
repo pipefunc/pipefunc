@@ -13,6 +13,7 @@ from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
 from pipefunc import Pipeline, pipefunc
+from pipefunc.map._result import ResultDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -154,7 +155,7 @@ async def test_adaptive_slurm_executor(
         show_progress=True,
     )
     result = await runner.task
-    assert isinstance(result, dict)
+    assert isinstance(result, ResultDict)
     assert len(result) == 3
     assert result["z_sum"].output == 100
     assert result["y"].output[0] == 0
@@ -228,7 +229,7 @@ async def test_pipeline_no_resources(
         show_progress=True,
     )
     result = await runner.task
-    assert isinstance(result, dict)
+    assert isinstance(result, ResultDict)
     assert len(result) == 3
     assert result["z_sum"].output == 100
     assert result["y"].output[0] == 0
