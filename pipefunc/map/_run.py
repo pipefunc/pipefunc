@@ -817,6 +817,8 @@ def _maybe_parallel_map(
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
+    if not indices:
+        return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None

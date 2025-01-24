@@ -78,7 +78,8 @@ def maybe_finalize_slurm_executors(
         if _adaptive_scheduler_imported() and _is_slurm_executor(ex):
             assert multi_run_manager is not None
             run_manager = ex.finalize()
-            multi_run_manager.add_run_manager(run_manager)
+            if run_manager is not None:  # is None if nothing was submitted
+                multi_run_manager.add_run_manager(run_manager)
 
 
 def _is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
