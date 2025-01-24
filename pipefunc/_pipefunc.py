@@ -1212,71 +1212,65 @@ class NestedPipeFunc(PipeFunc):
         return f
 
     @classmethod
-    def add_processing_step(
+    def inject(
         cls,
-        pre: Callable[..., Any] | None = None,
-        post: Callable[..., Any] | None = None,
-    ) -> Callable[[PipeFunc], NestedPipeFunc]:
-        if pre is None and post is None:
-            msg = "At least one of `pre` or `post` must be provided."
-            raise ValueError(msg)
+        processing_funcs: list[PipeFunc | Callable[..., Any]],
+        input_overwrites: dict[str, str] | None = None,
+        output_overwrites: dict[str, str] | None = None,
+        **kwargs: dict[str, Any],
+    ) -> Callable[[PipeFunc | Callable[..., Any]], NestedPipeFunc]:
+        if input_overwrites is None:
+            input_overwrites = {}
 
-        def wrapper(func: PipeFunc) -> NestedPipeFunc:
-            func_renames = {}
-            wrap_funcs = []
+        if output_overwrites is None:
+            output_overwrites = {}
 
-            if pre is not None:
-                pre_process_parameters = tuple(
-                    set(inspect.signature(pre).parameters) & set(func.parameters),
+        def process_func(f: PipeFunc | Callable[..., Any]) -> PipeFunc:
+            # This is mainly copied from Pipeline.add we need to promote callables to PipeFuncs before instantiating
+            # the NestedPipeFunc to update renames.
+            if isinstance(f, PipeFunc):
+                return f.copy()
+            if callable(f):
+                return PipeFunc(
+                    f,
+                    output_name=f.__name__,
                 )
+            msg = f"`f` must be a `PipeFunc` or callable, got {type(f)}"
+            raise TypeError(msg)
 
-                # TODO: Look for a renaming that can not conflict with pre parameters.
-                # For instance when func accepts arr and arr_processed and pre accepts arr, renaming arr to arr_processed
-                # would fail.
-                pre_process_renames = tuple(
-                    f"{param}_processed" for param in pre_process_parameters
-                )
+        def wrapper(wrapped_function: PipeFunc | Callable) -> NestedPipeFunc:
+            wrapped_func = process_func(wrapped_function)
+            original_outputs = wrapped_func.output_name
+            funcs = [wrapped_func, *list(map(process_func, processing_funcs))]
 
-                pre_func = PipeFunc(
-                    pre,
-                    pre_process_renames if len(pre_process_renames) > 1 else pre_process_renames[0],
-                )
+            for overwrite_name, with_name in input_overwrites.items():
+                for func in funcs:
+                    if overwrite_name in func.parameters and with_name not in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames({overwrite_name: with_name})
 
-                func_renames.update(dict(zip(pre_process_parameters, pre_process_renames)))
-                wrap_funcs.append(pre_func)
+            for overwrite_name, with_name in output_overwrites.items():
+                placeholder_name = f"{overwrite_name}_intermediate"
 
-            if post is not None:
-                post_process_outputs = tuple(
-                    set(inspect.signature(post).parameters) & set(at_least_tuple(func.output_name)),
-                )
-                post_process_placeholders = tuple(
-                    f"{param}_placeholder" for param in post_process_outputs
-                )
-                post_process_renames = tuple(
-                    f"{param}_unprocessed" for param in post_process_outputs
-                )
+                for func in funcs:
+                    if overwrite_name in at_least_tuple(func.output_name):
+                        func.update_renames({overwrite_name: placeholder_name})
+                    if overwrite_name in func.parameters and with_name in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames(
+                            {overwrite_name: placeholder_name, with_name: overwrite_name},
+                        )
+                    elif overwrite_name not in func.parameters and with_name in at_least_tuple(
+                        func.output_name,
+                    ):
+                        func.update_renames({with_name: overwrite_name})
 
-                post_func = PipeFunc(
-                    post,
-                    post_process_placeholders
-                    if len(post_process_placeholders) > 1
-                    else post_process_placeholders[0],
-                )
+            if "output_name" not in kwargs:
+                kwargs["output_name"] = original_outputs  # type: ignore[assignment]
 
-                post_func.update_renames(
-                    {
-                        **dict(zip(post_process_placeholders, post_process_outputs)),
-                        **dict(zip(post_process_outputs, post_process_renames)),
-                    },
-                )
-
-                func_renames.update(dict(zip(post_process_outputs, post_process_renames)))
-                wrap_funcs.append(post_func)
-
-            return NestedPipeFunc(
-                [*wrap_funcs, func.copy(renames=func_renames)],
-                output_name=func.output_name,
-            )
+            return cls(funcs, **kwargs)  # type: ignore[arg-type]
 
         return wrapper
 
