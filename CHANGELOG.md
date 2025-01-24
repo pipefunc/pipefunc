@@ -3,6 +3,57 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.51.0 (2025-01-24)
+
+### ✨ Enhancements
+
+- Make `Result` a `dataclass` to avoid confusion with tuples ([#601](https://github.com/pipefunc/pipefunc/pull/601))
+- Return a `ResultDict` that limits `__repr__` length in `pipeline.map` ([#600](https://github.com/pipefunc/pipefunc/pull/600))
+
+### 📊 Stats
+
+- `.py`: +73 lines, -31 lines
+
+## v0.50.4 (2025-01-24)
+
+### 🐛 Bug Fixes
+
+- Fix case with `SlurmExecutor.finalize()` but nothing was submitted ([#599](https://github.com/pipefunc/pipefunc/pull/599))
+
+### ✨ Enhancements
+
+- Make `AsyncMap` a `dataclass` instead of `NamedTuple` ([#598](https://github.com/pipefunc/pipefunc/pull/598))
+
+### 🤖 CI
+
+- Do not allow `FIX:` prefix ([#597](https://github.com/pipefunc/pipefunc/pull/597))
+
+### 📊 Stats
+
+- `.py`: +7 lines, -3 lines
+- `.json`: +0 lines, -1 lines
+- `.yml`: +2 lines, -1 lines
+
+## v0.50.3 (2025-01-24)
+
+### 🐛 Bug Fixes
+
+- Fix `ZeroDivisionError` in `ProgressBar` ([#596](https://github.com/pipefunc/pipefunc/pull/596))
+
+### ✨ Enhancements
+
+- Emit warning when `profile=True` and `parallel=True` ([#594](https://github.com/pipefunc/pipefunc/pull/594))
+- Allow setting custom colors in GraphViz graphs ([#593](https://github.com/pipefunc/pipefunc/pull/593))
+
+### 📚 Documentation
+
+- Release notes for 0.50.2 ([#592](https://github.com/pipefunc/pipefunc/pull/592))
+
+### 📊 Stats
+
+- `.md`: +18 lines, -0 lines
+- `.py`: +179 lines, -45 lines
+
 ## v0.50.2 (2025-01-23)
 
 ### 🧹 Maintenance
