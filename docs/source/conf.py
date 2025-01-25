@@ -263,7 +263,7 @@ def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
     # Replace the RTD links with local markdown links
     base_url = "https://pipefunc.readthedocs.io/en/latest/"
     content = content.replace(f"{base_url}examples/", "./examples/")
-    content = content.replace("/) page.", ") page.")
+    content = content.replace("/) page.", ".md) page.")
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(content)
