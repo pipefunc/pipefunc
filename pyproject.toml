@@ -85,7 +85,7 @@ extras = [
     "graphviz-anywidget",
     "griffe",
     "ipywidgets",
-    "matplotlib-base",
+    "matplotlib",
     "pandas",
     "psutil",
     "rich",
