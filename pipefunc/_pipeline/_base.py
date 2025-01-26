@@ -12,6 +12,7 @@ the resource usage of the pipeline functions.
 
 from __future__ import annotations
 
+import argparse
 import functools
 import inspect
 import os
@@ -2061,6 +2062,105 @@ class Pipeline:
             returns_table=returns_table,
             order=order,
         )
+
+    def cli(self, description: str | None = None) -> dict[str, Any]:
+        """Automatically construct an argparse for the pipeline.
+
+        This method creates an `argparse.ArgumentParser` instance, adds arguments for each
+        root parameter in the pipeline, sets the default values if they exist, and parses
+        the command-line arguments.
+
+        Parameters
+        ----------
+        description
+            The description of the pipeline to be displayed in the help message.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary containing the parsed command-line arguments.
+
+        Examples
+        --------
+        >>> pipeline = Pipeline([f1, f2])
+        >>> args = pipeline.cli(description="My Pipeline")
+        >>> result = pipeline("output_name", **args)
+
+        """
+        requires("rich", "griffe", reason="print_doc", extras="autodoc")
+        doc = PipelineDocumentation.from_pipeline(self)
+        import json
+
+        import rich
+        from rich_argparse import RichHelpFormatter
+
+        from ._autodoc import _create_parameter_row, parse_function_docstring
+
+        parser = argparse.ArgumentParser(description=description, formatter_class=RichHelpFormatter)
+
+        # Get the root arguments and their defaults
+        root_args = self.root_args()
+        defaults = self.defaults
+
+        # Add arguments for each root parameter
+        for arg in root_args:
+            default = defaults.get(arg)
+            row = _create_parameter_row(
+                arg,
+                doc.parameters.get(arg, ""),
+                doc.defaults,
+                doc.p_annotations,
+                skip_optional=True,
+            )
+            help_text = str(row[-1])
+            parser.add_argument(
+                f"--{arg}",
+                type=str,
+                default=default,
+                help=help_text,
+            )
+
+        doc_map = parse_function_docstring(Pipeline.map)
+        sig_map = inspect.signature(Pipeline.map)
+        defaults = {"run_folder": None, "parallel": True, "storage": "file_array", "cleanup": True}
+        for arg, p in sig_map.parameters.items():
+            if arg not in {"run_folder", "parallel", "storage", "cleanup"}:
+                continue
+            row = _create_parameter_row(
+                arg,
+                [doc_map.parameters[arg]],
+                {arg: p.default},
+                {arg: p.annotation},
+                skip_optional=True,
+            )
+            help_text = str(row[-1]).replace("``", "`")
+            parser.add_argument(
+                f"--map.{arg}",
+                type=str,
+                default=defaults[arg],
+                help=help_text,
+            )
+
+        # Parse the arguments and return them as a dictionary
+        args = parser.parse_args()
+        map_kwargs = {}
+        inputs = {}
+        print(args)
+        for arg, value in vars(args).items():
+            print(arg, value)
+            if arg.startswith("map."):
+                map_kwargs[arg[4:]] = json.loads(value) if isinstance(value, str) else value
+            else:
+                inputs[arg] = json.loads(value)
+        rich.print(inputs)
+        rich.print(map_kwargs)
+        self.map(inputs, **map_kwargs)
+
+
+def _to_type(annotation: Any) -> Any:
+    if annotation in {int, float}:
+        return annotation
+    return str
 
 
 class Generations(NamedTuple):
