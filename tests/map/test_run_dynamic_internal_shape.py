@@ -258,11 +258,12 @@ def test_dimension_mismatch_bug_with_autogen_axes(
     assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]
 
 
-def test_dynamic_internal_shape_with_size_1():
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
     @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
     def fa(n: int, m: int = 0) -> list[int]:
         return list(range(n + m))
 
     pipeline = Pipeline([fa])
-    r = pipeline.map(inputs={"n": [1, 1]}, parallel=False)
+    r = pipeline.map(inputs={"n": [1, 1]}, parallel=False, storage=storage)
     assert r["x"].output.tolist() == [[0, 0]]
