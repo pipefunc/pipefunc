@@ -53,3 +53,15 @@ def test_pipeline_input_as_pydantic_model() -> None:
     model = Model(x="1.0", y="2.0", z={"a": "1.0"})
     assert model.model_dump() == expected
     assert repr(model) == "InputModel(x=1, y=2, z={'a': 1})"
+
+
+def test_pipeline_with_mapspec_input_as_pydantic_model() -> None:
+    @pipefunc("foo", mapspec="x[i] -> foo[i]")
+    def foo(x: int, y: int = 1, z: dict[str, int] | None = None) -> int:
+        return x + y
+
+    pipeline = Pipeline([foo])
+    Model = pipeline.pydantic_model()  # noqa: N806
+    model = Model(x=[1, 2, 3], y=2, z={"a": 1})
+    expected = {"x": [1, 2, 3], "y": 2, "z": {"a": 1}}
+    assert model.model_dump() == expected
