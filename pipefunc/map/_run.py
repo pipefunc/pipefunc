@@ -612,9 +612,9 @@ def _validate_internal_shape(
             f" (output '{func.output_name}') does not match the expected"
             f" internal shape {internal_shape} defined by the `mapspec`"
             f" '{func.mapspec}'. This error typically occurs when"
-            f" a `PipeFunc` returns values with inconsistent shapes across"
-            f" different invocations. Ensure that the output shape is"
-            f" consistent for all inputs."
+            " a `PipeFunc` returns values with inconsistent shapes across"
+            " different invocations. Ensure that the output shape is"
+            " consistent for all inputs."
         )
         raise ValueError(msg)
 
