@@ -52,6 +52,7 @@ from ._mapspec import (
     find_non_root_axes,
     replace_none_in_axes,
 )
+from ._pydantic import pipeline_to_pydantic
 from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from ._validation import (
     validate_consistent_defaults,
@@ -69,6 +70,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
     import ipywidgets
+    from pydantic import BaseModel
     from rich.table import Table
 
     from pipefunc._plotting import GraphvizStyle
@@ -2061,6 +2063,16 @@ class Pipeline:
             returns_table=returns_table,
             order=order,
         )
+
+    def pydantic_model(self) -> type[BaseModel]:
+        """Create a Pydantic model for the pipeline's input and output types.
+
+        Returns
+        -------
+            A Pydantic model that can be used to validate the input and output types of the pipeline.
+
+        """
+        return pipeline_to_pydantic(self)
 
 
 class Generations(NamedTuple):
