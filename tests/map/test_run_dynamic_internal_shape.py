@@ -256,3 +256,17 @@ def test_dimension_mismatch_bug_with_autogen_axes(
         storage="dict",
     )
     assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]
+
+
+def test_dynamic_internal_shape_with_irregular_output():
+    @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
+    def fa(n: int, m: int = 0) -> int:
+        return list(range(n + m))
+
+    pipeline = Pipeline([fa])
+    r = pipeline.map(inputs={"n": [1, 2]}, parallel=False)
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Output shape (1,) of function 'fa' (output 'x') does not match"),
+    ):
+        pipeline.map(inputs={"n": [2, 1]}, parallel=False)
