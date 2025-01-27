@@ -258,6 +258,25 @@ def test_dimension_mismatch_bug_with_autogen_axes(
     assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]
 
 
+def test_dynamic_internal_shape_with_irregular_output():
+    @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
+    def f(n: int, m: int = 0) -> list[int]:
+        return list(range(n + m))
+
+    pipeline = Pipeline([f])
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Output shape (3,) of function 'f' (output 'x') does not match"),
+    ):
+        pipeline.map(inputs={"n": [2, 3]}, parallel=False)
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Output shape (1,) of function 'f' (output 'x') does not match"),
+    ):
+        pipeline.map(inputs={"n": [2, 1]}, parallel=False)
+
+
 @pytest.mark.parametrize("storage", ["dict", "file_array"])
 def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
     @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
