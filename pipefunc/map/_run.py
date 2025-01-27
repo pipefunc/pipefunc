@@ -589,7 +589,7 @@ def _set_output(
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    _validate_shape(output, internal_shape, func)
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -601,7 +601,11 @@ def _set_output(
         arr[flat_index] = output[internal_index]
 
 
-def _validate_shape(output: np.ndarray, internal_shape: tuple[int, ...], func: PipeFunc) -> None:
+def _validate_internal_shape(
+    output: np.ndarray,
+    internal_shape: tuple[int, ...],
+    func: PipeFunc,
+) -> None:
     if np.shape(output) != internal_shape:
         msg = (
             f"Output shape {np.shape(output)} of function '{func.__name__}'"
