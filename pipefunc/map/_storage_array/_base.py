@@ -190,6 +190,9 @@ def normalize_key(
     shape_index = 0
     internal_shape_index = 0
 
+    if for_dump:
+        shape_mask = (True,) * len(key)
+
     for axis, (mask, k) in enumerate(zip(shape_mask, key, strict=True)):
         if mask:
             axis_size = shape[shape_index]
