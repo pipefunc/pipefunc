@@ -286,3 +286,57 @@ def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
     pipeline = Pipeline([fa])
     r = pipeline.map(inputs={"n": [1, 1]}, parallel=False, storage=storage)
     assert r["x"].output.tolist() == [[0, 0]]
+
+
+@pytest.mark.parametrize("manually_set_internal_shape", [False])
+def test_dynamic_internal_shape_with_multiple_dynamic_axes(
+    manually_set_internal_shape: bool,
+) -> None:
+    @pipefunc(output_name="x", mapspec="... -> x[i]")
+    def fa(n: int) -> list[int]:
+        return [0, 1, 2]
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fb(x: int) -> int:
+        return 2 * x
+
+    @pipefunc(output_name="z", mapspec="... -> z[j]")
+    def fc(y) -> list[int]:
+        assert y.tolist() == [0, 2, 4]
+        return [
+            0,
+        ]
+
+    # @pipefunc(output_name="out", mapspec="z[j] -> out[j]")
+    # def fd(z: float) -> str:
+    #     return "foo"
+
+    pipeline = Pipeline([fa, fb, fc])
+    if manually_set_internal_shape:
+        pipeline["z"].internal_shape = (1,)
+    # r = pipeline.map(inputs={"n": 4}, parallel=False)  # this runs
+
+    pipeline.add_mapspec_axis("n", axis="k")
+    assert pipeline.mapspecs_as_strings == [
+        "n[k] -> x[i, k]",
+        "x[i, k] -> y[i, k]",
+        "y[:, k] -> z[j, k]",
+    ]
+    r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)  # this fails
+
+    r["z"].output
+
+
+def test_simple_2d():
+    @pipefunc(output_name="y", mapspec="x[:, k] -> y[i, k]")
+    def fa(x: int) -> list[int]:
+        return x + 1
+
+    @pipefunc(output_name="z", mapspec="y[i, k] -> z[i, k]")
+    def fb(y: int) -> int:
+        return 3 * y
+
+    pipeline = Pipeline([fa, fb])
+    r = pipeline.map(inputs={"x": np.ones((2, 3))}, parallel=False)
+    assert r["y"].output.tolist() == [[2.0, 2.0, 2.0], [2.0, 2.0, 2.0]]
+    assert r["z"].output.tolist() == [[6.0, 6.0, 6.0], [6.0, 6.0, 6.0]]
