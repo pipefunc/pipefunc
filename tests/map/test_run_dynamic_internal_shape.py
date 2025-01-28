@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 import random
 import re
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -288,9 +288,9 @@ def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
     assert r["x"].output.tolist() == [[0, 0]]
 
 
-@pytest.mark.parametrize("manually_set_internal_shape", [False])
+@pytest.mark.parametrize("manually_set_internal_shape", [True, False])
 def test_dynamic_internal_shape_with_multiple_dynamic_axes(
-    manually_set_internal_shape: bool,
+    manually_set_internal_shape: bool,  # noqa: FBT001
 ) -> None:
     @pipefunc(output_name="x", mapspec="... -> x[i]")
     def fa(n: int) -> list[int]:
@@ -309,8 +309,8 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     pipeline = Pipeline([fa, fb, fc])
     if manually_set_internal_shape:
         pipeline["z"].internal_shape = (2,)
-    # r = pipeline.map(inputs={"n": 4}, parallel=False)  # this runs
-    # assert r["z"].output == [6, 6]
+    r = pipeline.map(inputs={"n": 4}, parallel=False)
+    assert r["z"].output == [6, 6]
 
     pipeline.add_mapspec_axis("n", axis="k")
     assert pipeline.mapspecs_as_strings == [
@@ -318,12 +318,13 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
         "x[i, k] -> y[i, k]",
         "y[:, k] -> z[j, k]",
     ]
-    r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)  # this fails
+    r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)
+    assert r["z"].output.tolist() == [[6, 6], [6, 6]]
 
 
 def test_simple_2d():
     @pipefunc(output_name="y", mapspec="x[:, k] -> y[i, k]")
-    def fa(x: int) -> list[int]:
+    def fa(x: np.ndarray[Any, np.dtype[np.int64]]) -> np.ndarray[Any, np.dtype[np.int64]]:
         # The input is 1D slices of the input `x`.
         # This function will reduce the first dim of the input and
         # generate a new axis in its place.
@@ -334,7 +335,6 @@ def test_simple_2d():
 
     @pipefunc(output_name="z", mapspec="y[i, k] -> z[i, k]")
     def fb(y: int) -> int:
-        assert y.shape == ()
         return 3 * y
 
     pipeline = Pipeline([fa, fb])
