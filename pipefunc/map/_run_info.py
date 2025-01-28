@@ -234,6 +234,7 @@ class RunInfo:
 def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
     storage = store.get(name)
     if isinstance(storage, StorageBase):
+        assert len(storage.shape) == len(shape), (storage.shape, shape)
         storage.shape = shape
 
 

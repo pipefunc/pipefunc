@@ -298,23 +298,19 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def fb(x: int) -> int:
+        assert x in [0, 1, 2]
         return 2 * x
 
     @pipefunc(output_name="z", mapspec="... -> z[j]")
     def fc(y) -> list[int]:
         assert y.tolist() == [0, 2, 4]
-        return [
-            0,
-        ]
-
-    # @pipefunc(output_name="out", mapspec="z[j] -> out[j]")
-    # def fd(z: float) -> str:
-    #     return "foo"
+        return [sum(y), sum(y)]
 
     pipeline = Pipeline([fa, fb, fc])
     if manually_set_internal_shape:
-        pipeline["z"].internal_shape = (1,)
+        pipeline["z"].internal_shape = (2,)
     # r = pipeline.map(inputs={"n": 4}, parallel=False)  # this runs
+    # assert r["z"].output == [6, 6]
 
     pipeline.add_mapspec_axis("n", axis="k")
     assert pipeline.mapspecs_as_strings == [
@@ -324,19 +320,39 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     ]
     r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)  # this fails
 
-    r["z"].output
-
 
 def test_simple_2d():
     @pipefunc(output_name="y", mapspec="x[:, k] -> y[i, k]")
     def fa(x: int) -> list[int]:
-        return x + 1
+        # The input is 1D slices of the input `x`.
+        # This function will reduce the first dim of the input and
+        # generate a new axis in its place.
+        assert x.shape == (2,)
+        y = np.hstack([x, x, x])
+        assert y.shape == (6,)
+        return y
 
     @pipefunc(output_name="z", mapspec="y[i, k] -> z[i, k]")
     def fb(y: int) -> int:
+        assert y.shape == ()
         return 3 * y
 
     pipeline = Pipeline([fa, fb])
-    r = pipeline.map(inputs={"x": np.ones((2, 3))}, parallel=False)
-    assert r["y"].output.tolist() == [[2.0, 2.0, 2.0], [2.0, 2.0, 2.0]]
-    assert r["z"].output.tolist() == [[6.0, 6.0, 6.0], [6.0, 6.0, 6.0]]
+    x = np.array([[0, 1, 2], [3, 4, 5]])
+    r = pipeline.map(inputs={"x": x}, parallel=False)
+    assert r["y"].output.tolist() == [
+        [0, 1, 2],
+        [3, 4, 5],
+        [0, 1, 2],
+        [3, 4, 5],
+        [0, 1, 2],
+        [3, 4, 5],
+    ]
+    assert r["z"].output.tolist() == [
+        [0, 3, 6],
+        [9, 12, 15],
+        [0, 3, 6],
+        [9, 12, 15],
+        [0, 3, 6],
+        [9, 12, 15],
+    ]
