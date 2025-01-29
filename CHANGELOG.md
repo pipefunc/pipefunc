@@ -3,6 +3,66 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.51.4 (2025-01-28)
+
+### 🐛 Bug Fixes
+
+- Fix unresolved shape in ≥2D arrays ([#612](https://github.com/pipefunc/pipefunc/pull/612))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#608](https://github.com/pipefunc/pipefunc/pull/608))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +87 lines, -5 lines
+
+## v0.51.3 (2025-01-27)
+
+### ✨ Enhancements
+
+- Raise an appropriate error when returning different shapes with `internal_shapes` ([#610](https://github.com/pipefunc/pipefunc/pull/610))
+
+### 🐛 Bug Fixes
+
+- Fix 1 sized `internal_shapes` ([#611](https://github.com/pipefunc/pipefunc/pull/611))
+
+### 📊 Stats
+
+- `.py`: +58 lines, -5 lines
+
+## v0.51.2 (2025-01-26)
+
+### 🧹 Maintenance
+
+- Fix dependency name in `[extras]` (`matplotlib-base` is conda name) ([#606](https://github.com/pipefunc/pipefunc/pull/606))
+
+### 📚 Documentation
+
+- Fix URLs linking to examples ([#604](https://github.com/pipefunc/pipefunc/pull/604))
+
+### 📊 Stats
+
+- `.py`: +1 lines, -1 lines
+- `.ipynb`: +12 lines, -7 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.51.1 (2025-01-25)
+
+### 🧹 Maintenance
+
+- Rename `[extra]` optional dependencies to `[extras]` to align with `pipefunc-extras` ([#603](https://github.com/pipefunc/pipefunc/pull/603))
+
+### 📚 Documentation
+
+- Update release notes up to 0.51.0 ([#602](https://github.com/pipefunc/pipefunc/pull/602))
+
+### 📊 Stats
+
+- `.md`: +51 lines, -0 lines
+- `.toml`: +2 lines, -2 lines
+
 ## v0.51.0 (2025-01-24)
 
 ### ✨ Enhancements
