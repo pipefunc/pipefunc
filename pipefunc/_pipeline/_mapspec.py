@@ -7,6 +7,7 @@ from pipefunc.map._mapspec import ArraySpec, MapSpec
 
 if TYPE_CHECKING:
     from pipefunc._pipefunc import PipeFunc
+    from pipefunc._pipeline._types import OUTPUT_TYPE
 
 
 def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None, ...]:
@@ -14,9 +15,23 @@ def _axes_from_dims(p: str, dims: dict[str, int], axis: str) -> tuple[str | None
     return n * (None,) + (axis,)
 
 
-def add_mapspec_axis(p: str, dims: dict[str, int], axis: str, functions: list[PipeFunc]) -> None:
+def add_mapspec_axis(
+    p: str,
+    dims: dict[str, int],
+    axis: str,
+    functions: list[PipeFunc],
+    start_at: OUTPUT_TYPE | None = None,
+    stop_at: OUTPUT_TYPE | None = None,  # Is inclusive!
+) -> None:
     # Modify the MapSpec of functions that depend on `p` to include the new axis
+    include = start_at is None
     for f in functions:
+        if not include and f.output_name == start_at:
+            include = True
+        if not include:
+            continue
+        if include and f.output_name == stop_at:
+            break
         if p not in f.parameters or p in f._bound:
             continue
         if f.mapspec is None:
