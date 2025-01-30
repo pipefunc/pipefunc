@@ -90,7 +90,7 @@ extras = [
     "psutil",
     "rich",
     "xarray",
-    "zarr",
+    "zarr>=2,<3",
 ]
 
 [project.urls]
