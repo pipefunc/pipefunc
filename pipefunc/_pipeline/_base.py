@@ -314,7 +314,7 @@ class Pipeline:
             f.debug = self.debug
 
         self._clear_internal_cache()  # reset cache
-        self._validate()
+        self.validate()
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: OUTPUT_TYPE | None = None) -> None:
@@ -348,7 +348,7 @@ class Pipeline:
             f = self.output_to_func[output_name]
             self.drop(f=f)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
         """Replace a function in the pipeline with another function.
@@ -368,7 +368,7 @@ class Pipeline:
             self.drop(f=old)
         self.add(new)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     @functools.cached_property
     def output_to_func(self) -> dict[OUTPUT_TYPE, PipeFunc]:
@@ -1063,7 +1063,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_renames(
         self,
@@ -1104,7 +1104,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_scope(
         self,
@@ -1191,7 +1191,7 @@ class Pipeline:
             msg = "No function's scope was updated. Ensure `inputs` and/or `outputs` are specified correctly."
             raise ValueError(msg)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
@@ -1252,8 +1252,14 @@ class Pipeline:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
 
-    def _validate(self) -> None:
-        """Validate the pipeline."""
+    def validate(self) -> None:
+        """Validate the pipeline (checks its scopes, renames, defaults, mapspec, type hints).
+
+        This is automatically called when the pipeline is created and when calling state
+        updating methods like {method}`~Pipeline.update_renames` or
+        {method}`~Pipeline.update_defaults`. Should be called manually after e.g.,
+        manually updating `pipeline.validate_type_annotations` or changing some other attributes.
+        """
         validate_scopes(self.functions)
         validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
@@ -1365,7 +1371,7 @@ class Pipeline:
         for p in parameter:
             add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _func_node_colors(
         self,
