@@ -37,7 +37,7 @@ class PipelineDocumentation:
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
         p_annotations: dict[str, Any] = pipeline.parameter_annotations
-        r_annotations: dict[str, Any] = pipeline.output_annotation
+        r_annotations: dict[str, Any] = pipeline.output_annotations
 
         for f in pipeline.sorted_functions:
             doc = parse_function_docstring(f.func)

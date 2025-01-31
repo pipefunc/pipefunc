@@ -1220,7 +1220,7 @@ class Pipeline:
         return annotations
 
     @functools.cached_property
-    def output_annotation(self) -> dict[str, Any]:
+    def output_annotations(self) -> dict[str, Any]:
         """Return the (final and intermediate) output annotations for the pipeline."""
         annotations: dict[str, Any] = {}
         for f in self.sorted_functions:
