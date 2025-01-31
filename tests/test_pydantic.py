@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from pipefunc import PipeFunc
+from pipefunc import PipeFunc, Pipeline
 from pipefunc.typing import safe_get_type_hints
 
 
@@ -35,9 +35,14 @@ def test_pydantic_model_with__call__() -> None:
             return self.x + self.y + a
 
     foo = PipeFunc(Foo(x=1, y=2, z={1: 2}), "foo")
-    assert foo(3) == 6
+    assert foo(3) == foo(a=3) == 6
     assert foo.parameter_annotations == {"a": int}
     assert foo.defaults == {"a": 42}
+    pipeline = Pipeline([foo])
+    assert pipeline(a=3) == 6
+    assert pipeline.parameter_annotations == {"a": int}
+    assert pipeline.defaults == {"a": 42}
+    assert pipeline.output_annotations == {"foo": int}
 
 
 def test_dataclass_annotations() -> None:
