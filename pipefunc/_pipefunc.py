@@ -912,7 +912,8 @@ class PipeFunc(Generic[T]):
         """Return a unique identifier for the function used in cache keys."""
         name = "-".join(at_least_tuple(self.output_name))
         if hasattr(self.func, "__pipefunc_hash__"):
-            return f"{name}-{self.func.__pipefunc_hash__()}"
+            pipefunc_hash = self.func.__pipefunc_hash__()
+            return f"{name}-{pipefunc_hash}"
         return name
 
 
