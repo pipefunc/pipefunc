@@ -605,9 +605,15 @@ def test_default_and_bound_pydantic() -> None:
 def test_default_with_positional_args() -> None:
     @pipefunc("c")
     def f(a, b=1):
-        return a + b
+        return a, b
 
-    assert f(1, 2) == 3
+    assert f(1, 2) == (1, 2)
+    with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
+        f(1, 2, a=2)
+
+    f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
+    assert f(1) == (1, 1)
+    assert f(**{"x.a": 1, "x.b": 2}) == (1, 2)
 
 
 def test_nested_pipefunc_function_name() -> None:
