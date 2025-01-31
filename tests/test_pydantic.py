@@ -37,6 +37,7 @@ def test_pydantic_model_with__call__() -> None:
     foo = PipeFunc(Foo(x=1, y=2, z={1: 2}), "foo")
     assert foo(3) == foo(a=3) == 6
     assert foo.parameter_annotations == {"a": int}
+    assert foo.output_annotation == {"foo": int}
     assert foo.defaults == {"a": 42}
     pipeline = Pipeline([foo])
     assert pipeline(a=3) == 6
