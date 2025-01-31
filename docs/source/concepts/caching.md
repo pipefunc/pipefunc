@@ -141,6 +141,55 @@ pipeline.cache.clear()
 
 By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you can significantly improve the performance of your pipelines, especially when dealing with computationally expensive functions or large datasets.
 
+## Advanced: Caching Stateful Functions
+
+When caching stateful functions, you need to be careful about the cache key because the function's internal state can affect the result, even if the input arguments are the same.
+By default, `pipefunc` computes the cache key based on the function's input arguments.
+However, this is insufficient for stateful functions where the internal state can change the output.
+
+To address this, `pipefunc` provides a mechanism to customize how the cache key is generated for stateful functions using the special `__pipefunc_hash__` method.
+
+### The `__pipefunc_hash__` Method
+
+If a function (or a callable object) defines a `__pipefunc_hash__` method, `pipefunc` will call this method to obtain a string representation of the function's state, which will be included in the cache key.
+This allows you to incorporate relevant parts of the function's state into the cache key, ensuring that the cached results are invalidated when the state changes.
+
+**Example:**
+
+```python
+from pipefunc import PipeFunc, Pipeline
+
+class MyStatefulFunction:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __call__(self, x: int) -> int:
+        return self.value + x
+
+    def __pipefunc_hash__(self) -> str:
+        # Include the relevant state in the hash
+        return str(self.value)
+
+func = MyStatefulFunction(1)
+pfunc = PipeFunc(func, "out", cache=True)
+pipeline = Pipeline([pfunc], cache_type="disk")
+
+# Call the function to populate the cache
+result1 = pipeline(x=1)
+print(f"{pipeline.cache.cache=}")
+```
+
+In this example, `MyStatefulFunction` has an internal state `value`.
+The `__pipefunc_hash__` method returns a string representation of this state.
+When the function is called through the `PipeFunc` instance, `pipefunc` will automatically call `__pipefunc_hash__` to get the state representation and include it in the cache key.
+
+**Note:**
+
+- The `__pipefunc_hash__` method should return a string that uniquely identifies the relevant state of the function.
+- If you don't define `__pipefunc_hash__` for a stateful function, only the input arguments will be used for cache key computation, which might lead to incorrect cached results.
+
+By using the `__pipefunc_hash__` method, you can ensure that `pipefunc`'s caching mechanism correctly handles stateful functions and invalidates cached results when the function's state changes.
+
 ## The `@memoize` Decorator
 
 The `pipefunc.cache` module also provides a `@memoize` decorator for general-purpose function memoization, independent of `PipeFunc` and `Pipeline`.
