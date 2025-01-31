@@ -32,7 +32,7 @@ The actual cache lives in the `Pipeline` object and is shared across all functio
 It's configured at the `Pipeline` level using the `cache_type` and `cache_kwargs` parameters.
 When you create a `Pipeline`, you can specify the type of cache to use:
 
-```python
+```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
 
 @pipefunc("output", cache=True)
@@ -53,7 +53,7 @@ Individual functions have caching enabled or disabled using the `cache` paramete
 If `cache=True` the function will use the pipeline's cache.
 If `cache=False` (default) caching is disabled for that function.
 
-```python
+```{code-cell} ipython3
 @pipefunc("output", cache=False)  # Disable caching for this function
 def my_function(input1, input2):
     # ... inexpensive computation ...
@@ -103,7 +103,7 @@ When using `pipeline.map` with `parallel=True`, it is essential to use a cache t
 The `lru` and `hybrid` cache types support shared memory when created with `shared=True` in the `cache_kwargs`.
 This ensures that multiple processes can access and update the same cache.
 
-```python
+```{code-cell} ipython3
 from pipefunc import Pipeline, pipefunc
 
 # Enable shared memory caching for the pipeline
@@ -126,7 +126,7 @@ If the object cannot be made hashable and cannot be serialized, `pipefunc` will 
 
 You can clear the pipeline's cache using the `clear()` method of the cache object:
 
-```python
+```{code-cell} ipython3
 pipeline.cache.clear()
 ```
 
@@ -146,7 +146,7 @@ By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you 
 The `pipefunc.cache` module also provides a `@memoize` decorator for general-purpose function memoization, independent of `PipeFunc` and `Pipeline`.
 This decorator allows you to cache the results of any function using the available cache types (e.g., `LRUCache`, `HybridCache`, `SimpleCache`, `DiskCache`).
 
-```python
+```{code-cell} ipython3
 from pipefunc.cache import memoize, LRUCache, HybridCache, SimpleCache, DiskCache
 
 # Use a shared LRU cache
@@ -192,7 +192,7 @@ You can customize the behavior of `@memoize` using the following parameters:
   - `"warning"`: Log a warning and skip caching for that call.
   - `"ignore"`: Silently skip caching for that call.
 
-```python
+```{code-cell} ipython3
 from pipefunc.cache import memoize, UnhashableError
 
 def custom_key_func(*args, **kwargs):
