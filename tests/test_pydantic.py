@@ -25,6 +25,21 @@ def test_pydantic_annotations() -> None:
     assert bar.defaults == {}
 
 
+def test_pydantic_model_with__call__() -> None:
+    class Foo(BaseModel):
+        x: int
+        y: int = 1
+        z: dict = Field(default_factory=dict)
+
+        def __call__(self, a: int = 42) -> int:
+            return self.x + self.y + a
+
+    foo = PipeFunc(Foo(x=1, y=2, z={1: 2}), "foo")
+    assert foo(a=3) == 6
+    assert foo.parameter_annotations == {"a": int}
+    assert foo.defaults == {"a": 42}
+
+
 def test_dataclass_annotations() -> None:
     # Just for reference, pydantic.BaseModel should behave the same way as dataclasses.dataclass
     from dataclasses import dataclass, field
