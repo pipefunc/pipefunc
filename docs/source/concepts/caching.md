@@ -222,7 +222,7 @@ You can customize the behavior of `@memoize` using the following parameters:
 - `key_func`: A custom function to generate cache keys. If `None`, the default key generation using `pipefunc.cache.try_to_hashable` is used.
 - `fallback_to_pickle`: If `True` (default), unhashable objects will be pickled using `cloudpickle` as a last resort.
 - `unhashable_action`: Determines the behavior when encountering unhashable objects:
-  - `"error"`: Raise an `UnhashableError` (default).
+  - `"error"`: Raise an {class}`~pipefunc.cache.UnhashableError` (default).
   - `"warning"`: Log a warning and skip caching for that call.
   - `"ignore"`: Silently skip caching for that call.
 
