@@ -666,6 +666,7 @@ def test_pipefunc_with_class_with___call__() -> None:
     assert pf.defaults == {"b": 1}
     assert pf.parameter_annotations == {"a": int, "b": int}
     assert pf.output_annotation == {"out": int}
+    assert pf.__name__ == "MyClass"
 
 
 def test_nested_pipefunc_with_class_with___call__() -> None:

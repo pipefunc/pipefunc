@@ -35,6 +35,7 @@ def test_pydantic_model_with__call__() -> None:
             return self.x + self.y + a
 
     foo = PipeFunc(Foo(x=1, y=2, z={1: 2}), "foo")
+    assert foo.__name__ == "Foo"
     assert foo(3) == foo(a=3) == 6
     assert foo.parameter_annotations == {"a": int}
     assert foo.output_annotation == {"foo": int}
@@ -59,3 +60,4 @@ def test_dataclass_annotations() -> None:
     foo = PipeFunc(Foo, "foo", defaults={"x": 2})
     assert foo.defaults == {"x": 2, "y": 1, "z": {}}
     assert foo.parameter_annotations == {"x": int, "y": int, "z": dict}
+    assert foo.__name__ == "Foo"
