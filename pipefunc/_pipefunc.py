@@ -768,8 +768,6 @@ class PipeFunc(Generic[T]):
     def parameter_annotations(self) -> dict[str, Any]:
         """Return the type annotations of the wrapped function's parameters."""
         func = self.func
-        if isinstance(func, _NestedFuncWrapper):
-            func = func.func
         if not is_pydantic_base_model(func):
             if inspect.isclass(func):
                 func = func.__init__
@@ -1255,6 +1253,12 @@ class NestedPipeFunc(PipeFunc):
             name: self.pipeline[name].output_annotation[name]
             for name in at_least_tuple(self._output_name)
         }
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the type annotations of the wrapped function's parameters."""
+        annotations = self.pipeline.parameter_annotations
+        return {p: annotations[p] for p in self.parameters if p in annotations}
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
