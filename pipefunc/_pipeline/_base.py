@@ -16,6 +16,7 @@ import functools
 import inspect
 import os
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -1198,6 +1199,33 @@ class Pipeline:
         for f in self.functions:
             flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
         return flat_scope_kwargs
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the parameter annotations for the pipeline.
+
+        The parameter annotations are computed by traversing the pipeline graph in topological order
+        and collecting the annotations from the functions. If there are conflicting annotations
+        for the same parameter, a warning is issued and the first encountered annotation is used.
+        """
+        annotations: dict[str, Any] = {}
+        for f in self.sorted_functions:
+            if f.parameter_annotations:
+                for p, v in f.parameter_annotations.items():
+                    if p in annotations and annotations[p] != v:
+                        msg = f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
+                        warnings.warn(msg, stacklevel=2)
+                        continue
+                    annotations[p] = v
+        return annotations
+
+    @functools.cached_property
+    def output_annotation(self) -> dict[str, Any]:
+        """Return the (final and intermediate) output annotations for the pipeline."""
+        annotations: dict[str, Any] = {}
+        for f in self.sorted_functions:
+            annotations.update(f.output_annotation)
+        return annotations
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[OUTPUT_TYPE, set[tuple[str, ...]]]:
