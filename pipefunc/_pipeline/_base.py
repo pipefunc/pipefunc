@@ -151,8 +151,7 @@ class Pipeline:
     - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
       which is a requirement for storing results in a cache.
     - This function works for many common types but is not guaranteed to work for all types.
-    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
-    - Caution ⛔️: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
+    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the serialized representation of the value.
 
     The key difference is that ``pipeline.run``'s output is uniquely determined by the root arguments,
     while ``pipeline.map`` is not because it may contain reduction operations as described by `~pipefunc.map.MapSpec`.
