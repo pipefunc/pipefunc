@@ -31,6 +31,7 @@ def test_nested_pipefunc_defaults() -> None:
     pipeline["c"].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
+    assert nf.parameter_annotations == {"a": NoAnnotation, "b": NoAnnotation}
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
     assert pipeline() == (15, 15)
 
@@ -509,3 +510,16 @@ def test_nest_bound(scope: str) -> None:
         match=re.escape(f"Missing inputs: `{scope}n`."),
     ):
         pipeline_nested_test.map(inputs={})
+
+
+def test_annotations_nested_pipefunc() -> None:
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c: int) -> int:
+        return c
+
+    nf = NestedPipeFunc([f, g])
+    assert nf.parameter_annotations == {"a": int, "b": int}
