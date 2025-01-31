@@ -36,8 +36,6 @@ class PipelineDocumentation:
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
-        p_annotations: dict[str, Any] = pipeline.parameter_annotations
-        r_annotations: dict[str, Any] = pipeline.output_annotations
 
         for f in pipeline.sorted_functions:
             doc = parse_function_docstring(f.func)
@@ -70,8 +68,8 @@ class PipelineDocumentation:
             returns=returns,
             function_names={f.output_name: f.func.__name__ for f in pipeline.functions},
             defaults=pipeline.defaults,
-            p_annotations=p_annotations,
-            r_annotations=r_annotations,
+            p_annotations=pipeline.parameter_annotations,
+            r_annotations=pipeline.output_annotations,
             topological_order=[f.output_name for f in pipeline.sorted_functions],
             root_args=pipeline.topological_generations.root_args,
         )
