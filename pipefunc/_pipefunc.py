@@ -763,8 +763,11 @@ class PipeFunc(Generic[T]):
         func = self.func
         if isinstance(func, _NestedFuncWrapper):
             func = func.func
-        if inspect.isclass(func) and not is_pydantic_base_model(func):
-            func = func.__init__
+        if not is_pydantic_base_model(func):
+            if inspect.isclass(func):
+                func = func.__init__
+            elif not inspect.isfunction(func):
+                func = func.__call__
         type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
 
@@ -774,6 +777,8 @@ class PipeFunc(Generic[T]):
         func = self.func
         if inspect.isclass(func) and isinstance(self.output_name, str):
             return {self.output_name: func}
+        if not inspect.isfunction(func):
+            func = func.__call__
         if self._output_picker is None:
             hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         else:
@@ -1535,7 +1540,9 @@ def _get_name(func: Callable[..., Any]) -> str:
             *_, class_name, method_name = qualname.split(".")
             return f"{class_name}.{method_name}"
         return qualname  # pragma: no cover
-    return func.__name__
+    if inspect.isfunction(func) or hasattr(func, "__name__"):
+        return func.__name__
+    return type(func).__name__
 
 
 def _pydantic_defaults(
