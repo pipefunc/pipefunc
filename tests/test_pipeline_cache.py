@@ -255,11 +255,14 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
 
 
 def test_cache_with_custom__pipefunc_hash__() -> None:
+    counter = {"call": 0}
+
     class MyCallable:
         def __init__(self, value: int):
             self.value = value
 
         def __call__(self, x: int) -> int:
+            counter["call"] += 1
             return self.value + x
 
         def __pipefunc_hash__(self) -> str:
@@ -269,4 +272,15 @@ def test_cache_with_custom__pipefunc_hash__() -> None:
     assert type(func).__name__
     pfunc = PipeFunc(func, "out", cache=True)
     pipeline = Pipeline([pfunc], cache_type="simple")
+    assert counter["call"] == 0
     pipeline(x=1)
+    assert counter["call"] == 1
+    pipeline(x=1)
+    assert counter["call"] == 1
+    pipeline.map(inputs={"x": 1}, parallel=False)
+    # Map uses different cache key
+    assert counter["call"] == 2
+    pipeline.map(inputs={"x": 1}, parallel=False)
+    assert counter["call"] == 2
+
+    assert pfunc._cache_id == "out-1"
