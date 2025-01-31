@@ -46,7 +46,7 @@ def test_tuple_outputs_with_cache() -> None:
     f = pipeline.func("i")
     r = f.call_full_output(a=1, b=2, x=3)["i"]
     assert r == f(a=1, b=2, x=3)
-    key = (f_d._cache_id, (("a", 1), ("b", 2), ("x", 3)))
+    key = ("d-e", (("a", 1), ("b", 2), ("x", 3)))
     assert pipeline.cache is not None
     assert pipeline.cache.cache[key] == (6, 1)
 
@@ -135,18 +135,18 @@ def test_simple_cache() -> None:
     pipeline = Pipeline([f], cache_type="simple")
     assert pipeline("c", a=1, b=2) == (1, 2)
     assert pipeline.cache is not None
-    assert pipeline.cache.cache == {(f._cache_id, (("a", 1), ("b", 2))): (1, 2)}
+    assert pipeline.cache.cache == {("c", (("a", 1), ("b", 2))): (1, 2)}
     pipeline.cache.clear()
     assert pipeline("c", a={"a": 1}, b=[2]) == ({"a": 1}, [2])
     m = _HASH_MARKER
     assert pipeline.cache.cache == {
-        (f._cache_id, (("a", (m, dict, (("a", 1),))), ("b", (m, list, (2,))))): ({"a": 1}, [2]),
+        ("c", (("a", (m, dict, (("a", 1),))), ("b", (m, list, (2,))))): ({"a": 1}, [2]),
     }
     assert len(pipeline.cache.cache) == 1
     pipeline.cache.clear()
     assert pipeline("c", a={"a"}, b=[2]) == ({"a"}, [2])
     assert pipeline.cache.cache == {
-        (f._cache_id, (("a", (m, set, ("a",))), ("b", (m, list, (2,))))): ({"a"}, [2]),
+        ("c", (("a", (m, set, ("a",))), ("b", (m, list, (2,))))): ({"a"}, [2]),
     }
     assert len(pipeline.cache.cache) == 1
 
@@ -185,8 +185,8 @@ def test_sharing_defaults() -> None:
 
     assert pipeline.cache is not None
     assert pipeline.cache.cache == {
-        (f._cache_id, (("a", 1), ("b", 1))): 2,
-        (g._cache_id, (("a", 1), ("b", 1))): 3,
+        ("c", (("a", 1), ("b", 1))): 2,
+        ("d", (("a", 1), ("b", 1))): 3,
     }
     # Call again, should use cache
     assert pipeline("d", a=1) == 3
