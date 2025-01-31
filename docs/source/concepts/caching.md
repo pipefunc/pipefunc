@@ -62,20 +62,24 @@ If `cache=False` (default) caching is disabled for that function.
   When the cache is full, the least recently used item is discarded.
   This is a good general-purpose cache.
   Use the `shared=True` option in `cache_kwargs` when using `pipeline.map` with `parallel=True`.
+  This creates a {class}`~pipefunc.cache.LRUCache` instance.
 
 - **`hybrid`**:
   Uses a combination of Least Frequently Used (LFU) and Least Computationally Expensive (LCE) strategies to determine which items to evict from the cache.
   This is useful when the computation time of functions varies significantly.
   Use the `shared=True` option in `cache_kwargs` when using `pipeline.map` with `parallel=True`.
+  This creates a {class}`~pipefunc.cache.HybridCache` instance.
 
 - **`disk`**:
   Stores cached results on disk using `pickle` or `cloudpickle`.
   Useful for caching large objects that do not fit in memory or for persisting the cache across sessions.
   The `with_lru_cache=True` option in `cache_kwargs` can be used to combine `disk` with an in-memory LRU cache to avoid reading from disk too often.
+  This creates a {class}`~pipefunc.cache.DiskCache` instance.
 
 - **`simple`**:
   A basic cache that stores all results in memory without any eviction strategy.
   Useful for debugging or when you know that the cache will not grow too large.
+  This creates a {class}`~pipefunc.cache.SimpleCache` instance.
 
 You can specify the cache type using the `cache_type` parameter when creating a {class}`~pipefunc.Pipeline`.
 
