@@ -523,3 +523,7 @@ def test_annotations_nested_pipefunc() -> None:
 
     nf = NestedPipeFunc([f, g])
     assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"c": int, "d": int}
+    nf2 = NestedPipeFunc([f, g], output_name="d")
+    assert nf2.parameter_annotations == {"a": int, "b": int}
+    assert nf2.output_annotation == {"d": int}
