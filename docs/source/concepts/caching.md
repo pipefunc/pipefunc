@@ -156,7 +156,7 @@ This allows you to incorporate relevant parts of the function's state into the c
 
 **Example:**
 
-```python
+```{code-cell} ipython3
 from pipefunc import PipeFunc, Pipeline
 
 class MyStatefulFunction:
