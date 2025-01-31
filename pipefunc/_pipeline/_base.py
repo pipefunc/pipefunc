@@ -1210,13 +1210,14 @@ class Pipeline:
         """
         annotations: dict[str, Any] = {}
         for f in self.sorted_functions:
-            if f.parameter_annotations:
-                for p, v in f.parameter_annotations.items():
-                    if p in annotations and annotations[p] != v:
-                        msg = f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
-                        warnings.warn(msg, stacklevel=2)
-                        continue
-                    annotations[p] = v
+            for p, v in f.parameter_annotations.items():
+                if p in annotations and annotations[p] != v:
+                    msg = (
+                        f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
+                    )
+                    warnings.warn(msg, stacklevel=2)
+                    continue
+                annotations[p] = v
         return annotations
 
     @functools.cached_property
