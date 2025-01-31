@@ -187,7 +187,7 @@ By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you 
 ## Advanced: Caching Stateful Functions
 
 When caching stateful functions, you need to be careful about the cache key because the function's internal state can affect the result, even if the input arguments are the same.
-By default, `pipefunc` computes the cache key based on the function's input arguments.
+By default, `pipefunc` computes the [cache key](#cache-keys) based on the function's input arguments.
 However, this is insufficient for stateful functions where the internal state can change the output.
 
 To address this, `pipefunc` provides a mechanism to customize how the cache key is generated for stateful functions using the special `__pipefunc_hash__` method.
