@@ -672,7 +672,7 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
-        if args:
+        if args:  # Put positional arguments into kwargs
             for p, v in zip(self.parameters, args):
                 if p in kwargs:
                     msg = f"Multiple values provided for parameter `{p}`."
