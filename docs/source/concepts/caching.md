@@ -94,11 +94,71 @@ This function handles most built-in Python types and some common third-party typ
 If `to_hashable` cannot create a hashable representation of the input, it will attempt to serialize it to a string using `cloudpickle`.
 If that also fails, it will raise an {class}`pipefunc.cache.UnhashableError`.
 
-## Shared Memory Caching
+## Parallelization and Caching
 
-When using `pipeline.map` with `parallel=True`, it is essential to use a cache that supports shared memory.
+When using `pipeline.map` with `parallel=True`, the pipeline will execute functions in parallel using multiple processes.
+In this scenario, it is essential to use a cache that is safe for parallel access.
+`pipefunc` offers two primary options for this: shared memory caches and disk-based caches.
+
+**Shared Memory Caches:**
+
 The `lru` and `hybrid` cache types support shared memory when created with `shared=True` in the `cache_kwargs`.
-This ensures that multiple processes can access and update the same cache.
+This ensures that all processes can safely access and update the same cache in memory without conflicts.
+
+**Disk-Based Caches:**
+
+The `disk` type provides an alternative approach where each process stores its cached data in separate files on disk.
+This allows for caching large datasets that exceed available memory but comes with slower access times due to disk I/O.
+
+**Example with Shared Memory Cache:**
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+
+# Enable shared memory caching for the pipeline using an LRU cache
+pipeline = Pipeline(
+    [my_function, another_function],
+    cache_type="lru",
+    cache_kwargs={"max_size": 256, "shared": True},
+)
+
+# The pipeline can now be safely used with `pipeline.map(..., parallel=True)`
+```
+
+**Example with Disk Cache:**
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+
+# Enable disk caching for the pipeline
+pipeline = Pipeline(
+    [my_function, another_function],
+    cache_type="disk",
+    cache_kwargs={"cache_dir": "my_cache_dir"},
+)
+
+# The pipeline can now be safely used with `pipeline.map(..., parallel=True)`
+```
+
+**Choosing the Right Cache Type:**
+
+- **Shared Memory Caches (`lru`, `hybrid` with `shared=True`):**
+
+  - Generally faster access times as data is stored in memory.
+  - Suitable for smaller datasets that can fit in memory.
+  - Requires careful consideration of `max_size` to avoid excessive memory consumption.
+
+- **Disk-Based Caches (`disk`):**
+  - Ideal for very large datasets that exceed available memory.
+  - Cache survives across pipeline runs and process terminations.
+  - Can handle larger cache sizes without impacting memory usage.
+  - Slower access times compared to shared memory caches due to disk I/O.
+  - The `with_lru_cache=True` option can be used to mitigate this by adding an in-memory LRU cache.
+
+**Important Considerations:**
+
+- Using a shared cache or a disk cache with `parallel=False` is generally not recommended as it adds unnecessary overhead without providing any benefits.
+- When using `cache_type=disk`, ensure that the specified `cache_dir` has sufficient disk space and that the I/O performance is adequate for your needs.
 
 ## Handling Unhashable Objects
 
