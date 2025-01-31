@@ -10,7 +10,7 @@ from pipefunc.typing import NoAnnotation
 
 def test_nested_pipefunc_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 2})
-    def f(a, b):
+    def f(a, b: float):
         return a + b
 
     @pipefunc(output_name="d")
@@ -31,7 +31,7 @@ def test_nested_pipefunc_defaults() -> None:
     pipeline["c"].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
-    assert nf.parameter_annotations == {"a": NoAnnotation, "b": NoAnnotation}
+    assert nf.parameter_annotations == {"b": float}
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
     assert pipeline() == (15, 15)
 
