@@ -45,7 +45,7 @@ def another_function(x, y):
     # ... some computation ...
     return result
 
-# Enable caching for the entire pipeline using an LRU cache
+# Setting the caching for the pipeline to use a LRU cache
 pipeline = Pipeline([my_function, another_function], cache_type="lru", cache_kwargs={"max_size": 256})
 ```
 
@@ -94,7 +94,8 @@ When using `pipeline.map`, the cache key is computed based on the input values o
 
 By default, `pipefunc` uses the `pipefunc.cache.to_hashable` function to convert non-hashable input arguments into a hashable representation that can be used as a cache key.
 This function handles most built-in Python types and some common third-party types like NumPy arrays and pandas Series/DataFrames.
-Not all types can be converted to a hashable representation.
+If `to_hashable` cannot create a hashable representation of the input, it will attempt to serialize it to a string using `cloudpickle`.
+If that also fails, it will raise an `UnhashableError`.
 
 ## Shared Memory Caching
 
@@ -117,28 +118,9 @@ pipeline = Pipeline(
 
 If your function arguments are not hashable, `pipefunc` will attempt to convert them into a hashable representation using the `pipefunc.cache.to_hashable` function.
 This function handles most built-in Python types and some common third-party types like NumPy arrays and pandas Series/DataFrames.
+If it cannot make the object hashable, it will attempt to serialize it using `cloudpickle`.
 
-If the object cannot be made hashable, `pipefunc` will raise an `UnhashableError` by default.
-You can change this behavior using the `unhashable_action` parameter of the `pipefunc.cache.memoize` function:
-
-- `"error"`: Raise an `UnhashableError` (default).
-- `"warning"`: Log a warning and skip caching for that call.
-- `"ignore"`: Silently skip caching for that call.
-
-```python
-from pipefunc import Pipeline, pipefunc
-from pipefunc.cache import memoize
-
-# Configure memoize to warn on unhashable objects
-memoize_decorator = functools.partial(memoize, unhashable_action="warning")
-
-@pipefunc("output", memoize=memoize_decorator)
-def my_function(input1, input2):
-    # ... expensive computation ...
-    return result
-
-pipeline = Pipeline([my_function], cache_type="lru")
-```
+If the object cannot be made hashable and cannot be serialized, `pipefunc` will raise an `UnhashableError`.
 
 ## Clearing the Cache
 
@@ -158,3 +140,69 @@ pipeline.cache.clear()
 - Caution ⛔️: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
 
 By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you can significantly improve the performance of your pipelines, especially when dealing with computationally expensive functions or large datasets.
+
+## The `@memoize` Decorator
+
+The `pipefunc.cache` module also provides a `@memoize` decorator for general-purpose function memoization, independent of `PipeFunc` and `Pipeline`.
+This decorator allows you to cache the results of any function using the available cache types (e.g., `LRUCache`, `HybridCache`, `SimpleCache`, `DiskCache`).
+
+```python
+from pipefunc.cache import memoize, LRUCache, HybridCache, SimpleCache, DiskCache
+
+# Use a shared LRU cache
+lru_cache = LRUCache(max_size=256, shared=True)
+
+@memoize(cache=lru_cache)
+def expensive_function(arg1, arg2):
+    # ... expensive computation ...
+    return result
+
+# Use a HybridCache with specific weights
+hybrid_cache = HybridCache(max_size=100, access_weight=0.7, duration_weight=0.3, shared=True)
+
+@memoize(cache=hybrid_cache)
+def another_function(x, y):
+    # ... some computation ...
+    return result
+
+# Use a SimpleCache
+simple_cache = SimpleCache()
+
+@memoize(cache=simple_cache)
+def simple_function(a, b):
+    # ... simple computation ...
+    return a + b
+
+# Use a DiskCache with cloudpickle serialization and LRU caching
+disk_cache = DiskCache(cache_dir="cache_dir", use_cloudpickle=True, with_lru_cache=True, lru_cache_size=128)
+
+@memoize(cache=disk_cache)
+def disk_cached_function(data):
+    # ... function that processes large data ...
+    return processed_data
+```
+
+You can customize the behavior of `@memoize` using the following parameters:
+
+- `cache`: The cache instance to use. If `None`, a `SimpleCache` is used.
+- `key_func`: A custom function to generate cache keys. If `None`, the default key generation is used.
+- `fallback_to_pickle`: If `True` (default), unhashable keys will be pickled using `cloudpickle` as a last resort.
+- `unhashable_action`: Determines the behavior when encountering unhashable keys:
+  - `"error"`: Raise an `UnhashableError` (default).
+  - `"warning"`: Log a warning and skip caching for that call.
+  - `"ignore"`: Silently skip caching for that call.
+
+```python
+from pipefunc.cache import memoize, UnhashableError
+
+def custom_key_func(*args, **kwargs):
+    # Custom logic to generate a hashable key from the function arguments
+    return hash(str(args) + str(kwargs))
+
+@memoize(key_func=custom_key_func, unhashable_action="warning")
+def my_function(data):
+    # ... function that takes unhashable arguments ...
+    return result
+```
+
+The `@memoize` decorator provides a convenient way to add caching to any function, independent of `PipeFunc` and `Pipeline`.
