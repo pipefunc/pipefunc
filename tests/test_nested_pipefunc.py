@@ -19,6 +19,7 @@ def test_nested_pipefunc_defaults() -> None:
 
     nf = NestedPipeFunc([f, g])
     pipeline = Pipeline([nf])
+    assert nf.__name__ == "NestedPipeFunc_c_d"
     assert nf.defaults == {"b": 2}
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)

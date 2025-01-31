@@ -653,3 +653,33 @@ def test_nested_pipefunc_renames() -> None:
         renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
     )
     assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
+
+
+def test_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    pf = PipeFunc(MyClass(), output_name="out")
+    assert pf(a=1, b=2) == 3
+
+    assert pf.defaults == {"b": 1}
+    assert pf.parameter_annotations == {"a": int, "b": int}
+    assert pf.output_annotation == {"out": int}
+    assert pf.__name__ == "MyClass"
+
+
+def test_nested_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    def g(f: int) -> int:
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(MyClass(), "f"), PipeFunc(g, "g")])
+    assert nf.defaults == {"b": 1}
+    assert nf(a=1, b=2) == (3, 3)
+    nf.copy()
+    assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"f": int, "g": int}
