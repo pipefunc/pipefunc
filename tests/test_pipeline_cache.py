@@ -182,7 +182,6 @@ def test_sharing_defaults() -> None:
 
     pipeline = Pipeline([f, g], cache_type="simple")
     assert pipeline("d", a=1) == 3
-
     assert pipeline.cache is not None
     assert pipeline.cache.cache == {
         ("c", (("a", 1), ("b", 1))): 2,
@@ -253,3 +252,21 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
         # Call with different arguments
         assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
         assert calls == {"f": 2 * len(a), "g": 2, "h": i + 4}
+
+
+def test_cache_with_custom__pipefunc_hash__() -> None:
+    class MyCallable:
+        def __init__(self, value: int):
+            self.value = value
+
+        def __call__(self, x: int) -> int:
+            return self.value + x
+
+        def __pipefunc_hash__(self) -> str:
+            return str(self.value)
+
+    func = MyCallable(1)
+    assert type(func).__name__
+    pfunc = PipeFunc(func, "out", cache=True)
+    pipeline = Pipeline([pfunc], cache_type="simple")
+    pipeline(x=1)

@@ -1544,7 +1544,9 @@ def _get_name(func: Callable[..., Any]) -> str:
             *_, class_name, method_name = qualname.split(".")
             return f"{class_name}.{method_name}"
         return qualname  # pragma: no cover
-    return func.__name__
+    if hasattr(func, "__name__"):
+        return func.__name__
+    return func.__class__.__name__
 
 
 def _pydantic_defaults(
