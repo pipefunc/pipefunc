@@ -29,13 +29,13 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 pandas = ["pandas"]
-plotting = ["bokeh", "graphviz", "holoviews","matplotlib"]
+plotting = ["bokeh", "graphviz", "holoviews", "matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
 rich = ["rich"]
 widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr"]
+zarr = ["zarr>=2,<3"]
 test = [
     "coverage",
     "pytest-asyncio",
@@ -46,6 +46,7 @@ test = [
     "pytest",
     "versioningit",
 ]
+autodoc = ["griffe", "rich"]
 docs = [
     "emoji",
     "jupytext",
@@ -57,6 +58,7 @@ docs = [
     "sphinx-notfound-page",
     "sphinx-togglebutton",
     "sphinx",
+    "sphinxcontrib-mermaid",
     "versioningit",
     # Used for the example notebook
     "nltk",
@@ -65,7 +67,9 @@ docs = [
     "pipefunc[all]",
 ]
 # all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,pandas,plotting,profiling,rich,widgets,xarray,zarr]"]
+all = [
+    "pipefunc[adaptive,autodoc,pandas,plotting,profiling,rich,widgets,xarray,zarr]",
+]
 dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
@@ -74,6 +78,21 @@ dev = [ # all + dev deps
     "versioningit",
     "pipefunc[all,test,docs,pydantic]",
 ]
+# matches pipefunc-extras in https://github.com/conda-forge/pipefunc-feedstock/blob/main/recipe/meta.yaml
+extras = [
+    "adaptive",
+    "graphviz",
+    "graphviz-anywidget",
+    "griffe",
+    "ipywidgets",
+    "matplotlib",
+    "pandas",
+    "psutil",
+    "rich",
+    "xarray",
+    "zarr>=2,<3",
+]
+
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"

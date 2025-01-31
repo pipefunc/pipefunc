@@ -34,18 +34,17 @@ from ._adaptive_scheduler_slurm_executor import (
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, Result
+from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable, Generator, Iterable, Sequence
 
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
@@ -65,13 +64,13 @@ def run_map(
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
-) -> OrderedDict[str, Result]:
+) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -191,13 +190,14 @@ def run_map(
     return outputs
 
 
-class AsyncMap(NamedTuple):
-    task: asyncio.Task[OrderedDict[str, Result]]
+@dataclass
+class AsyncMap:
+    task: asyncio.Task[ResultDict]
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
 
-    def result(self) -> OrderedDict[str, Result]:
+    def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -230,7 +230,7 @@ def run_map_async(
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -336,7 +336,7 @@ def run_map_async(
 
     multi_run_manager = maybe_multi_run_manager(executor_dict)
 
-    async def _run_pipeline() -> OrderedDict[str, Result]:
+    async def _run_pipeline() -> ResultDict:
         with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
@@ -584,11 +584,12 @@ def _set_output(
     linear_index: int,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    assert np.shape(output) == internal_shape
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -600,17 +601,36 @@ def _set_output(
         arr[flat_index] = output[internal_index]
 
 
+def _validate_internal_shape(
+    output: np.ndarray,
+    internal_shape: tuple[int, ...],
+    func: PipeFunc,
+) -> None:
+    if np.shape(output) != internal_shape:
+        msg = (
+            f"Output shape {np.shape(output)} of function '{func.__name__}'"
+            f" (output '{func.output_name}') does not match the expected"
+            f" internal shape {internal_shape} used in the `mapspec`"
+            f" '{func.mapspec}'. This error typically occurs when"
+            " a `PipeFunc` returns values with inconsistent shapes across"
+            " different invocations. Ensure that the output shape is"
+            " consistent for all inputs."
+        )
+        raise ValueError(msg)
+
+
 def _update_result_array(
     result_arrays: list[np.ndarray],
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
-            _set_output(result_array, _output, index, shape, mask)
+            _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
 
@@ -816,6 +836,8 @@ def _maybe_parallel_map(
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
+    if not indices:
+        return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -953,7 +975,7 @@ def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -977,7 +999,7 @@ async def _run_and_process_generation_async(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -1001,7 +1023,7 @@ async def _run_and_process_generation_async(
 
 def _update_shapes_using_result(
     func: PipeFunc,
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
     store: dict[str, StoreType],
 ) -> None:
@@ -1029,7 +1051,7 @@ def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -1042,7 +1064,7 @@ async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -1151,7 +1173,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
@@ -1161,7 +1183,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
@@ -1191,9 +1213,9 @@ def _to_result_dict(
     kwargs: dict[str, Any],
     output: tuple[Any, ...],
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     # Note that the kwargs still contain the StorageBase objects if mapspec was used.
-    return {
+    data = {
         output_name: Result(
             function=func.__name__,
             kwargs=kwargs,
@@ -1203,6 +1225,7 @@ def _to_result_dict(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
+    return ResultDict(data)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1210,7 +1233,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
@@ -1245,7 +1268,7 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:

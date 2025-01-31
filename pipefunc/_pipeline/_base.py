@@ -44,6 +44,7 @@ from pipefunc.map._mapspec import (
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.resources import Resources
 
+from ._autodoc import PipelineDocumentation, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
 from ._mapspec import (
     add_mapspec_axis,
@@ -60,7 +61,6 @@ from ._validation import (
 )
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable, Iterable
     from concurrent.futures import Executor
     from pathlib import Path
@@ -71,11 +71,12 @@ if TYPE_CHECKING:
     import ipywidgets
     from rich.table import Table
 
+    from pipefunc._plotting import GraphvizStyle
     from pipefunc._profile import ProfilingStats
-    from pipefunc.map._result import Result
+    from pipefunc.map._result import ResultDict
     from pipefunc.map._types import UserShapeDict
 
-    from ._types import OUTPUT_TYPE
+    from ._types import OUTPUT_TYPE, StorageType
 
 
 class Pipeline:
@@ -94,6 +95,7 @@ class Pipeline:
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
+        Profiling is only available for sequential execution.
     cache_type
         The type of cache to use. See the notes below for more *important* information.
     cache_kwargs
@@ -220,6 +222,8 @@ class Pipeline:
             The leaf nodes of the pipeline as `PipeFunc` objects.
         root_args
             The root arguments (inputs) required to compute the output of the pipeline.
+        print_documentation
+            Print formatted documentation of the pipeline to the console.
 
         """
         inputs = self.root_args()
@@ -228,11 +232,11 @@ class Pipeline:
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
         info = {
-            "inputs": inputs,
-            "outputs": outputs,
-            "intermediate_outputs": intermediate_outputs,
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
+            "inputs": inputs,
+            "intermediate_outputs": intermediate_outputs,
+            "outputs": outputs,
         }
         if not print_table:
             return info
@@ -310,7 +314,7 @@ class Pipeline:
             f.debug = self.debug
 
         self._clear_internal_cache()  # reset cache
-        self._validate()
+        self.validate()
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: OUTPUT_TYPE | None = None) -> None:
@@ -344,7 +348,7 @@ class Pipeline:
             f = self.output_to_func[output_name]
             self.drop(f=f)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
         """Replace a function in the pipeline with another function.
@@ -364,7 +368,7 @@ class Pipeline:
             self.drop(f=old)
         self.add(new)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     @functools.cached_property
     def output_to_func(self) -> dict[OUTPUT_TYPE, PipeFunc]:
@@ -647,6 +651,16 @@ class Pipeline:
             names to their return values if ``full_output`` is ``True``.
 
         """
+        if output_name in kwargs:
+            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
+            raise ValueError(msg)
+        if output_name not in self.output_to_func:
+            available = ", ".join(k for k in self.output_to_func if isinstance(k, str))
+            msg = (
+                f"No function with output name `{output_name}` in the pipeline, only `{available}`."
+            )
+            raise ValueError(msg)
+
         if p := self.mapspec_names & set(self.func_dependencies(output_name)):
             inputs = self.mapspec_names & set(self.root_args(output_name))
             msg = (
@@ -654,10 +668,6 @@ class Pipeline:
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
             )
             raise RuntimeError(msg)
-
-        if output_name in kwargs:
-            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
-            raise ValueError(msg)
 
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
@@ -692,13 +702,13 @@ class Pipeline:
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+        storage: StorageType = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
-    ) -> OrderedDict[str, Result]:
+    ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
         Parameters
@@ -786,7 +796,7 @@ class Pipeline:
 
         Returns
         -------
-            An `OrderedDict` containing the results of the pipeline. The values are of type `Result`,
+            A `ResultDict` containing the results of the pipeline. The values are of type `Result`,
             use `Result.output` to get the actual result.
 
         """
@@ -816,7 +826,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+        storage: StorageType = "file_array",
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -967,15 +977,15 @@ class Pipeline:
         """
         if r := self._internal_cache.root_args.get(output_name):
             return r
+
         if output_name is None:
-            outputs = {arg for args in self.all_root_args.values() for arg in args}
-            sorted_outputs = tuple(sorted(outputs))
-            self._internal_cache.root_args[None] = sorted_outputs
-            return sorted_outputs
-        arg_combos = self.arg_combinations(output_name)
-        root_args = next(
-            args for args in arg_combos if all(isinstance(self.node_mapping[n], str) for n in args)
-        )
+            root_args = tuple(sorted(self.topological_generations.root_args))
+        else:
+            all_root_args = set(self.topological_generations.root_args)
+            ancestors = nx.ancestors(self.graph, self.output_to_func[output_name])
+            root_args_set = {n for n in self.graph.nodes if n in all_root_args and n in ancestors}
+            root_args = tuple(sorted(root_args_set))
+
         self._internal_cache.root_args[output_name] = root_args
         return root_args
 
@@ -1053,7 +1063,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_renames(
         self,
@@ -1094,7 +1104,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_scope(
         self,
@@ -1138,6 +1148,11 @@ class Pipeline:
             Names to exclude from the scope. Both inputs and outputs can be excluded.
             Can be used with ``inputs`` or ``outputs`` being ``"*"`` to exclude specific names.
 
+        Raises
+        ------
+        ValueError
+            If no function's scope was updated, e.g., when both ``inputs=None`` and ``outputs=None``.
+
         Examples
         --------
         >>> pipeline.update_scope("my_scope", inputs="*", outputs="*")  # Add scope to all inputs and outputs
@@ -1155,7 +1170,7 @@ class Pipeline:
             outputs = all_outputs
         if exclude is None:
             exclude = set()
-
+        changed_any = False
         for f in self.functions:
             parameters = set(f.parameters)
             f_inputs = (
@@ -1170,9 +1185,13 @@ class Pipeline:
                 else outputs
             )
             if f_inputs or f_outputs:
+                changed_any = True
                 f.update_scope(scope, inputs=f_inputs, outputs=f_outputs, exclude=exclude)
+        if not changed_any:
+            msg = "No function's scope was updated. Ensure `inputs` and/or `outputs` are specified correctly."
+            raise ValueError(msg)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
@@ -1233,8 +1252,14 @@ class Pipeline:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
 
-    def _validate(self) -> None:
-        """Validate the pipeline."""
+    def validate(self) -> None:
+        """Validate the pipeline (checks its scopes, renames, defaults, mapspec, type hints).
+
+        This is automatically called when the pipeline is created and when calling state
+        updating methods like {method}`~Pipeline.update_renames` or
+        {method}`~Pipeline.update_defaults`. Should be called manually after e.g.,
+        manually updating `pipeline.validate_type_annotations` or changing some other attributes.
+        """
         validate_scopes(self.functions)
         validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
@@ -1346,7 +1371,7 @@ class Pipeline:
         for p in parameter:
             add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _func_node_colors(
         self,
@@ -1439,7 +1464,7 @@ class Pipeline:
         *,
         figsize: tuple[int, int] | int | None = None,
         filename: str | Path | None = None,
-        func_node_colors: str | list[str] | None = None,
+        style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
@@ -1456,8 +1481,8 @@ class Pipeline:
             If ``None``, the size will be determined automatically.
         filename
             The filename to save the figure to, if provided.
-        func_node_colors
-            The colors for function nodes.
+        style
+            Style for the graph visualization.
         orient
             Graph orientation: 'TB', 'LR', 'BT', 'RL'.
         graphviz_kwargs
@@ -1486,7 +1511,7 @@ class Pipeline:
             self.defaults,
             figsize=figsize,
             filename=filename,
-            func_node_colors=func_node_colors,
+            style=style,
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,
@@ -1726,6 +1751,7 @@ class Pipeline:
         self,
         output_names: set[OUTPUT_TYPE] | Literal["*"],
         new_output_name: OUTPUT_TYPE | None = None,
+        function_name: str | None = None,
     ) -> NestedPipeFunc:
         """Replaces a set of output names with a single nested function inplace.
 
@@ -1736,7 +1762,11 @@ class Pipeline:
             in the pipeline into a single `NestedPipeFunc`.
         new_output_name
             The identifier for the output of the wrapped function. If ``None``, it is automatically
-            constructed from all the output names of the `PipeFunc` instances.
+            constructed from all the output names of the `PipeFunc` instances. Must be a subset of
+            the output names of the `PipeFunc` instances.
+        function_name
+            The name of the nested function, if ``None`` the name will be set
+            to ``"NestedPipeFunc_{output_name[0]}_{output_name[...]}"``.
 
         Returns
         -------
@@ -1750,7 +1780,11 @@ class Pipeline:
 
         for f in funcs:
             self.drop(f=f)
-        nested_func = NestedPipeFunc(funcs, output_name=new_output_name)
+        nested_func = NestedPipeFunc(
+            funcs,
+            output_name=new_output_name,
+            function_name=function_name,
+        )
         self.add(nested_func)
         return nested_func
 
@@ -1981,6 +2015,59 @@ class Pipeline:
         # Return a plaintext representation of the object
         return {"text/plain": repr(self)}
 
+    def print_documentation(
+        self,
+        *,
+        borders: bool = False,
+        skip_optional: bool = False,
+        skip_intermediate: bool = True,
+        description_table: bool = True,
+        parameters_table: bool = True,
+        returns_table: bool = True,
+        order: Literal["topological", "alphabetical"] = "topological",
+    ) -> None:
+        """Print the documentation for the pipeline as a table formatted with Rich.
+
+        Parameters
+        ----------
+        borders
+            Whether to include borders in the tables.
+        skip_optional
+            Whether to skip optional parameters.
+        skip_intermediate
+            Whether to skip intermediate outputs and only show root parameters.
+        description_table
+            Whether to generate the function description table.
+        parameters_table
+            Whether to generate the function parameters table.
+        returns_table
+            Whether to generate the function returns table.
+        order
+            The order in which to display the functions in the documentation.
+            Options are:
+
+            * ``topological``: Display functions in topological order.
+            * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+
+        See Also
+        --------
+        info
+            Returns the input and output information for the pipeline.
+
+        """
+        requires("rich", "griffe", reason="print_doc", extras="autodoc")
+        doc = PipelineDocumentation.from_pipeline(self)
+        format_pipeline_docs(
+            doc,
+            skip_optional=skip_optional,
+            skip_intermediate=skip_intermediate,
+            borders=borders,
+            description_table=description_table,
+            parameters_table=parameters_table,
+            returns_table=returns_table,
+            order=order,
+        )
+
 
 class Generations(NamedTuple):
     root_args: list[str]
@@ -2121,8 +2208,7 @@ def _update_all_results(
     all_results: dict[OUTPUT_TYPE, Any],
     lazy: bool,  # noqa: FBT001
 ) -> None:
-    if isinstance(func.output_name, tuple) and not isinstance(output_name, tuple):
-        # Function produces multiple outputs, but only one is requested
+    if isinstance(func.output_name, tuple):
         assert func.output_picker is not None
         for name in func.output_name:
             all_results[name] = (
@@ -2130,6 +2216,10 @@ def _update_all_results(
                 if lazy
                 else func.output_picker(r, name)
             )
+        if isinstance(output_name, tuple):
+            # Also assign the full name because `_run` will need it
+            # This duplicates the result but it's a small overhead
+            all_results[func.output_name] = r
     else:
         all_results[func.output_name] = r
 

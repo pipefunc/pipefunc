@@ -23,6 +23,8 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
+  # optional-dependencies: pydantic
+  - pydantic
   # optional-dependencies: rich
   - rich
   # optional-dependencies: widgets
@@ -31,7 +33,7 @@ dependencies:
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
-  - zarr
+  - zarr>=2,<3
   # optional-dependencies: test
   - coverage
   - pytest-asyncio
@@ -41,3 +43,5 @@ dependencies:
   - pytest-xdist
   - pytest
   - versioningit
+  # optional-dependencies: autodoc
+  - griffe

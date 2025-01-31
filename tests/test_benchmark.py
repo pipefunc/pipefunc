@@ -9,9 +9,9 @@ def pipeline() -> Pipeline:
     def f1(a, b, c, d, e):
         return a + b + c + d + e
 
-    @pipefunc(output_name="out2", defaults={"f": 1, "g": 1})
+    @pipefunc(output_name=("out2", "unused_out"), defaults={"f": 1, "g": 1})
     def f2(c, d, e, f, g, out1=1):
-        return c + d + e + f + g + out1
+        return c + d + e + f + g + out1, 1
 
     @pipefunc(output_name="out3", defaults={"h": 1, "i": 1})
     def f3(e, f, g, h, i, out1=1, out2=1):

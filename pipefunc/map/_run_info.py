@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import shutil
 import tempfile
 import warnings
@@ -223,17 +224,29 @@ class RunInfo:
         for name, shape in self.resolved_shapes.items():
             if not shape_is_resolved(shape):
                 mapspec = mapspecs[first(name)]
-                new_shape, _ = shape_and_mask_from_mapspec(mapspec, self.resolved_shapes, internal)
+                new_shape, mask = shape_and_mask_from_mapspec(
+                    mapspec,
+                    self.resolved_shapes,
+                    internal,
+                )
+                assert mask == self.shape_masks[name]
                 self.resolved_shapes[name] = new_shape
                 if not isinstance(name, tuple):
-                    _update_shape_in_store(new_shape, store, name)
+                    _update_shape_in_store(new_shape, mask, store, name)
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
 
 
-def _update_shape_in_store(shape: ShapeTuple, store: dict[str, StoreType], name: str) -> None:
+def _update_shape_in_store(
+    shape: ShapeTuple,
+    mask: tuple[bool, ...],
+    store: dict[str, StoreType],
+    name: str,
+) -> None:
     storage = store.get(name)
     if isinstance(storage, StorageBase):
-        storage.shape = shape
+        external_shape = external_shape_from_mask(shape, mask)
+        assert len(storage.shape) == len(external_shape)
+        storage.shape = external_shape
 
 
 def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
@@ -248,8 +261,9 @@ def _maybe_run_folder(
 ) -> Path | None:
     if run_folder is None and _requires_serialization(storage):
         run_folder = tempfile.mkdtemp()
-        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
-        warnings.warn(msg, stacklevel=2)
+        if os.getenv("READTHEDOCS") is None:
+            msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
+            warnings.warn(msg, stacklevel=2)
     return Path(run_folder) if run_folder is not None else None
 
 
