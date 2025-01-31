@@ -26,11 +26,11 @@ By storing the results of expensive function calls and reusing them when the sam
 
 ## Enabling Caching
 
-Caching is disabled by default for each `PipeFunc` but can be enabled using the `cache=True` parameter of the `@pipefunc` decorator or the `PipeFunc` constructor.
+Caching is disabled by default for each {class}`~pipefunc.PipeFunc` but can be enabled using the `cache=True` parameter of the `@pipefunc` decorator or the {class}`~pipefunc.PipeFunc` constructor.
 When caching is enabled, the result of the function is stored in the pipeline's cache after the first call.
-The actual cache lives in the `Pipeline` object and is shared across all functions in the pipeline.
-It's configured at the `Pipeline` level using the `cache_type` and `cache_kwargs` parameters.
-When you create a `Pipeline`, you can specify the type of cache to use:
+The actual cache lives in the {class}`~pipeline.Pipeline` object and is shared across all functions in the pipeline.
+It's configured at the {class}`~pipeline.Pipeline` level using the `cache_type` and `cache_kwargs` parameters.
+When you create a {class}`~pipeline.Pipeline`, you can specify the type of cache to use:
 
 ```{code-cell} ipython3
 from pipefunc import pipefunc, Pipeline
@@ -49,7 +49,7 @@ def another_function(x, y):
 pipeline = Pipeline([my_function, another_function], cache_type="lru", cache_kwargs={"max_size": 256})
 ```
 
-Individual functions have caching enabled or disabled using the `cache` parameter of the `@pipefunc` decorator or the `PipeFunc` constructor.
+Individual functions have caching enabled or disabled using the `cache` parameter of the `@pipefunc` decorator or the {class}`~pipefunc.PipeFunc` constructor.
 If `cache=True` the function will use the pipeline's cache.
 If `cache=False` (default) caching is disabled for that function.
 
@@ -81,9 +81,9 @@ You can specify the cache type using the `cache_type` parameter when creating a 
 
 ## Cache Keys
 
-The cache key is computed based on the input values of each `PipeFunc`.
+The cache key is computed based on the input values of each {class}`~pipefunc.PipeFunc`.
 When using `pipeline.run` or calling the pipeline as a function, the cache key is computed based solely on the root arguments provided to the pipeline. This means that _*only*_ the root arguments need to be "hashable" (see [section](#handling-unhashable-objects) below) for caching to work.
-When using `pipeline.map`, the cache key is computed based on the input values of each `PipeFunc`. That means that _*all*_ arguments to each cached function must be "hashable" (see [section](#handling-unhashable-objects) below) for caching to work.
+When using `pipeline.map`, the cache key is computed based on the input values of each {class}`~pipefunc.PipeFunc`. That means that _*all*_ arguments to each cached function must be "hashable" (see [section](#handling-unhashable-objects) below) for caching to work.
 
 By default, `pipefunc` uses the `pipefunc.cache.to_hashable` function to convert non-hashable input arguments into a hashable representation that can be used as a cache key.
 This function handles most built-in Python types and some common third-party types like NumPy arrays and pandas Series/DataFrames.
@@ -98,10 +98,10 @@ This ensures that multiple processes can access and update the same cache.
 
 ## Handling Unhashable Objects
 
-If your function arguments are not hashable, `pipefunc` will attempt to convert them into a hashable representation using the `pipefunc.cache.to_hashable` function.
+If your function arguments are not hashable, `pipefunc` will attempt to convert them into a hashable representation using the {func}`pipefunc.cache.to_hashable` function.
 This function handles most built-in Python types and some common third-party types like NumPy arrays and pandas Series/DataFrames.
 If it cannot make the object hashable, it will attempt to serialize it using `cloudpickle`.
-Finally, if that fails, it will raise an `UnhashableError`.
+Finally, if that fails, it will raise an {class}`pipefunc.cache.UnhashableError`.
 
 ## Clearing the Cache
 
@@ -114,8 +114,8 @@ pipeline.cache.clear()
 ## Important Notes
 
 - The caching behavior differs between `pipeline.map` and `pipeline.run`/`pipeline(...)`.
-- When using `pipeline.map` with `parallel=True`, the cache itself will be serialized, so one must use a cache that supports shared memory, such as `~pipefunc.cache.LRUCache` with `shared=True` or a disk cache like `~pipefunc.cache.DiskCache`.
-- The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable, which is a requirement for storing results in a cache.
+- When using `pipeline.map` with `parallel=True`, the cache itself will be serialized, so one must use a cache that supports shared memory, such as {class}`~pipefunc.cache.LRUCache` with `shared=True` or a disk cache like {class}`~pipefunc.cache.DiskCache`.
+- The {func}`pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable, which is a requirement for storing results in a cache.
 - This function works for many common types but is not guaranteed to work for all types.
 
 By understanding and utilizing `pipefunc`'s caching mechanisms effectively, you can significantly improve the performance of your pipelines, especially when dealing with computationally expensive functions or large datasets.
@@ -161,19 +161,19 @@ print(f"{pipeline.cache.cache=}")  # Print the cache
 
 In this example, `MyStatefulFunction` has an internal state `value`.
 The `__pipefunc_hash__` method returns a string representation of this state.
-When the function is called through the `PipeFunc` instance, `pipefunc` will automatically call `__pipefunc_hash__` to get the state representation and include it in the cache key.
+When the function is called through the {class}`~pipefunc.PipeFunc` instance, `pipefunc` will automatically call `__pipefunc_hash__` to get the state representation and include it in the cache key.
 
 **Note:**
 
 - The `__pipefunc_hash__` method should return a string that uniquely identifies the relevant state of the function.
 - If you don't define `__pipefunc_hash__` for a stateful function, only the input arguments will be used for cache key computation, which might lead to incorrect cached results.
-- The `__pipefunc_hash__` method is only relevant when caching is enabled for the `PipeFunc` instance (i.e., `cache=True`).
+- The `__pipefunc_hash__` method is only relevant when caching is enabled for the {class}`~pipefunc.PipeFunc` instance (i.e., `cache=True`).
 
 By using the `__pipefunc_hash__` method, you can ensure that `pipefunc`'s caching mechanism correctly handles stateful functions and invalidates cached results when the function's state changes.
 
 ## The `@memoize` Decorator
 
-The `pipefunc.cache` module also provides a `@memoize` decorator for general-purpose function memoization, independent of `PipeFunc` and `Pipeline`.
+The `pipefunc.cache` module also provides a {func}`pipefunc.cache.memoize` decorator for general-purpose function memoization, independent of {class}`~pipefunc.PipeFunc` and `Pipeline`.
 This decorator allows you to cache the results of any function using the available cache types (e.g., `LRUCache`, `HybridCache`, `SimpleCache`, `DiskCache`).
 
 ```{code-cell} ipython3
@@ -235,4 +235,4 @@ def my_function(data):
     return result
 ```
 
-Use the `@memoize` decorator to easily add caching to any function, even outside the context of `PipeFunc` and `Pipeline`.
+Use the `@memoize` decorator to easily add caching to any function, even outside the context of {class}`~pipefunc.PipeFunc` and `Pipeline`.
