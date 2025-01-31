@@ -602,6 +602,14 @@ def test_default_and_bound_pydantic() -> None:
     f.copy()
 
 
+def test_default_with_positional_args() -> None:
+    @pipefunc("c")
+    def f(a, b=1):
+        return a + b
+
+    assert f(1, 2) == 3
+
+
 def test_nested_pipefunc_function_name() -> None:
     def f(a, b):
         return a + b
