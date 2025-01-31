@@ -672,6 +672,13 @@ class PipeFunc(Generic[T]):
             )
             raise ValueError(msg)
 
+        if args:  # Put positional arguments into kwargs
+            for p, v in zip(self.parameters, args):
+                if p in kwargs:
+                    msg = f"Multiple values provided for parameter `{p}`."
+                    raise ValueError(msg)
+                kwargs[p] = v
+            args = ()
         kwargs = self.defaults | kwargs | self._bound
         kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
 
