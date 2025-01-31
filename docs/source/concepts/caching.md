@@ -21,7 +21,7 @@ kernelspec:
 :depth: 2
 ```
 
-Caching is a powerful technique to dramatically speed up your pipelines by avoiding redundant computations.
+Caching can dramatically speed up pipelines by storing and reusing the results of expensive function calls, avoiding redundant computations.
 By storing the results of expensive function calls and reusing them when the same inputs occur again, you can significantly improve performance.
 
 ## Enabling Caching
