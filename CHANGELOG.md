@@ -3,6 +3,54 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.53.0 (2025-01-31)
+
+### ✨ Enhancements
+
+- Include `__pipefunc_hash__` of function to determine the cache key ([#515](https://github.com/pipefunc/pipefunc/pull/515))
+- Allow custom class with `__call__` ([#619](https://github.com/pipefunc/pipefunc/pull/619))
+- Implement `NestedPipeFunc.parameter_annotations` ([#621](https://github.com/pipefunc/pipefunc/pull/621))
+- Implement `Pipeline.parameter_annotations` and `Pipeline.output_annotations` ([#622](https://github.com/pipefunc/pipefunc/pull/622))
+
+### 🐛 Bug Fixes
+
+- Fix defaults and positional args ([#620](https://github.com/pipefunc/pipefunc/pull/620))
+
+### 🧹 Maintenance
+
+- Set `zarr>=2,<3` in `[extras]` ([#618](https://github.com/pipefunc/pipefunc/pull/618))
+
+### 📊 Stats
+
+- `.py`: +195 lines, -32 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.52.1 (2025-01-30)
+
+### 🐛 Bug Fixes
+
+- Fix pipefunc import with Zarr v3 (which is currently incompatible) ([#617](https://github.com/pipefunc/pipefunc/pull/617))
+
+### 📊 Stats
+
+- `.py`: +5 lines, -1 lines
+
+## v0.52.0 (2025-01-30)
+
+### ✨ Enhancements
+
+- Make `Pipeline.validate()` public ([#616](https://github.com/pipefunc/pipefunc/pull/616))
+- Add `__repr__` to Storage classes ([#614](https://github.com/pipefunc/pipefunc/pull/614))
+
+### 📚 Documentation
+
+- Update release notes up to v0.51.4 ([#613](https://github.com/pipefunc/pipefunc/pull/613))
+
+### 📊 Stats
+
+- `.md`: +60 lines, -0 lines
+- `.py`: +53 lines, -10 lines
+
 ## v0.51.4 (2025-01-28)
 
 ### 🐛 Bug Fixes
