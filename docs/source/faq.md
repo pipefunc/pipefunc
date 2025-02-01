@@ -112,7 +112,7 @@ We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages
 
 There are plans to integrate `adaptive` with `pipeline.map` to enable adaptive sweeps over parameter spaces.
 Currently, using `adaptive` with `pipefunc` is a bit more cumbersome, but it is still possible.
-See [this tutorial](concepts/adaptive) for a detailed example of how to use `adaptive` with `pipefunc`.
+See [this tutorial](./concepts/adaptive-integration) for a detailed example of how to use `adaptive` with `pipefunc`.
 
 ## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
 
