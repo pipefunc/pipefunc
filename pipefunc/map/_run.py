@@ -531,12 +531,13 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
     *,
+    return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(
+    has_dumped = _update_array(
         func,
         arrays,
         shape,
@@ -546,6 +547,8 @@ def _run_iteration_and_process(
         in_post_process=False,
         force_dump=force_dump,
     )
+    if has_dumped and not return_results:
+        return ()
     return outputs
 
 
@@ -559,7 +562,7 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-) -> None:
+) -> bool:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
@@ -567,7 +570,7 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-
+    has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
@@ -576,6 +579,8 @@ def _update_array(
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
+            has_dumped = True
+    return has_dumped
 
 
 def _indices_to_flat_index(
@@ -698,6 +703,7 @@ def _prepare_submit_map_spec(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -713,6 +719,7 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
+        return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -1005,6 +1012,7 @@ def _run_and_process_generation(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
     _process_generation(generation, tasks, store, outputs, run_info, return_results)
@@ -1032,6 +1040,7 @@ async def _run_and_process_generation_async(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
@@ -1102,13 +1111,23 @@ def _submit_func(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     progress: ProgressTracker | None = None,
+    return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
+        args = _prepare_submit_map_spec(
+            func,
+            kwargs,
+            run_info,
+            store,
+            fixed_indices,
+            status,
+            return_results,
+            cache,
+        )
         r = _maybe_parallel_map(
             func,
             args.process_index,
@@ -1160,6 +1179,7 @@ def _submit_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1171,6 +1191,7 @@ def _submit_generation(
             executor,
             chunksizes,
             progress,
+            return_results,
             cache,
         )
         for func in generation
