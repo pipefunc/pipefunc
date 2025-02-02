@@ -548,7 +548,7 @@ def _run_iteration_and_process(
         force_dump=force_dump,
     )
     if has_dumped and not return_results:
-        return ()
+        return (None,) * len(outputs)
     return outputs
 
 
