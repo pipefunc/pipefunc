@@ -368,6 +368,6 @@ kwargs = learners_dict.to_slurm_run(
   This method is ideal when you want your SLURM job submission to closely mimic local execution. The results will be organized in the same data structures as you would expect from a local run, and it is straightforward to use with your existing pipelines.
 
 - **Using Adaptive Learners (`create_learners`):**
-  This alternative approach is better suited for extremely large sweeps or when you have independent branches in your computational graph. It offloads all data handling to the SLURM jobs themselves, thereby minimizing communication overhead. Additionally, the `split_independent_axes=True` option can improve overall performance by allowing different parts of your pipeline to progress independently.
+  This alternative approach is better suited for extremely large sweeps or when you have independent branches in your computational graph. It offloads all data handling to the SLURM jobs themselves, thereby minimizing communication overhead.
 
 By choosing the method that best fits your computational workload and cluster environment, you can optimize both performance and resource utilization when running large-scale simulations on SLURM.
