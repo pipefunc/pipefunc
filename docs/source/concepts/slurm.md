@@ -332,16 +332,13 @@ pipeline_adapt = Pipeline([double_it, half_it, take_sum])
 # Define the input parameters for the sweep
 inputs = {"x": [0, 1, 2, 3]}
 
-# Specify a template for run folders; each learner will use its own folder
-run_folder_template = "adaptive_learner/run_folder_{}"
-
 # Create Adaptive Learners from the pipeline.
 # The `split_independent_axes=True` option allows independent branches
 # in the computational graph to run separately.
 learners_dict = create_learners(
     pipeline_adapt,
     inputs,
-    run_folder_template=run_folder_template,
+    run_folder="my_run_folder",
     split_independent_axes=True,
 )
 
