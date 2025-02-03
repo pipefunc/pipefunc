@@ -165,7 +165,8 @@ pipeline_adapt = Pipeline([double_it, half_it, take_sum])
 
 We now have a pipeline with three functions, each with different resource requirements.
 So far nothing is Adaptive-Scheduler specific.
-We could call `pipeline_adapt.map(...)` to run this pipeline in parallel on your local machine.However, to run it on a cluster, we need to use `adaptive_scheduler`.
+We could call `pipeline_adapt.map(...)` to run this pipeline in parallel on your local machine.
+However, to run it on a cluster, we need to use `adaptive_scheduler`.
 We can convert the pipeline to a dictionary of `adaptive.SequenceLearner`s objects using `create_learners` and then submit these to the cluster using `adaptive_scheduler`.
 
 ```{code-cell} ipython3
