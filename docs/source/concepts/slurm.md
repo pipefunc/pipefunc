@@ -85,7 +85,6 @@ This distinction is essential when planning job submissions and balancing overhe
 To run your pipeline on a SLURM cluster, instantiate a `SlurmExecutor` and pass it as the executor in your `Pipeline.map_async` call. For example:
 
 ```python
-
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
 
