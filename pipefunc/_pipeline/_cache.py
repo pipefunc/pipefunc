@@ -26,7 +26,7 @@ def create_cache(
     if cache_kwargs is None:
         cache_kwargs = {}
     if cache_type == "lru":
-        cache_kwargs.setdefault("shared", not lazy)
+        cache_kwargs.setdefault("shared", False)
         return LRUCache(**cache_kwargs)
     if cache_type == "hybrid":
         if lazy:
@@ -36,10 +36,10 @@ def create_cache(
                 UserWarning,
                 stacklevel=2,
             )
-        cache_kwargs.setdefault("shared", not lazy)
+        cache_kwargs.setdefault("shared", False)
         return HybridCache(**cache_kwargs)
     if cache_type == "disk":
-        cache_kwargs.setdefault("lru_shared", not lazy)
+        cache_kwargs.setdefault("lru_shared", False)
         cache_kwargs.setdefault("cache_dir", tempfile.gettempdir())
         return DiskCache(**cache_kwargs)
     if cache_type == "simple":
