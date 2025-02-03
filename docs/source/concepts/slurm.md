@@ -13,6 +13,10 @@ kernelspec:
 
 # SLURM Integration with PipeFunc
 
+```{contents} ToC
+:depth: 2
+```
+
 PipeFunc integrates with SLURM on a high level without requiring you to write `sbatch` scripts or manage job submission manually.
 PipeFunc allows you to submit jobs to a SLURM cluster using the {class}`adaptive_scheduler.SlurmExecutor` and set its resources for individual functions using the `resources` parameter in `@pipefunc(..., resources=...)`.
 The `resources` parameter can be a dictionary or a {class}`~pipefunc.resources.Resources` object.
@@ -35,7 +39,11 @@ def double_it(x: int) -> int:
     return 2 * x
 
 pipeline = Pipeline([double_it])
-runner = pipeline.map_async({"x": 1}, run_folder="my_run_folder", executor=SlurmExecutor())
+runner = pipeline.map_async(
+    {"x": 1},
+    run_folder="my_run_folder",
+    executor=SlurmExecutor(),  # Run on SLURM.
+)
 result = await runner.task
 ```
 
@@ -79,7 +87,8 @@ This distinction is essential when planning job submissions and balancing overhe
 
 To run your pipeline on a SLURM cluster, instantiate a `SlurmExecutor` and pass it as the executor in your `Pipeline.map_async` call. For example:
 
-```python
+```{code-cell}
+
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
 
@@ -151,7 +160,8 @@ Every time `make_geometry` is executed, SLURM will allocate 4 CPUs and 8GB of me
 If your resource needs depend on the input values, pass a callable that returns a resource dictionary.
 For instance:
 
-```python
+```{code-cell}
+
 @pipefunc(
     output_name="electrostatics",
     mapspec="V_left[i], V_right[j] -> electrostatics[i, j]",
