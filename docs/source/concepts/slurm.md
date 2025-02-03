@@ -275,3 +275,98 @@ This hybrid approach allows you to optimize the overall pipeline execution by as
   Use `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources` so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated `Resources` object.
 - **Dictionary of Executors:**
   You can pass a dict to the `executor` argument so that different functions run on different executors (for example, fast functions can use a ThreadPoolExecutor, while heavy ones run on SLURM).
+
+---
+
+## Alternative SLURM Submission Using Adaptive Learners
+
+```{note}
+We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages in this section.
+```
+
+In addition to using the {class}`adaptive_scheduler.SlurmExecutor` for SLURM job submissions (as described above), PipeFunc also supports an alternative method based on creating Adaptive Learners first and then submitting to SLURM via Adaptive Scheduler.
+This approach is particularly well suited for _really_ big sweeps where communication overhead between SLURM jobs might become a bottleneck.
+
+### How It Works
+
+Instead of submitting each function call via an executor that mimics local execution, you can use the {func}`pipefunc.map.adaptive.create_learners` function from `pipefunc.map.adaptive` to convert your pipeline into a dictionary of {class}`adaptive.SequenceLearner` objects.
+These learners are then submitted to SLURM.
+The key advantages of this approach include:
+
+- **Independent Data Handling:**
+  Each learner is responsible for its own data, meaning that the simulation outputs and intermediate results are handled entirely within the SLURM jobs themselves. This reduces the communication overhead that can occur when large amounts of data are transferred back and forth.
+
+- **Scalability for Huge Sweeps:**
+  This approach minimizes central communication between the notebook that starts the jobs and the jobs themselves, and allows the jobs to scale more efficiently.
+
+- **Independent Branch Execution:**
+  When using the `split_independent_axes=True` option, independent branches in the computational graph can progress on their own. This means that parts of your pipeline that do not depend on each other are not forced to wait, further reducing overall computation time.
+
+### Using Adaptive Learners with SLURM
+
+Below is an example of how you can integrate this approach into your workflow.
+In this case, the pipeline is first converted into a dictionary of Adaptive Learners using `create_learners`.
+Then, these learners can be submitted to a SLURM cluster via your favorite SLURM submission mechanism (e.g., using Adaptive Scheduler).
+
+```python
+from pipefunc import Pipeline, pipefunc
+from pipefunc.map.adaptive import create_learners
+import numpy as np
+
+# Example pipeline definition
+@pipefunc(output_name="double", mapspec="x[i] -> double[i]", resources={"cpus": 2})
+def double_it(x: int) -> int:
+    return 2 * x
+
+@pipefunc(output_name="half", mapspec="x[i] -> half[i]", resources={"memory": "8GB"})
+def half_it(x: int) -> int:
+    return x // 2
+
+@pipefunc(output_name="sum")
+def take_sum(half: np.ndarray, double: np.ndarray) -> int:
+    return sum(half + double)
+
+# Create a pipeline with three functions
+pipeline_adapt = Pipeline([double_it, half_it, take_sum])
+
+# Define the input parameters for the sweep
+inputs = {"x": [0, 1, 2, 3]}
+
+# Specify a template for run folders; each learner will use its own folder
+run_folder_template = "adaptive_learner/run_folder_{}"
+
+# Create Adaptive Learners from the pipeline.
+# The `split_independent_axes=True` option allows independent branches
+# in the computational graph to run separately.
+learners_dict = create_learners(
+    pipeline_adapt,
+    inputs,
+    run_folder_template=run_folder_template,
+    split_independent_axes=True,
+)
+
+# Now, learners_dict is a dictionary of adaptive learners that can be submitted to SLURM.
+# For example, you can extract SLURM submission parameters from the learners:
+kwargs = learners_dict.to_slurm_run(
+    returns="kwargs",  # Returns a dictionary of SLURM submission keyword arguments
+    default_resources={"cpus": 2, "memory": "8GB"},
+)
+
+# The resulting `kwargs` can be passed to `slurm_run`
+adaptive_scheduler.slurm_run(**kwargs)
+```
+
+### Choosing Between the Two Methods
+
+- **Using `SlurmExecutor`:**
+  This method is ideal when you want your SLURM job submission to closely mimic local execution. The results will be organized in the same data structures as you would expect from a local run, and it is straightforward to use with your existing pipelines.
+
+- **Using Adaptive Learners (`create_learners`):**
+  This alternative approach is better suited for extremely large sweeps or when you have independent branches in your computational graph. It offloads all data handling to the SLURM jobs themselves, thereby minimizing communication overhead. Additionally, the `split_independent_axes=True` option can improve overall performance by allowing different parts of your pipeline to progress independently.
+
+```{important}
+Another important limitation of the `create_learners` approach is that it does not support dynamic `internal_shapes`, [as introduced here](../tutorial.md#dynamic-output-shapes-and-internal-shapes).
+So it requires to manually specify `internal_shapes` if needed.
+```
+
+By choosing the method that best fits your computational workload and cluster environment, you can optimize both performance and resource utilization when running large-scale simulations on SLURM.
