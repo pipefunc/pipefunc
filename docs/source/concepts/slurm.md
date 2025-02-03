@@ -22,7 +22,7 @@ This tutorial explains how to:
 - **Submit jobs using SlurmExecutor.**
 - **Specify Resources statically or dynamically.**
 - **Control resource allocation scopes** so that resources apply either to the entire mapspec or to each individual iteration.
-- **Have functions manage their own parallelization** when running a SLURM job in sequential mode.
+- **Have functions manage their own parallelization** when running a SLURM job.
 - **Use a dictionary of executors** to run some functions via SLURM while others run on a {class}`concurrent.futures.ThreadPoolExecutor`.
 
 ## tl;dr
@@ -176,19 +176,19 @@ Here, for each iteration of the simulation, the lambda inspects the voltage valu
 ## Functions Managing Their Own Parallelization
 
 Sometimes you want the SLURM job to have resources allocated while allowing your function to control its own parallelism internally.
-You can achieve this by running the SLURM job in sequential mode.
-In this mode, the SLURM job is submitted with the allocated {class}`~pipefunc.resources.Resources`, but the function is executed sequentially; it is then up to your function to manage internal parallelization (for example, by creating its own process pool).
+You can achieve this by specifying `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources`.
+In this mode, the SLURM job is submitted with the allocated resources, but the function is executed sequentially; it is then up to your function to manage internal parallelization (for example, by creating its own process pool).
 
 ```python
 from adaptive_scheduler import SlurmExecutor
 
-# Create a SlurmExecutor in "sequential" mode.
-executor = SlurmExecutor(cores_per_node=2, executor_type="sequential")
+executor = SlurmExecutor()
 
 @pipefunc(
     output_name="data_processed",
     resources={"cpus": 2, "memory": "4GB"},
     resources_variable="resources",
+    parallelization_mode="internal",  # Manage parallelism internally.
 )
 def process_data(data, resources):
     # The SLURM job will be allocated 2 CPUs and 4GB memory.
@@ -267,9 +267,9 @@ This hybrid approach allows you to optimize the overall pipeline execution by as
   - `"map"` scope applies the provided resources to the entire mapspec operation (one job per function).
   - `"element"` scope applies the resources to each iteration (one job per element).
 - **Setting Resources:**
-  - **Statically:** Pass a fixed dict or Resources instance.
+  - **Statically:** Pass a fixed dict or `Resources` instance.
   - **Dynamically:** Pass a callable that returns the resource dict (using only parameters available in the function signature).
 - **Functions Managing Their Own Parallelization:**
-  Use `executor_type="sequential"` in SlurmExecutor so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated Resources object.
+  Use `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources` so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated `Resources` object.
 - **Dictionary of Executors:**
   You can pass a dict to the `executor` argument so that different functions run on different executors (for example, fast functions can use a ThreadPoolExecutor, while heavy ones run on SLURM).
