@@ -46,7 +46,7 @@ result = await runner.task
 
 ## Overview of SLURM Integration
 
-When running pipelines on a SLURM cluster, each function (or each iteration of a function when using mapspec) is submitted as a separate job with the desired compute resources.
+When running pipelines on a SLURM cluster, each function (or each iteration, see [next section](#resource-allocation-scopes)) is submitted as a separate job with the desired compute resources.
 The two sources of resource specifications are:
 
 1. **SlurmExecutor Defaults:**
