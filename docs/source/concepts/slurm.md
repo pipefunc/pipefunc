@@ -13,10 +13,6 @@ kernelspec:
 
 # SLURM Integration with PipeFunc
 
-```{contents} ToC
-:depth: 2
-```
-
 PipeFunc integrates with SLURM on a high level without requiring you to write `sbatch` scripts or manage job submission manually.
 PipeFunc allows you to submit jobs to a SLURM cluster using the {class}`adaptive_scheduler.SlurmExecutor` and set its resources for individual functions using the `resources` parameter in `@pipefunc(..., resources=...)`.
 The `resources` parameter can be a dictionary or a {class}`~pipefunc.resources.Resources` object.
