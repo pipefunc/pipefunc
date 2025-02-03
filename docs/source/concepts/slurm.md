@@ -308,7 +308,7 @@ Below is an example of how you can integrate this approach into your workflow.
 In this case, the pipeline is first converted into a dictionary of Adaptive Learners using `create_learners`.
 Then, these learners can be submitted to a SLURM cluster via your favorite SLURM submission mechanism (e.g., using Adaptive Scheduler).
 
-```python
+```{code-cell} ipython3
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map.adaptive import create_learners
 import numpy as np
@@ -350,7 +350,7 @@ kwargs = learners_dict.to_slurm_run(
 )
 
 # The resulting `kwargs` can be passed to `slurm_run`
-adaptive_scheduler.slurm_run(**kwargs)
+# adaptive_scheduler.slurm_run(**kwargs)
 ```
 
 ### Choosing Between the Two Methods
