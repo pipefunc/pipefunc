@@ -97,6 +97,10 @@ html_theme_options = {
     "use_repository_button": True,
     "use_download_button": True,
     "navigation_with_keys": False,
+    "analytics": {
+        "plausible_analytics_domain": "pipefunc.readthedocs.io",
+        "plausible_analytics_url": "https://plausible.nijho.lt/js/script.js",
+    },
 }
 
 
