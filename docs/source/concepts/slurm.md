@@ -24,9 +24,25 @@ This tutorial explains how to:
 - **Have functions manage their own parallelization** when running a SLURM job in sequential mode.
 - **Use a dictionary of executors** to run some functions via SLURM while others run on a {class}`concurrent.futures.ThreadPoolExecutor`.
 
+## tl;dr
+
+```python
+from pipefunc import Pipeline, pipefunc
+from adaptive_scheduler import SlurmExecutor
+
+@pipefunc(output_name="y", resources={"cpus": 2})  # SLURM job with 2 CPUs.
+def double_it(x: int) -> int:
+    return 2 * x
+
+pipeline = Pipeline([double_it])
+runner = pipeline.map_async({"x": 1}, run_folder="my_run_folder", executor=SlurmExecutor())
+result = await runner.task
+```
+
 ## Overview of SLURM Integration
 
-When running pipelines on a SLURM cluster, each function (or each iteration of a function when using mapspec) is submitted as a separate job with the desired compute resources. The two sources of resource specifications are:
+When running pipelines on a SLURM cluster, each function (or each iteration of a function when using mapspec) is submitted as a separate job with the desired compute resources.
+The two sources of resource specifications are:
 
 1. **SlurmExecutor Defaults:**
    When you instantiate a SlurmExecutor (e.g. `SlurmExecutor(cores_per_node=2)`), you set default values. These defaults serve as a fallback for any function that does not override the resources.
@@ -46,15 +62,14 @@ The {class}`~pipefunc.resources.Resources` object provided (either as a dict or 
 
 ## Resource Allocation Scopes
 
-PipeFunc supports two modes for SLURM job submission when using mapspec. The **resources_scope** parameter controls how the {class}`~pipefunc.resources.Resources` provided are applied:
+PipeFunc supports two modes for SLURM job submission when using mapspec.
+The **resources_scope** parameter (in `@pipefunc(..., resources_scope=...)`) controls how the {class}`~pipefunc.resources.Resources` provided are applied:
 
 - **Map Scope (`resources_scope=="map"`):**
   The entire mapspec operation for the function is submitted as a single SLURM job using the provided resources.
-  _For example:_ If your function processes an entire array, one SLURM job is launched for that function.
 
 - **Element Scope (`resources_scope=="element"`):**
   A separate SLURM job is submitted for each iteration of the mapspec.
-  _For example:_ If your function processes each image in a list individually, a separate job is launched for each image.
 
 This distinction is essential when planning job submissions and balancing overhead versus resource granularity.
 
@@ -111,7 +126,8 @@ runner = pipeline.map_async(
 result = await runner.task  # Await asynchronous execution.
 ```
 
-In this example, functions with `resources_scope=="element"` submit one job per iteration while those with `resources_scope=="map"` submit one job for the entire mapspec operation. The resources specified on the function override the executor’s defaults for that job.
+In this example, functions with `resources_scope=="element"` submit one job per iteration while those with `resources_scope=="map"` submit one job for the entire mapspec operation.
+The resources specified on the function override the executor’s defaults for that job.
 
 ---
 
@@ -132,14 +148,15 @@ Every time `make_geometry` is executed, SLURM will allocate 4 CPUs and 8GB of me
 
 ### Dynamic Resources
 
-If your resource needs depend on the input values, pass a callable that returns a resource dictionary. For instance:
+If your resource needs depend on the input values, pass a callable that returns a resource dictionary.
+For instance:
 
 ```python
 @pipefunc(
     output_name="electrostatics",
     mapspec="V_left[i], V_right[j] -> electrostatics[i, j]",
-    # Dynamically allocate resources based on available input "x"
-    resources=lambda kwargs: {"cpus": int(kwargs["x"] % 3) + 1},
+    # Dynamically set resources based on inputs: e.g., more voltage difference requires more CPUs.
+    resources=lambda kw: {"cpus": abs(kw["V_left"] - kw["V_right"]) + 1},
     resources_scope="element",
 )
 def run_electrostatics(mesh, materials, V_left: float, V_right: float):
@@ -147,13 +164,15 @@ def run_electrostatics(mesh, materials, V_left: float, V_right: float):
     return Electrostatics(mesh, materials, [V_left, V_right])
 ```
 
-Here, the lambda examines the available input (in this case `"x"` from a previous function) and returns a dictionary specifying the required number of CPUs.
+Here, for each iteration of the simulation, the lambda inspects the voltage values and returns a dictionary specifying the number of CPUs needed.
 
 ---
 
 ## Functions Managing Their Own Parallelization
 
-Sometimes you want the SLURM job to have resources allocated while allowing your function to control its own parallelism internally. You can achieve this by running the SLURM job in sequential mode. In this mode, the SLURM job is submitted with the allocated {class}`~pipefunc.resources.Resources`, but the function is executed sequentially; it is then up to your function to manage internal parallelization (for example, by creating its own thread pool).
+Sometimes you want the SLURM job to have resources allocated while allowing your function to control its own parallelism internally.
+You can achieve this by running the SLURM job in sequential mode.
+In this mode, the SLURM job is submitted with the allocated {class}`~pipefunc.resources.Resources`, but the function is executed sequentially; it is then up to your function to manage internal parallelization (for example, by creating its own process pool).
 
 ```python
 from adaptive_scheduler import SlurmExecutor
@@ -170,8 +189,10 @@ def process_data(data, resources):
     # The SLURM job will be allocated 2 CPUs and 4GB memory.
     # The Resources object is available as `resources`.
     print(f"Allocated Resources: {resources}")
-    # The function can now manage its own parallelism (e.g. via a thread pool).
-    return [d * 2 for d in data]
+    # The function can now manage its own parallelism (e.g. via a process pool).
+    from concurrent.futures import ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=resources.cpus) as executor:
+        return list(executor.map(myfunc, data))
 
 pipeline = Pipeline([process_data])
 result = pipeline(data=[1, 2, 3])
@@ -198,7 +219,7 @@ def slow_function(x: int) -> int:
     time.sleep(1)
     return x * 10
 
-@pipefunc(output_name="b", mapspec="a[i] -> b[i]", resources={"cpus": 1})
+@pipefunc(output_name="b", mapspec="a[i] -> b[i]")
 def fast_function(a: int) -> int:
     # Simulate a fast computation that does not require heavy resources.
     return a + 5
@@ -211,9 +232,9 @@ inputs = {"x": range(5)}
 # - Run fast_function (output "b") using ThreadPoolExecutor.
 # - The empty key ("") is the default if a function's output name is not explicitly specified.
 executors = {
-    "a": SlurmExecutor(cores_per_node=2),
-    "b": ThreadPoolExecutor(max_workers=4),
-    "": SlurmExecutor(cores_per_node=2),  # default executor
+    "a": SlurmExecutor(),
+    "b": ThreadPoolExecutor(),
+    "": SlurmExecutor(cores_per_node=1),  # default executor
 }
 
 runner = pipeline.map_async(inputs, run_folder="executor_example", executor=executors)
@@ -226,7 +247,7 @@ print("Result from fast_function (b):", result["b"].output)
 In this example, the dictionary `executors` assigns:
 
 - **Output "a"** (from `slow_function`) to a SLURM job.
-- **Output "b"** (from `fast_function`) to a ThreadPoolExecutor for lower overhead.
+- **Output "b"** (from `fast_function`) to a {class}`~concurrent.futures.ThreadPoolExecutor` for lower overhead.
 
 This hybrid approach allows you to optimize the overall pipeline execution by assigning appropriate executors based on the function’s runtime characteristics.
 
