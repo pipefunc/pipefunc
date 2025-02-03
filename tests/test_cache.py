@@ -176,7 +176,7 @@ def test_file_cache_get_nonexistent_key(cache_dir):
 
 
 def test_file_cache_evict_if_needed(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir), max_size=2, lru_cache_size=2)
+    cache = DiskCache(cache_dir=str(cache_dir), max_size=2, lru_cache_size=2, with_lru_cache=True)
     cache.put("key1", "value1")
     time.sleep(0.2)
     cache.put("key2", "value2")
@@ -189,7 +189,7 @@ def test_file_cache_evict_if_needed(cache_dir):
 
 
 def test_file_cache_clear(cache_dir):
-    cache = DiskCache(cache_dir=str(cache_dir))
+    cache = DiskCache(cache_dir=str(cache_dir), with_lru_cache=True)
     cache.put("key1", "value1")
     cache.put("key2", "value2")
     assert len(cache) == 2
@@ -354,7 +354,7 @@ def test_disk_cache_clear_with_lru_cache(cache_dir: Path, shared: bool):  # noqa
 @pytest.mark.parametrize("shared", [True, False])
 def test_cache_pickling(cache_cls, shared, tmp_path):
     if cache_cls == DiskCache:
-        cache = cache_cls(cache_dir=str(tmp_path), lru_shared=shared)
+        cache = cache_cls(cache_dir=str(tmp_path), lru_shared=shared, with_lru_cache=True)
     else:
         cache = cache_cls(shared=shared)
 
