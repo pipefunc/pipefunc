@@ -157,8 +157,7 @@ Every time `make_geometry` is executed, SLURM will allocate 4 CPUs and 8GB of me
 If your resource needs depend on the input values, pass a callable that returns a resource dictionary.
 For instance:
 
-```{code-cell}
-
+```python
 @pipefunc(
     output_name="electrostatics",
     mapspec="V_left[i], V_right[j] -> electrostatics[i, j]",
