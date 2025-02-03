@@ -289,9 +289,10 @@ This approach is particularly well suited for _really_ big sweeps where communic
 
 ### How It Works
 
-Instead of submitting each function call via an executor that mimics local execution, you can use the {func}`pipefunc.map.adaptive.create_learners` function from `pipefunc.map.adaptive` to convert your pipeline into a dictionary of {class}`adaptive.SequenceLearner` objects.
+Instead of submitting each function call via an executor that mimics local execution, you can use the {func}`pipefunc.map.adaptive.create_learners` function to convert your pipeline into a dictionary of {class}`adaptive.SequenceLearner` objects.
 These learners are then submitted to SLURM.
-The key advantages of this approach include:
+
+The key advantages (👍) of this approach include:
 
 - **Independent Data Handling:**
   Each learner is responsible for its own data, meaning that the simulation outputs and intermediate results are handled entirely within the SLURM jobs themselves. This reduces the communication overhead that can occur when large amounts of data are transferred back and forth.
@@ -301,6 +302,14 @@ The key advantages of this approach include:
 
 - **Independent Branch Execution:**
   When using the `split_independent_axes=True` option, independent branches in the computational graph can progress on their own. This means that parts of your pipeline that do not depend on each other are not forced to wait, further reducing overall computation time.
+
+The disadvantages (👎) of this approach include:
+
+- **Complexity:**
+  The setup is more complex than using the `SlurmExecutor` directly, as you need to manage the Adaptive Learners and the SLURM submission separately, instead of changing _only_ the executor in `pipeline.map_async`.
+
+- **No Dynamic `internal_shapes`:**
+  The {func}`~pipefunc.map.adaptive.create_learners` function does not support dynamic `internal_shapes` (as introduced [here](../tutorial.md#dynamic-output-shapes-and-internal-shapes)), so you need to manually specify `internal_shapes` if needed.
 
 ### Using Adaptive Learners with SLURM
 
@@ -360,10 +369,5 @@ kwargs = learners_dict.to_slurm_run(
 
 - **Using Adaptive Learners (`create_learners`):**
   This alternative approach is better suited for extremely large sweeps or when you have independent branches in your computational graph. It offloads all data handling to the SLURM jobs themselves, thereby minimizing communication overhead. Additionally, the `split_independent_axes=True` option can improve overall performance by allowing different parts of your pipeline to progress independently.
-
-```{important}
-Another important limitation of the `create_learners` approach is that it does not support dynamic `internal_shapes`, [as introduced here](../tutorial.md#dynamic-output-shapes-and-internal-shapes).
-So it requires to manually specify `internal_shapes` if needed.
-```
 
 By choosing the method that best fits your computational workload and cluster environment, you can optimize both performance and resource utilization when running large-scale simulations on SLURM.
