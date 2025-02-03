@@ -14,6 +14,7 @@ kernelspec:
 # SLURM Integration with PipeFunc
 
 PipeFunc integrates with SLURM on a high level without requiring you to write `sbatch` scripts or manage job submission manually.
+
 PipeFunc allows you to submit jobs to a SLURM cluster using the {class}`adaptive_scheduler.SlurmExecutor` and set its resources for individual functions using the `resources` parameter in `@pipefunc(..., resources=...)`.
 The `resources` parameter can be a dictionary or a {class}`~pipefunc.resources.Resources` object.
 This tutorial explains how to:
@@ -83,7 +84,7 @@ This distinction is essential when planning job submissions and balancing overhe
 
 To run your pipeline on a SLURM cluster, instantiate a `SlurmExecutor` and pass it as the executor in your `Pipeline.map_async` call. For example:
 
-```{code-cell}
+```python
 
 from pipefunc import Pipeline, pipefunc
 from adaptive_scheduler import SlurmExecutor
