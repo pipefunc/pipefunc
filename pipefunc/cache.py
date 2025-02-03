@@ -85,7 +85,7 @@ class HybridCache(_CacheBase):
         duration_weight: float = 0.5,
         *,
         allow_cloudpickle: bool = True,
-        shared: bool = True,
+        shared: bool = False,
     ) -> None:
         """Initialize the HybridCache instance."""
         if shared:
@@ -273,7 +273,7 @@ class LRUCache(_CacheBase):
         *,
         max_size: int = 128,
         allow_cloudpickle: bool = True,
-        shared: bool = True,
+        shared: bool = False,
     ) -> None:
         """Initialize the cache."""
         self.max_size = max_size
@@ -406,9 +406,9 @@ class DiskCache(_CacheBase):
         max_size: int | None = None,
         *,
         use_cloudpickle: bool = True,
-        with_lru_cache: bool = True,
+        with_lru_cache: bool = False,
         lru_cache_size: int = 128,
-        lru_shared: bool = True,
+        lru_shared: bool = False,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
