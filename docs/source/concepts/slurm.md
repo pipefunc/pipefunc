@@ -285,7 +285,7 @@ We will assume familiarity with the `adaptive` and `adaptive_scheduler` packages
 ```
 
 In addition to using the {class}`adaptive_scheduler.SlurmExecutor` for SLURM job submissions (as described above), PipeFunc also supports an alternative method based on creating Adaptive Learners first and then submitting to SLURM via Adaptive Scheduler.
-This approach is particularly well suited for _really_ big sweeps where communication overhead between SLURM jobs might become a bottleneck.
+This approach is particularly well suited for _really_ big sweeps where communication overhead between SLURM jobs and the local notebook kernel might become a bottleneck.
 
 ### How It Works
 
