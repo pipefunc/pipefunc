@@ -116,6 +116,10 @@ See [this tutorial](./concepts/adaptive-integration) for a detailed example of h
 
 ## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
 
+```{important}
+PipeFunc implemented a newer feature that can use a `SlurmExecutor` directly with `pipeline.map`, see the [SLURM integration](./concepts/slurm.md) tutorial.
+```
+
 PipeFunc can also be used with the `adaptive_scheduler` package to run the pipeline on a cluster.
 This allows you to run the pipeline on a cluster (e.g., with SLURM) without having to worry about the details of submitting jobs and managing resources.
 

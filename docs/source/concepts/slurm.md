@@ -196,8 +196,10 @@ def process_data(data, resources):
     print(f"Allocated Resources: {resources}")
     # The function can now manage its own parallelism (e.g. via a process pool).
     from concurrent.futures import ProcessPoolExecutor
-    with ProcessPoolExecutor(max_workers=resources.cpus) as executor:
-        return list(executor.map(myfunc, data))
+    with ProcessPoolExecutor(resources.cpus) as ex:
+        # Do some printing in parallel (not smart, but just to show the parallelization)
+        list(ex.map(print, data))
+    return sum(data)
 
 pipeline = Pipeline([process_data])
 result = pipeline(data=[1, 2, 3])
