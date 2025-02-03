@@ -116,6 +116,10 @@ See [this tutorial](./concepts/adaptive-integration) for a detailed example of h
 
 ## SLURM integration via [Adaptive Scheduler](https://adaptive-scheduler.readthedocs.io/) integration
 
+```{important}
+PipeFunc implemented a newer feature that can use a `SlurmExecutor` directly with `pipeline.map`, see the [SLURM integration](./concepts/slurm.md) tutorial.
+```
+
 PipeFunc can also be used with the `adaptive_scheduler` package to run the pipeline on a cluster.
 This allows you to run the pipeline on a cluster (e.g., with SLURM) without having to worry about the details of submitting jobs and managing resources.
 
@@ -161,7 +165,8 @@ pipeline_adapt = Pipeline([double_it, half_it, take_sum])
 
 We now have a pipeline with three functions, each with different resource requirements.
 So far nothing is Adaptive-Scheduler specific.
-We could call `pipeline_adapt.map(...)` to run this pipeline in parallel on your local machine.However, to run it on a cluster, we need to use `adaptive_scheduler`.
+We could call `pipeline_adapt.map(...)` to run this pipeline in parallel on your local machine.
+However, to run it on a cluster, we need to use `adaptive_scheduler`.
 We can convert the pipeline to a dictionary of `adaptive.SequenceLearner`s objects using `create_learners` and then submit these to the cluster using `adaptive_scheduler`.
 
 ```{code-cell} ipython3

@@ -72,6 +72,7 @@ default_role = "autolink"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "networkx": ("https://networkx.org/documentation/stable/", None),
+    "adaptive_scheduler": ("https://adaptive-scheduler.readthedocs.io/en/latest/", None),
 }
 
 autodoc_member_order = "bysource"
