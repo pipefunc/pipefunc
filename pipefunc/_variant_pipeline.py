@@ -290,7 +290,7 @@ class VariantPipeline:
             msg = f"Ambiguous variant: `{select}`, could be in either `{group}`"
             raise ValueError(msg)
         if not group:
-            msg = f"Unknown variant: `{select}`"
+            msg = f"Unknown variant: `{select}`, choose one of: `{', '.join(inv)}`"
             raise ValueError(msg)
         return {group.pop(): select}
 
