@@ -10,6 +10,7 @@ import numpy.typing as npt
 import pytest
 
 from pipefunc import Pipeline, pipefunc
+from pipefunc.map import load_xarray_dataset
 from pipefunc.map._load import load_outputs
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
@@ -47,6 +48,9 @@ def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> Non
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
+    assert load_outputs("y", run_folder=tmp_path) == [0, 2, 4, 6]
+    assert load_xarray_dataset("x", run_folder=tmp_path)
+    assert load_xarray_dataset("y", run_folder=tmp_path)
 
 
 def test_exception():
@@ -358,7 +362,9 @@ def test_simple_2d():
     ]
 
 
-def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays() -> None:
+def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
+    tmp_path: Path,
+) -> None:
     @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
     def f(x):
         y1 = np.array([[x, x], [x + 1, x + 1]])
@@ -370,7 +376,7 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     pipeline = Pipeline([f])
     pipeline.add_mapspec_axis("x", axis="j")
     assert pipeline.mapspecs_as_strings == ["x[j] -> y1[i, j], y2[i, j], y3[i, j]"]
-    results = pipeline.map({"x": [1]})
+    results = pipeline.map({"x": [1]}, run_folder=tmp_path)
     y1 = results["y1"].output
     y2 = results["y2"].output
     y3 = results["y3"].output
