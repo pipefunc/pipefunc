@@ -356,3 +356,30 @@ def test_simple_2d():
         [0, 3, 6],
         [9, 12, 15],
     ]
+
+
+def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays() -> None:
+    @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
+    def f(x):
+        y1 = np.array([[x, x], [x + 1, x + 1]])
+        y2 = np.array([[x + 2, x + 2], [x + 3, x + 3]])
+        y3 = np.array([[x + 2], [x + 3]])
+        assert y1.shape == (2, 2)
+        return y1, y2, y3
+
+    pipeline = Pipeline([f])
+    pipeline.add_mapspec_axis("x", axis="j")
+    assert pipeline.mapspecs_as_strings == ["x[j] -> y1[i, j], y2[i, j], y3[i, j]"]
+    results = pipeline.map({"x": [1]})
+    y1 = results["y1"].output
+    y2 = results["y2"].output
+    y3 = results["y3"].output
+    assert y1.shape == (2, 1)
+    assert y1[0, 0].tolist() == [1, 1]
+    assert y1[1, 0].tolist() == [2, 2]
+    assert y2.shape == (2, 1)
+    assert y2[0, 0].tolist() == [3, 3]
+    assert y2[1, 0].tolist() == [4, 4]
+    assert y3.shape == (2, 1)
+    assert y3[0, 0].tolist() == [3]
+    assert y3[1, 0].tolist() == [4]
