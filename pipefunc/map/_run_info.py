@@ -118,7 +118,7 @@ class RunInfo:
             # `mapspec.output_names` is always tuple, even for single output
             output_name: OUTPUT_TYPE = name_mapping[mapspec.output_names]
             if mapspec.inputs:
-                shape = self.shapes[output_name]
+                shape = self.resolved_shapes[output_name]
                 mask = self.shape_masks[output_name]
                 arrays = _init_arrays(
                     output_name,
@@ -159,18 +159,16 @@ class RunInfo:
 
     def dump(self) -> None:
         """Dump the RunInfo to a file."""
-        if self.run_folder is None:  # pragma: no cover
-            msg = "Cannot dump `RunInfo` without `run_folder`."
-            raise ValueError(msg)
+        if self.run_folder is None:
+            return
         path = self.path(self.run_folder)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
         del data["inputs"]  # Cannot serialize inputs
         del data["defaults"]  # or defaults
-        del data["resolved_shapes"]
         data["input_paths"] = {k: str(v) for k, v in self.input_paths.items()}
         data["all_output_names"] = sorted(data["all_output_names"])
-        dicts_with_tuples = ["shapes", "shape_masks"]
+        dicts_with_tuples = ["shapes", "shape_masks", "resolved_shapes"]
         if isinstance(self.storage, dict):
             dicts_with_tuples.append("storage")
         for key in dicts_with_tuples:
@@ -189,7 +187,7 @@ class RunInfo:
         data["all_output_names"] = set(data["all_output_names"])
         if isinstance(data["storage"], dict):
             data["storage"] = {_maybe_str_to_tuple(k): v for k, v in data["storage"].items()}
-        for key in ["shapes", "shape_masks"]:
+        for key in ["shapes", "shape_masks", "resolved_shapes"]:
             data[key] = {_maybe_str_to_tuple(k): tuple(v) for k, v in data[key].items()}
         if data["internal_shapes"] is not None:
             data["internal_shapes"] = {
@@ -199,7 +197,6 @@ class RunInfo:
         data["run_folder"] = Path(data["run_folder"])
         data["inputs"] = {k: load(Path(v)) for k, v in data.pop("input_paths").items()}
         data["defaults"] = load(Path(data.pop("defaults_path")))
-        data["resolved_shapes"] = data["shapes"]
         return cls(**data)
 
     @staticmethod
@@ -231,6 +228,8 @@ class RunInfo:
                 )
                 assert mask == self.shape_masks[name]
                 self.resolved_shapes[name] = new_shape
+                if shape_is_resolved(new_shape):
+                    self.dump()  # Updates the resolved_shapes in the file
                 if not isinstance(name, tuple):
                     _update_shape_in_store(new_shape, mask, store, name)
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
