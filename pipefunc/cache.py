@@ -480,7 +480,7 @@ class DiskCache(_CacheBase):
                 oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
                 try:
                     oldest_file.unlink()
-                except PermissionError:  # Catch PermissionError during eviction
+                except PermissionError:  # pragma: no cover
                     warnings.warn(
                         f"Permission denied when trying to delete {oldest_file}.",
                         RuntimeWarning,
