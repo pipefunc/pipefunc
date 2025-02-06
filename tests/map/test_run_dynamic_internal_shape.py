@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+has_xarray = importlib.util.find_spec("xarray") is not None
 
 
 @pytest.mark.parametrize("dim", ["?", None])
@@ -49,8 +50,9 @@ def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> Non
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     assert load_outputs("y", run_folder=tmp_path).tolist() == [0, 2, 4, 6]
-    load_xarray_dataset("x", run_folder=tmp_path)
-    load_xarray_dataset("y", run_folder=tmp_path)
+    if has_xarray:
+        load_xarray_dataset("x", run_folder=tmp_path)
+        load_xarray_dataset("y", run_folder=tmp_path)
 
 
 def test_exception():
