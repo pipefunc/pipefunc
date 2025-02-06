@@ -218,7 +218,7 @@ class RunInfo:
             internal.update(internal_shape)
         # RunInfo.mapspecs is topologically ordered
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
-        has_update = False
+        has_updated = False
         for name, shape in self.resolved_shapes.items():
             if not shape_is_resolved(shape):
                 mapspec = mapspecs[first(name)]
@@ -230,11 +230,11 @@ class RunInfo:
                 assert mask == self.shape_masks[name]
                 self.resolved_shapes[name] = new_shape
                 if shape_is_resolved(new_shape):
-                    has_update = True
+                    has_updated = True
                 if not isinstance(name, tuple):
                     _update_shape_in_store(new_shape, mask, store, name)
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
-        if has_update:
+        if has_updated:
             self.dump()
 
 
