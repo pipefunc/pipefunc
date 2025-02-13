@@ -46,10 +46,13 @@ class Status:
     def progress(self) -> float:
         if self.n_total is None:
             return 0.0
+        if self.n_total == 0:
+            return 1.0
         return self.n_completed / self.n_total
 
     def elapsed_time(self) -> float:
-        assert self.start_time is not None
+        if self.start_time is None:  # Happens when n_total is 0
+            return 0.0
         if self.end_time is None:
             return time.monotonic() - self.start_time
         return self.end_time - self.start_time

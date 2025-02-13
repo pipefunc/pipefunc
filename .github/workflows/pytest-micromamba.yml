@@ -1,13 +1,14 @@
 name: pytest-micromamba
 
 on:
-  pull_request_target:
+  pull_request:
   push:
     branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:

@@ -600,3 +600,9 @@ def test_compare_equal(tmp_path: Path) -> None:
         assert np.ma.allequal(base_arr.mask, arr.mask), arr
         assert np.array_equal(base_arr.mask_linear(), arr.mask_linear()), arr
         assert np.ma.allequal(base_arr.to_array(), arr.to_array()), arr
+
+
+def test_repr(array_type: Callable[..., StorageBase]):
+    shape = (2, 3)
+    arr = array_type(shape)
+    repr(arr)

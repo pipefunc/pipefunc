@@ -966,3 +966,97 @@ def test_pipeline_map_zero_size() -> None:
         internal_shapes={"incomplete": ("?",)},
     )
     assert result["result"].output == [0, 1, 2, 3]
+
+
+def test_run_for_output_name_that_does_not_exist() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    with pytest.raises(
+        ValueError,
+        match=re.escape("No function with output name `d` in the pipeline, only `c`."),
+    ):
+        pipeline("d", a=1, b=2)
+
+
+def test_nested_pipefunc_in_pipeline_renames() -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int) -> int:
+        return 2 + n
+
+    @pipefunc(output_name="y")
+    def fb(x: int) -> int:
+        return 2 * x
+
+    # Run without nesting first
+    pipeline_base = Pipeline([fa, fb], scope="test")
+    assert pipeline_base.run("test.y", kwargs={"test.n": 2}) == 8
+
+    pipeline = Pipeline([NestedPipeFunc([fa, fb], ("x", "y"))], scope="test")
+    func = pipeline.output_to_func["test.x"]
+    assert func.renames == {"n": "test.n", "x": "test.x", "y": "test.y"}
+    assert isinstance(func, NestedPipeFunc)
+    assert func.pipeline.functions[0].renames == {}
+    r = pipeline.run("test.y", kwargs={"test.n": 2})
+    assert r == 8
+    r = pipeline.map(inputs={"test.n": 2})
+    assert r["test.y"].output == 8
+
+
+def test_run_multiple_outputs() -> None:
+    @pipefunc(output_name=("x", "y"))
+    def f(a: int) -> tuple[int, int]:
+        return a, 2 * a
+
+    @pipefunc(output_name="z")
+    def g(x: int, y: int) -> int:
+        return x + y
+
+    pipeline = Pipeline([f])
+    r = pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
+    # NOTE: Now unpacks the tuple but still also has the tuple.
+    # Changed in #536 to fix a real issue.
+    assert r == {"a": 2, ("x", "y"): (2, 4), "x": 2, "y": 4}
+
+    pipeline = Pipeline([f, g])
+    r = pipeline.run(("z"), kwargs={"a": 2}, full_output=True)
+    assert r == {"a": 2, "x": 2, "y": 4, "z": 6}
+
+
+def test_run_multiple_outputs_not_return_all() -> None:
+    @pipefunc(output_name=("x", "y", "z"))
+    def f(a: int) -> tuple[int, int, int]:
+        return a, 2 * a, 3 * a
+
+    pipeline = Pipeline([f])
+    r = pipeline.run(("x", "y", "z"), kwargs={"a": 2}, full_output=True)
+    assert r == {"a": 2, ("x", "y", "z"): (2, 4, 6), "x": 2, "y": 4, "z": 6}
+
+    r2 = pipeline.run("x", kwargs={"a": 2}, full_output=True)
+    assert r2 == {"a": 2, "x": 2, "y": 4, "z": 6}
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("No function with output name `('x', 'y')` in the pipeline"),
+    ):
+        # This currently is not possible because we only allow string output OR
+        # full exact tuple output_name.
+        pipeline.run(("x", "y"), kwargs={"a": 2}, full_output=True)
+
+
+def test_join_pipeline_preserves_defaults() -> None:
+    @pipefunc(output_name="c", defaults={"b": 2})
+    def f(a, b=1):
+        return a + b
+
+    @pipefunc(output_name="x.d", renames={"c": "x.c"})
+    def g(c):
+        return c + 1
+
+    pipeline1 = Pipeline([f], scope="x")
+    pipeline2 = Pipeline([g])
+    pipeline = pipeline1.join(pipeline2)
+    assert pipeline.run("x.d", kwargs={"x.a": 1}) == 4
+    assert pipeline.defaults == {"x.b": 2}

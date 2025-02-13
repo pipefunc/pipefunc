@@ -400,6 +400,16 @@ class DiskCache(_CacheBase):
         The maximum size of the in-memory LRU cache. Only used if with_lru_cache is True.
     lru_shared
         Whether the in-memory LRU cache should be shared between multiple processes.
+    permissions
+        The file permissions to set for the cache files.
+        If None, the default permissions are used.
+        Some examples:
+
+            - 0o660 (read/write for owner and group, no access for others)
+            - 0o644 (read/write for owner, read-only for group and others)
+            - 0o777 (read/write/execute for everyone - generally not recommended)
+            - 0o600 (read/write for owner, no access for group and others)
+            - None (use the system's default umask)
 
     """
 
@@ -412,12 +422,14 @@ class DiskCache(_CacheBase):
         with_lru_cache: bool = True,
         lru_cache_size: int = 128,
         lru_shared: bool = True,
+        permissions: int | None = None,
     ) -> None:
         self.cache_dir = Path(cache_dir)
         self.max_size = max_size
         self.use_cloudpickle = use_cloudpickle
         self.with_lru_cache = with_lru_cache
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.permissions = permissions
 
         if self.with_lru_cache:
             self.lru_cache = LRUCache(
@@ -454,6 +466,9 @@ class DiskCache(_CacheBase):
                 cloudpickle.dump(value, f)
             else:
                 pickle.dump(value, f)
+        if self.permissions is not None:
+            file_path.chmod(self.permissions)  # Set permissions after writing
+
         if self.with_lru_cache:
             self.lru_cache.put(key, value)
         self._evict_if_needed()
@@ -466,7 +481,14 @@ class DiskCache(_CacheBase):
             files = self._all_files()
             for _ in range(len(files) - self.max_size):
                 oldest_file = min(files, key=lambda f: f.stat().st_ctime_ns)
-                oldest_file.unlink()
+                try:
+                    oldest_file.unlink()
+                except PermissionError:  # pragma: no cover
+                    warnings.warn(
+                        f"Permission denied when trying to delete {oldest_file}.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
 
     def __contains__(self, key: Hashable) -> bool:
         """Check if a key is present in the cache."""
@@ -483,7 +505,7 @@ class DiskCache(_CacheBase):
     def clear(self) -> None:
         """Clear the cache by deleting all cache files."""
         for file_path in self._all_files():
-            with suppress(Exception):
+            with suppress(PermissionError, FileNotFoundError):
                 file_path.unlink()
         if self.with_lru_cache:
             self.lru_cache.clear()

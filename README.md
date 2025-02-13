@@ -1,6 +1,6 @@
 # PipeFunc: Structure, Automate, and Simplify Your Computational Workflows 🕸
 
-> ***Stop*** micromanaging execution. Focus on the **science**. Capture your workflow's essence with **function pipelines**, represent **computations as DAGs**, and **automate parallel sweeps**.
+> **_Stop_** micromanaging execution. Focus on the **science**. Capture your workflow's essence with **function pipelines**, represent **computations as DAGs**, and **automate parallel sweeps**.
 
 [![Python](https://img.shields.io/pypi/pyversions/pipefunc)](https://pypi.org/project/pipefunc/)
 [![PyPi](https://img.shields.io/pypi/v/pipefunc?color=blue)](https://pypi.org/project/pipefunc/)
@@ -12,12 +12,14 @@
 [![Documentation](https://readthedocs.org/projects/pipefunc/badge/?version=latest)](https://pipefunc.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://img.shields.io/conda/dn/conda-forge/pipefunc.svg)](https://anaconda.org/conda-forge/pipefunc)
 [![GitHub](https://img.shields.io/github/stars/pipefunc/pipefunc.svg?style=social)](https://github.com/pipefunc/pipefunc/stargazers)
-[![Discord](https://img.shields.io/discord/1320459922596565103.svg?label=Discord&logo=discord)](https://discord.gg/cBbxusZR)
+[![Discord](https://img.shields.io/discord/1320459922596565103.svg?label=Discord&logo=discord)](https://discord.gg/wUXg2drsNN)
 
 ![](https://user-images.githubusercontent.com/6897215/253785642-cf2a6941-2ea6-41b0-8225-b3e52e94c4de.png)
 
 <!-- toc-start -->
+
 ## :books: Table of Contents
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
@@ -40,7 +42,7 @@ By simply annotating functions and specifying their outputs, it builds a pipelin
 Visualize the pipeline as a directed graph, execute the pipeline for all (or specific) outputs, add multidimensional sweeps, automatically parallelize the pipeline, and get nicely structured data back.
 
 > [!NOTE]
-> A *_pipeline_* is a sequence of interconnected functions, structured as a [Directed Acyclic Graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG), where outputs from one or more functions serve as inputs to subsequent ones.
+> A _*pipeline*_ is a sequence of interconnected functions, structured as a [Directed Acyclic Graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG), where outputs from one or more functions serve as inputs to subsequent ones.
 > pipefunc streamlines the creation and management of these pipelines, offering powerful tools to efficiently execute them.
 
 Whether you're working with data processing, scientific computations, machine learning (AI) workflows, or any other scenario involving interdependent functions, `pipefunc` helps you focus on the logic of your code while it handles the intricacies of function dependencies and execution order.
@@ -58,7 +60,7 @@ Whether you're working with data processing, scientific computations, machine le
 1. 🔍 **Parameter Sweep Utilities**: Generate parameter combinations for parameter sweeps and optimize the sweeps with result caching.
 1. 💡 **Flexible Function Arguments**: Call functions with different argument combinations, letting `pipefunc` determine which other functions to call based on the provided arguments.
 1. 🏗️ **Leverages giants**: Builds on top of [NetworkX](https://networkx.org/) for graph algorithms, [NumPy](https://numpy.org/) for multi-dimensional arrays, and optionally [Xarray](https://docs.xarray.dev/) for labeled multi-dimensional arrays, [Zarr](https://zarr.readthedocs.io/) to store results in memory/disk/cloud or any key-value store, and [Adaptive](https://adaptive.readthedocs.io/) for parallel sweeps.
-1. 🤓 **Nerd stats**: >700 tests with 100% test coverage, fully typed, only 4 required dependencies, *all* Ruff Rules, *all* public API documented.
+1. 🤓 **Nerd stats**: >800 tests with 100% test coverage, fully typed, only 3 required dependencies, _all_ Ruff Rules, _all_ public API documented.
 
 ## :test_tube: How does it work?
 

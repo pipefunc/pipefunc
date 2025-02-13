@@ -23,6 +23,8 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
+  # optional-dependencies: pydantic
+  - pydantic
   # optional-dependencies: rich
   - rich
   # optional-dependencies: widgets
@@ -31,7 +33,9 @@ dependencies:
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
-  - zarr
+  - zarr>=2,<3
+  # optional-dependencies: autodoc
+  - griffe
   # optional-dependencies: docs
   - emoji
   - jupytext
@@ -43,6 +47,7 @@ dependencies:
   - sphinx-notfound-page
   - sphinx-togglebutton
   - sphinx
+  - sphinxcontrib-mermaid
   - versioningit
   - nltk
   - scikit-image

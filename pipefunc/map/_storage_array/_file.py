@@ -61,6 +61,15 @@ class FileArray(StorageBase):
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
+    def __repr__(self) -> str:
+        return (
+            f"FileArray(folder='{self.folder}', "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"filename_template={self.filename_template!r})"
+        )
+
     def _normalize_key(
         self,
         key: tuple[int | slice, ...],
@@ -195,10 +204,10 @@ class FileArray(StorageBase):
         items = _load_all(map(self._index_to_file, range(self.size)))
 
         if not splat_internal:
-            arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
-            arr[:] = items
+            ma_arr = np.empty(self.size, dtype=object)  # type: ignore[var-annotated]
+            ma_arr[:] = items
             mask = self.mask_linear()
-            return np.ma.MaskedArray(arr, mask=mask, dtype=object).reshape(self.resolved_shape)
+            return np.ma.MaskedArray(ma_arr, mask=mask, dtype=object).reshape(self.resolved_shape)
 
         if not self.resolved_internal_shape:
             msg = "internal_shape must be provided if splat_internal is True"

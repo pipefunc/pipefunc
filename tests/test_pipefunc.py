@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_psutil = importlib.util.find_spec("psutil") is not None
+has_pydantic = importlib.util.find_spec("pydantic") is not None
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
@@ -569,3 +570,116 @@ def test_defaults_dataclass_factory() -> None:
     pf2 = PipeFunc(TestClass, "container", defaults={"x0": [4, 5, 6]})
     assert pf2.defaults["x0"] == [4, 5, 6]
     assert pf2() == TestClass(x0=[4, 5, 6], y0=100)
+
+
+def test_default_and_bound() -> None:
+    @pipefunc("c", bound={"a": 2})
+    def f(a=1):
+        return a
+
+    _ = f.defaults
+    f.copy()
+
+    @dataclass
+    class Foo:
+        a: int = 1
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults
+    f.copy()
+
+
+@pytest.mark.skipif(not has_pydantic, reason="pydantic not installed")
+def test_default_and_bound_pydantic() -> None:
+    # Fixed in https://github.com/pipefunc/pipefunc/pull/525
+    import pydantic
+
+    class Foo(pydantic.BaseModel):
+        a: int = pydantic.Field(default=1)
+
+    f = PipeFunc(Foo, "d", bound={"a": 2})
+    _ = f.defaults  # accessing defaults should not modify state! (issue #525)
+    f.copy()
+
+
+def test_default_with_positional_args() -> None:
+    @pipefunc("c")
+    def f(a, b=1):
+        return a, b
+
+    assert f(1, 2) == (1, 2)
+    with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
+        f(1, 2, a=2)
+
+    f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
+    assert f(1) == (1, 1)
+    assert f(**{"x.a": 1, "x.b": 2}) == (1, 2)
+
+
+def test_nested_pipefunc_function_name() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], function_name="my_func")
+    assert nf.__name__ == "my_func"
+    nf.copy()
+
+
+def test_nested_pipefunc_renames() -> None:
+    def f(a, b):
+        return a + b
+
+    def g(f):
+        return f
+
+    # Rename output
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"f": "f1"})
+    assert nf.renames == {"f": "f1"}
+    nf.copy()
+    assert nf(a=1, b=2) == (3, 3)
+
+    # Rename input
+    nf = NestedPipeFunc([PipeFunc(f, "f"), PipeFunc(g, "g")], renames={"a": "a1"})
+    assert nf.renames == {"a": "a1"}
+    nf.copy()
+    assert nf(a1=1, b=2) == (3, 3)
+
+    # Rename both input and output (with scope)
+    nf = NestedPipeFunc(
+        [PipeFunc(f, "f"), PipeFunc(g, "g")],
+        renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
+    )
+    assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
+
+
+def test_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    pf = PipeFunc(MyClass(), output_name="out")
+    assert pf(a=1, b=2) == 3
+
+    assert pf.defaults == {"b": 1}
+    assert pf.parameter_annotations == {"a": int, "b": int}
+    assert pf.output_annotation == {"out": int}
+    assert pf.__name__ == "MyClass"
+
+
+def test_nested_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    def g(f: int) -> int:
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(MyClass(), "f"), PipeFunc(g, "g")])
+    assert nf.defaults == {"b": 1}
+    assert nf(a=1, b=2) == (3, 3)
+    nf.copy()
+    assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"f": int, "g": int}

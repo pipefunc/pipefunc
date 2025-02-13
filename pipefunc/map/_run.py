@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import itertools
+import math
 import time
+import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -13,7 +15,15 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from pipefunc._utils import at_least_tuple, dump, handle_error, is_running_in_ipynb, load, prod
+from pipefunc._utils import (
+    at_least_tuple,
+    dump,
+    get_ncores,
+    handle_error,
+    is_running_in_ipynb,
+    load,
+    prod,
+)
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -24,18 +34,17 @@ from ._adaptive_scheduler_slurm_executor import (
 )
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
-from ._result import DirectValue, Result
+from ._result import DirectValue, Result, ResultDict
 from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_is_resolved
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable, Generator, Iterable, Sequence
 
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
-    from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
 
@@ -55,13 +64,13 @@ def run_map(
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
-) -> OrderedDict[str, Result]:
+) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
     Parameters
@@ -99,16 +108,23 @@ def run_map(
 
         If parallel is ``False``, this argument is ignored.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -174,13 +190,14 @@ def run_map(
     return outputs
 
 
-class AsyncMap(NamedTuple):
-    task: asyncio.Task[OrderedDict[str, Result]]
+@dataclass
+class AsyncMap:
+    task: asyncio.Task[ResultDict]
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
 
-    def result(self) -> OrderedDict[str, Result]:
+    def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -213,7 +230,7 @@ def run_map_async(
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: str | dict[OUTPUT_TYPE, str] = "file_array",
+    storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
@@ -255,16 +272,23 @@ def run_map_async(
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
     chunksizes
-        The chunk sizes to use for batching `MapSpec` computations on parallel execution.
-        You can specify bigger chunksizes to reduce the overhead of submitting tasks to the executor.
-        By default, each execution of a PipeFunc with `MapSpec` is submitted as a separate task.
+        Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
+        Reduces overhead by grouping multiple function calls into single tasks.
         Can be specified as:
 
-        1. An integer: Use the same chunk size for all outputs.
-        2. A dictionary: Specify different chunk sizes for different outputs.
-            - Use output names as keys and integer chunk sizes or callables as values.
-            - Use an empty string ``""`` as a key to set a default chunk size.
-            - Callables should take the total number of function executions as input and return the chunk size.
+        - None: Automatically determine optimal chunk sizes (default)
+        - int: Same chunk size for all outputs
+        - dict: Different chunk sizes per output where:
+            - Keys are output names (or ``""`` for default)
+            - Values are either integers or callables
+            - Callables take total execution count and return chunk size
+
+        **Examples:**
+
+        >>> chunksizes = None  # Auto-determine optimal chunk sizes
+        >>> chunksizes = 100  # All outputs use chunks of 100
+        >>> chunksizes = {"out1": 50, "out2": 100}  # Different sizes per output
+        >>> chunksizes = {"": 50, "out1": lambda n: n // 20}  # Default and dynamic
     storage
         The storage class to use for storing intermediate and final results.
         Can be specified as:
@@ -312,7 +336,7 @@ def run_map_async(
 
     multi_run_manager = maybe_multi_run_manager(executor_dict)
 
-    async def _run_pipeline() -> OrderedDict[str, Result]:
+    async def _run_pipeline() -> ResultDict:
         with _maybe_executor(executor_dict, parallel=True) as ex:
             assert ex is not None
             for gen in pipeline.topological_generations.function_lists:
@@ -457,7 +481,7 @@ def _get_or_set_cache(
 ) -> Any:
     if cache is None:
         return compute_fn()
-    cache_key = (func.output_name, to_hashable(kwargs))
+    cache_key = (func._cache_id, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
@@ -560,11 +584,12 @@ def _set_output(
     linear_index: int,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    assert np.shape(output) == internal_shape
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -576,17 +601,37 @@ def _set_output(
         arr[flat_index] = output[internal_index]
 
 
+def _validate_internal_shape(
+    output: np.ndarray,
+    internal_shape: tuple[int, ...],
+    func: PipeFunc,
+) -> None:
+    shape = np.shape(output)[: len(internal_shape)]
+    if shape != internal_shape:
+        msg = (
+            f"Output shape {shape} of function '{func.__name__}'"
+            f" (output '{func.output_name}') does not match the expected"
+            f" internal shape {internal_shape} used in the `mapspec`"
+            f" '{func.mapspec}'. This error typically occurs when"
+            " a `PipeFunc` returns values with inconsistent shapes across"
+            " different invocations. Ensure that the output shape is"
+            " consistent for all inputs."
+        )
+        raise ValueError(msg)
+
+
 def _update_result_array(
     result_arrays: list[np.ndarray],
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
-            _set_output(result_array, _output, index, shape, mask)
+            _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
 
@@ -735,6 +780,7 @@ def _chunksize_for_func(
     func: PipeFunc,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     num_iterations: int,
+    executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
@@ -748,7 +794,38 @@ def _chunksize_for_func(
             msg = f"Invalid chunksize {chunksize} for {func.output_name}"
             raise ValueError(msg)
         return chunksize
-    return 1
+    return _get_optimal_chunk_size(num_iterations, executor)
+
+
+def _get_optimal_chunk_size(
+    total_items: int,
+    executor: Executor,
+    min_chunks_per_worker: int = 20,
+) -> int:
+    """Calculate an optimal chunk size for parallel processing.
+
+    Parameters
+    ----------
+    total_items
+        Total number of items to process
+    executor
+        The executor to use for parallel processing
+    min_chunks_per_worker
+        Minimum number of chunks each worker should process. Default of 20 provides good
+        balance between load distribution and overhead for most workloads
+
+    """
+    try:
+        n_cores = get_ncores(executor)
+    except TypeError as e:
+        warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
+        n_cores = 1
+
+    if total_items < n_cores * 2:
+        return 1
+
+    chunk_size = math.ceil(total_items / (n_cores * min_chunks_per_worker))
+    return max(1, chunk_size)
 
 
 def _maybe_parallel_map(
@@ -760,11 +837,13 @@ def _maybe_parallel_map(
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
+    if not indices:
+        return []
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
-        chunksize = _chunksize_for_func(func, chunksizes, len(indices))
+        chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
@@ -897,7 +976,7 @@ def _run_and_process_generation(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -921,7 +1000,7 @@ async def _run_and_process_generation_async(
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
@@ -945,7 +1024,7 @@ async def _run_and_process_generation_async(
 
 def _update_shapes_using_result(
     func: PipeFunc,
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
     store: dict[str, StoreType],
 ) -> None:
@@ -973,7 +1052,7 @@ def _process_generation(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -986,7 +1065,7 @@ async def _process_generation_async(
     generation: list[PipeFunc],
     tasks: dict[PipeFunc, _KwargsTask],
     store: dict[str, StoreType],
-    outputs: dict[str, Result],
+    outputs: ResultDict,
     run_info: RunInfo,
 ) -> None:
     for func in generation:
@@ -1095,7 +1174,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
@@ -1105,7 +1184,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
@@ -1135,9 +1214,9 @@ def _to_result_dict(
     kwargs: dict[str, Any],
     output: tuple[Any, ...],
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     # Note that the kwargs still contain the StorageBase objects if mapspec was used.
-    return {
+    data = {
         output_name: Result(
             function=func.__name__,
             kwargs=kwargs,
@@ -1147,6 +1226,7 @@ def _to_result_dict(
         )
         for output_name, _output in zip(at_least_tuple(func.output_name), output)
     }
+    return ResultDict(data)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1154,7 +1234,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
@@ -1189,7 +1269,7 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-) -> dict[str, Result]:
+) -> ResultDict:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:

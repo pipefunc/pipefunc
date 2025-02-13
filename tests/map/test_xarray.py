@@ -152,3 +152,17 @@ def test_xarray_from_result():
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "returns_array" in ds.coords
     assert "returns_custom_object" in ds.data_vars
+
+
+def test_loop_over_list_with_elements_with_shape() -> None:
+    # See PR #587
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: list[list[int]]) -> int:
+        return len(x)
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [[1, 2], [3, 4], [5, 6]]}
+    results = pipeline.map(inputs, run_folder="tmp_path", parallel=False)
+    assert results["y"].output.tolist() == [2, 2, 2]
+    ds = xarray_dataset_from_results(inputs, results, pipeline)
+    assert "x" in ds.coords
