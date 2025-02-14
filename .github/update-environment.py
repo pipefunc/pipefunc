@@ -54,6 +54,7 @@ def generate_environment_yml(
     default_packages: tuple[str, ...] = ("python", "pip"),
     filename: str | None = "environment.yml",
     pip_deps: list[str] | None = None,
+    conda_deps: list[str] | None = None,
 ) -> str:
     """Generate environment.yml from pyproject.toml."""
     if pip_deps is None:
@@ -80,6 +81,8 @@ def generate_environment_yml(
         added_deps,
         "from pyproject.toml",
     )
+    if conda_deps is not None:
+        env_yaml += write_deps(conda_deps, "extras from `.github/update-environment.py`")
 
     # Optional dependencies
     for group in data["project"]["optional-dependencies"]:
@@ -140,4 +143,6 @@ if __name__ == "__main__":
         name="pipefunc-sphinx",
         sections=("docs", *sections),
         filename="docs/environment-sphinx.yml",
+        conda_deps=["luigi", "airflow", "dask", "kedro"],
+        pip_deps=["pydra"],
     )
