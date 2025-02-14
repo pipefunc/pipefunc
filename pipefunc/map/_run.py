@@ -70,6 +70,7 @@ def run_map(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
+    return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -152,6 +153,10 @@ def run_map(
         and an exception is raised if any are missing.
     show_progress
         Whether to display a progress bar. Only works if ``parallel=True``.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the provided
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
     pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
@@ -182,6 +187,7 @@ def run_map(
                 executor=ex,
                 chunksizes=chunksizes,
                 progress=progress,
+                return_results=return_results,
                 cache=pipeline.cache,
             )
     if progress is not None:  # final update
@@ -236,6 +242,7 @@ def run_map_async(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
+    return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -316,6 +323,10 @@ def run_map_async(
         and an exception is raised if any are missing.
     show_progress
         Whether to display a progress bar.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the provided
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
     pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
@@ -349,6 +360,7 @@ def run_map_async(
                     executor=ex,
                     chunksizes=chunksizes,
                     progress=progress,
+                    return_results=return_results,
                     cache=pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
@@ -519,12 +531,13 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
     *,
+    return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(
+    has_dumped = _update_array(
         func,
         arrays,
         shape,
@@ -534,6 +547,8 @@ def _run_iteration_and_process(
         in_post_process=False,
         force_dump=force_dump,
     )
+    if has_dumped and not return_results:
+        return (None,) * len(outputs)
     return outputs
 
 
@@ -547,7 +562,7 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-) -> None:
+) -> bool:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
@@ -555,7 +570,7 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-
+    has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
@@ -564,6 +579,8 @@ def _update_array(
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
+            has_dumped = True
+    return has_dumped
 
 
 def _indices_to_flat_index(
@@ -687,6 +704,7 @@ def _prepare_submit_map_spec(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -702,6 +720,7 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
+        return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -844,6 +863,7 @@ def _maybe_parallel_map(
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
+        print(f"chunksize for {func.output_name}: {chunksize}")
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
@@ -973,6 +993,7 @@ class _KwargsTask(NamedTuple):
 
 # NOTE: A similar async version of this function is provided below.
 def _run_and_process_generation(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
@@ -981,6 +1002,7 @@ def _run_and_process_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
@@ -991,12 +1013,14 @@ def _run_and_process_generation(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs, run_info)
+    _process_generation(generation, tasks, store, outputs, run_info, return_results)
 
 
 async def _run_and_process_generation_async(
+    *,
     generation: list[PipeFunc],
     run_info: RunInfo,
     store: dict[str, StoreType],
@@ -1005,6 +1029,7 @@ async def _run_and_process_generation_async(
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
 ) -> None:
@@ -1016,10 +1041,11 @@ async def _run_and_process_generation_async(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs, run_info)
+    await _process_generation_async(generation, tasks, store, outputs, run_info, return_results)
 
 
 def _update_shapes_using_result(
@@ -1054,11 +1080,13 @@ def _process_generation(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store)
         _update_shapes_using_result(func, _outputs, run_info, store)
-        outputs.update(_outputs)
+        if return_results:
+            outputs.update(_outputs)
 
 
 async def _process_generation_async(
@@ -1067,11 +1095,13 @@ async def _process_generation_async(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store)
         _update_shapes_using_result(func, _outputs, run_info, store)
-        outputs.update(_outputs)
+        if return_results:
+            outputs.update(_outputs)
 
 
 def _submit_func(
@@ -1082,13 +1112,23 @@ def _submit_func(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     progress: ProgressTracker | None = None,
+    return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
+        args = _prepare_submit_map_spec(
+            func,
+            kwargs,
+            run_info,
+            store,
+            fixed_indices,
+            status,
+            return_results,
+            cache,
+        )
         r = _maybe_parallel_map(
             func,
             args.process_index,
@@ -1140,6 +1180,7 @@ def _submit_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1151,6 +1192,7 @@ def _submit_generation(
             executor,
             chunksizes,
             progress,
+            return_results,
             cache,
         )
         for func in generation
