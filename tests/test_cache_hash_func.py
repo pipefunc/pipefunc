@@ -250,7 +250,7 @@ def test_no_module(monkeypatch):
 
     memo = set()
     # Monkey-patch inspect.getmodule to always return None.
-    monkeypatch.setattr(inspect, "getmodule", lambda obj: None)  # noqa: ARG005
+    monkeypatch.setattr(inspect, "getmodule", lambda obj, default=None: None)  # noqa: ARG005
     source = inspect.getsource(dummy)
     result = _extract_source_with_dependency_info(dummy, memo)
     assert result == source

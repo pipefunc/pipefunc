@@ -12,6 +12,7 @@ import inspect
 import os
 import pickle
 import sys
+import textwrap
 import time
 import warnings
 from collections.abc import Callable
@@ -836,6 +837,8 @@ def _safe_get_source(obj: Any) -> str:
 
 
 def _collect_names_from_source(source: str) -> set[str]:
+    # Dedent the source code to avoid unexpected indent errors.
+    source = textwrap.dedent(source)
     try:
         tree = ast.parse(source)
     except Exception as e:  # noqa: BLE001
@@ -928,15 +931,11 @@ def hash_func(func: Callable | type, bound_args: dict | None = None) -> str:
         A SHA-256 hash string.
 
     """
-    try:
-        from pipefunc import __version__
-    except ImportError:
-        __version__ = "unknown"
+    from pipefunc import __version__
 
     source = extract_source_with_dependency_info(func)
-    version = __version__
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     bound_args_hashable = to_hashable(bound_args or {})
 
-    combined_info = f"{source}-{version}-{python_version}-{bound_args_hashable}"
+    combined_info = f"{source}-{__version__}-{python_version}-{bound_args_hashable}"
     return hashlib.sha256(combined_info.encode("utf-8")).hexdigest()
