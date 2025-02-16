@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import abc
 import array
+import ast
 import collections
 import functools
 import hashlib
@@ -796,138 +797,146 @@ class UnhashableError(TypeError):
 
 
 @functools.lru_cache(maxsize=256)
-def extract_source_with_dependency_info(func: Callable) -> str:
-    r"""Recursively get the source code or file info of a function and its dependencies.
+def extract_source_with_dependency_info(obj: Callable | type) -> str:
+    r"""Recursively extract the source code (or file info) for a function, method,
+    or class and all its internal dependencies.
 
-    For internal dependencies (functions defined within the same module), the
-    source code is recursively retrieved. For external dependencies (modules
-    outside the project or from the standard library), only the module name,
-    version (if available), file path, and file hash are included.
+    For any dependency defined in the same module (functions or classes),
+    the complete source is concatenated. For external dependencies (modules
+    outside the project and not part of the standard library), a comment line
+    is added with the module's name, version, file path, and the file hash.
 
     Parameters
     ----------
-    func
-        The function for which to retrieve the source code and dependency information.
+    obj
+        A function, method, or class to extract source information from.
 
     Returns
     -------
     str
-        A string containing the source code of the input function and its internal
-        dependencies, concatenated together. For each external dependency
-        encountered, a comment line is added with the format:
-        `# {module_name}-{version}-{file_path}-{file_hash}\n`.
-        If the source code of the input function cannot be obtained, an empty
-        string is returned.
+        A concatenation of the source code of the input object and its internal
+        dependencies. For external dependencies, a comment with module info is added.
 
     Warns
     -----
     UserWarning
-        If the source code of the input function or any of its dependencies
-        cannot be retrieved or if there is an error processing a dependency.
+        When the source code cannot be retrieved or parsed for any dependency.
 
-    Notes
-    -----
-    - External dependencies are identified as modules that are either part of the
-      Python standard library or installed in site-packages.
-    - The hash of the external dependency's file is included to detect changes
-      even if the version number remains the same.
-    - This function uses recursion to traverse the dependency graph.
-    - Standard library modules are skipped.
-
-    Examples
-    --------
-    >>> def my_function(x):
-    ...     return x + 1
-
-    >>> def my_other_function(x):
-    ...     return my_function(x) * 2
-
-    >>> print(extract_source_with_dependency_info(my_other_function))
-    def my_other_function(x):
-        return my_function(x) * 2
-    def my_function(x):
-        return x + 1
-
-    >>> import numpy as np
-    >>> def uses_numpy(x):
-    ...     return np.array(x)
-
-    >>> print(extract_source_with_dependency_info(uses_numpy))
-    def uses_numpy(x):
-        return np.array(x)
-    # numpy-1.23.0-/path/to/site-packages/numpy/__init__.py-<hash>
-
-    """
-    # A set used to keep track of processed functions and avoid infinite recursion.
-    # If not provided, an empty set is created.
-    memo: set[Callable] = set()
-    return _extract_source_with_dependency_info(func, memo)
+    """  # noqa: D205
+    memo: set[Any] = set()
+    return _extract_source_with_dependency_info(obj, memo)
 
 
-def _extract_source_with_dependency_info(func: Callable, memo: set) -> str:
-    source_code = ""
-    module = inspect.getmodule(func)
-
+def _safe_get_source(obj: Any) -> str:
     try:
-        source_code += inspect.getsource(func)
+        return inspect.getsource(obj)
     except (TypeError, OSError) as e:
-        warnings.warn(f"Could not get source code for {func}: {e}", stacklevel=2)
+        warnings.warn(f"Could not get source code for {obj}: {e}", stacklevel=2)
         return ""
 
-    if module:
-        for name in func.__code__.co_names:
-            if name in module.__dict__:
-                obj = module.__dict__[name]
-                try:
-                    if inspect.isfunction(obj) and obj.__module__ == module.__name__:
-                        if obj not in memo:
-                            memo.add(obj)
-                            source_code += _extract_source_with_dependency_info(obj, memo)
-                    elif inspect.ismodule(obj):
-                        if obj.__name__ in sys.stdlib_module_names:
-                            continue
-                        _name = getattr(obj, "__name__", "")
-                        version = getattr(obj, "__version__", "")
-                        file = getattr(obj, "__file__", "")
-                        file_hash = _get_file_hash(file)
-                        source_code += f"# {_name}-{version}-{file}-{file_hash}\n"
-                except (TypeError, AttributeError) as e:
-                    warnings.warn(f"Error processing dependency {name}: {e}", stacklevel=2)
 
-    return source_code
+def _collect_names_from_source(source: str) -> set[str]:
+    try:
+        tree = ast.parse(source)
+    except Exception as e:  # noqa: BLE001
+        warnings.warn(f"Could not parse source: {e}", stacklevel=2)
+        return set()
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            names.add(node.value.id)
+    return names
+
+
+def _process_dependency(dep: Any, module: Any, memo: set) -> str:
+    result = ""
+    if inspect.isfunction(dep) or inspect.isclass(dep):
+        if getattr(dep, "__module__", None) == module.__name__:
+            result += _extract_source_with_dependency_info(dep, memo)
+    elif inspect.ismodule(dep):
+        if dep.__name__ in sys.stdlib_module_names:
+            return result
+        mod_name = dep.__name__
+        mod_version = getattr(dep, "__version__", "")
+        mod_file = getattr(dep, "__file__", "")
+        file_hash = _get_file_hash(mod_file)
+        result += f"# {mod_name}-{mod_version}-{mod_file}-{file_hash}\n"
+    return result
+
+
+def _extract_source_with_dependency_info(obj: Any, memo: set[Any]) -> str:
+    if inspect.ismethod(obj):
+        obj = obj.__func__
+
+    if obj in memo:
+        return ""
+    memo.add(obj)
+
+    src = _safe_get_source(obj)
+    if not src:
+        return ""
+    combined_src = src
+
+    module = inspect.getmodule(obj)
+    if not module:
+        return combined_src
+
+    names = _collect_names_from_source(src)
+    for name in names:
+        if name in module.__dict__:
+            dep = module.__dict__[name]
+            combined_src += _process_dependency(dep, module, memo)
+    return combined_src
 
 
 def _get_file_hash(filepath: str, algorithm: str = "sha256") -> str:
     """Calculate the hash of a file."""
-    if not os.path.isfile(filepath):  # noqa: PTH113
+    if not filepath or not os.path.isfile(filepath):  # noqa: PTH113
         return ""
-
     hasher = hashlib.new(algorithm)
-    with open(filepath, "rb") as f:  # noqa: PTH123
-        while True:
-            chunk = f.read(4096)  # Read in chunks
-            if not chunk:
-                break
-            hasher.update(chunk)
+    try:
+        with open(filepath, "rb") as f:  # noqa: PTH123
+            for chunk in iter(lambda: f.read(4096), b""):
+                hasher.update(chunk)
+    except Exception as e:  # noqa: BLE001
+        warnings.warn(f"Could not read file {filepath}: {e}", stacklevel=2)
+        return ""
     return hasher.hexdigest()
 
 
-def hash_func(func: Callable, bound_args: dict | None = None) -> str:
-    """Computes a hash of the function's source code and its dependencies."""
-    from pipefunc import __version__
+def hash_func(func: Callable | type, bound_args: dict | None = None) -> str:
+    """Computes a hash of the function's or class's source code and its dependencies.
+
+    This hash is computed from:
+      - The concatenated source code (and file info for external modules)
+      - The version of the current package (pipefunc)
+      - The current Python version
+      - An optional hash of any bound arguments
+
+    Parameters
+    ----------
+    func : Callable or type
+        The function, method, or class to hash.
+    bound_args : dict, optional
+        A dictionary of bound arguments that will also contribute to the hash.
+
+    Returns
+    -------
+    str
+        A SHA-256 hash string.
+
+    """
+    try:
+        from pipefunc import __version__
+    except ImportError:
+        __version__ = "unknown"
 
     source = extract_source_with_dependency_info(func)
-
-    # Include the version of the current package 'pipefunc'
     version = __version__
-
-    # Include the Python version
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-
-    # Include bound arguments
     bound_args_hashable = to_hashable(bound_args or {})
 
-    # Combine all relevant information into a single string
     combined_info = f"{source}-{version}-{python_version}-{bound_args_hashable}"
-
     return hashlib.sha256(combined_info.encode("utf-8")).hexdigest()
