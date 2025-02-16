@@ -193,6 +193,7 @@ def test_hash_func_external_dependency_in_class():
 
     src = extract_source_with_dependency_info(WithNumpy)
     # External dependency info for numpy should be included.
+    # e.g.,: numpy-1.26.4-22cd1535fa14d74ef6f457cca149ffdc80875f460be313b8f895273f78bc402e
     assert "numpy-" in src
 
 
