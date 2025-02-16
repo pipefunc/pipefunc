@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import abc
 import array
+import ast
 import collections
 import functools
 import hashlib
+import inspect
+import os
 import pickle
 import sys
+import textwrap
 import time
 import warnings
+from collections.abc import Callable
 from contextlib import nullcontext, suppress
 from multiprocessing import Manager
 from pathlib import Path
@@ -790,3 +795,154 @@ class UnhashableError(TypeError):
             f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
         )
         super().__init__(self.message)
+
+
+@functools.lru_cache(maxsize=256)
+def extract_source_with_dependency_info(obj: Callable | type) -> str:
+    r"""Recursively extract the source code (or file info) for a function, method,
+    or class and all its internal dependencies.
+
+    For any dependency defined in the same module (functions or classes),
+    the complete source is concatenated. For external dependencies (modules
+    outside the project and not part of the standard library), a comment line
+    is added with the module's name, version, file path, and the file hash.
+
+    Parameters
+    ----------
+    obj
+        A function, method, or class to extract source information from.
+
+    Returns
+    -------
+    str
+        A concatenation of the source code of the input object and its internal
+        dependencies. For external dependencies, a comment with module info is added.
+
+    Warns
+    -----
+    UserWarning
+        When the source code cannot be retrieved or parsed for any dependency.
+
+    """  # noqa: D205
+    module = inspect.getmodule(obj)
+    if module:  # noqa: SIM108
+        # Use module.__package__ if available; otherwise fall back to module.__name__
+        base_package = module.__package__ or module.__name__
+    else:  # pragma: no cover
+        base_package = ""
+    memo: set[Any] = set()
+    return _extract_source_with_dependency_info(obj, memo, base_package)
+
+
+def _safe_get_source(obj: Any) -> str:
+    try:
+        return inspect.getsource(obj)
+    except (TypeError, OSError) as e:
+        warnings.warn(f"Could not get source code for {obj}: {e}", stacklevel=2)
+        return ""
+
+
+def _collect_names_from_source(source: str) -> set[str]:
+    # Dedent the source code to avoid unexpected indent errors.
+    source = textwrap.dedent(source)
+    try:
+        tree = ast.parse(source)
+    except Exception as e:  # noqa: BLE001  # pragma: no cover
+        warnings.warn(f"Could not parse source: {e}", stacklevel=2)
+        return set()
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            names.add(node.value.id)
+    return names
+
+
+def _process_dependency(dep: Any, base_package: str, memo: set[Any]) -> str:
+    result = ""
+    if inspect.isfunction(dep) or inspect.isclass(dep):
+        dep_mod = getattr(dep, "__module__", "")
+        if dep_mod.startswith(base_package):
+            result += _extract_source_with_dependency_info(dep, memo, base_package)
+    elif inspect.ismodule(dep):
+        # For modules, include detailed info if they are not part of the stdlib.
+        dep_mod = getattr(dep, "__name__", "")
+        if dep_mod.startswith(base_package):
+            result += _extract_source_with_dependency_info(dep, memo, base_package)
+        elif dep_mod not in sys.stdlib_module_names:
+            mod_version = getattr(dep, "__version__", "")
+            mod_file = getattr(dep, "__file__", "")
+            file_hash = _get_file_hash(mod_file)
+            result += f"# {dep_mod}-{mod_version}-{file_hash}\n"
+    return result
+
+
+def _extract_source_with_dependency_info(obj: Any, memo: set[Any], base_package: str) -> str:
+    if inspect.ismethod(obj):
+        obj = obj.__func__
+    if obj in memo:
+        return ""
+    memo.add(obj)
+
+    src = _safe_get_source(obj)
+    if not src:
+        return ""
+    combined_src = src
+
+    module = inspect.getmodule(obj)
+    if not module:
+        return combined_src
+
+    for name in _collect_names_from_source(src):
+        if name in module.__dict__:
+            dep = module.__dict__[name]
+            combined_src += _process_dependency(dep, base_package, memo)
+    return combined_src
+
+
+def _get_file_hash(filepath: str, algorithm: str = "sha256") -> str:
+    """Calculate the hash of a file."""
+    if not filepath or not os.path.isfile(filepath):  # noqa: PTH113
+        return ""
+    hasher = hashlib.new(algorithm)
+    try:
+        with open(filepath, "rb") as f:  # noqa: PTH123
+            for chunk in iter(lambda: f.read(4096), b""):
+                hasher.update(chunk)
+    except Exception as e:  # noqa: BLE001
+        warnings.warn(f"Could not read file {filepath}: {e}", stacklevel=2)
+        return ""
+    return hasher.hexdigest()
+
+
+def hash_func(func: Callable | type, bound_args: dict | None = None) -> str:
+    """Computes a hash of the function's or class's source code and its dependencies.
+
+    This hash is computed from:
+      - The concatenated source code (and file info for external modules)
+      - The version of the current package (pipefunc)
+      - The current Python version
+      - An optional hash of any bound arguments
+
+    Parameters
+    ----------
+    func : Callable or type
+        The function, method, or class to hash.
+    bound_args : dict, optional
+        A dictionary of bound arguments that will also contribute to the hash.
+
+    Returns
+    -------
+    str
+        A SHA-256 hash string.
+
+    """
+    from pipefunc import __version__
+
+    source = extract_source_with_dependency_info(func)
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    bound_args_hashable = to_hashable(bound_args or {})
+
+    combined_info = f"{source}-{__version__}-{python_version}-{bound_args_hashable}"
+    return hashlib.sha256(combined_info.encode("utf-8")).hexdigest()
