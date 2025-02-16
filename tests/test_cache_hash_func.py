@@ -169,7 +169,6 @@ def test_hash_func_nested_class():
         def outer_method(self):
             return self.Inner().inner_method()
 
-    _hash_outer = hash_func(Outer)
     src = extract_source_with_dependency_info(Outer)
     # The source for Outer should include the nested class Inner.
     assert "class Inner" in src
