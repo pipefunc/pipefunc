@@ -1486,6 +1486,7 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
+@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
