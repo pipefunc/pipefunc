@@ -828,7 +828,7 @@ def extract_source_with_dependency_info(obj: Callable | type) -> str:
     if module:  # noqa: SIM108
         # Use module.__package__ if available; otherwise fall back to module.__name__
         base_package = module.__package__ or module.__name__
-    else:
+    else:  # pragma: no cover
         base_package = ""
     memo: set[Any] = set()
     return _extract_source_with_dependency_info(obj, memo, base_package)
@@ -847,7 +847,7 @@ def _collect_names_from_source(source: str) -> set[str]:
     source = textwrap.dedent(source)
     try:
         tree = ast.parse(source)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001  # pragma: no cover
         warnings.warn(f"Could not parse source: {e}", stacklevel=2)
         return set()
     names = set()
