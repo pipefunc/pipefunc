@@ -874,7 +874,7 @@ def _process_dependency(dep: Any, base_package: str, memo: set[Any]) -> str:
             mod_version = getattr(dep, "__version__", "")
             mod_file = getattr(dep, "__file__", "")
             file_hash = _get_file_hash(mod_file)
-            result += f"# {dep_mod}-{mod_version}-{mod_file}-{file_hash}\n"
+            result += f"# {dep_mod}-{mod_version}-{file_hash}\n"
     return result
 
 

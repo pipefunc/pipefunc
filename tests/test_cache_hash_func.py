@@ -1,13 +1,11 @@
 import hashlib
-import importlib
-import importlib.util
 import inspect
 import os
 import sys
 import types
 from dataclasses import dataclass
 
-import pytest
+import numpy as np
 
 from pipefunc.cache import (
     _extract_source_with_dependency_info,
@@ -15,11 +13,6 @@ from pipefunc.cache import (
     extract_source_with_dependency_info,
     hash_func,
 )
-
-has_numpy = importlib.util.find_spec("numpy") is not None
-
-
-has_numpy = importlib.util.find_spec("numpy") is not None
 
 
 def f1():
@@ -37,17 +30,12 @@ def test_get_dependency_source_code():
 
 
 def f2():
-    if has_numpy:
-        import numpy as np
-
-        return np.array([1, 2, 3])
-    return [1, 2, 3]
+    return np.array([1, 2, 3])
 
 
 def test_get_external_dependencies():
     source = extract_source_with_dependency_info(f2)
-    if has_numpy:
-        assert "numpy" in source
+    assert "numpy-" in source
 
 
 def test_hash_func_different_functions():
@@ -199,18 +187,13 @@ def test_hash_func_method_on_instance():
 
 
 def test_hash_func_external_dependency_in_class():
-    # This test uses numpy if available.
-    if not has_numpy:
-        pytest.skip("requires numpy")
-    import numpy as np
-
     class WithNumpy:
         def use_numpy(self):
             return np.array([1, 2, 3])
 
     src = extract_source_with_dependency_info(WithNumpy)
     # External dependency info for numpy should be included.
-    assert "numpy" in src
+    assert "numpy-" in src
 
 
 def dummy_function():
@@ -277,7 +260,7 @@ def test_external_module_dependency(monkeypatch):
     memo = set()
     result = _extract_source_with_dependency_info(dummy_func, memo, "test")
     # Since the file does not exist, _get_file_hash returns an empty string.
-    expected_line = "# dummy_mod-1.0-/fake/path/dummy_mod.py-\n"
+    expected_line = "# dummy_mod-1.0-\n"
     assert expected_line in result
 
 
