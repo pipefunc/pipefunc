@@ -824,8 +824,14 @@ def extract_source_with_dependency_info(obj: Callable | type) -> str:
         When the source code cannot be retrieved or parsed for any dependency.
 
     """  # noqa: D205
+    module = inspect.getmodule(obj)
+    if module:  # noqa: SIM108
+        # Use module.__package__ if available; otherwise fall back to module.__name__
+        base_package = module.__package__ or module.__name__
+    else:
+        base_package = ""
     memo: set[Any] = set()
-    return _extract_source_with_dependency_info(obj, memo)
+    return _extract_source_with_dependency_info(obj, memo, base_package)
 
 
 def _safe_get_source(obj: Any) -> str:
@@ -853,26 +859,28 @@ def _collect_names_from_source(source: str) -> set[str]:
     return names
 
 
-def _process_dependency(dep: Any, module: Any, memo: set) -> str:
+def _process_dependency(dep: Any, base_package: str, memo: set[Any]) -> str:
     result = ""
     if inspect.isfunction(dep) or inspect.isclass(dep):
-        if getattr(dep, "__module__", None) == module.__name__:
-            result += _extract_source_with_dependency_info(dep, memo)
+        dep_mod = getattr(dep, "__module__", "")
+        if dep_mod.startswith(base_package):
+            result += _extract_source_with_dependency_info(dep, memo, base_package)
     elif inspect.ismodule(dep):
-        if dep.__name__ in sys.stdlib_module_names:
-            return result
-        mod_name = dep.__name__
-        mod_version = getattr(dep, "__version__", "")
-        mod_file = getattr(dep, "__file__", "")
-        file_hash = _get_file_hash(mod_file)
-        result += f"# {mod_name}-{mod_version}-{mod_file}-{file_hash}\n"
+        # For modules, include detailed info if they are not part of the stdlib.
+        dep_mod = getattr(dep, "__name__", "")
+        if dep_mod.startswith(base_package):
+            result += _extract_source_with_dependency_info(dep, memo, base_package)
+        elif dep_mod not in sys.stdlib_module_names:
+            mod_version = getattr(dep, "__version__", "")
+            mod_file = getattr(dep, "__file__", "")
+            file_hash = _get_file_hash(mod_file)
+            result += f"# {dep_mod}-{mod_version}-{mod_file}-{file_hash}\n"
     return result
 
 
-def _extract_source_with_dependency_info(obj: Any, memo: set[Any]) -> str:
+def _extract_source_with_dependency_info(obj: Any, memo: set[Any], base_package: str) -> str:
     if inspect.ismethod(obj):
         obj = obj.__func__
-
     if obj in memo:
         return ""
     memo.add(obj)
@@ -886,11 +894,10 @@ def _extract_source_with_dependency_info(obj: Any, memo: set[Any]) -> str:
     if not module:
         return combined_src
 
-    names = _collect_names_from_source(src)
-    for name in names:
+    for name in _collect_names_from_source(src):
         if name in module.__dict__:
             dep = module.__dict__[name]
-            combined_src += _process_dependency(dep, module, memo)
+            combined_src += _process_dependency(dep, base_package, memo)
     return combined_src
 
 

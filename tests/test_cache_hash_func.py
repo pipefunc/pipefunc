@@ -1,4 +1,5 @@
 import hashlib
+import importlib
 import importlib.util
 import inspect
 import os
@@ -219,7 +220,7 @@ def dummy_function():
 def test_memo_branch():
     """Test that if the object is already in the memo, an empty string is returned."""
     memo = {dummy_function}
-    result = _extract_source_with_dependency_info(dummy_function, memo)
+    result = _extract_source_with_dependency_info(dummy_function, memo, "")
     assert result == ""
 
 
@@ -236,7 +237,7 @@ def test_getsource_exception(monkeypatch, recwarn):
         return 1
 
     memo = set()
-    result = _extract_source_with_dependency_info(dummy, memo)
+    result = _extract_source_with_dependency_info(dummy, memo, "")
     assert result == ""
     warn = recwarn.pop(UserWarning)
     assert "Could not get source code for" in str(warn.message)
@@ -252,7 +253,7 @@ def test_no_module(monkeypatch):
     # Monkey-patch inspect.getmodule to always return None.
     monkeypatch.setattr(inspect, "getmodule", lambda obj, default=None: None)  # noqa: ARG005
     source = inspect.getsource(dummy)
-    result = _extract_source_with_dependency_info(dummy, memo)
+    result = _extract_source_with_dependency_info(dummy, memo, "")
     assert result == source
 
 
@@ -274,15 +275,10 @@ def test_external_module_dependency(monkeypatch):
     dummy_func.__globals__["dummy_mod"] = dummy_module
 
     memo = set()
-    result = _extract_source_with_dependency_info(dummy_func, memo)
+    result = _extract_source_with_dependency_info(dummy_func, memo, "test")
     # Since the file does not exist, _get_file_hash returns an empty string.
     expected_line = "# dummy_mod-1.0-/fake/path/dummy_mod.py-\n"
     assert expected_line in result
-
-
-# -----------------------------------------------------------------------------
-# Tests for _get_file_hash
-# -----------------------------------------------------------------------------
 
 
 def test_get_file_hash_no_file(tmp_path):
@@ -319,3 +315,45 @@ def test_get_file_hash_normal(tmp_path):
     expected_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     result = _get_file_hash(str(file_path))
     assert result == expected_hash
+
+
+def test_internal_dependency_branch():
+    # Create fake modules to simulate a package "fakepkg"
+    fake_main = types.ModuleType("fakepkg.main")
+    fake_main.__package__ = "fakepkg"
+    fake_utils = types.ModuleType("fakepkg.utils")
+    fake_utils.__package__ = "fakepkg"
+
+    # Define a dependency function that should be treated as internal.
+    def internal_func():
+        return "internal dependency"
+
+    # Define a main function that calls the internal dependency.
+    def main_func():
+        return internal_func()
+
+    # Simulate that these functions belong to different submodules of the same package.
+    main_func.__module__ = "fakepkg.main"
+    internal_func.__module__ = "fakepkg.utils"
+
+    # Inject the functions into our fake modules.
+    fake_main.main_func = main_func
+    fake_main.internal_func = internal_func
+    fake_utils.internal_func = internal_func
+
+    # Make sure the globals of main_func are that of fake_main so that the dependency can be found.
+    # (Normally, the module dict of a top-level function is the __dict__ of the module where it was defined.)
+    main_func.__globals__.update(fake_main.__dict__)
+
+    # Insert our fake modules into sys.modules so that inspect.getmodule can find them.
+    sys.modules["fakepkg.main"] = fake_main
+    sys.modules["fakepkg.utils"] = fake_utils
+
+    # Set the base package to "fakepkg" so that any module name starting with it is considered internal.
+    base_package = "fakepkg"
+    memo = set()
+
+    # Call our modified extraction function (which now accepts a base_package argument).
+    src = _extract_source_with_dependency_info(main_func, memo, base_package)
+    # The branch should have been taken so that the source of internal_func is included.
+    assert "def internal_func(" in src
