@@ -101,7 +101,14 @@ def test_hash_func_builtin_module():
     assert "os-" not in source
 
 
-# --- Tests for classes and methods ---
+def test_extract_source_class():
+    class Foo:
+        x: int
+
+    source = extract_source_with_dependency_info(Foo)
+    assert "class Foo" in source
+
+
 def test_hash_func_class_methods():
     class MyClass:
         def method(self, x):
