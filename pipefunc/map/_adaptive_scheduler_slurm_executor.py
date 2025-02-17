@@ -164,13 +164,30 @@ def _map_slurm_executor_kwargs(
     resources = func.resources  # type: ignore[has-type]
     if resources is None:
         return kwargs  # type: ignore[return-value]
-    resources_list: list[dict[str, Any]] = []
 
-    assert resources is not None
+    # If resources is not callable, treat as static.
     if not callable(resources):
-        kwargs = _adaptive_scheduler_resource_dict(resources)
-        # Remove keys with None or [] values
-        return {k: v for k, v in kwargs.items() if v}
+        if func.resources_scope == "element":
+            # Replicate the static resource dict for each element.
+            resources_dict = _adaptive_scheduler_resource_dict(resources)
+            resources_list = [resources_dict] * len(seq)
+            dict_of_tuples = _list_of_dicts_to_dict_of_tuples(resources_list)
+            kwargs.update(dict_of_tuples)
+            return kwargs
+        assert func.resources_scope == "map"
+        # Use the single static resource dict.
+        kwargs.update(_adaptive_scheduler_resource_dict(resources))
+        return kwargs
+
+    # Now resources is callable.
+    if func.resources_scope == "map":
+        # Call the callable only once.
+        evaluated_resources = _resources_from_process_index(process_index, seq[0])
+        scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
+        kwargs.update(scheduler_resources)
+        return kwargs
+    assert func.resources_scope == "element"
+    resources_list: list[dict[str, Any]] = []  # type: ignore[no-redef]
     for i in seq:
         evaluated_resources = _resources_from_process_index(process_index, i)
         scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
