@@ -3,6 +3,76 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.54.0 (2025-02-17)
+
+### 🐛 Bug Fixes
+
+- Fix correct number of SLURM jobs for both `resources_scope` options ([#638](https://github.com/pipefunc/pipefunc/pull/638))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#637](https://github.com/pipefunc/pipefunc/pull/637))
+
+### ✨ Enhancements
+
+- Allow setting permissions in `DiskCache` ([#636](https://github.com/pipefunc/pipefunc/pull/636))
+
+### 📊 Stats
+
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +114 lines, -8 lines
+
+## v0.53.3 (2025-02-06)
+
+### 🐛 Bug Fixes
+
+- Fix data loading with dynamic shapes ([#635](https://github.com/pipefunc/pipefunc/pull/635))
+
+### 📊 Stats
+
+- `.py`: +20 lines, -10 lines
+
+## v0.53.2 (2025-02-05)
+
+### 🐛 Bug Fixes
+
+- Fix ND mapspec with multiple outputs and `internal_shape` ([#634](https://github.com/pipefunc/pipefunc/pull/634))
+
+### 📊 Stats
+
+- `.py`: +30 lines, -2 lines
+
+## v0.53.1 (2025-02-05)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.27 ([#564](https://github.com/pipefunc/pipefunc/pull/564))
+
+### ✨ Enhancements
+
+- Raise more informative error when unknown variant selected ([#632](https://github.com/pipefunc/pipefunc/pull/632))
+
+### 📚 Documentation
+
+- Enable Plausible analytics ([#631](https://github.com/pipefunc/pipefunc/pull/631))
+- Explain alternative SLURM method ([#630](https://github.com/pipefunc/pipefunc/pull/630))
+- Add SLURM tutorial ([#629](https://github.com/pipefunc/pipefunc/pull/629))
+- Fix links in documentation ([#625](https://github.com/pipefunc/pipefunc/pull/625))
+- Update CHANGELOG.md until v0.53.0 ([#624](https://github.com/pipefunc/pipefunc/pull/624))
+- Add page about caching ([#623](https://github.com/pipefunc/pipefunc/pull/623))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#628](https://github.com/pipefunc/pipefunc/pull/628))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +736 lines, -81 lines
+- `.py`: +12 lines, -4 lines
+- `.ipynb`: +1 lines, -1 lines
+- `other`: +1 lines, -1 lines
+
 ## v0.53.0 (2025-01-31)
 
 ### ✨ Enhancements
