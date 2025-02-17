@@ -288,3 +288,4 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
     runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
     result = await runner.task
     assert isinstance(result, ResultDict)
+    assert len(result["z"].output) == 10
