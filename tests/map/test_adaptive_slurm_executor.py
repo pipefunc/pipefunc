@@ -282,3 +282,9 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
                 # In map scope, only one set of resources is used, so it should be an int.
                 assert isinstance(value, int)
                 assert value == 2
+
+    # Now rerun the test with without mocking to see if it works
+    # This will actually submit jobs to the mock scheduler.
+    runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
+    result = await runner.task
+    assert isinstance(result, ResultDict)
