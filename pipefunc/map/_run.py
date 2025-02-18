@@ -623,9 +623,10 @@ def _validate_internal_shape(
     internal_shape: tuple[int, ...],
     func: PipeFunc,
 ) -> None:
-    if np.shape(output) != internal_shape:
+    shape = np.shape(output)[: len(internal_shape)]
+    if shape != internal_shape:
         msg = (
-            f"Output shape {np.shape(output)} of function '{func.__name__}'"
+            f"Output shape {shape} of function '{func.__name__}'"
             f" (output '{func.output_name}') does not match the expected"
             f" internal shape {internal_shape} used in the `mapspec`"
             f" '{func.mapspec}'. This error typically occurs when"
