@@ -363,7 +363,7 @@ def _execute_iteration_in_single(
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, store)
+    result = _process_task(func, kwargs_task, store, return_result=True)
     if not return_output:
         return None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
