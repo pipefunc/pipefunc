@@ -1083,7 +1083,7 @@ def _process_generation(
     return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store)
+        _outputs = _process_task(func, tasks[func], store, return_results)
         _update_shapes_using_result(func, _outputs, run_info, store)
         if return_results:
             outputs.update(_outputs)
@@ -1098,7 +1098,7 @@ async def _process_generation_async(
     return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
-        _outputs = await _process_task_async(func, tasks[func], store)
+        _outputs = await _process_task_async(func, tasks[func], store, return_results)
         _update_shapes_using_result(func, _outputs, run_info, store)
         if return_results:
             outputs.update(_outputs)
@@ -1204,6 +1204,7 @@ def _output_from_mapspec_task(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
+    return_result: bool,  # noqa: FBT001
 ) -> tuple[np.ndarray, ...]:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
@@ -1213,7 +1214,7 @@ def _output_from_mapspec_task(
     first = True
     for index, outputs in zip(args.missing, outputs_list):
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_result)
             first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
@@ -1223,7 +1224,7 @@ def _output_from_mapspec_task(
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_result)
             first = False
         assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
@@ -1276,6 +1277,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
+    return_result: bool,  # noqa: FBT001
 ) -> ResultDict:
     kwargs, task = kwargs_task
     if func.requires_mapping:
@@ -1283,7 +1285,7 @@ def _process_task(
         chunk_outputs_list = [_result(x) for x in r]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_result)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
@@ -1295,6 +1297,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
+    return_result: bool,  # noqa: FBT001
 ) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
@@ -1302,7 +1305,7 @@ def _maybe_resolve_shapes_from_map(
         _maybe_set_internal_shape(output, array)
     # Outside the loop above, just needs to do this once ⬇️
     assert isinstance(array, StorageBase)
-    if args.result_arrays is None:
+    if return_result and args.result_arrays is None:
         args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
     return array.full_shape
 
@@ -1311,6 +1314,7 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
+    return_result: bool,  # noqa: FBT001
 ) -> ResultDict:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
@@ -1320,7 +1324,7 @@ async def _process_task_async(
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list)
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_result)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
