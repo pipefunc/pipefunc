@@ -24,8 +24,13 @@ has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_xarray = importlib.util.find_spec("xarray") is not None
 
 
+@pytest.mark.parametrize("return_results", [True, False])
 @pytest.mark.parametrize("dim", ["?", None])
-def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> None:
+def test_dynamic_internal_shape(
+    tmp_path: Path,
+    dim: Literal["?"] | None,
+    return_results: bool,  # noqa: FBT001
+) -> None:
     @pipefunc(output_name="n")
     def f() -> int:
         return 4
@@ -45,9 +50,10 @@ def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> Non
 
     pipeline = Pipeline([f, g, h, i])
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
-    results = pipeline.map({}, run_folder=tmp_path, parallel=False)
-    assert results["sum"].output == 12
-    assert results["sum"].output_name == "sum"
+    results = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    if return_results:
+        assert results["sum"].output == 12
+        assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
     assert load_outputs("y", run_folder=tmp_path).tolist() == [0, 2, 4, 6]
     if has_xarray:
@@ -294,9 +300,12 @@ def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
     assert r["x"].output.tolist() == [[0, 0]]
 
 
+@pytest.mark.parametrize("return_results", [True, False])
 @pytest.mark.parametrize("manually_set_internal_shape", [True, False])
 def test_dynamic_internal_shape_with_multiple_dynamic_axes(
+    tmp_path: Path,
     manually_set_internal_shape: bool,  # noqa: FBT001
+    return_results: bool,  # noqa: FBT001
 ) -> None:
     @pipefunc(output_name="x", mapspec="... -> x[i]")
     def fa(n: int) -> list[int]:
@@ -315,8 +324,15 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     pipeline = Pipeline([fa, fb, fc])
     if manually_set_internal_shape:
         pipeline["z"].internal_shape = (2,)
-    r = pipeline.map(inputs={"n": 4}, parallel=False)
-    assert r["z"].output == [6, 6]
+    r = pipeline.map(
+        inputs={"n": 4},
+        parallel=False,
+        run_folder=tmp_path,
+        return_results=return_results,
+    )
+    if return_results:
+        assert r["z"].output == [6, 6]
+    assert load_outputs("z", run_folder=tmp_path) == [6, 6]
 
     pipeline.add_mapspec_axis("n", axis="k")
     assert pipeline.mapspecs_as_strings == [
@@ -324,8 +340,15 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
         "x[i, k] -> y[i, k]",
         "y[:, k] -> z[j, k]",
     ]
-    r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)
-    assert r["z"].output.tolist() == [[6, 6], [6, 6]]
+    r = pipeline.map(
+        inputs={"n": [4, 4]},
+        parallel=False,
+        run_folder=tmp_path,
+        return_results=return_results,
+    )
+    if return_results:
+        assert r["z"].output.tolist() == [[6, 6], [6, 6]]
+    assert load_outputs("z", run_folder=tmp_path).tolist() == [[6, 6], [6, 6]]
 
 
 def test_simple_2d():

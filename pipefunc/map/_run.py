@@ -155,7 +155,7 @@ def run_map(
         Whether to display a progress bar. Only works if ``parallel=True``.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
-        without keeping the results in memory. Instead the results are only kept in the provided
+        without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
@@ -325,7 +325,7 @@ def run_map_async(
         Whether to display a progress bar.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
-        without keeping the results in memory. Instead the results are only kept in the provided
+        without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
