@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Annotated, Any
 import numpy as np
 
 from pipefunc._utils import requires
-from pipefunc.typing import ArrayElementType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -68,7 +67,6 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     parameter_name: str,
     type_annotation: Any,
     mapspecs: list[MapSpec],
-    array_as_lists: bool = True,  # noqa: FBT001, FBT002
 ) -> Any:
     array_spec = _select_array_spec(parameter_name, mapspecs)
     if array_spec is None:
@@ -76,19 +74,8 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     from pydantic import AfterValidator
 
     ndim = len(array_spec.axes)
-    if array_as_lists:
-        list_type = _nested_list_type(ndim, type_annotation)
-        return Annotated[list_type, AfterValidator(_nd_array_with_ndim(ndim))]
-    # TODO: this doesn't natively work with Pydantic!
-    # Use NDArray for higher dimensions
-    shape_any_tuple = (Any,) * ndim
-    shape = tuple[shape_any_tuple]  # type: ignore[valid-type]
-    # Same as `pipefunc.typing.Array` but with shape
-    return Annotated[
-        np.ndarray[shape, np.dtype[np.object_]],
-        AfterValidator(_nd_array_with_ndim(ndim)),
-        ArrayElementType[type_annotation],  # type: ignore[valid-type]
-    ]
+    list_type = _nested_list_type(ndim, type_annotation)
+    return Annotated[list_type, AfterValidator(_nd_array_with_ndim(ndim))]
 
 
 def _nested_list_type(ndim: int, inner_type: Any) -> Any:
