@@ -70,11 +70,11 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     mapspecs: list[MapSpec],
     array_as_lists: bool = True,  # noqa: FBT001, FBT002
 ) -> Any:
-    from pydantic import AfterValidator
-
     array_spec = _select_array_spec(parameter_name, mapspecs)
     if array_spec is None:
         return type_annotation
+    from pydantic import AfterValidator
+
     ndim = len(array_spec.axes)
     if array_as_lists:
         list_type = _nested_list_type(ndim, type_annotation)
