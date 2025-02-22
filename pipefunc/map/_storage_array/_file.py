@@ -61,6 +61,15 @@ class FileArray(StorageBase):
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
+    def __repr__(self) -> str:
+        return (
+            f"FileArray(folder='{self.folder}', "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"filename_template={self.filename_template!r})"
+        )
+
     def _normalize_key(
         self,
         key: tuple[int | slice, ...],

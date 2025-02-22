@@ -3,13 +3,14 @@ from __future__ import annotations
 import importlib.util
 import random
 import re
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
 import pytest
 
 from pipefunc import Pipeline, pipefunc
+from pipefunc.map import load_xarray_dataset
 from pipefunc.map._load import load_outputs
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+has_xarray = importlib.util.find_spec("xarray") is not None
 
 
 @pytest.mark.parametrize("dim", ["?", None])
@@ -47,6 +49,10 @@ def test_dynamic_internal_shape(tmp_path: Path, dim: Literal["?"] | None) -> Non
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 12
+    assert load_outputs("y", run_folder=tmp_path).tolist() == [0, 2, 4, 6]
+    if has_xarray:
+        load_xarray_dataset("x", run_folder=tmp_path)
+        load_xarray_dataset("y", run_folder=tmp_path)
 
 
 def test_exception():
@@ -256,3 +262,132 @@ def test_dimension_mismatch_bug_with_autogen_axes(
         storage="dict",
     )
     assert results["processed"].output.tolist() == ["0, 0", "0, 0", "1, 1"]
+
+
+def test_dynamic_internal_shape_with_irregular_output():
+    @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
+    def f(n: int, m: int = 0) -> list[int]:
+        return list(range(n + m))
+
+    pipeline = Pipeline([f])
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Output shape (3,) of function 'f' (output 'x') does not match"),
+    ):
+        pipeline.map(inputs={"n": [2, 3]}, parallel=False)
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Output shape (1,) of function 'f' (output 'x') does not match"),
+    ):
+        pipeline.map(inputs={"n": [2, 1]}, parallel=False)
+
+
+@pytest.mark.parametrize("storage", ["dict", "file_array"])
+def test_dynamic_internal_shape_with_size_1(storage: str) -> None:
+    @pipefunc(output_name="x", mapspec="n[k] -> x[i, k]")
+    def fa(n: int, m: int = 0) -> list[int]:
+        return list(range(n + m))
+
+    pipeline = Pipeline([fa])
+    r = pipeline.map(inputs={"n": [1, 1]}, parallel=False, storage=storage)
+    assert r["x"].output.tolist() == [[0, 0]]
+
+
+@pytest.mark.parametrize("manually_set_internal_shape", [True, False])
+def test_dynamic_internal_shape_with_multiple_dynamic_axes(
+    manually_set_internal_shape: bool,  # noqa: FBT001
+) -> None:
+    @pipefunc(output_name="x", mapspec="... -> x[i]")
+    def fa(n: int) -> list[int]:
+        return [0, 1, 2]
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def fb(x: int) -> int:
+        assert x in [0, 1, 2]
+        return 2 * x
+
+    @pipefunc(output_name="z", mapspec="... -> z[j]")
+    def fc(y) -> list[int]:
+        assert y.tolist() == [0, 2, 4]
+        return [sum(y), sum(y)]
+
+    pipeline = Pipeline([fa, fb, fc])
+    if manually_set_internal_shape:
+        pipeline["z"].internal_shape = (2,)
+    r = pipeline.map(inputs={"n": 4}, parallel=False)
+    assert r["z"].output == [6, 6]
+
+    pipeline.add_mapspec_axis("n", axis="k")
+    assert pipeline.mapspecs_as_strings == [
+        "n[k] -> x[i, k]",
+        "x[i, k] -> y[i, k]",
+        "y[:, k] -> z[j, k]",
+    ]
+    r = pipeline.map(inputs={"n": [4, 4]}, parallel=False)
+    assert r["z"].output.tolist() == [[6, 6], [6, 6]]
+
+
+def test_simple_2d():
+    @pipefunc(output_name="y", mapspec="x[:, k] -> y[i, k]")
+    def fa(x: np.ndarray[Any, np.dtype[np.int64]]) -> np.ndarray[Any, np.dtype[np.int64]]:
+        # The input is 1D slices of the input `x`.
+        # This function will reduce the first dim of the input and
+        # generate a new axis in its place.
+        assert x.shape == (2,)
+        y = np.hstack([x, x, x])
+        assert y.shape == (6,)
+        return y
+
+    @pipefunc(output_name="z", mapspec="y[i, k] -> z[i, k]")
+    def fb(y: int) -> int:
+        return 3 * y
+
+    pipeline = Pipeline([fa, fb])
+    x = np.array([[0, 1, 2], [3, 4, 5]])
+    r = pipeline.map(inputs={"x": x}, parallel=False)
+    assert r["y"].output.tolist() == [
+        [0, 1, 2],
+        [3, 4, 5],
+        [0, 1, 2],
+        [3, 4, 5],
+        [0, 1, 2],
+        [3, 4, 5],
+    ]
+    assert r["z"].output.tolist() == [
+        [0, 3, 6],
+        [9, 12, 15],
+        [0, 3, 6],
+        [9, 12, 15],
+        [0, 3, 6],
+        [9, 12, 15],
+    ]
+
+
+def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
+    tmp_path: Path,
+) -> None:
+    @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
+    def f(x):
+        y1 = np.array([[x, x], [x + 1, x + 1]])
+        y2 = np.array([[x + 2, x + 2], [x + 3, x + 3]])
+        y3 = np.array([[x + 2], [x + 3]])
+        assert y1.shape == (2, 2)
+        return y1, y2, y3
+
+    pipeline = Pipeline([f])
+    pipeline.add_mapspec_axis("x", axis="j")
+    assert pipeline.mapspecs_as_strings == ["x[j] -> y1[i, j], y2[i, j], y3[i, j]"]
+    results = pipeline.map({"x": [1]}, run_folder=tmp_path)
+    y1 = results["y1"].output
+    y2 = results["y2"].output
+    y3 = results["y3"].output
+    assert y1.shape == (2, 1)
+    assert y1[0, 0].tolist() == [1, 1]
+    assert y1[1, 0].tolist() == [2, 2]
+    assert y2.shape == (2, 1)
+    assert y2[0, 0].tolist() == [3, 3]
+    assert y2[1, 0].tolist() == [4, 4]
+    assert y3.shape == (2, 1)
+    assert y3[0, 0].tolist() == [3]
+    assert y3[1, 0].tolist() == [4]

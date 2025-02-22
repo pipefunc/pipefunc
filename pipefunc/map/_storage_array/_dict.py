@@ -51,6 +51,16 @@ class DictArray(StorageBase):
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
         self.load()
 
+    def __repr__(self) -> str:
+        folder = f"'{self.folder}'" if self.folder is not None else self.folder
+        return (
+            f"DictArray(folder={folder}, "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"mapping={self._dict})"
+        )
+
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
         np_index = np.unravel_index(index, self.resolved_shape)

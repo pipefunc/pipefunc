@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 
 import pytest
 
@@ -173,7 +174,10 @@ def test_error_handling_with_variant() -> None:
 
     pipeline = VariantPipeline([f, f_alt])
 
-    with pytest.raises(ValueError, match="Unknown variant"):
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Unknown variant: `mul`, choose one of: `add, sub`"),
+    ):
         pipeline.with_variant(select="mul")
 
     with pytest.raises(TypeError, match="Invalid variant type"):
