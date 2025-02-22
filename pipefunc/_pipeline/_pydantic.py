@@ -88,7 +88,7 @@ def _nested_list_type(ndim: int, inner_type: Any) -> Any:
     For ndim == 1, returns list[inner_type].
     For ndim == 2, returns list[list[inner_type]], etc.
     """
-    if ndim < 1:
+    if ndim < 1:  # pragma: no cover
         msg = "ndim must be at least 1"
         raise ValueError(msg)
     if ndim == 1:
@@ -100,7 +100,8 @@ def _nested_list_type(ndim: int, inner_type: Any) -> Any:
 def _nd_array_with_ndim(ndim: int) -> Callable[[Any], np.ndarray]:
     def _as_ndarray(value: Any) -> np.ndarray:
         arr = np.asarray(value)
-        if arr.ndim != ndim:
+        if arr.ndim != ndim:  # pragma: no cover
+            # This should never happen, as the pydantic model should prevent it.
             msg = f"Expected an array with {ndim} dimensions, got {arr.ndim}."
             raise ValueError(msg)
         return arr
