@@ -77,7 +77,7 @@ def _maybe_ndarray_type_annotation_from_mapspec(
         return type_annotation
     ndim = len(array_spec.axes)
     if array_as_lists:
-        list_type = nested_list_type(ndim, type_annotation)
+        list_type = _nested_list_type(ndim, type_annotation)
         return Annotated[list_type, AfterValidator(_nd_array_with_ndim(ndim))]
     # TODO: this doesn't natively work with Pydantic!
     # Use NDArray for higher dimensions
@@ -91,7 +91,7 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     ]
 
 
-def nested_list_type(ndim: int, inner_type: Any) -> Any:
+def _nested_list_type(ndim: int, inner_type: Any) -> Any:
     """Recursively build a nested list type annotation.
 
     For ndim == 1, returns list[inner_type].
@@ -102,7 +102,7 @@ def nested_list_type(ndim: int, inner_type: Any) -> Any:
         raise ValueError(msg)
     if ndim == 1:
         return list[inner_type]
-    type_ = nested_list_type(ndim - 1, inner_type)
+    type_ = _nested_list_type(ndim - 1, inner_type)
     return list[type_]  # type: ignore[valid-type]
 
 
