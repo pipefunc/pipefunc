@@ -1,8 +1,13 @@
+import importlib.util
+
 import numpy as np
+import pytest
 from pydantic import BaseModel, Field
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.typing import safe_get_type_hints
+
+has_griffe = importlib.util.find_spec("griffe") is not None
 
 
 def test_pydantic_annotations() -> None:
@@ -165,6 +170,48 @@ def test_pipeline_to_pydantic_without_griffe(monkeypatch):
     # Since has_griffe is False, the field descriptions should be None.
     field_info = instance.model_fields["x"]
     assert field_info.description is None, "Expected no description when griffe is not available."
+    # Check that the instance validates the values as expected.
+    assert instance.x == 10
+    assert instance.y == 5
+
+
+@pytest.mark.skipif(not has_griffe, reason="requires griffe")
+def test_pipeline_to_pydantic_with_doc():
+    @pipefunc("foo")
+    def foo(x: int, y: int = 1) -> int:
+        """
+        Add x and y.
+
+        Parameters
+        ----------
+        x : int
+            The first number.
+        y : int, optional
+            The second number.
+
+        Returns
+        -------
+        int
+        """
+        return x + y
+
+    # Build a pipeline using the function.
+    pipeline = Pipeline([foo])
+    # Create the Pydantic model from the pipeline.
+    Model: type[BaseModel] = pipeline.pydantic_model(model_name="TestModel")  # noqa: N806
+
+    # Instantiate the model.
+    instance = Model(x=10, y=5)
+
+    # Verify that the field descriptions are populated (i.e. not None).
+    field_x_info = instance.model_fields["x"]
+    assert field_x_info.description is not None
+    assert "The first number." in field_x_info.description
+
+    field_y_info = instance.model_fields["y"]
+    assert field_y_info.description is not None
+    assert "The second number." in field_y_info.description
+
     # Check that the instance validates the values as expected.
     assert instance.x == 10
     assert instance.y == 5

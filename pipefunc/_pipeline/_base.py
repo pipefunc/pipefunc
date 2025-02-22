@@ -2098,15 +2098,20 @@ class Pipeline:
             order=order,
         )
 
-    def pydantic_model(self) -> type[BaseModel]:
+    def pydantic_model(self, model_name: str = "InputModel") -> type[BaseModel]:
         """Create a Pydantic model for the pipeline's input and output types.
+
+        Parameters
+        ----------
+        model_name
+            The name of the Pydantic model.
 
         Returns
         -------
             A Pydantic model that can be used to validate the input and output types of the pipeline.
 
         """
-        return pipeline_to_pydantic(self)
+        return pipeline_to_pydantic(self, model_name)
 
 
 class Generations(NamedTuple):
