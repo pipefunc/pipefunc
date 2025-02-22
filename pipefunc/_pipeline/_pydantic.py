@@ -9,6 +9,8 @@ from pipefunc._utils import requires
 from pipefunc.typing import ArrayElementType
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic import BaseModel
 
     from pipefunc import Pipeline
@@ -66,21 +68,53 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     parameter_name: str,
     type_annotation: Any,
     mapspecs: list[MapSpec],
+    array_as_lists: bool = True,  # noqa: FBT001, FBT002
 ) -> Any:
+    from pydantic import AfterValidator
+
     array_spec = _select_array_spec(parameter_name, mapspecs)
     if array_spec is None:
         return type_annotation
     ndim = len(array_spec.axes)
-    if ndim == 1:
-        return list[type_annotation]
+    if array_as_lists:
+        list_type = nested_list_type(ndim, type_annotation)
+        return Annotated[list_type, AfterValidator(_nd_array_with_ndim(ndim))]
+    # TODO: this doesn't natively work with Pydantic!
     # Use NDArray for higher dimensions
     shape_any_tuple = (Any,) * ndim
     shape = tuple[shape_any_tuple]  # type: ignore[valid-type]
     # Same as `pipefunc.typing.Array` but with shape
     return Annotated[
         np.ndarray[shape, np.dtype[np.object_]],
+        AfterValidator(_nd_array_with_ndim(ndim)),
         ArrayElementType[type_annotation],  # type: ignore[valid-type]
     ]
+
+
+def nested_list_type(ndim: int, inner_type: Any) -> Any:
+    """Recursively build a nested list type annotation.
+
+    For ndim == 1, returns list[inner_type].
+    For ndim == 2, returns list[list[inner_type]], etc.
+    """
+    if ndim < 1:
+        msg = "ndim must be at least 1"
+        raise ValueError(msg)
+    if ndim == 1:
+        return list[inner_type]
+    type_ = nested_list_type(ndim - 1, inner_type)
+    return list[type_]  # type: ignore[valid-type]
+
+
+def _nd_array_with_ndim(ndim: int) -> Callable[[Any], np.ndarray]:
+    def _as_ndarray(value: Any) -> np.ndarray:
+        arr = np.asarray(value)
+        if arr.ndim != ndim:
+            msg = f"Expected an array with {ndim} dimensions, got {arr.ndim}."
+            raise ValueError(msg)
+        return arr
+
+    return _as_ndarray
 
 
 def _select_array_spec(parameter_name: str, mapspecs: list[MapSpec]) -> ArraySpec | None:
