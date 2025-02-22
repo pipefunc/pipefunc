@@ -30,7 +30,7 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
 
     """
     requires("pydantic", reason="pydantic_model")
-    from pydantic import Field, create_model
+    from pydantic import ConfigDict, Field, create_model
 
     if has_griffe:
         from pipefunc._pipeline._autodoc import PipelineDocumentation
@@ -60,7 +60,11 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
         field = Field(default, description=description)
         field_definitions[p] = (type_annotation, field)
 
-    return create_model(model_name, **field_definitions)
+    return create_model(
+        model_name,
+        __config__=ConfigDict(arbitrary_types_allowed=True),
+        **field_definitions,
+    )
 
 
 def _maybe_ndarray_type_annotation_from_mapspec(

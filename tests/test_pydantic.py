@@ -1,3 +1,4 @@
+import numpy as np
 from pydantic import BaseModel, Field
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
@@ -87,4 +88,46 @@ def test_pipeline_with_mapspec_input_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[1, 2, 3], y=2, z={"a": 1})
     expected = {"x": [1, 2, 3], "y": 2, "z": {"a": 1}}
-    assert model.model_dump() == expected
+    out = model.model_dump()
+    assert isinstance(out["x"], np.ndarray)
+    assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
+    assert out["y"] == expected["y"]
+
+
+def test_pipeline_2d_mapspec_as_pydantic_model() -> None:
+    @pipefunc("foo", mapspec="x[i, j] -> foo[i, j]")
+    def foo(x: int, y: int = 1, z: dict[str, int] | None = None) -> int:
+        return x + y
+
+    pipeline = Pipeline([foo])
+    Model = pipeline.pydantic_model()  # noqa: N806
+    model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
+    expected = {"x": np.array([[1, 2], [3, 4]]), "y": 2, "z": {"a": 1}}
+    out = model.model_dump()
+    assert isinstance(out["x"], np.ndarray)
+    assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
+    assert out["y"] == expected["y"]
+    assert out["z"] == expected["z"]
+
+
+class CustomObject:
+    def __init__(self, x: int):
+        self.x = x
+
+
+def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
+    @pipefunc("foo", mapspec="x[i, j, k] -> foo[i, j, k]")
+    def foo(x: CustomObject, y: int = 1) -> int:
+        return x.x + y
+
+    pipeline = Pipeline([foo])
+    Model = pipeline.pydantic_model()  # noqa: N806
+    x = [[[CustomObject(1), CustomObject(2)], [CustomObject(3), CustomObject(4)]]]
+    model = Model(x=x, y=2, z={"a": 1})
+    expected = {"x": np.array(x), "y": 2, "z": {"a": 1}}
+    out = model.model_dump()
+    assert isinstance(out["x"], np.ndarray)
+    assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
+    assert out["x"].shape == (1, 2, 2)
+    assert str(out["x"].dtype) == "object"
+    assert out["y"] == expected["y"]
