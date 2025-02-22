@@ -76,7 +76,7 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     # Use NDArray for higher dimensions
     shape_any_tuple = (Any,) * ndim
     shape = tuple[shape_any_tuple]  # type: ignore[valid-type]
-    # Same as pipefunc.typing.Array but with shape
+    # Same as `pipefunc.typing.Array` but with shape
     return Annotated[
         np.ndarray[shape, np.dtype[np.object_]],
         ArrayElementType[type_annotation],  # type: ignore[valid-type]
