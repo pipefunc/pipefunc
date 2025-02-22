@@ -131,3 +131,40 @@ def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
     assert out["x"].shape == (1, 2, 2)
     assert str(out["x"].dtype) == "object"
     assert out["y"] == expected["y"]
+
+
+def test_pipeline_to_pydantic_without_griffe(monkeypatch):
+    # Import the module where pipeline_to_pydantic is defined.
+    # Adjust the import path according to your project structure.
+    from pydantic import BaseModel
+
+    from pipefunc import Pipeline, pipefunc
+    from pipefunc._pipeline._pydantic import pipeline_to_pydantic
+
+    # Force has_griffe to False for this test.
+    monkeypatch.setattr("pipefunc._pipeline._pydantic.has_griffe", False)
+
+    # Create a simple function with a docstring that would normally be used for field descriptions
+    @pipefunc("foo")
+    def foo(x: int, y: int = 1) -> int:
+        """Add x and y.
+
+        Parameters:
+            x: The first number.
+            y: The second number.
+        """
+        return x + y
+
+    # Build a pipeline using the function.
+    pipeline = Pipeline([foo])
+    # Create the Pydantic model from the pipeline.
+    Model: type[BaseModel] = pipeline_to_pydantic(pipeline, model_name="TestModel")  # noqa: N806
+
+    # Instantiate the model.
+    instance = Model(x=10, y=5)
+    # Since has_griffe is False, the field descriptions should be None.
+    field_info = instance.model_fields["x"]
+    assert field_info.description is None, "Expected no description when griffe is not available."
+    # Check that the instance validates the values as expected.
+    assert instance.x == 10
+    assert instance.y == 5
