@@ -783,7 +783,7 @@ class PipeFunc(Generic[T]):
         func = self.func
         if inspect.isclass(func) and isinstance(self.output_name, str):
             return {self.output_name: func}
-        if not inspect.isfunction(func):
+        if not inspect.isfunction(func) and not is_classmethod(func):
             func = func.__call__  # type: ignore[operator]
         if self._output_picker is None:
             hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)

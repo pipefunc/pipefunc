@@ -90,27 +90,31 @@ def test_pipefunc_from_class():
     assert adder_func.output_annotation == {"sum": Adder}
 
 
+@dataclass
+class Foo:
+    name: str
+
+    @classmethod
+    def from_name(cls, name: str) -> Foo:
+        return cls(name)
+
+
 def test_pipefunc_with_classmethod_dataclass() -> None:
-    @dataclass
-    class Foo:
-        name: str
-
-        @classmethod
-        def from_name(cls, name: str) -> Foo:
-            return cls(name)
-
     f = PipeFunc(Foo.from_name, output_name="foo")
     assert f.parameter_annotations == {"name": str}
+    assert f.output_annotation == {"foo": Foo}
+
+
+class Bar:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @classmethod
+    def from_name(cls, name: str) -> Bar:
+        return cls(name)
 
 
 def test_pipefunc_with_classmethod() -> None:
-    class Foo:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        @classmethod
-        def from_name(cls, name: str) -> Foo:
-            return cls(name)
-
-    f = PipeFunc(Foo.from_name, output_name="foo")
+    f = PipeFunc(Bar.from_name, output_name="foo")
     assert f.parameter_annotations == {"name": str}
+    assert f.output_annotation == {"foo": Bar}
