@@ -14,6 +14,7 @@ from pipefunc._utils import (
     format_function_call,
     format_kwargs,
     handle_error,
+    is_classmethod,
     is_min_version,
     is_pydantic_base_model,
     load,
@@ -311,3 +312,29 @@ def test_is_pydantic_base_model() -> None:
     assert is_pydantic_base_model(CustomModel)
     assert not is_pydantic_base_model(Foo)
     assert not is_pydantic_base_model(lambda x: x)
+
+
+def test_is_classmethod() -> None:
+    class Foo:
+        def method(self):
+            pass
+
+        @classmethod
+        def classmethod(cls):
+            pass
+
+        @staticmethod
+        def staticmethod():
+            pass
+
+        @property
+        def property(self):
+            pass
+
+    assert not is_classmethod(Foo.method)
+    assert is_classmethod(Foo.classmethod)
+    assert not is_classmethod(Foo.staticmethod)
+    assert not is_classmethod(Foo.property)
+    assert not is_classmethod(lambda x: x)
+    assert not is_classmethod(1)  # type: ignore[arg-type]
+    assert not is_classmethod("method")  # type: ignore[arg-type]

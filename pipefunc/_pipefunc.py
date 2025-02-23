@@ -33,6 +33,7 @@ from pipefunc._utils import (
     clear_cached_properties,
     format_function_call,
     get_local_ip,
+    is_classmethod,
     is_pydantic_base_model,
     requires,
 )
@@ -771,7 +772,7 @@ class PipeFunc(Generic[T]):
         if not is_pydantic_base_model(func):
             if inspect.isclass(func):
                 func = func.__init__
-            elif not inspect.isfunction(func):
+            elif not inspect.isfunction(func) and not is_classmethod(func):
                 func = func.__call__  # type: ignore[operator]
         type_hints = safe_get_type_hints(func, include_extras=True)
         return {self.renames.get(k, k): v for k, v in type_hints.items() if k != "return"}
