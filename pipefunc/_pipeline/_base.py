@@ -2121,6 +2121,7 @@ class Pipeline:
         pipeline receives the correctly structured NumPy arrays it expects.
 
         **Usage:**
+
         - Validate input data and automatically coerce types before passing them to the pipeline.
         - Serve as the foundation for generating a CLI where user-supplied inputs are validated
         and converted, ensuring that the pipeline's functions receive the proper input types.
