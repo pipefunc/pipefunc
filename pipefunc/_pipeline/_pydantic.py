@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import warnings
 from typing import TYPE_CHECKING, Annotated, Any
 
 import numpy as np
@@ -46,7 +47,12 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
     for p in root_args:
         for f in pipeline.functions:
             if p in f.parameters:
-                parameter_annotations[p] = f.parameter_annotations[p]
+                if p not in parameter_annotations:
+                    warnings.warn(
+                        f"Parameter '{p}' is not annotated, using `typing.Any`.",
+                        stacklevel=2,
+                    )
+                parameter_annotations[p] = f.parameter_annotations.get(p, Any)
     mapspecs = pipeline.mapspecs()
     for p in root_args:
         type_annotation = parameter_annotations.get(p, Any)
