@@ -2226,11 +2226,7 @@ class Pipeline:
             value = getattr(args_cli, arg)
             try:
                 # Attempt to parse string as JSON (list, dict, number, bool, etc.)
-                input_data[arg] = (
-                    json.loads(value)
-                    if isinstance(value, str) and value and field_info.annotation is not str
-                    else value
-                )
+                input_data[arg] = json.loads(value) if field_info.annotation is not str else value
             except json.JSONDecodeError:
                 # If JSON parsing fails, use the string value directly
                 input_data[arg] = value
@@ -2242,21 +2238,10 @@ class Pipeline:
         map_kwargs = {}
         for arg, value in vars(args_cli).items():
             if arg.startswith("map."):
-                try:
-                    map_kwargs[arg[4:]] = (
-                        json.loads(value) if isinstance(value, str) and value else value
-                    )
-                except json.JSONDecodeError:
-                    rich.print("[red bold]Failed to parse JSON", arg, value, type(value))
+                map_kwargs[arg[4:]] = value
 
         rich.print("Map kwargs from CLI:", map_kwargs)
         self.map(inputs, **map_kwargs)
-
-
-def _to_type(annotation: Any) -> Any:
-    if annotation in {int, float}:
-        return annotation
-    return str
 
 
 class Generations(NamedTuple):
