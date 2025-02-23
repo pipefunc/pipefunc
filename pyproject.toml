@@ -66,9 +66,8 @@ docs = [
     "seaborn",
     "pipefunc[all]",
 ]
-# all doesn't include 'pydantic' because there are no specific features that depend on it
 all = [
-    "pipefunc[adaptive,autodoc,pandas,plotting,profiling,rich,widgets,xarray,zarr]",
+    "pipefunc[adaptive,autodoc,pandas,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
 ]
 dev = [ # all + dev deps
     "black[jupyter]",
@@ -76,7 +75,7 @@ dev = [ # all + dev deps
     "pre-commit",
     "ruff",
     "versioningit",
-    "pipefunc[all,test,docs,pydantic]",
+    "pipefunc[all,test,docs]",
 ]
 # matches pipefunc-extras in https://github.com/conda-forge/pipefunc-feedstock/blob/main/recipe/meta.yaml
 extras = [
@@ -88,6 +87,7 @@ extras = [
     "matplotlib",
     "pandas",
     "psutil",
+    "pydantic",
     "rich",
     "xarray",
     "zarr>=2,<3",
