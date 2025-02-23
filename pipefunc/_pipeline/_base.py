@@ -2202,18 +2202,19 @@ class Pipeline:
         for arg, p in sig_map.parameters.items():
             if arg not in {"run_folder", "parallel", "storage", "cleanup"}:
                 continue
+            default = defaults[arg]
             row = _create_parameter_row(
                 arg,
                 [doc_map.parameters[arg]],
-                {arg: p.default},
+                {arg: default},
                 {arg: p.annotation},
                 skip_optional=True,
             )
             help_text = str(row[-1]).replace("``", "`")
             parser.add_argument(
-                f"--map.{arg}",
+                f"--map-{arg}",
                 type=str,
-                default=defaults[arg],
+                default=default,
                 help=help_text,
             )
 
@@ -2234,14 +2235,24 @@ class Pipeline:
         model_instance = InputModel.model_validate(input_data)
         inputs = model_instance.model_dump()
         rich.print("Inputs from CLI:", model_instance)
-
-        map_kwargs = {}
+        rich.print(vars(args_cli))
+        map_kwargs: dict[str, Any] = {}
         for arg, value in vars(args_cli).items():
-            if arg.startswith("map."):
-                map_kwargs[arg[4:]] = value
+            if arg.startswith("map_"):
+                map_kwargs[arg[4:]] = _maybe_bool(value)
 
         rich.print("Map kwargs from CLI:", map_kwargs)
         self.map(inputs, **map_kwargs)
+
+
+def _maybe_bool(value: Any) -> bool | Any:
+    if not isinstance(value, str):
+        return value
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    return value
 
 
 class Generations(NamedTuple):
