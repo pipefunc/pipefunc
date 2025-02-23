@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 import numpy as np
 
-from pipefunc._utils import requires
+from pipefunc._utils import is_imported, requires
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -65,6 +65,19 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
         __config__=ConfigDict(arbitrary_types_allowed=True),
         **field_definitions,
     )
+
+
+def maybe_pydantic_model_to_dict(x: dict[str, Any] | BaseModel) -> dict[str, Any]:
+    """Convert a Pydantic model to a dictionary if needed."""
+    if isinstance(x, dict):
+        return x
+    if not is_imported("pydantic"):
+        msg = "Unknown type, expected a Pydantic model or a dictionary."
+        raise ValueError(msg)
+    import pydantic
+
+    assert isinstance(x, pydantic.BaseModel)
+    return x.model_dump()
 
 
 def _maybe_ndarray_type_annotation_from_mapspec(

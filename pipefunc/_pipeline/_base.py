@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
     import ipywidgets
-    from pydantic import BaseModel
+    import pydantic
     from rich.table import Table
 
     from pipefunc._plotting import GraphvizStyle
@@ -696,7 +696,7 @@ class Pipeline:
 
     def map(
         self,
-        inputs: dict[str, Any],
+        inputs: dict[str, Any] | pydantic.BaseModel,
         run_folder: str | Path | None = None,
         internal_shapes: UserShapeDict | None = None,
         *,
@@ -821,7 +821,7 @@ class Pipeline:
 
     def map_async(
         self,
-        inputs: dict[str, Any],
+        inputs: dict[str, Any] | pydantic.BaseModel,
         run_folder: str | Path | None = None,
         internal_shapes: UserShapeDict | None = None,
         *,
@@ -2098,7 +2098,7 @@ class Pipeline:
             order=order,
         )
 
-    def pydantic_model(self, model_name: str = "InputModel") -> type[BaseModel]:
+    def pydantic_model(self, model_name: str = "InputModel") -> type[pydantic.BaseModel]:
         """Generate a Pydantic model from the pipeline's root input parameters.
 
         This function inspects the provided pipeline to extract its default values,
@@ -2132,7 +2132,7 @@ class Pipeline:
 
         Returns
         -------
-        type[BaseModel]
+        type[pydantic.BaseModel]
             A dynamically generated Pydantic model class representing the input schema of the pipeline.
             This model performs the following functions:
 

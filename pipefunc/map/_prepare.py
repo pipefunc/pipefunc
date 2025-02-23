@@ -4,6 +4,7 @@ import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
+from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
 from pipefunc._utils import at_least_tuple
 
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from concurrent.futures import Executor
     from pathlib import Path
 
+    import pydantic
+
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc._widgets import ProgressTracker
@@ -27,7 +30,7 @@ if TYPE_CHECKING:
 def prepare_run(
     *,
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None,
     internal_shapes: UserShapeDict | None,
     output_names: set[OUTPUT_TYPE] | None,
@@ -51,6 +54,7 @@ def prepare_run(
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
+    inputs = maybe_pydantic_model_to_dict(inputs)
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
