@@ -46,14 +46,15 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
     field_definitions = {}
     for p in root_args:
         for f in pipeline.functions:
-            if p in f.parameters:
-                if p not in parameter_annotations:
-                    msg = (
-                        f"Parameter '{p}' is not annotated, using `typing.Any`."
-                        " This may lead to unexpected behavior and incorrect type coercion."
-                    )
-                    warnings.warn(msg, stacklevel=2)
-                parameter_annotations[p] = f.parameter_annotations.get(p, Any)
+            if p not in f.parameters:
+                continue
+            if p not in parameter_annotations:
+                msg = (
+                    f"Parameter '{p}' is not annotated, using `typing.Any`."
+                    " This may lead to unexpected behavior and incorrect type coercion."
+                )
+                warnings.warn(msg, stacklevel=2)
+            parameter_annotations[p] = f.parameter_annotations.get(p, Any)
     mapspecs = pipeline.mapspecs()
     for p in root_args:
         type_annotation = parameter_annotations.get(p, Any)
