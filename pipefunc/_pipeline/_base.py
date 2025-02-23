@@ -2242,7 +2242,9 @@ class Pipeline:
                 map_kwargs[arg[4:]] = _maybe_bool(value)
 
         rich.print("Map kwargs from CLI:", map_kwargs)
-        self.map(inputs, **map_kwargs)
+        results = self.map(inputs, **map_kwargs)
+        rich.print("\n\n[bold blue]Results:")
+        rich.print(results)
 
 
 def _maybe_bool(value: Any) -> bool | Any:
