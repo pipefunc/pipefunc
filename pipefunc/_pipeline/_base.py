@@ -2121,6 +2121,7 @@ class Pipeline:
         -------
         type[pydantic.BaseModel]
             A dynamically generated Pydantic model class for validating pipeline inputs. It:
+
             - Validates and coerces input data to the expected types.
             - Annotates multidimensional arrays as nested lists and converts them to NumPy arrays.
             - Facilitates CLI creation by ensuring proper input validation.
