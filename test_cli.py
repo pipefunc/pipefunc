@@ -1,8 +1,8 @@
+from dataclasses import dataclass
+
 import numpy as np
 
 from pipefunc import Pipeline, pipefunc
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ def make_geometry(x: float, y: float) -> Geometry:
 
     Returns:
         The created geometry object
+
     """
     return Geometry(x, y)
 
@@ -61,6 +62,7 @@ def make_mesh(
         A tuple containing:
             - The fine mesh
             - The coarse mesh
+
     """
     return Mesh(geo, mesh_size), Mesh(geo, coarse_mesh_size)
 
@@ -74,6 +76,7 @@ def make_materials(geo: Geometry) -> Materials:
 
     Returns:
         The created materials object
+
     """
     return Materials(geo, ["i", "j", "c"])
 
@@ -95,6 +98,7 @@ def run_electrostatics(
 
     Returns:
         Results of electrostatics simulation
+
     """
     return Electrostatics(mesh, materials, [V_left, V_right])
 
@@ -112,6 +116,7 @@ def get_charge(electrostatics: Electrostatics) -> float:
     -------
     float
     Calculated charge (sum of voltages)
+
     """
     # obviously not actually the charge; but we should return _some_ number that
     # is "derived" from the electrostatics.
