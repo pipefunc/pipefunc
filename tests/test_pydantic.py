@@ -98,6 +98,9 @@ def test_pipeline_with_mapspec_input_as_pydantic_model() -> None:
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["y"] == expected["y"]
+    # Test the `PlainSerializer`
+    out_json = model.model_dump_json()
+    assert out_json == '{"x":[1,2,3],"y":2,"z":{"a":1}}'
 
 
 def test_pipeline_2d_mapspec_as_pydantic_model() -> None:
