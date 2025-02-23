@@ -238,6 +238,10 @@ def test_pipeline_map(tmp_path: Path) -> None:
     assert out.shape == (2, 2)
     assert out.tolist() == [[3.0, 4.0], [5.0, 6.0]]
     assert isinstance(out[0, 0], float)
+    out = results["bar"].output
+    assert out.shape == (2, 2)
+    assert out.tolist() == [[6.0, 8.0], [10.0, 12.0]]
+    assert isinstance(out[0, 0], float)
 
 
 def test_not_annotated_warning() -> None:
