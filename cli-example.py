@@ -1,3 +1,6 @@
+"""Pipeline example with CLI interface."""
+# python cli-example.py --V_left "[0]" --V_right "[1]" --coarse_mesh_size 0.1 --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup false
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -6,25 +9,25 @@ from pipefunc import Pipeline, pipefunc
 
 
 @dataclass(frozen=True)
-class Geometry:
+class Geometry:  # noqa: D101
     x: float
     y: float
 
 
 @dataclass(frozen=True)
-class Mesh:
+class Mesh:  # noqa: D101
     geometry: Geometry
     mesh_size: float
 
 
 @dataclass(frozen=True)
-class Materials:
+class Materials:  # noqa: D101
     geometry: Geometry
     materials: list[str]
 
 
 @dataclass(frozen=True)
-class Electrostatics:
+class Electrostatics:  # noqa: D101
     mesh: Mesh
     materials: Materials
     voltages: list[float]
@@ -85,8 +88,8 @@ def make_materials(geo: Geometry) -> Materials:
 def run_electrostatics(
     mesh: Mesh,
     materials: Materials,
-    V_left: float,
-    V_right: float,
+    V_left: float,  # noqa: N803
+    V_right: float,  # noqa: N803
 ) -> Electrostatics:
     """Run electrostatics simulation with given boundary conditions.
 
