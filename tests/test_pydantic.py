@@ -226,7 +226,11 @@ def test_pipeline_map(tmp_path: Path) -> None:
     def foo(x: float, y: int = 1, z: dict[str, int] | None = None) -> float:
         return x + y
 
-    pipeline = Pipeline([foo])
+    @pipefunc("bar", mapspec="foo[i, j] -> bar[i, j]")
+    def bar(foo: float) -> float:
+        return foo * 2
+
+    pipeline = Pipeline([foo, bar])
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
     results = pipeline.map(model, run_folder=tmp_path, parallel=False)
