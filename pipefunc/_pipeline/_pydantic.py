@@ -48,7 +48,7 @@ def pipeline_to_pydantic(pipeline: Pipeline, model_name: str = "InputModel") -> 
         for f in pipeline.functions:
             if p not in f.parameters:
                 continue
-            if p not in parameter_annotations:
+            if p not in f.parameter_annotations:
                 msg = (
                     f"Parameter '{p}' is not annotated, using `typing.Any`."
                     " This may lead to unexpected behavior and incorrect type coercion."
