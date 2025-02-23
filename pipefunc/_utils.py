@@ -448,3 +448,8 @@ def parse_function_docstring(
             description.append(section.value)
 
     return DocstringInfo("\n".join(description), parameters, "\n".join(returns))
+
+
+def is_classmethod(func: Callable) -> bool:
+    """Check if a function is a classmethod."""
+    return inspect.ismethod(func) and func.__self__ is not None
