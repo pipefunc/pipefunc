@@ -2234,8 +2234,8 @@ class Pipeline:
 
         model_instance = InputModel.model_validate(input_data)
         inputs = model_instance.model_dump()
+
         rich.print("Inputs from CLI:", model_instance)
-        rich.print(vars(args_cli))
         map_kwargs: dict[str, Any] = {}
         for arg, value in vars(args_cli).items():
             if arg.startswith("map_"):
