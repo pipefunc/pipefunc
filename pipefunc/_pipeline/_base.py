@@ -2149,10 +2149,7 @@ class Pipeline:
         """
         return pipeline_to_pydantic(self, model_name)
 
-    def cli(
-        self: Pipeline,
-        description: str | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    def cli(self: Pipeline, description: str | None = None) -> None:
         """Automatically construct an argparse for the pipeline.
 
         This method creates an `argparse.ArgumentParser` instance, adds arguments for each
@@ -2163,15 +2160,6 @@ class Pipeline:
         ----------
         description
             The description of the pipeline to be displayed in the help message.
-
-        Returns
-        -------
-        tuple[dict[str, Any], dict[str, Any]]
-            A tuple containing two dictionaries:
-                - The first dictionary contains the parsed and validated root input parameters from the CLI,
-                as validated and coerced by the Pydantic model.
-                - The second dictionary contains the parsed keyword arguments specifically for the `map` method,
-                such as 'run_folder', 'parallel', 'storage', and 'cleanup'.
 
         Examples
         --------
@@ -2205,7 +2193,12 @@ class Pipeline:
 
         doc_map = parse_function_docstring(Pipeline.map)
         sig_map = inspect.signature(Pipeline.map)
-        defaults = {"run_folder": None, "parallel": True, "storage": "file_array", "cleanup": True}
+        defaults = {
+            "run_folder": "run_folder",
+            "parallel": True,
+            "storage": "file_array",
+            "cleanup": True,
+        }
         for arg, p in sig_map.parameters.items():
             if arg not in {"run_folder", "parallel", "storage", "cleanup"}:
                 continue
@@ -2240,7 +2233,7 @@ class Pipeline:
 
         model_instance = InputModel.model_validate(input_data)
         inputs = model_instance.model_dump()
-        rich.print("Inputs from CLI:", inputs)
+        rich.print("Inputs from CLI:", model_instance)
 
         map_kwargs = {}
         for arg, value in vars(args_cli).items():
@@ -2253,7 +2246,7 @@ class Pipeline:
                     print("Failed to parse JSON", arg, value, type(value))
 
         rich.print("Map kwargs from CLI:", map_kwargs)
-        return inputs, map_kwargs
+        self.map(inputs, **map_kwargs)
 
 
 def _to_type(annotation: Any) -> Any:
