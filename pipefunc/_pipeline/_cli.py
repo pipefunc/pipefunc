@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import json
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
@@ -14,18 +15,18 @@ if TYPE_CHECKING:
 
 def cli(pipeline: Pipeline, description: str | None) -> None:
     """Run the pipeline from the command-line."""
-    requires("rich", "griffe", "pydantic", "rich_argparse", reason="cli", extras="cli")
+    requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
     import rich
 
-    parser = _cli_create_parser(description)
+    parser = _create_parser(description)
     input_model = pipeline.pydantic_model()
-    _cli_add_pydantic_arguments(parser, input_model)
-    _cli_add_map_arguments(parser)
+    _add_pydantic_arguments(parser, input_model)
+    _add_map_arguments(parser)
 
-    args_cli = _cli_parse_arguments(parser)
+    args_cli = parser.parse_args()
 
-    inputs = _cli_validate_inputs(args_cli, input_model)
-    map_kwargs = _cli_process_map_kwargs(args_cli)
+    inputs = _validate_inputs(args_cli, input_model)
+    map_kwargs = _process_map_kwargs(args_cli)
 
     rich.print("Inputs from CLI:", inputs)
     rich.print("Map kwargs from CLI:", map_kwargs)
@@ -34,14 +35,16 @@ def cli(pipeline: Pipeline, description: str | None) -> None:
     rich.print(results)
 
 
-def _cli_create_parser(description: str | None) -> argparse.ArgumentParser:
+def _create_parser(description: str | None) -> argparse.ArgumentParser:
     """Create the argparse.ArgumentParser instance."""
-    from rich_argparse import RichHelpFormatter
+    try:  # pragma: no cover
+        from rich_argparse import RichHelpFormatter as _HelpFormatter
+    except ImportError:  # pragma: no cover
+        from argparse import HelpFormatter as _HelpFormatter  # type: ignore[assignment]
+    return argparse.ArgumentParser(description=description, formatter_class=_HelpFormatter)
 
-    return argparse.ArgumentParser(description=description, formatter_class=RichHelpFormatter)
 
-
-def _cli_add_pydantic_arguments(
+def _add_pydantic_arguments(
     parser: argparse.ArgumentParser,
     input_model: type[BaseModel],
 ) -> None:
@@ -59,7 +62,7 @@ def _cli_add_pydantic_arguments(
         )
 
 
-def _cli_add_map_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments for the Pipeline.map method to the parser."""
     import inspect
 
@@ -94,18 +97,11 @@ def _cli_add_map_arguments(parser: argparse.ArgumentParser) -> None:
         )
 
 
-def _cli_parse_arguments(parser: argparse.ArgumentParser) -> argparse.Namespace:
-    """Parse command-line arguments using the provided parser."""
-    return parser.parse_args()
-
-
-def _cli_validate_inputs(
+def _validate_inputs(
     args_cli: argparse.Namespace,
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
     """Create Pydantic Model instance for validation and coercion of inputs."""
-    import json
-
     input_data = {}
     for arg, field_info in input_model.model_fields.items():
         value = getattr(args_cli, arg)
@@ -120,7 +116,7 @@ def _cli_validate_inputs(
     return model_instance.model_dump()
 
 
-def _cli_process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
+def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
     """Process and convert map_kwargs from argparse.Namespace."""
     map_kwargs: dict[str, Any] = {}
     for arg, value in vars(args_cli).items():
