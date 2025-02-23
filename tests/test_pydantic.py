@@ -1,4 +1,5 @@
 import importlib.util
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -215,3 +216,18 @@ def test_pipeline_to_pydantic_with_doc():
     # Check that the instance validates the values as expected.
     assert instance.x == 10
     assert instance.y == 5
+
+
+def test_pipeline_map(tmp_path: Path) -> None:
+    @pipefunc("foo", mapspec="x[i, j] -> foo[i, j]")
+    def foo(x: float, y: int = 1, z: dict[str, int] | None = None) -> float:
+        return x + y
+
+    pipeline = Pipeline([foo])
+    Model = pipeline.pydantic_model()  # noqa: N806
+    model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
+    results = pipeline.map(model, run_folder=tmp_path, parallel=False)
+    out = results["foo"].output
+    assert out.shape == (2, 2)
+    assert out.tolist() == [[3.0, 4.0], [5.0, 6.0]]
+    assert isinstance(out[0, 0], float)

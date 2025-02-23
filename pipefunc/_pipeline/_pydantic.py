@@ -71,7 +71,7 @@ def maybe_pydantic_model_to_dict(x: dict[str, Any] | BaseModel) -> dict[str, Any
     """Convert a Pydantic model to a dictionary if needed."""
     if isinstance(x, dict):
         return x
-    if not is_imported("pydantic"):
+    if not is_imported("pydantic"):  # pragma: no cover
         # Means it is not a Pydantic model
         msg = "Unknown type, expected a Pydantic model or a dictionary."
         raise ValueError(msg)
