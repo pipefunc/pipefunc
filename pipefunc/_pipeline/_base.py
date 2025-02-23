@@ -2228,19 +2228,30 @@ class Pipeline:
         args_cli = parser.parse_args()
 
         # Create Pydantic Model instance for validation and coercion
-        input_data = {arg: getattr(args_cli, arg) for arg in InputModel.model_fields}
-        input_data_json = json.dumps(input_data)
-        model_instance = InputModel.model_validate_json(input_data_json)
+        input_data = {}
+        for arg in InputModel.model_fields:
+            value = getattr(args_cli, arg)
+            try:
+                # Attempt to parse string as JSON (list, dict, number, bool, etc.)
+                input_data[arg] = json.loads(value) if isinstance(value, str) and value else value
+            except json.JSONDecodeError:
+                # If JSON parsing fails, use the string value directly
+                input_data[arg] = value
+
+        model_instance = InputModel.model_validate(input_data)
         inputs = model_instance.model_dump()
+        rich.print("Inputs from CLI:", inputs)
 
         map_kwargs = {}
         for arg, value in vars(args_cli).items():
             if arg.startswith("map."):
-                map_kwargs[arg[4:]] = (
-                    json.loads(value) if isinstance(value, str) and value else value
-                )
+                try:
+                    map_kwargs[arg[4:]] = (
+                        json.loads(value) if isinstance(value, str) and value else value
+                    )
+                except json.JSONDecodeError:
+                    print("Failed to parse JSON", arg, value, type(value))
 
-        rich.print("Inputs from CLI:", inputs)
         rich.print("Map kwargs from CLI:", map_kwargs)
         return inputs, map_kwargs
 
