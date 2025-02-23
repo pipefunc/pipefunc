@@ -10,7 +10,7 @@ from pipefunc.typing import NoAnnotation
 
 def test_nested_pipefunc_defaults() -> None:
     @pipefunc(output_name="c", defaults={"b": 2})
-    def f(a, b):
+    def f(a, b: float):
         return a + b
 
     @pipefunc(output_name="d")
@@ -19,6 +19,7 @@ def test_nested_pipefunc_defaults() -> None:
 
     nf = NestedPipeFunc([f, g])
     pipeline = Pipeline([nf])
+    assert nf.__name__ == "NestedPipeFunc_c_d"
     assert nf.defaults == {"b": 2}
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)
@@ -31,6 +32,7 @@ def test_nested_pipefunc_defaults() -> None:
     pipeline["c"].update_defaults({"a": 5, "b": 10})
     assert nf.defaults == {"a": 5, "b": 10}
     assert nf() == (15, 15)
+    assert nf.parameter_annotations == {"b": float}
     assert nf.output_annotation == {"c": NoAnnotation, "d": int}
     assert pipeline() == (15, 15)
 
@@ -509,3 +511,20 @@ def test_nest_bound(scope: str) -> None:
         match=re.escape(f"Missing inputs: `{scope}n`."),
     ):
         pipeline_nested_test.map(inputs={})
+
+
+def test_annotations_nested_pipefunc() -> None:
+    @pipefunc(output_name="c")
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c: int) -> int:
+        return c
+
+    nf = NestedPipeFunc([f, g])
+    assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"c": int, "d": int}
+    nf2 = NestedPipeFunc([f, g], output_name="d")
+    assert nf2.parameter_annotations == {"a": int, "b": int}
+    assert nf2.output_annotation == {"d": int}

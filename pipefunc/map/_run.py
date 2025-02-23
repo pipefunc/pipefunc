@@ -41,6 +41,7 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Sequence
 
+    import pydantic
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
@@ -56,7 +57,7 @@ if TYPE_CHECKING:
 
 def run_map(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
@@ -223,7 +224,7 @@ class AsyncMap:
 
 def run_map_async(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
@@ -481,7 +482,7 @@ def _get_or_set_cache(
 ) -> Any:
     if cache is None:
         return compute_fn()
-    cache_key = (func.output_name, to_hashable(kwargs))
+    cache_key = (func._cache_id, to_hashable(kwargs))
 
     if cache_key in cache:
         return cache.get(cache_key)
@@ -584,11 +585,12 @@ def _set_output(
     linear_index: int,
     shape: tuple[int, ...],
     shape_mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    assert np.shape(output) == internal_shape
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -600,17 +602,37 @@ def _set_output(
         arr[flat_index] = output[internal_index]
 
 
+def _validate_internal_shape(
+    output: np.ndarray,
+    internal_shape: tuple[int, ...],
+    func: PipeFunc,
+) -> None:
+    shape = np.shape(output)[: len(internal_shape)]
+    if shape != internal_shape:
+        msg = (
+            f"Output shape {shape} of function '{func.__name__}'"
+            f" (output '{func.output_name}') does not match the expected"
+            f" internal shape {internal_shape} used in the `mapspec`"
+            f" '{func.mapspec}'. This error typically occurs when"
+            " a `PipeFunc` returns values with inconsistent shapes across"
+            " different invocations. Ensure that the output shape is"
+            " consistent for all inputs."
+        )
+        raise ValueError(msg)
+
+
 def _update_result_array(
     result_arrays: list[np.ndarray],
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
+    func: PipeFunc,
 ) -> None:
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
-            _set_output(result_array, _output, index, shape, mask)
+            _set_output(result_array, _output, index, shape, mask, func)
         else:
             result_array[index] = _output
 
@@ -1153,7 +1175,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
@@ -1163,7 +1185,7 @@ def _output_from_mapspec_task(
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
         assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape

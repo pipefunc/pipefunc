@@ -602,6 +602,20 @@ def test_default_and_bound_pydantic() -> None:
     f.copy()
 
 
+def test_default_with_positional_args() -> None:
+    @pipefunc("c")
+    def f(a, b=1):
+        return a, b
+
+    assert f(1, 2) == (1, 2)
+    with pytest.raises(ValueError, match="Multiple values provided for parameter `a`"):
+        f(1, 2, a=2)
+
+    f.update_renames({"a": "x.a", "b": "x.b"}, update_from="original")
+    assert f(1) == (1, 1)
+    assert f(**{"x.a": 1, "x.b": 2}) == (1, 2)
+
+
 def test_nested_pipefunc_function_name() -> None:
     def f(a, b):
         return a + b
@@ -639,3 +653,33 @@ def test_nested_pipefunc_renames() -> None:
         renames={"f": "x.f", "g": "x.g", "a": "x.a", "b": "x.b"},
     )
     assert nf(**{"x.a": 1, "x.b": 2}) == (3, 3)
+
+
+def test_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    pf = PipeFunc(MyClass(), output_name="out")
+    assert pf(a=1, b=2) == 3
+
+    assert pf.defaults == {"b": 1}
+    assert pf.parameter_annotations == {"a": int, "b": int}
+    assert pf.output_annotation == {"out": int}
+    assert pf.__name__ == "MyClass"
+
+
+def test_nested_pipefunc_with_class_with___call__() -> None:
+    class MyClass:
+        def __call__(self, a: int, b: int = 1) -> int:
+            return a + b
+
+    def g(f: int) -> int:
+        return f
+
+    nf = NestedPipeFunc([PipeFunc(MyClass(), "f"), PipeFunc(g, "g")])
+    assert nf.defaults == {"b": 1}
+    assert nf(a=1, b=2) == (3, 3)
+    nf.copy()
+    assert nf.parameter_annotations == {"a": int, "b": int}
+    assert nf.output_annotation == {"f": int, "g": int}

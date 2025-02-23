@@ -6,11 +6,13 @@
 Function Inputs and Outputs <function-io>
 Understanding mapspec <mapspec>
 Parallelism and Execution <execution-and-parallelism>
-Variants <variants>
-Type Checking <type-checking>
-Error Handling <error-handling>
-Resource Management <resource-management>
 Parameter Scopes <parameter-scopes>
+Error Handling <error-handling>
+Type Checking <type-checking>
+Variants <variants>
+Caching <caching>
+SLURM integration <slurm>
+Resource Management <resource-management>
 Simplifying Pipelines <simplifying-pipelines>
 Adaptive integration <adaptive-integration>
 Testing <testing>
@@ -36,13 +38,15 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 
 - **[Function Inputs and Outputs](./function-io):** Manage inputs, outputs, defaults, renaming, and multiple returns. Use with `dataclasses` and `pydantic`.
 - **[Understanding `mapspec`](mapspec.md):** Define data mappings with `mapspec` for element-wise operations, reductions, and parallelization.
-- **[Parameter Scopes](./parameter-scopes):** Organize pipelines and avoid naming conflicts using parameter scopes.
 - **[Execution and Parallelism](./execution-and-parallelism):** Control pipeline execution: sequential and parallel, with mixed executors and storage. Includes post-execution hooks.
-- **[Simplifying Pipelines](./simplifying-pipelines):** Merge nodes with `simplified_pipeline` and `NestedPipeFunc`. Understand the trade-offs.
-- **[Resource Management](./resource-management):** Specify and dynamically allocate resources (CPU, memory, GPU) for individual functions.
+- **[Parameter Scopes](./parameter-scopes):** Organize pipelines and avoid naming conflicts using parameter scopes.
 - **[Error Handling](./error-handling):** Capture detailed error information with `ErrorSnapshot` for debugging.
-- **[Variants](./variants):** Use `VariantPipeline` to manage multiple function implementations within a single pipeline.
 - **[Type Checking](./type-checking):** How `pipefunc` uses type hints for static and runtime type checking to ensure data integrity.
+- **[Variants](./variants):** Use `VariantPipeline` to manage multiple function implementations within a single pipeline.
+- **[Caching](./caching):** Cache function results with `memoize` and `Pipeline` cache options. Understand cache types and shared memory caching.
+- **[SLURM Integration](./slurm):** Submit pipeline.map calls to SLURM clusters with `pipefunc` and [`adaptive-scheduler`](https://adaptive-scheduler.readthedocs.io/en/latest/).
+- **[Resource Management](./resource-management):** Specify and dynamically allocate resources (CPU, memory, GPU) for individual functions.
+- **[Simplifying Pipelines](./simplifying-pipelines):** Merge nodes with `simplified_pipeline` and `NestedPipeFunc`. Understand the trade-offs.
 - **[Adaptive Integration](./adaptive-integration):** Optimize parameter space exploration with `adaptive` library integration.
 - **[Testing](./testing):** Best practices for testing, including mocking functions in pipelines.
 - **[Overhead and Efficiency](./overhead-and-efficiency):** Measure the performance overhead of `pipefunc`.

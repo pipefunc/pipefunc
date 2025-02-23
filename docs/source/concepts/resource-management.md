@@ -24,7 +24,7 @@ kernelspec:
 
 ```{note}
 Using `resouces` requires an execution environment that supports resource management.
-Currently, only the Adaptive Scheduler execution environment supports resource management.
+Currently, only the Adaptive Scheduler execution environment supports resource management, see [SLURM integration](./slurm.md).
 In all cases, you can set and inspect the `Resources` object, but whether these resources are actually used depends on the execution environment.
 ```
 
