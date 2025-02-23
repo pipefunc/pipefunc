@@ -331,10 +331,20 @@ def test_is_classmethod() -> None:
         def property(self):
             pass
 
+        def __init__(self):
+            pass
+
+        class Nested:
+            @classmethod
+            def nested_classmethod(cls):
+                pass
+
     assert not is_classmethod(Foo.method)
     assert is_classmethod(Foo.classmethod)
     assert not is_classmethod(Foo.staticmethod)
     assert not is_classmethod(Foo.property)
+    assert not is_classmethod(Foo.__init__)
+    assert is_classmethod(Foo.Nested.nested_classmethod)
     assert not is_classmethod(lambda x: x)
     assert not is_classmethod(1)  # type: ignore[arg-type]
     assert not is_classmethod("method")  # type: ignore[arg-type]
