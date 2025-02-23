@@ -96,10 +96,15 @@ def _maybe_ndarray_type_annotation_from_mapspec(
     if array_spec is None:
         return type_annotation
     from pydantic import AfterValidator
+    from pydantic.functional_serializers import PlainSerializer
 
     ndim = len(array_spec.axes)
     list_type = _nested_list_type(ndim, type_annotation)
-    return Annotated[list_type, AfterValidator(_nd_array_with_ndim(ndim))]
+    return Annotated[
+        list_type,
+        AfterValidator(_nd_array_with_ndim(ndim)),
+        PlainSerializer(lambda x: x.tolist(), return_type=list_type, when_used="json"),
+    ]
 
 
 def _nested_list_type(ndim: int, inner_type: Any) -> Any:
