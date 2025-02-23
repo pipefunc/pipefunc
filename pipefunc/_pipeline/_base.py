@@ -2222,11 +2222,15 @@ class Pipeline:
 
         # Create Pydantic Model instance for validation and coercion
         input_data = {}
-        for arg in InputModel.model_fields:
+        for arg, field_info in InputModel.model_fields.items():
             value = getattr(args_cli, arg)
             try:
                 # Attempt to parse string as JSON (list, dict, number, bool, etc.)
-                input_data[arg] = json.loads(value) if isinstance(value, str) and value else value
+                input_data[arg] = (
+                    json.loads(value)
+                    if isinstance(value, str) and value and field_info.annotation is not str
+                    else value
+                )
             except json.JSONDecodeError:
                 # If JSON parsing fails, use the string value directly
                 input_data[arg] = value
@@ -2243,7 +2247,7 @@ class Pipeline:
                         json.loads(value) if isinstance(value, str) and value else value
                     )
                 except json.JSONDecodeError:
-                    print("Failed to parse JSON", arg, value, type(value))
+                    rich.print("[red bold]Failed to parse JSON", arg, value, type(value))
 
         rich.print("Map kwargs from CLI:", map_kwargs)
         self.map(inputs, **map_kwargs)
