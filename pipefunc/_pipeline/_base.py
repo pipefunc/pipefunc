@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import functools
 import inspect
+import json
 import os
 import time
 import warnings
@@ -2148,12 +2149,15 @@ class Pipeline:
         """
         return pipeline_to_pydantic(self, model_name)
 
-    def cli(self, description: str | None = None) -> dict[str, Any]:
+    def cli(
+        self: Pipeline,
+        description: str | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Automatically construct an argparse for the pipeline.
 
         This method creates an `argparse.ArgumentParser` instance, adds arguments for each
-        root parameter in the pipeline, sets the default values if they exist, and parses
-        the command-line arguments.
+        root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
+        and parses the command-line arguments.
 
         Parameters
         ----------
@@ -2162,20 +2166,21 @@ class Pipeline:
 
         Returns
         -------
-        dict[str, Any]
-            A dictionary containing the parsed command-line arguments.
+        tuple[dict[str, Any], dict[str, Any]]
+            A tuple containing two dictionaries:
+                - The first dictionary contains the parsed and validated root input parameters from the CLI,
+                as validated and coerced by the Pydantic model.
+                - The second dictionary contains the parsed keyword arguments specifically for the `map` method,
+                such as 'run_folder', 'parallel', 'storage', and 'cleanup'.
 
         Examples
         --------
         >>> pipeline = Pipeline([f1, f2])
-        >>> args = pipeline.cli(description="My Pipeline")
-        >>> result = pipeline("output_name", **args)
+        >>> inputs, map_kwargs = pipeline.cli(description="My Pipeline")
+        >>> result = pipeline("output_name", **inputs, **map_kwargs)
 
         """
-        requires("rich", "griffe", reason="print_doc", extras="autodoc")
-        doc = PipelineDocumentation.from_pipeline(self)
-        import json
-
+        requires("rich", "griffe", "pydantic", "rich_argparse", reason="cli", extras="cli")
         import rich
         from rich_argparse import RichHelpFormatter
 
@@ -2183,25 +2188,18 @@ class Pipeline:
 
         parser = argparse.ArgumentParser(description=description, formatter_class=RichHelpFormatter)
 
-        # Get the root arguments and their defaults
-        root_args = self.root_args()
-        defaults = self.defaults
+        # Generate Pydantic Model
+        InputModel = self.pydantic_model()  # noqa: N806
 
-        # Add arguments for each root parameter
-        for arg in root_args:
-            default = defaults.get(arg)
-            row = _create_parameter_row(
-                arg,
-                doc.parameters.get(arg, ""),
-                doc.defaults,
-                doc.p_annotations,
-                skip_optional=True,
-            )
-            help_text = str(row[-1])
+        # Add arguments from Pydantic Model fields
+        for field_name, field_info in InputModel.model_fields.items():
+            help_text = field_info.description or ""
             parser.add_argument(
-                f"--{arg}",
-                type=str,
-                default=default,
+                f"--{field_name}",
+                type=str,  # CLI always receives strings, Pydantic will coerce
+                default=field_info.default
+                if field_info.default is not inspect.Parameter.empty
+                else None,
                 help=help_text,
             )
 
@@ -2226,20 +2224,25 @@ class Pipeline:
                 help=help_text,
             )
 
-        # Parse the arguments and return them as a dictionary
-        args = parser.parse_args()
+        # Parse the arguments
+        args_cli = parser.parse_args()
+
+        # Create Pydantic Model instance for validation and coercion
+        input_data = {arg: getattr(args_cli, arg) for arg in InputModel.model_fields}
+        input_data_json = json.dumps(input_data)
+        model_instance = InputModel.model_validate_json(input_data_json)
+        inputs = model_instance.model_dump()
+
         map_kwargs = {}
-        inputs = {}
-        print(args)
-        for arg, value in vars(args).items():
-            print(arg, value)
+        for arg, value in vars(args_cli).items():
             if arg.startswith("map."):
-                map_kwargs[arg[4:]] = json.loads(value) if isinstance(value, str) else value
-            else:
-                inputs[arg] = json.loads(value)
-        rich.print(inputs)
-        rich.print(map_kwargs)
-        self.map(inputs, **map_kwargs)
+                map_kwargs[arg[4:]] = (
+                    json.loads(value) if isinstance(value, str) and value else value
+                )
+
+        rich.print("Inputs from CLI:", inputs)
+        rich.print("Map kwargs from CLI:", map_kwargs)
+        return inputs, map_kwargs
 
 
 def _to_type(annotation: Any) -> Any:
