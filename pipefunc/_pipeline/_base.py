@@ -2099,16 +2099,87 @@ class Pipeline:
         )
 
     def pydantic_model(self, model_name: str = "InputModel") -> type[BaseModel]:
-        """Create a Pydantic model for the pipeline's input and output types.
+        """Generate a Pydantic model from the pipeline's root input parameters.
+
+        This function inspects the provided pipeline to extract its default values,
+        parameter annotations, and (if available) documentation from docstrings to
+        dynamically create a Pydantic model. The generated model serves as a schema for
+        the pipeline's inputs, allowing for robust type validation and
+        coercion—particularly useful when receiving input from sources like JSON. This
+        model can then be used to ensure that inputs passed to the pipeline are of the
+        correct types and, in turn, used to build a command-line interface (CLI) for the
+        pipeline.
+
+        **Handling Multidimensional Array Inputs:**
+        For parameters that are specified as
+        multidimensional arrays (via mapspecs), the type is annotated as a nested list.
+        This is because Pydantic does not support native coercion into NumPy arrays.
+        Instead, the input is first validated as a list (or nested list for higher
+        dimensions) with the correct type, and then, as part of the validation process, it
+        is converted to a NumPy ndarray with the appropriate number of dimensions. This
+        approach allows for the flexibility of JSON input while still ensuring that the
+        pipeline receives the correctly structured NumPy arrays it expects.
+
+        **Usage:**
+        - Validate input data and automatically coerce types before passing them to the pipeline.
+        - Serve as the foundation for generating a CLI where user-supplied inputs are validated
+        and converted, ensuring that the pipeline's functions receive the proper input types.
 
         Parameters
         ----------
         model_name
-            The name of the Pydantic model.
+            The name to assign to the generated Pydantic model class.
 
         Returns
         -------
-            A Pydantic model that can be used to validate the input and output types of the pipeline.
+        type[BaseModel]
+            A dynamically generated Pydantic model class representing the input schema of the pipeline.
+            This model performs the following functions:
+
+            - Validates and coerces input data (e.g., JSON) to the expected types.
+            - Annotates multidimensional array inputs as nested lists (due to Pydantic's
+              limitations with NumPy) and subsequently converts them into NumPy arrays with
+              the correct dimensions.
+            - Acts as a schema for building a CLI for the pipeline, ensuring that user inputs are correctly
+              validated before execution.
+
+        Examples
+        --------
+        >>> from pipefunc import Pipeline, pipefunc
+        >>> @pipefunc("foo")
+        ... def foo(x: int, y: int = 1) -> int:
+        ...     '''Adds x and y.
+        ...
+        ...     Parameters
+        ...     ----------
+        ...     x : int
+        ...         The first number.
+        ...     y : int, optional
+        ...         The second number.
+        ...
+        ...     Returns
+        ...     -------
+        ...     int
+        ...         The sum of x and y.
+        ...     '''
+        ...     return x + y
+        >>> pipeline = Pipeline([foo])
+        >>> InputModel = pipeline_to_pydantic(pipeline)
+        >>> data = {"x": "10", "y": "2"}
+        >>> model_instance = InputModel(**data)
+        >>> model_instance.x, model_instance.y
+        (10, 2)
+
+        Notes
+        -----
+        - When griffe (a documentation parsing library) is available, this function utilizes it to extract
+          and include detailed parameter descriptions from NumPy-style docstrings in the model's field metadata.
+        - Multidimensional inputs are type annotated as nested lists since Pydantic cannot coerce
+          directly into NumPy arrays. After validation, these nested lists are transformed into NumPy ndarrays
+          with the required dimensions.
+        - This function is particularly useful for scenarios where the pipeline is exposed as a CLI, ensuring
+          that input data from sources like JSON is validated and transformed appropriately before being used
+          within the pipeline.
 
         """
         return pipeline_to_pydantic(self, model_name)
