@@ -12,8 +12,10 @@ the resource usage of the pipeline functions.
 
 from __future__ import annotations
 
+import argparse
 import functools
 import inspect
+import json
 import os
 import time
 import warnings
@@ -2146,6 +2148,107 @@ class Pipeline:
 
         """
         return pipeline_to_pydantic(self, model_name)
+
+    def cli(
+        self: Pipeline,
+        description: str | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Automatically construct an argparse for the pipeline.
+
+        This method creates an `argparse.ArgumentParser` instance, adds arguments for each
+        root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
+        and parses the command-line arguments.
+
+        Parameters
+        ----------
+        description
+            The description of the pipeline to be displayed in the help message.
+
+        Returns
+        -------
+        tuple[dict[str, Any], dict[str, Any]]
+            A tuple containing two dictionaries:
+                - The first dictionary contains the parsed and validated root input parameters from the CLI,
+                as validated and coerced by the Pydantic model.
+                - The second dictionary contains the parsed keyword arguments specifically for the `map` method,
+                such as 'run_folder', 'parallel', 'storage', and 'cleanup'.
+
+        Examples
+        --------
+        >>> pipeline = Pipeline([f1, f2])
+        >>> inputs, map_kwargs = pipeline.cli(description="My Pipeline")
+        >>> result = pipeline("output_name", **inputs, **map_kwargs)
+
+        """
+        requires("rich", "griffe", "pydantic", "rich_argparse", reason="cli", extras="cli")
+        import rich
+        from rich_argparse import RichHelpFormatter
+
+        from ._autodoc import _create_parameter_row, parse_function_docstring
+
+        parser = argparse.ArgumentParser(description=description, formatter_class=RichHelpFormatter)
+
+        # Generate Pydantic Model
+        InputModel = self.pydantic_model()  # noqa: N806
+
+        # Add arguments from Pydantic Model fields
+        for field_name, field_info in InputModel.model_fields.items():
+            help_text = field_info.description or ""
+            parser.add_argument(
+                f"--{field_name}",
+                type=str,  # CLI always receives strings, Pydantic will coerce
+                default=field_info.default
+                if field_info.default is not inspect.Parameter.empty
+                else None,
+                help=help_text,
+            )
+
+        doc_map = parse_function_docstring(Pipeline.map)
+        sig_map = inspect.signature(Pipeline.map)
+        defaults = {"run_folder": None, "parallel": True, "storage": "file_array", "cleanup": True}
+        for arg, p in sig_map.parameters.items():
+            if arg not in {"run_folder", "parallel", "storage", "cleanup"}:
+                continue
+            row = _create_parameter_row(
+                arg,
+                [doc_map.parameters[arg]],
+                {arg: p.default},
+                {arg: p.annotation},
+                skip_optional=True,
+            )
+            help_text = str(row[-1]).replace("``", "`")
+            parser.add_argument(
+                f"--map.{arg}",
+                type=str,
+                default=defaults[arg],
+                help=help_text,
+            )
+
+        # Parse the arguments
+        args_cli = parser.parse_args()
+
+        # Create Pydantic Model instance for validation and coercion
+        input_data = {arg: getattr(args_cli, arg) for arg in InputModel.model_fields}
+        input_data_json = json.dumps(input_data)
+        model_instance = InputModel.model_validate_json(input_data_json)
+        inputs = model_instance.model_dump()
+
+        map_kwargs = {}
+        for arg, value in vars(args_cli).items():
+            if arg.startswith("map."):
+                map_kwargs[arg[4:]] = (
+                    json.loads(value) if isinstance(value, str) and value else value
+                )
+
+        rich.print("Inputs from CLI:", inputs)
+        rich.print("Map kwargs from CLI:", map_kwargs)
+        return inputs, map_kwargs
+
+
+def _to_type(annotation: Any) -> Any:
+    if annotation in {int, float}:
+        return annotation
+    return str
 
 
 class Generations(NamedTuple):

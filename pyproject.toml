@@ -28,6 +28,8 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 
 [project.optional-dependencies]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
+autodoc = ["griffe", "rich"]
+cli = ["griffe", "rich", "pydantic", "rich-argparse"]
 pandas = ["pandas"]
 plotting = ["bokeh", "graphviz", "holoviews", "matplotlib"]
 profiling = ["psutil"]
@@ -46,7 +48,6 @@ test = [
     "pytest",
     "versioningit",
 ]
-autodoc = ["griffe", "rich"]
 docs = [
     "emoji",
     "jupytext",
