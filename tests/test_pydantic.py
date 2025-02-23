@@ -234,3 +234,13 @@ def test_pipeline_map(tmp_path: Path) -> None:
     assert out.shape == (2, 2)
     assert out.tolist() == [[3.0, 4.0], [5.0, 6.0]]
     assert isinstance(out[0, 0], float)
+
+
+def test_not_annotated_warning() -> None:
+    @pipefunc("foo")
+    def foo(x: int, y=1) -> int:
+        return x + y
+
+    pipeline = Pipeline([foo])
+    with pytest.warns(UserWarning, match="Parameter 'y' is not annotated"):
+        pipeline.pydantic_model()
