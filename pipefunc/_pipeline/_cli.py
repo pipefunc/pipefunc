@@ -40,20 +40,21 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
 
     This method creates an `argparse.ArgumentParser` instance, adds arguments for each
     root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
-    parses the command-line arguments, and runs `pipeline.map` with the parsed arguments.
-    Mapping options (prefixed with "--map-") are available in both subcommands to control
+    parses the command-line arguments, and runs `Pipeline.map` with the parsed arguments.
+    Mapping options (prefixed with ``--map-``) are available in both subcommands to control
     parallel execution, storage method, and cleanup behavior.
 
     It constructs a CLI with two subcommands:
-    - "cli": for specifying individual input parameters as command-line options.
-    - "json": for loading input parameters from a JSON file.
 
+    - ``cli``: for specifying individual input parameters as command-line options.
+    - ``json``: for loading input parameters from a JSON file.
 
     Usage Examples:
-    CLI mode:
-        python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
-    JSON mode:
-        python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
+
+    **CLI mode:**
+        ``python cli.py cli --voltage "[0, 1]" --mesh_size 1.0 --x 0 --y 1 --map-parallel false --map-cleanup true``
+    **JSON mode:**
+        ``python cli.py json --json-file my_inputs.json --map-parallel false --map-cleanup true``
 
     Parameters
     ----------
