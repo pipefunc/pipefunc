@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
@@ -10,7 +9,6 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc._pipeline._cli import (
     _add_map_arguments,
     _add_pydantic_arguments,
-    _maybe_bool,
     _process_map_kwargs,
     _validate_inputs,
 )
@@ -92,26 +90,6 @@ def test_cli_process_map_kwargs() -> None:
         "parallel": False,
         "storage": "dict",
     }
-
-
-@pytest.mark.parametrize(
-    ("value_str", "expected"),
-    [
-        ("True", True),
-        ("true", True),
-        ("TRUE", True),
-        ("False", False),
-        ("false", False),
-        ("FALSE", False),
-        ("abc", "abc"),
-        (123, 123),  # Not a string
-        (True, True),  # Not a string
-        (False, False),  # Not a string
-        (None, None),  # Not a string
-    ],
-)
-def test_maybe_bool(value_str: Any, expected: Any) -> None:
-    assert _maybe_bool(value_str) == expected
 
 
 def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
