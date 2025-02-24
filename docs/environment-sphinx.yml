@@ -17,6 +17,9 @@ dependencies:
   # optional-dependencies: autodoc
   - griffe
   - rich
+  # optional-dependencies: cli
+  - pydantic
+  - rich-argparse
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -27,7 +30,6 @@ dependencies:
   # optional-dependencies: profiling
   - psutil
   # optional-dependencies: pydantic
-  - pydantic
   # optional-dependencies: rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.3.0

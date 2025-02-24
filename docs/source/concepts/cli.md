@@ -1,3 +1,16 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+    format_version: 0.13
+    jupytext_version: 1.16.4
+kernelspec:
+  display_name: Python 3 (ipykernel)
+  language: python
+  name: python3
+---
+
 # Pipeline CLI Interface
 
 The {meth}`~pipefunc.Pipeline.cli()` method provides an out‐of‐the‐box command‐line interface (CLI) for executing your PipeFunc pipelines directly from the terminal.
@@ -83,7 +96,9 @@ Below is a complete example that demonstrates how to define a simple pipeline wi
 Notice how each function’s docstring provides detailed descriptions for its parameters and return values.
 These descriptions are automatically extracted and shown in the CLI help text.
 
-```python
+```{code-cell} ipython3
+%%writefile cli-example.py
+
 import numpy as np
 from pipefunc import Pipeline, pipefunc
 
@@ -198,6 +213,28 @@ if __name__ == "__main__":
 
 In both CLI and JSON modes, the CLI uses the detailed parameter descriptions (extracted from the docstrings) to help guide the user.
 For parameters that involve multi-dimensional arrays, ensure that the inputs are represented as nested lists so that they can be properly coerced by Pydantic.
+
+**Example outputs:**
+
+_Click on "*Show code cell output*" to see the CLI output._
+
+```{code-cell} ipython3
+:tags: [hide-output]
+
+!python cli-example.py --help
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+
+!python cli-example.py docs
+```
+
+```{code-cell} ipython3
+:tags: [hide-output]
+
+!python cli-example.py cli -h
+```
 
 ---
 
