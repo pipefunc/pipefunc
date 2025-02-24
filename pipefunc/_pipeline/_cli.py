@@ -89,16 +89,10 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         formatter_class=_formatter_class(),
     )
 
-    # If no arguments are provided, show the help message and exit.
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(0)
-
     # Create subparsers for the two input modes.
     subparsers = parser.add_subparsers(
         title="Input Modes",
         dest="mode",
-        required=True,
         help="Choose an input mode: 'cli' for individual options or 'json' to load from a JSON file.",
     )
 
@@ -128,6 +122,11 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
 
     # Parse arguments from the command line.
     args = parser.parse_args()
+
+    # If no arguments are provided, show the help message and exit.
+    if args.mode is None:
+        parser.print_help()
+        sys.exit(0)
 
     # Validate and parse inputs using the pydantic model.
     inputs = _validate_inputs(args, input_model)
