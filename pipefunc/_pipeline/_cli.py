@@ -175,7 +175,14 @@ def _add_pydantic_arguments(
 
     for field_name, field_info in input_model.model_fields.items():
         help_text = field_info.description or ""
-        default = field_info.default if field_info.default is not PydanticUndefined else None
+
+        if field_info.default is PydanticUndefined:
+            default = None
+        else:
+            default = field_info.default
+            if default is None:
+                default = "null"
+
         if default is not None:
             help_text += f" (default: {default})"
         parser.add_argument(
@@ -273,16 +280,17 @@ def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
     map_kwargs: dict[str, Any] = {}
     for arg, value in vars(args_cli).items():
         if arg.startswith("map_"):
-            map_kwargs[arg[4:]] = _maybe_bool(value)
+            map_kwargs[arg[4:]] = _maybe_bool_or_none(value)
     return map_kwargs
 
 
-def _maybe_bool(value: Any) -> bool | Any:
-    """Convert string values to booleans if they represent boolean literals."""
+def _maybe_bool_or_none(value: Any) -> bool | Any:
     if not isinstance(value, str):  # pragma: no cover
         return value
     if value.lower() == "true":
         return True
     if value.lower() == "false":
         return False
+    if value.lower() in ("none", "null"):  # pragma: no cover
+        return None
     return value

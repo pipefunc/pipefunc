@@ -252,3 +252,16 @@ def test_not_annotated_warning() -> None:
     pipeline = Pipeline([foo])
     with pytest.warns(UserWarning, match="Parameter 'y' is not annotated"):
         pipeline.pydantic_model()
+
+
+def test_none_default() -> None:
+    @pipefunc("foo")
+    def foo(x: int, y: int | None = None) -> int:
+        return x + (y or 1)
+
+    pipeline = Pipeline([foo])
+    Model = pipeline.pydantic_model()  # noqa: N806
+    model = Model(x=1)
+    assert model.y is None
+    assert Model.model_fields["y"].default is None
+    assert pipeline(x=1) == 2

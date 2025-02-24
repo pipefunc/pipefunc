@@ -48,8 +48,8 @@ def test_cli_add_pydantic_arguments() -> None:
     param3_action = actions[3]
     assert param3_action.dest == "param3"
     assert param3_action.type is str
-    assert param3_action.help == "Parameter 3 description"
-    assert param3_action.default is None
+    assert param3_action.help == "Parameter 3 description (default: null)"
+    assert param3_action.default == "null"
 
 
 def test_cli_add_map_arguments() -> None:
@@ -103,6 +103,19 @@ def test_cli_process_map_kwargs() -> None:
     }
 
 
+def _monkeypatch_cli(cli_args_dict: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_ns = argparse.Namespace(**cli_args_dict)
+
+    def fake_parse_args(self, args=None, namespace=None):
+        return fake_ns
+
+    def fake_parse_known_args(self, args=None, namespace=None):
+        return (fake_ns, [])
+
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_known_args", fake_parse_known_args)
+
+
 def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the cli function with a simple pipeline end-to-end in CLI mode.
 
@@ -134,18 +147,7 @@ def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     }
     # Combine all CLI arguments including the positional "mode".
     cli_args_dict = {"mode": "cli", **inputs_cli, **map_kwargs_cli}
-    fake_ns = argparse.Namespace(**cli_args_dict)
-
-    # Define fake parse_args and parse_known_args that always return our fake_ns.
-    def fake_parse_args(self, args=None, namespace=None):
-        return fake_ns
-
-    def fake_parse_known_args(self, args=None, namespace=None):
-        return (fake_ns, [])
-
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_known_args", fake_parse_known_args)
-
+    _monkeypatch_cli(cli_args_dict, monkeypatch)
     printed = []
 
     def fake_print(*args, **kwargs):
@@ -190,17 +192,12 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_storage": "dict",
         "map_cleanup": "True",
     }
-    cli_args_dict = {"mode": "json", "json_file": json_file, **map_kwargs}
-    fake_ns = argparse.Namespace(**cli_args_dict)
-
-    def fake_parse_args(self, args=None, namespace=None):
-        return fake_ns
-
-    def fake_parse_known_args(self, args=None, namespace=None):
-        return (fake_ns, [])
-
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_known_args", fake_parse_known_args)
+    cli_args_dict: dict[str, str] = {
+        "mode": "json",
+        "json_file": json_file,  # type: ignore[dict-item]
+        **map_kwargs,
+    }
+    _monkeypatch_cli(cli_args_dict, monkeypatch)
 
     printed = []
 
@@ -214,3 +211,26 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
     assert final_sum == 12
     # Verify that the printed inputs (loaded from JSON) include key "x".
     assert "x" in printed[0][1]
+
+
+def test_none_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pipefunc("foo")
+    def foo(x: int, y: int | None = None) -> int:
+        return x + (y or 1)
+
+    pipeline = Pipeline([foo])
+    cli_args = {
+        "mode": "cli",
+        "x": "10",
+        "y": "null",
+    }
+    map_kwargs_cli = {
+        "map_run_folder": str(tmp_path),
+        "map_parallel": "False",
+        "map_storage": "dict",
+    }
+    cli_args_dict = {**cli_args, **map_kwargs_cli}
+    _monkeypatch_cli(cli_args_dict, monkeypatch)
+    pipeline.cli("CLI integration test")
+    final_sum = load_outputs("foo", run_folder=tmp_path)
+    assert final_sum == 11
