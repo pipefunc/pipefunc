@@ -90,6 +90,7 @@ extras = [
     "psutil",
     "pydantic",
     "rich",
+    "rich-argparse",
     "xarray",
     "zarr>=2,<3",
 ]
