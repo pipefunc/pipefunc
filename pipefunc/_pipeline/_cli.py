@@ -13,16 +13,12 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
 
-
 DEFAULT_DESCRIPTION = """PipeFunc Pipeline CLI
 
 This command-line interface (CLI) provides an easy and flexible way to execute a PipeFunc pipeline
 directly from the terminal. The CLI is auto-generated based on your Pipeline's definition and input schema,
-allowing you to supply parameters interactively or via a JSON file.
-
-Input Modes:
-  - `cli`: Supply individual input parameters as command-line options (e.g., --x, --y, etc.).
-  - `json`: Load all input parameters from a JSON file by specifying the `--json-file` option.
+allowing you to supply parameters interactively (via the "cli" subcommand) or load them from a JSON file
+(via the "json" subcommand).
 
 Mapping Options:
   In addition to input parameters, you can configure mapping options (e.g., --map-parallel, --map-run_folder,
@@ -30,41 +26,31 @@ Mapping Options:
 
 Usage Examples:
   CLI mode:
-    `python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true`
+    python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
 
   JSON mode:
-    `python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true`
+    python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
 
-For more details, run the CLI with the `--help` flag.
+For more details, run the CLI with the --help flag.
 """
 
 
 def cli(pipeline: Pipeline, description: str | None = None) -> None:
-    """Execute a PipeFunc pipeline via a command-line interface.
+    """Execute a PipeFunc pipeline via a command-line interface using subparsers.
 
-    This function auto-generates a CLI for the provided PipeFunc pipeline using its underlying
-    Pydantic input model for validation and coercion. It supports two modes of input:
+    This function automatically constructs a CLI with two subcommands:
+      - "cli": for specifying individual input parameters as command-line options.
+      - "json": for loading input parameters from a JSON file.
 
-      1. "cli" mode: Input parameters are provided directly via command-line options.
-         Example:
-           python cli-example.py cli --x 0 --y 1 --V_left "[0]" --V_right "[1]" --mesh_size 1 --coarse_mesh_size 0.1 --map-parallel false --map-cleanup true
+    The CLI is auto-generated based on your Pipeline's definition and input schema.
+    Mapping options (prefixed with "--map-") are available in both subcommands to control
+    parallel execution, storage method, and cleanup behavior.
 
-      2. "json" mode: A single JSON file containing all input parameters is used.
-         In this mode, you must supply the JSON file using the '--json-file' option.
-         Example:
-           python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
-
-    Additionally, mapping options (prefixed with "--map-") allow configuration of parallel execution,
-    result storage, and cleanup behaviors.
-
-    On execution, the CLI:
-      - Parses a positional mode argument (either "cli" or "json").
-      - Adds input arguments based on the selected mode (individual parameters for CLI mode or a required
-        JSON file for JSON mode).
-      - Processes any mapping options provided.
-      - Validates and coerces the inputs using the pipeline's Pydantic model.
-      - Executes the pipeline with the provided inputs and mapping options.
-      - Outputs the results to the console using Rich formatting.
+    Usage Examples:
+      CLI mode:
+        python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
+      JSON mode:
+        python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
 
     Parameters
     ----------
@@ -76,9 +62,9 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     Raises
     ------
     ValueError
-        If an invalid mode is specified or if required arguments (such as the JSON file in JSON mode) are missing.
+        If an invalid subcommand is specified.
     FileNotFoundError
-        If the JSON input file specified in JSON mode does not exist.
+        If the JSON input file does not exist (in JSON mode).
     json.JSONDecodeError
         If the JSON input file is not formatted correctly.
 
@@ -86,30 +72,58 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
     import rich
 
-    parser = _create_parser(description)
+    # Create the base parser.
+    parser = argparse.ArgumentParser(
+        description=description or DEFAULT_DESCRIPTION,
+        formatter_class=_formatter_class(),
+    )
+
+    # Create subparsers for the two input modes.
+    subparsers = parser.add_subparsers(
+        title="Input Modes",
+        dest="mode",
+        required=True,
+        help="Choose an input mode: 'cli' for individual options or 'json' to load from a JSON file.",
+    )
+
+    # Subparser for CLI mode: add individual parameter arguments.
+    cli_parser = subparsers.add_parser(
+        "cli",
+        help="Supply individual input parameters as command-line options.",
+        formatter_class=_formatter_class(),
+    )
     input_model = pipeline.pydantic_model()
+    _add_pydantic_arguments(cli_parser, input_model)
+    _add_map_arguments(cli_parser)
 
-    # First, do a partial parse to check the selected mode.
-    args_partial, _ = parser.parse_known_args()
-    mode = args_partial.mode
+    # Subparser for JSON mode: require a JSON file.
+    json_parser = subparsers.add_parser(
+        "json",
+        help="Load all input parameters from a JSON file.",
+        formatter_class=_formatter_class(),
+    )
+    json_parser.add_argument(
+        "--json-file",
+        type=Path,
+        help="Path to a JSON file containing inputs for the pipeline.",
+        required=True,
+    )
+    _add_map_arguments(json_parser)
 
-    if mode == "json":
-        parser.add_argument(
-            "--json-file",
-            type=Path,
-            help="Path to a JSON file containing inputs for the pipeline.",
-            required=True,
-        )
-    elif mode == "cli":
-        _add_pydantic_arguments(parser, input_model)
+    # Parse arguments from the command line.
+    args = parser.parse_args()
+
+    # Validate and parse inputs using the pydantic model.
+    if args.mode == "json":
+        inputs = _validate_inputs_from_json(args, input_model)
+    elif args.mode == "cli":
+        inputs = _validate_inputs_from_cli(args, input_model)
     else:  # pragma: no cover
-        msg = f"Invalid mode: {mode}. Must be 'cli' or 'json'."
+        msg = f"Invalid mode: {args.mode}. Must be 'cli' or 'json'."
         raise ValueError(msg)
 
-    _add_map_arguments(parser)
-    args_cli = parser.parse_args()
-    inputs = _validate_inputs(args_cli, input_model)
-    map_kwargs = _process_map_kwargs(args_cli)
+    # Process mapping-related arguments.
+    map_kwargs = _process_map_kwargs(args)
 
     rich.print("Inputs from CLI:", inputs)
     rich.print("Map kwargs from CLI:", map_kwargs)
@@ -118,41 +132,13 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     rich.print(results)
 
 
-def _create_parser(description: str | None) -> argparse.ArgumentParser:
-    """Create and return an ArgumentParser instance with a positional 'mode' argument.
-
-    The parser is configured to support two modes:
-      - 'cli': Accepts individual command-line input parameters.
-      - 'json': Requires a JSON file containing the inputs via the '--json-file' option.
-
-    Parameters
-    ----------
-    description : str or None
-        The description for the help message; if None, DEFAULT_DESCRIPTION is used.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        The constructed ArgumentParser instance.
-
-    """
+def _formatter_class() -> type[argparse.RawDescriptionHelpFormatter]:
     try:  # pragma: no cover
-        from rich_argparse import RawTextRichHelpFormatter as _HelpFormatter
+        from rich_argparse import RawTextRichHelpFormatter
+
+        return RawTextRichHelpFormatter  # noqa: TRY300
     except ImportError:  # pragma: no cover
-        from argparse import (
-            RawDescriptionHelpFormatter as _HelpFormatter,  # type: ignore[assignment]
-        )
-    if description is None:  # pragma: no cover
-        description = DEFAULT_DESCRIPTION
-    parser = argparse.ArgumentParser(description=description, formatter_class=_HelpFormatter)
-    parser.add_argument(
-        "mode",
-        nargs="?",
-        choices=["cli", "json"],
-        default="cli",
-        help="Input mode: 'cli' to specify parameters via command-line options or 'json' to load from a JSON file.",
-    )
-    return parser
+        return argparse.RawDescriptionHelpFormatter
 
 
 def _add_pydantic_arguments(
@@ -169,14 +155,14 @@ def _add_pydantic_arguments(
             help_text += f" (default: {default})"
         parser.add_argument(
             f"--{field_name}",
-            type=str,  # CLI always receives strings, Pydantic will coerce
+            type=str,  # CLI always receives strings; Pydantic will coerce them.
             default=default,
             help=help_text,
         )
 
 
 def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add arguments for the Pipeline.map method to the parser."""
+    """Add mapping options for Pipeline.map to the parser."""
     from pipefunc._pipeline._autodoc import _create_parameter_row, parse_function_docstring
     from pipefunc._pipeline._base import Pipeline
 
@@ -213,7 +199,7 @@ def _validate_inputs_from_cli(
     args_cli: argparse.Namespace,
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
-    """Create Pydantic Model instance for validation and coercion of inputs from CLI args."""
+    """Validate CLI-provided inputs using a Pydantic model."""
     input_data = {}
     for arg, field_info in input_model.model_fields.items():
         value = getattr(args_cli, arg)
@@ -229,7 +215,7 @@ def _validate_inputs_from_json(
     args_cli: argparse.Namespace,
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
-    """Create Pydantic Model instance for validation and coercion of inputs from a JSON file."""
+    """Validate inputs loaded from a JSON file using a Pydantic model."""
     json_file_path = args_cli.json_file
     assert isinstance(json_file_path, Path)
     try:
@@ -248,14 +234,14 @@ def _validate_inputs(
     args_cli: argparse.Namespace,
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
-    """Dispatch to the correct input validation function based on mode (deprecated)."""
+    """Dispatch input validation based on the chosen mode."""
     if args_cli.mode == "json":
         return _validate_inputs_from_json(args_cli, input_model)
     return _validate_inputs_from_cli(args_cli, input_model)
 
 
 def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
-    """Process and convert map_kwargs from argparse.Namespace."""
+    """Process and convert map_kwargs from the argparse.Namespace."""
     map_kwargs: dict[str, Any] = {}
     for arg, value in vars(args_cli).items():
         if arg.startswith("map_"):
@@ -264,8 +250,8 @@ def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
 
 
 def _maybe_bool(value: Any) -> bool | Any:
-    """Convert string values to boolean if they represent boolean literals."""
-    if not isinstance(value, str):  # pragma: no cover
+    """Convert string values to booleans if they represent boolean literals."""
+    if not isinstance(value, str):
         return value
     if value.lower() == "true":
         return True
