@@ -20,7 +20,7 @@ This command-line interface (CLI) provides an easy and flexible way to execute a
 directly from the terminal. The CLI is auto-generated based on your Pipeline's definition and input schema,
 allowing you to supply parameters interactively (via the `cli` subcommand), load them from a JSON file
 (via the `json` subcommand), or simply view the pipeline documentation (via the `docs` subcommand).
-Mapping options (prefixed with '--map-') allow you to configure parallel execution, storage method,
+Mapping options (prefixed with `--map-`) allow you to configure parallel execution, storage method,
 and cleanup behavior.
 
 Usage Examples:
@@ -96,7 +96,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     subparsers = parser.add_subparsers(
         title="Input Modes",
         dest="mode",
-        help="Choose an input mode: 'cli' for individual options, 'json' to load from a JSON file, or 'docs' to print documentation.",
+        help="Choose an input mode: `cli` for individual options, `json` to load from a JSON file, or `docs` to print documentation.",
     )
 
     # Subparser for CLI mode: add individual parameter arguments.
