@@ -53,10 +53,13 @@ def _add_pydantic_arguments(
 
     for field_name, field_info in input_model.model_fields.items():
         help_text = field_info.description or ""
+        default = field_info.default if field_info.default is not PydanticUndefined else None
+        if default is not None:
+            help_text += f" (default: {default})"
         parser.add_argument(
             f"--{field_name}",
             type=str,  # CLI always receives strings, Pydantic will coerce
-            default=field_info.default if field_info.default is not PydanticUndefined else None,
+            default=default,
             help=help_text,
         )
 
