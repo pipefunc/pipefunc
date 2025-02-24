@@ -53,7 +53,7 @@ When you invoke `pipeline.cli()`, the following steps occur:
    Pydantic then coerces these lists into the appropriate array type (e.g., NumPy arrays) based on your type annotations.
 
 2. **Argument Parsing:**
-   An `argparse.ArgumentParser` is created with two subcommands:
+   An {class}`argparse.ArgumentParser` is created with two subcommands:
    - **`cli`**: Accepts individual command-line arguments.
    - **`json`**: Requires a JSON file that contains all inputs.
 
@@ -62,7 +62,7 @@ When you invoke `pipeline.cli()`, the following steps occur:
 
 4. **Input Validation and Execution:**
    The CLI parses and validates the inputs using the generated Pydantic model.
-   Once validated, it executes the pipeline via `Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output.
+   Once validated, it executes the pipeline via {meth}`pipefunc.Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output, and stored to disk in the specified run folder.
 
 ---
 
