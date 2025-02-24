@@ -40,7 +40,7 @@ def test_cli_add_pydantic_arguments() -> None:
     param2_action = actions[2]
     assert param2_action.dest == "param2"
     assert param2_action.type is str
-    # Updated expected help text to include the default value.
+    # Expected help text now includes the default value.
     assert param2_action.help == "Parameter 2 description (default: default_value)"
     assert param2_action.default == "default_value"
 
@@ -68,7 +68,7 @@ def test_cli_validate_inputs() -> None:
         param2: list[str]
         param3: float | None
 
-    # Include mode attribute so that the new _validate_inputs function sees mode "cli"
+    # Include mode so that _validate_inputs sees mode "cli"
     namespace = argparse.Namespace(param1="10", param2='["a", "b"]', param3="1.5", mode="cli")
     inputs = _validate_inputs(namespace, MockInputModel)
     assert inputs == {"param1": 10, "param2": ["a", "b"], "param3": 1.5}
@@ -78,7 +78,7 @@ def test_cli_validate_inputs_validation_error() -> None:
     class MockInputModel(BaseModel):
         param1: int
 
-    namespace = argparse.Namespace(param1="invalid", mode="cli")  # invalid cannot be coerced to int
+    namespace = argparse.Namespace(param1="invalid", mode="cli")
     with pytest.raises(ValidationError):
         _validate_inputs(namespace, MockInputModel)
 
@@ -102,8 +102,8 @@ def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     """Test the cli function with a simple pipeline end-to-end in CLI mode.
 
     The pipeline doubles each element of a list (using a mapspec) and then sums the
-    resulting array. We simulate command-line input via a fake argparse.Namespace and
-    monkeypatch the parse_args() call.
+    resulting array. We simulate command-line input by monkey-patching both
+    parse_args and parse_known_args to return a fake namespace.
     """
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -115,7 +115,6 @@ def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         assert isinstance(y, np.ndarray)
         return int(np.sum(y))
 
-    # Create the pipeline using a mapspec for double_it.
     pipeline = Pipeline([double_it, take_sum])
 
     # CLI inputs: only "x" is used by the pipeline.
@@ -130,15 +129,18 @@ def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     }
     # Combine all CLI arguments including the positional "mode".
     cli_args_dict = {"mode": "cli", **inputs_cli, **map_kwargs_cli}
-    namespace = argparse.Namespace(**cli_args_dict)
+    fake_ns = argparse.Namespace(**cli_args_dict)
 
-    # Monkey-patch ArgumentParser.parse_args() to always return our namespace.
-    def fake_parse_args(self):
-        return namespace
+    # Define fake parse_args and parse_known_args that always return our fake_ns.
+    def fake_parse_args(self, args=None, namespace=None):
+        return fake_ns
+
+    def fake_parse_known_args(self, args=None, namespace=None):
+        return (fake_ns, [])
 
     monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_known_args", fake_parse_known_args)
 
-    # Capture calls to rich.print by appending printed arguments to a list.
     printed = []
 
     def fake_print(*args, **kwargs):
@@ -146,20 +148,19 @@ def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("rich.print", fake_print)
 
-    # Call cli; it will validate inputs and call pipeline.map.
     pipeline.cli("CLI integration test")
-
     final_sum = load_outputs("sum", run_folder=tmp_path)
     assert final_sum == 12
-    # Check that the printed inputs include "x".
-    assert "x" in printed[0][1].keys()
+    # Verify that the printed inputs include key "x".
+    assert "x" in printed[0][1]
 
 
 def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test the cli function with a simple pipeline end-to-end in JSON mode.
 
     The pipeline doubles each element of a list (using a mapspec) and then sums the resulting array.
-    This test creates a temporary JSON file with inputs and simulates command-line input in JSON mode.
+    This test creates a temporary JSON file with inputs and simulates JSON mode via monkey-patching
+    both parse_args and parse_known_args.
     """
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -175,7 +176,7 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
     # Create a temporary JSON file with the input "x".
     inputs = {"x": [0, 1, 2, 3]}
     json_file = tmp_path / "inputs.json"
-    with open(json_file, "w") as f:
+    with json_file.open("w") as f:
         json.dump(inputs, f)
 
     map_kwargs = {
@@ -184,12 +185,16 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_storage": "dict",
     }
     cli_args_dict = {"mode": "json", "json_file": str(json_file), **map_kwargs}
-    namespace = argparse.Namespace(**cli_args_dict)
+    fake_ns = argparse.Namespace(**cli_args_dict)
 
-    def fake_parse_args(self):
-        return namespace
+    def fake_parse_args(self, args=None, namespace=None):
+        return fake_ns
+
+    def fake_parse_known_args(self, args=None, namespace=None):
+        return (fake_ns, [])
 
     monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_known_args", fake_parse_known_args)
 
     printed = []
 
@@ -201,5 +206,5 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
     pipeline.cli("CLI integration test")
     final_sum = load_outputs("sum", run_folder=tmp_path)
     assert final_sum == 12
-    # Check that the printed inputs (loaded from JSON) include key "x".
-    assert "x" in printed[0][1].keys()
+    # Verify that the printed inputs (loaded from JSON) include key "x".
+    assert "x" in printed[0][1]
