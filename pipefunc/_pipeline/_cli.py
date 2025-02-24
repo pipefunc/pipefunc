@@ -124,7 +124,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     args = parser.parse_args()
 
     # If no arguments are provided, show the help message and exit.
-    if args.mode is None:
+    if args.mode is None:  # pragma: no cover
         parser.print_help()
         sys.exit(0)
 
