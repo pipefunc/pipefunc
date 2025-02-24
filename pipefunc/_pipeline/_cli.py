@@ -17,8 +17,8 @@ DEFAULT_DESCRIPTION = """PipeFunc Pipeline CLI
 
 This command-line interface (CLI) provides an easy and flexible way to execute a PipeFunc pipeline
 directly from the terminal. The CLI is auto-generated based on your Pipeline's definition and input schema,
-allowing you to supply parameters interactively (via the "cli" subcommand) or load them from a JSON file
-(via the "json" subcommand).
+allowing you to supply parameters interactively (via the `cli` subcommand) or load them from a JSON file
+(via the `json` subcommand).
 
 Mapping Options:
   In addition to input parameters, you can configure mapping options (e.g., --map-parallel, --map-run_folder,
@@ -26,12 +26,12 @@ Mapping Options:
 
 Usage Examples:
   CLI mode:
-    python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
+    `python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true`
 
   JSON mode:
-    python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
+    `python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true`
 
-For more details, run the CLI with the --help flag.
+For more details, run the CLI with the `--help` flag.
 """
 
 
