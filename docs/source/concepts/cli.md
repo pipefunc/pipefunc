@@ -136,6 +136,13 @@ if __name__ == "__main__":
 
 ### Running the Example
 
+- **Help Text:**
+  Run the script with the `--help` flag to see the generated help text:
+
+  ```bash
+  python cli-example.py --help
+  ```
+
 - **CLI Mode:**
   Execute the script and supply individual parameters:
 
