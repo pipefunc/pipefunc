@@ -3,6 +3,62 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.55.0 (2025-02-24)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.6.2 ([#633](https://github.com/pipefunc/pipefunc/pull/633))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#646](https://github.com/pipefunc/pipefunc/pull/646))
+
+### 🧹 Maintenance
+
+- Add rich-argparse to extras ([#645](https://github.com/pipefunc/pipefunc/pull/645))
+
+### 📚 Documentation
+
+- Fix Xarray CSS in dark mode for sphinx-book-theme ([#372](https://github.com/pipefunc/pipefunc/pull/372))
+- Add real outputs to the CLI docs ([#647](https://github.com/pipefunc/pipefunc/pull/647))
+- Add CLI concepts page ([#642](https://github.com/pipefunc/pipefunc/pull/642))
+
+### ✨ Enhancements
+
+- Add `docs` subcommand to CLI ([#644](https://github.com/pipefunc/pipefunc/pull/644))
+- Add `Pipeline.cli()` that automatically generates a CLI ([#607](https://github.com/pipefunc/pipefunc/pull/607))
+- Add `Pipeline.pydantic_model` ([#609](https://github.com/pipefunc/pipefunc/pull/609))
+
+### 🐛 Bug Fixes
+
+- Extract type annotation for classmethod ([#641](https://github.com/pipefunc/pipefunc/pull/641))
+
+### 📊 Stats
+
+- `.json`: +1 lines, -1 lines
+- `.py`: +1090 lines, -15 lines
+- `.yaml`: +1 lines, -1 lines
+- `.yml`: +12 lines, -8 lines
+- `.css`: +15 lines, -0 lines
+- `.md`: +261 lines, -0 lines
+- `.toml`: +6 lines, -4 lines
+- `other`: +1 lines, -1 lines
+
+## v0.54.1 (2025-02-17)
+
+### ✨ Enhancements
+
+- Add support for `SlurmExecutor` in `get_ncores` ([#640](https://github.com/pipefunc/pipefunc/pull/640))
+
+### 📚 Documentation
+
+- Update CHANGELOG.md until v0.54.0 ([#639](https://github.com/pipefunc/pipefunc/pull/639))
+
+### 📊 Stats
+
+- `.md`: +70 lines, -0 lines
+- `.py`: +7 lines, -0 lines
+
 ## v0.54.0 (2025-02-17)
 
 ### 🐛 Bug Fixes

@@ -270,11 +270,11 @@ def _get_file_stats(
     return stats
 
 
-def _generate_release_notes(  # noqa: PLR0912
+def _generate_release_notes(  # noqa: PLR0912, PLR0915
     token: str | None = None,
     repo_path: str | None = None,
     remote_name: str = "origin",
-) -> str:
+) -> tuple[str, str]:
     """Generate release notes in Markdown format."""
     repo, remote = _get_repo(repo_path, remote_name)
     gh = Github(token)
@@ -358,8 +358,8 @@ def _generate_release_notes(  # noqa: PLR0912
         if (stats := file_stats.get("other")) is not None:  # type: ignore[assignment]
             _add_stats_lines(lines, "`other`", stats)
         lines.append("\n")
-
-    return "".join(lines).rstrip() + "\n"
+    last_tag = tags_with_dates[0][0].name
+    return "".join(lines).rstrip() + "\n", last_tag
 
 
 def _add_stats_lines(lines: list[str], ext: str, stats: dict[str, int]) -> None:
@@ -381,7 +381,12 @@ if __name__ == "__main__":
     else:
         _print_error("No GitHub token found")
         github_token = None  # type: ignore[assignment]
-    notes = _generate_release_notes(github_token)
+    notes, last_tag = _generate_release_notes(github_token)
     console.print(notes)
     with open(REPO_ROOT / "CHANGELOG.md", "w") as f:  # noqa: PTH123
         f.write(notes)
+
+    _print_info("Run the following command to commit the changes:")
+    _print_info(
+        f"git checkout -b update-changelog-{last_tag} && git add CHANGELOG.md && git commit -m 'DOC: Update `CHANGELOG.md` until {last_tag}' && git push",
+    )
