@@ -86,7 +86,9 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     """
     requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
     import rich
+    from rich.traceback import install
 
+    install()
     # Create the base parser.
     parser = argparse.ArgumentParser(
         description=description or DEFAULT_DESCRIPTION,
@@ -154,7 +156,8 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     rich.print("Map kwargs from CLI:", map_kwargs)
     results = pipeline.map(inputs, **map_kwargs)
     rich.print("\n\n[bold blue]Results:")
-    rich.print(results)
+    for key, value in results.items():
+        rich.print(f"[bold yellow]Output `{key}`:[/]", "\n", value.output, "\n")
 
 
 def _formatter_class() -> type[argparse.RawDescriptionHelpFormatter]:
