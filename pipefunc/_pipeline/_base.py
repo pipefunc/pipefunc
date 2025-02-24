@@ -47,6 +47,7 @@ from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
+from ._cli import cli
 from ._mapspec import (
     add_mapspec_axis,
     create_missing_mapspecs,
@@ -2120,6 +2121,7 @@ class Pipeline:
         -------
         type[pydantic.BaseModel]
             A dynamically generated Pydantic model class for validating pipeline inputs. It:
+
             - Validates and coerces input data to the expected types.
             - Annotates multidimensional arrays as nested lists and converts them to NumPy arrays.
             - Facilitates CLI creation by ensuring proper input validation.
@@ -2146,6 +2148,51 @@ class Pipeline:
 
         """
         return pipeline_to_pydantic(self, model_name)
+
+    def cli(self: Pipeline, description: str | None = None) -> None:
+        """Automatically construct a command-line interface using argparse.
+
+        This method creates an `argparse.ArgumentParser` instance, adds arguments for each
+        root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
+        parses the command-line arguments, and runs `pipeline.map` with the parsed arguments.
+        Mapping options (prefixed with "--map-") are available in both subcommands to control
+        parallel execution, storage method, and cleanup behavior.
+
+        It constructs a CLI with two subcommands:
+        - "cli": for specifying individual input parameters as command-line options.
+        - "json": for loading input parameters from a JSON file.
+
+
+        Usage Examples:
+        CLI mode:
+            python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
+        JSON mode:
+            python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
+
+        Parameters
+        ----------
+        pipeline
+            The PipeFunc pipeline instance to be executed.
+        description
+            A custom description for the CLI help message. If not provided, a default description is used.
+
+        Raises
+        ------
+        ValueError
+            If an invalid subcommand is specified.
+        FileNotFoundError
+            If the JSON input file does not exist (in JSON mode).
+        json.JSONDecodeError
+            If the JSON input file is not formatted correctly.
+
+        Examples
+        --------
+        >>> if __name__ == "__main__":
+        ...     pipeline = create_my_pipeline()
+        ...     pipeline.cli()
+
+        """
+        cli(self, description=description)
 
 
 class Generations(NamedTuple):
