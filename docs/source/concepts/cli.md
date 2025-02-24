@@ -126,6 +126,7 @@ def compute_result(sum: float, product: float) -> float:
 
 # Create a pipeline with the three functions
 pipeline = Pipeline([add, multiply, compute_result])
+pipeline.add_mapspec_axis("x", axis="i")
 
 if __name__ == "__main__":
     # This will launch the CLI.
@@ -147,7 +148,7 @@ if __name__ == "__main__":
   Execute the script and supply individual parameters:
 
   ```bash
-  python cli-example.py cli --x "2" --y "3"
+  python cli-example.py cli --x "2" --y "[3, 4, 5]"
   ```
 
 - **JSON Mode:**
@@ -156,7 +157,7 @@ if __name__ == "__main__":
   ```json
   {
     "x": 2,
-    "y": 3
+    "y": [3, 4, 5]
   }
   ```
 
