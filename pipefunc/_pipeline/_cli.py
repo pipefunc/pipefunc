@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -87,6 +88,11 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         description=description or DEFAULT_DESCRIPTION,
         formatter_class=_formatter_class(),
     )
+
+    # If no arguments are provided, show the help message and exit.
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
 
     # Create subparsers for the two input modes.
     subparsers = parser.add_subparsers(
