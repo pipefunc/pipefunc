@@ -40,7 +40,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
 
     This method creates an `argparse.ArgumentParser` instance, adds arguments for each
     root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
-    and parses the command-line arguments.
+    parses the command-line arguments, and runs `pipeline.map` with the parsed arguments.
     Mapping options (prefixed with "--map-") are available in both subcommands to control
     parallel execution, storage method, and cleanup behavior.
 
