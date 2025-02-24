@@ -2146,6 +2146,13 @@ class Pipeline:
         - This method is especially useful for CLI generation, ensuring that user inputs are properly
           validated and converted before pipeline execution.
 
+        See Also
+        --------
+        cli
+            Automatically construct a command-line interface using argparse.
+        print_documentation
+            Print the pipeline documentation as a table formatted with Rich.
+
         """
         return pipeline_to_pydantic(self, model_name)
 
