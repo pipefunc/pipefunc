@@ -1,15 +1,15 @@
-details.hide.below-input summary span {
+[data-theme="dark"] details.hide.below-input summary span {
   color: black !important;
 }
 
-label.xr-section-summary {
+[data-theme="dark"] label.xr-section-summary {
   color: black !important;
 }
 
-div.xr-obj-type {
+[data-theme="dark"] .xr-wrap .xr-header div.xr-obj-type {
   color: black !important;
 }
 
-li.xr-var-item {
+[data-theme="dark"] li.xr-var-item {
   color: white !important;
 }
