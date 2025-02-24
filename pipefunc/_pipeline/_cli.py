@@ -236,8 +236,13 @@ def _validate_inputs_from_cli(
     for arg, field_info in input_model.model_fields.items():
         value = getattr(args_cli, arg)
         try:
-            input_data[arg] = json.loads(value) if field_info.annotation is not str else value
+            input_data[arg] = (
+                json.loads(value)
+                if field_info.annotation is not str and isinstance(value, str)
+                else value
+            )
         except json.JSONDecodeError:
+            print(f"Error decoding JSON for {arg}: {value}")
             input_data[arg] = value
     model_instance = input_model.model_validate(input_data)
     return model_instance.model_dump()
