@@ -267,4 +267,6 @@ body {
   margin-left: auto;
   margin-right: auto;
   margin-top: 10px;
+details.hide.below-input summary span {
+    color: black !important;
 }

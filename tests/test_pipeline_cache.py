@@ -46,7 +46,7 @@ def test_tuple_outputs_with_cache() -> None:
     f = pipeline.func("i")
     r = f.call_full_output(a=1, b=2, x=3)["i"]
     assert r == f(a=1, b=2, x=3)
-    key = (("d", "e"), (("a", 1), ("b", 2), ("x", 3)))
+    key = ("d-e", (("a", 1), ("b", 2), ("x", 3)))
     assert pipeline.cache is not None
     assert pipeline.cache.cache[key] == (6, 1)
 
@@ -214,7 +214,7 @@ def test_autoset_cache() -> None:
 
 @pytest.mark.parametrize("cache_type", ["simple", "lru", "hybrid", "disk"])
 def test_cache_with_map(cache_type, tmp_path: Path) -> None:
-    calls = {"f": 0, "g": 0}
+    calls = {"f": 0, "g": 0, "h": 0}
 
     @pipefunc(
         output_name="c",
@@ -231,6 +231,11 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
         calls["g"] += 1
         return b + sum(c)
 
+    @pipefunc(output_name="e", cache=False)
+    def h(d):
+        calls["h"] += 1
+        return d
+
     cache_kwargs: dict[str, Any]
     if cache_type == "disk":
         cache_kwargs = {"cache_dir": tmp_path}
@@ -238,12 +243,44 @@ def test_cache_with_map(cache_type, tmp_path: Path) -> None:
         cache_kwargs = {"shared": False}
     else:
         cache_kwargs = {}
-    pipeline = Pipeline([f, g], cache_type=cache_type, cache_kwargs=cache_kwargs)
+    pipeline = Pipeline([f, g, h], cache_type=cache_type, cache_kwargs=cache_kwargs)
     a = [1, 2, 3]
-    for _ in range(3):
+    for i in range(3):
         assert pipeline.map(inputs={"a": a}, parallel=False)["d"].output == 10
-        assert calls == {"f": len(a), "g": 1}
-    for _ in range(3):
+        assert calls == {"f": len(a), "g": 1, "h": i + 1}
+    for i in range(3):
         # Call with different arguments
         assert pipeline.map(inputs={"a": a, "b": 2}, parallel=False)["d"].output == 14
-        assert calls == {"f": 2 * len(a), "g": 2}
+        assert calls == {"f": 2 * len(a), "g": 2, "h": i + 4}
+
+
+def test_cache_with_custom__pipefunc_hash__() -> None:
+    counter = {"call": 0}
+
+    class MyCallable:
+        def __init__(self, value: int):
+            self.value = value
+
+        def __call__(self, x: int) -> int:
+            counter["call"] += 1
+            return self.value + x
+
+        def __pipefunc_hash__(self) -> str:
+            return str(self.value)
+
+    func = MyCallable(1)
+    assert type(func).__name__
+    pfunc = PipeFunc(func, "out", cache=True)
+    pipeline = Pipeline([pfunc], cache_type="simple")
+    assert counter["call"] == 0
+    pipeline(x=1)
+    assert counter["call"] == 1
+    pipeline(x=1)
+    assert counter["call"] == 1
+    pipeline.map(inputs={"x": 1}, parallel=False)
+    # Map uses different cache key
+    assert counter["call"] == 2
+    pipeline.map(inputs={"x": 1}, parallel=False)
+    assert counter["call"] == 2
+
+    assert pfunc._cache_id == "out-1"

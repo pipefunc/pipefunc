@@ -4,21 +4,26 @@ import contextlib
 import functools
 import importlib.util
 import inspect
+import logging
 import math
 import operator
 import socket
 import sys
 import warnings
+from collections.abc import Callable
+from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
 import cloudpickle
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable
 
     import pydantic
+    from griffe import DocstringSection
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -85,8 +90,9 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     """Handle an error that occurred while executing a function."""
     call_str = format_function_call(func.__name__, (), kwargs)
     msg = f"Error occurred while executing function `{call_str}`."
-    if sys.version_info <= (3, 11):  # pragma: no cover
-        raise type(e)(e.args[0] + msg) from e
+    if sys.version_info < (3, 11):  # pragma: no cover
+        original_msg = e.args[0] if e.args else ""
+        raise type(e)(original_msg + msg) from e
     e.add_note(msg)
     raise  # noqa: PLE0704
 
@@ -218,8 +224,12 @@ def get_local_ip() -> str:
 def is_running_in_ipynb() -> bool:
     """Check if the code is running in a Jupyter notebook."""
     try:
+        from IPython import get_ipython
+    except ImportError:  # pragma: no cover
+        return False
+    try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"  # type: ignore[name-defined]
-    except NameError:
+    except NameError:  # pragma: no cover
         return False  # Probably standard Python interpreter
 
 
@@ -230,7 +240,7 @@ def is_installed(package: str) -> bool:
 
 def requires(*packages: str, reason: str = "", extras: str | None = None) -> None:
     """Check if a package is installed, raise an ImportError if not."""
-    conda_name_mapping = {"graphviz": "python-graphviz"}
+    conda_name_mapping = {"graphviz": "python-graphviz", "graphviz_anywidget": "graphviz-anywidget"}
 
     for package in packages:
         if is_installed(package):
@@ -265,10 +275,181 @@ def is_min_version(package: str, version: str) -> bool:
 
 
 def is_pydantic_base_model(x: Any) -> TypeGuard[type[pydantic.BaseModel]]:
-    if "pydantic" not in sys.modules:
+    if not is_imported("pydantic"):  # pragma: no cover
         return False
     if not inspect.isclass(x):
         return False
     import pydantic
 
     return issubclass(x, pydantic.BaseModel)
+
+
+T = TypeVar("T")
+
+
+def first(x: T | tuple[T, ...]) -> T:
+    if isinstance(x, tuple):  # pragma: no cover
+        return x[0]
+    return x
+
+
+def is_imported(package: str) -> bool:
+    """Check if a package is imported."""
+    return package in sys.modules
+
+
+def get_ncores(ex: Executor) -> int:
+    """Return the maximum number of cores that an executor can use."""
+    if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
+        return ex._max_workers  # type: ignore[union-attr]
+    if is_imported("ipyparallel"):  # pragma: no cover
+        import ipyparallel
+
+        if isinstance(ex, ipyparallel.client.view.ViewExecutor):
+            return len(ex.view)
+    if is_imported("loky"):  # pragma: no cover
+        import loky
+
+        if isinstance(ex, loky.reusable_executor._ReusablePoolExecutor):
+            return ex._max_workers
+    if is_imported("distributed"):  # pragma: no cover
+        import distributed
+
+        if isinstance(ex, distributed.cfexecutor.ClientExecutor):
+            return sum(n for n in ex._client.ncores().values())
+    if is_imported("mpi4py"):  # pragma: no cover
+        import mpi4py.futures
+
+        if isinstance(ex, mpi4py.futures.MPIPoolExecutor):
+            ex.bootup()  # wait until all workers are up and running
+            return ex._pool.size  # not public API!
+    if is_imported("adaptive_scheduler"):
+        import adaptive_scheduler
+
+        if isinstance(ex, adaptive_scheduler.SlurmExecutor):
+            # This could be better but since there is `cores`, `cores_per_node`,
+            # and `nodes`; and they can be `None`, we just return 1 for now.
+            return 1
+    msg = f"Cannot get number of cores for {ex.__class__}"
+    raise TypeError(msg)
+
+
+@contextlib.contextmanager
+def temporarily_disable_logger(logger_name: str) -> Generator[None, None, None]:
+    """Temporarily disable a logger within a context manager scope.
+
+    Upon entering, disables the specified logger.
+    Upon exiting, restores the logger to its original enabled/disabled state.
+
+    Parameters
+    ----------
+    logger_name
+        Name of the logger to temporarily disable
+
+    Examples
+    --------
+    >>> with temporarily_disable_logger("my_logger"):
+    ...     # Logger is disabled here
+    ...     perform_noisy_operation()
+    ... # Logger is restored to original state here
+
+    """
+    logger = logging.getLogger(name=logger_name)
+    original_state = logger.disabled
+    try:
+        logger.disabled = True
+        yield
+    finally:
+        logger.disabled = original_state
+
+
+DocstringStyle = Literal["google", "numpy", "sphinx", "auto"]
+
+
+def _parse_docstring_sections(
+    docstring: str,
+    docstring_parser: DocstringStyle,
+) -> list[DocstringSection]:
+    requires("griffe", reason="extracting docstrings", extras="autodoc")
+    from griffe import Docstring, Parser
+
+    options = get_args(DocstringStyle)
+    if docstring_parser == "auto":
+        # Poor man's "auto" parser selection because griffe has this as a paid feature
+        # https://mkdocstrings.github.io/griffe-autodocstringstyle/insiders/
+        results = [
+            _parse_docstring_sections(docstring, parser)  # type: ignore[arg-type]
+            for parser in options
+            if parser != "auto"
+        ]
+        return max(results, key=len)
+
+    if docstring_parser not in options:
+        msg = f"Invalid docstring parser: {docstring_parser}, must be one of {', '.join(options)}"
+        raise ValueError(msg)
+
+    parser = Parser(docstring_parser)
+    with temporarily_disable_logger("griffe"):
+        return Docstring(docstring).parse(parser)
+
+
+@dataclass
+class DocstringInfo:
+    """A class to store a function's docstring and its extracted parameter docstrings."""
+
+    description: str | None
+    parameters: dict[str, str]
+    returns: str | None
+
+
+def parse_function_docstring(
+    func: Callable[..., Any],
+    docstring_parser: DocstringStyle = "auto",
+) -> DocstringInfo:
+    """Parse a function's docstring into structured components.
+
+    Extracts the main description, parameter descriptions, and return description
+    from a function's docstring. Supports Google, NumPy, and standard Python
+    docstring formats using the `griffe` library for parsing.
+
+    Parameters
+    ----------
+    func
+        The function whose docstring should be parsed.
+    docstring_parser
+        The docstring style to use for parsing. Can be 'google', 'numpy',
+        'sphinx', or 'auto' to automatically detect the style.
+
+    Returns
+    -------
+        A structured representation of the docstring containing the main description,
+        parameter descriptions, and return description.
+
+    """
+    docstring = inspect.getdoc(func)
+    if not docstring:
+        return DocstringInfo(None, {}, None)
+
+    parameters: dict[str, str] = {}
+    returns: list[str] = []
+    description: list[str] = []
+    sections = _parse_docstring_sections(docstring, docstring_parser)
+    for section in sections:
+        if section.kind.name == "parameters":
+            for parameter in section.value:
+                parameters[parameter.name] = parameter.description
+        if section.kind.name == "returns":
+            for return_value in section.value:
+                if return_value.description or return_value.annotation:
+                    # If numpy style without types, the description is the annotation
+                    value = return_value.description or return_value.annotation.lstrip()
+                    returns.append(value)
+        if section.kind.name == "text":
+            description.append(section.value)
+
+    return DocstringInfo("\n".join(description), parameters, "\n".join(returns))
+
+
+def is_classmethod(func: Callable) -> bool:
+    """Check if a function is a classmethod."""
+    return inspect.ismethod(func) and func.__self__ is not None

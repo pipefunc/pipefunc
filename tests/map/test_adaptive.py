@@ -17,7 +17,7 @@ from pipefunc.map.adaptive import (
     to_adaptive_learner,
 )
 from pipefunc.sweep import Sweep
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -493,3 +493,35 @@ def test_adaptive_wrapper_with_heterogeneous_storage(tmp_path: Path, pipeline: P
 
     assert learner.to_numpy().shape == (npoints_goal, 4)
     assert len(list(tmp_path.glob("*"))) == npoints_goal
+
+
+def test_adaptive_run_dynamic_internal_shape():
+    @pipefunc(output_name="n")
+    def f() -> int:
+        return 10
+
+    @pipefunc(output_name="y", internal_shape=("?",))
+    def g(n: int, a: float) -> list[float]:
+        return [a * i for i in range(n)]
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def h(y: float) -> float:
+        return y**2
+
+    @pipefunc(output_name="sum")
+    def i(z: Array[float]) -> float:
+        return sum(z)
+
+    pipeline = Pipeline([f, g, h, i])
+
+    learner = to_adaptive_learner(
+        pipeline,
+        inputs={},
+        adaptive_dimensions={"a": (0.0, 1.0)},
+        adaptive_output="sum",
+    )
+
+    adaptive.runner.simple(learner, npoints_goal=10)
+
+    assert len(learner.data) == 10
+    assert learner.to_numpy().shape == (10, 2)

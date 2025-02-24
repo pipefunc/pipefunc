@@ -351,8 +351,11 @@ def test_larger_output_then_input():  # noqa: PLR0915
     assert mask == (True, True, False, False)
     assert shape == (3, 4, 5, 6)
 
-    with pytest.raises(TypeError, match="Internal shape for 'c' must be a tuple of integers."):
-        mapspec.shape(input_shapes, internal_shapes={"c": ("a",)})
+    with pytest.raises(
+        TypeError,
+        match="Internal shape for 'c' must be a tuple of integers or '?'",
+    ):
+        mapspec.shape(input_shapes, internal_shapes={"c": (object(),)})
 
 
 def test_shape_exceptions():

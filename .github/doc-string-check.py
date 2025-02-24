@@ -6,6 +6,10 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
+import pipefunc._pipeline
+import pipefunc._pipeline._autodoc
+import pipefunc._pipeline._cli
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -187,6 +191,19 @@ if __name__ == "__main__":
     import pipefunc._plotting
     from pipefunc.map import run_map, run_map_async
 
+    # @pipefunc and PipeFunc
+    compare_param_descriptions(
+        pipefunc.PipeFunc,
+        pipefunc.pipefunc,
+        # In PipeFunc "wrapped function" and in @pipefunc "decorated function"
+        allow_discrepancy=["output_name", "profile", "cache"],
+        allow_missing=["func"],
+    )
+    compare_param_descriptions(
+        pipefunc.PipeFunc.update_bound,
+        pipefunc.NestedPipeFunc.update_bound,
+    )
+
     # map vs map_async
     compare_param_descriptions(
         pipefunc.Pipeline.map,
@@ -227,4 +244,26 @@ if __name__ == "__main__":
             "graph",
             "func_node_colors",
         ],
+    )
+
+    # Pipeline and VariantsPipeline
+    compare_param_descriptions(
+        pipefunc.Pipeline,
+        pipefunc.VariantPipeline,
+        allow_missing=["default_variant"],
+        allow_discrepancy=["functions"],
+    )
+
+    # print_documentation and format_pipeline_docs
+    compare_param_descriptions(
+        pipefunc.Pipeline.print_documentation,
+        pipefunc._pipeline._autodoc.format_pipeline_docs,
+        allow_missing=["doc", "print_table"],
+    )
+
+    # CLI
+    compare_param_descriptions(
+        pipefunc.Pipeline.cli,
+        pipefunc._pipeline._cli.cli,
+        allow_missing=["pipeline"],
     )

@@ -214,12 +214,12 @@ def test_file_array_with_internal_arrays_full_array_different_order_simple(tmp_p
 
     result = arr[:, :]
     assert result.shape == full_shape
-    expected = data1.reshape(1, 2)
-    expected = np.ma.MaskedArray(expected, mask=False, dtype=object)
-    assert np.array_equal(result, expected)
+    expected1 = data1.reshape(1, 2)
+    expected1 = np.ma.MaskedArray(expected1, mask=False, dtype=object)
+    assert np.array_equal(result, expected1)
 
     result = arr[0, :]
     assert result.shape == (2,), result.shape
-    expected = data1
-    expected = np.ma.MaskedArray(expected, mask=False, dtype=object)
-    assert np.array_equal(result, expected)
+    expected2 = data1
+    expected2 = np.ma.MaskedArray(expected2, mask=False, dtype=object)
+    assert np.array_equal(result, expected2)

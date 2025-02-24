@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import multiprocessing.managers
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cloudpickle
 import numpy as np
@@ -17,6 +17,9 @@ from numcodecs.registry import register_codec
 from pipefunc._utils import prod
 
 from ._base import StorageBase, register_storage, select_by_mask
+
+if TYPE_CHECKING:
+    from pipefunc.map._types import ShapeTuple
 
 
 class ZarrFileArray(StorageBase):
@@ -31,8 +34,8 @@ class ZarrFileArray(StorageBase):
     def __init__(
         self,
         folder: str | Path | None,
-        shape: tuple[int, ...],
-        internal_shape: tuple[int, ...] | None = None,
+        shape: ShapeTuple,
+        internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
         *,
         store: zarr.storage.Store | str | Path | None = None,
@@ -49,11 +52,12 @@ class ZarrFileArray(StorageBase):
         if not isinstance(store, zarr.storage.Store):
             store = zarr.DirectoryStore(str(self.folder))
         self.store = store
+        self.object_codec = object_codec  # Just for __repr__
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
 
-        if object_codec is None:
+        if self.object_codec is None:
             object_codec = CloudPickleCodec()
 
         chunks = select_by_mask(self.shape_mask, (1,) * len(self.shape), self.internal_shape)
@@ -77,10 +81,21 @@ class ZarrFileArray(StorageBase):
             chunks=1,
         )
 
+    def __repr__(self) -> str:
+        folder = f"'{self.folder}'" if self.folder is not None else self.folder
+        return (
+            f"ZarrFileArray(folder={folder}, "
+            f"shape={self.shape}, "
+            f"internal_shape={self.internal_shape}, "
+            f"shape_mask={self.shape_mask}, "
+            f"store={self.store}, "
+            f"object_codec={self.object_codec})"
+        )
+
     @property
     def size(self) -> int:
         """Return number of elements in the array."""
-        return prod(self.shape)
+        return prod(self.resolved_shape)
 
     @property
     def rank(self) -> int:
@@ -89,7 +104,7 @@ class ZarrFileArray(StorageBase):
 
     def get_from_index(self, index: int) -> Any:
         """Return the data associated with the given linear index."""
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         full_index = select_by_mask(
             self.shape_mask,
             np_index,
@@ -99,7 +114,7 @@ class ZarrFileArray(StorageBase):
 
     def has_index(self, index: int) -> bool:
         """Return whether the given linear index exists."""
-        np_index = np.unravel_index(index, self.shape)
+        np_index = np.unravel_index(index, self.resolved_shape)
         return not self._mask[np_index]
 
     def __getitem__(self, key: tuple[int | slice, ...]) -> Any:
@@ -206,7 +221,7 @@ class ZarrFileArray(StorageBase):
 
     def _slice_indices(self, key: tuple[int | slice, ...]) -> list[range]:
         slice_indices = []
-        for size, k in zip(self.shape, key):
+        for size, k in zip(self.resolved_shape, key):
             if isinstance(k, slice):
                 slice_indices.append(range(*k.indices(size)))
             else:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from numbers import Number
 from typing import (
     Annotated,
@@ -638,3 +639,31 @@ def test_unexpected_type():
 
     weird = WeirdType()
     assert "WeirdType" in type_as_string(weird)
+
+
+@dataclass
+class Foo:
+    name: str
+
+    @classmethod
+    def from_name(cls, name: str) -> Foo:
+        return cls(name)
+
+
+def test_with_classmethod_dataclass() -> None:
+    type_hints = safe_get_type_hints(Foo.from_name)
+    assert type_hints == {"name": str, "return": Foo}
+
+
+class Bar:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @classmethod
+    def from_name(cls, name: str) -> Bar:
+        return cls(name)
+
+
+def test_with_classmethod() -> None:
+    type_hints = safe_get_type_hints(Bar.from_name)
+    assert type_hints == {"name": str, "return": Bar}

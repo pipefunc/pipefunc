@@ -1,6 +1,6 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools", "wheel", "versioningit"]
+build-backend = "hatchling.build"
+requires = ["hatchling", "versioningit"]
 
 [project]
 name = "pipefunc"
@@ -24,52 +24,76 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing",
 ]
-dependencies = ["networkx", "cloudpickle", "numpy"]
+dependencies = ["cloudpickle", "networkx", "numpy"]
+
 [project.optional-dependencies]
-adaptive = ["adaptive", "adaptive-scheduler>=2.13.3"]
-xarray = ["xarray"]
-widgets = ["ipywidgets"]
-zarr = ["zarr"]
+adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
+autodoc = ["griffe", "rich"]
+cli = ["griffe", "rich", "pydantic", "rich-argparse"]
 pandas = ["pandas"]
+plotting = ["bokeh", "graphviz", "holoviews", "matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
-plotting = ["matplotlib", "pygraphviz", "holoviews", "bokeh", "graphviz"]
+rich = ["rich"]
+widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
+xarray = ["xarray"]
+zarr = ["zarr>=2,<3"]
 test = [
-    "pytest",
+    "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
     "pytest-cov",
+    "pytest-timeout",
     "pytest-xdist",
-    "coverage",
+    "pytest",
     "versioningit",
 ]
 docs = [
-    "sphinx",
+    "emoji",
+    "jupytext",
+    "myst-nb",
+    "myst-parser",
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
-    "emoji",
-    "jupytext",
-    "myst-nb",
-    "myst-parser",
+    "sphinx",
+    "sphinxcontrib-mermaid",
     "versioningit",
     # Used for the example notebook
-    "seaborn",
     "nltk",
     "scikit-image",
+    "seaborn",
+    "pipefunc[all]",
 ]
-# all doesn't include 'pydantic' because there are no specific features that depend on it
-all = ["pipefunc[adaptive,xarray,zarr,plotting,profiling,widgets]"]
+all = [
+    "pipefunc[adaptive,autodoc,cli,pandas,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
+]
 dev = [ # all + dev deps
     "black[jupyter]",
+    "mypy",
     "pre-commit",
     "ruff",
-    "mypy",
     "versioningit",
-    "pipefunc[all,test,docs,pydantic]",
+    "pipefunc[all,test,docs]",
 ]
+# matches pipefunc-extras in https://github.com/conda-forge/pipefunc-feedstock/blob/main/recipe/meta.yaml
+extras = [
+    "adaptive",
+    "graphviz",
+    "graphviz-anywidget",
+    "griffe",
+    "ipywidgets",
+    "matplotlib",
+    "pandas",
+    "psutil",
+    "pydantic",
+    "rich",
+    "xarray",
+    "zarr>=2,<3",
+]
+
 [project.urls]
 homepage = "https://pipefunc.readthedocs.io/"
 documentation = "https://pipefunc.readthedocs.io/"
@@ -79,6 +103,16 @@ repository = "https://github.com/pipefunc/pipefunc"
 content-type = "text/markdown"
 file = "README.md"
 
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipefunc"]
+
+[tool.hatch.build.hooks.versioningit-onbuild]
+build-file = "pipefunc/_version.py"
+source-file = "pipefunc/_version.py"
+
 [tool.versioningit]
 default-version = "0.0.0"
 
@@ -87,24 +121,10 @@ method = "git"
 match = ["v*"]
 default-tag = "0.0.0"
 
-[tool.setuptools.package-data]
-"pipefunc" = ["py.typed"]
-
-[tool.setuptools.packages.find]
-include = ["pipefunc.*", "pipefunc"]
-
-[tool.setuptools.cmdclass]
-sdist = "versioningit.cmdclass.sdist"
-build_py = "versioningit.cmdclass.build_py"
-
 [tool.versioningit.format]
 dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
 distance = "{version}.dev{distance}+{branch}.{vcs}{rev}"
 distance-dirty = "{version}.dev{distance}+{branch}.{vcs}{rev}.dirty"
-
-[tool.versioningit.onbuild]
-build-file = "pipefunc/_version.py"
-source-file = "pipefunc/_version.py"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "module"
@@ -116,19 +136,20 @@ addopts = """
     --cov-report xml
     --cov-fail-under=35
     --asyncio-mode=strict
+    --timeout 60
 """
 
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
-    "if TYPE_CHECKING:",
+    "if TYPE_CHECKING",
     "if __name__ == .__main__.:",
 ]
 
 [tool.coverage.run]
 omit = [
-    "pipefunc/map/_types.py",  # Only imported in `if TYPE_CHECKING` block
+    "pipefunc/map/_types.py", # Only imported in `if TYPE_CHECKING` block
 ]
 
 [tool.ruff]
@@ -139,7 +160,6 @@ target-version = "py310"
 select = ["ALL"]
 ignore = [
     "T20",     # flake8-print
-    "ANN101",  # Missing type annotation for {name} in method
     "S101",    # Use of assert detected
     "PD901",   # df is a bad variable name. Be kinder to your future self.
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}

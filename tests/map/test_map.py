@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pytest
@@ -18,7 +19,7 @@ from pipefunc.map._run_info import RunInfo, map_shapes
 from pipefunc.map._storage_array._base import StorageBase, storage_registry
 from pipefunc.map._storage_array._dict import SharedMemoryDictArray
 from pipefunc.map._storage_array._file import FileArray
-from pipefunc.typing import Array  # noqa: TCH001
+from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,8 +27,14 @@ if TYPE_CHECKING:
 has_xarray = importlib.util.find_spec("xarray") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_zarr = importlib.util.find_spec("zarr") is not None
+has_psutil = importlib.util.find_spec("psutil") is not None
 
 storage_options = list(storage_registry)
+
+try:
+    has_gil = sys._is_gil_enabled()  # type: ignore[attr-defined]
+except AttributeError:
+    has_gil = True
 
 
 def xarray_dataset_from_results(*args, **kwargs):
@@ -329,9 +336,6 @@ def test_simple_from_step(tmp_path: Path) -> None:
     assert masks == {"x": (False,), "y": (True,)}
     assert shapes == {"x": (4,), "y": (4,)}
 
-    with pytest.raises(ValueError, match="Internal shape for 'x' is missing."):
-        map_shapes(pipeline, inputs)
-
     with pytest.raises(
         RuntimeError,
         match="Use `Pipeline.map` instead",
@@ -411,7 +415,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
 
     @pipefunc(output_name="sum")
     def norm(vector: np.ndarray) -> np.float64:
-        return np.linalg.norm(vector)
+        return np.linalg.norm(vector)  # type: ignore[return-value]
 
     pipeline = Pipeline(
         [
@@ -435,7 +439,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
     assert results["sum"].output == 21.0
     assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == 21.0
-    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
+    shapes, masks = map_shapes(pipeline, inputs, internal_shapes)  # type: ignore[arg-type]
     assert shapes == {"array": (1, 2, 3), "vector": (1,)}
     assert masks == {"array": (False, False, False), "vector": (True,)}
     load_xarray_dataset(run_folder=tmp_path)
@@ -1459,8 +1463,9 @@ def test_map_func_exception():
         pipeline.map({"x": 1}, None, parallel=False)
 
 
-def test_internal_shape_in_pipefunc():
-    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(3,))
+@pytest.mark.parametrize("dim", [3, "?"])
+def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
+    @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(dim,))
     def f(x):
         return [x] * 3
 
@@ -1481,6 +1486,7 @@ def test_internal_shape_in_pipefunc():
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
+@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
@@ -1640,6 +1646,41 @@ def test_pipeline_with_heterogeneous_executor() -> None:
     assert r["y2"].output.tolist() == [2, 3, 4]
 
 
+@pytest.mark.parametrize(
+    "chunksizes",
+    [
+        {("y1", "y2"): 2, "h": lambda x: x // 2, "": 1},
+        1,
+        10000,
+    ],
+)
+def test_pipeline_with_heterogeneous_chunksize(chunksizes):
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x):
+        return x - 1, x + 1
+
+    @pipefunc(output_name="z", mapspec="x[i] -> z[i]")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="h", mapspec="x[i] -> h[i]")
+    def h(x):
+        return x + 1
+
+    pipeline = Pipeline([f, g, h])
+    inputs = {"x": [1, 2, 3]}
+    results = pipeline.map(inputs, chunksizes=chunksizes)
+    assert results["y1"].output.tolist() == [0, 1, 2]
+    assert results["z"].output.tolist() == [2, 3, 4]
+    assert results["y2"].output.tolist() == [2, 3, 4]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Invalid chunksize -1 for z"),
+    ):
+        pipeline.map(inputs, chunksizes={"z": -1})
+
+
 def test_map_range():
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
@@ -1653,3 +1694,103 @@ def test_map_range():
         ds = xarray_dataset_from_results(inputs, r, pipeline)
         assert ds.coords["x"].to_numpy().tolist() == [0, 1, 2]
         assert not r["y"].store.mask.all()
+
+
+@pytest.mark.parametrize("dim", [10, "?"])
+def test_pipeline_loading_existing_results_with_internal_shape(
+    tmp_path: Path,
+    dim: int | Literal["?"],
+) -> None:
+    # Modified from `test_pipeline_loading_existing_results`
+    counters = {"f": 0, "g": 0}
+
+    @pipefunc(output_name="z", internal_shape=(dim,))
+    def f(x: int) -> list[int]:
+        counters["f"] += 1
+        return list(range(10))
+
+    @pipefunc(output_name="sum_", mapspec="z[i] -> sum_[i]")
+    def g(z: int) -> int:
+        counters["g"] += 1
+        return z + 1
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": 1}
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert counters["f"] == 1
+    assert counters["g"] == 10
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    assert counters["f"] == 1
+    assert counters["g"] == 10
+
+    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    assert counters["f"] == 2
+    assert counters["g"] == 20
+
+
+def test_nested_pipefunc_map_no_mapspec() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(b, c, x=1):
+        return b * c * x
+
+    @pipefunc(output_name="e")
+    def h(c, d, x=1):
+        return c * d * x
+
+    pipeline = Pipeline([f, g, h])
+    results_before = pipeline.map({"a": 1, "b": 2})
+    pipeline.nest_funcs({"c", "d"})
+    results_after = pipeline.map({"a": 1, "b": 2})
+    assert results_after["e"].output == results_before["e"].output
+
+
+def test_nested_pipefunc_map_with_mapspec() -> None:
+    @pipefunc(output_name="c", mapspec="a[i], b[i] -> c[i]")
+    def f(a: int, b: int, x: int = 0) -> int:
+        return a + b + x
+
+    @pipefunc(output_name="d", mapspec="b[i], c[i] -> d[i]")
+    def g(b: int, c: int) -> int:
+        return b * c
+
+    @pipefunc(output_name="e")
+    def h(c: Array[int], d: Array[int]):
+        return sum(c) + sum(d)
+
+    pipeline = Pipeline([f, g, h])
+    pipeline_copy = pipeline.copy()
+    results_before = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
+    nested = pipeline.nest_funcs({"c", "d"})
+    results_after = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
+    assert results_after["e"].output == results_before["e"].output
+    assert str(nested.mapspec) == "a[i], b[i] -> c[i], d[i]"
+    pipeline_copy.add_mapspec_axis("x", axis="j")
+    pipeline.add_mapspec_axis("x", axis="j")
+    results_before = pipeline_copy.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
+    results_after = pipeline.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
+    assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
+
+
+@pytest.mark.skipif(not has_psutil, reason="psutil not installed")
+def test_profiling_and_parallel_unsupported_warning() -> None:
+    @pipefunc("a", mapspec="val[i] -> a[i]")
+    def a(val: int) -> int:
+        return val + 1
+
+    @pipefunc("a", mapspec="val[i] -> a[i]", profile=True)
+    def a_profile(val: int) -> int:
+        return val + 1
+
+    test_pipeline_with_profile_true = Pipeline([a], profile=True)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_true.map({"val": np.array([1, 2, 3])})
+
+    test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
+    with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
+        test_pipeline_with_profile_none.map({"val": np.array([1, 2, 3])})

@@ -16,14 +16,13 @@ from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from collections.abc import Callable
     from pathlib import Path
     from typing import Any
 
     from pipefunc import Pipeline
 
-    from ._result import Result
+    from ._result import ResultDict
 
 
 def load_xarray(
@@ -67,7 +66,7 @@ def load_xarray_dataset(
 
 def xarray_dataset_from_results(
     inputs: dict[str, Any],
-    results: OrderedDict[str, Result],
+    results: ResultDict,
     pipeline: Pipeline,
     *,
     load_intermediate: bool = True,
@@ -88,7 +87,7 @@ def _data_loader(
     output_name: str,
     *,
     run_folder: Path | None = None,
-    data: dict[str, Result] | None = None,
+    data: ResultDict | None = None,
 ) -> Any:
     if data is not None:
         assert data is not None
@@ -118,6 +117,8 @@ def _xarray(
         dims.update(axes)
         if name in inputs:
             array = inputs[name]
+            if not isinstance(array, np.ndarray):
+                array = _to_array(array, (len(array),))
         elif load_intermediate:
             array = data_loader(name)
         else:
@@ -138,6 +139,13 @@ def _xarray(
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
+
+
+def _to_array(x: list[Any], shape: tuple[int, ...]) -> np.ndarray:
+    """Convert an iterable to an array."""
+    arr = np.empty(shape, dtype=object)
+    arr[:] = x
+    return arr
 
 
 def _xarray_dataset(
