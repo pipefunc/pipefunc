@@ -218,6 +218,7 @@ def test_none_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cli_args = {
         "mode": "cli",
         "x": "10",
+        "y": "null",
     }
     map_kwargs_cli = {
         "map_run_folder": str(tmp_path),
