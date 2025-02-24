@@ -184,7 +184,7 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_parallel": "False",
         "map_storage": "dict",
     }
-    cli_args_dict = {"mode": "json", "json_file": str(json_file), **map_kwargs}
+    cli_args_dict = {"mode": "json", "json_file": json_file, **map_kwargs}
     fake_ns = argparse.Namespace(**cli_args_dict)
 
     def fake_parse_args(self, args=None, namespace=None):
