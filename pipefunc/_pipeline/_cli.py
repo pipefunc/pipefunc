@@ -242,9 +242,8 @@ def _validate_inputs(
         return _validate_inputs_from_json(args_cli, input_model)
     if args_cli.mode == "cli":
         return _validate_inputs_from_cli(args_cli, input_model)
-    # pragma: no cover
-    msg = f"Invalid mode: {args_cli.mode}. Must be 'cli' or 'json'."
-    raise ValueError(msg)
+    msg = f"Invalid mode: {args_cli.mode}. Must be 'cli' or 'json'."  # pragma: no cover
+    raise ValueError(msg)  # pragma: no cover
 
 
 def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
