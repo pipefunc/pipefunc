@@ -140,7 +140,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         sys.exit(0)
 
     # Docs mode: print documentation and exit.
-    if args.mode == "docs":
+    if args.mode == "docs":  # pragma: no cover
         pipeline.print_documentation()
         sys.exit(0)
 
