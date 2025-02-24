@@ -236,6 +236,12 @@ _Click on "*Show code cell output*" to see the CLI output._
 !python cli-example.py cli -h
 ```
 
+```{code-cell} ipython3
+:tags: [hide-output]
+
+!python cli-example.py cli --x 2 --y "[3, 4, 5]"
+```
+
 ---
 
 ## Dependencies
