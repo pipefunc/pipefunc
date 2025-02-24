@@ -11,6 +11,11 @@ In other words, you can:
 - **Extract parameter descriptions** from your function docstrings (if packages like Griffe are installed) so that the CLI help text includes detailed information.
 - **Configure mapping options** (e.g., parallel execution, storage method, and cleanup) via dedicated command‐line flags.
 
+```{note}
+The CLI works with simple input types that can be represented in JSON.
+This means that multi-dimensional arrays or any non-JSON-serializable types must be provided in a simplified form (e.g., as nested lists) so that Pydantic can later coerce them to the correct type (such as NumPy arrays) based on your type annotations.
+```
+
 ---
 
 ## Input Modes
@@ -42,11 +47,13 @@ In both modes, additional mapping options (prefixed with `--map-`) allow you to 
 When you invoke `pipeline.cli()`, the following steps occur:
 
 1. **Pydantic Model Generation:**
-   The CLI inspects your pipeline’s root input parameters and generates a Pydantic model. It automatically uses the default values, type hints, and even the descriptions extracted from your (NumPy, Google, or Sphinx)-style docstrings to create a robust input schema.
+   The CLI inspects your pipeline’s root input parameters and generates a Pydantic model.
+   It automatically uses the default values, type hints, and even the descriptions extracted from your (NumPy, Google, or Sphinx)-style docstrings to create a robust input schema.
+   For parameters associated with multi-dimensional arrays (using mapspecs), the CLI expects these values to be represented as nested lists in JSON.
+   Pydantic then coerces these lists into the appropriate array type (e.g., NumPy arrays) based on your type annotations.
 
 2. **Argument Parsing:**
    An `argparse.ArgumentParser` is created with two subcommands:
-
    - **`cli`**: Accepts individual command-line arguments.
    - **`json`**: Requires a JSON file that contains all inputs.
 
@@ -54,14 +61,16 @@ When you invoke `pipeline.cli()`, the following steps occur:
    Mapping-related options (e.g., `--map-run_folder`, `--map-parallel`, `--map-storage`, and `--map-cleanup`) are added to both subcommands, letting you configure pipeline execution without modifying code.
 
 4. **Input Validation and Execution:**
-   The CLI parses and validates the inputs using the generated Pydantic model. Once validated, it executes the pipeline via `Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output.
+   The CLI parses and validates the inputs using the generated Pydantic model.
+   Once validated, it executes the pipeline via `Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output.
 
 ---
 
 ## Example Pipeline with CLI
 
 Below is a complete example that demonstrates how to define a simple pipeline with NumPy-style docstrings and run it via the CLI.
-Notice how each function’s docstring provides detailed descriptions for its parameters and return values. These descriptions are automatically extracted and shown in the CLI help text.
+Notice how each function’s docstring provides detailed descriptions for its parameters and return values.
+These descriptions are automatically extracted and shown in the CLI help text.
 
 ```python
 import numpy as np
@@ -126,12 +135,13 @@ def compute_result(sum: float, product: float) -> float:
 
 # Create a pipeline with the three functions
 pipeline = Pipeline([add, multiply, compute_result])
-pipeline.add_mapspec_axis("x", axis="i")
+# Optional: add a mapspec axis to parameter 'x' for demonstration of multi-dimensional inputs.
+pipeline.add_mapspec_axis("y", axis="i")
 
 if __name__ == "__main__":
     # This will launch the CLI.
     # The CLI automatically extracts default values, type annotations,
-    # and parameter descriptions from the NumPy-style docstrings.
+    # and parameter descriptions from the docstrings.
     pipeline.cli()
 ```
 
@@ -168,6 +178,7 @@ if __name__ == "__main__":
   ```
 
 In both cases, the CLI uses the detailed parameter descriptions (extracted from the docstrings) to help guide the user.
+For parameters that involve multi-dimensional arrays, ensure that the inputs are represented as nested lists so that they can be properly coerced by Pydantic.
 
 ---
 
@@ -188,3 +199,5 @@ pip install "pipefunc[cli]"
 ---
 
 By integrating a fully automated CLI into your pipelines, `Pipeline.cli()` makes it straightforward to run and experiment with complex workflows directly from the terminal.
+Just remember that the CLI currently supports only simple input types—those that can be represented in JSON and then coerced to the correct type using Pydantic.
+Enjoy the simplicity and power of running your pipelines with minimal setup!
