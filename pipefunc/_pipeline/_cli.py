@@ -74,8 +74,9 @@ def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
         "storage": "file_array",
         "cleanup": True,
     }
+    include_only = {"run_folder", "parallel", "storage", "cleanup"}
     for arg, p in sig_map.parameters.items():
-        if arg not in {"run_folder", "parallel", "storage", "cleanup"}:
+        if arg not in include_only:
             continue
         default = defaults[arg]
         row = _create_parameter_row(
