@@ -2160,22 +2160,26 @@ class Pipeline:
         """Automatically construct a command-line interface using argparse.
 
         This method creates an `argparse.ArgumentParser` instance, adds arguments for each
-        root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
-        parses the command-line arguments, and runs `Pipeline.map` with the parsed arguments.
-        Mapping options (prefixed with ``--map-``) are available in both subcommands to control
+        root parameter in the pipeline using a Pydantic model, sets default values if they exist,
+        parses the command-line arguments, and runs one of three subcommands:
+
+        - ``cli``: Supply individual input parameters as command-line options.
+        - ``json``: Load all input parameters from a JSON file.
+        - ``docs``: Display the pipeline documentation (using `pipeline.print_documentation`).
+
+        Mapping options (prefixed with `--map-`) are available for the `cli` and `json` subcommands to control
         parallel execution, storage method, and cleanup behavior.
-
-        It constructs a CLI with two subcommands:
-
-        - ``cli``: for specifying individual input parameters as command-line options.
-        - ``json``: for loading input parameters from a JSON file.
 
         Usage Examples:
 
         **CLI mode:**
-            ``python cli.py cli --voltage "[0, 1]" --mesh_size 1.0 --x 0 --y 1 --map-parallel false --map-cleanup true``
+            ``python cli-example.py cli --x 2 --y 3 --map-parallel false --map-cleanup true``
+
         **JSON mode:**
-            ``python cli.py json --json-file my_inputs.json --map-parallel false --map-cleanup true``
+            ``python cli-example.py json --json-file inputs.json --map-parallel false --map-cleanup true``
+
+        **Docs mode:**
+            ``python cli-example.py docs``
 
         Parameters
         ----------
@@ -2203,6 +2207,8 @@ class Pipeline:
         --------
         pydantic_model
             Generate a Pydantic model for pipeline root input parameters.
+        print_documentation
+            Print the pipeline documentation as a table formatted with Rich.
 
         """
         cli(self, description=description)
