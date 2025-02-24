@@ -18,7 +18,7 @@ DEFAULT_DESCRIPTION = """PipeFunc Pipeline CLI
 This command-line interface (CLI) provides an easy and flexible way to execute a PipeFunc pipeline
 directly from the terminal. The CLI is auto-generated based on your Pipeline's definition and input schema,
 allowing you to supply parameters interactively (via the `cli` subcommand) or load them from a JSON file
-(via the `json` subcommand).
+(via the `json` subcommand). It then runs `pipeline.map` with the provided inputs and mapping options.
 
 Mapping Options:
   In addition to input parameters, you can configure mapping options (e.g., --map-parallel, --map-run_folder,
