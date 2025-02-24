@@ -49,23 +49,20 @@ def _add_pydantic_arguments(
     input_model: type[BaseModel],
 ) -> None:
     """Add arguments from Pydantic Model fields to the parser."""
-    # Add arguments from Pydantic Model fields
+    from pydantic.fields import PydanticUndefined
+
     for field_name, field_info in input_model.model_fields.items():
         help_text = field_info.description or ""
         parser.add_argument(
             f"--{field_name}",
             type=str,  # CLI always receives strings, Pydantic will coerce
-            default=field_info.default
-            if field_info.default is not inspect.Parameter.empty
-            else None,
+            default=field_info.default if field_info.default is not PydanticUndefined else None,
             help=help_text,
         )
 
 
 def _add_map_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments for the Pipeline.map method to the parser."""
-    import inspect
-
     from pipefunc._pipeline._autodoc import _create_parameter_row, parse_function_docstring
     from pipefunc._pipeline._base import Pipeline
 

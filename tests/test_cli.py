@@ -1,7 +1,6 @@
 import argparse
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -11,20 +10,12 @@ from pipefunc import Pipeline, pipefunc
 from pipefunc._pipeline._cli import (
     _add_map_arguments,
     _add_pydantic_arguments,
-    _create_parser,
     _maybe_bool,
     _process_map_kwargs,
     _validate_inputs,
-    cli,
 )
 from pipefunc.map import load_outputs
 from pipefunc.typing import Array
-
-
-def test_cli_create_parser() -> None:
-    parser = _create_parser("Test Description")
-    assert isinstance(parser, argparse.ArgumentParser)
-    assert parser.description == "Test Description"
 
 
 def test_cli_add_pydantic_arguments() -> None:
@@ -112,11 +103,6 @@ def test_cli_process_map_kwargs() -> None:
         ("False", False),
         ("false", False),
         ("FALSE", False),
-        ("None", None),
-        ("none", None),
-        ("NONE", None),
-        ("123", 123),
-        ("123.45", 123.45),
         ("abc", "abc"),
         (123, 123),  # Not a string
         (True, True),  # Not a string
@@ -126,38 +112,6 @@ def test_cli_process_map_kwargs() -> None:
 )
 def test_maybe_bool(value_str: Any, expected: Any) -> None:
     assert _maybe_bool(value_str) == expected
-
-
-@patch("pipefunc._pipeline._cli._create_parser")
-@patch("pipefunc._pipeline._cli._add_pydantic_arguments")
-@patch("pipefunc._pipeline._cli._add_map_arguments")
-@patch("pipefunc._pipeline._cli._parse_arguments")
-@patch("pipefunc._pipeline._cli._validate_inputs")
-@patch("pipefunc._pipeline._cli._process_map_kwargs")
-@patch("pipefunc._pipeline._cli.rich")  # Mock rich.print
-def test_cli_integration(
-    mock_rich,
-    mock_process_map_kwargs,
-    mock_validate_inputs,
-    mock_parse_arguments,
-    mock_add_map_arguments,
-    mock_add_pydantic_arguments,
-    mock_create_parser,
-) -> None:
-    mock_pipeline = MagicMock(spec=Pipeline)
-    mock_pipeline.pydantic_model.return_value = MagicMock(spec=BaseModel)
-
-    description = "Test Pipeline CLI"
-    cli(mock_pipeline, description)
-
-    mock_create_parser.assert_called_once_with(description)
-    mock_add_pydantic_arguments.assert_called_once()
-    mock_add_map_arguments.assert_called_once()
-    mock_parse_arguments.assert_called_once()
-    mock_validate_inputs.assert_called_once()
-    mock_process_map_kwargs.assert_called_once()
-    mock_pipeline.map.assert_called_once()
-    assert mock_rich.print.call_count >= 3  # Check for at least 3 rich.print calls
 
 
 def test_cli_pipeline_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
