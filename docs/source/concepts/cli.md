@@ -216,7 +216,7 @@ For parameters that involve multi-dimensional arrays, ensure that the inputs are
 
 **Example outputs:**
 
-_Click on "Show code cell output" to see the CLI output._
+_Click on "*Show code cell output*" to see the CLI output._
 
 ```{code-cell} ipython3
 :tags: [hide-output]
