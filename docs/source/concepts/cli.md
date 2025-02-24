@@ -236,8 +236,6 @@ _Click on "*Show code cell output*" to see the CLI output._
 !python cli-example.py cli -h
 ```
 
-
-
 ---
 
 ## Dependencies
