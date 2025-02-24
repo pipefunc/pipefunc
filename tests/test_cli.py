@@ -48,8 +48,8 @@ def test_cli_add_pydantic_arguments() -> None:
     param3_action = actions[3]
     assert param3_action.dest == "param3"
     assert param3_action.type is str
-    assert param3_action.help == "Parameter 3 description"
-    assert param3_action.default is None
+    assert param3_action.help == "Parameter 3 description (default: null)"
+    assert param3_action.default == "null"
 
 
 def test_cli_add_map_arguments() -> None:
@@ -192,7 +192,11 @@ def test_cli_pipeline_integration_json(tmp_path: Path, monkeypatch: pytest.Monke
         "map_storage": "dict",
         "map_cleanup": "True",
     }
-    cli_args_dict: dict[str, str] = {"mode": "json", "json_file": str(json_file), **map_kwargs}
+    cli_args_dict: dict[str, str] = {
+        "mode": "json",
+        "json_file": json_file,  # type: ignore[dict-item]
+        **map_kwargs,
+    }
     _monkeypatch_cli(cli_args_dict, monkeypatch)
 
     printed = []
