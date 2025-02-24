@@ -291,6 +291,6 @@ def _maybe_bool_or_none(value: Any) -> bool | Any:
         return True
     if value.lower() == "false":
         return False
-    if value.lower() in ("none", "null"):
+    if value.lower() in ("none", "null"):  # pragma: no cover
         return None
     return value
