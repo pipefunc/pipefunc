@@ -18,8 +18,8 @@ In other words, you can:
 The CLI supports two modes:
 
 1. **CLI Mode**
-    Each input parameter is provided as an individual command‐line option.
-    **Example usage:**
+   Each input parameter is provided as an individual command‐line option.
+   **Example usage:**
 
    ```bash
    python cli-example.py cli --x 2 --y 3
@@ -169,7 +169,7 @@ To use the CLI features, ensure that you have the following packages installed:
 
 - **Pydantic** – For input validation and dynamic model generation.
 - **Rich** – For enhanced terminal output and formatted tables.
-- **Griffe** (optional) – For extracting detailed docstring information.
+- **Griffe** – For extracting detailed docstring information.
 
 Install the CLI extras with:
 
