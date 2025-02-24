@@ -265,7 +265,7 @@ def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
 
 def _maybe_bool(value: Any) -> bool | Any:
     """Convert string values to boolean if they represent boolean literals."""
-    if not isinstance(value, str):
+    if not isinstance(value, str):  # pragma: no cover
         return value
     if value.lower() == "true":
         return True
