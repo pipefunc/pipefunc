@@ -235,6 +235,8 @@ def _validate_inputs_from_cli(
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
     """Validate CLI-provided inputs using a Pydantic model."""
+    import rich
+
     input_data = {}
     for arg, field_info in input_model.model_fields.items():
         value = getattr(args_cli, arg)
@@ -245,7 +247,11 @@ def _validate_inputs_from_cli(
                 else value
             )
         except json.JSONDecodeError:
-            print(f"Error decoding JSON for {arg}: {value}")
+            msg = (
+                f"[red bold]Error decoding JSON:[/] for `{arg}`: `{value!r}` with"
+                f" type `{type(value)}` and annotation `{field_info.annotation}`"
+            )
+            rich.print(msg)
             input_data[arg] = value
     model_instance = input_model.model_validate(input_data)
     return model_instance.model_dump()
