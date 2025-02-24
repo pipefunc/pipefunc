@@ -21,7 +21,8 @@ directly from the terminal. The CLI is auto-generated based on your Pipeline's d
 allowing you to supply parameters interactively (via the `cli` subcommand), load them from a JSON file
 (via the `json` subcommand), or simply view the pipeline documentation (via the `docs` subcommand).
 Mapping options (prefixed with `--map-`) allow you to configure parallel execution, storage method,
-and cleanup behavior.
+and cleanup behavior. In `cli` or `json` mode it runs `pipeline.map` with the provided inputs and
+mapping options.
 
 Usage Examples:
   CLI mode:
