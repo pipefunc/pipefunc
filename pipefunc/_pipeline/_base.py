@@ -2150,22 +2150,46 @@ class Pipeline:
         return pipeline_to_pydantic(self, model_name)
 
     def cli(self: Pipeline, description: str | None = None) -> None:
-        """Automatically construct an argparse for the pipeline.
+        """Automatically construct a command-line interface using argparse.
 
         This method creates an `argparse.ArgumentParser` instance, adds arguments for each
         root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
         and parses the command-line arguments.
+        Mapping options (prefixed with "--map-") are available in both subcommands to control
+        parallel execution, storage method, and cleanup behavior.
+
+        It constructs a CLI with two subcommands:
+        - "cli": for specifying individual input parameters as command-line options.
+        - "json": for loading input parameters from a JSON file.
+
+
+        Usage Examples:
+        CLI mode:
+            python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
+        JSON mode:
+            python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
 
         Parameters
         ----------
-        description
-            The description of the pipeline to be displayed in the help message.
+        pipeline : Pipeline
+            The PipeFunc pipeline instance to be executed.
+        description : str, optional
+            A custom description for the CLI help message. If not provided, a default description is used.
+
+        Raises
+        ------
+        ValueError
+            If an invalid subcommand is specified.
+        FileNotFoundError
+            If the JSON input file does not exist (in JSON mode).
+        json.JSONDecodeError
+            If the JSON input file is not formatted correctly.
 
         Examples
         --------
-        >>> pipeline = Pipeline([f1, f2])
-        >>> inputs, map_kwargs = pipeline.cli(description="My Pipeline")
-        >>> result = pipeline("output_name", **inputs, **map_kwargs)
+        >>> if __name__ == "__main__":
+        ...     pipeline = MyPipeline()
+        ...     pipeline.cli()
 
         """
         cli(self, description=description)

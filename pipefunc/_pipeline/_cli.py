@@ -36,20 +36,23 @@ For more details, run the CLI with the `--help` flag.
 
 
 def cli(pipeline: Pipeline, description: str | None = None) -> None:
-    """Execute a PipeFunc pipeline via a command-line interface using subparsers.
+    """Automatically construct a command-line interface using argparse.
 
-    This function automatically constructs a CLI with two subcommands:
-      - "cli": for specifying individual input parameters as command-line options.
-      - "json": for loading input parameters from a JSON file.
-
-    The CLI is auto-generated based on your Pipeline's definition and input schema.
+    This method creates an `argparse.ArgumentParser` instance, adds arguments for each
+    root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
+    and parses the command-line arguments.
     Mapping options (prefixed with "--map-") are available in both subcommands to control
     parallel execution, storage method, and cleanup behavior.
 
+    It constructs a CLI with two subcommands:
+    - "cli": for specifying individual input parameters as command-line options.
+    - "json": for loading input parameters from a JSON file.
+
+
     Usage Examples:
-      CLI mode:
+    CLI mode:
         python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true
-      JSON mode:
+    JSON mode:
         python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true
 
     Parameters
@@ -67,6 +70,12 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         If the JSON input file does not exist (in JSON mode).
     json.JSONDecodeError
         If the JSON input file is not formatted correctly.
+
+    Examples
+    --------
+    >>> if __name__ == "__main__":
+    ...     pipeline = MyPipeline()
+    ...     pipeline.cli()
 
     """
     requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
