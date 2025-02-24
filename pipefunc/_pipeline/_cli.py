@@ -57,9 +57,9 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
 
     Parameters
     ----------
-    pipeline : Pipeline
+    pipeline
         The PipeFunc pipeline instance to be executed.
-    description : str, optional
+    description
         A custom description for the CLI help message. If not provided, a default description is used.
 
     Raises
@@ -74,7 +74,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     Examples
     --------
     >>> if __name__ == "__main__":
-    ...     pipeline = MyPipeline()
+    ...     pipeline = create_my_pipeline()
     ...     pipeline.cli()
 
     """
