@@ -135,7 +135,7 @@ def compute_result(sum: float, product: float) -> float:
 
 # Create a pipeline with the three functions
 pipeline = Pipeline([add, multiply, compute_result])
-# Optional: add a mapspec axis to parameter 'x' for demonstration of multi-dimensional inputs.
+# Optional: add a mapspec axis to parameter 'y' for demonstration of multi-dimensional inputs.
 pipeline.add_mapspec_axis("y", axis="i")
 
 if __name__ == "__main__":
