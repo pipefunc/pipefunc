@@ -13,6 +13,25 @@ if TYPE_CHECKING:
     from pipefunc import Pipeline
 
 
+DEFAULT_DESCRIPTION = """Run the pipefunc pipeline from the command-line.
+
+This CLI is automatically generated from the `pipefunc.Pipeline` definition.
+It allows you to execute the pipeline and control its behavior via command-line arguments.
+
+You can provide inputs to the pipeline, configure mapping parameters for parallel execution,
+and specify how results are stored and managed.
+
+For detailed information on available parameters and options, please use the `--help` flag.
+
+To load the results of a previous pipeline run:
+
+`output = pipefunc.map.load_outputs(output_name, run_folder="run_folder")`
+or
+`dataset = pipefunc.map.load_xarray_dataset(run_folder="run_folder")`
+
+"""
+
+
 def cli(pipeline: Pipeline, description: str | None) -> None:
     """Run the pipeline from the command-line."""
     requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
@@ -41,6 +60,8 @@ def _create_parser(description: str | None) -> argparse.ArgumentParser:
         from rich_argparse import RichHelpFormatter as _HelpFormatter
     except ImportError:  # pragma: no cover
         from argparse import HelpFormatter as _HelpFormatter  # type: ignore[assignment]
+    if description is None:
+        description = DEFAULT_DESCRIPTION
     return argparse.ArgumentParser(description=description, formatter_class=_HelpFormatter)
 
 
