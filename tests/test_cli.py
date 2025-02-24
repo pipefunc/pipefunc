@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from pydantic import BaseModel, Field, ValidationError
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc._pipeline._cli import (
@@ -18,6 +17,8 @@ from pipefunc.typing import Array
 
 
 def test_cli_add_pydantic_arguments() -> None:
+    from pydantic import BaseModel, Field
+
     parser = argparse.ArgumentParser()
 
     class MockInputModel(BaseModel):
@@ -63,6 +64,8 @@ def test_cli_add_map_arguments() -> None:
 
 
 def test_cli_validate_inputs() -> None:
+    from pydantic import BaseModel
+
     class MockInputModel(BaseModel):
         param1: int
         param2: list[str]
@@ -75,6 +78,8 @@ def test_cli_validate_inputs() -> None:
 
 
 def test_cli_validate_inputs_validation_error() -> None:
+    from pydantic import BaseModel, ValidationError
+
     class MockInputModel(BaseModel):
         param1: int
 
