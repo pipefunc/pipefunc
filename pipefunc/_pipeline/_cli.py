@@ -18,19 +18,19 @@ DEFAULT_DESCRIPTION = """PipeFunc Pipeline CLI
 
 This command-line interface (CLI) provides an easy and flexible way to execute a PipeFunc pipeline
 directly from the terminal. The CLI is auto-generated based on your Pipeline's definition and input schema,
-allowing you to supply parameters interactively (via the `cli` subcommand) or load them from a JSON file
-(via the `json` subcommand). It then runs `pipeline.map` with the provided inputs and mapping options.
-
-Mapping Options:
-  In addition to input parameters, you can configure mapping options (e.g., --map-parallel, --map-run_folder,
-  --map-storage, --map-cleanup) to control parallel execution, storage method, and cleanup behavior.
+allowing you to supply parameters interactively (via the `cli` subcommand), load them from a JSON file
+(via the `json` subcommand), or simply view the pipeline documentation (via the `docs` subcommand).
+Mapping options (prefixed with `--map-`) allow you to configure parallel execution, storage method,
+and cleanup behavior. In `cli` or `json` mode it runs `pipeline.map` with the provided inputs and
+mapping options.
 
 Usage Examples:
   CLI mode:
-    `python cli-example.py cli --V_left "[0, 1]" --V_right "[1, 2]" --mesh_size 1 --x 0 --y 1 --map-parallel false --map-cleanup true`
-
+    `python cli-example.py cli --x 2 --y 3`
   JSON mode:
-    `python cli-example.py json --json-file my_inputs.json --map-parallel false --map-cleanup true`
+    `python cli-example.py json --json-file inputs.json`
+  Docs mode:
+    `python cli-example.py docs`
 
 For more details, run the CLI with the `--help` flag.
 """
@@ -40,22 +40,26 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     """Automatically construct a command-line interface using argparse.
 
     This method creates an `argparse.ArgumentParser` instance, adds arguments for each
-    root parameter in the pipeline using a Pydantic model, sets the default values if they exist,
-    parses the command-line arguments, and runs `Pipeline.map` with the parsed arguments.
-    Mapping options (prefixed with ``--map-``) are available in both subcommands to control
+    root parameter in the pipeline using a Pydantic model, sets default values if they exist,
+    parses the command-line arguments, and runs one of three subcommands:
+
+    - ``cli``: Supply individual input parameters as command-line options.
+    - ``json``: Load all input parameters from a JSON file.
+    - ``docs``: Display the pipeline documentation (using `pipeline.print_documentation`).
+
+    Mapping options (prefixed with `--map-`) are available for the `cli` and `json` subcommands to control
     parallel execution, storage method, and cleanup behavior.
-
-    It constructs a CLI with two subcommands:
-
-    - ``cli``: for specifying individual input parameters as command-line options.
-    - ``json``: for loading input parameters from a JSON file.
 
     Usage Examples:
 
     **CLI mode:**
-        ``python cli.py cli --voltage "[0, 1]" --mesh_size 1.0 --x 0 --y 1 --map-parallel false --map-cleanup true``
+        ``python cli-example.py cli --x 2 --y 3 --map-parallel false --map-cleanup true``
+
     **JSON mode:**
-        ``python cli.py json --json-file my_inputs.json --map-parallel false --map-cleanup true``
+        ``python cli-example.py json --json-file inputs.json --map-parallel false --map-cleanup true``
+
+    **Docs mode:**
+        ``python cli-example.py docs``
 
     Parameters
     ----------
@@ -89,11 +93,11 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         formatter_class=_formatter_class(),
     )
 
-    # Create subparsers for the two input modes.
+    # Create subparsers for the three input modes.
     subparsers = parser.add_subparsers(
         title="Input Modes",
         dest="mode",
-        help="Choose an input mode: 'cli' for individual options or 'json' to load from a JSON file.",
+        help="Choose an input mode: `cli` for individual options, `json` to load from a JSON file, or `docs` to print documentation.",
     )
 
     # Subparser for CLI mode: add individual parameter arguments.
@@ -120,12 +124,24 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     )
     _add_map_arguments(json_parser)
 
+    # Subparser for Docs mode: print pipeline documentation.
+    _docs_parser = subparsers.add_parser(
+        "docs",
+        help="Print the pipeline documentation.",
+        formatter_class=_formatter_class(),
+    )
+
     # Parse arguments from the command line.
     args = parser.parse_args()
 
     # If no arguments are provided, show the help message and exit.
     if args.mode is None:  # pragma: no cover
         parser.print_help()
+        sys.exit(0)
+
+    # Docs mode: print documentation and exit.
+    if args.mode == "docs":  # pragma: no cover
+        pipeline.print_documentation()
         sys.exit(0)
 
     # Validate and parse inputs using the pydantic model.
@@ -248,7 +264,7 @@ def _validate_inputs(
         return _validate_inputs_from_json(args_cli, input_model)
     if args_cli.mode == "cli":
         return _validate_inputs_from_cli(args_cli, input_model)
-    msg = f"Invalid mode: {args_cli.mode}. Must be 'cli' or 'json'."  # pragma: no cover
+    msg = f"Invalid mode: {args_cli.mode}. Must be 'cli', 'json', or 'docs'."  # pragma: no cover
     raise ValueError(msg)  # pragma: no cover
 
 

@@ -2,7 +2,7 @@
 
 The {meth}`~pipefunc.Pipeline.cli()` method provides an out‐of‐the‐box command‐line interface (CLI) for executing your PipeFunc pipelines directly from the terminal.
 This feature leverages your pipeline’s input schema—generated automatically via Pydantic—and even extracts detailed parameter descriptions from your docstrings.
-With a single call to `pipeline.cli()`, you can run your entire pipeline without writing any additional command-line parsing code.
+With a single call to `pipeline.cli()`, you can run your entire pipeline without writing any additional command-line parsing code, load inputs from a JSON file, or simply view the pipeline documentation.
 
 In other words, you can:
 
@@ -10,6 +10,7 @@ In other words, you can:
 - **Validate and coerce user inputs** using a dynamically created Pydantic model.
 - **Extract parameter descriptions** from your function docstrings (if packages like Griffe are installed) so that the CLI help text includes detailed information.
 - **Configure mapping options** (e.g., parallel execution, storage method, and cleanup) via dedicated command‐line flags.
+- **Print pipeline documentation** directly via the `docs` subcommand.
 
 ```{note}
 The CLI works with simple input types that can be represented in JSON.
@@ -20,7 +21,7 @@ This means that multi-dimensional arrays or any non-JSON-serializable types must
 
 ## Input Modes
 
-The CLI supports two modes:
+The CLI supports three modes:
 
 1. **CLI Mode**
    Each input parameter is provided as an individual command‐line option.
@@ -38,7 +39,15 @@ The CLI supports two modes:
    python cli-example.py json --json-file inputs.json
    ```
 
-In both modes, additional mapping options (prefixed with `--map-`) allow you to control how the pipeline executes, including settings like the run folder, parallel execution, storage backend, and cleanup behavior.
+3. **Docs Mode**
+   Instead of executing the pipeline, this mode simply prints the pipeline documentation (via `pipeline.print_documentation()`).
+   **Example usage:**
+
+   ```bash
+   python cli-example.py docs
+   ```
+
+In CLI and JSON modes, additional mapping options (prefixed with `--map-`) allow you to control how the pipeline executes, including settings like the run folder, parallel execution, storage backend, and cleanup behavior.
 
 ---
 
@@ -53,16 +62,18 @@ When you invoke `pipeline.cli()`, the following steps occur:
    Pydantic then coerces these lists into the appropriate array type (e.g., NumPy arrays) based on your type annotations.
 
 2. **Argument Parsing:**
-   An {class}`argparse.ArgumentParser` is created with two subcommands:
+   An {class}`argparse.ArgumentParser` is created with three subcommands:
    - **`cli`**: Accepts individual command-line arguments.
    - **`json`**: Requires a JSON file that contains all inputs.
+   - **`docs`**: Prints the pipeline documentation.
 
 3. **Mapping Options:**
-   Mapping-related options (e.g., `--map-run_folder`, `--map-parallel`, `--map-storage`, and `--map-cleanup`) are added to both subcommands, letting you configure pipeline execution without modifying code.
+   Mapping-related options (e.g., `--map-run_folder`, `--map-parallel`, `--map-storage`, and `--map-cleanup`) are added to the `cli` and `json` subcommands, letting you configure pipeline execution without modifying code.
 
 4. **Input Validation and Execution:**
-   The CLI parses and validates the inputs using the generated Pydantic model.
+   For the `cli` and `json` subcommands, the CLI parses and validates the inputs using the generated Pydantic model.
    Once validated, it executes the pipeline via {meth}`pipefunc.Pipeline.map()`, and the results are printed to the terminal using a rich, formatted output, and stored to disk in the specified run folder.
+   In **docs mode**, instead of executing the pipeline, the CLI simply calls `pipeline.print_documentation()` to display the documentation and then exits.
 
 ---
 
@@ -135,13 +146,14 @@ def compute_result(sum: float, product: float) -> float:
 
 # Create a pipeline with the three functions
 pipeline = Pipeline([add, multiply, compute_result])
-# Optional: add a mapspec axis to parameter 'x' for demonstration of multi-dimensional inputs.
+# Optional: add a mapspec axis to parameter 'y' for demonstration of multi-dimensional inputs.
 pipeline.add_mapspec_axis("y", axis="i")
 
 if __name__ == "__main__":
     # This will launch the CLI.
     # The CLI automatically extracts default values, type annotations,
     # and parameter descriptions from the docstrings.
+    # Use 'cli' or 'json' to execute the pipeline, or 'docs' to print documentation.
     pipeline.cli()
 ```
 
@@ -177,7 +189,14 @@ if __name__ == "__main__":
   python cli-example.py json --json-file inputs.json
   ```
 
-In both cases, the CLI uses the detailed parameter descriptions (extracted from the docstrings) to help guide the user.
+- **Docs Mode:**
+  To simply view the pipeline documentation without running the pipeline, execute:
+
+  ```bash
+  python cli-example.py docs
+  ```
+
+In both CLI and JSON modes, the CLI uses the detailed parameter descriptions (extracted from the docstrings) to help guide the user.
 For parameters that involve multi-dimensional arrays, ensure that the inputs are represented as nested lists so that they can be properly coerced by Pydantic.
 
 ---
