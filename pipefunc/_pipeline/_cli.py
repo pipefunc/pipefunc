@@ -86,7 +86,9 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     """
     requires("rich", "griffe", "pydantic", reason="cli", extras="cli")
     import rich
+    from rich.traceback import install
 
+    install()
     # Create the base parser.
     parser = argparse.ArgumentParser(
         description=description or DEFAULT_DESCRIPTION,
@@ -154,7 +156,8 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     rich.print("Map kwargs from CLI:", map_kwargs)
     results = pipeline.map(inputs, **map_kwargs)
     rich.print("\n\n[bold blue]Results:")
-    rich.print(results)
+    for key, value in results.items():
+        rich.print(f"[bold yellow]Output `{key}`:[/]", "\n", value.output, "\n")
 
 
 def _formatter_class() -> type[argparse.RawDescriptionHelpFormatter]:
@@ -232,12 +235,23 @@ def _validate_inputs_from_cli(
     input_model: type[BaseModel],
 ) -> dict[str, Any]:
     """Validate CLI-provided inputs using a Pydantic model."""
+    import rich
+
     input_data = {}
     for arg, field_info in input_model.model_fields.items():
         value = getattr(args_cli, arg)
         try:
-            input_data[arg] = json.loads(value) if field_info.annotation is not str else value
+            input_data[arg] = (
+                json.loads(value)
+                if field_info.annotation is not str and isinstance(value, str)
+                else value
+            )
         except json.JSONDecodeError:
+            msg = (
+                f"[red bold]Error decoding JSON:[/] for `{arg}`: `{value!r}` with"
+                f" type `{type(value)}` and annotation `{field_info.annotation}`"
+            )
+            rich.print(msg)
             input_data[arg] = value
     model_instance = input_model.model_validate(input_data)
     return model_instance.model_dump()
