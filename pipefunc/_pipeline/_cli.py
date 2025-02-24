@@ -102,19 +102,13 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
         )
     elif mode == "cli":
         _add_pydantic_arguments(parser, input_model)
-    else:
+    else:  # pragma: no cover
         msg = f"Invalid mode: {mode}. Must be 'cli' or 'json'."
         raise ValueError(msg)
 
     _add_map_arguments(parser)
-
     args_cli = parser.parse_args()
-
-    if args_cli.mode == "json":
-        inputs = _validate_inputs_from_json(args_cli, input_model)
-    else:  # args_cli.mode == "cli"
-        inputs = _validate_inputs_from_cli(args_cli, input_model)
-
+    inputs = _validate_inputs(args_cli, input_model)
     map_kwargs = _process_map_kwargs(args_cli)
 
     rich.print("Inputs from CLI:", inputs)
@@ -148,7 +142,7 @@ def _create_parser(description: str | None) -> argparse.ArgumentParser:
         from argparse import (
             RawDescriptionHelpFormatter as _HelpFormatter,  # type: ignore[assignment]
         )
-    if description is None:
+    if description is None:  # pragma: no cover
         description = DEFAULT_DESCRIPTION
     parser = argparse.ArgumentParser(description=description, formatter_class=_HelpFormatter)
     parser.add_argument(
@@ -241,10 +235,10 @@ def _validate_inputs_from_json(
     try:
         with json_file_path.open() as f:
             input_data = json.load(f)
-    except FileNotFoundError:
+    except FileNotFoundError:  # pragma: no cover
         msg = f"JSON input file not found: {json_file_path}"
         raise FileNotFoundError(msg) from None
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # pragma: no cover
         raise
     model_instance = input_model.model_validate(input_data)
     return model_instance.model_dump()
