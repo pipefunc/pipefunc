@@ -114,13 +114,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
     args = parser.parse_args()
 
     # Validate and parse inputs using the pydantic model.
-    if args.mode == "json":
-        inputs = _validate_inputs_from_json(args, input_model)
-    elif args.mode == "cli":
-        inputs = _validate_inputs_from_cli(args, input_model)
-    else:  # pragma: no cover
-        msg = f"Invalid mode: {args.mode}. Must be 'cli' or 'json'."
-        raise ValueError(msg)
+    inputs = _validate_inputs(args, input_model)
 
     # Process mapping-related arguments.
     map_kwargs = _process_map_kwargs(args)
@@ -237,7 +231,11 @@ def _validate_inputs(
     """Dispatch input validation based on the chosen mode."""
     if args_cli.mode == "json":
         return _validate_inputs_from_json(args_cli, input_model)
-    return _validate_inputs_from_cli(args_cli, input_model)
+    if args_cli.mode == "cli":
+        return _validate_inputs_from_cli(args_cli, input_model)
+    # pragma: no cover
+    msg = f"Invalid mode: {args_cli.mode}. Must be 'cli' or 'json'."
+    raise ValueError(msg)
 
 
 def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
@@ -251,7 +249,7 @@ def _process_map_kwargs(args_cli: argparse.Namespace) -> dict[str, Any]:
 
 def _maybe_bool(value: Any) -> bool | Any:
     """Convert string values to booleans if they represent boolean literals."""
-    if not isinstance(value, str):
+    if not isinstance(value, str):  # pragma: no cover
         return value
     if value.lower() == "true":
         return True
