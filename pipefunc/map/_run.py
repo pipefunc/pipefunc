@@ -548,6 +548,7 @@ class _InternalShape:
 
     @classmethod
     def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
+        # TODO: validate with internal_shape, all being the same!
         return tuple(cls(_try_shape(output)) for output in outputs)
 
 
@@ -667,13 +668,15 @@ def _validate_internal_shape(
 
 
 def _update_result_array(
-    result_arrays: list[np.ndarray],
+    result_arrays: list[np.ndarray] | None,
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     func: PipeFunc,
 ) -> None:
+    if result_arrays is None:
+        return
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
@@ -1220,8 +1223,7 @@ def _output_from_mapspec_task(
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        if args.result_arrays is not None:
-            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
@@ -1230,8 +1232,7 @@ def _output_from_mapspec_task(
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        if args.result_arrays is not None:
-            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
