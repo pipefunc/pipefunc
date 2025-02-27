@@ -401,7 +401,7 @@ def _single_dump_single_output(
     store: dict[str, StoreType],
     run_info: RunInfo,
 ) -> None:
-    run_info.resolve_downstream_shapes(np.shape(output), output_name, store)
+    run_info.resolve_downstream_shapes(output_name, store, output=output)
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -563,6 +563,7 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
+
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
@@ -1173,7 +1174,7 @@ def _output_from_mapspec_task(
         shape = args.arrays[0].full_shape
 
     for name in at_least_tuple(func.output_name):
-        run_info.resolve_downstream_shapes(shape, name, store)
+        run_info.resolve_downstream_shapes(name, store, shape=shape)
 
     if args.result_arrays is None:
         return (None,) * len(arrays)
