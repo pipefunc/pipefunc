@@ -171,7 +171,7 @@ class DictArray(StorageBase):
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    data[full_index] = value_array
+                    data[full_index] = value_array[internal_index]
                     mask[full_index] = False
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
