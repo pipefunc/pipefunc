@@ -647,3 +647,22 @@ def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
     for i in range(*internal_shape):
         for j in range(*shape):
             assert np.array_equal(y_original[i, j], y_new[i, j])
+
+
+@pytest.mark.parametrize("storage_id", ["file_array", "shared_memory_dict", "dict"])
+def test_inhomogeneous_array(tmp_path: Path, storage_id: str) -> None:
+    shape = (2,)
+    internal_shape = (2,)
+    shape_mask = (True, True)
+    array_class = get_storage_class(storage_id)
+    arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    x = np.empty(internal_shape, dtype=object)
+    x[0] = ("yo", "lo")
+    x[1] = ("foo",)
+    arr.dump((0,), x)
+    arr.persist()
+    y_original = arr.to_array()
+
+    arr_new = FileArray(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    y_new = arr_new.to_array()
+    np.testing.assert_almost_equal(y_original, y_new)
