@@ -637,7 +637,7 @@ def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
     shape_mask = (False, True)
     array_class = get_storage_class(storage_id)
     arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
-    x = np.arange(0, 4).reshape((2, 2))
+    x = np.arange(0, 6).reshape((2, 3))
     arr.dump((0,), x)
     arr.persist()
     y_original = arr.to_array()
