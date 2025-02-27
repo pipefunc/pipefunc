@@ -24,13 +24,7 @@ has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 has_xarray = importlib.util.find_spec("xarray") is not None
 
 
-@pytest.mark.parametrize("return_results", [True, False])
-@pytest.mark.parametrize("dim", ["?", None])
-def test_dynamic_internal_shape(
-    tmp_path: Path,
-    dim: Literal["?"] | None,
-    return_results: bool,  # noqa: FBT001
-) -> None:
+def _pipeline(dim: Literal["?"] | None) -> Pipeline:
     @pipefunc(output_name="n")
     def f() -> int:
         return 4
@@ -48,12 +42,47 @@ def test_dynamic_internal_shape(
     def i(y: Array[int]) -> int:
         return sum(y)
 
-    pipeline = Pipeline([f, g, h, i])
+    return Pipeline([f, g, h, i])
+
+
+@pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("dim", ["?", None])
+def test_dynamic_internal_shape(
+    tmp_path: Path,
+    dim: Literal["?"] | None,
+    return_results: bool,  # noqa: FBT001
+) -> None:
+    pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     results = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
     if return_results:
+        assert results["sum"].output == expected_sum
+        assert results["sum"].output_name == "sum"
+    assert load_outputs("sum", run_folder=tmp_path) == expected_sum
+    assert load_outputs("y", run_folder=tmp_path).tolist() == expected_y
+    if has_xarray:
+        load_xarray_dataset("x", run_folder=tmp_path)
+        load_xarray_dataset("y", run_folder=tmp_path)
+
+
+@pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("dim", ["?", None])
+@pytest.mark.asyncio
+async def test_dynamic_internal_shape_async(
+    tmp_path: Path,
+    dim: Literal["?"] | None,
+    return_results: bool,  # noqa: FBT001
+) -> None:
+    pipeline = _pipeline(dim)
+    assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
+    runner = pipeline.map_async({}, run_folder=tmp_path, return_results=return_results)
+    await runner.task
+    expected_sum = 12
+    expected_y = [0, 2, 4, 6]
+    if return_results:
+        results = runner.result()
         assert results["sum"].output == expected_sum
         assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == expected_sum

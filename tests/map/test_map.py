@@ -1536,7 +1536,7 @@ async def test_map_async_with_progress():
 
     pipeline = Pipeline([f, g, h, i])
     async_map = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
-    # Test that the progress tracket is working
+    # Test that the progress tracker is working
     async_map.progress.update_progress()
     async_map.progress._first_auto_update_interval = 0.0
     async_map.progress._toggle_auto_update()  # Turn off auto update
