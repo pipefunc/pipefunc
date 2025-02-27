@@ -473,8 +473,12 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(output_name: OUTPUT_TYPE, shape: ShapeTuple) -> list[np.ndarray] | None:
-    if not shape_is_resolved(shape):
+def _init_result_arrays(
+    output_name: OUTPUT_TYPE,
+    shape: ShapeTuple,
+    return_results: bool,  # noqa: FBT001
+) -> list[np.ndarray] | None:
+    if not return_results or not shape_is_resolved(shape):
         return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
@@ -523,6 +527,15 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
+class InternalShape:
+    def __init__(self, shape: tuple[int, ...]) -> None:
+        self.shape = shape
+
+    @classmethod
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[InternalShape, ...]:
+        return tuple(cls(np.shape(output)) for output in outputs)
+
+
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -549,7 +562,7 @@ def _run_iteration_and_process(
         force_dump=force_dump,
     )
     if has_dumped and not return_results:
-        return (None,) * len(outputs)
+        return InternalShape.from_outputs(outputs)
     return outputs
 
 
@@ -712,7 +725,7 @@ def _prepare_submit_map_spec(
     shape = run_info.resolved_shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays = _init_result_arrays(func.output_name, shape)
+    result_arrays = _init_result_arrays(func.output_name, shape, return_results)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -1205,8 +1218,8 @@ def _output_from_mapspec_task(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
-    return_result: bool,  # noqa: FBT001
-) -> tuple[np.ndarray, ...]:
+    return_results: bool,  # noqa: FBT001
+) -> tuple[np.ndarray | None, ...]:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
@@ -1215,28 +1228,31 @@ def _output_from_mapspec_task(
     first = True
     for index, outputs in zip(args.missing, outputs_list):
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_result)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        if args.result_arrays is not None:
+            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_result)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
-        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        if args.result_arrays is not None:
+            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
+    if args.result_arrays is None:
+        return (None,) * len(arrays)
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    return np.shape(output)[: len(storage.internal_shape)]
+    shape = output.shape if isinstance(output, InternalShape) else np.shape(output)
+    return shape[: len(storage.internal_shape)]
 
 
 def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
@@ -1278,7 +1294,7 @@ def _process_task(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-    return_result: bool,  # noqa: FBT001
+    return_results: bool,  # noqa: FBT001
 ) -> ResultDict:
     kwargs, task = kwargs_task
     if func.requires_mapping:
@@ -1286,7 +1302,7 @@ def _process_task(
         chunk_outputs_list = [_result(x) for x in r]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_result)
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_results)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store)
@@ -1298,7 +1314,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
-    return_result: bool,  # noqa: FBT001
+    return_results: bool,  # noqa: FBT001
 ) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
@@ -1306,8 +1322,8 @@ def _maybe_resolve_shapes_from_map(
         _maybe_set_internal_shape(output, array)
     # Outside the loop above, just needs to do this once ⬇️
     assert isinstance(array, StorageBase)
-    if return_result and args.result_arrays is None:
-        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
+    if args.result_arrays is None:
+        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape, return_results)
     return array.full_shape
 
 
@@ -1315,7 +1331,7 @@ async def _process_task_async(
     func: PipeFunc,
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
-    return_result: bool,  # noqa: FBT001
+    return_results: bool,  # noqa: FBT001
 ) -> ResultDict:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
@@ -1325,7 +1341,7 @@ async def _process_task_async(
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_result)
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, return_results)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)

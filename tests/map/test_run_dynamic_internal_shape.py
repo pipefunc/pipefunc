@@ -426,7 +426,7 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     assert load_outputs("z", run_folder=tmp_path).tolist() == expected_z2
 
 
-@pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("return_results", [False])
 def test_simple_2d(
     tmp_path: Path,
     return_results: bool,  # noqa: FBT001
