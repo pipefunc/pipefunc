@@ -366,7 +366,6 @@ def _execute_iteration_in_single(
     result = _process_task(func, kwargs_task, store, run_info)
     if not return_output:
         return None
-    assert result is not None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
     return output if isinstance(func.output_name, tuple) else output[0]
 
