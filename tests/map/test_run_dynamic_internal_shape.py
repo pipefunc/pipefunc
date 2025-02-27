@@ -485,8 +485,6 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     parallel: bool,  # noqa: FBT001
     storage: str,
 ) -> None:
-    return_results = False
-
     @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
     def f(x):
         y1 = np.array([[x, x], [x + 1, x + 1]])
