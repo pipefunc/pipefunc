@@ -152,7 +152,7 @@ def format_pipeline_docs(
     if print_table:
         console = Console()
         for table in tables:
-            console.print(table)
+            console.print(table, "\n")
         return None
     return tuple(tables)
 

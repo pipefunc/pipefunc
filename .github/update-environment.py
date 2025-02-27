@@ -117,6 +117,7 @@ if __name__ == "__main__":
     sections = (
         "adaptive",
         "autodoc",
+        "cli",
         "pandas",
         "plotting",
         "profiling",

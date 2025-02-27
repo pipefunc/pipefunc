@@ -41,6 +41,7 @@ from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Sequence
 
+    import pydantic
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
@@ -56,7 +57,7 @@ if TYPE_CHECKING:
 
 def run_map(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
@@ -229,7 +230,7 @@ class AsyncMap:
 
 def run_map_async(
     pipeline: Pipeline,
-    inputs: dict[str, Any],
+    inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,

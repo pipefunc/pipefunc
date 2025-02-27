@@ -292,3 +292,4 @@ nb_merge_streams = True
 
 def setup(app) -> None:
     app.add_directive("try-notebook", TryNotebookWithUV)
+    app.add_css_file("custom.css")

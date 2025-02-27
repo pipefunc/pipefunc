@@ -14,6 +14,12 @@ dependencies:
   # optional-dependencies: adaptive
   - adaptive
   - adaptive-scheduler>=2.14.0
+  # optional-dependencies: autodoc
+  - griffe
+  - rich
+  # optional-dependencies: cli
+  - pydantic
+  - rich-argparse
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -24,9 +30,7 @@ dependencies:
   # optional-dependencies: profiling
   - psutil
   # optional-dependencies: pydantic
-  - pydantic
   # optional-dependencies: rich
-  - rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.3.0
   - ipywidgets
@@ -43,5 +47,3 @@ dependencies:
   - pytest-xdist
   - pytest
   - versioningit
-  # optional-dependencies: autodoc
-  - griffe
