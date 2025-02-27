@@ -78,11 +78,10 @@ async def test_dynamic_internal_shape_async(
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
     runner = pipeline.map_async({}, run_folder=tmp_path, return_results=return_results)
-    await runner.task
+    results = await runner.task
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
     if return_results:
-        results = runner.result()
         assert results["sum"].output == expected_sum
         assert results["sum"].output_name == "sum"
     assert load_outputs("sum", run_folder=tmp_path) == expected_sum
