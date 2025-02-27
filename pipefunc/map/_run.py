@@ -1231,13 +1231,7 @@ def _process_task(
         chunk_outputs_list = [_result(x) for x in r]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(
-            func,
-            store,
-            args,
-            chained_outputs_list,
-            run_info,
-        )
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, run_info)
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store, run_info)
