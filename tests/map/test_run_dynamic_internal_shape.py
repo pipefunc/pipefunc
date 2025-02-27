@@ -477,10 +477,16 @@ def test_simple_2d(
 
 
 @pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize("storage", ["file_array", "dict", "shared_memory_dict"])
 def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
     tmp_path: Path,
     return_results: bool,  # noqa: FBT001
+    parallel: bool,  # noqa: FBT001
+    storage: str,
 ) -> None:
+    return_results = False
+
     @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
     def f(x):
         y1 = np.array([[x, x], [x + 1, x + 1]])
@@ -492,7 +498,13 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     pipeline = Pipeline([f])
     pipeline.add_mapspec_axis("x", axis="j")
     assert pipeline.mapspecs_as_strings == ["x[j] -> y1[i, j], y2[i, j], y3[i, j]"]
-    results = pipeline.map({"x": [1]}, run_folder=tmp_path, return_results=return_results)
+    results = pipeline.map(
+        {"x": [1]},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=parallel,
+        storage=storage,
+    )
     if return_results:
         y1 = results["y1"].output
         y2 = results["y2"].output

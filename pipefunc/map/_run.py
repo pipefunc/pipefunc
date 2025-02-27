@@ -534,12 +534,12 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
-class InternalShape:
-    def __init__(self, shape: tuple[int, ...]) -> None:
-        self.shape = shape
+@dataclass
+class _InternalShape:
+    shape: tuple[int, ...]
 
     @classmethod
-    def from_outputs(cls, outputs: tuple[Any]) -> tuple[InternalShape, ...]:
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
         return tuple(cls(np.shape(output)) for output in outputs)
 
 
@@ -569,7 +569,7 @@ def _run_iteration_and_process(
         force_dump=force_dump,
     )
     if has_dumped and not return_results:
-        return InternalShape.from_outputs(outputs)
+        return _InternalShape.from_outputs(outputs)
     return outputs
 
 
@@ -1237,7 +1237,7 @@ def _output_from_mapspec_task(
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    shape = output.shape if isinstance(output, InternalShape) else np.shape(output)
+    shape = output.shape if isinstance(output, _InternalShape) else np.shape(output)
     return shape[: len(storage.internal_shape)]
 
 
