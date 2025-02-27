@@ -1180,8 +1180,7 @@ def _output_from_mapspec_task(
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    shape = np.shape(output)
-    return shape[: len(storage.internal_shape)]
+    return np.shape(output)[: len(storage.internal_shape)]
 
 
 def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
@@ -1235,7 +1234,6 @@ def _process_task(
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store, run_info)
-
     return _to_result_dict(func, kwargs, output, store)
 
 
@@ -1270,13 +1268,7 @@ async def _process_task_async(
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(
-            func,
-            store,
-            args,
-            chained_outputs_list,
-            run_info,
-        )
+        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, run_info)
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
