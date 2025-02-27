@@ -468,10 +468,7 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(
-    output_name: OUTPUT_TYPE,
-    shape: ShapeTuple,
-) -> list[np.ndarray] | None:
+def _init_result_arrays(output_name: OUTPUT_TYPE, shape: ShapeTuple) -> list[np.ndarray] | None:
     if not shape_is_resolved(shape):
         return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
@@ -521,15 +518,6 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
-class InternalShape:
-    def __init__(self, shape: tuple[int, ...]) -> None:
-        self.shape = shape
-
-    @classmethod
-    def from_outputs(cls, outputs: tuple[Any]) -> tuple[InternalShape, ...]:
-        return tuple(cls(np.shape(output)) for output in outputs)
-
-
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -544,7 +532,7 @@ def _run_iteration_and_process(
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    has_dumped = _update_array(
+    _update_array(
         func,
         arrays,
         shape,
@@ -554,8 +542,6 @@ def _run_iteration_and_process(
         in_post_process=False,
         force_dump=force_dump,
     )
-    if has_dumped:
-        return InternalShape.from_outputs(outputs)
     return outputs
 
 
@@ -569,7 +555,7 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-) -> bool:
+) -> None:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
@@ -577,7 +563,6 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-    has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
@@ -586,8 +571,6 @@ def _update_array(
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
-            has_dumped = True
-    return has_dumped
 
 
 def _indices_to_flat_index(
@@ -868,7 +851,6 @@ def _maybe_parallel_map(
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
-        print(f"chunksize for {func.output_name}: {chunksize}")
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
@@ -1059,7 +1041,6 @@ def _process_generation(
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store, run_info)
-        assert _outputs is not None
         outputs.update(_outputs)
 
 
@@ -1072,7 +1053,6 @@ async def _process_generation_async(
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store, run_info)
-        assert _outputs is not None
         outputs.update(_outputs)
 
 
@@ -1090,15 +1070,7 @@ def _submit_func(
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(
-            func,
-            kwargs,
-            run_info,
-            store,
-            fixed_indices,
-            status,
-            cache,
-        )
+        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
         r = _maybe_parallel_map(
             func,
             args.process_index,
@@ -1184,8 +1156,8 @@ def _output_from_mapspec_task(
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
-        if args.result_arrays is not None:
-            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        assert args.result_arrays is not None
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
     first = True
@@ -1194,8 +1166,8 @@ def _output_from_mapspec_task(
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
             first = False
-        if args.result_arrays is not None:
-            _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
+        assert args.result_arrays is not None
+        _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
         shape = args.arrays[0].full_shape
@@ -1209,7 +1181,7 @@ def _output_from_mapspec_task(
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    shape = output.shape if isinstance(output, InternalShape) else np.shape(output)
+    shape = np.shape(output)
     return shape[: len(storage.internal_shape)]
 
 
