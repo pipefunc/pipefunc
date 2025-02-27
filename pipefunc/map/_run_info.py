@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, first, load
 from pipefunc._version import __version__
 
@@ -205,9 +207,10 @@ class RunInfo:
 
     def resolve_downstream_shapes(
         self,
-        shape: tuple[int, ...],
         output_name: str,
         store: dict[str, StoreType],
+        output: Any | None = None,
+        shape: tuple[int, ...] | None = None,
     ) -> None:
         if output_name not in self.resolved_shapes:
             return
@@ -219,6 +222,10 @@ class RunInfo:
             for name, shape in self.resolved_shapes.items()
             if not isinstance(name, tuple)
         }
+        if output is not None:
+            assert shape is None
+            shape = np.shape(output)
+        assert shape is not None
         internal[output_name] = internal_shape_from_mask(shape, self.shape_masks[output_name])
         # RunInfo.mapspecs is topologically ordered
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
