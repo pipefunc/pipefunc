@@ -364,8 +364,12 @@ def test_simple_2d():
     ]
 
 
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize("storage", ["file_array", "dict", "shared_memory_dict"])
 def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
     tmp_path: Path,
+    parallel: bool,  # noqa: FBT001
+    storage: str,
 ) -> None:
     @pipefunc(("y1", "y2", "y3"), mapspec="... -> y1[i], y2[i], y3[i]")
     def f(x):
@@ -378,7 +382,13 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     pipeline = Pipeline([f])
     pipeline.add_mapspec_axis("x", axis="j")
     assert pipeline.mapspecs_as_strings == ["x[j] -> y1[i, j], y2[i, j], y3[i, j]"]
-    results = pipeline.map({"x": [1]}, run_folder=tmp_path)
+    results = pipeline.map(
+        {"x": [1]},
+        run_folder=tmp_path,
+        parallel=parallel,
+        storage=storage,
+    )
+    # From `results`
     y1 = results["y1"].output
     y2 = results["y2"].output
     y3 = results["y3"].output
@@ -391,3 +401,17 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     assert y3.shape == (2, 1)
     assert y3[0, 0].tolist() == [3]
     assert y3[1, 0].tolist() == [4]
+
+    # From `load_outputs`
+    y1_loaded = load_outputs("y1", run_folder=tmp_path)
+    y2_loaded = load_outputs("y2", run_folder=tmp_path)
+    y3_loaded = load_outputs("y3", run_folder=tmp_path)
+    assert y1_loaded.shape == (2, 1)
+    assert y1_loaded[0, 0].tolist() == [1, 1]
+    assert y1_loaded[1, 0].tolist() == [2, 2]
+    assert y2_loaded.shape == (2, 1)
+    assert y2_loaded[0, 0].tolist() == [3, 3]
+    assert y2_loaded[1, 0].tolist() == [4, 4]
+    assert y3_loaded.shape == (2, 1)
+    assert y3_loaded[0, 0].tolist() == [3]
+    assert y3_loaded[1, 0].tolist() == [4]

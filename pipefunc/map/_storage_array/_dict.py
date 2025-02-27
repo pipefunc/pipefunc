@@ -11,7 +11,13 @@ import numpy as np
 
 from pipefunc._utils import dump, load
 
-from ._base import StorageBase, normalize_key, register_storage, select_by_mask
+from ._base import (
+    StorageBase,
+    iterate_shape_indices,
+    normalize_key,
+    register_storage,
+    select_by_mask,
+)
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -151,13 +157,22 @@ class DictArray(StorageBase):
         data = _masked_empty(self.full_shape)
         mask = np.full(self.full_shape, fill_value=True, dtype=bool)
         for external_index, value in self._dict.items():
-            full_index = select_by_mask(
-                self.shape_mask,
-                external_index,
-                (slice(None),) * len(self.resolved_internal_shape),
-            )
-            data[full_index] = value
-            mask[full_index] = False
+            value_array = np.asarray(value)
+
+            if value_array.shape == self.resolved_internal_shape:
+                # Normal case - shapes match
+                full_index = select_by_mask(
+                    self.shape_mask,
+                    external_index,
+                    (slice(None),) * len(self.resolved_internal_shape),
+                )
+                data[full_index] = value_array
+                mask[full_index] = False
+            else:
+                for internal_index in iterate_shape_indices(self.resolved_internal_shape):
+                    full_index = select_by_mask(self.shape_mask, external_index, internal_index)
+                    data[full_index] = value_array[internal_index]
+                    mask[full_index] = False
         return np.ma.MaskedArray(data, mask=mask, dtype=object)
 
     @property
