@@ -415,3 +415,40 @@ def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_array
     assert y3_loaded.shape == (2, 1)
     assert y3_loaded[0, 0].tolist() == [3]
     assert y3_loaded[1, 0].tolist() == [4]
+
+
+@pytest.mark.parametrize("storage_id", ["file_array", "shared_memory_dict", "dict"])
+@pytest.mark.parametrize("asarray", [True, False])
+def test_inhomogeneous_array(
+    tmp_path: Path,
+    storage_id: str,
+    asarray: bool,  # noqa: FBT001
+) -> None:
+    internal_shape = (2,)
+
+    @pipefunc(output_name="x", internal_shape=internal_shape, mapspec="... -> x[i]")
+    def f():
+        if asarray:
+            x = np.empty(internal_shape, dtype=object)
+            x[0] = ("yo", "lo")
+            x[1] = ("foo",)
+        else:
+            x = [("yo", "lo"), ("foo",)]
+        return x
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def g(x):
+        return x
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map({}, run_folder=tmp_path, storage=storage_id, parallel=False)
+    assert results["x"].output[0] == ("yo", "lo")
+    assert results["x"].output[1] == ("foo",)
+    assert results["y"].output[0] == ("yo", "lo")
+    assert results["y"].output[1] == ("foo",)
+    x = load_outputs("x", run_folder=tmp_path)
+    y = load_outputs("y", run_folder=tmp_path)
+    assert x[0] == ("yo", "lo")
+    assert x[1] == ("foo",)
+    assert y[0] == ("yo", "lo")
+    assert y[1] == ("foo",)

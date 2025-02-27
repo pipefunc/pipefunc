@@ -656,7 +656,9 @@ def test_inhomogeneous_array(tmp_path: Path, storage_id: str) -> None:
     shape_mask = (True, True)
     array_class = get_storage_class(storage_id)
     arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
-    x = [("yo", "lo"), ("foo",)]
+    x = np.empty(internal_shape, dtype=object)
+    x[0] = ("yo", "lo")
+    x[1] = ("foo",)
     arr.dump((0,), x)
     arr.persist()
     y_original = arr.to_array()
