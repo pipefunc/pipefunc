@@ -884,7 +884,6 @@ def _maybe_parallel_map(
         assert executor is not None
         ex = maybe_update_slurm_executor_map(func, ex, executor, process_index, indices)
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
-        print(f"chunksize for {func.output_name}: {chunksize}")
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
         return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
