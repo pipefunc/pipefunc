@@ -644,6 +644,6 @@ def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
 
     arr_new = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
     y_new = arr_new.to_array()
-    for i in range(2):
-        for j in range(1):
+    for i in range(*internal_shape):
+        for j in range(*shape):
             assert np.array_equal(y_original[i, j], y_new[i, j])
