@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, first, load
 from pipefunc._version import __version__
 
@@ -205,22 +207,31 @@ class RunInfo:
 
     def resolve_downstream_shapes(
         self,
+        output_name: str,
         store: dict[str, StoreType],
-        internal_shape: dict[str, tuple[int, ...]] | None = None,
+        output: Any | None = None,
+        shape: tuple[int, ...] | None = None,
     ) -> None:
+        if output_name not in self.resolved_shapes:
+            return
+        if shape_is_resolved(self.resolved_shapes[output_name]):
+            return
         # After a new shape is known, update downstream shapes
         internal: ShapeDict = {
             name: internal_shape_from_mask(shape, self.shape_masks[name])
             for name, shape in self.resolved_shapes.items()
             if not isinstance(name, tuple)
         }
-        if internal_shape is not None:
-            internal.update(internal_shape)
+        if output is not None:
+            assert shape is None
+            shape = np.shape(output)
+        assert shape is not None
+        internal[output_name] = internal_shape_from_mask(shape, self.shape_masks[output_name])
         # RunInfo.mapspecs is topologically ordered
         mapspecs = {name: mapspec for mapspec in self.mapspecs for name in mapspec.output_names}
         has_updated = False
-        for name, shape in self.resolved_shapes.items():
-            if not shape_is_resolved(shape):
+        for name, _shape in self.resolved_shapes.items():
+            if not shape_is_resolved(_shape):
                 mapspec = mapspecs[first(name)]
                 new_shape, mask = shape_and_mask_from_mapspec(
                     mapspec,
