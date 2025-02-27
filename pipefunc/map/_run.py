@@ -1176,8 +1176,6 @@ def _output_from_mapspec_task(
     for name in at_least_tuple(func.output_name):
         run_info.resolve_downstream_shapes(name, store, shape=shape)
 
-    if args.result_arrays is None:
-        return (None,) * len(arrays)
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
