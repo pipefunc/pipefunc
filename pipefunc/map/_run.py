@@ -534,9 +534,9 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
-def _try_shape(output: Any) -> tuple[int, ...]:
+def _try_shape(x: Any) -> tuple[int, ...]:
     try:
-        return np.shape(output)
+        return np.shape(x)
     except ValueError:
         # e.g., when inhomogeneous lists are passed
         return ()
