@@ -363,7 +363,7 @@ def _execute_iteration_in_single(
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, store, run_info, return_results=True)
+    result = _process_task(func, kwargs_task, store, run_info)
     if not return_output:
         return None
     assert result is not None
