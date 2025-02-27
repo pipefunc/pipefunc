@@ -363,9 +363,10 @@ def _execute_iteration_in_single(
     if exists:
         return output
     kwargs_task = _submit_func(func, run_info, store, fixed_indices=None, executor=None)
-    result = _process_task(func, kwargs_task, store, return_results=True)
+    result = _process_task(func, kwargs_task, store, run_info, return_results=True)
     if not return_output:
         return None
+    assert result is not None
     output = tuple(result[name].output for name in at_least_tuple(func.output_name))
     return output if isinstance(func.output_name, tuple) else output[0]
 
