@@ -627,3 +627,33 @@ def test_persist(storage_id, tmp_path: Path) -> None:
     arr_new = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
     y_new = arr_new.to_array()
     np.testing.assert_almost_equal(y_original, y_new)
+
+
+@pytest.mark.parametrize(
+    "storage_id",
+    [
+        "file_array",
+        "shared_memory_dict",
+        "dict",
+    ],
+)
+def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
+    shape = (1,)
+    internal_shape = (2,)
+    shape_mask = (False, True)
+    array_class = {
+        "file_array": FileArray,
+        "shared_memory_dict": SharedMemoryDictArray,
+        "dict": DictArray,
+    }[storage_id]
+    arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    x = np.arange(0, 4).reshape((2, 2))
+    arr.dump((0,), x)
+    arr.persist()
+    y_original = arr.to_array()
+
+    arr_new = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    y_new = arr_new.to_array()
+    for i in range(2):
+        for j in range(1):
+            assert np.array_equal(y_original[i, j], y_new[i, j])
