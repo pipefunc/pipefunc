@@ -1146,7 +1146,7 @@ def _output_from_mapspec_task(
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
     run_info: RunInfo,
-) -> tuple[np.ndarray | None, ...]:
+) -> tuple[np.ndarray, ...]:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
