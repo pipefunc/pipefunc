@@ -210,15 +210,17 @@ class DictArray(StorageBase):
             return
         path = self._path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        dump(self._dict, path)
+        dct = self._dict if isinstance(self._dict, dict) else dict(self._dict)
+        dump(dct, path)
 
     def load(self) -> None:
         """Load the dict storage from disk."""
         if self.folder is None:  # pragma: no cover
             return
-        if not self.folder.exists():
+        path = self._path()
+        if not path.exists():
             return
-        self._dict = load(self._path())
+        self._dict = load(path)
 
     @property
     def dump_in_subprocess(self) -> bool:
