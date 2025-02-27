@@ -534,13 +534,21 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
+def _try_shape(output: Any) -> tuple[int, ...]:
+    try:
+        return np.shape(output)
+    except ValueError:
+        # e.g., when inhomogeneous lists are passed
+        return ()
+
+
 @dataclass
 class _InternalShape:
     shape: tuple[int, ...]
 
     @classmethod
     def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
-        return tuple(cls(np.shape(output)) for output in outputs)
+        return tuple(cls(_try_shape(output)) for output in outputs)
 
 
 def _run_iteration_and_process(
