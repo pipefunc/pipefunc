@@ -413,13 +413,7 @@ def _single_dump_single_output(
     store: dict[str, StoreType],
     run_info: RunInfo,
 ) -> None:
-    if not shape_is_resolved(run_info.resolved_shapes.get(output_name, ())):
-        internal_shape = internal_shape_from_mask(
-            np.shape(output),
-            run_info.shape_masks[output_name],
-        )
-        run_info.resolve_downstream_shapes(store, {output_name: internal_shape})
-
+    run_info.resolve_downstream_shapes(np.shape(output), output_name, store)
     storage = store[output_name]
     assert not isinstance(storage, StorageBase)
     if isinstance(storage, Path):
@@ -1236,9 +1230,7 @@ def _output_from_mapspec_task(
         shape = args.arrays[0].full_shape
 
     for name in at_least_tuple(func.output_name):
-        if not shape_is_resolved(run_info.resolved_shapes.get(name, ())):
-            internal_shape = internal_shape_from_mask(shape, run_info.shape_masks[name])
-            run_info.resolve_downstream_shapes(store, {name: internal_shape})
+        run_info.resolve_downstream_shapes(shape, name, store)
 
     if args.result_arrays is None:
         return (None,) * len(arrays)
