@@ -1211,7 +1211,7 @@ def _output_from_mapspec_task(
     outputs_list: list[list[Any]],
     run_info: RunInfo,
     return_results: bool,  # noqa: FBT001
-) -> tuple[np.ndarray | None, ...]:
+) -> tuple[np.ndarray, ...] | None:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
@@ -1240,7 +1240,7 @@ def _output_from_mapspec_task(
         run_info.resolve_downstream_shapes(name, store, shape=shape)
 
     if args.result_arrays is None:
-        return (None,) * len(arrays)
+        return None
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
@@ -1310,6 +1310,7 @@ def _process_task(
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
+        assert output is not None
         return _to_result_dict(func, kwargs, output, store)
     return None
 
@@ -1360,5 +1361,6 @@ async def _process_task_async(
         r = await _result_async(task, loop)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
+        assert output is not None
         return _to_result_dict(func, kwargs, output, store)
     return None
