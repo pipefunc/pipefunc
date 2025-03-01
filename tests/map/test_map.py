@@ -352,7 +352,12 @@ def test_simple_from_step(tmp_path: Path) -> None:
         # Load from the results
         ds = xarray_dataset_from_results(inputs, results, pipeline)
         assert "x" in ds.coords
+        ds = results.to_xarray()
+        assert "x" in ds.coords
+
         ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
+        assert "x" not in ds.coords
+        ds = results.to_xarray(load_intermediate=False)
         assert "x" not in ds.coords
 
 
