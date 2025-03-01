@@ -547,17 +547,8 @@ class _InternalShape:
     shape: tuple[int, ...]
 
     @classmethod
-    def from_outputs(cls, outputs: tuple[Any], ndims: int) -> tuple[_InternalShape, ...]:
-        # TODO: validate with internal_shape, all being the same!
-        internal_shapes = tuple(cls(_try_shape(output)) for output in outputs)
-        first = internal_shapes[0]
-        if len(first.shape) < ndims:
-            msg = f"Internal shape expected at least {ndims} dimensions, got {first.shape}."
-            raise ValueError(msg)
-        if not all(shape.shape[:ndims] == first.shape[:ndims] for shape in internal_shapes):
-            msg = "Internal shapes of outputs are not consistent."
-            raise ValueError(msg)
-        return internal_shapes
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
+        return tuple(cls(_try_shape(output)) for output in outputs)
 
 
 def _run_iteration_and_process(
@@ -586,7 +577,7 @@ def _run_iteration_and_process(
         force_dump=force_dump,
     )
     if has_dumped and not return_results:
-        return _InternalShape.from_outputs(outputs, ndims=len(arrays[0].internal_shape))
+        return _InternalShape.from_outputs(outputs)
     return outputs
 
 
