@@ -71,6 +71,7 @@ def run_map(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
+    return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -153,6 +154,10 @@ def run_map(
         and an exception is raised if any are missing.
     show_progress
         Whether to display a progress bar. Only works if ``parallel=True``.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the set
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
     pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
@@ -183,6 +188,7 @@ def run_map(
                 executor=ex,
                 chunksizes=chunksizes,
                 progress=progress,
+                return_results=return_results,
                 cache=pipeline.cache,
             )
     if progress is not None:  # final update
@@ -237,6 +243,7 @@ def run_map_async(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool = False,
+    return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -317,6 +324,10 @@ def run_map_async(
         and an exception is raised if any are missing.
     show_progress
         Whether to display a progress bar.
+    return_results
+        Whether to return the results of the pipeline. If ``False``, the pipeline is run
+        without keeping the results in memory. Instead the results are only kept in the set
+        ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
     pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
@@ -350,6 +361,7 @@ def run_map_async(
                     executor=ex,
                     chunksizes=chunksizes,
                     progress=progress,
+                    return_results=return_results,
                     cache=pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
@@ -468,8 +480,12 @@ def _select_kwargs_and_eval_resources(
     return selected
 
 
-def _init_result_arrays(output_name: OUTPUT_TYPE, shape: ShapeTuple) -> list[np.ndarray] | None:
-    if not shape_is_resolved(shape):
+def _init_result_arrays(
+    output_name: OUTPUT_TYPE,
+    shape: ShapeTuple,
+    return_results: bool,  # noqa: FBT001
+) -> list[np.ndarray] | None:
+    if not return_results or not shape_is_resolved(shape):
         return None
     return [np.empty(prod(shape), dtype=object) for _ in at_least_tuple(output_name)]
 
@@ -518,6 +534,23 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
 
+def _try_shape(x: Any) -> tuple[int, ...]:
+    try:
+        return np.shape(x)
+    except ValueError:
+        # e.g., when inhomogeneous lists are passed
+        return ()
+
+
+@dataclass
+class _InternalShape:
+    shape: tuple[int, ...]
+
+    @classmethod
+    def from_outputs(cls, outputs: tuple[Any]) -> tuple[_InternalShape, ...]:
+        return tuple(cls(_try_shape(output)) for output in outputs)
+
+
 def _run_iteration_and_process(
     index: int,
     func: PipeFunc,
@@ -527,12 +560,13 @@ def _run_iteration_and_process(
     arrays: Sequence[StorageBase],
     cache: _CacheBase | None = None,
     *,
+    return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, cache)
     outputs = _pick_output(func, output)
-    _update_array(
+    has_dumped = _update_array(
         func,
         arrays,
         shape,
@@ -542,6 +576,8 @@ def _run_iteration_and_process(
         in_post_process=False,
         force_dump=force_dump,
     )
+    if has_dumped and not return_results:
+        return _InternalShape.from_outputs(outputs)
     return outputs
 
 
@@ -555,7 +591,7 @@ def _update_array(
     *,
     in_post_process: bool,
     force_dump: bool = False,  # Only true in `adaptive.py`
-) -> None:
+) -> bool:
     # This function is called both in the main process (in post processing) and in the executor process.
     # It needs to only dump the data once.
     # If the data can be written during the function call inside the executor (e.g., a file array),
@@ -563,7 +599,7 @@ def _update_array(
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
     output_key = None
-
+    has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
@@ -572,6 +608,8 @@ def _update_array(
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
             array.dump(output_key, _output)
+            has_dumped = True
+    return has_dumped
 
 
 def _indices_to_flat_index(
@@ -629,13 +667,15 @@ def _validate_internal_shape(
 
 
 def _update_result_array(
-    result_arrays: list[np.ndarray],
+    result_arrays: list[np.ndarray] | None,
     index: int,
     output: list[Any],
     shape: tuple[int, ...],
     mask: tuple[bool, ...],
     func: PipeFunc,
 ) -> None:
+    if result_arrays is None:
+        return
     for result_array, _output in zip(result_arrays, output):
         if not all(mask):
             _output = np.asarray(_output)  # In case _output is a list
@@ -695,13 +735,14 @@ def _prepare_submit_map_spec(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
     shape = run_info.resolved_shapes[func.output_name]
     mask = run_info.shape_masks[func.output_name]
     arrays: list[StorageBase] = [store[name] for name in at_least_tuple(func.output_name)]  # type: ignore[misc]
-    result_arrays = _init_result_arrays(func.output_name, shape)
+    result_arrays = _init_result_arrays(func.output_name, shape, return_results)
     process_index = functools.partial(
         _run_iteration_and_process,
         func=func,
@@ -710,6 +751,7 @@ def _prepare_submit_map_spec(
         shape_mask=mask,
         arrays=arrays,
         cache=cache,
+        return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -990,6 +1032,7 @@ def _run_and_process_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
@@ -1000,9 +1043,10 @@ def _run_and_process_generation(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
-    _process_generation(generation, tasks, store, outputs, run_info)
+    _process_generation(generation, tasks, store, outputs, run_info, return_results)
 
 
 async def _run_and_process_generation_async(
@@ -1015,6 +1059,7 @@ async def _run_and_process_generation_async(
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
 ) -> None:
@@ -1026,10 +1071,11 @@ async def _run_and_process_generation_async(
         executor,
         chunksizes,
         progress,
+        return_results,
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
-    await _process_generation_async(generation, tasks, store, outputs, run_info)
+    await _process_generation_async(generation, tasks, store, outputs, run_info, return_results)
 
 
 # NOTE: A similar async version of this function is provided below.
@@ -1039,10 +1085,13 @@ def _process_generation(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
-        _outputs = _process_task(func, tasks[func], store, run_info)
-        outputs.update(_outputs)
+        _outputs = _process_task(func, tasks[func], store, run_info, return_results)
+        if return_results:
+            assert _outputs is not None
+            outputs.update(_outputs)
 
 
 async def _process_generation_async(
@@ -1051,10 +1100,13 @@ async def _process_generation_async(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
+    return_results: bool,  # noqa: FBT001
 ) -> None:
     for func in generation:
-        _outputs = await _process_task_async(func, tasks[func], store, run_info)
-        outputs.update(_outputs)
+        _outputs = await _process_task_async(func, tasks[func], store, run_info, return_results)
+        if return_results:
+            assert _outputs is not None
+            outputs.update(_outputs)
 
 
 def _submit_func(
@@ -1065,13 +1117,23 @@ def _submit_func(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     progress: ProgressTracker | None = None,
+    return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
     status = progress.progress_dict[func.output_name] if progress is not None else None
     cache = cache if func.cache else None
     if func.requires_mapping:
-        args = _prepare_submit_map_spec(func, kwargs, run_info, store, fixed_indices, status, cache)
+        args = _prepare_submit_map_spec(
+            func,
+            kwargs,
+            run_info,
+            store,
+            fixed_indices,
+            status,
+            return_results,
+            cache,
+        )
         r = _maybe_parallel_map(
             func,
             args.process_index,
@@ -1123,6 +1185,7 @@ def _submit_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
+    return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1134,6 +1197,7 @@ def _submit_generation(
             executor,
             chunksizes,
             progress,
+            return_results,
             cache,
         )
         for func in generation
@@ -1146,7 +1210,8 @@ def _output_from_mapspec_task(
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
     run_info: RunInfo,
-) -> tuple[np.ndarray, ...]:
+    return_results: bool,  # noqa: FBT001
+) -> tuple[np.ndarray, ...] | None:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
@@ -1155,9 +1220,8 @@ def _output_from_mapspec_task(
     first = True
     for index, outputs in zip(args.missing, outputs_list):
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
 
@@ -1165,9 +1229,8 @@ def _output_from_mapspec_task(
     for index in args.existing:
         outputs = [array.get_from_index(index) for array in args.arrays]
         if first:
-            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs)
+            shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
-        assert args.result_arrays is not None
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
 
     if not args.missing and not args.existing:  # shape variable does not exist
@@ -1176,11 +1239,14 @@ def _output_from_mapspec_task(
     for name in at_least_tuple(func.output_name):
         run_info.resolve_downstream_shapes(name, store, shape=shape)
 
+    if args.result_arrays is None:
+        return None
     return tuple(x.reshape(shape) for x in args.result_arrays)  # type: ignore[union-attr]
 
 
 def _internal_shape(output: Any, storage: StorageBase) -> tuple[int, ...]:
-    return np.shape(output)[: len(storage.internal_shape)]
+    shape = output.shape if isinstance(output, _InternalShape) else np.shape(output)
+    return shape[: len(storage.internal_shape)]
 
 
 def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
@@ -1223,18 +1289,30 @@ def _process_task(
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
     run_info: RunInfo,
-) -> ResultDict:
+    return_results: bool,  # noqa: FBT001
+) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
         chunk_outputs_list = [_result(x) for x in r]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, run_info)
+        output = _output_from_mapspec_task(
+            func,
+            store,
+            args,
+            chained_outputs_list,
+            run_info,
+            return_results,
+        )
     else:
         r = _result(task)
         output = _dump_single_output(func, r, store, run_info)
-    return _to_result_dict(func, kwargs, output, store)
+
+    if return_results:
+        assert output is not None
+        return _to_result_dict(func, kwargs, output, store)
+    return None
 
 
 def _maybe_resolve_shapes_from_map(
@@ -1242,6 +1320,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
+    return_results: bool,  # noqa: FBT001
 ) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
@@ -1250,7 +1329,7 @@ def _maybe_resolve_shapes_from_map(
     # Outside the loop above, just needs to do this once ⬇️
     assert isinstance(array, StorageBase)
     if args.result_arrays is None:
-        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape)
+        args.result_arrays = _init_result_arrays(func.output_name, array.full_shape, return_results)
     return array.full_shape
 
 
@@ -1259,7 +1338,8 @@ async def _process_task_async(
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
     run_info: RunInfo,
-) -> ResultDict:
+    return_results: bool,  # noqa: FBT001
+) -> ResultDict | None:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
@@ -1268,9 +1348,19 @@ async def _process_task_async(
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
-        output = _output_from_mapspec_task(func, store, args, chained_outputs_list, run_info)
+        output = _output_from_mapspec_task(
+            func,
+            store,
+            args,
+            chained_outputs_list,
+            run_info,
+            return_results,
+        )
     else:
         assert isinstance(task, Future)
         r = await _result_async(task, loop)
         output = _dump_single_output(func, r, store, run_info)
-    return _to_result_dict(func, kwargs, output, store)
+    if return_results:
+        assert output is not None
+        return _to_result_dict(func, kwargs, output, store)
+    return None

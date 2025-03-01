@@ -711,6 +711,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
+        return_results: bool = True,
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -791,6 +792,10 @@ class Pipeline:
             and an exception is raised if any are missing.
         show_progress
             Whether to display a progress bar. Only works if ``parallel=True``.
+        return_results
+            Whether to return the results of the pipeline. If ``False``, the pipeline is run
+            without keeping the results in memory. Instead the results are only kept in the set
+            ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
         See Also
         --------
@@ -818,6 +823,7 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            return_results=return_results,
         )
 
     def map_async(
@@ -835,6 +841,7 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
+        return_results: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -913,6 +920,10 @@ class Pipeline:
             and an exception is raised if any are missing.
         show_progress
             Whether to display a progress bar.
+        return_results
+            Whether to return the results of the pipeline. If ``False``, the pipeline is run
+            without keeping the results in memory. Instead the results are only kept in the set
+            ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
         See Also
         --------
@@ -939,6 +950,7 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            return_results=return_results,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
