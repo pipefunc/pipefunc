@@ -46,25 +46,35 @@ def _pipeline(dim: Literal["?"] | None) -> Pipeline:
 
 
 @pytest.mark.parametrize("return_results", [True, False])
+# reaches the run_folder is None in RunInfo.dump:
+@pytest.mark.parametrize("use_run_folder", [True, False])
 @pytest.mark.parametrize("dim", ["?", None])
 def test_dynamic_internal_shape(
     tmp_path: Path,
     dim: Literal["?"] | None,
     return_results: bool,  # noqa: FBT001
+    use_run_folder: bool,  # noqa: FBT001
 ) -> None:
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
-    results = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    results = pipeline.map(
+        {},
+        run_folder=tmp_path if use_run_folder else None,
+        parallel=False,
+        return_results=return_results,
+        storage="dict",
+    )
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
     if return_results:
         assert results["sum"].output == expected_sum
         assert results["sum"].output_name == "sum"
-    assert load_outputs("sum", run_folder=tmp_path) == expected_sum
-    assert load_outputs("y", run_folder=tmp_path).tolist() == expected_y
-    if has_xarray:
-        load_xarray_dataset("x", run_folder=tmp_path)
-        load_xarray_dataset("y", run_folder=tmp_path)
+    if use_run_folder:
+        assert load_outputs("sum", run_folder=tmp_path) == expected_sum
+        assert load_outputs("y", run_folder=tmp_path).tolist() == expected_y
+        if has_xarray:
+            load_xarray_dataset("x", run_folder=tmp_path)
+            load_xarray_dataset("y", run_folder=tmp_path)
 
 
 @pytest.mark.parametrize("return_results", [True, False])
