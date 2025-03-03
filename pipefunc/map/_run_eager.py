@@ -316,7 +316,7 @@ class _FunctionTracker:
                 self.pending_async_tasks.discard(task)
 
         # Return functions whose futures have all completed
-        return self.get_completed_functions()
+        return self._get_completed_functions()
 
     def wait_for_futures_sync(self) -> list[PipeFunc]:
         """Wait for futures to complete in sync mode and return completed functions."""
@@ -338,7 +338,7 @@ class _FunctionTracker:
 
         return list(completed_funcs)
 
-    def get_completed_functions(self) -> list[PipeFunc]:
+    def _get_completed_functions(self) -> list[PipeFunc]:
         """Return functions whose futures are all complete but not yet processed."""
         newly_completed = []
 
@@ -436,6 +436,7 @@ def _process_completed_futures(
     for func in completed_funcs:
         # Process the task and update outputs
         result = _process_task(func, tracker.tasks[func], store, run_info, return_results)
+
         if return_results and result is not None:
             outputs.update(result)
 

@@ -5,7 +5,7 @@ import shutil
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 
 import adaptive
@@ -137,11 +137,13 @@ def pipeline() -> Pipeline:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("use_mock", [True, False])
 @pytest.mark.parametrize("use_instance", [True, False])
+@pytest.mark.parametrize("scheduling_strategy", ["eager", "generation"])
 async def test_adaptive_slurm_executor(
     pipeline: Pipeline,
     tmp_path: Path,
     use_mock: bool,  # noqa: FBT001
     use_instance: bool,  # noqa: FBT001
+    scheduling_strategy: Literal["eager", "generation"],
 ) -> None:
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
@@ -156,6 +158,7 @@ async def test_adaptive_slurm_executor(
         run_folder,
         executor=ex,  # type: ignore[arg-type]
         show_progress=True,
+        scheduling_strategy=scheduling_strategy,
     )
     result = await runner.task
     assert isinstance(result, ResultDict)
