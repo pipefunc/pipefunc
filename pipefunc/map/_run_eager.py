@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from concurrent.futures import FIRST_COMPLETED, Executor, Future, wait
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -16,6 +15,7 @@ from pipefunc.map._run import (
 )
 
 if TYPE_CHECKING:
+    import asyncio
     from collections.abc import Callable
     from pathlib import Path
 
@@ -303,27 +303,6 @@ class _FunctionTracker:
         if self.is_async:
             return bool(self.future_to_func) or bool(self.pending_async_tasks)
         return bool(self.future_to_func)
-
-    def create_async_task(
-        self,
-        fut: Future,
-        func: PipeFunc,
-        loop: asyncio.AbstractEventLoop,
-    ) -> asyncio.Task:
-        """Create an asyncio task for a concurrent future."""
-        assert self.is_async
-        async_task = asyncio.ensure_future(asyncio.wrap_future(fut, loop=loop))
-
-        # When the task completes, remove the future from the function's futures
-        async_task.add_done_callback(
-            lambda _: self.func_futures[func].discard(fut) if func in self.func_futures else None,
-        )
-
-        # Track the relationship between future and task
-        self.future_to_async_task[fut] = async_task
-        self.pending_async_tasks.add(async_task)
-
-        return async_task
 
 
 def _eager_scheduler_loop(

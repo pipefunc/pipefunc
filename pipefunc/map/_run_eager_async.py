@@ -258,16 +258,18 @@ async def _process_completed_futures_async(
     """Process completed futures and schedule new tasks asynchronously."""
     loop = asyncio.get_event_loop()
 
-    # Create tasks for all pending futures that don't have tasks yet
-    pending_tasks = []
-    for fut, func in list(tracker.future_to_func.items()):
+    # Step 1: Create tasks for all pending futures first
+    pending_futures = list(tracker.future_to_func.keys())
+    for fut in pending_futures:
         if fut not in tracker.future_to_async_task:
-            task = tracker.create_async_task(fut, func, loop)
-            pending_tasks.append(task)
+            func = tracker.future_to_func[fut]
+            task = asyncio.ensure_future(asyncio.wrap_future(fut, loop=loop))
+            tracker.future_to_async_task[fut] = task
+            tracker.pending_async_tasks.add(task)
 
-    # If we have any async tasks (new or existing), wait for one to complete
+    # Step 2: Wait for any task to complete if there are pending tasks
     if tracker.pending_async_tasks:
-        done, pending = await asyncio.wait(
+        done, _ = await asyncio.wait(
             tracker.pending_async_tasks,
             return_when=asyncio.FIRST_COMPLETED,
         )
@@ -275,20 +277,31 @@ async def _process_completed_futures_async(
         # Remove completed tasks
         for task in done:
             tracker.pending_async_tasks.discard(task)
+            # No need to update func_futures here - we'll do it directly below
 
-            # Find and remove the corresponding future
-            for fut, async_task in list(tracker.future_to_async_task.items()):
-                if async_task == task:
-                    del tracker.future_to_async_task[fut]
-                    if fut in tracker.future_to_func:
-                        del tracker.future_to_func[fut]
-                    break
+    # Step 3: Check ALL functions for completion
+    newly_completed_funcs = []  # Track newly completed functions for SLURM
 
-    # Process completed functions
-    completed_funcs = []
     for func in list(tracker.func_futures.keys()):
-        if tracker.is_function_complete(func):
-            # Process the task and update outputs
+        if func in tracker.completed_funcs:
+            continue
+
+        # Directly check if all futures are done
+        all_futures = list(tracker.func_futures[func])
+        all_done = all(fut.done() for fut in all_futures)
+
+        if all_done:
+            # Clean up tracking dictionaries
+            for fut in all_futures:
+                if fut in tracker.future_to_func:
+                    del tracker.future_to_func[fut]
+                if fut in tracker.future_to_async_task:
+                    del tracker.future_to_async_task[fut]
+
+            # Clear futures for this function
+            tracker.func_futures[func] = set()
+
+            # Process the function results
             result = await _process_task_async(
                 func,
                 tracker.tasks[func],
@@ -296,14 +309,15 @@ async def _process_completed_futures_async(
                 run_info,
                 return_results,
             )
+
             if return_results and result is not None:
                 outputs.update(result)
 
-            # Mark this function as completed
-            tracker.mark_function_complete(func)
-            completed_funcs.append(func)
+            # Mark complete and track for SLURM
+            tracker.completed_funcs.add(func)
+            newly_completed_funcs.append(func)
 
-            # Update dependencies and submit new functions
+            # Schedule new tasks
             _update_dependencies_and_submit(
                 func=func,
                 tracker=tracker,
@@ -318,6 +332,6 @@ async def _process_completed_futures_async(
                 cache=cache,
             )
 
-    # Finalize SLURM executors if needed for newly completed functions
-    if completed_funcs and multi_run_manager is not None:
-        maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)
+    # Handle SLURM executors for newly completed functions
+    if newly_completed_funcs and multi_run_manager is not None:
+        maybe_finalize_slurm_executors(newly_completed_funcs, executor, multi_run_manager)
