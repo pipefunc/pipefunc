@@ -311,10 +311,7 @@ class _FunctionTracker:
         loop: asyncio.AbstractEventLoop,
     ) -> asyncio.Task:
         """Create an asyncio task for a concurrent future."""
-        if not self.is_async:
-            msg = "Cannot create async tasks in sync mode"
-            raise RuntimeError(msg)
-
+        assert self.is_async
         async_task = asyncio.ensure_future(asyncio.wrap_future(fut, loop=loop))
 
         # When the task completes, remove the future from the function's futures
