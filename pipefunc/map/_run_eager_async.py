@@ -12,7 +12,12 @@ from pipefunc.map._run import (
     maybe_multi_run_manager,
     prepare_run,
 )
-from pipefunc.map._run_eager import _build_dependency_graph, _DependencyInfo, _FunctionTracker
+from pipefunc.map._run_eager import (
+    _build_dependency_graph,
+    _DependencyInfo,
+    _FunctionTracker,
+    _update_dependencies_and_submit,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,7 +28,6 @@ if TYPE_CHECKING:
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import Pipeline
-    from pipefunc._pipefunc import PipeFunc
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
@@ -197,7 +201,7 @@ async def _eager_scheduler_loop_async(
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
-    multi_run_manager: MultiRunManager | None = None,
+    multi_run_manager: MultiRunManager | None,
 ) -> None:
     """Dynamically submit and await tasks for functions as soon as they are ready."""
     tracker = _FunctionTracker()
@@ -300,7 +304,7 @@ async def _process_completed_futures_async(
             completed_funcs.append(func)
 
             # Update dependencies and submit new functions
-            await _update_dependencies_and_submit_async(
+            _update_dependencies_and_submit(
                 func=func,
                 tracker=tracker,
                 dependency_info=dependency_info,
@@ -317,38 +321,6 @@ async def _process_completed_futures_async(
     # Finalize SLURM executors if needed for newly completed functions
     if completed_funcs and multi_run_manager is not None:
         maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)
-
-
-async def _update_dependencies_and_submit_async(
-    *,
-    func: PipeFunc,
-    tracker: _FunctionTracker,
-    dependency_info: _DependencyInfo,
-    run_info: RunInfo,
-    store: dict[str, Any],
-    fixed_indices: dict[str, int | slice] | None,
-    executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    progress: ProgressTracker | None,
-    return_results: bool,
-    cache: _CacheBase | None,
-) -> None:
-    """Update dependencies after a function completes and submit newly ready functions."""
-    for child in dependency_info.children.get(func, []):
-        dependency_info.remaining_deps[child] -= 1
-        if dependency_info.remaining_deps[child] == 0:
-            # Submit child function if all dependencies are resolved
-            tracker.submit_function(
-                child,
-                run_info,
-                store,
-                fixed_indices,
-                executor,
-                chunksizes,
-                progress,
-                return_results,
-                cache,
-            )
 
 
 async def _eager_scheduler_loop_async(

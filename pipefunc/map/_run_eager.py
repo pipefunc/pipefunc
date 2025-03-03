@@ -219,7 +219,7 @@ class _DependencyInfo:
     ready: list[PipeFunc]
 
 
-def _ensure_future(x: Any) -> Future[Any]:
+def _ensure_future(x: Any) -> Future[Any] | asyncio.Future[Any]:
     """Ensure that an object is a Future."""
     if isinstance(x, Future | asyncio.Future):
         return x
@@ -241,8 +241,8 @@ class _FunctionTracker:
 
         # Async-specific attributes
         if self.is_async:
-            self.future_to_async_task = {}  # Future -> asyncio.Task
-            self.pending_async_tasks = set()  # set[asyncio.Task]
+            self.future_to_async_task: dict[Future, asyncio.Task] = {}
+            self.pending_async_tasks: set[asyncio.Task] = set()
 
     def submit_function(
         self,
@@ -304,7 +304,12 @@ class _FunctionTracker:
             return bool(self.future_to_func) or bool(self.pending_async_tasks)
         return bool(self.future_to_func)
 
-    def create_async_task(self, fut, func, loop):
+    def create_async_task(
+        self,
+        fut: Future,
+        func: PipeFunc,
+        loop: asyncio.AbstractEventLoop,
+    ) -> asyncio.Task:
         """Create an asyncio task for a concurrent future."""
         if not self.is_async:
             msg = "Cannot create async tasks in sync mode"
