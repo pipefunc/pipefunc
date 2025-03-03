@@ -48,7 +48,7 @@ def run_map_eager(
     show_progress: bool = False,
     return_results: bool = True,
 ) -> ResultDict:
-    """Dynamically schedule pipeline functions as soon as their dependencies are met.
+    """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
     This implementation replaces the generation-by-generation scheduling used in the
     original run_map. Instead, it maintains a dependency counter for each function and

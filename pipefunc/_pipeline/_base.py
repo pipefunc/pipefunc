@@ -43,6 +43,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._run_eager import run_map_eager
 from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs
@@ -712,6 +713,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool = False,
         return_results: bool = True,
+        scheduling_type: Literal["topological_generation", "eager"] = "topological_generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -796,6 +798,8 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        scheduling_type
+            TODD
 
         See Also
         --------
@@ -808,7 +812,14 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        return run_map(
+        if scheduling_type == "topological_generation":
+            run_map_func = run_map
+        elif scheduling_type == "eager":
+            run_map_func = run_map_eager
+        else:
+            msg = f"Invalid scheduling type: {scheduling_type}"
+            raise ValueError(msg)
+        return run_map_func(
             self,
             inputs,
             run_folder,
