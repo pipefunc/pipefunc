@@ -1519,6 +1519,8 @@ def test_parallel_memory_storage(storage: str):
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
 async def test_map_async_with_progress(scheduling_strategy: Literal["generation", "eager"]) -> None:
+    if scheduling_strategy == "eager":
+        pytest.skip("Eager scheduling is not supported in async mode")
     from pipefunc._widgets import ProgressTracker
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
