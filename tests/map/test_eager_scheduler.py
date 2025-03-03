@@ -109,8 +109,8 @@ def test_complex_dependency_graph(tmp_path: Path):
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "complex_graph"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=True,
@@ -142,8 +142,8 @@ def test_eager_scheduler_with_mapspec(tmp_path: Path):
     run_folder = tmp_path / "mapspec"
 
     inputs = {"x": [1, 2, 3, 4, 5]}
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
@@ -174,8 +174,8 @@ def test_eager_scheduler_with_multiple_outputs(tmp_path: Path):
     run_folder = tmp_path / "multiple_outputs"
 
     # Make sure we're getting results back
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=False,
@@ -204,8 +204,8 @@ def test_eager_scheduler_with_custom_executor(tmp_path: Path):
     run_folder = tmp_path / "custom_executor"
 
     with ProcessPoolExecutor(max_workers=2) as executor:
-        result = run_map_eager(
-            pipeline,
+        result = pipeline.map(
+            scheduling_strategy="eager",
             inputs={},
             run_folder=run_folder,
             executor=executor,
@@ -221,8 +221,8 @@ def test_eager_scheduler_without_returning_results(tmp_path: Path):
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "no_return"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         return_results=False,
@@ -261,8 +261,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
     run_folder = tmp_path / "caching"
 
     # First run
-    result1 = run_map_eager(
-        pipeline,
+    result1 = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=False,
@@ -276,8 +276,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
     assert call_counts == {"a": 1, "b": 1, "c": 1}
 
     # Second run should use cache
-    result2 = run_map_eager(
-        pipeline,
+    result2 = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         cleanup=False,  # Don't clean up to test caching
@@ -310,8 +310,8 @@ def test_eager_scheduler_with_internal_shapes(tmp_path: Path):
     pipeline = Pipeline([generate_values, double_values, sum_doubled])
     run_folder = tmp_path / "internal_shapes"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=False,
@@ -335,8 +335,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
     inputs = {"x": [10, 20, 30, 40, 50]}
 
     # Only process index 2 (value 30)
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         fixed_indices={"i": 2},
@@ -353,8 +353,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
     assert values_on_disk[2] == 60
 
     # Run again with a different fixed index
-    result2 = run_map_eager(
-        pipeline,
+    result2 = pipeline.map(
+        scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         fixed_indices={"i": 3},
@@ -400,8 +400,8 @@ def test_eager_scheduler_with_long_dependency_chain(tmp_path: Path):
     pipeline = Pipeline([step_a, step_b, step_c, step_d, step_e])
     run_folder = tmp_path / "long_chain"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=False,
@@ -453,8 +453,8 @@ def test_eager_scheduler_with_diamond_pattern(tmp_path: Path):
     pipeline = Pipeline([diamond_start, diamond_left, diamond_right, diamond_end])
     run_folder = tmp_path / "diamond"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         show_progress=False,
@@ -481,8 +481,8 @@ def test_eager_scheduler_with_chunksizes(tmp_path: Path):
     inputs = {"x": list(range(20))}  # 20 values to process
 
     # Use a small chunksize to force multiple chunks
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         chunksizes=5,  # Process in chunks of 5
@@ -501,8 +501,8 @@ def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / f"storage_{storage}"
 
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         storage=storage,
@@ -530,8 +530,8 @@ def test_eager_scheduler_error_handling(tmp_path: Path):
     run_folder = tmp_path / "error_handling"
 
     with pytest.raises(ValueError, match="This task is designed to fail"):
-        run_map_eager(
-            pipeline,
+        pipeline.map(
+            scheduling_strategy="eager",
             inputs={},
             run_folder=run_folder,
             show_progress=False,
@@ -549,8 +549,8 @@ def test_eager_scheduler_with_persist_memory(
     run_folder = tmp_path / f"persist_{persist_memory}"
 
     # Use memory-based storage
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
         storage="dict",  # Memory-based storage
@@ -598,8 +598,8 @@ def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
     run_folder = tmp_path / "complex_mapspec"
 
     inputs = {"x": [1, 2, 3], "y": [4, 5]}
-    result = run_map_eager(
-        pipeline,
+    result = pipeline.map(
+        scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
