@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import FIRST_COMPLETED, Executor, Future, wait
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -15,7 +16,6 @@ from pipefunc.map._run import (
 )
 
 if TYPE_CHECKING:
-    import asyncio
     from collections.abc import Callable
     from pathlib import Path
 
@@ -303,6 +303,61 @@ class _FunctionTracker:
         if self.is_async:
             return bool(self.future_to_func) or bool(self.pending_async_tasks)
         return bool(self.future_to_func)
+
+    async def ensure_async_tasks(self) -> set[asyncio.Task]:
+        """Create asyncio tasks for all pending futures that don't have them yet."""
+        loop = asyncio.get_event_loop()
+
+        # Create tasks for all pending futures
+        pending_futures = list(self.future_to_func.keys())
+        for fut in pending_futures:
+            if fut not in self.future_to_async_task:
+                task = asyncio.ensure_future(asyncio.wrap_future(fut, loop=loop))
+                self.future_to_async_task[fut] = task
+                self.pending_async_tasks.add(task)
+
+        # Wait for any task to complete if there are pending tasks
+        if self.pending_async_tasks:
+            done, _ = await asyncio.wait(
+                self.pending_async_tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            # Remove completed tasks from pending set
+            for task in done:
+                self.pending_async_tasks.discard(task)
+
+            return done
+        return set()
+
+    def get_completed_functions(self) -> list[PipeFunc]:
+        """Return a list of functions whose futures are all complete."""
+        newly_completed = []
+
+        for func in list(self.func_futures.keys()):
+            if func in self.completed_funcs:
+                continue
+
+            all_futures = list(self.func_futures[func])
+            if all(fut.done() for fut in all_futures):
+                newly_completed.append(func)
+
+        return newly_completed
+
+    def cleanup_completed_function(self, func: PipeFunc) -> None:
+        """Clean up tracking data for a completed function."""
+        all_futures = list(self.func_futures[func])
+        for fut in all_futures:
+            if fut in self.future_to_func:
+                del self.future_to_func[fut]
+            if fut in self.future_to_async_task:
+                del self.future_to_async_task[fut]
+
+        # Clear futures for this function
+        self.func_futures[func] = set()
+
+        # Mark function as completed
+        self.completed_funcs.add(func)
 
 
 def _eager_scheduler_loop(
