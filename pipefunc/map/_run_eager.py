@@ -229,7 +229,7 @@ def _ensure_future(x: Any) -> Future[Any]:
 
 
 class _FunctionTracker:
-    """Tracks function execution state during eager scheduling."""
+    """Tracks function execution state during eager scheduling with unified sync/async API."""
 
     def __init__(self, *, is_async: bool = False) -> None:
         """Initialize the function tracker."""
@@ -286,29 +286,17 @@ class _FunctionTracker:
             self.future_to_func[fut] = func
             self.func_futures[func].add(fut)
 
-    def is_function_complete(self, func: PipeFunc) -> bool:
-        """Check if all futures for a function are completed."""
-        return (
-            func in self.func_futures
-            and not self.func_futures[func]
-            and func not in self.completed_funcs
-        )
-
-    def mark_function_complete(self, func: PipeFunc) -> None:
-        """Mark a function as completed."""
-        self.completed_funcs.add(func)
-
     def has_active_futures(self) -> bool:
         """Check if there are any active futures."""
         if self.is_async:
             return bool(self.future_to_func) or bool(self.pending_async_tasks)
         return bool(self.future_to_func)
 
-    async def ensure_async_tasks(self) -> set[asyncio.Task]:
-        """Create asyncio tasks for all pending futures that don't have them yet."""
+    async def wait_for_futures_async(self) -> list[PipeFunc]:
+        """Wait for futures to complete in async mode and return completed functions."""
+        assert self.is_async
+        # Create asyncio tasks for all pending futures
         loop = asyncio.get_event_loop()
-
-        # Create tasks for all pending futures
         pending_futures = list(self.future_to_func.keys())
         for fut in pending_futures:
             if fut not in self.future_to_async_task:
@@ -327,11 +315,31 @@ class _FunctionTracker:
             for task in done:
                 self.pending_async_tasks.discard(task)
 
-            return done
-        return set()
+        # Return functions whose futures have all completed
+        return self.get_completed_functions()
+
+    def wait_for_futures_sync(self) -> list[PipeFunc]:
+        """Wait for futures to complete in sync mode and return completed functions."""
+        assert not self.is_async
+
+        if not self.future_to_func:
+            return []
+
+        done, _ = wait(self.future_to_func.keys(), return_when=FIRST_COMPLETED)
+
+        # Get functions with potentially all futures completed
+        completed_funcs = set()
+        for fut in done:
+            func = self.future_to_func.pop(fut)
+            if func in self.func_futures:
+                self.func_futures[func].discard(fut)
+                if not self.func_futures[func] and func not in self.completed_funcs:
+                    completed_funcs.add(func)
+
+        return list(completed_funcs)
 
     def get_completed_functions(self) -> list[PipeFunc]:
-        """Return a list of functions whose futures are all complete."""
+        """Return functions whose futures are all complete but not yet processed."""
         newly_completed = []
 
         for func in list(self.func_futures.keys()):
@@ -339,24 +347,25 @@ class _FunctionTracker:
                 continue
 
             all_futures = list(self.func_futures[func])
-            if all(fut.done() for fut in all_futures):
+            if all(fut.done() for fut in all_futures) and all_futures:  # ensure non-empty
                 newly_completed.append(func)
 
         return newly_completed
 
-    def cleanup_completed_function(self, func: PipeFunc) -> None:
-        """Clean up tracking data for a completed function."""
+    def mark_function_processed(self, func: PipeFunc) -> None:
+        """Mark a function as processed and clean up its tracking data."""
+        # Clean up future references
         all_futures = list(self.func_futures[func])
         for fut in all_futures:
             if fut in self.future_to_func:
                 del self.future_to_func[fut]
-            if fut in self.future_to_async_task:
+            if self.is_async and fut in self.future_to_async_task:
                 del self.future_to_async_task[fut]
 
         # Clear futures for this function
         self.func_futures[func] = set()
 
-        # Mark function as completed
+        # Mark as completed
         self.completed_funcs.add(func)
 
 
@@ -422,40 +431,31 @@ def _process_completed_futures(
     cache: _CacheBase | None,
 ) -> None:
     """Process completed futures and schedule new tasks."""
-    done, _ = wait(tracker.future_to_func.keys(), return_when=FIRST_COMPLETED)
+    completed_funcs = tracker.wait_for_futures_sync()
 
-    for fut in done:
-        # Get the function associated with this future
-        func = tracker.future_to_func.pop(fut)
+    for func in completed_funcs:
+        # Process the task and update outputs
+        result = _process_task(func, tracker.tasks[func], store, run_info, return_results)
+        if return_results and result is not None:
+            outputs.update(result)
 
-        # Remove this future from the function's futures
-        if func in tracker.func_futures:
-            tracker.func_futures[func].discard(fut)
+        # Mark this function as processed
+        tracker.mark_function_processed(func)
 
-            # If all futures for this function are done, process the results
-            if tracker.is_function_complete(func):
-                # Process the task and update outputs
-                result = _process_task(func, tracker.tasks[func], store, run_info, return_results)
-                if return_results and result is not None:
-                    outputs.update(result)
-
-                # Mark this function as completed
-                tracker.mark_function_complete(func)
-
-                # Update dependencies and submit new tasks
-                _update_dependencies_and_submit(
-                    func=func,
-                    tracker=tracker,
-                    dependency_info=dependency_info,
-                    run_info=run_info,
-                    store=store,
-                    fixed_indices=fixed_indices,
-                    executor=executor,
-                    chunksizes=chunksizes,
-                    progress=progress,
-                    return_results=return_results,
-                    cache=cache,
-                )
+        # Update dependencies and submit new tasks
+        _update_dependencies_and_submit(
+            func=func,
+            tracker=tracker,
+            dependency_info=dependency_info,
+            run_info=run_info,
+            store=store,
+            fixed_indices=fixed_indices,
+            executor=executor,
+            chunksizes=chunksizes,
+            progress=progress,
+            return_results=return_results,
+            cache=cache,
+        )
 
 
 def _update_dependencies_and_submit(

@@ -256,16 +256,9 @@ async def _process_completed_futures_async(
     multi_run_manager: MultiRunManager | None,
 ) -> None:
     """Process completed futures and schedule new tasks asynchronously."""
-    # Ensure all futures have corresponding asyncio tasks and wait for any completions
-    await tracker.ensure_async_tasks()
+    completed_funcs = await tracker.wait_for_futures_async()
 
-    # Check which functions have completed
-    newly_completed_funcs = tracker.get_completed_functions()
-
-    for func in newly_completed_funcs:
-        # Clean up tracking data
-        tracker.cleanup_completed_function(func)
-
+    for func in completed_funcs:
         # Process the function results
         result = await _process_task_async(
             func,
@@ -277,6 +270,9 @@ async def _process_completed_futures_async(
 
         if return_results and result is not None:
             outputs.update(result)
+
+        # Mark this function as processed
+        tracker.mark_function_processed(func)
 
         # Schedule new tasks
         _update_dependencies_and_submit(
@@ -294,5 +290,5 @@ async def _process_completed_futures_async(
         )
 
     # Handle SLURM executors for newly completed functions
-    if newly_completed_funcs and multi_run_manager is not None:
-        maybe_finalize_slurm_executors(newly_completed_funcs, executor, multi_run_manager)
+    if completed_funcs and multi_run_manager is not None:
+        maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)
