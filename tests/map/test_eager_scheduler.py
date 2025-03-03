@@ -1,5 +1,6 @@
+import threading
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -7,58 +8,59 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
+from pipefunc.map._run import run_map
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.typing import Array
 
 
-@pipefunc(output_name="slow")
-def slow_task():
-    # Simulate a slow CPU-bound task
-    time.sleep(0.5)  # Reduced sleep time for faster tests
-    return "slow"
+@pytest.mark.parametrize("eager", [True, False])
+@pytest.mark.parametrize("parallel", [True, False])
+def test_dynamic_scheduler_worker_count(
+    tmp_path: Path,
+    parallel: bool,  # noqa: FBT001
+    eager: bool,  # noqa: FBT001
+):
+    """Test that multiple workers are active simultaneously."""
+    max_concurrent_workers = 0
+    worker_count_lock = threading.Lock()
+    active_workers = 0
 
+    def instrumented_task(name, duration):
+        nonlocal max_concurrent_workers, active_workers
+        with worker_count_lock:
+            active_workers += 1
+            max_concurrent_workers = max(max_concurrent_workers, active_workers)
+        time.sleep(duration)
+        with worker_count_lock:
+            active_workers -= 1
+        return name
 
-@pipefunc(output_name="quick")
-def quick_task():
-    # Simulate a fast CPU-bound task
-    time.sleep(0.1)  # Reduced sleep time for faster tests
-    return "quick"
+    @pipefunc(output_name="task1")
+    def task1():
+        return instrumented_task("task1", 0.5)
 
+    @pipefunc(output_name="task2")
+    def task2():
+        return instrumented_task("task2", 0.5)
 
-@pipefunc(output_name="combined")
-def combine(slow, quick):
-    return f"{slow} and {quick}"
-
-
-def test_eager_scheduler_parallel_execution(tmp_path: Path):
-    """
-    Test that independent branches run in parallel.
-    The pipeline is:
-       slow_task  -->
-                    \
-                     --> combine  (should wait for both slow and quick)
-       quick_task -->
-
-    Since slow_task sleeps for 0.5 seconds and quick_task for 0.1 seconds,
-    if they were executed sequentially the total time would be >0.6 seconds.
-    With parallel eager scheduling, the total time should be close to the slow branch (≈0.5 seconds + overhead).
-    """
-    pipeline = Pipeline([slow_task, quick_task, combine])
-    # No root inputs in this example, so we pass an empty dict.
-    run_folder = tmp_path / "run_eager"
-    start = time.monotonic()
-    result = run_map_eager(
+    pipeline = Pipeline([task1, task2])
+    run_folder = tmp_path / "worker_count"
+    executor = ThreadPoolExecutor(max_workers=2) if parallel else None
+    run = run_map if not eager else run_map_eager
+    run(
         pipeline,
         inputs={},
         run_folder=run_folder,
+        executor=executor,
         show_progress=False,
+        parallel=parallel,
     )
-    elapsed = time.monotonic() - start
-    # Check that the combined result is correct.
-    assert result["combined"].output == "slow and quick"
-    # The total elapsed time is likely to include overhead from the eager scheduler,
-    # which may make it longer than expected. Let's use a more generous threshold.
-    assert elapsed < 2.0, f"Elapsed time was {elapsed:.2f} seconds, expected less than 2.0 seconds"
+    if parallel:
+        # If tasks run in parallel, we should have had 2 concurrent workers at some point
+        assert max_concurrent_workers > 1
+    else:
+        # If tasks run sequentially, we should have had at most 1 worker at a time
+        assert max_concurrent_workers == 1
 
 
 # Test a more complex dependency graph
