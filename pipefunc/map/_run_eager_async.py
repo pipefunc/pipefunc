@@ -201,10 +201,10 @@ async def _eager_scheduler_loop_async(
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
-    multi_run_manager: MultiRunManager | None,
+    multi_run_manager: MultiRunManager | None = None,
 ) -> None:
     """Dynamically submit and await tasks for functions as soon as they are ready."""
-    tracker = _FunctionTracker()
+    tracker = _FunctionTracker(is_async=True)
 
     # Submit initial ready tasks
     for f in dependency_info.ready:
