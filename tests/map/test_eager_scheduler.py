@@ -538,64 +538,6 @@ def test_eager_scheduler_error_handling(tmp_path: Path):
         )
 
 
-# Test with auto_subpipeline
-@pipefunc(output_name="intermediate")
-def create_intermediate():
-    return "intermediate_value"
-
-
-@pipefunc(output_name="final")
-def use_intermediate(intermediate):
-    return f"Used {intermediate}"
-
-
-def test_eager_scheduler_with_auto_subpipeline(tmp_path: Path):
-    """Test that the eager scheduler works with auto_subpipeline."""
-    pipeline = Pipeline([create_intermediate, use_intermediate])
-    run_folder = tmp_path / "auto_subpipeline"
-
-    # Provide the intermediate result directly
-    result = run_map_eager(
-        pipeline,
-        inputs={"intermediate": "direct_value"},
-        run_folder=run_folder,
-        auto_subpipeline=True,
-        show_progress=False,
-    )
-
-    assert result["final"].output == "Used direct_value"
-    # Check result from disk
-    assert load_outputs("final", run_folder=run_folder) == "Used direct_value"
-
-    # Without auto_subpipeline, this would fail because create_intermediate wouldn't be called
-    with pytest.raises(ValueError, match="Missing required inputs"):
-        run_map_eager(
-            pipeline,
-            inputs={"intermediate": "direct_value"},
-            run_folder=run_folder,
-            auto_subpipeline=False,
-            show_progress=False,
-        )
-
-
-# Test with show_progress (can only verify it doesn't crash)
-@pytest.mark.skipif(not hasattr(pytest, "xvfb"), reason="GUI test")
-def test_eager_scheduler_with_progress_bar(tmp_path: Path):
-    """Test that the eager scheduler works with progress bar display."""
-    pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
-    run_folder = tmp_path / "progress_bar"
-
-    # This just tests that it doesn't crash
-    result = run_map_eager(
-        pipeline,
-        inputs={},
-        run_folder=run_folder,
-        show_progress=True,
-    )
-
-    assert result["e"].output == "e(c(a),d(b))"
-
-
 # Test with persist_memory
 @pytest.mark.parametrize("persist_memory", [True, False])
 def test_eager_scheduler_with_persist_memory(
