@@ -113,7 +113,7 @@ def test_complex_dependency_graph(tmp_path: Path):
         scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
-        show_progress=True,
+        show_progress=False,
     )
 
     assert result["e"].output == "e(c(a),d(b))"
