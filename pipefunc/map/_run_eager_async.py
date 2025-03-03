@@ -1,27 +1,29 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import FIRST_COMPLETED, Executor, Future, wait
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
-    _KwargsTask,
+    AsyncMap,
     _maybe_executor,
     _maybe_persist_memory,
-    _process_task,
-    _submit_func,
+    _process_task_async,
+    maybe_finalize_slurm_executors,
+    maybe_multi_run_manager,
     prepare_run,
 )
+from pipefunc.map._run_eager import _build_dependency_graph, _DependencyInfo, _FunctionTracker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from concurrent.futures import Executor
     from pathlib import Path
 
     import pydantic
+    from adaptive_scheduler import MultiRunManager
 
     from pipefunc import Pipeline
+    from pipefunc._pipefunc import PipeFunc
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets import ProgressTracker
     from pipefunc.cache import _CacheBase
@@ -31,14 +33,13 @@ if TYPE_CHECKING:
     from ._types import UserShapeDict
 
 
-def run_map_eager(
+def run_map_eager_async(
     pipeline: Pipeline,
     inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
     internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
-    parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: StorageType = "file_array",
@@ -48,12 +49,15 @@ def run_map_eager(
     auto_subpipeline: bool = False,
     show_progress: bool = False,
     return_results: bool = True,
-) -> ResultDict:
-    """Eagerly schedule pipeline functions as soon as their dependencies are met.
+) -> AsyncMap:
+    """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
 
-    This implementation replaces the generation-by-generation scheduling used in the
-    original run_map. Instead, it maintains a dependency counter for each function and
-    submits tasks as soon as all their upstream dependencies (other PipeFunc nodes) have finished.
+    This implementation dynamically schedules functions as soon as their dependencies
+    are met, without waiting for an entire generation to complete.
+
+    Parameters are identical to run_map_async.
+
+    Returns immediately with an `AsyncRun` instance with a `task` attribute that can be awaited.
 
     Parameters
     ----------
@@ -76,8 +80,6 @@ def run_map_eager(
         If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
-    parallel
-        Whether to run the functions in parallel. Is ignored if provided ``executor`` is not ``None``.
     executor
         The executor to use for parallel execution. Can be specified as:
 
@@ -87,8 +89,6 @@ def run_map_eager(
 
            - Use output names as keys and `~concurrent.futures.Executor` instances as values.
            - Use an empty string ``""`` as a key to set a default executor.
-
-        If parallel is ``False``, this argument is ignored.
     chunksizes
         Controls batching of `~pipefunc.map.MapSpec` computations for parallel execution.
         Reduces overhead by grouping multiple function calls into single tasks.
@@ -133,198 +133,59 @@ def run_map_eager(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. Only works if ``parallel=True``.
+        Whether to display a progress bar.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    # Prepare the run (this call sets up the run folder, storage, progress, etc.)
-    pipeline, run_info, store, outputs, parallel, executor_dict, progress = prepare_run(
+    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
         internal_shapes=internal_shapes,
         output_names=output_names,
-        parallel=parallel,
+        parallel=True,
         executor=executor,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
-        in_async=False,
+        in_async=True,
     )
 
+    multi_run_manager = maybe_multi_run_manager(executor_dict)
+
+    async def _run_pipeline() -> ResultDict:
+        with _maybe_executor(executor_dict, parallel=True) as ex:
+            assert ex is not None
+            dependency_info = _build_dependency_graph(pipeline)
+            await _eager_scheduler_loop_async(
+                dependency_info=dependency_info,
+                executor=ex,
+                run_info=run_info,
+                store=store,
+                outputs=outputs,
+                fixed_indices=fixed_indices,
+                chunksizes=chunksizes,
+                progress=progress,
+                return_results=return_results,
+                cache=pipeline.cache,
+                multi_run_manager=multi_run_manager,
+            )
+        _maybe_persist_memory(store, persist_memory)
+        return outputs
+
+    task = asyncio.create_task(_run_pipeline())
     if progress is not None:
-        progress.display()
+        progress.attach_task(task)
 
-    dependency_info = _build_dependency_graph(pipeline)
-
-    with _maybe_executor(executor_dict, parallel) as ex:
-        _eager_scheduler_loop(
-            dependency_info=dependency_info,
-            executor=ex,
-            run_info=run_info,
-            store=store,
-            outputs=outputs,
-            fixed_indices=fixed_indices,
-            chunksizes=chunksizes,
-            progress=progress,
-            return_results=return_results,
-            cache=pipeline.cache,
-        )
-
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
-
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    return AsyncMap(task, run_info, progress, multi_run_manager)
 
 
-def _build_dependency_graph(pipeline: Pipeline) -> _DependencyInfo:
-    """Build the dependency graph for PipeFunc nodes.
-
-    Returns
-    -------
-    DependencyInfo
-        Contains the dependency counts, child relationships, and initially ready functions.
-
-    """
-    graph = pipeline.graph
-    remaining_deps: dict[PipeFunc, int] = {}
-    children: dict[PipeFunc, list[PipeFunc]] = {}
-
-    for f in pipeline.functions:
-        # Count only incoming edges from other PipeFunc nodes
-        count = sum(1 for n in graph.predecessors(f) if isinstance(n, PipeFunc))
-        remaining_deps[f] = count
-
-        # Record all downstream functions (children) that are PipeFunc instances
-        children[f] = [child for child in graph.successors(f) if isinstance(child, PipeFunc)]
-
-    # Initially, functions with no PipeFunc dependencies are ready
-    ready = [f for f in pipeline.functions if remaining_deps[f] == 0]
-
-    return _DependencyInfo(remaining_deps, children, ready)
-
-
-@dataclass
-class _DependencyInfo:
-    """Container for dependency graph information."""
-
-    remaining_deps: dict[PipeFunc, int]
-    children: dict[PipeFunc, list[PipeFunc]]
-    ready: list[PipeFunc]
-
-
-def _ensure_future(x: Any) -> Future[Any]:
-    """Ensure that an object is a Future."""
-    if isinstance(x, Future | asyncio.Future):
-        return x
-    fut: Future[Any] = Future()
-    fut.set_result(x)
-    return fut
-
-
-class _FunctionTracker:
-    """Tracks function execution state during eager scheduling."""
-
-    def __init__(self, *, is_async: bool = False) -> None:
-        """Initialize the function tracker."""
-        self.tasks: dict[PipeFunc, _KwargsTask] = {}
-        self.future_to_func: dict[Future, PipeFunc] = {}
-        self.func_futures: dict[PipeFunc, set[Future]] = {}
-        self.completed_funcs: set[PipeFunc] = set()
-        self.is_async: bool = is_async
-
-        # Async-specific attributes
-        if self.is_async:
-            self.future_to_async_task = {}  # Future -> asyncio.Task
-            self.pending_async_tasks = set()  # set[asyncio.Task]
-
-    def submit_function(
-        self,
-        func: PipeFunc,
-        run_info: RunInfo,
-        store: dict[str, Any],
-        fixed_indices: dict[str, int | slice] | None,
-        executor: dict[OUTPUT_TYPE, Executor] | None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-        progress: ProgressTracker | None,
-        return_results: bool,  # noqa: FBT001
-        cache: _CacheBase | None,
-    ) -> None:
-        """Submit a function and track its futures."""
-        kwargs_task = _submit_func(
-            func,
-            run_info,
-            store,
-            fixed_indices,
-            executor,
-            chunksizes,
-            progress,
-            return_results,
-            cache,
-        )
-        self.tasks[func] = kwargs_task
-
-        # Initialize the set of futures for this function
-        self.func_futures[func] = set()
-
-        # Track futures for this function
-        if func.requires_mapping:
-            r, _ = kwargs_task.task
-            for task in r:
-                fut = _ensure_future(task)
-                self.future_to_func[fut] = func
-                self.func_futures[func].add(fut)
-        else:
-            task = kwargs_task.task
-            fut = _ensure_future(task)
-            self.future_to_func[fut] = func
-            self.func_futures[func].add(fut)
-
-    def is_function_complete(self, func: PipeFunc) -> bool:
-        """Check if all futures for a function are completed."""
-        return (
-            func in self.func_futures
-            and not self.func_futures[func]
-            and func not in self.completed_funcs
-        )
-
-    def mark_function_complete(self, func: PipeFunc) -> None:
-        """Mark a function as completed."""
-        self.completed_funcs.add(func)
-
-    def has_active_futures(self) -> bool:
-        """Check if there are any active futures."""
-        if self.is_async:
-            return bool(self.future_to_func) or bool(self.pending_async_tasks)
-        return bool(self.future_to_func)
-
-    def create_async_task(self, fut, func, loop):
-        """Create an asyncio task for a concurrent future."""
-        if not self.is_async:
-            msg = "Cannot create async tasks in sync mode"
-            raise RuntimeError(msg)
-
-        async_task = asyncio.ensure_future(asyncio.wrap_future(fut, loop=loop))
-
-        # When the task completes, remove the future from the function's futures
-        async_task.add_done_callback(
-            lambda _: self.func_futures[func].discard(fut) if func in self.func_futures else None,
-        )
-
-        # Track the relationship between future and task
-        self.future_to_async_task[fut] = async_task
-        self.pending_async_tasks.add(async_task)
-
-        return async_task
-
-
-def _eager_scheduler_loop(
+async def _eager_scheduler_loop_async(
     *,
     dependency_info: _DependencyInfo,
     executor: dict[OUTPUT_TYPE, Executor] | None,
@@ -336,8 +197,9 @@ def _eager_scheduler_loop(
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
+    multi_run_manager: MultiRunManager | None = None,
 ) -> None:
-    """Dynamically submit tasks for functions as soon as they are ready."""
+    """Dynamically submit and await tasks for functions as soon as they are ready."""
     tracker = _FunctionTracker()
 
     # Submit initial ready tasks
@@ -354,9 +216,11 @@ def _eager_scheduler_loop(
             cache,
         )
 
+    maybe_finalize_slurm_executors(dependency_info.ready, executor, multi_run_manager)
+
     # Process tasks as they complete
     while tracker.has_active_futures():
-        _process_completed_futures(
+        await _process_completed_futures_async(
             tracker=tracker,
             dependency_info=dependency_info,
             run_info=run_info,
@@ -368,10 +232,11 @@ def _eager_scheduler_loop(
             progress=progress,
             return_results=return_results,
             cache=cache,
+            multi_run_manager=multi_run_manager,
         )
 
 
-def _process_completed_futures(
+async def _process_completed_futures_async(
     *,
     tracker: _FunctionTracker,
     dependency_info: _DependencyInfo,
@@ -384,45 +249,77 @@ def _process_completed_futures(
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
+    multi_run_manager: MultiRunManager | None,
 ) -> None:
-    """Process completed futures and schedule new tasks."""
-    done, _ = wait(tracker.future_to_func.keys(), return_when=FIRST_COMPLETED)
+    """Process completed futures and schedule new tasks asynchronously."""
+    loop = asyncio.get_event_loop()
 
-    for fut in done:
-        # Get the function associated with this future
-        func = tracker.future_to_func.pop(fut)
+    # Create tasks for all pending futures that don't have tasks yet
+    pending_tasks = []
+    for fut, func in list(tracker.future_to_func.items()):
+        if fut not in tracker.future_to_async_task:
+            task = tracker.create_async_task(fut, func, loop)
+            pending_tasks.append(task)
 
-        # Remove this future from the function's futures
-        if func in tracker.func_futures:
-            tracker.func_futures[func].discard(fut)
+    # If we have any async tasks (new or existing), wait for one to complete
+    if tracker.pending_async_tasks:
+        done, pending = await asyncio.wait(
+            tracker.pending_async_tasks,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
 
-            # If all futures for this function are done, process the results
-            if tracker.is_function_complete(func):
-                # Process the task and update outputs
-                result = _process_task(func, tracker.tasks[func], store, run_info, return_results)
-                if return_results and result is not None:
-                    outputs.update(result)
+        # Remove completed tasks
+        for task in done:
+            tracker.pending_async_tasks.discard(task)
 
-                # Mark this function as completed
-                tracker.mark_function_complete(func)
+            # Find and remove the corresponding future
+            for fut, async_task in list(tracker.future_to_async_task.items()):
+                if async_task == task:
+                    del tracker.future_to_async_task[fut]
+                    if fut in tracker.future_to_func:
+                        del tracker.future_to_func[fut]
+                    break
 
-                # Update dependencies and submit new tasks
-                _update_dependencies_and_submit(
-                    func=func,
-                    tracker=tracker,
-                    dependency_info=dependency_info,
-                    run_info=run_info,
-                    store=store,
-                    fixed_indices=fixed_indices,
-                    executor=executor,
-                    chunksizes=chunksizes,
-                    progress=progress,
-                    return_results=return_results,
-                    cache=cache,
-                )
+    # Process completed functions
+    completed_funcs = []
+    for func in list(tracker.func_futures.keys()):
+        if tracker.is_function_complete(func):
+            # Process the task and update outputs
+            result = await _process_task_async(
+                func,
+                tracker.tasks[func],
+                store,
+                run_info,
+                return_results,
+            )
+            if return_results and result is not None:
+                outputs.update(result)
+
+            # Mark this function as completed
+            tracker.mark_function_complete(func)
+            completed_funcs.append(func)
+
+            # Update dependencies and submit new functions
+            await _update_dependencies_and_submit_async(
+                func=func,
+                tracker=tracker,
+                dependency_info=dependency_info,
+                run_info=run_info,
+                store=store,
+                fixed_indices=fixed_indices,
+                executor=executor,
+                chunksizes=chunksizes,
+                progress=progress,
+                return_results=return_results,
+                cache=cache,
+            )
+
+    # Finalize SLURM executors if needed for newly completed functions
+    if completed_funcs and multi_run_manager is not None:
+        maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)
 
 
-def _update_dependencies_and_submit(
+async def _update_dependencies_and_submit_async(
     *,
     func: PipeFunc,
     tracker: _FunctionTracker,
@@ -452,3 +349,54 @@ def _update_dependencies_and_submit(
                 return_results,
                 cache,
             )
+
+
+async def _eager_scheduler_loop_async(
+    *,
+    dependency_info: _DependencyInfo,
+    executor: dict[OUTPUT_TYPE, Executor] | None,
+    run_info: RunInfo,
+    store: dict[str, Any],
+    outputs: ResultDict,
+    fixed_indices: dict[str, int | slice] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    progress: ProgressTracker | None,
+    return_results: bool,
+    cache: _CacheBase | None,
+    multi_run_manager: MultiRunManager | None = None,
+) -> None:
+    """Dynamically submit and await tasks for functions as soon as they are ready."""
+    tracker = _FunctionTracker(is_async=True)
+
+    # Submit initial ready tasks
+    for f in dependency_info.ready:
+        tracker.submit_function(
+            f,
+            run_info,
+            store,
+            fixed_indices,
+            executor,
+            chunksizes,
+            progress,
+            return_results,
+            cache,
+        )
+
+    maybe_finalize_slurm_executors(dependency_info.ready, executor, multi_run_manager)
+
+    # Process tasks as they complete
+    while tracker.has_active_futures():
+        await _process_completed_futures_async(
+            tracker=tracker,
+            dependency_info=dependency_info,
+            run_info=run_info,
+            store=store,
+            outputs=outputs,
+            fixed_indices=fixed_indices,
+            executor=executor,
+            chunksizes=chunksizes,
+            progress=progress,
+            return_results=return_results,
+            cache=cache,
+            multi_run_manager=multi_run_manager,
+        )
