@@ -529,3 +529,5 @@ def run_map_eager_async(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
+    msg = "This function is not yet implemented."
+    raise NotImplementedError(msg)
