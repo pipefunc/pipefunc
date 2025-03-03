@@ -7,7 +7,7 @@ import pytest
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
-from pipefunc.map._run_dynamic import run_map_dynamic
+from pipefunc.map._run_eager import run_map_eager
 from pipefunc.typing import Array
 
 
@@ -30,7 +30,7 @@ def combine(slow, quick):
     return f"{slow} and {quick}"
 
 
-def test_dynamic_scheduler_parallel_execution(tmp_path: Path):
+def test_eager_scheduler_parallel_execution(tmp_path: Path):
     """
     Test that independent branches run in parallel.
     The pipeline is:
@@ -41,13 +41,13 @@ def test_dynamic_scheduler_parallel_execution(tmp_path: Path):
 
     Since slow_task sleeps for 0.5 seconds and quick_task for 0.1 seconds,
     if they were executed sequentially the total time would be >0.6 seconds.
-    With parallel dynamic scheduling, the total time should be close to the slow branch (≈0.5 seconds + overhead).
+    With parallel eager scheduling, the total time should be close to the slow branch (≈0.5 seconds + overhead).
     """
     pipeline = Pipeline([slow_task, quick_task, combine])
     # No root inputs in this example, so we pass an empty dict.
-    run_folder = tmp_path / "run_dynamic"
+    run_folder = tmp_path / "run_eager"
     start = time.monotonic()
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -56,7 +56,7 @@ def test_dynamic_scheduler_parallel_execution(tmp_path: Path):
     elapsed = time.monotonic() - start
     # Check that the combined result is correct.
     assert result["combined"].output == "slow and quick"
-    # The total elapsed time is likely to include overhead from the dynamic scheduler,
+    # The total elapsed time is likely to include overhead from the eager scheduler,
     # which may make it longer than expected. Let's use a more generous threshold.
     assert elapsed < 2.0, f"Elapsed time was {elapsed:.2f} seconds, expected less than 2.0 seconds"
 
@@ -100,14 +100,14 @@ def test_complex_dependency_graph(tmp_path: Path):
               --> e
     b --> d --/
 
-    With dynamic scheduling, tasks a and b should run in parallel,
+    With eager scheduling, tasks a and b should run in parallel,
     then c and d should run in parallel once a and b complete,
     and finally e should run once c and d complete.
     """
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "complex_graph"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -134,13 +134,13 @@ def sum_values(values: Array[int]) -> int:
     return sum(values)
 
 
-def test_dynamic_scheduler_with_mapspec(tmp_path: Path):
-    """Test that the dynamic scheduler works with MapSpec functions."""
+def test_eager_scheduler_with_mapspec(tmp_path: Path):
+    """Test that the eager scheduler works with MapSpec functions."""
     pipeline = Pipeline([multiply_by_two, sum_values])
     run_folder = tmp_path / "mapspec"
 
     inputs = {"x": [1, 2, 3, 4, 5]}
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -166,13 +166,13 @@ def combine_outputs(out1, out2):
     return f"{out1} and {out2}"
 
 
-def test_dynamic_scheduler_with_multiple_outputs(tmp_path: Path):
-    """Test that the dynamic scheduler handles functions with multiple outputs."""
+def test_eager_scheduler_with_multiple_outputs(tmp_path: Path):
+    """Test that the eager scheduler handles functions with multiple outputs."""
     pipeline = Pipeline([multiple_outputs, combine_outputs])
     run_folder = tmp_path / "multiple_outputs"
 
     # Make sure we're getting results back
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -196,13 +196,13 @@ def test_dynamic_scheduler_with_multiple_outputs(tmp_path: Path):
 
 
 # Test with custom executor
-def test_dynamic_scheduler_with_custom_executor(tmp_path: Path):
-    """Test that the dynamic scheduler works with a custom executor."""
+def test_eager_scheduler_with_custom_executor(tmp_path: Path):
+    """Test that the eager scheduler works with a custom executor."""
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "custom_executor"
 
     with ProcessPoolExecutor(max_workers=2) as executor:
-        result = run_map_dynamic(
+        result = run_map_eager(
             pipeline,
             inputs={},
             run_folder=run_folder,
@@ -214,12 +214,12 @@ def test_dynamic_scheduler_with_custom_executor(tmp_path: Path):
 
 
 # Test with return_results=False
-def test_dynamic_scheduler_without_returning_results(tmp_path: Path):
-    """Test that the dynamic scheduler works when not returning results."""
+def test_eager_scheduler_without_returning_results(tmp_path: Path):
+    """Test that the eager scheduler works when not returning results."""
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "no_return"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -235,8 +235,8 @@ def test_dynamic_scheduler_without_returning_results(tmp_path: Path):
 
 
 # Test with caching
-def test_dynamic_scheduler_with_caching(tmp_path: Path):
-    """Test that the dynamic scheduler respects function caching."""
+def test_eager_scheduler_with_caching(tmp_path: Path):
+    """Test that the eager scheduler respects function caching."""
     # Define functions with counters to check if they're called
     call_counts = {"a": 0, "b": 0, "c": 0}
 
@@ -259,7 +259,7 @@ def test_dynamic_scheduler_with_caching(tmp_path: Path):
     run_folder = tmp_path / "caching"
 
     # First run
-    result1 = run_map_dynamic(
+    result1 = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -274,7 +274,7 @@ def test_dynamic_scheduler_with_caching(tmp_path: Path):
     assert call_counts == {"a": 1, "b": 1, "c": 1}
 
     # Second run should use cache
-    result2 = run_map_dynamic(
+    result2 = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -303,12 +303,12 @@ def sum_doubled(y: Array[int]) -> int:
     return sum(y)
 
 
-def test_dynamic_scheduler_with_internal_shapes(tmp_path: Path):
-    """Test that the dynamic scheduler handles internal shapes correctly."""
+def test_eager_scheduler_with_internal_shapes(tmp_path: Path):
+    """Test that the eager scheduler handles internal shapes correctly."""
     pipeline = Pipeline([generate_values, double_values, sum_doubled])
     run_folder = tmp_path / "internal_shapes"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -325,15 +325,15 @@ def process_value(x: int) -> int:
     return x * 2
 
 
-def test_dynamic_scheduler_with_fixed_indices(tmp_path: Path):
-    """Test that the dynamic scheduler respects fixed indices."""
+def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
+    """Test that the eager scheduler respects fixed indices."""
     pipeline = Pipeline([process_value])
     run_folder = tmp_path / "fixed_indices"
 
     inputs = {"x": [10, 20, 30, 40, 50]}
 
     # Only process index 2 (value 30)
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -351,7 +351,7 @@ def test_dynamic_scheduler_with_fixed_indices(tmp_path: Path):
     assert values_on_disk[2] == 60
 
     # Run again with a different fixed index
-    result2 = run_map_dynamic(
+    result2 = run_map_eager(
         pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -393,12 +393,12 @@ def step_e(d):
     return d + 1
 
 
-def test_dynamic_scheduler_with_long_dependency_chain(tmp_path: Path):
-    """Test that the dynamic scheduler handles long dependency chains correctly."""
+def test_eager_scheduler_with_long_dependency_chain(tmp_path: Path):
+    """Test that the eager scheduler handles long dependency chains correctly."""
     pipeline = Pipeline([step_a, step_b, step_c, step_d, step_e])
     run_folder = tmp_path / "long_chain"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -438,7 +438,7 @@ def diamond_end(left, right):
     return left + right
 
 
-def test_dynamic_scheduler_with_diamond_pattern(tmp_path: Path):
+def test_eager_scheduler_with_diamond_pattern(tmp_path: Path):
     """
     Test a diamond dependency pattern:
 
@@ -451,7 +451,7 @@ def test_dynamic_scheduler_with_diamond_pattern(tmp_path: Path):
     pipeline = Pipeline([diamond_start, diamond_left, diamond_right, diamond_end])
     run_folder = tmp_path / "diamond"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -471,15 +471,15 @@ def slow_process(x: int) -> int:
     return x * 2
 
 
-def test_dynamic_scheduler_with_chunksizes(tmp_path: Path):
-    """Test that the dynamic scheduler respects the chunksizes parameter."""
+def test_eager_scheduler_with_chunksizes(tmp_path: Path):
+    """Test that the eager scheduler respects the chunksizes parameter."""
     pipeline = Pipeline([slow_process])
     run_folder = tmp_path / "chunksizes"
 
     inputs = {"x": list(range(20))}  # 20 values to process
 
     # Use a small chunksize to force multiple chunks
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -494,12 +494,12 @@ def test_dynamic_scheduler_with_chunksizes(tmp_path: Path):
 
 # Test with different storage types
 @pytest.mark.parametrize("storage", ["file_array", "dict", "shared_memory_dict"])
-def test_dynamic_scheduler_with_different_storage(tmp_path: Path, storage: str):
-    """Test that the dynamic scheduler works with different storage types."""
+def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
+    """Test that the eager scheduler works with different storage types."""
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / f"storage_{storage}"
 
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -522,13 +522,13 @@ def dependent_task(will_fail):
     return f"Processed {will_fail}"
 
 
-def test_dynamic_scheduler_error_handling(tmp_path: Path):
-    """Test that the dynamic scheduler properly handles errors in tasks."""
+def test_eager_scheduler_error_handling(tmp_path: Path):
+    """Test that the eager scheduler properly handles errors in tasks."""
     pipeline = Pipeline([failing_task, dependent_task])
     run_folder = tmp_path / "error_handling"
 
     with pytest.raises(ValueError, match="This task is designed to fail"):
-        run_map_dynamic(
+        run_map_eager(
             pipeline,
             inputs={},
             run_folder=run_folder,
@@ -547,13 +547,13 @@ def use_intermediate(intermediate):
     return f"Used {intermediate}"
 
 
-def test_dynamic_scheduler_with_auto_subpipeline(tmp_path: Path):
-    """Test that the dynamic scheduler works with auto_subpipeline."""
+def test_eager_scheduler_with_auto_subpipeline(tmp_path: Path):
+    """Test that the eager scheduler works with auto_subpipeline."""
     pipeline = Pipeline([create_intermediate, use_intermediate])
     run_folder = tmp_path / "auto_subpipeline"
 
     # Provide the intermediate result directly
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={"intermediate": "direct_value"},
         run_folder=run_folder,
@@ -567,7 +567,7 @@ def test_dynamic_scheduler_with_auto_subpipeline(tmp_path: Path):
 
     # Without auto_subpipeline, this would fail because create_intermediate wouldn't be called
     with pytest.raises(ValueError, match="Missing required inputs"):
-        run_map_dynamic(
+        run_map_eager(
             pipeline,
             inputs={"intermediate": "direct_value"},
             run_folder=run_folder,
@@ -578,13 +578,13 @@ def test_dynamic_scheduler_with_auto_subpipeline(tmp_path: Path):
 
 # Test with show_progress (can only verify it doesn't crash)
 @pytest.mark.skipif(not hasattr(pytest, "xvfb"), reason="GUI test")
-def test_dynamic_scheduler_with_progress_bar(tmp_path: Path):
-    """Test that the dynamic scheduler works with progress bar display."""
+def test_eager_scheduler_with_progress_bar(tmp_path: Path):
+    """Test that the eager scheduler works with progress bar display."""
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "progress_bar"
 
     # This just tests that it doesn't crash
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -596,16 +596,16 @@ def test_dynamic_scheduler_with_progress_bar(tmp_path: Path):
 
 # Test with persist_memory
 @pytest.mark.parametrize("persist_memory", [True, False])
-def test_dynamic_scheduler_with_persist_memory(
+def test_eager_scheduler_with_persist_memory(
     tmp_path: Path,
     persist_memory: bool,  # noqa: FBT001
 ):
-    """Test that the dynamic scheduler respects the persist_memory parameter."""
+    """Test that the eager scheduler respects the persist_memory parameter."""
     pipeline = Pipeline([task_a, task_b])
     run_folder = tmp_path / f"persist_{persist_memory}"
 
     # Use memory-based storage
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs={},
         run_folder=run_folder,
@@ -638,8 +638,8 @@ def sum_all(row_sums: np.ndarray) -> int:
     return np.sum(row_sums)
 
 
-def test_dynamic_scheduler_with_complex_mapspec(tmp_path: Path):
-    """Test that the dynamic scheduler handles complex MapSpec patterns correctly.
+def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
+    """Test that the eager scheduler handles complex MapSpec patterns correctly.
 
     # Expected matrix:
     # [[1*4, 1*5],
@@ -654,7 +654,7 @@ def test_dynamic_scheduler_with_complex_mapspec(tmp_path: Path):
     run_folder = tmp_path / "complex_mapspec"
 
     inputs = {"x": [1, 2, 3], "y": [4, 5]}
-    result = run_map_dynamic(
+    result = run_map_eager(
         pipeline,
         inputs=inputs,
         run_folder=run_folder,

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from ._types import UserShapeDict
 
 
-def run_map_dynamic(
+def run_map_eager(
     pipeline: Pipeline,
     inputs: dict[str, Any] | pydantic.BaseModel,
     run_folder: str | Path | None = None,
@@ -162,7 +162,7 @@ def run_map_dynamic(
     dependency_info = _build_dependency_graph(pipeline)
 
     with _maybe_executor(executor_dict, parallel) as ex:
-        _dynamic_scheduler_loop(
+        _eager_scheduler_loop(
             dependency_info=dependency_info,
             executor=ex,
             run_info=run_info,
@@ -228,7 +228,7 @@ def _ensure_future(x: Any) -> Future[Any]:
 
 
 class _FunctionTracker:
-    """Tracks function execution state during dynamic scheduling."""
+    """Tracks function execution state during eager scheduling."""
 
     def __init__(self) -> None:
         """Initialize the function tracker."""
@@ -296,7 +296,7 @@ class _FunctionTracker:
         return bool(self.future_to_func)
 
 
-def _dynamic_scheduler_loop(
+def _eager_scheduler_loop(
     *,
     dependency_info: _DependencyInfo,
     executor: dict[OUTPUT_TYPE, Executor] | None,
