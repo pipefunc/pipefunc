@@ -209,7 +209,7 @@ if __name__ == "__main__":
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         run_map,
-        allow_missing=["pipeline"],
+        allow_missing=["pipeline", "scheduling_strategy"],
     )
     compare_param_descriptions(
         run_map_eager,
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     compare_param_descriptions(
         pipefunc.Pipeline.map_async,
         run_map_async,
-        allow_missing=["parallel", "pipeline"],
+        allow_missing=["parallel", "pipeline", "scheduling_strategy"],
         allow_discrepancy=["show_progress"],
     )
     compare_param_descriptions(

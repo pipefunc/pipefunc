@@ -43,7 +43,7 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
-from pipefunc.map._run_eager import run_map_eager
+from pipefunc.map._run_eager import run_map_eager, run_map_eager_async
 from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs
@@ -713,7 +713,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool = False,
         return_results: bool = True,
-        scheduling_type: Literal["topological_generation", "eager"] = "topological_generation",
+        scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -798,8 +798,17 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
-        scheduling_type
-            TODD
+        scheduling_strategy
+            Strategy for scheduling pipeline function execution:
+
+            - "generation" (default): Executes functions in strict topological generations,
+              waiting for all functions in a generation to complete before starting the next.
+              Provides predictable execution order but may not maximize parallelism.
+
+            - "eager": Dynamically schedules functions as soon as their dependencies are met,
+              without waiting for entire generations to complete. Can improve performance
+              by maximizing parallel execution, especially for complex dependency graphs
+              with varied execution times.
 
         See Also
         --------
@@ -812,12 +821,12 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        if scheduling_type == "topological_generation":
+        if scheduling_strategy == "generation":
             run_map_func = run_map
-        elif scheduling_type == "eager":
+        elif scheduling_strategy == "eager":
             run_map_func = run_map_eager
         else:
-            msg = f"Invalid scheduling type: {scheduling_type}"
+            msg = f"Invalid scheduling type: {scheduling_strategy}"
             raise ValueError(msg)
         return run_map_func(
             self,
@@ -853,6 +862,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool = False,
         return_results: bool = True,
+        scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -935,6 +945,17 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        scheduling_strategy
+            Strategy for scheduling pipeline function execution:
+
+            - "generation" (default): Executes functions in strict topological generations,
+              waiting for all functions in a generation to complete before starting the next.
+              Provides predictable execution order but may not maximize parallelism.
+
+            - "eager": Dynamically schedules functions as soon as their dependencies are met,
+              without waiting for entire generations to complete. Can improve performance
+              by maximizing parallel execution, especially for complex dependency graphs
+              with varied execution times.
 
         See Also
         --------
@@ -946,8 +967,17 @@ class Pipeline:
             An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
             The ``task`` can be awaited to get the final result of the pipeline.
 
+
         """
-        return run_map_async(
+        if scheduling_strategy == "generation":
+            run_map_func = run_map_async
+        elif scheduling_strategy == "eager":
+            run_map_func = run_map_eager_async
+        else:
+            msg = f"Invalid scheduling type: {scheduling_strategy}"
+            raise ValueError(msg)
+
+        return run_map_func(
             self,
             inputs,
             run_folder,
