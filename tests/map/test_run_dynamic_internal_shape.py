@@ -161,10 +161,12 @@ def test_2d_internal_shape_non_dynamic(
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.parametrize("dim", ["?", None])
 @pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
 def test_2d_internal_shape(
     tmp_path: Path,
     dim: Literal["?"] | None,
     return_results: bool,  # noqa: FBT001
+    scheduling_strategy: Literal["generation", "eager"],
 ) -> None:
     counters = {"f": 0, "g": 0, "h": 0}
 
@@ -200,6 +202,7 @@ def test_2d_internal_shape(
         run_folder=tmp_path,
         parallel=False,
         return_results=return_results,
+        scheduling_strategy=scheduling_strategy,
     )
     if return_results:
         assert results["y"].output.tolist() == expected_y
@@ -213,6 +216,7 @@ def test_2d_internal_shape(
         cleanup=False,
         show_progress=True,
         return_results=return_results,
+        scheduling_strategy=scheduling_strategy,
     )
     assert before == counters
 

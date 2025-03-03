@@ -43,7 +43,8 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
-from pipefunc.map._run_eager import run_map_eager, run_map_eager_async
+from pipefunc.map._run_eager import run_map_eager
+from pipefunc.map._run_eager_async import run_map_eager_async
 from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs

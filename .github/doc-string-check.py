@@ -190,7 +190,8 @@ if __name__ == "__main__":
     import pipefunc
     import pipefunc._plotting
     from pipefunc.map import run_map, run_map_async
-    from pipefunc.map._run_eager import run_map_eager, run_map_eager_async
+    from pipefunc.map._run_eager import run_map_eager
+    from pipefunc.map._run_eager_async import run_map_eager_async
 
     # @pipefunc and PipeFunc
     compare_param_descriptions(
