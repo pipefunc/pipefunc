@@ -219,9 +219,9 @@ class _DependencyInfo:
     ready: list[PipeFunc]
 
 
-def _ensure_future(x: Any) -> Future[Any] | asyncio.Future[Any]:
+def _ensure_future(x: Any) -> Future[Any]:
     """Ensure that an object is a Future."""
-    if isinstance(x, Future | asyncio.Future):
+    if isinstance(x, Future):
         return x
     fut: Future[Any] = Future()
     fut.set_result(x)

@@ -192,7 +192,7 @@ def run_map_eager_async(
 async def _eager_scheduler_loop_async(
     *,
     dependency_info: _DependencyInfo,
-    executor: dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor],
     run_info: RunInfo,
     store: dict[str, Any],
     outputs: ResultDict,
@@ -248,7 +248,7 @@ async def _process_completed_futures_async(
     store: dict[str, Any],
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
-    executor: dict[OUTPUT_TYPE, Executor] | None,
+    executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     progress: ProgressTracker | None,
     return_results: bool,
@@ -321,54 +321,3 @@ async def _process_completed_futures_async(
     # Finalize SLURM executors if needed for newly completed functions
     if completed_funcs and multi_run_manager is not None:
         maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)
-
-
-async def _eager_scheduler_loop_async(
-    *,
-    dependency_info: _DependencyInfo,
-    executor: dict[OUTPUT_TYPE, Executor] | None,
-    run_info: RunInfo,
-    store: dict[str, Any],
-    outputs: ResultDict,
-    fixed_indices: dict[str, int | slice] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    progress: ProgressTracker | None,
-    return_results: bool,
-    cache: _CacheBase | None,
-    multi_run_manager: MultiRunManager | None = None,
-) -> None:
-    """Dynamically submit and await tasks for functions as soon as they are ready."""
-    tracker = _FunctionTracker(is_async=True)
-
-    # Submit initial ready tasks
-    for f in dependency_info.ready:
-        tracker.submit_function(
-            f,
-            run_info,
-            store,
-            fixed_indices,
-            executor,
-            chunksizes,
-            progress,
-            return_results,
-            cache,
-        )
-
-    maybe_finalize_slurm_executors(dependency_info.ready, executor, multi_run_manager)
-
-    # Process tasks as they complete
-    while tracker.has_active_futures():
-        await _process_completed_futures_async(
-            tracker=tracker,
-            dependency_info=dependency_info,
-            run_info=run_info,
-            store=store,
-            outputs=outputs,
-            fixed_indices=fixed_indices,
-            executor=executor,
-            chunksizes=chunksizes,
-            progress=progress,
-            return_results=return_results,
-            cache=cache,
-            multi_run_manager=multi_run_manager,
-        )
