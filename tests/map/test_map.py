@@ -1794,3 +1794,41 @@ def test_profiling_and_parallel_unsupported_warning() -> None:
     test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
     with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
         test_pipeline_with_profile_none.map({"val": np.array([1, 2, 3])})
+
+
+# Test with auto_subpipeline
+@pipefunc(output_name="intermediate")
+def create_intermediate():
+    return "intermediate_value"
+
+
+@pipefunc(output_name="final")
+def use_intermediate(intermediate):
+    return f"Used {intermediate}"
+
+
+def test_map_with_auto_subpipeline(tmp_path: Path):
+    """Test that the eager scheduler works with auto_subpipeline."""
+    pipeline = Pipeline([create_intermediate, use_intermediate])
+    run_folder = tmp_path / "auto_subpipeline"
+
+    # Provide the intermediate result directly
+    result = pipeline.map(
+        inputs={"intermediate": "direct_value"},
+        run_folder=run_folder,
+        auto_subpipeline=True,
+        show_progress=False,
+    )
+
+    assert result["final"].output == "Used direct_value"
+    # Check result from disk
+    assert load_outputs("final", run_folder=run_folder) == "Used direct_value"
+
+    # Without auto_subpipeline, this would fail because create_intermediate wouldn't be called
+    with pytest.raises(ValueError, match="Missing required inputs"):
+        pipeline.map(
+            inputs={"intermediate": "direct_value"},
+            run_folder=run_folder,
+            auto_subpipeline=False,
+            show_progress=False,
+        )
