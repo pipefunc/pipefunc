@@ -825,7 +825,7 @@ class Pipeline:
             run_map_func = run_map
         elif scheduling_strategy == "eager":
             run_map_func = run_map_eager
-        else:
+        else:  # pragma: no cover
             msg = f"Invalid scheduling type: {scheduling_strategy}"
             raise ValueError(msg)
         return run_map_func(
@@ -973,7 +973,7 @@ class Pipeline:
             run_map_func = run_map_async
         elif scheduling_strategy == "eager":
             run_map_func = run_map_eager_async
-        else:
+        else:  # pragma: no cover
             msg = f"Invalid scheduling type: {scheduling_strategy}"
             raise ValueError(msg)
 
