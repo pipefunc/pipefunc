@@ -331,9 +331,6 @@ class _FunctionTracker:
         """Wait for futures to complete in sync mode and return completed functions."""
         assert not self.is_async
 
-        if not self.future_to_func:
-            return []
-
         done, _ = wait(self.future_to_func.keys(), return_when=FIRST_COMPLETED)
 
         # Get functions with potentially all futures completed
