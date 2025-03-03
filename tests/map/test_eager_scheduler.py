@@ -113,7 +113,7 @@ def test_complex_dependency_graph(tmp_path: Path):
         pipeline,
         inputs={},
         run_folder=run_folder,
-        show_progress=False,
+        show_progress=True,
     )
 
     assert result["e"].output == "e(c(a),d(b))"

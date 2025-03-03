@@ -190,7 +190,7 @@ if __name__ == "__main__":
     import pipefunc
     import pipefunc._plotting
     from pipefunc.map import run_map, run_map_async
-    from pipefunc.map._run_dynamic import run_map_dynamic
+    from pipefunc.map._run_eager import run_map_eager
 
     # @pipefunc and PipeFunc
     compare_param_descriptions(
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         allow_missing=["pipeline"],
     )
     compare_param_descriptions(
-        run_map_dynamic,
+        run_map_eager,
         run_map,
     )
     compare_param_descriptions(
