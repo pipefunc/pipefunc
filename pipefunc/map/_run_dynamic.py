@@ -261,14 +261,16 @@ class _FunctionTracker:
         if func.requires_mapping:
             r, _ = kwargs_task.task
             for future in r:
-                if isinstance(future, Future):
-                    self.future_to_func[future] = func
-                    self.func_futures[func].add(future)
+                assert isinstance(future, Future)
+                self.future_to_func[future] = func
+                self.func_futures[func].add(future)
         else:
             task = kwargs_task.task
             if isinstance(task, Future):
                 self.future_to_func[task] = func
-                self.func_futures[func].add(task)  # Fixed: using task instead of undefined future
+                self.func_futures[func].add(task)
+            else:
+                self.func_futures[func] = set()  # Empty set means it's ready to be processed
 
     def is_function_complete(self, func: PipeFunc) -> bool:
         """Check if all futures for a function are completed."""
