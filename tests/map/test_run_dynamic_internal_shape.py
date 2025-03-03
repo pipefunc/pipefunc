@@ -216,6 +216,7 @@ def test_2d_internal_shape(
         cleanup=False,
         show_progress=True,
         return_results=return_results,
+        scheduling_strategy=scheduling_strategy,
     )
     assert before == counters
 
