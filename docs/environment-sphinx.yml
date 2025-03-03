@@ -12,7 +12,7 @@ dependencies:
   - networkx
   - numpy
   # optional-dependencies: adaptive
-  - adaptive
+  - adaptive >=1.3.2
   - adaptive-scheduler>=2.14.0
   # optional-dependencies: autodoc
   - griffe
