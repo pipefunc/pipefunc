@@ -218,6 +218,15 @@ class _DependencyInfo:
     ready: list[PipeFunc]
 
 
+def _ensure_future(x: Any) -> Future[Any]:
+    """Ensure that an object is a Future."""
+    if isinstance(x, Future):
+        return x
+    fut: Future[Any] = Future()
+    fut.set_result(x)
+    return fut
+
+
 class _FunctionTracker:
     """Tracks function execution state during dynamic scheduling."""
 
@@ -260,17 +269,15 @@ class _FunctionTracker:
         # Track futures for this function
         if func.requires_mapping:
             r, _ = kwargs_task.task
-            for future in r:
-                assert isinstance(future, Future)
-                self.future_to_func[future] = func
-                self.func_futures[func].add(future)
+            for task in r:
+                fut = _ensure_future(task)
+                self.future_to_func[fut] = func
+                self.func_futures[func].add(fut)
         else:
             task = kwargs_task.task
-            if isinstance(task, Future):
-                self.future_to_func[task] = func
-                self.func_futures[func].add(task)
-            else:
-                self.func_futures[func] = set()  # Empty set means it's ready to be processed
+            fut = _ensure_future(task)
+            self.future_to_func[fut] = func
+            self.func_futures[func].add(fut)
 
     def is_function_complete(self, func: PipeFunc) -> bool:
         """Check if all futures for a function are completed."""
