@@ -8,7 +8,6 @@ from pipefunc.map._run import (
     _maybe_executor,
     _maybe_persist_memory,
     _process_task_async,
-    maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
     prepare_run,
 )
@@ -218,9 +217,8 @@ async def _eager_scheduler_loop_async(
             progress,
             return_results,
             cache,
+            multi_run_manager,
         )
-
-    maybe_finalize_slurm_executors(dependency_info.ready, executor, multi_run_manager)
 
     # Process tasks as they complete
     while tracker.has_active_futures():
@@ -287,8 +285,5 @@ async def _process_completed_futures_async(
             progress=progress,
             return_results=return_results,
             cache=cache,
+            multi_run_manager=multi_run_manager,
         )
-
-    # Handle SLURM executors for newly completed functions
-    if completed_funcs and multi_run_manager is not None:
-        maybe_finalize_slurm_executors(completed_funcs, executor, multi_run_manager)

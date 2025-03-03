@@ -15,11 +15,14 @@ from pipefunc.map._run import (
     prepare_run,
 )
 
+from ._adaptive_scheduler_slurm_executor import maybe_finalize_slurm_executors
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
     import pydantic
+    from adaptive_scheduler import MultiRunManager
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
@@ -255,6 +258,7 @@ class _FunctionTracker:
         progress: ProgressTracker | None,
         return_results: bool,  # noqa: FBT001
         cache: _CacheBase | None,
+        multi_run_manager: MultiRunManager | None = None,
     ) -> None:
         """Submit a function and track its futures."""
         kwargs_task = _submit_func(
@@ -285,6 +289,11 @@ class _FunctionTracker:
             fut = _ensure_future(task)
             self.future_to_func[fut] = func
             self.func_futures[func].add(fut)
+
+        if multi_run_manager is not None:
+            assert self.is_async
+            assert executor is not None
+            maybe_finalize_slurm_executors([func], executor, multi_run_manager)
 
     def has_active_futures(self) -> bool:
         """Check if there are any active futures."""
@@ -472,6 +481,7 @@ def _update_dependencies_and_submit(
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
+    multi_run_manager: MultiRunManager | None = None,
 ) -> None:
     """Update dependencies after a function completes and submit newly ready functions."""
     for child in dependency_info.children.get(func, []):
@@ -488,4 +498,5 @@ def _update_dependencies_and_submit(
                 progress,
                 return_results,
                 cache,
+                multi_run_manager,
             )
