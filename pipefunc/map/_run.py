@@ -867,6 +867,7 @@ def _get_optimal_chunk_size(
     """
     try:
         n_cores = get_ncores(executor)
+        n_cores = max(1, n_cores)
     except TypeError as e:
         warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
         n_cores = 1
