@@ -47,12 +47,12 @@ class ResultDict(dict[str, Result]):
     def __init__(
         self,
         *args: Any,
-        pipeline: Pipeline | None = None,
-        inputs: dict[str, Any] | None = None,
+        _pipeline_: Pipeline | None = None,
+        _inputs_: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        self._pipeline = pipeline
-        self._inputs = inputs
+        self._pipeline = _pipeline_
+        self._inputs = _inputs_
         super().__init__(*args, **kwargs)
 
     def __repr__(self) -> str:
