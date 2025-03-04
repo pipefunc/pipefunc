@@ -252,26 +252,19 @@ class HybridCache(_CacheBase):
             state["_computation_durations"] = _dict_to_regular(self._computation_durations)
             # Remove unpicklable lock
             state.pop("_cache_lock", None)
-            # Flag for reconstruction
-            state["_needs_shared_recreation"] = True
 
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore the object after unpickling."""
-        # Check if we need to recreate shared objects
-        needs_recreation = state.pop("_needs_shared_recreation", False)
-
-        # Update instance
         self.__dict__.update(state)
-
-        # Recreate shared objects if needed
-        if needs_recreation and self.shared:
-            manager = Manager()
-            self._cache_dict = _create_shared_dict(manager, self._cache_dict)
-            self._access_counts = _create_shared_dict(manager, self._access_counts)
-            self._computation_durations = _create_shared_dict(manager, self._computation_durations)
-            self._cache_lock = manager.Lock()
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._access_counts = _create_shared_dict(manager, self._access_counts)  # type: ignore[arg-type]
+        self._computation_durations = _create_shared_dict(manager, self._computation_durations)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
 
 
 def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:  # noqa: FBT001
@@ -379,24 +372,19 @@ class LRUCache(_CacheBase):
             # Remove unpicklable lock
             state.pop("_cache_lock", None)
             # Flag for reconstruction
-            state["_needs_shared_recreation"] = True
+            state["shared"] = True
 
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore the object after unpickling."""
-        # Check if we need to recreate shared objects
-        needs_recreation = state.pop("_needs_shared_recreation", False)
-
-        # Update instance
         self.__dict__.update(state)
-
-        # Recreate shared objects if needed
-        if needs_recreation and self.shared:
-            manager = Manager()
-            self._cache_dict = _create_shared_dict(manager, self._cache_dict)
-            self._cache_queue = _create_shared_list(manager, self._cache_queue)
-            self._cache_lock = manager.Lock()
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._cache_queue = _create_shared_list(manager, self._cache_queue)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
 
 
 class SimpleCache(_CacheBase):
