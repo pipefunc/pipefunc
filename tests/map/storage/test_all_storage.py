@@ -7,7 +7,12 @@ import numpy as np
 import pytest
 
 from pipefunc._utils import prod
-from pipefunc.map._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
+from pipefunc.map._storage_array._base import (
+    StorageBase,
+    get_storage_class,
+    iterate_shape_indices,
+    select_by_mask,
+)
 from pipefunc.map._storage_array._dict import DictArray
 from pipefunc.map._storage_array._file import FileArray
 
@@ -600,3 +605,45 @@ def test_compare_equal(tmp_path: Path) -> None:
         assert np.ma.allequal(base_arr.mask, arr.mask), arr
         assert np.array_equal(base_arr.mask_linear(), arr.mask_linear()), arr
         assert np.ma.allequal(base_arr.to_array(), arr.to_array()), arr
+
+
+def test_repr(array_type: Callable[..., StorageBase]):
+    shape = (2, 3)
+    arr = array_type(shape)
+    repr(arr)
+
+
+@pytest.mark.parametrize("storage_id", ["file_array", "shared_memory_dict", "dict"])
+def test_persist(storage_id, tmp_path: Path) -> None:
+    shape = (1,)
+    internal_shape = (2,)
+    shape_mask = (False, True)
+    array_class = get_storage_class(storage_id)
+    arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    x = [0, 1]
+    arr.dump((0,), x)
+    arr.persist()
+    y_original = arr.to_array()
+
+    arr_new = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    y_new = arr_new.to_array()
+    np.testing.assert_almost_equal(y_original, y_new)
+
+
+@pytest.mark.parametrize("storage_id", ["file_array", "shared_memory_dict", "dict"])
+def test_size_one_with_internal_shape(storage_id, tmp_path: Path) -> None:
+    shape = (1,)
+    internal_shape = (2,)
+    shape_mask = (False, True)
+    array_class = get_storage_class(storage_id)
+    arr = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    x = np.arange(0, 6).reshape((2, 3))
+    arr.dump((0,), x)
+    arr.persist()
+    y_original = arr.to_array()
+
+    arr_new = array_class(tmp_path, shape, internal_shape=internal_shape, shape_mask=shape_mask)
+    y_new = arr_new.to_array()
+    for i in range(*internal_shape):
+        for j in range(*shape):
+            assert np.array_equal(y_original[i, j], y_new[i, j])

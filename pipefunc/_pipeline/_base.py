@@ -16,6 +16,7 @@ import functools
 import inspect
 import os
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -42,16 +43,20 @@ from pipefunc.map._mapspec import (
     validate_consistent_axes,
 )
 from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._run_eager import run_map_eager
+from pipefunc.map._run_eager_async import run_map_eager_async
 from pipefunc.resources import Resources
 
 from ._autodoc import PipelineDocumentation, format_pipeline_docs
 from ._cache import compute_cache_key, create_cache, get_result_from_cache, update_cache
+from ._cli import cli
 from ._mapspec import (
     add_mapspec_axis,
     create_missing_mapspecs,
     find_non_root_axes,
     replace_none_in_axes,
 )
+from ._pydantic import pipeline_to_pydantic
 from ._simplify import _func_node_colors, _identify_combinable_nodes, simplified_pipeline
 from ._validation import (
     validate_consistent_defaults,
@@ -69,6 +74,7 @@ if TYPE_CHECKING:
     import holoviews as hv
     import IPython.display
     import ipywidgets
+    import pydantic
     from rich.table import Table
 
     from pipefunc._plotting import GraphvizStyle
@@ -150,8 +156,7 @@ class Pipeline:
     - The `pipefunc.cache.to_hashable` function is used to attempt to ensure that input values are hashable,
       which is a requirement for storing results in a cache.
     - This function works for many common types but is not guaranteed to work for all types.
-    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the `str` representation of the value.
-    - Caution ⛔️: Using `str` representations can lead to unexpected behavior if they are not unique for different function calls!
+    - If `~pipefunc.cache.to_hashable` cannot make a value hashable, it falls back to using the serialized representation of the value.
 
     The key difference is that ``pipeline.run``'s output is uniquely determined by the root arguments,
     while ``pipeline.map`` is not because it may contain reduction operations as described by `~pipefunc.map.MapSpec`.
@@ -314,7 +319,7 @@ class Pipeline:
             f.debug = self.debug
 
         self._clear_internal_cache()  # reset cache
-        self._validate()
+        self.validate()
         return f
 
     def drop(self, *, f: PipeFunc | None = None, output_name: OUTPUT_TYPE | None = None) -> None:
@@ -348,7 +353,7 @@ class Pipeline:
             f = self.output_to_func[output_name]
             self.drop(f=f)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def replace(self, new: PipeFunc, old: PipeFunc | None = None) -> None:
         """Replace a function in the pipeline with another function.
@@ -368,7 +373,7 @@ class Pipeline:
             self.drop(f=old)
         self.add(new)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     @functools.cached_property
     def output_to_func(self) -> dict[OUTPUT_TYPE, PipeFunc]:
@@ -589,7 +594,7 @@ class Pipeline:
         if use_cache:
             assert cache is not None
             cache_key = compute_cache_key(
-                func.output_name,
+                func._cache_id,
                 self._func_defaults(func) | flat_scope_kwargs | func._bound,
                 root_args,
             )
@@ -694,7 +699,7 @@ class Pipeline:
 
     def map(
         self,
-        inputs: dict[str, Any],
+        inputs: dict[str, Any] | pydantic.BaseModel,
         run_folder: str | Path | None = None,
         internal_shapes: UserShapeDict | None = None,
         *,
@@ -708,6 +713,8 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
+        return_results: bool = True,
+        scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -788,6 +795,21 @@ class Pipeline:
             and an exception is raised if any are missing.
         show_progress
             Whether to display a progress bar. Only works if ``parallel=True``.
+        return_results
+            Whether to return the results of the pipeline. If ``False``, the pipeline is run
+            without keeping the results in memory. Instead the results are only kept in the set
+            ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        scheduling_strategy
+            Strategy for scheduling pipeline function execution:
+
+            - "generation" (default): Executes functions in strict topological generations,
+              waiting for all functions in a generation to complete before starting the next.
+              Provides predictable execution order but may not maximize parallelism.
+
+            - "eager": Dynamically schedules functions as soon as their dependencies are met,
+              without waiting for entire generations to complete. Can improve performance
+              by maximizing parallel execution, especially for complex dependency graphs
+              with varied execution times.
 
         See Also
         --------
@@ -800,7 +822,14 @@ class Pipeline:
             use `Result.output` to get the actual result.
 
         """
-        return run_map(
+        if scheduling_strategy == "generation":
+            run_map_func = run_map
+        elif scheduling_strategy == "eager":
+            run_map_func = run_map_eager
+        else:  # pragma: no cover
+            msg = f"Invalid scheduling type: {scheduling_strategy}"
+            raise ValueError(msg)
+        return run_map_func(
             self,
             inputs,
             run_folder,
@@ -815,11 +844,12 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            return_results=return_results,
         )
 
     def map_async(
         self,
-        inputs: dict[str, Any],
+        inputs: dict[str, Any] | pydantic.BaseModel,
         run_folder: str | Path | None = None,
         internal_shapes: UserShapeDict | None = None,
         *,
@@ -832,6 +862,8 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool = False,
+        return_results: bool = True,
+        scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -910,6 +942,21 @@ class Pipeline:
             and an exception is raised if any are missing.
         show_progress
             Whether to display a progress bar.
+        return_results
+            Whether to return the results of the pipeline. If ``False``, the pipeline is run
+            without keeping the results in memory. Instead the results are only kept in the set
+            ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        scheduling_strategy
+            Strategy for scheduling pipeline function execution:
+
+            - "generation" (default): Executes functions in strict topological generations,
+              waiting for all functions in a generation to complete before starting the next.
+              Provides predictable execution order but may not maximize parallelism.
+
+            - "eager": Dynamically schedules functions as soon as their dependencies are met,
+              without waiting for entire generations to complete. Can improve performance
+              by maximizing parallel execution, especially for complex dependency graphs
+              with varied execution times.
 
         See Also
         --------
@@ -921,8 +968,17 @@ class Pipeline:
             An `AsyncRun` instance that contains ``run_info``, ``progress`` and ``task``.
             The ``task`` can be awaited to get the final result of the pipeline.
 
+
         """
-        return run_map_async(
+        if scheduling_strategy == "generation":
+            run_map_func = run_map_async
+        elif scheduling_strategy == "eager":
+            run_map_func = run_map_eager_async
+        else:  # pragma: no cover
+            msg = f"Invalid scheduling type: {scheduling_strategy}"
+            raise ValueError(msg)
+
+        return run_map_func(
             self,
             inputs,
             run_folder,
@@ -936,6 +992,7 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            return_results=return_results,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1063,7 +1120,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable defaults."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_renames(
         self,
@@ -1104,7 +1161,7 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
-        self._validate()
+        self.validate()
 
     def update_scope(
         self,
@@ -1191,13 +1248,41 @@ class Pipeline:
             msg = "No function's scope was updated. Ensure `inputs` and/or `outputs` are specified correctly."
             raise ValueError(msg)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
         for f in self.functions:
             flat_scope_kwargs = f._flatten_scopes(flat_scope_kwargs)
         return flat_scope_kwargs
+
+    @functools.cached_property
+    def parameter_annotations(self) -> dict[str, Any]:
+        """Return the parameter annotations for the pipeline.
+
+        The parameter annotations are computed by traversing the pipeline graph in topological order
+        and collecting the annotations from the functions. If there are conflicting annotations
+        for the same parameter, a warning is issued and the first encountered annotation is used.
+        """
+        annotations: dict[str, Any] = {}
+        for f in self.sorted_functions:
+            for p, v in f.parameter_annotations.items():
+                if p in annotations and annotations[p] != v:
+                    msg = (
+                        f"Conflicting annotations for parameter `{p}`: `{annotations[p]}` != `{v}`."
+                    )
+                    warnings.warn(msg, stacklevel=2)
+                    continue
+                annotations[p] = v
+        return annotations
+
+    @functools.cached_property
+    def output_annotations(self) -> dict[str, Any]:
+        """Return the (final and intermediate) output annotations for the pipeline."""
+        annotations: dict[str, Any] = {}
+        for f in self.sorted_functions:
+            annotations.update(f.output_annotation)
+        return annotations
 
     @functools.cached_property
     def all_arg_combinations(self) -> dict[OUTPUT_TYPE, set[tuple[str, ...]]]:
@@ -1252,8 +1337,14 @@ class Pipeline:
         """Return the axes for each array parameter in the pipeline."""
         return mapspec_axes(self.mapspecs())
 
-    def _validate(self) -> None:
-        """Validate the pipeline."""
+    def validate(self) -> None:
+        """Validate the pipeline (checks its scopes, renames, defaults, mapspec, type hints).
+
+        This is automatically called when the pipeline is created and when calling state
+        updating methods like {method}`~Pipeline.update_renames` or
+        {method}`~Pipeline.update_defaults`. Should be called manually after e.g.,
+        manually updating `pipeline.validate_type_annotations` or changing some other attributes.
+        """
         validate_scopes(self.functions)
         validate_consistent_defaults(self.functions, output_to_func=self.output_to_func)
         self._validate_mapspec()
@@ -1365,7 +1456,7 @@ class Pipeline:
         for p in parameter:
             add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
         self._clear_internal_cache()
-        self._validate()
+        self.validate()
 
     def _func_node_colors(
         self,
@@ -2061,6 +2152,120 @@ class Pipeline:
             returns_table=returns_table,
             order=order,
         )
+
+    def pydantic_model(self, model_name: str = "InputModel") -> type[pydantic.BaseModel]:
+        """Generate a Pydantic model for pipeline root input parameters.
+
+        Inspects the pipeline to extract defaults, type annotations, and docstrings to
+        create a model that validates and coerces input data (e.g., from JSON) to the
+        correct types. This is useful for ensuring that inputs meet the pipeline's
+        requirements and for generating a CLI.
+
+        **Multidimensional Array Handling:**
+        Array inputs specified via mapspecs are annotated as nested lists because Pydantic
+        cannot directly coerce JSON arrays into NumPy arrays. After validation, these
+        lists are converted to NumPy ndarrays.
+
+        Parameters
+        ----------
+        model_name
+            Name for the generated Pydantic model class.
+
+        Returns
+        -------
+        type[pydantic.BaseModel]
+            A dynamically generated Pydantic model class for validating pipeline inputs. It:
+
+            - Validates and coerces input data to the expected types.
+            - Annotates multidimensional arrays as nested lists and converts them to NumPy arrays.
+            - Facilitates CLI creation by ensuring proper input validation.
+
+        Examples
+        --------
+        >>> from pipefunc import Pipeline, pipefunc
+        >>> @pipefunc("foo")
+        ... def foo(x: int, y: int = 1) -> int:
+        ...     return x + y
+        >>> pipeline = Pipeline([foo])
+        >>> InputModel = pipeline.pydantic_model()
+        >>> inputs = {"x": "10", "y": "2"}
+        >>> model = InputModel(**inputs)
+        >>> model.x, model.y
+        (10, 2)
+        >>> results = pipeline.map(model)  # Equivalent to `pipeline.map(inputs)`
+
+        Notes
+        -----
+        - If available, detailed parameter descriptions are extracted from docstrings using griffe.
+        - This method is especially useful for CLI generation, ensuring that user inputs are properly
+          validated and converted before pipeline execution.
+
+        See Also
+        --------
+        cli
+            Automatically construct a command-line interface using argparse.
+        print_documentation
+            Print the pipeline documentation as a table formatted with Rich.
+
+        """
+        return pipeline_to_pydantic(self, model_name)
+
+    def cli(self: Pipeline, description: str | None = None) -> None:
+        """Automatically construct a command-line interface using argparse.
+
+        This method creates an `argparse.ArgumentParser` instance, adds arguments for each
+        root parameter in the pipeline using a Pydantic model, sets default values if they exist,
+        parses the command-line arguments, and runs one of three subcommands:
+
+        - ``cli``: Supply individual input parameters as command-line options.
+        - ``json``: Load all input parameters from a JSON file.
+        - ``docs``: Display the pipeline documentation (using `pipeline.print_documentation`).
+
+        Mapping options (prefixed with `--map-`) are available for the `cli` and `json` subcommands to control
+        parallel execution, storage method, and cleanup behavior.
+
+        Usage Examples:
+
+        **CLI mode:**
+            ``python cli-example.py cli --x 2 --y 3 --map-parallel false --map-cleanup true``
+
+        **JSON mode:**
+            ``python cli-example.py json --json-file inputs.json --map-parallel false --map-cleanup true``
+
+        **Docs mode:**
+            ``python cli-example.py docs``
+
+        Parameters
+        ----------
+        pipeline
+            The PipeFunc pipeline instance to be executed.
+        description
+            A custom description for the CLI help message. If not provided, a default description is used.
+
+        Raises
+        ------
+        ValueError
+            If an invalid subcommand is specified.
+        FileNotFoundError
+            If the JSON input file does not exist (in JSON mode).
+        json.JSONDecodeError
+            If the JSON input file is not formatted correctly.
+
+        Examples
+        --------
+        >>> if __name__ == "__main__":
+        ...     pipeline = create_my_pipeline()
+        ...     pipeline.cli()
+
+        See Also
+        --------
+        pydantic_model
+            Generate a Pydantic model for pipeline root input parameters.
+        print_documentation
+            Print the pipeline documentation as a table formatted with Rich.
+
+        """
+        cli(self, description=description)
 
 
 class Generations(NamedTuple):

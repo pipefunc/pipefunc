@@ -352,7 +352,12 @@ def test_simple_from_step(tmp_path: Path) -> None:
         # Load from the results
         ds = xarray_dataset_from_results(inputs, results, pipeline)
         assert "x" in ds.coords
+        ds = results.to_xarray()
+        assert "x" in ds.coords
+
         ds = xarray_dataset_from_results(inputs, results, pipeline, load_intermediate=False)
+        assert "x" not in ds.coords
+        ds = results.to_xarray(load_intermediate=False)
         assert "x" not in ds.coords
 
 
@@ -1515,9 +1520,12 @@ def test_parallel_memory_storage(storage: str):
     assert r1["r"].output == r2["r"].output == 12
 
 
+@pytest.mark.parametrize("scheduling_strategy", ["generation", "eager"])
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
-async def test_map_async_with_progress():
+async def test_map_async_with_progress(scheduling_strategy: Literal["generation", "eager"]) -> None:
+    from pipefunc._widgets import ProgressTracker
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
         return x - 1
@@ -1535,12 +1543,18 @@ async def test_map_async_with_progress():
         return sum(w)
 
     pipeline = Pipeline([f, g, h, i])
-    async_map = pipeline.map_async({"x": [1, 2, 3]}, show_progress=True)
-    # Test that the progress tracket is working
-    async_map.progress.update_progress()
-    async_map.progress._first_auto_update_interval = 0.0
-    async_map.progress._toggle_auto_update()  # Turn off auto update
-    async_map.progress._toggle_auto_update()  # Turn on auto update
+    async_map = pipeline.map_async(
+        {"x": [1, 2, 3]},
+        show_progress=True,
+        scheduling_strategy=scheduling_strategy,
+    )
+    # Test that the progress tracker is working
+    progress = async_map.progress
+    assert isinstance(progress, ProgressTracker)
+    progress.update_progress()
+    progress._first_auto_update_interval = 0.0
+    progress._toggle_auto_update()  # Turn off auto update
+    progress._toggle_auto_update()  # Turn on auto update
     result = await async_map.task
     assert result["r"].output == 12
 

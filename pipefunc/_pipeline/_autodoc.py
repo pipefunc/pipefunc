@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -32,23 +31,14 @@ class PipelineDocumentation:
     root_args: list[str]
 
     @classmethod
-    def from_pipeline(cls, pipeline: Pipeline) -> PipelineDocumentation:  # noqa: PLR0912
+    def from_pipeline(cls, pipeline: Pipeline) -> PipelineDocumentation:
         """Generates a PipelineDocumentation object from a pipeline."""
         descriptions: dict[OUTPUT_TYPE, str] = {}
         returns: dict[OUTPUT_TYPE, str] = {}
         parameters: dict[str, list[str]] = defaultdict(list)
-        p_annotations: dict[str, Any] = {}
-        r_annotations: dict[str, Any] = {}
 
         for f in pipeline.sorted_functions:
             doc = parse_function_docstring(f.func)
-            if f.parameter_annotations:
-                for p, v in f.parameter_annotations.items():
-                    if p in p_annotations and p_annotations[p] != v:
-                        msg = f"Conflicting annotations for parameter `{p}`: `{p_annotations[p]}` != `{v}`."
-                        warnings.warn(msg, stacklevel=2)
-                    p_annotations[p] = v
-            r_annotations.update(f.output_annotation)
             if doc.description:
                 descriptions[f.output_name] = doc.description
             if doc.returns:
@@ -78,8 +68,8 @@ class PipelineDocumentation:
             returns=returns,
             function_names={f.output_name: f.func.__name__ for f in pipeline.functions},
             defaults=pipeline.defaults,
-            p_annotations=p_annotations,
-            r_annotations=r_annotations,
+            p_annotations=pipeline.parameter_annotations,
+            r_annotations=pipeline.output_annotations,
             topological_order=[f.output_name for f in pipeline.sorted_functions],
             root_args=pipeline.topological_generations.root_args,
         )
@@ -162,7 +152,7 @@ def format_pipeline_docs(
     if print_table:
         console = Console()
         for table in tables:
-            console.print(table)
+            console.print(table, "\n")
         return None
     return tuple(tables)
 

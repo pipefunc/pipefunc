@@ -72,6 +72,7 @@ default_role = "autolink"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "networkx": ("https://networkx.org/documentation/stable/", None),
+    "adaptive_scheduler": ("https://adaptive-scheduler.readthedocs.io/en/latest/", None),
 }
 
 autodoc_member_order = "bysource"
@@ -96,6 +97,10 @@ html_theme_options = {
     "use_repository_button": True,
     "use_download_button": True,
     "navigation_with_keys": False,
+    "analytics": {
+        "plausible_analytics_domain": "pipefunc.readthedocs.io",
+        "plausible_analytics_url": "https://plausible.nijho.lt/js/script.js",
+    },
 }
 
 
@@ -287,3 +292,4 @@ nb_merge_streams = True
 
 def setup(app) -> None:
     app.add_directive("try-notebook", TryNotebookWithUV)
+    app.add_css_file("custom.css")

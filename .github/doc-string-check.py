@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import pipefunc._pipeline
 import pipefunc._pipeline._autodoc
+import pipefunc._pipeline._cli
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -189,6 +190,8 @@ if __name__ == "__main__":
     import pipefunc
     import pipefunc._plotting
     from pipefunc.map import run_map, run_map_async
+    from pipefunc.map._run_eager import run_map_eager
+    from pipefunc.map._run_eager_async import run_map_eager_async
 
     # @pipefunc and PipeFunc
     compare_param_descriptions(
@@ -207,12 +210,20 @@ if __name__ == "__main__":
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         run_map,
-        allow_missing=["pipeline"],
+        allow_missing=["pipeline", "scheduling_strategy"],
+    )
+    compare_param_descriptions(
+        run_map_eager,
+        run_map,
+    )
+    compare_param_descriptions(
+        run_map_eager_async,
+        run_map_async,
     )
     compare_param_descriptions(
         pipefunc.Pipeline.map_async,
         run_map_async,
-        allow_missing=["parallel", "pipeline"],
+        allow_missing=["parallel", "pipeline", "scheduling_strategy"],
         allow_discrepancy=["show_progress"],
     )
     compare_param_descriptions(
@@ -253,9 +264,16 @@ if __name__ == "__main__":
         allow_discrepancy=["functions"],
     )
 
-    # map vs map_async
+    # print_documentation and format_pipeline_docs
     compare_param_descriptions(
         pipefunc.Pipeline.print_documentation,
         pipefunc._pipeline._autodoc.format_pipeline_docs,
         allow_missing=["doc", "print_table"],
+    )
+
+    # CLI
+    compare_param_descriptions(
+        pipefunc.Pipeline.cli,
+        pipefunc._pipeline._cli.cli,
+        allow_missing=["pipeline"],
     )

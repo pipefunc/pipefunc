@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
+from unittest import mock
 
 import adaptive
 import pytest
@@ -81,12 +82,14 @@ class MockSlurmExecutor(SlurmExecutor):
 
     _finalized: bool = False
     _thread_pool: ThreadPoolExecutor = field(default_factory=ThreadPoolExecutor)
+    _futures: list[Future] = field(default_factory=list)
 
     def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> MockSlurmTask:
         if kwargs:
             msg = "Keyword arguments are not supported"
             raise ValueError(msg)
         fut = self._thread_pool.submit(fn, *args)
+        self._futures.append(fut)
         return MockSlurmTask(executor=self, thread_future=fut)  # type: ignore[arg-type]
 
     def finalize(
@@ -134,11 +137,13 @@ def pipeline() -> Pipeline:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("use_mock", [True, False])
 @pytest.mark.parametrize("use_instance", [True, False])
+@pytest.mark.parametrize("scheduling_strategy", ["eager", "generation"])
 async def test_adaptive_slurm_executor(
     pipeline: Pipeline,
     tmp_path: Path,
     use_mock: bool,  # noqa: FBT001
     use_instance: bool,  # noqa: FBT001
+    scheduling_strategy: Literal["eager", "generation"],
 ) -> None:
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
@@ -153,6 +158,7 @@ async def test_adaptive_slurm_executor(
         run_folder,
         executor=ex,  # type: ignore[arg-type]
         show_progress=True,
+        scheduling_strategy=scheduling_strategy,
     )
     result = await runner.task
     assert isinstance(result, ResultDict)
@@ -236,3 +242,53 @@ async def test_pipeline_no_resources(
     assert result["y"].output[-1] == 18
     assert result["z"].output[0] == 1
     assert result["z"].output[-1] == 19
+
+
+@pytest.mark.parametrize("resources", [lambda kw: {"cpus": 2}, {"cpus": 2}])  # noqa: ARG005
+@pytest.mark.parametrize("resources_scope", ["element", "map"])
+@pytest.mark.asyncio
+async def test_number_of_jobs_created_with_resources(resources, resources_scope):
+    @pipefunc(
+        output_name="z",
+        mapspec="y[i] -> z[i]",
+        resources=resources,
+        resources_scope=resources_scope,
+    )
+    def add_one(y):
+        return y + 1
+
+    pipeline = Pipeline([add_one])
+    # Create an instance of our mock executor so we can inspect calls
+    executor_instance = MockSlurmExecutor(cores_per_node=1)
+    with mock.patch(
+        "pipefunc.map._adaptive_scheduler_slurm_executor._new_slurm_executor",
+        autospec=True,
+    ) as mock_new_executor:
+        # When _new_slurm_executor is called, return our executor instance.
+        mock_new_executor.return_value = executor_instance
+        runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
+        await runner.task
+        # Inspect all calls to _new_slurm_executor
+        calls = mock_new_executor.call_args_list
+        # For each call, check the keyword arguments:
+        for call in calls:
+            kw = call.kwargs
+            # We expect the key "cores_per_node" to be present
+            assert "cores_per_node" in kw
+            value = kw["cores_per_node"]
+            if resources_scope == "element":
+                # In element scope, the resource dict should be replicated per element.
+                # So cores_per_node should be a tuple with length 10.
+                assert isinstance(value, tuple)
+                assert len(value) == 10
+            else:  # resources_scope == "map"
+                # In map scope, only one set of resources is used, so it should be an int.
+                assert isinstance(value, int)
+                assert value == 2
+
+    # Now rerun the test with without mocking to see if it works
+    # This will actually submit jobs to the mock scheduler.
+    runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
+    result = await runner.task
+    assert isinstance(result, ResultDict)
+    assert len(result["z"].output) == 10

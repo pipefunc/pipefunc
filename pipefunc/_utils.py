@@ -323,7 +323,13 @@ def get_ncores(ex: Executor) -> int:
         if isinstance(ex, mpi4py.futures.MPIPoolExecutor):
             ex.bootup()  # wait until all workers are up and running
             return ex._pool.size  # not public API!
+    if is_imported("adaptive_scheduler"):
+        import adaptive_scheduler
 
+        if isinstance(ex, adaptive_scheduler.SlurmExecutor):
+            # This could be better but since there is `cores`, `cores_per_node`,
+            # and `nodes`; and they can be `None`, we just return 1 for now.
+            return 1
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
 
@@ -442,3 +448,8 @@ def parse_function_docstring(
             description.append(section.value)
 
     return DocstringInfo("\n".join(description), parameters, "\n".join(returns))
+
+
+def is_classmethod(func: Callable) -> bool:
+    """Check if a function is a classmethod."""
+    return inspect.ismethod(func) and func.__self__ is not None

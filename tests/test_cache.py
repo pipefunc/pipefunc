@@ -404,3 +404,18 @@ def test_disk_cache_pickling(tmp_path: Path) -> None:
     cache.put("key1", "value1")
     cache2 = pickle.loads(pickle.dumps(cache))  # noqa: S301
     assert cache2.get("key1") == "value1"
+
+
+@pytest.mark.parametrize("permissions", [0o600, 0o660, 0o777, 0o644, None])
+def test_disk_cache_permissions(cache_dir: Path, permissions: int | None) -> None:
+    """Test that DiskCache sets file permissions correctly."""
+    cache = DiskCache(cache_dir=str(cache_dir), permissions=permissions)
+    cache.put("key1", "value1")
+    file_path = cache._get_file_path("key1")
+    assert file_path.exists()
+
+    if permissions is not None:
+        # stat().st_mode returns the full mode, including file type bits.
+        # We only want the permission bits, so we mask with 0o777.
+        actual_permissions = file_path.stat().st_mode & 0o777
+        assert actual_permissions == permissions

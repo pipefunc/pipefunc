@@ -3,6 +3,299 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.57.0 (2025-03-04)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#660](https://github.com/pipefunc/pipefunc/pull/660))
+
+### ✨ Enhancements
+
+- Add `ResultDict.to_xarray` ([#656](https://github.com/pipefunc/pipefunc/pull/656))
+- Add `pipeline.map_async(..., scheduling_strategy="eager")` ([#662](https://github.com/pipefunc/pipefunc/pull/662))
+- Eager execution of graph, adds `pipeline.map(..., scheduling_strategy="eager")` ([#659](https://github.com/pipefunc/pipefunc/pull/659))
+
+### 📊 Stats
+
+- `.py`: +1527 lines, -15 lines
+- `.yaml`: +1 lines, -1 lines
+
+## v0.56.0 (2025-03-01)
+
+### ✨ Enhancements
+
+- Add option to `pipeline.map(..., return_results=False)` ([#626](https://github.com/pipefunc/pipefunc/pull/626))
+- Simplify dynamic shape setting (do not rely on `result_array`) ([#652](https://github.com/pipefunc/pipefunc/pull/652))
+
+### 🐛 Bug Fixes
+
+- Fix `DictArray` with `internal_shape` who's entries have an additional dimension ([#654](https://github.com/pipefunc/pipefunc/pull/654))
+- Fix persist and load `DictArray` and `SharedMemoryDictArray` ([#653](https://github.com/pipefunc/pipefunc/pull/653))
+
+### 📊 Stats
+
+- `.py`: +527 lines, -145 lines
+
+## v0.55.2 (2025-02-24)
+
+### 🐛 Bug Fixes
+
+- Deal with defaults in the CLI that are not set ([#650](https://github.com/pipefunc/pipefunc/pull/650))
+
+### 📊 Stats
+
+- `.md`: +6 lines, -0 lines
+- `.py`: +16 lines, -2 lines
+
+## v0.55.1 (2025-02-24)
+
+### 🐛 Bug Fixes
+
+- Fix CLI with None default ([#649](https://github.com/pipefunc/pipefunc/pull/649))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.55.0 ([#648](https://github.com/pipefunc/pipefunc/pull/648))
+
+### 📊 Stats
+
+- `.py`: +80 lines, -34 lines
+- `.md`: +56 lines, -0 lines
+
+## v0.55.0 (2025-02-24)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.6.2 ([#633](https://github.com/pipefunc/pipefunc/pull/633))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#646](https://github.com/pipefunc/pipefunc/pull/646))
+
+### 🧹 Maintenance
+
+- Add rich-argparse to extras ([#645](https://github.com/pipefunc/pipefunc/pull/645))
+
+### 📚 Documentation
+
+- Fix Xarray CSS in dark mode for sphinx-book-theme ([#372](https://github.com/pipefunc/pipefunc/pull/372))
+- Add real outputs to the CLI docs ([#647](https://github.com/pipefunc/pipefunc/pull/647))
+- Add CLI concepts page ([#642](https://github.com/pipefunc/pipefunc/pull/642))
+
+### ✨ Enhancements
+
+- Add `docs` subcommand to CLI ([#644](https://github.com/pipefunc/pipefunc/pull/644))
+- Add `Pipeline.cli()` that automatically generates a CLI ([#607](https://github.com/pipefunc/pipefunc/pull/607))
+- Add `Pipeline.pydantic_model` ([#609](https://github.com/pipefunc/pipefunc/pull/609))
+
+### 🐛 Bug Fixes
+
+- Extract type annotation for classmethod ([#641](https://github.com/pipefunc/pipefunc/pull/641))
+
+### 📊 Stats
+
+- `.json`: +1 lines, -1 lines
+- `.py`: +1090 lines, -15 lines
+- `.yaml`: +1 lines, -1 lines
+- `.yml`: +12 lines, -8 lines
+- `.css`: +15 lines, -0 lines
+- `.md`: +261 lines, -0 lines
+- `.toml`: +6 lines, -4 lines
+- `other`: +1 lines, -1 lines
+
+## v0.54.1 (2025-02-17)
+
+### ✨ Enhancements
+
+- Add support for `SlurmExecutor` in `get_ncores` ([#640](https://github.com/pipefunc/pipefunc/pull/640))
+
+### 📚 Documentation
+
+- Update CHANGELOG.md until v0.54.0 ([#639](https://github.com/pipefunc/pipefunc/pull/639))
+
+### 📊 Stats
+
+- `.md`: +70 lines, -0 lines
+- `.py`: +7 lines, -0 lines
+
+## v0.54.0 (2025-02-17)
+
+### 🐛 Bug Fixes
+
+- Fix correct number of SLURM jobs for both `resources_scope` options ([#638](https://github.com/pipefunc/pipefunc/pull/638))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#637](https://github.com/pipefunc/pipefunc/pull/637))
+
+### ✨ Enhancements
+
+- Allow setting permissions in `DiskCache` ([#636](https://github.com/pipefunc/pipefunc/pull/636))
+
+### 📊 Stats
+
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +114 lines, -8 lines
+
+## v0.53.3 (2025-02-06)
+
+### 🐛 Bug Fixes
+
+- Fix data loading with dynamic shapes ([#635](https://github.com/pipefunc/pipefunc/pull/635))
+
+### 📊 Stats
+
+- `.py`: +20 lines, -10 lines
+
+## v0.53.2 (2025-02-05)
+
+### 🐛 Bug Fixes
+
+- Fix ND mapspec with multiple outputs and `internal_shape` ([#634](https://github.com/pipefunc/pipefunc/pull/634))
+
+### 📊 Stats
+
+- `.py`: +30 lines, -2 lines
+
+## v0.53.1 (2025-02-05)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.27 ([#564](https://github.com/pipefunc/pipefunc/pull/564))
+
+### ✨ Enhancements
+
+- Raise more informative error when unknown variant selected ([#632](https://github.com/pipefunc/pipefunc/pull/632))
+
+### 📚 Documentation
+
+- Enable Plausible analytics ([#631](https://github.com/pipefunc/pipefunc/pull/631))
+- Explain alternative SLURM method ([#630](https://github.com/pipefunc/pipefunc/pull/630))
+- Add SLURM tutorial ([#629](https://github.com/pipefunc/pipefunc/pull/629))
+- Fix links in documentation ([#625](https://github.com/pipefunc/pipefunc/pull/625))
+- Update CHANGELOG.md until v0.53.0 ([#624](https://github.com/pipefunc/pipefunc/pull/624))
+- Add page about caching ([#623](https://github.com/pipefunc/pipefunc/pull/623))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#628](https://github.com/pipefunc/pipefunc/pull/628))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +736 lines, -81 lines
+- `.py`: +12 lines, -4 lines
+- `.ipynb`: +1 lines, -1 lines
+- `other`: +1 lines, -1 lines
+
+## v0.53.0 (2025-01-31)
+
+### ✨ Enhancements
+
+- Include `__pipefunc_hash__` of function to determine the cache key ([#515](https://github.com/pipefunc/pipefunc/pull/515))
+- Allow custom class with `__call__` ([#619](https://github.com/pipefunc/pipefunc/pull/619))
+- Implement `NestedPipeFunc.parameter_annotations` ([#621](https://github.com/pipefunc/pipefunc/pull/621))
+- Implement `Pipeline.parameter_annotations` and `Pipeline.output_annotations` ([#622](https://github.com/pipefunc/pipefunc/pull/622))
+
+### 🐛 Bug Fixes
+
+- Fix defaults and positional args ([#620](https://github.com/pipefunc/pipefunc/pull/620))
+
+### 🧹 Maintenance
+
+- Set `zarr>=2,<3` in `[extras]` ([#618](https://github.com/pipefunc/pipefunc/pull/618))
+
+### 📊 Stats
+
+- `.py`: +195 lines, -32 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.52.1 (2025-01-30)
+
+### 🐛 Bug Fixes
+
+- Fix pipefunc import with Zarr v3 (which is currently incompatible) ([#617](https://github.com/pipefunc/pipefunc/pull/617))
+
+### 📊 Stats
+
+- `.py`: +5 lines, -1 lines
+
+## v0.52.0 (2025-01-30)
+
+### ✨ Enhancements
+
+- Make `Pipeline.validate()` public ([#616](https://github.com/pipefunc/pipefunc/pull/616))
+- Add `__repr__` to Storage classes ([#614](https://github.com/pipefunc/pipefunc/pull/614))
+
+### 📚 Documentation
+
+- Update release notes up to v0.51.4 ([#613](https://github.com/pipefunc/pipefunc/pull/613))
+
+### 📊 Stats
+
+- `.md`: +60 lines, -0 lines
+- `.py`: +53 lines, -10 lines
+
+## v0.51.4 (2025-01-28)
+
+### 🐛 Bug Fixes
+
+- Fix unresolved shape in ≥2D arrays ([#612](https://github.com/pipefunc/pipefunc/pull/612))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#608](https://github.com/pipefunc/pipefunc/pull/608))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +87 lines, -5 lines
+
+## v0.51.3 (2025-01-27)
+
+### ✨ Enhancements
+
+- Raise an appropriate error when returning different shapes with `internal_shapes` ([#610](https://github.com/pipefunc/pipefunc/pull/610))
+
+### 🐛 Bug Fixes
+
+- Fix 1 sized `internal_shapes` ([#611](https://github.com/pipefunc/pipefunc/pull/611))
+
+### 📊 Stats
+
+- `.py`: +58 lines, -5 lines
+
+## v0.51.2 (2025-01-26)
+
+### 🧹 Maintenance
+
+- Fix dependency name in `[extras]` (`matplotlib-base` is conda name) ([#606](https://github.com/pipefunc/pipefunc/pull/606))
+
+### 📚 Documentation
+
+- Fix URLs linking to examples ([#604](https://github.com/pipefunc/pipefunc/pull/604))
+
+### 📊 Stats
+
+- `.py`: +1 lines, -1 lines
+- `.ipynb`: +12 lines, -7 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.51.1 (2025-01-25)
+
+### 🧹 Maintenance
+
+- Rename `[extra]` optional dependencies to `[extras]` to align with `pipefunc-extras` ([#603](https://github.com/pipefunc/pipefunc/pull/603))
+
+### 📚 Documentation
+
+- Update release notes up to 0.51.0 ([#602](https://github.com/pipefunc/pipefunc/pull/602))
+
+### 📊 Stats
+
+- `.md`: +51 lines, -0 lines
+- `.toml`: +2 lines, -2 lines
+
 ## v0.51.0 (2025-01-24)
 
 ### ✨ Enhancements
