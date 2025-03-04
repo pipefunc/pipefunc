@@ -166,3 +166,14 @@ def test_loop_over_list_with_elements_with_shape() -> None:
     assert results["y"].output.tolist() == [2, 2, 2]
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "x" in ds.coords
+
+
+def test_no_inputs_to_xarray():
+    @pipefunc(output_name="y")
+    def f() -> int:
+        return 1
+
+    pipeline = Pipeline([f])
+    results = pipeline.map({}, storage="dict", parallel=False)
+    ds = results.to_xarray()
+    assert "y" in ds.coords
