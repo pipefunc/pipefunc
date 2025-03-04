@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import pickle
 import re
@@ -1060,3 +1061,12 @@ def test_join_pipeline_preserves_defaults() -> None:
     pipeline = pipeline1.join(pipeline2)
     assert pipeline.run("x.d", kwargs={"x.a": 1}) == 4
     assert pipeline.defaults == {"x.b": 2}
+
+
+def test_deepcopy_with_cache() -> None:
+    @pipefunc(output_name="y")
+    def f(x):
+        return x
+
+    pipeline = Pipeline([f], cache_type="hybrid")
+    copy.deepcopy(pipeline)
