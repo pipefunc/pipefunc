@@ -805,6 +805,8 @@ def _submit(
     fut.add_done_callback(status.mark_complete)
     if not progress.in_async:
         fut.add_done_callback(progress.update_progress)
+    if fut.done():
+        status.mark_complete()
     return fut
 
 
