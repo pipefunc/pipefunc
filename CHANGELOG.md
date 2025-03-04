@@ -3,6 +3,65 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.57.0 (2025-03-04)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#660](https://github.com/pipefunc/pipefunc/pull/660))
+
+### ✨ Enhancements
+
+- Add `ResultDict.to_xarray` ([#656](https://github.com/pipefunc/pipefunc/pull/656))
+- Add `pipeline.map_async(..., scheduling_strategy="eager")` ([#662](https://github.com/pipefunc/pipefunc/pull/662))
+- Eager execution of graph, adds `pipeline.map(..., scheduling_strategy="eager")` ([#659](https://github.com/pipefunc/pipefunc/pull/659))
+
+### 📊 Stats
+
+- `.py`: +1527 lines, -15 lines
+- `.yaml`: +1 lines, -1 lines
+
+## v0.56.0 (2025-03-01)
+
+### ✨ Enhancements
+
+- Add option to `pipeline.map(..., return_results=False)` ([#626](https://github.com/pipefunc/pipefunc/pull/626))
+- Simplify dynamic shape setting (do not rely on `result_array`) ([#652](https://github.com/pipefunc/pipefunc/pull/652))
+
+### 🐛 Bug Fixes
+
+- Fix `DictArray` with `internal_shape` who's entries have an additional dimension ([#654](https://github.com/pipefunc/pipefunc/pull/654))
+- Fix persist and load `DictArray` and `SharedMemoryDictArray` ([#653](https://github.com/pipefunc/pipefunc/pull/653))
+
+### 📊 Stats
+
+- `.py`: +527 lines, -145 lines
+
+## v0.55.2 (2025-02-24)
+
+### 🐛 Bug Fixes
+
+- Deal with defaults in the CLI that are not set ([#650](https://github.com/pipefunc/pipefunc/pull/650))
+
+### 📊 Stats
+
+- `.md`: +6 lines, -0 lines
+- `.py`: +16 lines, -2 lines
+
+## v0.55.1 (2025-02-24)
+
+### 🐛 Bug Fixes
+
+- Fix CLI with None default ([#649](https://github.com/pipefunc/pipefunc/pull/649))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.55.0 ([#648](https://github.com/pipefunc/pipefunc/pull/648))
+
+### 📊 Stats
+
+- `.py`: +80 lines, -34 lines
+- `.md`: +56 lines, -0 lines
+
 ## v0.55.0 (2025-02-24)
 
 ### 📦 Dependencies

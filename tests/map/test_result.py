@@ -17,3 +17,9 @@ def test_truncating_result_dict_repr() -> None:
     assert text.startswith(
         "{'a': aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
+
+
+def test_xarray() -> None:
+    result = ResultDict()
+    with pytest.raises(ValueError, match="method can only be used when"):
+        result.to_xarray()
