@@ -1810,19 +1810,17 @@ def test_profiling_and_parallel_unsupported_warning() -> None:
         test_pipeline_with_profile_none.map({"val": np.array([1, 2, 3])})
 
 
-# Test with auto_subpipeline
-@pipefunc(output_name="intermediate")
-def create_intermediate():
-    return "intermediate_value"
-
-
-@pipefunc(output_name="final")
-def use_intermediate(intermediate):
-    return f"Used {intermediate}"
-
-
 def test_map_with_auto_subpipeline(tmp_path: Path):
     """Test that the eager scheduler works with auto_subpipeline."""
+
+    @pipefunc(output_name="intermediate")
+    def create_intermediate():
+        return "intermediate_value"
+
+    @pipefunc(output_name="final")
+    def use_intermediate(intermediate):
+        return f"Used {intermediate}"
+
     pipeline = Pipeline([create_intermediate, use_intermediate])
     run_folder = tmp_path / "auto_subpipeline"
 
@@ -1839,7 +1837,7 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
     assert load_outputs("final", run_folder=run_folder) == "Used direct_value"
 
     # Without auto_subpipeline, this would fail because create_intermediate wouldn't be called
-    with pytest.raises(ValueError, match="Missing required inputs"):
+    with pytest.raises(ValueError, match="Got extra inputs: `intermediate` that"):
         pipeline.map(
             inputs={"intermediate": "direct_value"},
             run_folder=run_folder,
