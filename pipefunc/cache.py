@@ -371,8 +371,6 @@ class LRUCache(_CacheBase):
             state["_cache_queue"] = _list_to_regular(self._cache_queue)
             # Remove unpicklable lock
             state.pop("_cache_lock", None)
-            # Flag for reconstruction
-            state["shared"] = True
 
         return state
 
