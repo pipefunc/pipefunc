@@ -114,16 +114,6 @@ class ProgressTracker:
         if self.task is not None:
             self._set_auto_update(auto_update)
 
-    def mark_all_complete(self) -> None:
-        """Mark all progress as complete."""
-        for status in self.progress_dict.values():
-            if status.end_time is None:
-                status.n_in_progress = 0
-                assert isinstance(status.n_total, int)
-                status.n_completed = status.n_total
-                status.end_time = time.monotonic()
-        self.update_progress(force=True)
-
     def attach_task(self, task: asyncio.Task[Any]) -> None:
         """Attach a new task to the progress tracker."""
         self.task = task
