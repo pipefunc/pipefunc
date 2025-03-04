@@ -51,8 +51,8 @@ class ResultDict(dict[str, Result]):
         inputs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        self._pipeline = pipeline or None
-        self._inputs = inputs or None
+        self._pipeline = pipeline
+        self._inputs = inputs
         super().__init__(*args, **kwargs)
 
     def __repr__(self) -> str:
