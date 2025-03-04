@@ -74,7 +74,7 @@ def prepare_run(
         storage=storage,
         cleanup=cleanup,
     )
-    outputs = ResultDict()
+    outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
     store = run_info.init_store()
     progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
     if executor is None and _cannot_be_parallelized(pipeline):
