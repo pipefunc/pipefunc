@@ -105,7 +105,7 @@ def _slurm_executor_for_map(
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     func = process_index.keywords["func"]
     executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
-    executor_kwargs["name"] = _slurm_name(func.output_name)  # type: ignore[assignment]
+    executor_kwargs["name"] = _slurm_name(func.output_name, executor)  # type: ignore[assignment]
     return _new_slurm_executor(executor, **executor_kwargs)
 
 
@@ -118,7 +118,7 @@ def _slurm_executor_for_single(
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
     executor_kwargs = _adaptive_scheduler_resource_dict(resources)
-    executor_kwargs["name"] = _slurm_name(func.output_name)
+    executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)
 
 
@@ -149,8 +149,13 @@ def _executors_for_generation(
     return executors
 
 
-def _slurm_name(output_name: OUTPUT_TYPE) -> str:
-    return "-".join(at_least_tuple(output_name))
+def _slurm_name(output_name: OUTPUT_TYPE, executor: SlurmExecutor | type[SlurmExecutor]) -> str:
+    from adaptive_scheduler import SlurmExecutor
+
+    name = "-".join(at_least_tuple(output_name))
+    if isinstance(executor, SlurmExecutor):
+        return f"{executor.name}-{name}"
+    return name
 
 
 def _map_slurm_executor_kwargs(
