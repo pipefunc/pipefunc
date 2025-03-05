@@ -795,14 +795,16 @@ def _submit(
     executor: Executor,
     status: Status | None,
     progress: ProgressTracker | None,
+    chunksize: int,
     *args: Any,
 ) -> Future:
     if status is None:
         return executor.submit(func, *args)
     assert progress is not None
-    status.mark_in_progress()
+    status.mark_in_progress(n=chunksize)
     fut = executor.submit(func, *args)
-    fut.add_done_callback(status.mark_complete)
+    mark_complete = functools.partial(status.mark_complete, n=chunksize)
+    fut.add_done_callback(mark_complete)
     if not progress.in_async:
         fut.add_done_callback(progress.update_progress)
     return fut
@@ -897,7 +899,7 @@ def _maybe_parallel_map(
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
+        return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
@@ -934,7 +936,7 @@ def _maybe_execute_single(
     if ex:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
-        return _submit(_execute_single, ex, status, progress, *args)
+        return _submit(_execute_single, ex, status, progress, 1, *args)
     if status is not None:
         assert progress is not None
         return _wrap_with_status_update(_execute_single, status, progress)(*args)

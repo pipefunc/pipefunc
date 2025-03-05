@@ -31,14 +31,19 @@ class Status:
     def n_left(self) -> int:
         return self.n_total - self.n_completed - self.n_failed  # type: ignore[operator]
 
-    def mark_in_progress(self) -> None:
+    def mark_in_progress(self, *, n: int = 1) -> None:
         if self.start_time is None:
             self.start_time = time.monotonic()
-        self.n_in_progress += 1
+        self.n_in_progress += n
 
-    def mark_complete(self, _: Any = None) -> None:  # needs arg to be used as callback
-        self.n_in_progress -= 1
-        self.n_completed += 1
+    def mark_complete(
+        self,
+        _: Any = None,
+        *,
+        n: int = 1,
+    ) -> None:  # needs arg to be used as callback
+        self.n_in_progress -= n
+        self.n_completed += n
         if self.n_completed == self.n_total:
             self.end_time = time.monotonic()
 
