@@ -245,9 +245,7 @@ class VariantPipeline:
             msg = f"Invalid variant type: `{type(select)}`. Expected `str` or `dict`."
             raise TypeError(msg)
 
-        # Merge defaults with selection when both are dictionaries and there are missing groups
-        if isinstance(select, dict) and isinstance(self.default_variant, dict):
-            # Create merged selection dict (start with defaults, update with explicit selection)
+        if isinstance(self.default_variant, dict):
             select = self.default_variant | select
 
         assert isinstance(select, dict)
