@@ -70,6 +70,19 @@ def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
     )
 
 
+@pytest.mark.benchmark
+def test_map_sequential_with_dict_storage_eager(pipeline_mapspec: Pipeline) -> None:
+    a = list(range(10))
+    b = list(range(10))
+
+    pipeline_mapspec.map(
+        inputs={"a": a, "b": b},
+        parallel=False,
+        storage="dict",
+        scheduling_strategy="eager",
+    )
+
+
 @pytest.fixture
 def pipeline_nd() -> Pipeline:
     @pipefunc(output_name="c", mapspec="a[k], b[k] -> c[k]")
@@ -96,4 +109,16 @@ def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
         storage="dict",
         parallel=False,
+    )
+
+
+@pytest.mark.benchmark
+def test_large_nd_sweep_from_faq_eager(pipeline_nd: Pipeline) -> None:
+    n = 15
+    lst = list(range(n))
+    pipeline_nd.map(
+        inputs={"a": lst, "b": lst, "x": lst, "y": lst},
+        storage="dict",
+        parallel=False,
+        scheduling_strategy="eager",
     )
