@@ -358,18 +358,10 @@ class PipeFunc(Generic[T]):
         desired output.
         """
         if self._output_picker is None and isinstance(self.output_name, tuple):
-            return functools.partial(
-                _default_output_picker,
-                output_name=self.output_name,
-            )
+            return functools.partial(_default_output_picker, output_name=self.output_name)
         return self._output_picker
 
-    def update_defaults(
-        self,
-        defaults: dict[str, Any],
-        *,
-        overwrite: bool = False,
-    ) -> None:
+    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
         """Update defaults to the provided keyword arguments.
 
         Parameters
@@ -792,10 +784,7 @@ class PipeFunc(Generic[T]):
         if not inspect.isfunction(func) and not is_classmethod(func):
             func = func.__call__  # type: ignore[operator]
         if self._output_picker is None:
-            hint = safe_get_type_hints(func, include_extras=True).get(
-                "return",
-                NoAnnotation,
-            )
+            hint = safe_get_type_hints(func, include_extras=True).get("return", NoAnnotation)
         else:
             # We cannot determine the output type if a custom output picker
             # is used, however, if the output is a tuple and the _default_output_picker
@@ -1154,7 +1143,25 @@ class NestedPipeFunc(PipeFunc):
         that are fixed. Even when providing different values, the bound values will be
         used. Must be in terms of the renamed argument names.
     variants
-        TODO
+        Same as the `PipeFunc` class.
+        Identifies this function as an alternative implementation in a
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
 
     Attributes
     ----------
