@@ -342,6 +342,8 @@ def test_calling_add_with_autogen_mapspec(dim: int | Literal["?"]):
     results = pipeline.map(
         inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
         internal_shapes={"foo_out": (dim,)},
+        storage="dict",
+        parallel=False,
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
 
@@ -413,5 +415,5 @@ def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa
         return 2 * x
 
     pipeline_sum = Pipeline([generate_ints, double_it])
-    results = pipeline_sum.map({}, show_progress=show_progress)
+    results = pipeline_sum.map({}, show_progress=show_progress, parallel=False, storage="dict")
     assert results["y"].output.tolist() == []

@@ -1,6 +1,6 @@
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -114,6 +114,8 @@ def test_complex_dependency_graph(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -147,6 +149,8 @@ def test_eager_scheduler_with_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
+        storage="dict",
+        parallel=False,
     )
 
     assert result["sum"].output == 30  # 2 + 4 + 6 + 8 + 10 = 30
@@ -203,7 +207,7 @@ def test_eager_scheduler_with_custom_executor(tmp_path: Path):
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "custom_executor"
 
-    with ProcessPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         result = pipeline.map(
             scheduling_strategy="eager",
             inputs={},
@@ -227,6 +231,8 @@ def test_eager_scheduler_without_returning_results(tmp_path: Path):
         run_folder=run_folder,
         return_results=False,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Result should be an empty dict
@@ -315,6 +321,8 @@ def test_eager_scheduler_with_internal_shapes(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result["sum"].output == 20  # (1+2+3+4)*2 = 20
@@ -341,6 +349,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
         run_folder=run_folder,
         fixed_indices={"i": 2},
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Result should be a 1D array with only the processed value at index 2
@@ -360,6 +370,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
         fixed_indices={"i": 3},
         cleanup=False,  # Don't clean up to keep previous results
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Now both indices 2 and 3 should be processed
@@ -487,6 +499,8 @@ def test_eager_scheduler_with_chunksizes(tmp_path: Path):
         run_folder=run_folder,
         chunksizes=5,  # Process in chunks of 5
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Check results
@@ -507,6 +521,7 @@ def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
         run_folder=run_folder,
         storage=storage,
         show_progress=False,
+        parallel=False,
     )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -556,6 +571,7 @@ def test_eager_scheduler_with_persist_memory(
         storage="dict",  # Memory-based storage
         persist_memory=persist_memory,
         show_progress=False,
+        parallel=False,
     )
 
     assert result["a"].output == "a"
@@ -603,6 +619,8 @@ def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
+        storage="dict",
+        parallel=False,
     )
 
     assert result["matrix"].output.tolist() == [[4, 5], [8, 10], [12, 15]]

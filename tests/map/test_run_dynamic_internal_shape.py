@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import random
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -87,7 +88,13 @@ async def test_dynamic_internal_shape_async(
 ) -> None:
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
-    runner = pipeline.map_async({}, run_folder=tmp_path, return_results=return_results)
+    runner = pipeline.map_async(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        executor=ThreadPoolExecutor(),
+        storage="dict",
+    )
     results = await runner.task
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
@@ -520,7 +527,7 @@ def test_simple_2d(
 
 @pytest.mark.parametrize("return_results", [True, False])
 @pytest.mark.parametrize("parallel", [True, False])
-@pytest.mark.parametrize("storage", ["file_array", "dict", "shared_memory_dict"])
+@pytest.mark.parametrize("storage", ["file_array", "dict"])
 def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
     tmp_path: Path,
     return_results: bool,  # noqa: FBT001

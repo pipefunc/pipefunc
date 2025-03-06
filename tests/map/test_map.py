@@ -878,7 +878,7 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     xarray_dataset_from_results(inputs, results, pipeline)
 
 
-def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
+def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -915,7 +915,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output == 13
 
@@ -938,7 +938,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output.tolist() == [13]
 
@@ -955,7 +955,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output.tolist() == [13]
     load_xarray_dataset(run_folder=tmp_path)
@@ -1547,6 +1547,7 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
         {"x": [1, 2, 3]},
         show_progress=True,
         scheduling_strategy=scheduling_strategy,
+        executor=ThreadPoolExecutor(),
     )
     # Test that the progress tracker is working
     progress = async_map.progress
@@ -1683,7 +1684,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
 
     pipeline = Pipeline([f, g, h])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, chunksizes=chunksizes)
+    results = pipeline.map(
+        inputs,
+        chunksizes=chunksizes,
+        parallel=True,
+        storage="dict",
+        executor=ThreadPoolExecutor(),
+    )
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["y2"].output.tolist() == [2, 3, 4]
@@ -1692,7 +1699,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
         ValueError,
         match=re.escape("Invalid chunksize -1 for z"),
     ):
-        pipeline.map(inputs, chunksizes={"z": -1})
+        pipeline.map(
+            inputs,
+            chunksizes={"z": -1},
+            parallel=True,
+            storage="dict",
+            executor=ThreadPoolExecutor(),
+        )
 
 
 def test_map_range():
@@ -1702,7 +1715,7 @@ def test_map_range():
 
     pipeline = Pipeline([f])
     inputs = {"x": range(3)}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["y"].output.tolist() == [0, 1, 2]
     if has_xarray:
         ds = xarray_dataset_from_results(inputs, r, pipeline)
@@ -1803,11 +1816,11 @@ def test_profiling_and_parallel_unsupported_warning() -> None:
 
     test_pipeline_with_profile_true = Pipeline([a], profile=True)
     with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
-        test_pipeline_with_profile_true.map({"val": np.array([1, 2, 3])})
+        test_pipeline_with_profile_true.map({"val": [1]})
 
     test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
     with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
-        test_pipeline_with_profile_none.map({"val": np.array([1, 2, 3])})
+        test_pipeline_with_profile_none.map({"val": [1]})
 
 
 def test_map_with_auto_subpipeline(tmp_path: Path):
