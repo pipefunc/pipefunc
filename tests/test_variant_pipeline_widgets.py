@@ -165,8 +165,15 @@ def multi_variant_functions() -> list[PipeFunc]:
     not has_ipywidgets or not has_graphviz,
     reason="requires ipywidgets and graphviz",
 )
-def test_multi_dimensional_variants_widget(multi_variant_functions: list[PipeFunc]) -> None:
-    pipeline = VariantPipeline(multi_variant_functions, default_variant={"optimization": "1"})
+@pytest.mark.parametrize("default_variant", [{"optimization": "1"}, None])
+def test_multi_dimensional_variants_widget(
+    multi_variant_functions: list[PipeFunc],
+    default_variant: dict[str, str] | None,
+) -> None:
+    pipeline = VariantPipeline(
+        multi_variant_functions,
+        default_variant=default_variant,  # type: ignore[arg-type]
+    )
     result = pipeline._repr_mimebundle_()
     assert "text/plain" in result
     viz = pipeline.visualize(backend="graphviz_widget")
