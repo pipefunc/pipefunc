@@ -29,11 +29,11 @@ Here's a simple example:
 ```{code-cell} ipython3
 from pipefunc import VariantPipeline, pipefunc
 
-@pipefunc(output_name="c", variants="A")
+@pipefunc(output_name="c", variant="A")
 def f(a, b):
     return a + b
 
-@pipefunc(output_name="c", variants="B")
+@pipefunc(output_name="c", variant="B")
 def f_alt(a, b):
     return a - b
 
@@ -56,23 +56,23 @@ result_B = pipeline_B(a=2, b=3)  # (2 - 3) * 3 = -3
 For more complex cases, you can group variants using a dictionary:
 
 ```{code-cell} ipython3
-@pipefunc(output_name="c", variants={"method": "add"})
+@pipefunc(output_name="c", variant={"method": "add"})
 def process_A(a, b):
     return a + b
 
-@pipefunc(output_name="b", variants={"method": "sub"})
+@pipefunc(output_name="b", variant={"method": "sub"})
 def process_B1(a):
     return a
 
-@pipefunc(output_name="c", variants={"method": "sub"})
+@pipefunc(output_name="c", variant={"method": "sub"})
 def process_B2(a, b):
     return a - b
 
-@pipefunc(output_name="d", variants={"analysis": "mul"})
+@pipefunc(output_name="d", variant={"analysis": "mul"})
 def analyze_A(b, c):
     return b * c
 
-@pipefunc(output_name="d", variants={"analysis": "div"})
+@pipefunc(output_name="d", variant={"analysis": "div"})
 def analyze_B(b, c):
     return b / c
 
@@ -87,7 +87,7 @@ sub_div_pipeline = pipeline.with_variant(
 )
 ```
 
-Here, we see that the `variants={"method": "add"}` in for `process_A` and `variants={"method": "sub"}` for `process_B1` and `process_B2` define alternative pipelines.
+Here, we see that the `variant={"method": "add"}` in for `process_A` and `variant={"method": "sub"}` for `process_B1` and `process_B2` define alternative pipelines.
 
 You can visualize the pipelines using the `visualize` method:
 
@@ -110,12 +110,12 @@ pipeline.variants_mapping()
 Variants in the same group can have different output names:
 
 ```{code-cell} ipython3
-@pipefunc(output_name="stats_result", variants={"analysis": "stats"})
+@pipefunc(output_name="stats_result", variant={"analysis": "stats"})
 def analyze_stats(data):
     # Perform statistical analysis
     return ...
 
-@pipefunc(output_name="ml_result", variants={"analysis": "ml"})
+@pipefunc(output_name="ml_result", variant={"analysis": "ml"})
 def analyze_ml(data):
     # Perform machine learning analysis
     return ...
