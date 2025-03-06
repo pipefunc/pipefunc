@@ -208,11 +208,11 @@ def test_nested_pipefunc_resources() -> None:
 
 
 def test_nested_pipefunc_variants() -> None:
-    @pipefunc(output_name="c", variants="add")
+    @pipefunc(output_name="c", variant="add")
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants="sub")
+    @pipefunc(output_name="c", variant="sub")
     def f2(a, b):
         return a - b
 
@@ -223,14 +223,14 @@ def test_nested_pipefunc_variants() -> None:
     vp = VariantPipeline([f, f2, g])
     nf = NestedPipeFunc(
         [vp.with_variant("add").functions[0], g],
-        variants="add",
+        variant="add",
     )
-    assert nf.variants == {None: "add"}
+    assert nf.variant == {None: "add"}
     nf2 = NestedPipeFunc(
         [vp.with_variant("sub").functions[0], g],
-        variants="sub",
+        variant="sub",
     )
-    assert nf2.variants == {None: "sub"}
+    assert nf2.variant == {None: "sub"}
 
     vp = VariantPipeline([nf, nf2])
     pipeline_add = vp.with_variant("add")
@@ -242,19 +242,19 @@ def test_nested_pipefunc_variants() -> None:
 
 
 def test_nested_pipefunc_variant_groups() -> None:
-    @pipefunc(output_name="c", variants={"op": "add"})
+    @pipefunc(output_name="c", variant={"op": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"op": "sub"})
+    @pipefunc(output_name="c", variant={"op": "sub"})
     def f2(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variants={"mult": "yes"})
+    @pipefunc(output_name="d", variant={"mult": "yes"})
     def g(c):
         return c * 2
 
-    @pipefunc(output_name="d", variants={"mult": "no"})
+    @pipefunc(output_name="d", variant={"mult": "no"})
     def g2(c):
         return c
 
@@ -264,7 +264,7 @@ def test_nested_pipefunc_variant_groups() -> None:
             vp.with_variant({"op": "add", "mult": "yes"}).functions[0],
             vp.with_variant({"op": "add", "mult": "yes"}).functions[1],
         ],
-        variants={"op_mult": "add_yes"},
+        variant={"op_mult": "add_yes"},
     )
 
     nf2 = NestedPipeFunc(
@@ -272,7 +272,7 @@ def test_nested_pipefunc_variant_groups() -> None:
             vp.with_variant({"op": "sub", "mult": "no"}).functions[0],
             vp.with_variant({"op": "sub", "mult": "no"}).functions[1],
         ],
-        variants={"op_mult": "sub_no"},
+        variant={"op_mult": "sub_no"},
     )
 
     vp = VariantPipeline([nf, nf2])
@@ -352,11 +352,11 @@ def test_nested_pipefunc_no_leaf_node() -> None:
 
 
 def test_nested_pipefunc_variant_different_output_name() -> None:
-    @pipefunc(output_name="sum_", variants={"op": "add"})
+    @pipefunc(output_name="sum_", variant={"op": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="diff", variants={"op": "sub"})
+    @pipefunc(output_name="diff", variant={"op": "sub"})
     def f2(a, b):
         return a - b
 
@@ -374,12 +374,12 @@ def test_nested_pipefunc_variant_different_output_name() -> None:
 
     nf = NestedPipeFunc(
         [vp_add.functions[0], vp_add.functions[1]],
-        variants={"op": "add"},
+        variant={"op": "add"},
         output_name="double",
     )
     nf2 = NestedPipeFunc(
         [vp_sub.functions[0], vp_sub.functions[2]],
-        variants={"op": "sub"},
+        variant={"op": "sub"},
         output_name="half",
     )
 

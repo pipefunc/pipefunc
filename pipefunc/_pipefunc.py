@@ -149,7 +149,7 @@ class PipeFunc(Generic[T]):
         a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
-    variants
+    variant
         Identifies this function as an alternative implementation in a
         `VariantPipeline` and specifies which variant groups it belongs to.
         When multiple functions share the same `output_name`, variants allow
@@ -217,7 +217,7 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
-        variants: str | dict[str | None, str] | None = None,
+        variant: str | dict[str | None, str] | None = None,
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -238,7 +238,7 @@ class PipeFunc(Generic[T]):
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.resources_scope: Literal["map", "element"] = resources_scope
-        self.variants = _ensure_variants(variants)
+        self.variant = _ensure_variant(variant)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -640,7 +640,7 @@ class PipeFunc(Generic[T]):
             "resources": self.resources,
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
-            "variants": self.variants,
+            "variant": self.variant,
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -946,7 +946,7 @@ def pipefunc(
     resources_variable: str | None = None,
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
-    variants: str | dict[str | None, str] | None = None,
+    variant: str | dict[str | None, str] | None = None,
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -1036,7 +1036,7 @@ def pipefunc(
         a `PipeFunc` instance with scope "foo" and "bar", the parameters
         can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
-    variants
+    variant
         Identifies this function as an alternative implementation in a
         `VariantPipeline` and specifies which variant groups it belongs to.
         When multiple functions share the same `output_name`, variants allow
@@ -1109,7 +1109,7 @@ def pipefunc(
             resources=resources,
             resources_variable=resources_variable,
             resources_scope=resources_scope,
-            variants=variants,
+            variant=variant,
             scope=scope,
         )
 
@@ -1142,7 +1142,7 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
         that are fixed. Even when providing different values, the bound values will be
         used. Must be in terms of the renamed argument names.
-    variants
+    variant
         Same as the `PipeFunc` class.
         Identifies this function as an alternative implementation in a
         `VariantPipeline` and specifies which variant groups it belongs to.
@@ -1188,7 +1188,7 @@ class NestedPipeFunc(PipeFunc):
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
         bound: dict[str, Any] | None = None,
-        variants: str | dict[str | None, str] | None = None,
+        variant: str | dict[str | None, str] | None = None,
     ) -> None:
         from pipefunc import Pipeline
 
@@ -1203,7 +1203,7 @@ class NestedPipeFunc(PipeFunc):
         self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
-        self.variants: dict[str | None, str] = _ensure_variants(variants)
+        self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}
@@ -1231,7 +1231,7 @@ class NestedPipeFunc(PipeFunc):
             "bound": self._bound,
             "mapspec": self.mapspec,
             "resources": self.resources,
-            "variants": self.variants,
+            "variant": self.variant,
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
@@ -1599,9 +1599,9 @@ def _pydantic_defaults(
     return defaults
 
 
-def _ensure_variants(variants: str | dict[str | None, str] | None) -> dict[str | None, str]:
-    """Ensure that the variants are in the correct format."""
+def _ensure_variant(variant: str | dict[str | None, str] | None) -> dict[str | None, str]:
+    """Ensure that the variant is in the correct format."""
     # Convert string variant to dict with None as group
-    if isinstance(variants, str):
-        return {None: variants}
-    return variants or {}
+    if isinstance(variant, str):
+        return {None: variant}
+    return variant or {}

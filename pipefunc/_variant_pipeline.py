@@ -112,19 +112,19 @@ class VariantPipeline:
 
     Multiple variant groups:
 
-        >>> @pipefunc(output_name="c", variants={"method": "add"})
+        >>> @pipefunc(output_name="c", variant={"method": "add"})
         ... def f1(a, b):
         ...     return a + b
         ...
-        >>> @pipefunc(output_name="c", variants={"method": "sub"})
+        >>> @pipefunc(output_name="c", variant={"method": "sub"})
         ... def f2(a, b):
         ...     return a - b
         ...
-        >>> @pipefunc(output_name="d", variants={"analysis": "mul"})
+        >>> @pipefunc(output_name="d", variant={"analysis": "mul"})
         ... def g1(b, c):
         ...     return b * c
         ...
-        >>> @pipefunc(output_name="d", variants={"analysis": "div"})
+        >>> @pipefunc(output_name="d", variant={"analysis": "div"})
         ... def g2(b, c):
         ...     return b / c
         ...
@@ -191,7 +191,7 @@ class VariantPipeline:
         """Return a dictionary of variant groups and their variants."""
         variant_groups: dict[str | None, set[str]] = {}
         for function in self.functions:
-            for group, variant in function.variants.items():
+            for group, variant in function.variant.items():
                 variants = variant_groups.setdefault(group, set())
                 variants.add(variant)
         return variant_groups
@@ -200,7 +200,7 @@ class VariantPipeline:
         """Return a dictionary of variants and their variant groups."""
         variants: dict[str, set[str | None]] = {}
         for function in self.functions:
-            for group, variant in function.variants.items():
+            for group, variant in function.variant.items():
                 groups = variants.setdefault(variant, set())
                 groups.add(group)
         return variants
@@ -289,7 +289,7 @@ class VariantPipeline:
         new_functions: list[PipeFunc] = []
         for function in self.functions:
             # For functions with no variants, always include them
-            if not function.variants:
+            if not function.variant:
                 new_functions.append(function)
                 continue
 
@@ -297,7 +297,7 @@ class VariantPipeline:
             include = True
 
             # Check variants dict
-            for group, variant in function.variants.items():
+            for group, variant in function.variant.items():
                 if group in select and select[group] != variant:
                     include = False
                     break
@@ -311,7 +311,7 @@ class VariantPipeline:
         """Check if any variants remain after selection."""
         left_over = defaultdict(set)
         for function in functions:
-            for group, variant in function.variants.items():
+            for group, variant in function.variant.items():
                 left_over[group].add(variant)
         return any(len(variants) > 1 for variants in left_over.values())
 
@@ -445,7 +445,7 @@ class VariantPipeline:
             variants_param = {variant_group: variant} if variant_group is not None else variant
 
             unique_funcs = [
-                func.copy(variants=variants_param)
+                func.copy(variant=variants_param)
                 for func in funcs
                 if not _pipefunc_in_list(func, common_funcs)
             ]
