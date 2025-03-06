@@ -168,5 +168,6 @@ def multi_variant_functions() -> list[PipeFunc]:
 def test_multi_dimensional_variants_widget(multi_variant_functions: list[PipeFunc]) -> None:
     pipeline = VariantPipeline(multi_variant_functions, default_variant={"optimization": "1"})
     result = pipeline._repr_mimebundle_()
-    result = pipeline.visualize(backend="graphviz_widget")
-    assert type(result).__name__ == "VBox"
+    assert "text/plain" in result
+    viz = pipeline.visualize(backend="graphviz_widget")
+    assert type(viz).__name__ == "VBox"
