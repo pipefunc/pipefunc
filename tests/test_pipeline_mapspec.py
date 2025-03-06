@@ -415,5 +415,5 @@ def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa
         return 2 * x
 
     pipeline_sum = Pipeline([generate_ints, double_it])
-    results = pipeline_sum.map({}, show_progress=show_progress)
+    results = pipeline_sum.map({}, show_progress=show_progress, parallel=False, storage="dict")
     assert results["y"].output.tolist() == []

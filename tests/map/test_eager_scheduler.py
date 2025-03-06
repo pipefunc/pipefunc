@@ -1,6 +1,6 @@
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -114,6 +114,8 @@ def test_complex_dependency_graph(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -205,7 +207,7 @@ def test_eager_scheduler_with_custom_executor(tmp_path: Path):
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
     run_folder = tmp_path / "custom_executor"
 
-    with ProcessPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         result = pipeline.map(
             scheduling_strategy="eager",
             inputs={},
@@ -229,6 +231,8 @@ def test_eager_scheduler_without_returning_results(tmp_path: Path):
         run_folder=run_folder,
         return_results=False,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Result should be an empty dict
@@ -567,6 +571,7 @@ def test_eager_scheduler_with_persist_memory(
         storage="dict",  # Memory-based storage
         persist_memory=persist_memory,
         show_progress=False,
+        parallel=False,
     )
 
     assert result["a"].output == "a"
