@@ -155,7 +155,7 @@ class PipeFunc(Generic[T]):
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
+        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
     scope
         If provided, *all* parameter names and output names of the function will
         be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
@@ -1061,7 +1061,7 @@ def pipefunc(
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
+        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
 
     Returns
     -------
@@ -1171,7 +1171,7 @@ class NestedPipeFunc(PipeFunc):
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
+        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
 
     Attributes
     ----------
