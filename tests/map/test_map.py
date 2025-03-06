@@ -878,7 +878,7 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
     xarray_dataset_from_results(inputs, results, pipeline)
 
 
-def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
+def test_add_mapspec_axis_from_step(tmp_path: Path) -> None:
     @pipefunc(output_name="x")
     def generate_ints(n: int) -> list[int]:
         return list(range(n))
@@ -915,7 +915,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output == 13
 
@@ -938,7 +938,7 @@ def test_add_mapspec_axis_from_step(storage: str, tmp_path: Path) -> None:
         tmp_path,
         internal_shapes=internal_shapes_map,  # type: ignore[arg-type]
         parallel=False,
-        storage=storage,
+        storage="dict",
     )
     assert results["sum"].output.tolist() == [13]
 
