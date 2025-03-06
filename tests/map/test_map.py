@@ -1699,7 +1699,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
         ValueError,
         match=re.escape("Invalid chunksize -1 for z"),
     ):
-        pipeline.map(inputs, chunksizes={"z": -1}, parallel=False, storage="dict")
+        pipeline.map(
+            inputs,
+            chunksizes={"z": -1},
+            parallel=True,
+            storage="dict",
+            executor=ThreadPoolExecutor(),
+        )
 
 
 def test_map_range():
