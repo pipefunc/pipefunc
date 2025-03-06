@@ -519,6 +519,7 @@ def test_adaptive_run_dynamic_internal_shape():
         inputs={},
         adaptive_dimensions={"a": (0.0, 1.0)},
         adaptive_output="sum",
+        map_kwargs={"parallel": False, "storage": "dict"},
     )
 
     adaptive.runner.simple(learner, npoints_goal=10)
