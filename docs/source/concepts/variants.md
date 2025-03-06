@@ -131,8 +131,8 @@ result = pipeline_ml("ml_result", data={...})
 
 Key features:
 
-- Define multiple implementations of a function using the `variants` parameter
-- Group related variants using dictionary keys in the `variants` parameter
+- Define multiple implementations of a function using the `variant` parameter
+- Group related variants using dictionary keys in the `variant` parameter
 - Specify defaults with `default_variant`
 - Get a regular `Pipeline` when variants are selected
 - No changes required to your existing functions
@@ -142,7 +142,7 @@ The `with_variant()` method returns either:
 - A regular `Pipeline` if all variants are resolved
 - Another `VariantPipeline` if some variants remain unselected
 
-Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variants` for each function.
+Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variant` for each function.
 
 This makes `VariantPipeline` ideal for:
 
