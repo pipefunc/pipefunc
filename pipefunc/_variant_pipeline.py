@@ -272,7 +272,7 @@ class VariantPipeline:
             default_resources=kwargs.get("default_resources", self.default_resources),
         )
 
-    def _resolve_single_variant(self, select: str) -> dict[str, str]:
+    def _resolve_single_variant(self, select: str) -> dict[str | None, str]:
         """Resolve a single variant string to a dictionary."""
         inv = self._variants_mapping_inverse()
         group = inv.get(select, set())
@@ -284,7 +284,7 @@ class VariantPipeline:
             raise ValueError(msg)
         return {group.pop(): select}
 
-    def _select_functions(self, select: dict[str, str]) -> list[PipeFunc]:
+    def _select_functions(self, select: dict[str | None, str]) -> list[PipeFunc]:
         """Select functions based on the given variant selection."""
         new_functions: list[PipeFunc] = []
         for function in self.functions:
