@@ -580,10 +580,7 @@ def multi_variant_functions() -> list[PipeFunc]:
 
 
 def test_multi_dimensional_variants(multi_variant_functions: list[PipeFunc]) -> None:
-    pipeline = VariantPipeline(
-        multi_variant_functions,
-        default_variant={"algorithm": "A", "optimization": "1"},
-    )
+    pipeline = VariantPipeline(multi_variant_functions)
 
     # Check variants mapping
     variants = pipeline.variants_mapping()
@@ -620,3 +617,105 @@ def test_setting_single_default_variant_group(multi_variant_functions: list[Pipe
     pipeline = VariantPipeline(multi_variant_functions, default_variant={"algorithm": "B"})
     pipeline_b = pipeline.with_variant({"optimization": "2"})
     assert isinstance(pipeline_b, Pipeline)
+
+
+def test_partial_variant_selection_with_defaults() -> None:
+    """Test selecting variants with partial selection and defaults."""
+
+    @pipefunc(output_name="c", variant={"method": "add"})
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", variant={"method": "sub"})
+    def f2(a, b):
+        return a - b
+
+    @pipefunc(output_name="d", variant={"analysis": "mul"})
+    def g1(b, c):
+        return b * c
+
+    @pipefunc(output_name="d", variant={"analysis": "div"})
+    def g2(b, c):
+        return b / c
+
+    # Create pipeline with default for both variant groups
+    pipeline = VariantPipeline(
+        [f1, f2, g1, g2],
+        default_variant={"method": "add", "analysis": "mul"},
+    )
+
+    # Test selecting just one variant group - should use default for the other
+    pipeline_sub = pipeline.with_variant(select={"method": "sub"})
+    assert isinstance(pipeline_sub, Pipeline)  # Should be a concrete Pipeline
+    assert pipeline_sub(a=2, b=3) == -3  # (2-3)*3 = -3 (using sub for method, mul for analysis)
+
+    # Test selecting the other variant group
+    pipeline_div = pipeline.with_variant(select={"analysis": "div"})
+    assert isinstance(pipeline_div, Pipeline)
+    assert pipeline_div(a=2, b=3) == 5 / 3  # (2+3)/3 = 5/3 (using add for method, div for analysis)
+
+
+def test_partial_default_variant() -> None:
+    """Test having a default for only one variant group."""
+
+    @pipefunc(output_name="c", variant={"method": "add"})
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", variant={"method": "sub"})
+    def f2(a, b):
+        return a - b
+
+    @pipefunc(output_name="d", variant={"analysis": "mul"})
+    def g1(b, c):
+        return b * c
+
+    @pipefunc(output_name="d", variant={"analysis": "div"})
+    def g2(b, c):
+        return b / c
+
+    # Create pipeline with default for only one variant group
+    pipeline = VariantPipeline([f1, f2, g1, g2], default_variant={"method": "sub"})
+
+    # Test selecting just the other variant group
+    pipeline_div = pipeline.with_variant(select={"analysis": "div"})
+    assert isinstance(pipeline_div, Pipeline)
+    assert pipeline_div(a=2, b=3) == -1 / 3  # (2-3)/3 = -1/3 (using sub default, div selection)
+
+    # Test overriding the default
+    pipeline_add_mul = pipeline.with_variant(select={"method": "add", "analysis": "mul"})
+    assert isinstance(pipeline_add_mul, Pipeline)
+    assert pipeline_add_mul(a=2, b=3) == 15  # (2+3)*3 = 15
+
+
+def test_variant_selection_edge_cases() -> None:
+    """Test edge cases with variant selection."""
+
+    @pipefunc(output_name="c", variant={"method": "add", "version": "v1"})
+    def f1(a, b):
+        return a + b
+
+    @pipefunc(output_name="c", variant={"method": "sub", "version": "v1"})
+    def f2(a, b):
+        return a - b
+
+    @pipefunc(output_name="c", variant={"method": "add", "version": "v2"})
+    def f3(a, b):
+        return a + b + 1
+
+    @pipefunc(output_name="c", variant={"method": "sub", "version": "v2"})
+    def f4(a, b):
+        return a - b - 1
+
+    # Create pipeline with partial defaults
+    pipeline = VariantPipeline([f1, f2, f3, f4], default_variant={"method": "add"})
+
+    # Test selecting another dimension works with default
+    result = pipeline.with_variant(select={"version": "v2"})
+    assert isinstance(result, Pipeline)
+    assert result(a=2, b=3) == 6  # (2+3+1) = 6 (using add default, v2 selection)
+
+    # Test selecting everything explicitly
+    result = pipeline.with_variant(select={"method": "sub", "version": "v1"})
+    assert isinstance(result, Pipeline)
+    assert result(a=2, b=3) == -1  # (2-3) = -1

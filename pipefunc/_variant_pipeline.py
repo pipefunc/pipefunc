@@ -219,6 +219,8 @@ class VariantPipeline:
             If `select` is a string, it selects a single variant if no ambiguity exists.
             If `select` is a dictionary, it selects a variant for each variant group, where
             the keys are variant group names and the values are variant names.
+            If a partial dictionary is provided (not covering all variant groups) and
+            default_variant is a dictionary, it will merge the defaults with the selection.
         kwargs
             Keyword arguments for changing the parameters for a Pipeline or VariantPipeline.
 
@@ -247,6 +249,18 @@ class VariantPipeline:
         elif not isinstance(select, dict):
             msg = f"Invalid variant type: `{type(select)}`. Expected `str` or `dict`."
             raise TypeError(msg)
+
+        # Merge defaults with selection when both are dictionaries and there are missing groups
+        if (
+            isinstance(select, dict)
+            and isinstance(self.default_variant, dict)
+            and set(select.keys()) != set(self.variants_mapping().keys())
+        ):
+            # Create merged selection dict (start with defaults, update with explicit selection)
+            complete_select = dict(self.default_variant)
+            complete_select.update(select)
+            select = complete_select
+
         assert isinstance(select, dict)
         _validate_variants_exist(self.variants_mapping(), select)
 
