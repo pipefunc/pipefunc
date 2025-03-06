@@ -645,6 +645,7 @@ class PipeFunc(Generic[T]):
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
             "variant": self.variant,
+            "variant_group": None,  # deprecated
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -1244,6 +1245,7 @@ class NestedPipeFunc(PipeFunc):
             "mapspec": self.mapspec,
             "resources": self.resources,
             "variant": self.variant,
+            "variant_group": None,  # deprecated
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)

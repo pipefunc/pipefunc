@@ -5,12 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc import PipeFunc, Pipeline
-from pipefunc._utils import (
-    assert_complete_kwargs,
-    is_installed,
-    is_running_in_ipynb,
-    requires,
-)
+from pipefunc._utils import assert_complete_kwargs, is_installed, is_running_in_ipynb, requires
 
 if TYPE_CHECKING:
     from collections.abc import Callable
