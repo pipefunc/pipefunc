@@ -147,6 +147,8 @@ def test_eager_scheduler_with_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
+        storage="dict",
+        parallel=False,
     )
 
     assert result["sum"].output == 30  # 2 + 4 + 6 + 8 + 10 = 30
@@ -315,6 +317,8 @@ def test_eager_scheduler_with_internal_shapes(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result["sum"].output == 20  # (1+2+3+4)*2 = 20
@@ -491,6 +495,8 @@ def test_eager_scheduler_with_chunksizes(tmp_path: Path):
         run_folder=run_folder,
         chunksizes=5,  # Process in chunks of 5
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Check results
