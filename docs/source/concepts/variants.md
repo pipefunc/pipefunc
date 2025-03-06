@@ -29,11 +29,11 @@ Here's a simple example:
 ```{code-cell} ipython3
 from pipefunc import VariantPipeline, pipefunc
 
-@pipefunc(output_name="c", variant="A")
+@pipefunc(output_name="c", variants="A")
 def f(a, b):
     return a + b
 
-@pipefunc(output_name="c", variant="B")
+@pipefunc(output_name="c", variants="B")
 def f_alt(a, b):
     return a - b
 
@@ -53,26 +53,26 @@ pipeline_B = pipeline.with_variant(select="B")
 result_B = pipeline_B(a=2, b=3)  # (2 - 3) * 3 = -3
 ```
 
-For more complex cases, you can group variants using `variant_group`:
+For more complex cases, you can group variants using a dictionary:
 
 ```{code-cell} ipython3
-@pipefunc(output_name="c", variant_group="method", variant="add")
+@pipefunc(output_name="c", variants={"method": "add"})
 def process_A(a, b):
     return a + b
 
-@pipefunc(output_name="b", variant_group="method", variant="sub")
+@pipefunc(output_name="b", variants={"method": "sub"})
 def process_B1(a):
     return a
 
-@pipefunc(output_name="c", variant_group="method", variant="sub")
+@pipefunc(output_name="c", variants={"method": "sub"})
 def process_B2(a, b):
     return a - b
 
-@pipefunc(output_name="d", variant_group="analysis", variant="mul")
+@pipefunc(output_name="d", variants={"analysis": "mul"})
 def analyze_A(b, c):
     return b * c
 
-@pipefunc(output_name="d", variant_group="analysis", variant="div")
+@pipefunc(output_name="d", variants={"analysis": "div"})
 def analyze_B(b, c):
     return b / c
 
@@ -87,7 +87,7 @@ sub_div_pipeline = pipeline.with_variant(
 )
 ```
 
-Here, we see that the `variant_group="method"` in for `variant="add"` will result in a pipeline that takes `a` and `b`, whereas `variant="sub"` will take only `a`.
+Here, we see that the `variants={"method": "add"}` in for `process_A` and `variants={"method": "sub"}` for `process_B1` and `process_B2` define alternative pipelines.
 
 You can visualize the pipelines using the `visualize` method:
 
@@ -110,12 +110,12 @@ pipeline.variants_mapping()
 Variants in the same group can have different output names:
 
 ```{code-cell} ipython3
-@pipefunc(output_name="stats_result", variant_group="analysis", variant="stats")
+@pipefunc(output_name="stats_result", variants={"analysis": "stats"})
 def analyze_stats(data):
     # Perform statistical analysis
     return ...
 
-@pipefunc(output_name="ml_result", variant_group="analysis", variant="ml")
+@pipefunc(output_name="ml_result", variants={"analysis": "ml"})
 def analyze_ml(data):
     # Perform machine learning analysis
     return ...
@@ -131,8 +131,8 @@ result = pipeline_ml("ml_result", data={...})
 
 Key features:
 
-- Define multiple implementations of a function using the `variant` parameter
-- Group related variants using `variant_group`
+- Define multiple implementations of a function using the `variants` parameter
+- Group related variants using dictionary keys in the `variants` parameter
 - Specify defaults with `default_variant`
 - Get a regular `Pipeline` when variants are selected
 - No changes required to your existing functions
@@ -142,7 +142,7 @@ The `with_variant()` method returns either:
 - A regular `Pipeline` if all variants are resolved
 - Another `VariantPipeline` if some variants remain unselected
 
-Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variant` and `variant_group` for each function.
+Also check out {class}`pipefunc.VariantPipeline.from_pipelines` to create a `VariantPipeline` from multiple `Pipeline` objects without having to specify `variants` for each function.
 
 This makes `VariantPipeline` ideal for:
 
