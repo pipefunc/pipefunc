@@ -951,12 +951,16 @@ def test_pipeline_map_zero_size() -> None:
     result = pipeline.map(
         {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
     # Now with empty complete
     result = pipeline.map(
         {"mock_complete": [], "mock_incomplete": [0, 1, 2, 3]},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
 
@@ -965,6 +969,8 @@ def test_pipeline_map_zero_size() -> None:
     result = pipeline.map(
         {"mock_complete": [0, 1, 2, 3], "mock_incomplete": []},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
 
