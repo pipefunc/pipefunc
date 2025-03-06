@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from pipefunc import PipeFunc, Pipeline, VariantPipeline, pipefunc
+from pipefunc import Pipeline, VariantPipeline, pipefunc
 from pipefunc._variant_pipeline import is_identical_pipefunc
 
 has_psutil = importlib.util.find_spec("psutil") is not None
@@ -52,22 +52,22 @@ def test_variant_pipeline_single_group() -> None:
 
 def test_variant_pipeline_multiple_groups() -> None:
     # Define functions with variants and variant groups
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         print("Running f (add)")
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         print("Running f_alt (sub)")
         return a - b
 
-    @pipefunc(output_name="d", variants={"mul": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "mul"})
     def g(b, c, x=3):
         print("Running g (mul)")
         return b * c * x
 
-    @pipefunc(output_name="d", variants={"div": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "div"})
     def g_alt(b, c, x=3):
         print("Running g_alt (div)")
         return b * c / x
@@ -94,11 +94,11 @@ def test_lazy_debug_profile_cache() -> None:
     # We just check that these parameters are passed through to the Pipeline
     # No need to test the actual functionality of these parameters,
     # as they are tested in test_pipeline.py
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -124,11 +124,11 @@ def test_lazy_debug_profile_cache() -> None:
 
 
 def test_validate_type_annotations() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a: int, b: int) -> int:
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a: int, b: int) -> str:
         return str(a - b)
 
@@ -149,11 +149,11 @@ def test_validate_type_annotations() -> None:
 
 
 def test_error_handling_ambiguous_variant() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"add": "op2"})
+    @pipefunc(output_name="c", variants={"op2": "add"})
     def f_alt(a, b):
         return a - b
 
@@ -164,11 +164,11 @@ def test_error_handling_ambiguous_variant() -> None:
 
 
 def test_error_handling_with_variant() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -191,15 +191,15 @@ def test_error_handling_with_variant() -> None:
 
 
 def test_variants_mapping_and_inverse() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variants={"mul": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "mul"})
     def g(b, c):
         return b * c
 
@@ -222,7 +222,7 @@ def test_variants_mapping_and_inverse() -> None:
 
 
 def test_copy_method() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
@@ -237,7 +237,7 @@ def test_copy_method() -> None:
 
 
 def test_getattr_for_pipeline_attributes() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
@@ -253,19 +253,19 @@ def test_getattr_for_pipeline_attributes() -> None:
 
 
 def test_default_variant() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variants={"mul": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "mul"})
     def g(b, c):
         return b * c
 
-    @pipefunc(output_name="d", variants={"div": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "div"})
     def g_alt(b, c):
         return b / c
 
@@ -273,10 +273,9 @@ def test_default_variant() -> None:
     pipeline = VariantPipeline([f, f_alt, g, g_alt], default_variant="add")
     pipeline_add = pipeline.with_variant()
     assert [func.variants for func in pipeline_add.functions] == [
-        {"add": "op1"},
-        {"sub": "op1"},
-        {"mul": "op2"},
-        {"div": "op2"},
+        {"op1": "add"},
+        {"op2": "mul"},
+        {"op2": "div"},
     ]
 
     # Test with a default variant per group
@@ -285,15 +284,18 @@ def test_default_variant() -> None:
         default_variant={"op1": "sub", "op2": "div"},
     )
     pipeline_sub_div = pipeline.with_variant()
-    assert [func.variants for func in pipeline_sub_div.functions] == ["sub", "div"]
+    assert [func.variants for func in pipeline_sub_div.functions] == [
+        {"op1": "sub"},
+        {"op2": "div"},
+    ]
 
 
 def test_variant_pipeline_with_no_variant_group() -> None:
-    @pipefunc(output_name="c", variant="add")
+    @pipefunc(output_name="c", variants="add")
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variant="sub")
+    @pipefunc(output_name="c", variants="sub")
     def f_alt(a, b):
         return a - b
 
@@ -314,22 +316,22 @@ def test_variant_pipeline_with_no_variant_group() -> None:
 
 
 def test_variant_pipeline_copy_with_different_functions() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="d", variants={"mul": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "mul"})
     def g(b, c):
         return b * c
 
     pipeline = VariantPipeline([f, g], default_variant={"op1": "add", "op2": "mul"})
 
     # Create new functions to replace the existing ones in the copy
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variants={"div": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "div"})
     def g_alt(b, c):
         return b / c
 
@@ -351,19 +353,19 @@ def test_variant_pipeline_copy_with_different_functions() -> None:
 
 
 def test_variant_pipeline_copy_with_different_default_variant() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variants={"mul": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "mul"})
     def g(b, c):
         return b * c
 
-    @pipefunc(output_name="d", variants={"div": "op2"})
+    @pipefunc(output_name="d", variants={"op2": "div"})
     def g_alt(b, c):
         return b / c
 
@@ -391,11 +393,11 @@ def test_variant_pipeline_copy_with_different_default_variant() -> None:
 
 
 def test_variant_pipeline_with_variant_as_input_to_another_function() -> None:
-    @pipefunc(output_name="c", variants={"add": "op"})
+    @pipefunc(output_name="c", variants={"op": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op"})
+    @pipefunc(output_name="c", variants={"op": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -416,17 +418,6 @@ def test_variant_pipeline_with_variant_as_input_to_another_function() -> None:
     assert pipeline_sub(a=1, b=2) == -2  # (1 - 2) * 2
 
 
-def test_pipefunc_with_variant_group_but_no_variant_error() -> None:
-    def f(a, b):
-        return a + b
-
-    with pytest.raises(
-        ValueError,
-        match="`variant_group='add'` cannot be set without a corresponding `variant`",
-    ):
-        PipeFunc(f, output_name="c", variant_group="add")
-
-
 def test_variant_pipeline_with_no_variants() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
@@ -444,11 +435,11 @@ def test_variant_pipeline_with_no_variants() -> None:
 
 
 def test_variant_pipeline_with_only_some_functions_having_variants() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -470,11 +461,11 @@ def test_variant_pipeline_with_only_some_functions_having_variants() -> None:
 
 
 def test_variant_pipeline_with_default_variant_not_in_functions() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -550,8 +541,8 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
     )
     assert len(variant_pipeline.functions) == 3
     assert is_identical_pipefunc(variant_pipeline.functions[0], f)  # The common function f
-    assert variant_pipeline.functions[1].variant == {"group1": "add_mul"}
-    assert variant_pipeline.functions[2].variant == {"group1": "add_div"}
+    assert variant_pipeline.functions[1].variants == {"group1": "add_mul"}
+    assert variant_pipeline.functions[2].variants == {"group1": "add_div"}
 
 
 def test_exception_no_pipelines() -> None:
@@ -580,8 +571,7 @@ def test_multi_dimensional_variants():
     def g_a(x, c):
         return x * c
 
-    # Test the string shorthand for variants
-    @pipefunc(output_name="y", variants="B")
+    @pipefunc(output_name="y", variants={"algorithm": "B"})
     def g_b(x, c):
         return x / c
 
@@ -593,7 +583,6 @@ def test_multi_dimensional_variants():
     assert variants == {
         "algorithm": {"A", "B"},
         "optimization": {"1", "2"},
-        None: {"B"},  # From the string shorthand
     }
 
     # Test selecting all dimensions

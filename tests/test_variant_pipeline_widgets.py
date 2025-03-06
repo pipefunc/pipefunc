@@ -27,11 +27,11 @@ def patched_show():
 
 @pytest.mark.skipif(not has_graphviz, reason="requires graphviz")
 def test_visualize_default_backend() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -46,11 +46,11 @@ def test_visualize_default_backend() -> None:
 
 @pytest.mark.skipif(not has_graphviz, reason="requires graphviz")
 def test_visualize_graphviz_backend() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -64,11 +64,11 @@ def test_visualize_graphviz_backend() -> None:
     reason="requires ipywidgets and graphviz",
 )
 def test_visualize_graphviz_widget_backend() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -79,11 +79,11 @@ def test_visualize_graphviz_widget_backend() -> None:
 
 @pytest.mark.skipif(not has_matplotlib, reason="requires matplotlib")
 def test_visualize_matplotlib_backend() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -98,11 +98,11 @@ def test_visualize_matplotlib_backend() -> None:
     reason="requires ipywidgets and graphviz",
 )
 def test_visualize_with_variant_selection() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variants={"sub": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "sub"})
     def f_alt(a, b):
         return a - b
 
@@ -113,7 +113,7 @@ def test_visualize_with_variant_selection() -> None:
 
 @pytest.mark.skipif(not has_ipywidgets or not has_rich, reason="requires ipywidgets and rich")
 def test_repr_mimebundle_with_ipywidgets_and_rich() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 
@@ -123,7 +123,7 @@ def test_repr_mimebundle_with_ipywidgets_and_rich() -> None:
 
 
 def test_repr_mimebundle_without_ipywidgets_or_rich() -> None:
-    @pipefunc(output_name="c", variants={"add": "op1"})
+    @pipefunc(output_name="c", variants={"op1": "add"})
     def f(a, b):
         return a + b
 

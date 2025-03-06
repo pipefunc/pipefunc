@@ -174,9 +174,7 @@ class VariantPipeline:
     ) -> None:
         """Initialize a VariantPipeline."""
         self.functions = functions
-        self.default_variant: dict[str | None] | None = (
-            default_variant if not isinstance(default_variant, str) else {None: default_variant}
-        )
+        self.default_variant = default_variant
         self.lazy = lazy
         self.debug = debug
         self.profile = profile
