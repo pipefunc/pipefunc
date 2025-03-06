@@ -1693,7 +1693,7 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
         ValueError,
         match=re.escape("Invalid chunksize -1 for z"),
     ):
-        pipeline.map(inputs, chunksizes={"z": -1})
+        pipeline.map(inputs, chunksizes={"z": -1}, parallel=False, storage="dict")
 
 
 def test_map_range():
@@ -1703,7 +1703,7 @@ def test_map_range():
 
     pipeline = Pipeline([f])
     inputs = {"x": range(3)}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["y"].output.tolist() == [0, 1, 2]
     if has_xarray:
         ds = xarray_dataset_from_results(inputs, r, pipeline)
