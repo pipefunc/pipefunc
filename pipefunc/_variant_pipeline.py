@@ -33,7 +33,7 @@ class VariantPipeline:
 
     The pipeline can have multiple variant groups, where each group contains alternative
     implementations of a function. Functions can be assigned to variant groups using
-    the ``variants`` parameter which can be a single string (for the default group) or
+    the ``variant`` parameter which can be a single string (for the default group) or
     a dictionary mapping group names to variant names.
 
     All parameters below (except ``functions`` and ``default_variant``) are simply passed to
