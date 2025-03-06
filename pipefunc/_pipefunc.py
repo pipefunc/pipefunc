@@ -135,20 +135,6 @@ class PipeFunc(Generic[T]):
         - "element": Allocate resources for each element in the mapspec.
 
         If no mapspec is defined, this parameter is ignored.
-    scope
-        If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
-        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
-        pipeline to have parameters with the same name without conflict. To be selective
-        about which parameters and outputs to include in the scope, use the
-        `PipeFunc.update_scope` method.
-
-        When providing parameter values for functions that have scopes, they can
-        be provided either as a dictionary for the scope, or by using the
-        ``f'{scope}.{name}'`` notation. For example,
-        a `PipeFunc` instance with scope "foo" and "bar", the parameters
-        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
-        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
         `VariantPipeline` and specifies which variant groups it belongs to.
@@ -168,6 +154,22 @@ class PipeFunc(Generic[T]):
         have "preprocessing" variants ("v1"/"v2") independent from "computation"
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
+    variant_group
+        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
+    scope
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
+
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
 
     Returns
     -------
@@ -218,6 +220,7 @@ class PipeFunc(Generic[T]):
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
         variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
         scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
@@ -238,6 +241,7 @@ class PipeFunc(Generic[T]):
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.resources_scope: Literal["map", "element"] = resources_scope
+        _maybe_variant_group_error(variant_group, variant)
         self.variant = _ensure_variant(variant)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
@@ -947,6 +951,7 @@ def pipefunc(
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
     variant: str | dict[str | None, str] | None = None,
+    variant_group: str | None = None,  # deprecated
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -1055,6 +1060,8 @@ def pipefunc(
         have "preprocessing" variants ("v1"/"v2") independent from "computation"
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
+    variant_group
+        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
 
     Returns
     -------
@@ -1110,6 +1117,7 @@ def pipefunc(
             resources_variable=resources_variable,
             resources_scope=resources_scope,
             variant=variant,
+            variant_group=variant_group,  # deprecated
             scope=scope,
         )
 
@@ -1162,6 +1170,8 @@ class NestedPipeFunc(PipeFunc):
         have "preprocessing" variants ("v1"/"v2") independent from "computation"
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
+    variant_group
+        DEPRECATED: Use `variant` instead. Specifies the variant group for the function.
 
     Attributes
     ----------
@@ -1189,6 +1199,7 @@ class NestedPipeFunc(PipeFunc):
         resources: dict | Resources | None = None,
         bound: dict[str, Any] | None = None,
         variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
     ) -> None:
         from pipefunc import Pipeline
 
@@ -1203,6 +1214,7 @@ class NestedPipeFunc(PipeFunc):
         self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
         self.cache = any(f.cache for f in self.pipeline.functions)
+        _maybe_variant_group_error(variant_group, variant)
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
@@ -1605,3 +1617,15 @@ def _ensure_variant(variant: str | dict[str | None, str] | None) -> dict[str | N
     if isinstance(variant, str):
         return {None: variant}
     return variant or {}
+
+
+def _maybe_variant_group_error(
+    variant_group: str | None,
+    variant: str | dict[str | None, str] | None,
+) -> None:
+    if variant_group is not None:  # TODO: remove in 2025-09
+        msg = (
+            "The `variant_group` parameter has been removed."
+            f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
+        )
+        raise ValueError(msg)

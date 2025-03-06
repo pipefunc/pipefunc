@@ -719,3 +719,18 @@ def test_variant_selection_edge_cases() -> None:
     result = pipeline.with_variant(select={"method": "sub", "version": "v1"})
     assert isinstance(result, Pipeline)
     assert result(a=2, b=3) == -1  # (2-3) = -1
+
+
+def test_variant_group_exception() -> None:
+    msg = "The `variant_group` parameter has been removed. Use the `variant = {'group1': 'add'}` parameter instead"
+    with pytest.raises(ValueError, match=msg):
+
+        @pipefunc(output_name="c", variant="add", variant_group="group1")
+        def f1(a, b):
+            return a + b
+
+    def f2(a, b):
+        return a + b
+
+    with pytest.raises(ValueError, match=msg):
+        PipeFunc(f2, output_name="c", variant="add", variant_group="group1")
