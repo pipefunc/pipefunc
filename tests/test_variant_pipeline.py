@@ -734,3 +734,6 @@ def test_variant_group_exception() -> None:
 
     with pytest.raises(ValueError, match=msg):
         PipeFunc(f2, output_name="c", variant="add", variant_group="group1")
+
+
+def test_default_exists_exception() -> None: ...

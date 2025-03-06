@@ -573,6 +573,7 @@ def _create_variant_selection_widget(
 
     dropdowns: dict[str | None, ipywidgets.Dropdown] = {}
     output = ipywidgets.Output()
+    default = _ensure_dict(vp.default_variant)
 
     def wrapped_update_func(_change: dict | None = None) -> None:
         """Update the output with the selected variants."""
@@ -582,10 +583,10 @@ def _create_variant_selection_widget(
         update_func(pipeline, output, **kwargs)  # type: ignore[call-arg]
 
     for group, variants in vp.variants_mapping().items():
+        options = list(variants)
         dropdown = ipywidgets.Dropdown(
-            options=list(variants),
-            # Select first variant by default
-            value=list(variants)[0],  # noqa: RUF015
+            options=options,
+            value=default.get(group, options[0]),
             description=f"{group}:",
             disabled=False,
         )
@@ -596,6 +597,15 @@ def _create_variant_selection_widget(
     wrapped_update_func()
 
     return ipywidgets.VBox([*dropdowns.values(), output])
+
+
+def _ensure_dict(default_variant: str | dict[str | None, str] | None) -> dict[str | None, str]:
+    """Ensure that the default_variant is a dictionary."""
+    if default_variant is None:
+        return {}
+    if isinstance(default_variant, str):
+        return {None: default_variant}
+    return default_variant
 
 
 def _update_visualization(
