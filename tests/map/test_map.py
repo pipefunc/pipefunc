@@ -1547,6 +1547,7 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
         {"x": [1, 2, 3]},
         show_progress=True,
         scheduling_strategy=scheduling_strategy,
+        executor=ThreadPoolExecutor(),
     )
     # Test that the progress tracker is working
     progress = async_map.progress

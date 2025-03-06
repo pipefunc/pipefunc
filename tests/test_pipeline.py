@@ -886,7 +886,7 @@ def test_double_output_then_iterate_over_single_axis():
             PipeFunc(f2, "c", mapspec="a[:, j] -> c[j]"),
         ],
     )
-    pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False, storage="dict")
     assert pipeline.mapspec_axes == {
         "a": ("i", "j"),
         "b": ("i", "j"),

@@ -608,6 +608,8 @@ def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
+        storage="dict",
+        parallel=False,
     )
 
     assert result["matrix"].output.tolist() == [[4, 5], [8, 10], [12, 15]]

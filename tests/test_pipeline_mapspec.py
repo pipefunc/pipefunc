@@ -342,6 +342,8 @@ def test_calling_add_with_autogen_mapspec(dim: int | Literal["?"]):
     results = pipeline.map(
         inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
         internal_shapes={"foo_out": (dim,)},
+        storage="dict",
+        parallel=False,
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
 
