@@ -32,9 +32,9 @@ class VariantPipeline:
     - Creating configurable pipelines
 
     The pipeline can have multiple variant groups, where each group contains alternative
-    implementations of a function. Functions can be assigned to a variant group using
-    the ``variant_group`` parameter and identified within that group using the ``variant``
-    parameter.
+    implementations of a function. Functions can be assigned to variant groups using
+    the ``variants`` parameter which can be a single string (for the default group) or
+    a dictionary mapping group names to variant names.
 
     All parameters below (except ``functions`` and ``default_variant``) are simply passed to
     the `~pipefunc.Pipeline` constructor when creating a new pipeline with the selected
@@ -187,26 +187,22 @@ class VariantPipeline:
             msg = "No variants found in the pipeline. Use a regular `Pipeline` instead."
             raise ValueError(msg)
 
-    def variants_mapping(self) -> dict[str | None, set[str]]:
+    def variants_mapping(self) -> dict[str, set[str]]:
         """Return a dictionary of variant groups and their variants."""
-        variant_groups: dict[str | None, set[str]] = {}
+        variant_groups: dict[str, set[str]] = {}
         for function in self.functions:
-            if function.variant is None:
-                assert function.variant_group is None
-                continue
-            variants = variant_groups.setdefault(function.variant_group, set())
-            variants.add(function.variant)
+            for group, variant in function.variants.items():
+                variants = variant_groups.setdefault(group, set())
+                variants.add(variant)
         return variant_groups
 
-    def _variants_mapping_inverse(self) -> dict[str, set[str | None]]:
+    def _variants_mapping_inverse(self) -> dict[str, set[str]]:
         """Return a dictionary of variants and their variant groups."""
-        variants: dict[str, set[str | None]] = {}
+        variants: dict[str, set[str]] = {}
         for function in self.functions:
-            if function.variant is None:
-                assert function.variant_group is None
-                continue
-            groups = variants.setdefault(function.variant, set())
-            groups.add(function.variant_group)
+            for group, variant in function.variants.items():
+                groups = variants.setdefault(variant, set())
+                groups.add(group)
         return variants
 
     def with_variant(
@@ -276,14 +272,8 @@ class VariantPipeline:
             default_resources=kwargs.get("default_resources", self.default_resources),
         )
 
-    def _resolve_single_variant(self, select: str) -> dict[str | None, str]:
-        """Resolve a single variant string to a dictionary.
-
-        Raises
-        ------
-            ValueError: If the variant is ambiguous or unknown.
-
-        """
+    def _resolve_single_variant(self, select: str) -> dict[str, str]:
+        """Resolve a single variant string to a dictionary."""
         inv = self._variants_mapping_inverse()
         group = inv.get(select, set())
         if len(group) > 1:
@@ -294,31 +284,35 @@ class VariantPipeline:
             raise ValueError(msg)
         return {group.pop(): select}
 
-    def _select_functions(
-        self,
-        select: dict[str | None, str],
-    ) -> list[PipeFunc]:
+    def _select_functions(self, select: dict[str, str]) -> list[PipeFunc]:
         """Select functions based on the given variant selection."""
         new_functions: list[PipeFunc] = []
         for function in self.functions:
-            if function.variant is None:
+            # For functions with no variants, always include them
+            if not function.variants:
                 new_functions.append(function)
                 continue
-            if function.variant_group in select:
-                if function.variant == select[function.variant_group]:
-                    new_functions.append(function)
-                else:
-                    continue
-            else:
+
+            # Check if function matches the selected variants
+            include = True
+
+            # Check variants dict
+            for group, variant in function.variants.items():
+                if group in select and select[group] != variant:
+                    include = False
+                    break
+
+            if include:
                 new_functions.append(function)
+
         return new_functions
 
     def _check_remaining_variants(self, functions: list[PipeFunc]) -> bool:
         """Check if any variants remain after selection."""
         left_over = defaultdict(set)
         for function in functions:
-            if function.variant is not None:
-                left_over[function.variant_group].add(function.variant)
+            for group, variant in function.variants.items():
+                left_over[group].add(variant)
         return any(len(variants) > 1 for variants in left_over.values())
 
     def copy(self, **kwargs: Any) -> VariantPipeline:

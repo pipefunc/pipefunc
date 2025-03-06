@@ -552,3 +552,64 @@ def test_from_pipelines_with_common_function_different_variant() -> None:
 def test_exception_no_pipelines() -> None:
     with pytest.raises(ValueError, match="At least 2 pipelines must be provided"):
         VariantPipeline.from_pipelines()
+
+
+def test_multi_dimensional_variants():
+    @pipefunc(output_name="x", variants={"algorithm": "A", "optimization": "1"})
+    def f_a1(a, b):
+        return a + b
+
+    @pipefunc(output_name="x", variants={"algorithm": "A", "optimization": "2"})
+    def f_a2(a, b):
+        return a + b + 1
+
+    @pipefunc(output_name="x", variants={"algorithm": "B", "optimization": "1"})
+    def f_b1(a, b):
+        return a - b
+
+    @pipefunc(output_name="x", variants={"algorithm": "B", "optimization": "2"})
+    def f_b2(a, b):
+        return a - b + 1
+
+    @pipefunc(output_name="y", variants={"algorithm": "A"})
+    def g_a(x, c):
+        return x * c
+
+    # Test the string shorthand for variants
+    @pipefunc(output_name="y", variants="B")
+    def g_b(x, c):
+        return x / c
+
+    functions = [f_a1, f_a2, f_b1, f_b2, g_a, g_b]
+    pipeline = VariantPipeline(functions, default_variant={"algorithm": "A", "optimization": "1"})
+
+    # Check variants mapping
+    variants = pipeline.variants_mapping()
+    assert variants == {
+        "algorithm": {"A", "B"},
+        "optimization": {"1", "2"},
+        None: {"B"},  # From the string shorthand
+    }
+
+    # Test selecting all dimensions
+    pipeline_a1 = pipeline.with_variant(select={"algorithm": "A", "optimization": "1"})
+    assert isinstance(pipeline_a1, Pipeline)
+    assert pipeline_a1(a=2, b=3, c=4) == 20  # (2+3)*4 = 20
+
+    pipeline_b2 = pipeline.with_variant(select={"algorithm": "B", "optimization": "2"})
+    assert isinstance(pipeline_b2, Pipeline)
+    assert pipeline_b2(a=2, b=3, c=4) == 0  # (2-3+1)/4 = 0
+
+    # Test using string shorthand for selection
+    pipeline_b_short = pipeline.with_variant(select="B")  # If unambiguous
+    assert isinstance(pipeline_b_short, VariantPipeline)
+
+    # Test selecting just one dimension
+    pipeline_a = pipeline.with_variant(select={"algorithm": "A"})
+    assert isinstance(pipeline_a, VariantPipeline)
+    assert "optimization" in pipeline_a.variants_mapping()
+
+    # Further select the partially resolved pipeline
+    pipeline_a2 = pipeline_a.with_variant(select={"optimization": "2"})
+    assert isinstance(pipeline_a2, Pipeline)
+    assert pipeline_a2(a=2, b=3, c=4) == 24  # (2+3+1)*4 = 24
