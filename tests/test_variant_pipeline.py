@@ -722,7 +722,7 @@ def test_variant_selection_edge_cases() -> None:
 
 
 def test_variant_group_exception() -> None:
-    msg = "The `variant_group` parameter has been removed. Use the `variant = {'group1': 'add'}` parameter instead"
+    msg = "The `variant_group` parameter has been removed in v0.58.0. Use the `variant = {'group1': 'add'}` parameter instead"
     with pytest.raises(ValueError, match=msg):
 
         @pipefunc(output_name="c", variant="add", variant_group="group1")

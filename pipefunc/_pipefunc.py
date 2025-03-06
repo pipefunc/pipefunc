@@ -1625,7 +1625,7 @@ def _maybe_variant_group_error(
 ) -> None:
     if variant_group is not None:  # TODO: remove in 2025-09
         msg = (
-            "The `variant_group` parameter has been removed."
+            "The `variant_group` parameter has been removed in v0.58.0."
             f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
         )
         raise ValueError(msg)
