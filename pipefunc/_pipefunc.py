@@ -135,6 +135,20 @@ class PipeFunc(Generic[T]):
         - "element": Allocate resources for each element in the mapspec.
 
         If no mapspec is defined, this parameter is ignored.
+    scope
+        If provided, *all* parameter names and output names of the function will
+        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
+        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
+        pipeline to have parameters with the same name without conflict. To be selective
+        about which parameters and outputs to include in the scope, use the
+        `PipeFunc.update_scope` method.
+
+        When providing parameter values for functions that have scopes, they can
+        be provided either as a dictionary for the scope, or by using the
+        ``f'{scope}.{name}'`` notation. For example,
+        a `PipeFunc` instance with scope "foo" and "bar", the parameters
+        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
+        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
         `VariantPipeline` and specifies which variant groups it belongs to.
@@ -155,21 +169,7 @@ class PipeFunc(Generic[T]):
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
-    scope
-        If provided, *all* parameter names and output names of the function will
-        be prefixed with the specified scope followed by a dot (``'.'``), e.g., parameter
-        ``x`` with scope ``foo`` becomes ``foo.x``. This allows multiple functions in a
-        pipeline to have parameters with the same name without conflict. To be selective
-        about which parameters and outputs to include in the scope, use the
-        `PipeFunc.update_scope` method.
-
-        When providing parameter values for functions that have scopes, they can
-        be provided either as a dictionary for the scope, or by using the
-        ``f'{scope}.{name}'`` notation. For example,
-        a `PipeFunc` instance with scope "foo" and "bar", the parameters
-        can be provided as: ``func(foo=dict(a=1, b=2), bar=dict(a=3, b=4))``
-        or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -219,9 +219,9 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
+        scope: str | None = None,
         variant: str | dict[str | None, str] | None = None,
         variant_group: str | None = None,  # deprecated
-        scope: str | None = None,
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
@@ -1062,7 +1062,7 @@ def pipefunc(
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -1172,7 +1172,7 @@ class NestedPipeFunc(PipeFunc):
         variants ("fast"/"accurate"), allowing you to select specific combinations
         like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        DEPRECATED in v0.58.0: Use `variant` instead. Specifies the variant group for the function.
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Attributes
     ----------
