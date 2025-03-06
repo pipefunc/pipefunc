@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pipefunc import VariantPipeline, pipefunc
+from pipefunc import PipeFunc, VariantPipeline, pipefunc
 
 has_graphviz = importlib.util.find_spec("graphviz") is not None
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
@@ -130,3 +130,51 @@ def test_repr_mimebundle_without_ipywidgets_or_rich() -> None:
     pipeline = VariantPipeline([f], default_variant="add")
     result = pipeline._repr_mimebundle_()
     assert "text/plain" in result
+
+
+@pytest.fixture
+def multi_variant_functions() -> list[PipeFunc]:
+    @pipefunc(output_name="x", variant={"algorithm": "A", "optimization": "1"})
+    def f_a1(a, b):
+        return a + b
+
+    @pipefunc(output_name="x", variant={"algorithm": "A", "optimization": "2"})
+    def f_a2(a, b):
+        return a + b + 1
+
+    @pipefunc(output_name="x", variant={"algorithm": "B", "optimization": "1"})
+    def f_b1(a, b):
+        return a - b
+
+    @pipefunc(output_name="x", variant={"algorithm": "B", "optimization": "2"})
+    def f_b2(a, b):
+        return a - b + 1
+
+    @pipefunc(output_name="y", variant={"algorithm": "A"})
+    def g_a(x, c):
+        return x * c
+
+    @pipefunc(output_name="y", variant={"algorithm": "B"})
+    def g_b(x, c):
+        return x / c
+
+    return [f_a1, f_a2, f_b1, f_b2, g_a, g_b]
+
+
+@pytest.mark.skipif(
+    not has_ipywidgets or not has_graphviz,
+    reason="requires ipywidgets and graphviz",
+)
+@pytest.mark.parametrize("default_variant", [{"optimization": "1"}, None])
+def test_multi_dimensional_variants_widget(
+    multi_variant_functions: list[PipeFunc],
+    default_variant: dict[str, str] | None,
+) -> None:
+    pipeline = VariantPipeline(
+        multi_variant_functions,
+        default_variant=default_variant,  # type: ignore[arg-type]
+    )
+    result = pipeline._repr_mimebundle_()
+    assert "text/plain" in result
+    viz = pipeline.visualize(backend="graphviz_widget")
+    assert type(viz).__name__ == "VBox"
