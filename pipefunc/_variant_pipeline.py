@@ -112,19 +112,19 @@ class VariantPipeline:
 
     Multiple variant groups:
 
-        >>> @pipefunc(output_name="c", variant_group="method", variant="add")
+        >>> @pipefunc(output_name="c", variants={"method": "add"})
         ... def f1(a, b):
         ...     return a + b
         ...
-        >>> @pipefunc(output_name="c", variant_group="method", variant="sub")
+        >>> @pipefunc(output_name="c", variants={"method": "sub"})
         ... def f2(a, b):
         ...     return a - b
         ...
-        >>> @pipefunc(output_name="d", variant_group="analysis", variant="mul")
+        >>> @pipefunc(output_name="d", variants={"analysis": "mul"})
         ... def g1(b, c):
         ...     return b * c
         ...
-        >>> @pipefunc(output_name="d", variant_group="analysis", variant="div")
+        >>> @pipefunc(output_name="d", variants={"analysis": "div"})
         ... def g2(b, c):
         ...     return b / c
         ...
@@ -174,7 +174,9 @@ class VariantPipeline:
     ) -> None:
         """Initialize a VariantPipeline."""
         self.functions = functions
-        self.default_variant = default_variant
+        self.default_variant: dict[str | None] | None = (
+            default_variant if not isinstance(default_variant, str) else {None: default_variant}
+        )
         self.lazy = lazy
         self.debug = debug
         self.profile = profile
@@ -187,18 +189,18 @@ class VariantPipeline:
             msg = "No variants found in the pipeline. Use a regular `Pipeline` instead."
             raise ValueError(msg)
 
-    def variants_mapping(self) -> dict[str, set[str]]:
+    def variants_mapping(self) -> dict[str | None, set[str]]:
         """Return a dictionary of variant groups and their variants."""
-        variant_groups: dict[str, set[str]] = {}
+        variant_groups: dict[str | None, set[str]] = {}
         for function in self.functions:
             for group, variant in function.variants.items():
                 variants = variant_groups.setdefault(group, set())
                 variants.add(variant)
         return variant_groups
 
-    def _variants_mapping_inverse(self) -> dict[str, set[str]]:
+    def _variants_mapping_inverse(self) -> dict[str, set[str | None]]:
         """Return a dictionary of variants and their variant groups."""
-        variants: dict[str, set[str]] = {}
+        variants: dict[str, set[str | None]] = {}
         for function in self.functions:
             for group, variant in function.variants.items():
                 groups = variants.setdefault(variant, set())
@@ -350,7 +352,7 @@ class VariantPipeline:
 
         This method constructs a `VariantPipeline` by combining functions from
         multiple `Pipeline` instances, identifying common functions and assigning
-        variant groups and names based on the input tuples.
+        variants based on the input tuples.
 
         Each input tuple can either be a 2-tuple or a 3-tuple.
         - A 2-tuple contains: ``(variant_name, pipeline)``.
@@ -361,7 +363,7 @@ class VariantPipeline:
         the resulting `VariantPipeline` without any variant information.
 
         Functions that are unique to a specific pipeline are added with their
-        corresponding variant group and variant name (if provided in the input tuple).
+        corresponding variant information (if provided in the input tuple).
 
         Parameters
         ----------
@@ -369,7 +371,7 @@ class VariantPipeline:
             Variable number of tuples, where each tuple represents a pipeline and its
             associated variant information. Each tuple can be either:
             - `(variant_name, pipeline)`: Specifies the variant name for all functions
-            in the pipeline. The variant group will be set to `None`.
+            in the pipeline. The variant group will be set to `None` (default group).
             - `(variant_group, variant_name, pipeline)`: Specifies both the variant
             group and variant name for all functions in the pipeline.
 
@@ -404,10 +406,10 @@ class VariantPipeline:
         Notes
         -----
         - The `is_identical_pipefunc` function is used to determine if two `PipeFunc`
-          instances are identical.
+        instances are identical.
         - If multiple pipelines contain the same function but with different variant
-          information, the function will be included multiple times in the
-          resulting `VariantPipeline`, each with its respective variant assignment.
+        information, the function will be included multiple times in the
+        resulting `VariantPipeline`, each with its respective variant assignment.
 
         """
         if len(variant_pipeline) < 2:  # noqa: PLR2004
@@ -441,8 +443,11 @@ class VariantPipeline:
         # Add unique functions with variant information
         for i, funcs in enumerate(all_funcs):
             variant_group, variant = variant_info[i]
+            # Create the variants parameter based on variant_group
+            variants_param = {variant_group: variant} if variant_group is not None else variant
+
             unique_funcs = [
-                func.copy(variant_group=variant_group, variant=variant)
+                func.copy(variants=variants_param)
                 for func in funcs
                 if not _pipefunc_in_list(func, common_funcs)
             ]
