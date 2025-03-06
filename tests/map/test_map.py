@@ -1684,7 +1684,13 @@ def test_pipeline_with_heterogeneous_chunksize(chunksizes):
 
     pipeline = Pipeline([f, g, h])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, chunksizes=chunksizes, parallel=False, storage="dict")
+    results = pipeline.map(
+        inputs,
+        chunksizes=chunksizes,
+        parallel=True,
+        storage="dict",
+        executor=ThreadPoolExecutor(),
+    )
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["y2"].output.tolist() == [2, 3, 4]
