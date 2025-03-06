@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from pipefunc import Pipeline, VariantPipeline, pipefunc
+from pipefunc import PipeFunc, Pipeline, VariantPipeline, pipefunc
 from pipefunc._variant_pipeline import is_identical_pipefunc
 
 has_psutil = importlib.util.find_spec("psutil") is not None
@@ -550,7 +550,8 @@ def test_exception_no_pipelines() -> None:
         VariantPipeline.from_pipelines()
 
 
-def test_multi_dimensional_variants():
+@pytest.fixture
+def multi_variant_functions() -> list[PipeFunc]:
     @pipefunc(output_name="x", variant={"algorithm": "A", "optimization": "1"})
     def f_a1(a, b):
         return a + b
@@ -575,8 +576,14 @@ def test_multi_dimensional_variants():
     def g_b(x, c):
         return x / c
 
-    functions = [f_a1, f_a2, f_b1, f_b2, g_a, g_b]
-    pipeline = VariantPipeline(functions, default_variant={"algorithm": "A", "optimization": "1"})
+    return [f_a1, f_a2, f_b1, f_b2, g_a, g_b]
+
+
+def test_multi_dimensional_variants(multi_variant_functions: list[PipeFunc]) -> None:
+    pipeline = VariantPipeline(
+        multi_variant_functions,
+        default_variant={"algorithm": "A", "optimization": "1"},
+    )
 
     # Check variants mapping
     variants = pipeline.variants_mapping()
@@ -607,3 +614,9 @@ def test_multi_dimensional_variants():
     pipeline_a2 = pipeline_a.with_variant(select={"optimization": "2"})
     assert isinstance(pipeline_a2, Pipeline)
     assert pipeline_a2(a=2, b=3, c=4) == 24  # (2+3+1)*4 = 24
+
+
+def test_setting_single_default_variant_group(multi_variant_functions: list[PipeFunc]) -> None:
+    pipeline = VariantPipeline(multi_variant_functions, default_variant={"algorithm": "B"})
+    pipeline_b = pipeline.with_variant({"optimization": "2"})
+    assert isinstance(pipeline_b, Pipeline)
