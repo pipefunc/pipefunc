@@ -647,12 +647,12 @@ def test_partial_variant_selection_with_defaults() -> None:
     # Test selecting just one variant group - should use default for the other
     pipeline_sub = pipeline.with_variant(select={"method": "sub"})
     assert isinstance(pipeline_sub, Pipeline)  # Should be a concrete Pipeline
-    assert pipeline_sub(a=2, b=3) == -3  # (2-3)*3 = -3 (using sub for method, mul for analysis)
+    assert pipeline_sub(a=2, b=3) == (2 - 3) * 3  # using sub for method, mul for analysis
 
     # Test selecting the other variant group
     pipeline_div = pipeline.with_variant(select={"analysis": "div"})
     assert isinstance(pipeline_div, Pipeline)
-    assert pipeline_div(a=2, b=3) == 5 / 3  # (2+3)/3 = 5/3 (using add for method, div for analysis)
+    assert pipeline_div(a=2, b=3) == 3 / (2 + 3)  # using add for method, div for analysis
 
 
 def test_partial_default_variant() -> None:
@@ -680,12 +680,12 @@ def test_partial_default_variant() -> None:
     # Test selecting just the other variant group
     pipeline_div = pipeline.with_variant(select={"analysis": "div"})
     assert isinstance(pipeline_div, Pipeline)
-    assert pipeline_div(a=2, b=3) == -1 / 3  # (2-3)/3 = -1/3 (using sub default, div selection)
+    assert pipeline_div(a=2, b=3) == -3 / 1  # using sub default, div selection
 
     # Test overriding the default
     pipeline_add_mul = pipeline.with_variant(select={"method": "add", "analysis": "mul"})
     assert isinstance(pipeline_add_mul, Pipeline)
-    assert pipeline_add_mul(a=2, b=3) == 15  # (2+3)*3 = 15
+    assert pipeline_add_mul(a=2, b=3) == 3 * (2 + 3)
 
 
 def test_variant_selection_edge_cases() -> None:

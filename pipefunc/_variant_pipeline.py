@@ -251,15 +251,9 @@ class VariantPipeline:
             raise TypeError(msg)
 
         # Merge defaults with selection when both are dictionaries and there are missing groups
-        if (
-            isinstance(select, dict)
-            and isinstance(self.default_variant, dict)
-            and set(select.keys()) != set(self.variants_mapping().keys())
-        ):
+        if isinstance(select, dict) and isinstance(self.default_variant, dict):
             # Create merged selection dict (start with defaults, update with explicit selection)
-            complete_select = dict(self.default_variant)
-            complete_select.update(select)
-            select = complete_select
+            select = self.default_variant | select
 
         assert isinstance(select, dict)
         _validate_variants_exist(self.variants_mapping(), select)
