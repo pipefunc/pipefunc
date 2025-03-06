@@ -404,10 +404,10 @@ class VariantPipeline:
         Notes
         -----
         - The `is_identical_pipefunc` function is used to determine if two `PipeFunc`
-        instances are identical.
+          instances are identical.
         - If multiple pipelines contain the same function but with different variant
-        information, the function will be included multiple times in the
-        resulting `VariantPipeline`, each with its respective variant assignment.
+          information, the function will be included multiple times in the
+          resulting `VariantPipeline`, each with its respective variant assignment.
 
         """
         if len(variant_pipeline) < 2:  # noqa: PLR2004

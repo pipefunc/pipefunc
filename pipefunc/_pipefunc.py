@@ -1296,11 +1296,7 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
         func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
-        return _NestedFuncWrapper(
-            func.call_full_output,
-            self._output_name,
-            self.function_name,
-        )
+        return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
     @functools.cached_property
     def __name__(self) -> str:  # type: ignore[override]
@@ -1472,10 +1468,7 @@ def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
         raise ValueError(msg)
 
 
-def _validate_output_name(
-    output_name: OUTPUT_TYPE | None,
-    all_outputs: tuple[str, ...],
-) -> None:
+def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
     if not all(x in all_outputs for x in at_least_tuple(output_name)):
