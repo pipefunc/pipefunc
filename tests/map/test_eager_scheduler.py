@@ -341,6 +341,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
         run_folder=run_folder,
         fixed_indices={"i": 2},
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Result should be a 1D array with only the processed value at index 2
@@ -360,6 +362,8 @@ def test_eager_scheduler_with_fixed_indices(tmp_path: Path):
         fixed_indices={"i": 3},
         cleanup=False,  # Don't clean up to keep previous results
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     # Now both indices 2 and 3 should be processed
@@ -507,6 +511,7 @@ def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
         run_folder=run_folder,
         storage=storage,
         show_progress=False,
+        parallel=False,
     )
 
     assert result["e"].output == "e(c(a),d(b))"
