@@ -71,7 +71,7 @@ class ResultDict(dict[str, Result]):
         return text
 
     def to_xarray(self, *, load_intermediate: bool = True) -> xr.Dataset:
-        """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
+        """Convert the results to an `xarray.Dataset`."""
         if self._pipeline is None or self._inputs is None:
             msg = (
                 "The `to_xarray` method can only be used when the `ResultDict` was created"
@@ -89,7 +89,7 @@ class ResultDict(dict[str, Result]):
         )
 
     def to_dataframe(self, *, load_intermediate: bool = True) -> pd.DataFrame:
-        """Load the dataframe from the results as returned by `pipefunc.Pipeline.map`."""
+        """Convert the results to a `pandas.DataFrame`."""
         ds = self.to_xarray(load_intermediate=load_intermediate)  # ensures xarray is installed
         from .xarray import xarray_dataset_to_dataframe
 
