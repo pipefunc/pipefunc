@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
@@ -177,3 +178,52 @@ def test_no_inputs_to_xarray():
     results = pipeline.map({}, storage="dict", parallel=False)
     ds = results.to_xarray()
     assert "y" in ds.variables
+
+
+def test_to_dataframe():
+    data = {
+        "player": ["Player A", "Player B", "Player C", "Player D", "Player E"],
+        "at_bats": [200, 300, 330, 250, 175],
+        "hits": [65, 82, 110, 92, 45],
+        "home_runs": [10, 15, 20, 8, 5],
+    }
+    baseball_df = pd.DataFrame(data)
+
+    @pipefunc(output_name="batting_avg", mapspec="hits[i], at_bats[i] -> batting_avg[i]")
+    def calculate_batting_avg(hits: int, at_bats: int) -> float:
+        """Calculate batting average from hits and at-bats."""
+        return hits / at_bats if at_bats > 0 else 0.0
+
+    @pipefunc(output_name="slugging", mapspec="hits[i], home_runs[i], at_bats[i] -> slugging[i]")
+    def calculate_slugging(hits: int, home_runs: int, at_bats: int) -> float:
+        """Calculate simplified slugging percentage."""
+        return (hits + 3 * home_runs) / at_bats if at_bats > 0 else 0.0
+
+    @pipefunc(output_name="category", mapspec="batting_avg[i] -> category[i]")
+    def categorize_players(batting_avg: float) -> str:
+        """Categorize players based on their statistics."""
+        if batting_avg >= 0.300:
+            return "Elite"
+        if batting_avg >= 0.250:
+            return "Good"
+        return "Average"
+
+    pipeline = Pipeline([calculate_batting_avg, calculate_slugging, categorize_players])
+    result = pipeline.map(
+        {
+            "hits": baseball_df["hits"],
+            "at_bats": baseball_df["at_bats"],
+            "home_runs": baseball_df["home_runs"],
+        },
+        storage="dict",
+        parallel=False,
+    )
+    df = result.to_dataframe()
+    assert set(df.columns.tolist()) == {
+        "batting_avg",
+        "slugging",
+        "category",
+        "at_bats",
+        "hits",
+        "home_runs",
+    }

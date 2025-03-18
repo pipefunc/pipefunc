@@ -135,7 +135,7 @@ def _xarray(
             names = list(dct.keys())
             name = ":".join(names)
             arrays = list(itertools.chain.from_iterable(dct.values()))
-            array = pd.MultiIndex.from_arrays(arrays, names=names)
+            array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
@@ -171,3 +171,20 @@ def _xarray_dataset(
         array = data_loader(name)
         ds[name] = array if isinstance(array, np.ndarray) else ((), array)
     return ds
+
+
+def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
+    result_df = df.copy()
+    tuple_columns = [col for col in df.columns if ":" in col]
+    for col in tuple_columns:
+        new_col_names = col.split(":")
+        for i, new_col in enumerate(new_col_names):
+            result_df[new_col] = df[col].apply(lambda x: x[i])  # noqa: B023
+        result_df = result_df.drop(col, axis=1)
+    return result_df
+
+
+def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
+    """Convert an xarray dataset to a pandas dataframe."""
+    df = ds.to_dataframe().reset_index(drop=True)
+    return _split_tuple_columns(df)
