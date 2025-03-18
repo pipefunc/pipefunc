@@ -360,6 +360,9 @@ def test_simple_from_step(tmp_path: Path) -> None:
         ds = results.to_xarray(load_intermediate=False)
         assert "x" not in ds.coords
 
+        df = results.to_dataframe()
+        assert df["x"].tolist() == [0, 1, 2, 3]
+
 
 @pipefunc(output_name=("single", "double"))
 def double_it_tuple(x: int) -> tuple[int, int]:
