@@ -90,7 +90,7 @@ class ResultDict(dict[str, Result]):
 
     def to_dataframe(self, *, load_intermediate: bool = True) -> pd.DataFrame:
         """Load the dataframe from the results as returned by `pipefunc.Pipeline.map`."""
-        ds = self.to_xarray(load_intermediate=load_intermediate)  # ensure xarray is installed
+        ds = self.to_xarray(load_intermediate=load_intermediate)  # ensures xarray is installed
         from .xarray import xarray_dataset_to_dataframe
 
         return xarray_dataset_to_dataframe(ds)
