@@ -23,7 +23,7 @@ dependencies:
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
-  - bokeh
+  - bokeh<3.7
   - python-graphviz
   - holoviews
   - matplotlib
