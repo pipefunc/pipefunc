@@ -3,6 +3,97 @@
 These release notes are automatically generated from commits and GitHub issues and PRs.
 If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
 
+## v0.59.0 (2025-03-18)
+
+### ✨ Enhancements
+
+- Add `ResultDict.to_dataframe()` ([#681](https://github.com/pipefunc/pipefunc/pull/681))
+
+### 🧹 Maintenance
+
+- Pin bokeh<3.7 ([#682](https://github.com/pipefunc/pipefunc/pull/682))
+
+### 🤖 CI
+
+- Use `uv build` for PyPI releases ([#680](https://github.com/pipefunc/pipefunc/pull/680))
+
+### 📊 Stats
+
+- `.yml`: +5 lines, -12 lines
+- `.py`: +80 lines, -2 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.58.1 (2025-03-11)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#676](https://github.com/pipefunc/pipefunc/pull/676))
+
+### 📦 Dependencies
+
+- ⬆️ Pin python to 3.13.2 ([#677](https://github.com/pipefunc/pipefunc/pull/677))
+
+### 🧪 Testing
+
+- Speedup tests ([#675](https://github.com/pipefunc/pipefunc/pull/675))
+
+### ✨ Enhancements
+
+- Select default initially in `VariantPipeline` selection widget ([#674](https://github.com/pipefunc/pipefunc/pull/674))
+
+### 📊 Stats
+
+- `.yml`: +2 lines, -2 lines
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +128 lines, -23 lines
+
+## v0.58.0 (2025-03-06)
+
+### 🧪 Testing
+
+- Add `scheduling_strategy="eager"` benchmarks ([#669](https://github.com/pipefunc/pipefunc/pull/669))
+
+### ✨ Enhancements
+
+- Allow multiple variant groups per `PipeFunc` (breaking change) ([#673](https://github.com/pipefunc/pipefunc/pull/673))
+
+### 📊 Stats
+
+- `.md`: +11 lines, -11 lines
+- `.py`: +414 lines, -171 lines
+
+## v0.57.2 (2025-03-05)
+
+### 🐛 Bug Fixes
+
+- Prefix the SLURM job names with `executor.name` ([#671](https://github.com/pipefunc/pipefunc/pull/671))
+
+### 📊 Stats
+
+- `.py`: +9 lines, -4 lines
+
+## v0.57.1 (2025-03-05)
+
+### 🐛 Bug Fixes
+
+- Fix progress bar for `chunksize>1` ([#668](https://github.com/pipefunc/pipefunc/pull/668))
+- Fix deepcopy/serialization for `Pipeline` with shared cache ([#657](https://github.com/pipefunc/pipefunc/pull/657))
+- FIX `ResultDict.to_xarray` when no inputs ([#667](https://github.com/pipefunc/pipefunc/pull/667))
+- Prevent ZeroDivisionError in auto-chunks ([#666](https://github.com/pipefunc/pipefunc/pull/666))
+
+### 🧪 Testing
+
+- Add `auto_subpipeline` test ([#661](https://github.com/pipefunc/pipefunc/pull/661))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.57.0 ([#664](https://github.com/pipefunc/pipefunc/pull/664))
+
+### 📊 Stats
+
+- `.md`: +60 lines, -1 lines
+- `.py`: +296 lines, -38 lines
+
 ## v0.57.0 (2025-03-04)
 
 ### 🔄 Pre-commit
@@ -158,6 +249,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - `.py`: +30 lines, -2 lines
 
 ## v0.53.1 (2025-02-05)
+
+### Closed Issues
+
+- Stateful callable output caching ([#510](https://github.com/pipefunc/pipefunc/issues/510))
 
 ### 📦 Dependencies
 
@@ -329,6 +424,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.50.3 (2025-01-24)
 
+### Closed Issues
+
+- BUG: Profiling `Pipeline.map` only works with `parallel=False` ([#547](https://github.com/pipefunc/pipefunc/issues/547))
+
 ### 🐛 Bug Fixes
 
 - Fix `ZeroDivisionError` in `ProgressBar` ([#596](https://github.com/pipefunc/pipefunc/pull/596))
@@ -348,6 +447,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - `.py`: +179 lines, -45 lines
 
 ## v0.50.2 (2025-01-23)
+
+### Closed Issues
+
+- DOC: uv tip in tutorial.md is incorrect ([#588](https://github.com/pipefunc/pipefunc/issues/588))
 
 ### 🧹 Maintenance
 
@@ -1855,21 +1958,21 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - Include `pipefunc.map.adaptive` integration in docs ([#149](https://github.com/pipefunc/pipefunc/pull/149))
 - Validate inputs to `PipeFunc` ([#148](https://github.com/pipefunc/pipefunc/pull/148))
 - Add `PipeFunc.update_bound` to allow fixed parameters ([#110](https://github.com/pipefunc/pipefunc/pull/110))
+- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
+- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 
 ### 📊 Stats
 
-- `.py`: +1150 lines, -466 lines
-- `.md`: +1 lines, -1 lines
-- `.yml`: +4 lines, -0 lines
+- `.py`: +1174 lines, -475 lines
+- `.md`: +3 lines, -3 lines
+- `.yml`: +15 lines, -3 lines
 - `.ipynb`: +67 lines, -3 lines
-- `.toml`: +1 lines, -1 lines
+- `.toml`: +17 lines, -14 lines
 
 ## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
-- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
-- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now) ([a9302d7](https://github.com/pipefunc/pipefunc/commit/a9302d7))
 - Drop support for Python 3.8 and 3.9 ([#142](https://github.com/pipefunc/pipefunc/pull/142))
 - Factor out simplify functions to simplify module ([#141](https://github.com/pipefunc/pipefunc/pull/141))
@@ -1896,12 +1999,12 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ### 📊 Stats
 
-- `.py`: +1794 lines, -883 lines
-- `.yml`: +15 lines, -17 lines
-- `.md`: +20 lines, -2 lines
+- `.py`: +1771 lines, -875 lines
+- `.yml`: +11 lines, -21 lines
+- `.md`: +18 lines, -0 lines
 - `.ipynb`: +46 lines, -14 lines
 - `.py}`: +32 lines, -20 lines
-- `.toml`: +20 lines, -17 lines
+- `.toml`: +10 lines, -10 lines
 
 ## v0.12.0 (2024-05-30)
 
