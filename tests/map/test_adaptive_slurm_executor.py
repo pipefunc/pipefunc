@@ -302,6 +302,9 @@ async def test_with_nested_pipefunc(
     resources_scope: Literal["element", "map"],
     use_mock: bool,  # noqa: FBT001
 ):
+    if not has_slurm and not use_mock:
+        pytest.skip("Slurm not available")
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         assert isinstance(x, int)
