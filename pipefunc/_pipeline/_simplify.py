@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 import networkx as nx
 
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._nested_pipefunc import NestedPipeFunc
+from pipefunc._pipefunc import PipeFunc
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:

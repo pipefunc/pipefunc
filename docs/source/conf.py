@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 from docutils import nodes
-from sphinx.util.docutils import SphinxDirective
 from docutils.statemachine import StringList
+from sphinx.util.docutils import SphinxDirective
 
 PACKAGE_PATH = Path("../..").resolve()
 sys.path.insert(0, str(PACKAGE_PATH))
@@ -129,7 +129,7 @@ class TryNotebookWithUV(SphinxDirective):
             "Alternatively, run:",
             "",
             "```bash",
-            f"uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py",
+            "uv run https://raw.githubusercontent.com/pipefunc/pipefunc/refs/heads/main/get-notebooks.py",
             "```",
             "",
             "to download *all* documentation as Jupyter notebooks.",
@@ -147,7 +147,7 @@ class TryNotebookWithUV(SphinxDirective):
         return node.children
 
 
-def setup(app):
+def setup(app) -> None:
     app.add_directive("try-notebook", TryNotebookWithUV)
 
 
@@ -261,8 +261,9 @@ def replace_rtd_links_with_local(input_file: str, output_file: str) -> None:
         Path to the input file
     output_file
         Path to the output file where the modified content will be written
+
     """
-    with open(input_file, "r", encoding="utf-8") as f:
+    with open(input_file, encoding="utf-8") as f:
         content = f.read()
 
     # Replace the RTD links with local markdown links

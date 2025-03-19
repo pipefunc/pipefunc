@@ -22,7 +22,8 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._nested_pipefunc import NestedPipeFunc
+from pipefunc._pipefunc import ErrorSnapshot, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
