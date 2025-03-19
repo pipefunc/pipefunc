@@ -1147,6 +1147,14 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
+    resources_scope
+        Same as the `PipeFunc` class.
+        Determines how resources are allocated in relation to the mapspec:
+
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+
+        If no mapspec is defined, this parameter is ignored.
     bound
         Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
         that are fixed. Even when providing different values, the bound values will be
@@ -1198,6 +1206,7 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        resources_scope: Literal["map", "element"] = "map",
         bound: dict[str, Any] | None = None,
         variant: str | dict[str | None, str] | None = None,
         variant_group: str | None = None,  # deprecated
@@ -1207,6 +1216,7 @@ class NestedPipeFunc(PipeFunc):
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         _validate_nested_pipefunc(pipefuncs, resources)
         self.resources = _maybe_max_resources(resources, pipefuncs)
+        self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
         _validate_single_leaf_node(self.pipeline.leaf_nodes)
@@ -1244,6 +1254,7 @@ class NestedPipeFunc(PipeFunc):
             "bound": self._bound,
             "mapspec": self.mapspec,
             "resources": self.resources,
+            "resources_scope": self.resources_scope,
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }

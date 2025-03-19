@@ -1,7 +1,9 @@
 # Changelog
 
 These release notes are automatically generated from commits and GitHub issues and PRs.
-If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
+If it is out of date, please run
+
+GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ## v0.59.0 (2025-03-18)
 
@@ -250,10 +252,6 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.53.1 (2025-02-05)
 
-### Closed Issues
-
-- Stateful callable output caching ([#510](https://github.com/pipefunc/pipefunc/issues/510))
-
 ### 📦 Dependencies
 
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.27 ([#564](https://github.com/pipefunc/pipefunc/pull/564))
@@ -424,10 +422,6 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.50.3 (2025-01-24)
 
-### Closed Issues
-
-- BUG: Profiling `Pipeline.map` only works with `parallel=False` ([#547](https://github.com/pipefunc/pipefunc/issues/547))
-
 ### 🐛 Bug Fixes
 
 - Fix `ZeroDivisionError` in `ProgressBar` ([#596](https://github.com/pipefunc/pipefunc/pull/596))
@@ -447,10 +441,6 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - `.py`: +179 lines, -45 lines
 
 ## v0.50.2 (2025-01-23)
-
-### Closed Issues
-
-- DOC: uv tip in tutorial.md is incorrect ([#588](https://github.com/pipefunc/pipefunc/issues/588))
 
 ### 🧹 Maintenance
 
@@ -1958,21 +1948,21 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - Include `pipefunc.map.adaptive` integration in docs ([#149](https://github.com/pipefunc/pipefunc/pull/149))
 - Validate inputs to `PipeFunc` ([#148](https://github.com/pipefunc/pipefunc/pull/148))
 - Add `PipeFunc.update_bound` to allow fixed parameters ([#110](https://github.com/pipefunc/pipefunc/pull/110))
-- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
-- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 
 ### 📊 Stats
 
-- `.py`: +1174 lines, -475 lines
-- `.md`: +3 lines, -3 lines
-- `.yml`: +15 lines, -3 lines
+- `.py`: +1150 lines, -466 lines
+- `.md`: +1 lines, -1 lines
+- `.yml`: +4 lines, -0 lines
 - `.ipynb`: +67 lines, -3 lines
-- `.toml`: +17 lines, -14 lines
+- `.toml`: +1 lines, -1 lines
 
 ## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
+- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
+- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now) ([a9302d7](https://github.com/pipefunc/pipefunc/commit/a9302d7))
 - Drop support for Python 3.8 and 3.9 ([#142](https://github.com/pipefunc/pipefunc/pull/142))
 - Factor out simplify functions to simplify module ([#141](https://github.com/pipefunc/pipefunc/pull/141))
@@ -1999,12 +1989,12 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ### 📊 Stats
 
-- `.py`: +1771 lines, -875 lines
-- `.yml`: +11 lines, -21 lines
-- `.md`: +18 lines, -0 lines
+- `.py`: +1794 lines, -883 lines
+- `.yml`: +15 lines, -17 lines
+- `.md`: +20 lines, -2 lines
 - `.ipynb`: +46 lines, -14 lines
 - `.py}`: +32 lines, -20 lines
-- `.toml`: +10 lines, -10 lines
+- `.toml`: +20 lines, -17 lines
 
 ## v0.12.0 (2024-05-30)
 

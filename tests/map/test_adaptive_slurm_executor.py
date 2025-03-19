@@ -13,7 +13,7 @@ import pytest
 from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
-from pipefunc import Pipeline, pipefunc
+from pipefunc import NestedPipeFunc, Pipeline, pipefunc
 from pipefunc.map._result import ResultDict
 
 if TYPE_CHECKING:
@@ -289,6 +289,43 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
     # Now rerun the test with without mocking to see if it works
     # This will actually submit jobs to the mock scheduler.
     runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
+    result = await runner.task
+    assert isinstance(result, ResultDict)
+    assert len(result["z"].output) == 10
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resources_scope", ["element", "map"])
+@pytest.mark.parametrize("use_mock", [True, False])
+async def test_with_nested_pipefunc(
+    tmp_path: Path,
+    resources_scope: Literal["element", "map"],
+    use_mock: bool,  # noqa: FBT001
+):
+    if not has_slurm and not use_mock:
+        pytest.skip("Slurm not available")
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        assert isinstance(x, int)
+        return 2 * x
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def add_one(y):
+        return y + 1
+
+    nested_pipefunc = NestedPipeFunc(
+        [double_it, add_one],
+        resources={"cpus": 1},
+        resources_scope=resources_scope,
+    )
+
+    pipeline = Pipeline([nested_pipefunc])
+    runner = pipeline.map_async(
+        {"x": range(10)},
+        tmp_path,
+        executor=MockSlurmExecutor() if use_mock else SlurmExecutor(),
+    )
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
