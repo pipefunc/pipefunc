@@ -296,9 +296,11 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("resources_scope", ["element", "map"])
+@pytest.mark.parametrize("use_mock", [True, False])
 async def test_with_nested_pipefunc(
     tmp_path: Path,
     resources_scope: Literal["element", "map"],
+    use_mock: bool,  # noqa: FBT001
 ):
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
@@ -316,7 +318,11 @@ async def test_with_nested_pipefunc(
     )
 
     pipeline = Pipeline([nested_pipefunc])
-    runner = pipeline.map_async({"x": range(10)}, tmp_path)
+    runner = pipeline.map_async(
+        {"x": range(10)},
+        tmp_path,
+        executor=MockSlurmExecutor() if use_mock else SlurmExecutor(),
+    )
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
