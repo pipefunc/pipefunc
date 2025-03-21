@@ -31,6 +31,11 @@ has_psutil = importlib.util.find_spec("psutil") is not None
 
 storage_options = list(storage_registry)
 
+try:
+    has_gil = sys._is_gil_enabled()  # type: ignore[attr-defined]
+except AttributeError:
+    has_gil = True
+
 
 def xarray_dataset_from_results(*args, **kwargs):
     """Simple wrapper to avoid importing xarray in the global scope."""
@@ -1605,6 +1610,7 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 def test_pipeline_with_heterogeneous_executor() -> None:
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):
