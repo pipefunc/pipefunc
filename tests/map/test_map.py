@@ -31,11 +31,6 @@ has_psutil = importlib.util.find_spec("psutil") is not None
 
 storage_options = list(storage_registry)
 
-try:
-    has_gil = sys._is_gil_enabled()  # type: ignore[attr-defined]
-except AttributeError:
-    has_gil = True
-
 
 def xarray_dataset_from_results(*args, **kwargs):
     """Simple wrapper to avoid importing xarray in the global scope."""
@@ -1494,11 +1489,12 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
-@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
+    if storage == "zarr_memory" and sys.version_info >= (3, 13):
+        pytest.skip("zarr_memory seems to hang in 3.13(t) CI")
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
