@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run  # noqa: EXE003
+#!/usr/bin/env -S uv run
 """Automatically generate release notes from GitHub issues and PRs.
 
 Run `uv run .github/generate-release-notes.py` to generate the release notes.
