@@ -631,6 +631,33 @@ class Pipeline:
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
+    def _validate_run_output_name(
+        self,
+        kwargs: dict[str, Any],
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+    ) -> None:
+        if isinstance(output_name, list):
+            for name in output_name:
+                self._validate_run_output_name(kwargs, name)
+            return
+        if output_name in kwargs:
+            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
+            raise ValueError(msg)
+        if output_name not in self.output_to_func:
+            available = ", ".join(k for k in self.output_to_func if isinstance(k, str))
+            msg = (
+                f"No function with output name `{output_name}` in the pipeline, only `{available}`."
+            )
+            raise ValueError(msg)
+
+        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
+            inputs = self.mapspec_names & set(self.root_args(output_name))
+            msg = (
+                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
+                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
+            )
+            raise RuntimeError(msg)
+
     def run(
         self,
         output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
@@ -688,33 +715,6 @@ class Pipeline:
         if isinstance(output_name, list):
             return tuple(all_results[k] for k in output_name)
         return all_results[output_name]
-
-    def _validate_run_output_name(
-        self,
-        kwargs: dict[str, Any],
-        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
-    ) -> None:
-        if isinstance(output_name, list):
-            for name in output_name:
-                self._validate_run_output_name(kwargs, name)
-            return
-        if output_name in kwargs:
-            msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
-            raise ValueError(msg)
-        if output_name not in self.output_to_func:
-            available = ", ".join(k for k in self.output_to_func if isinstance(k, str))
-            msg = (
-                f"No function with output name `{output_name}` in the pipeline, only `{available}`."
-            )
-            raise ValueError(msg)
-
-        if p := self.mapspec_names & set(self.func_dependencies(output_name)):
-            inputs = self.mapspec_names & set(self.root_args(output_name))
-            msg = (
-                f"Cannot execute pipeline to get `{output_name}` because `{p}`"
-                f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
-            )
-            raise RuntimeError(msg)
 
     def map(
         self,
