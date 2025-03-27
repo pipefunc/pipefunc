@@ -632,31 +632,15 @@ class Pipeline:
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
-    def run(
+    def _validate_run_output_name(
         self,
-        output_name: OUTPUT_TYPE,
-        *,
-        full_output: bool = False,
         kwargs: dict[str, Any],
-    ) -> Any:
-        """Execute the pipeline for a specific return value.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the pipeline.
-        full_output
-            Whether to return the outputs of all function executions
-            as a dictionary mapping function names to their return values.
-        kwargs
-            Keyword arguments to be passed to the pipeline functions.
-
-        Returns
-        -------
-            The return value of the pipeline or a dictionary mapping function
-            names to their return values if ``full_output`` is ``True``.
-
-        """
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+    ) -> None:
+        if isinstance(output_name, list):
+            for name in output_name:
+                self._validate_run_output_name(kwargs, name)
+            return
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
@@ -675,18 +659,49 @@ class Pipeline:
             )
             raise RuntimeError(msg)
 
+    def run(
+        self,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+        *,
+        full_output: bool = False,
+        kwargs: dict[str, Any],
+    ) -> Any:
+        """Execute the pipeline for a specific return value.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline. Can be a single
+            output name or a list of output names.
+        full_output
+            Whether to return the outputs of all function executions
+            as a dictionary mapping function names to their return values.
+        kwargs
+            Keyword arguments to be passed to the pipeline functions.
+
+        Returns
+        -------
+            A dictionary mapping function names to their return values
+            if ``full_output`` is ``True``. Otherwise, the return value is the
+            return value of the pipeline function specified by ``output_name``.
+            If ``output_name`` is a list, the return value is a tuple of the
+            return values of the pipeline functions.
+
+        """
+        self._validate_run_output_name(kwargs, output_name)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
-
-        self._run(
-            output_name=output_name,
-            flat_scope_kwargs=flat_scope_kwargs,
-            all_results=all_results,
-            full_output=full_output,
-            used_parameters=used_parameters,
-        )
+        output_names = [output_name] if not isinstance(output_name, list) else output_name
+        for _output_name in output_names:
+            self._run(
+                output_name=_output_name,
+                flat_scope_kwargs=flat_scope_kwargs,
+                all_results=all_results,
+                full_output=full_output,
+                used_parameters=used_parameters,
+            )
 
         # if has None, result was from cache, so we don't know which parameters were used
         if None not in used_parameters and (
@@ -696,7 +711,11 @@ class Pipeline:
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
 
-        return all_results if full_output else all_results[output_name]
+        if full_output:
+            return all_results
+        if isinstance(output_name, list):
+            return tuple(all_results[k] for k in output_name)
+        return all_results[output_name]
 
     def map(
         self,
