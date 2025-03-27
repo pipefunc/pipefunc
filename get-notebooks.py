@@ -1,3 +1,4 @@
+#! /usr/bin/env -S uv run
 """Downloads all relevant documentation from PipeFunc's GitHub repository and converts it to Jupyter Notebooks.
 
 Run this script like
