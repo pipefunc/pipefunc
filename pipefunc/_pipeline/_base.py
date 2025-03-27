@@ -633,7 +633,7 @@ class Pipeline:
 
     def run(
         self,
-        output_name: OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
         *,
         full_output: bool = False,
         kwargs: dict[str, Any],
@@ -656,6 +656,41 @@ class Pipeline:
             names to their return values if ``full_output`` is ``True``.
 
         """
+        if isinstance(output_name, list):
+            for name in output_name:
+                self._validate_output_name(kwargs, name)
+        else:
+            self._validate_output_name(kwargs, output_name)
+
+        flat_scope_kwargs = self._flatten_scopes(kwargs)
+
+        all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
+        used_parameters: set[str | None] = set()
+        output_names = [output_name] if not isinstance(output_name, list) else output_name
+        for _output_name in output_names:
+            self._run(
+                output_name=_output_name,
+                flat_scope_kwargs=flat_scope_kwargs,
+                all_results=all_results,
+                full_output=full_output,
+                used_parameters=used_parameters,
+            )
+
+        # if has None, result was from cache, so we don't know which parameters were used
+        if None not in used_parameters and (
+            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        ):
+            unused_str = ", ".join(sorted(unused))
+            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
+            raise UnusedParametersError(msg)
+
+        if full_output:
+            return all_results
+        if isinstance(output_name, list):
+            return tuple(all_results[k] for k in output_name)
+        return all_results[output_name]
+
+    def _validate_output_name(self, kwargs: dict[str, Any], output_name: OUTPUT_TYPE) -> None:
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
@@ -673,29 +708,6 @@ class Pipeline:
                 f" (depends on `{inputs=}`) have `MapSpec`(s). Use `Pipeline.map` instead."
             )
             raise RuntimeError(msg)
-
-        flat_scope_kwargs = self._flatten_scopes(kwargs)
-
-        all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
-        used_parameters: set[str | None] = set()
-
-        self._run(
-            output_name=output_name,
-            flat_scope_kwargs=flat_scope_kwargs,
-            all_results=all_results,
-            full_output=full_output,
-            used_parameters=used_parameters,
-        )
-
-        # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (
-            unused := flat_scope_kwargs.keys() - set(used_parameters)
-        ):
-            unused_str = ", ".join(sorted(unused))
-            msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
-            raise UnusedParametersError(msg)
-
-        return all_results if full_output else all_results[output_name]
 
     def map(
         self,
