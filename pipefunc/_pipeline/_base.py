@@ -17,6 +17,7 @@ import inspect
 import os
 import time
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -1548,6 +1549,7 @@ class Pipeline:
         self,
         *,
         figsize: tuple[int, int] | int | None = None,
+        collapse_scopes: bool | Sequence[str] = False,
         filename: str | Path | None = None,
         style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1595,6 +1597,7 @@ class Pipeline:
             self.graph,
             self.defaults,
             figsize=figsize,
+            collapse_scopes=collapse_scopes,
             filename=filename,
             style=style,
             orient=orient,
@@ -1773,7 +1776,7 @@ class Pipeline:
     @functools.cached_property
     def leaf_nodes(self) -> list[PipeFunc]:
         """Return the leaf nodes in the pipeline's execution graph."""
-        return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
+        return _leaf_nodes(self.graph)
 
     @functools.cached_property
     def root_nodes(self) -> list[PipeFunc]:
@@ -2304,12 +2307,12 @@ class _PipelineAsFunc:
     def __init__(
         self,
         pipeline: Pipeline,
-        output_name: OUTPUT_TYPE,
+        output_names: tuple[OUTPUT_TYPE, ...],
         root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
         self.pipeline = pipeline
-        self.output_name = output_name
+        self.output_names = output_names
         self.root_args = root_args
         self._call_with_root_args: Callable[..., Any] | None = None
 
@@ -2548,3 +2551,7 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
         console = rich.get_console()
         console.print(table)
     return table
+
+
+def _leaf_nodes(graph: nx.DiGraph) -> list[PipeFunc]:
+    return [node for node in graph.nodes() if graph.out_degree(node) == 0]

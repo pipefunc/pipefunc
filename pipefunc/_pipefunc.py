@@ -1219,7 +1219,7 @@ class NestedPipeFunc(PipeFunc):
         self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
-        _validate_single_leaf_node(self.pipeline.leaf_nodes)
+        # _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
@@ -1320,6 +1320,7 @@ class NestedPipeFunc(PipeFunc):
 
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
+        outputs = [f.output_name for f in self.leaf_nodes]
         func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
         return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
@@ -1329,6 +1330,16 @@ class NestedPipeFunc(PipeFunc):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pipefuncs={self.pipeline.functions})"
+
+
+def _flattened_outputs(leaf_nodes: list[PipeFunc]) -> tuple[OUTPUT_TYPE, ...]:
+    outputs = []
+    for f in leaf_nodes:
+        if isinstance(f.output_name, str):
+            outputs.append(f.output_name)
+        else:
+            outputs.extend(f.output_name)
+    return tuple(outputs)
 
 
 def _maybe_max_resources(
