@@ -653,8 +653,11 @@ class Pipeline:
 
         Returns
         -------
-            The return value of the pipeline or a dictionary mapping function
-            names to their return values if ``full_output`` is ``True``.
+            A dictionary mapping function names to their return values
+            if ``full_output`` is ``True``. Otherwise, the return value is the
+            return value of the pipeline function specified by ``output_name``.
+            If ``output_name`` is a list, the return value is a tuple of the
+            return values of the pipeline functions.
 
         """
         self._validate_run_output_name(kwargs, output_name)
