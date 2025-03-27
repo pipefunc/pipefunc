@@ -656,12 +656,7 @@ class Pipeline:
             names to their return values if ``full_output`` is ``True``.
 
         """
-        if isinstance(output_name, list):
-            for name in output_name:
-                self._validate_output_name(kwargs, name)
-        else:
-            self._validate_output_name(kwargs, output_name)
-
+        self._validate_output_name(kwargs, output_name)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
@@ -690,7 +685,15 @@ class Pipeline:
             return tuple(all_results[k] for k in output_name)
         return all_results[output_name]
 
-    def _validate_output_name(self, kwargs: dict[str, Any], output_name: OUTPUT_TYPE) -> None:
+    def _validate_output_name(
+        self,
+        kwargs: dict[str, Any],
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+    ) -> None:
+        if isinstance(output_name, list):
+            for name in output_name:
+                self._validate_output_name(kwargs, name)
+            return
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
