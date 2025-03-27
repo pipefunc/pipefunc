@@ -643,7 +643,8 @@ class Pipeline:
         Parameters
         ----------
         output_name
-            The identifier for the return value of the pipeline.
+            The identifier for the return value of the pipeline. Can be a single
+            output name or a list of output names.
         full_output
             Whether to return the outputs of all function executions
             as a dictionary mapping function names to their return values.
