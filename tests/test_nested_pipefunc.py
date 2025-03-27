@@ -524,3 +524,17 @@ def test_annotations_nested_pipefunc() -> None:
     nf2 = NestedPipeFunc([f, g], output_name="d")
     assert nf2.parameter_annotations == {"a": int, "b": int}
     assert nf2.output_annotation == {"d": int}
+
+
+def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
+    @pipefunc(output_name="c", scope="foo")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", scope="foo")
+    def g(c):
+        return c
+
+    nf = NestedPipeFunc([f, g])
+    assert nf.parameter_scopes == {"foo"}
+    assert nf(foo={"a": 1, "b": 2}) == (3, 3)
