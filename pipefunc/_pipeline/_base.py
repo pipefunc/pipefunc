@@ -17,7 +17,6 @@ import inspect
 import os
 import time
 import warnings
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -67,7 +66,7 @@ from ._validation import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -482,7 +481,7 @@ class Pipeline:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
-    def func(self, output_name: OUTPUT_TYPE) -> _PipelineAsFunc:
+    def func(self, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -1585,6 +1584,9 @@ class Pipeline:
             The width and height of the figure in inches.
             If a single integer is provided, the figure will be a square.
             If ``None``, the size will be determined automatically.
+        collapse_scopes
+            Whether to collapse functions with the same scope into a single node.
+            If a sequence of scopes is provided, only functions with those scopes are collapsed.
         filename
             The filename to save the figure to, if provided.
         style
@@ -2326,12 +2328,12 @@ class _PipelineAsFunc:
     def __init__(
         self,
         pipeline: Pipeline,
-        output_names: tuple[OUTPUT_TYPE, ...],
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
         root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
         self.pipeline = pipeline
-        self.output_names = output_names
+        self.output_name = output_name
         self.root_args = root_args
         self._call_with_root_args: Callable[..., Any] | None = None
 
