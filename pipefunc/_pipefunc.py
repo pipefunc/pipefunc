@@ -1294,8 +1294,11 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         return {
-            name: self.pipeline[name].output_annotation[name]
-            for name in at_least_tuple(self._output_name)
+            name: self.pipeline[original_name].output_annotation[original_name]
+            for name, original_name in zip(
+                at_least_tuple(self.output_name),
+                at_least_tuple(self._output_name),
+            )
         }
 
     @functools.cached_property
