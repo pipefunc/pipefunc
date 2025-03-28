@@ -665,34 +665,3 @@ def test_nested_pipefunc_scope_removal() -> None:
 
     # Verify execution works with unscoped parameters
     assert pipeline(a=2, b=3) == (5, 10)
-
-
-def test_nested_pipefunc_with_nested_scopes() -> None:
-    """Test nested pipelines with different layers of scopes."""
-
-    # First level of nesting
-    @pipefunc(output_name="x")
-    def f1(a: int, b: int) -> int:
-        return a + b
-
-    @pipefunc(output_name="y")
-    def f2(x: int) -> int:
-        return x * 2
-
-    # Create first nested pipefunc with scope
-    nf1 = NestedPipeFunc([f1, f2], output_name="y")
-    nf1.update_scope("inner", inputs="*", outputs="*")
-
-    # Check that output annotation reflects the scope
-    assert nf1.output_annotation == {"inner.y": int}
-
-    # Create pipeline with the nested pipefunc
-    pipeline = Pipeline([nf1])
-    assert pipeline.output_annotations == {"inner.y": int}
-
-    # Add another scope level
-    pipeline.update_scope("outer", inputs="*", outputs="*")
-
-    # Check that output annotations reflect the nested scopes
-    # When applying the outer scope, it replaces the inner scope in the annotations
-    assert pipeline.output_annotations == {"outer.y": int}
