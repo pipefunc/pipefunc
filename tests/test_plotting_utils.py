@@ -1,3 +1,5 @@
+import pytest
+
 from pipefunc import Pipeline, pipefunc
 from pipefunc._plotting_utils import _get_collapsed_scope_graph, _would_create_cycle
 
@@ -61,3 +63,31 @@ def test_get_collapsed_scope_graph_each_scope_only_once() -> None:
     new_graph = _get_collapsed_scope_graph(pipeline.graph, ["scope"])
     assert len(pipeline.graph.nodes) == 2 + 2  # 2 functions + 2 inputs
     assert len(new_graph.nodes) == 2 + 2  # no change
+
+
+def test_nested_pipefunc_uncombinable_mapspecs() -> None:
+    @pipefunc(output_name="c", mapspec="... -> c[i]")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
+    def g(c):
+        return c * 2
+
+    pipeline = Pipeline([f, g])
+    pipeline.update_scope("foo", inputs={"a", "b"}, outputs={"c", "d"})
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine MapSpecs with different input and output mappings",
+    ):
+        _get_collapsed_scope_graph(pipeline.graph, scopes_to_collapse=True)
+
+    pipeline = Pipeline([f, g])
+    pipeline.update_scope("foo", inputs={"a", "b"}, outputs={"c", "d"})
+
+    with pytest.raises(
+        ValueError,
+        match="Cannot combine MapSpecs with different input and output mappings",
+    ):
+        pipeline.nest_funcs({"foo.c", "foo.d"})

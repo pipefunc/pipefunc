@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 import networkx as nx
 
-from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _validate_combinable_mapspecs
 from pipefunc._utils import at_least_tuple
 
 if TYPE_CHECKING:
@@ -67,7 +67,9 @@ def _get_collapsed_scope_graph(
 
     for funcs_in_scope in grouped_funcs.values():
         # Check if collapsing would create a cycle
-        if _would_create_cycle(graph, funcs_in_scope):
+        if _would_create_cycle(graph, funcs_in_scope) or not _is_combinable_mapspecs(
+            funcs_in_scope,
+        ):
             # Don't collapse, just add the functions individually
             new_pipeline_funcs.extend(funcs_in_scope)
         else:
@@ -77,6 +79,18 @@ def _get_collapsed_scope_graph(
 
     collapsed_pipeline = Pipeline(new_pipeline_funcs)  # type: ignore[arg-type]
     return collapsed_pipeline.graph
+
+
+def _is_combinable_mapspecs(funcs: list[PipeFunc]) -> bool:
+    """Check if the MapSpecs of the functions in the list are combinable."""
+    mapspecs = [f.mapspec for f in funcs if f.mapspec is not None]
+    if len(mapspecs) <= 1:
+        return True
+    try:
+        _validate_combinable_mapspecs(mapspecs)  # type: ignore[arg-type]
+    except ValueError:
+        return False
+    return True
 
 
 def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) -> bool:
