@@ -285,11 +285,9 @@ def test_independent_axes_in_mapspecs_with_disconnected_chains() -> None:
     assert pipeline.independent_axes_in_mapspecs(("c", "d")) == {"i", "j"}
     assert pipeline.independent_axes_in_mapspecs("z") == {"i", "j"}
 
-    with pytest.raises(
-        ValueError,
-        match="The provided `pipefuncs` should have only one leaf node, not 2.",
-    ):
-        NestedPipeFunc([f, g])
+    nf = NestedPipeFunc([f, g])
+    assert nf.output_name == ("c", "d", "z")
+    assert nf(a=1, b=2, x=3, y=4) == (3, 1, 7)
 
 
 def test_axis_in_root_args() -> None:
