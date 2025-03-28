@@ -4,7 +4,6 @@ import html
 import inspect
 import re
 import warnings
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
@@ -19,6 +18,7 @@ from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     import graphviz
@@ -192,7 +192,7 @@ def _generate_node_label(
 
     elif hasattr(node, "_collapsed_scope_name"):  # Check for our marker attribute
         # This is a collapsed scope node
-        scope_name = node._collapsed_scope_name  # type: ignore
+        scope_name = node._collapsed_scope_name
         label = f"<B>Scope: {html.escape(scope_name)}</B>"
 
     elif isinstance(node, PipeFunc | NestedPipeFunc):
@@ -285,6 +285,10 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         The width and height of the figure in inches.
         If a single integer is provided, the figure will be a square.
         If ``None``, the size will be determined automatically.
+    collapse_scopes
+        Whether to collapse scopes in the graph.
+        If ``True``, scopes are collapsed into a single node.
+        If a sequence of scope names, only the specified scopes are collapsed.
     filename
         The filename to save the figure to, if provided.
     style
