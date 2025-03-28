@@ -1282,8 +1282,10 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                k.split(".", 1)[-1],
-                inspect.Parameter.KEYWORD_ONLY,
+                # Technically, this is not correct because the parameter name
+                # might contain a scope, however, the validation will catch this.
+                name=k.split(sep=".", maxsplit=1)[-1],
+                kind=inspect.Parameter.KEYWORD_ONLY,
                 # TODO: Do we need defaults here?
                 # default=...,  # noqa: ERA001
             )

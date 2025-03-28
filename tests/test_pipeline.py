@@ -1076,3 +1076,23 @@ def test_deepcopy_with_cache() -> None:
 
     pipeline = Pipeline([f], cache_type="hybrid")
     copy.deepcopy(pipeline)
+
+
+def test_run_multiple_outputs_list() -> None:
+    @pipefunc(output_name=("y1", "y2"))
+    def f(a, b):
+        return a + b, 1
+
+    @pipefunc(output_name="z1")
+    def g(a, b, y1):
+        return a * b + y1
+
+    @pipefunc(output_name="z2")
+    def h(a, b, y2):
+        return a * b + y2
+
+    pipeline = Pipeline([f, g, h])
+    assert len(pipeline.leaf_nodes) == 2
+    y1 = 2 + 1
+    y2 = 1
+    assert pipeline.run(["z1", "z2"], kwargs={"a": 1, "b": 2}) == (1 * 2 + y1, 1 * 2 + y2)

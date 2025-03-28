@@ -194,6 +194,7 @@ ignore = [
     "NPY002",
     "RET504",
 ]
+"get-notebooks.py" = ["EXE003"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18
