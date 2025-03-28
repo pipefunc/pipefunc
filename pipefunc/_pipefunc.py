@@ -1333,16 +1333,6 @@ class NestedPipeFunc(PipeFunc):
         return f"{self.__class__.__name__}(pipefuncs={self.pipeline.functions})"
 
 
-def _flattened_outputs(leaf_nodes: list[PipeFunc]) -> tuple[OUTPUT_TYPE, ...]:
-    outputs = []
-    for f in leaf_nodes:
-        if isinstance(f.output_name, str):
-            outputs.append(f.output_name)
-        else:
-            outputs.extend(f.output_name)
-    return tuple(outputs)
-
-
 def _maybe_max_resources(
     resources: dict | Resources | None,
     pipefuncs: list[PipeFunc],
