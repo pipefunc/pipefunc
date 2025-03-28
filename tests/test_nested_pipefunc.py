@@ -1,5 +1,6 @@
 import re
 
+import networkx as nx
 import pytest
 
 from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
@@ -538,6 +539,89 @@ def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
     nf = NestedPipeFunc([f, g])
     assert nf.parameter_scopes == {"foo"}
     assert nf(foo={"a": 1, "b": 2}) == (3, 3)
+
+
+def test_disjoint_nested_pipefuncs() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(a, b):
+        return a * b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c"].output == 7
+    assert r["d"].output == 12
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs() -> None:
+    @pipefunc(output_name=("c1", "c2"))
+    def f(a, b):
+        return 2 * a, 2 * b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c1", "c2", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c1"].output == 6
+    assert r["c2"].output == 8
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs_mixed() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c"].output == 7
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7
+
+
+def test_linear_pipeline_nest_outer_funcs_error() -> None:
+    @pipefunc(output_name="x")
+    def f():
+        return 1
+
+    @pipefunc(output_name="y")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="z")
+    def h(y):
+        return y * 2
+
+    pipeline = Pipeline([f, g, h])
+    r = pipeline.map(inputs={}, parallel=False, storage="dict")
+    assert r["z"].output == 4
+    assert pipeline() == 4
+
+    # Should not be possible to nest functions that have a dependency in the middle of the pipeline
+    with pytest.raises(
+        nx.exception.NetworkXUnfeasible,
+        match="Graph contains a cycle or graph changed during iteration",
+    ):
+        pipeline.nest_funcs({"x", "z"})
 
 
 def test_nested_pipefunc_with_multiple_outputs_then_adding_scope_annotation() -> None:
