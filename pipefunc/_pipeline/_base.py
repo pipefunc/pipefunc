@@ -1793,7 +1793,7 @@ class Pipeline:
     @functools.cached_property
     def leaf_nodes(self) -> list[PipeFunc]:
         """Return the leaf nodes in the pipeline's execution graph."""
-        return _leaf_nodes(self.graph)
+        return [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
 
     @functools.cached_property
     def root_nodes(self) -> list[PipeFunc]:
@@ -2568,10 +2568,6 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
         console = rich.get_console()
         console.print(table)
     return table
-
-
-def _leaf_nodes(graph: nx.DiGraph) -> list[PipeFunc]:
-    return [node for node in graph.nodes() if graph.out_degree(node) == 0]
 
 
 def _maybe_tuple(value: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> OUTPUT_TYPE | tuple[OUTPUT_TYPE, ...]:
