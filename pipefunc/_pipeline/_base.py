@@ -494,7 +494,7 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
-        key = _maybe_tuple(output_name)
+        key = tuple(output_name) if isinstance(output_name, list) else output_name
         if f := self._internal_cache.func.get(key):
             return f
         root_args = _root_args(self, output_name)
@@ -2568,12 +2568,6 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
         console = rich.get_console()
         console.print(table)
     return table
-
-
-def _maybe_tuple(value: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> OUTPUT_TYPE | tuple[OUTPUT_TYPE, ...]:
-    if isinstance(value, list):
-        return tuple(value)
-    return value
 
 
 def _root_args(pipeline: Pipeline, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> tuple[str, ...]:
