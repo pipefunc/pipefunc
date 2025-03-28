@@ -336,7 +336,7 @@ def test_nested_pipefunc_error_snapshot() -> None:
     assert nf.error_snapshot.kwargs == {"a": 1, "b": 2}
 
 
-def test_nested_pipefunc_no_leaf_node() -> None:
+def test_nested_pipefunc_no_unique_leaf_node() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -345,11 +345,9 @@ def test_nested_pipefunc_no_leaf_node() -> None:
     def g(a, b):
         return a + b
 
-    with pytest.raises(
-        ValueError,
-        match="The provided `pipefuncs` should have only one leaf node, not 2.",
-    ):
-        NestedPipeFunc([f, g])
+    nf = NestedPipeFunc([f, g])
+    assert nf.output_name == ("c", "d")
+    assert nf(a=1, b=2) == (3, 3)
 
 
 def test_nested_pipefunc_variant_different_output_name() -> None:
