@@ -5,6 +5,49 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.60.0 (2025-03-28)
+
+### ✨ Enhancements
+
+- Allow multiple leaf nodes in `NestedPipeFunc` ([#696](https://github.com/pipefunc/pipefunc/pull/696))
+- Allow scoped `PipeFunc`s inside `NestedPipeFunc` ([#692](https://github.com/pipefunc/pipefunc/pull/692))
+- Allow returning multiple outputs in `Pipeline.run` ([#694](https://github.com/pipefunc/pipefunc/pull/694))
+
+### 🐛 Bug Fixes
+
+- Fix `NestedPipeFunc.output_annotation` to handle renamed outputs with scopes ([#695](https://github.com/pipefunc/pipefunc/pull/695))
+
+### 🧹 Maintenance
+
+- Add `uv run` shebang to `get-notebooks.py` ([#691](https://github.com/pipefunc/pipefunc/pull/691))
+
+### 🧪 Testing
+
+- Skip flaky `test_pipeline_with_heterogeneous_executor` on nogil ([#690](https://github.com/pipefunc/pipefunc/pull/690))
+- Skip test_parallel_memory_storage on 3.13 ([#689](https://github.com/pipefunc/pipefunc/pull/689))
+- Actually test `NestedPipeFunc` with `SlurmExecutor` ([#687](https://github.com/pipefunc/pipefunc/pull/687))
+
+### 📊 Stats
+
+- `.md`: +13 lines, -23 lines
+- `.py`: +345 lines, -62 lines
+- `.toml`: +1 lines, -0 lines
+
+## v0.59.1 (2025-03-19)
+
+### 🐛 Bug Fixes
+
+- Fix missing `resources_scope` in `NestedPipeFunc` ([#686](https://github.com/pipefunc/pipefunc/pull/686))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.59.0 ([#684](https://github.com/pipefunc/pipefunc/pull/684))
+
+### 📊 Stats
+
+- `.py`: +50 lines, -4 lines
+- `.md`: +113 lines, -10 lines
+
 ## v0.59.0 (2025-03-18)
 
 ### ✨ Enhancements
@@ -252,6 +295,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ## v0.53.1 (2025-02-05)
 
+### Closed Issues
+
+- Stateful callable output caching ([#510](https://github.com/pipefunc/pipefunc/issues/510))
+
 ### 📦 Dependencies
 
 - ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.5.27 ([#564](https://github.com/pipefunc/pipefunc/pull/564))
@@ -422,6 +469,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ## v0.50.3 (2025-01-24)
 
+### Closed Issues
+
+- BUG: Profiling `Pipeline.map` only works with `parallel=False` ([#547](https://github.com/pipefunc/pipefunc/issues/547))
+
 ### 🐛 Bug Fixes
 
 - Fix `ZeroDivisionError` in `ProgressBar` ([#596](https://github.com/pipefunc/pipefunc/pull/596))
@@ -441,6 +492,10 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - `.py`: +179 lines, -45 lines
 
 ## v0.50.2 (2025-01-23)
+
+### Closed Issues
+
+- DOC: uv tip in tutorial.md is incorrect ([#588](https://github.com/pipefunc/pipefunc/issues/588))
 
 ### 🧹 Maintenance
 
