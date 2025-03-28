@@ -1096,3 +1096,22 @@ def test_run_multiple_outputs_list() -> None:
     y1 = 2 + 1
     y2 = 1
     assert pipeline.run(["z1", "z2"], kwargs={"a": 1, "b": 2}) == (1 * 2 + y1, 1 * 2 + y2)
+
+
+def test_disjoint_pipefuncs() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(a, b):
+        return a * b
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.run(["c", "d"], kwargs={"a": 3, "b": 4}) == (7, 12)
+    assert pipeline.func("c")(a=3, b=4) == 7
+    assert pipeline.func("d")(a=3, b=4) == 12
+    func = pipeline.func(["c", "d"])
+    assert func(a=3, b=4) == (7, 12)
+    func2 = pipeline.func(["d", "c"])
+    assert func2(a=3, b=4) == (12, 7)

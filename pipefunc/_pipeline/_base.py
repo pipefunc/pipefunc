@@ -494,12 +494,13 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
-        if f := self._internal_cache.func.get(output_name):
+        key = _maybe_tuple(output_name)
+        if f := self._internal_cache.func.get(key):
             return f
-        root_args = self.root_args(output_name)
+        root_args = _root_args(self, output_name)
         assert isinstance(root_args, tuple)
         f = _PipelineAsFunc(self, output_name, root_args=root_args)
-        self._internal_cache.func[output_name] = f
+        self._internal_cache.func[key] = f
         return f
 
     @functools.cached_property
@@ -2576,3 +2577,19 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
 
 def _leaf_nodes(graph: nx.DiGraph) -> list[PipeFunc]:
     return [node for node in graph.nodes() if graph.out_degree(node) == 0]
+
+
+def _maybe_tuple(value: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> OUTPUT_TYPE | tuple[OUTPUT_TYPE, ...]:
+    if isinstance(value, list):
+        return tuple(value)
+    return value
+
+
+def _root_args(pipeline: Pipeline, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> tuple[str, ...]:
+    if not isinstance(output_name, list):
+        return pipeline.root_args(output_name)
+    root_args = []
+    for name in output_name:
+        root_args.extend(pipeline.root_args(name))
+    # deduplicate while preserving order
+    return tuple(dict.fromkeys(root_args))

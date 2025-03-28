@@ -538,3 +538,21 @@ def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
     nf = NestedPipeFunc([f, g])
     assert nf.parameter_scopes == {"foo"}
     assert nf(foo={"a": 1, "b": 2}) == (3, 3)
+
+
+def test_disjoint_nested_pipefuncs() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(a, b):
+        return a * b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4})
+    assert r["c"].output == 7
+    assert r["d"].output == 12
