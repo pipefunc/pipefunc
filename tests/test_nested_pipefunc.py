@@ -541,6 +541,7 @@ def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
 
 
 def test_nested_pipefunc_with_multiple_outputs_then_adding_scope_annotation() -> None:
+    # Tests regression fixed in https://github.com/pipefunc/pipefunc/pull/695
     @pipefunc(output_name=("c", "d"))
     def f(a: int, b: int) -> tuple[int, int]:
         return a + b, a * b
