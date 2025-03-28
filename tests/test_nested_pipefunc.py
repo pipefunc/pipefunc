@@ -1,5 +1,6 @@
 import re
 
+import networkx as nx
 import pytest
 
 from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
@@ -595,3 +596,29 @@ def test_disjoint_nested_pipefuncs_multiple_ouputs_mixed() -> None:
     assert r["c"].output == 7
     assert r["d1"].output == 12
     assert r["d2"].output == 7
+
+
+def test_linear_pipeline_nest_outer_funcs_error() -> None:
+    @pipefunc(output_name="x")
+    def f():
+        return 1
+
+    @pipefunc(output_name="y")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="z")
+    def h(y):
+        return y * 2
+
+    pipeline = Pipeline([f, g, h])
+    r = pipeline.map(inputs={}, parallel=False, storage="dict")
+    assert r["z"].output == 4
+    assert pipeline() == 4
+
+    # Should not be possible to nest functions that have a dependency in the middle of the pipeline
+    with pytest.raises(
+        nx.exception.NetworkXUnfeasible,
+        match="Graph contains a cycle or graph changed during iteration",
+    ):
+        pipeline.nest_funcs({"x", "z"})
