@@ -538,3 +538,31 @@ def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
     nf = NestedPipeFunc([f, g])
     assert nf.parameter_scopes == {"foo"}
     assert nf(foo={"a": 1, "b": 2}) == (3, 3)
+
+
+def test_nested_pipefunc_with_multiple_outputs_then_adding_scope_annotation() -> None:
+    @pipefunc(output_name=("c", "d"))
+    def f(a: int, b: int) -> tuple[int, int]:
+        return a + b, a * b
+
+    @pipefunc(output_name="e")
+    def g(c: int, d: int) -> int:
+        return c + d
+
+    # Validating that the pipeline has correct output annotations
+    normal_pipeline = Pipeline([f, g], scope="foo")
+    assert normal_pipeline.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
+    assert normal_pipeline.all_output_names == {"foo.c", "foo.d", "foo.e"}
+    assert normal_pipeline.root_args() == ("foo.a", "foo.b")
+
+    nf = NestedPipeFunc([f, g])
+    pipeline = Pipeline([nf])
+    assert pipeline("e", a=1, b=2) == 5
+    assert pipeline.output_annotations == {"e": int, "c": int, "d": int}
+    pipeline.update_scope("foo", inputs="*", outputs="*")
+    assert pipeline.root_args() == ("foo.a", "foo.b")
+    assert pipeline.all_output_names == {"foo.c", "foo.d", "foo.e"}
+    assert pipeline.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
+
+    pipeline2 = Pipeline([nf], scope="foo")
+    assert pipeline2.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
