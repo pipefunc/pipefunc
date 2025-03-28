@@ -54,7 +54,7 @@ def _print_substep(message: str) -> None:
 
 def _print_info(message: str) -> None:
     """Print an info message with a nice format."""
-    console.print(f"  ℹ️  {message}")  # noqa: RUF001
+    console.print(f"  ℹ️  {message}", width=300)  # noqa: RUF001
 
 
 def _print_error(message: str) -> None:
