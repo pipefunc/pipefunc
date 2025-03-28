@@ -66,7 +66,7 @@ from ._validation import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -1568,6 +1568,7 @@ class Pipeline:
         self,
         *,
         figsize: tuple[int, int] | int | None = None,
+        collapse_scopes: bool | Sequence[str] = False,
         filename: str | Path | None = None,
         style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1584,6 +1585,9 @@ class Pipeline:
             The width and height of the figure in inches.
             If a single integer is provided, the figure will be a square.
             If ``None``, the size will be determined automatically.
+        collapse_scopes
+            Whether to collapse functions with the same scope into a single node.
+            If a sequence of scopes is provided, only functions with those scopes are collapsed.
         filename
             The filename to save the figure to, if provided.
         style
@@ -1615,6 +1619,7 @@ class Pipeline:
             self.graph,
             self.defaults,
             figsize=figsize,
+            collapse_scopes=collapse_scopes,
             filename=filename,
             style=style,
             orient=orient,

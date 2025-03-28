@@ -13,10 +13,12 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
+from pipefunc._plotting_utils import maybe_collapse_scope
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     import graphviz
@@ -188,6 +190,11 @@ def _generate_node_label(
         mapspec = arg_mapspec.get(node)
         label = _format_type_and_default(mapspec or node, type_string, default_value)
 
+    elif hasattr(node, "_collapsed_scope_name"):  # Check for our marker attribute
+        # This is a collapsed scope node
+        scope_name = node._collapsed_scope_name
+        label = f"<B>Scope: {html.escape(scope_name)}</B>"
+
     elif isinstance(node, PipeFunc | NestedPipeFunc):
         name = str(node).split(" → ")[0]
         label = f'<TABLE BORDER="0"><TR><TD><B>{html.escape(name)}</B></TD></TR><HR/>'
@@ -257,6 +264,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     defaults: dict[str, Any] | None = None,
     *,
     figsize: tuple[int, int] | int | None = None,
+    collapse_scopes: bool | Sequence[str] = False,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -277,6 +285,10 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         The width and height of the figure in inches.
         If a single integer is provided, the figure will be a square.
         If ``None``, the size will be determined automatically.
+    collapse_scopes
+        Whether to collapse scopes in the graph.
+        If ``True``, scopes are collapsed into a single node.
+        If a sequence of scope names, only the specified scopes are collapsed.
     filename
         The filename to save the figure to, if provided.
     style
@@ -304,6 +316,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     """
     requires("graphviz", reason="visualize_graphviz", extras="plotting")
     import graphviz
+
+    if collapse_scopes:
+        graph = maybe_collapse_scope(graph, collapse_scopes)
 
     if style is None:
         style = GraphvizStyle()
