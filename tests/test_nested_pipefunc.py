@@ -553,6 +553,45 @@ def test_disjoint_nested_pipefuncs() -> None:
     assert nested.parameters == ("a", "b")
     assert nested.output_name == ("c", "d")
     pipeline = Pipeline([nested])
-    r = pipeline.map(inputs={"a": 3, "b": 4})
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
     assert r["c"].output == 7
     assert r["d"].output == 12
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs() -> None:
+    @pipefunc(output_name=("c1", "c2"))
+    def f(a, b):
+        return 2 * a, 2 * b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c1", "c2", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c1"].output == 6
+    assert r["c2"].output == 8
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs_mixed() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c"].output == 7
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7

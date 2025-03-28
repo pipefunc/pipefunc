@@ -2553,7 +2553,7 @@ def _find_nodes_between(
 class _PipelineInternalCache:
     arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
-    func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func: dict[OUTPUT_TYPE | tuple[OUTPUT_TYPE, ...], _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
@@ -2588,7 +2588,7 @@ def _maybe_tuple(value: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> OUTPUT_TYPE | tuple[
 def _root_args(pipeline: Pipeline, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> tuple[str, ...]:
     if not isinstance(output_name, list):
         return pipeline.root_args(output_name)
-    root_args = []
+    root_args: list[str] = []
     for name in output_name:
         root_args.extend(pipeline.root_args(name))
     # deduplicate while preserving order
