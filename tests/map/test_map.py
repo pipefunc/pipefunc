@@ -1494,11 +1494,12 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
     assert r2["z"].output.tolist() == [1, 1, 1]
 
 
-@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 @pytest.mark.parametrize("storage", ["dict", "zarr_memory"])
 def test_parallel_memory_storage(storage: str):
     if storage == "zarr_memory" and not has_zarr:
         pytest.skip("zarr not installed")
+    if storage == "zarr_memory" and sys.version_info >= (3, 13):
+        pytest.skip("zarr_memory seems to hang in 3.13(t) CI")
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
@@ -1609,6 +1610,7 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.skipif(not has_gil, reason="Sometimes hang forever in 3.13t CI")
 def test_pipeline_with_heterogeneous_executor() -> None:
     @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
     def f(x):

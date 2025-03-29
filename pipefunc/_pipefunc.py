@@ -1219,7 +1219,6 @@ class NestedPipeFunc(PipeFunc):
         self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
-        _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
@@ -1282,8 +1281,10 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                k,
-                inspect.Parameter.KEYWORD_ONLY,
+                # Technically, this is not correct because the parameter name
+                # might contain a scope, however, the validation will catch this.
+                name=k.split(sep=".", maxsplit=1)[-1],
+                kind=inspect.Parameter.KEYWORD_ONLY,
                 # TODO: Do we need defaults here?
                 # default=...,  # noqa: ERA001
             )
@@ -1293,8 +1294,11 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         return {
-            name: self.pipeline[name].output_annotation[name]
-            for name in at_least_tuple(self._output_name)
+            name: self.pipeline[original_name].output_annotation[original_name]
+            for name, original_name in zip(
+                at_least_tuple(self.output_name),
+                at_least_tuple(self._output_name),
+            )
         }
 
     @functools.cached_property
@@ -1320,7 +1324,8 @@ class NestedPipeFunc(PipeFunc):
 
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
-        func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
+        outputs = [f.output_name for f in self.pipeline.leaf_nodes]
+        func = self.pipeline.func(outputs)
         return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
     @functools.cached_property
@@ -1485,12 +1490,6 @@ def _validate_nested_pipefunc(
             " Provide a `Resources` instance instead or do not nest the `PipeFunc`s."
         )
         raise TypeError(msg)
-
-
-def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
-    if len(leaf_nodes) > 1:
-        msg = f"The provided `pipefuncs` should have only one leaf node, not {len(leaf_nodes)}."
-        raise ValueError(msg)
 
 
 def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
