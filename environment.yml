@@ -37,7 +37,7 @@ dependencies:
   # optional-dependencies: xarray
   - xarray
   # optional-dependencies: zarr
-  - zarr>=2,<3
+  - zarr>=3,<4
   # optional-dependencies: test
   - coverage
   - pytest-asyncio
