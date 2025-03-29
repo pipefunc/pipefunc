@@ -25,7 +25,7 @@ dependencies:
   # optional-dependencies: plotting
   - bokeh
   - python-graphviz
-  - holoviews >=1.14.0
+  - holoviews
   - matplotlib
   # optional-dependencies: profiling
   - psutil
