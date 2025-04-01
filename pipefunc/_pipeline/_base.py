@@ -665,6 +665,7 @@ class Pipeline:
         *,
         full_output: bool = False,
         kwargs: dict[str, Any],
+        allow_unused: bool = False,
     ) -> Any:
         """Execute the pipeline for a specific return value.
 
@@ -678,6 +679,10 @@ class Pipeline:
             as a dictionary mapping function names to their return values.
         kwargs
             Keyword arguments to be passed to the pipeline functions.
+        allow_unused
+            Whether to allow unused keyword arguments. If ``False``, an error
+            is raised if any keyword arguments are unused. If ``True``, unused
+            keyword arguments are ignored.
 
         Returns
         -------
@@ -704,8 +709,10 @@ class Pipeline:
             )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (
-            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        if (
+            not allow_unused
+            and None not in used_parameters
+            and (unused := flat_scope_kwargs.keys() - set(used_parameters))
         ):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
