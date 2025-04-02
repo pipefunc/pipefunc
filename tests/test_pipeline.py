@@ -77,7 +77,11 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.renames == {}
     f_nested.update_renames({"a": "a1", "b": "b1"})
     assert f_nested.renames == {"a": "a1", "b": "b1"}
-    f_nested.update_renames({"a": "a2", "b": "b2"}, overwrite=True, update_from="original")
+    f_nested.update_renames(
+        {"a": "a2", "b": "b2"},
+        overwrite=True,
+        update_from="original",
+    )
     assert f_nested.renames == {"a": "a2", "b": "b2"}
     assert f_nested.parameters == ("a2", "b2", "x")
     f_nested_copy = f_nested.copy()
@@ -435,7 +439,10 @@ def test_drop_from_pipeline() -> None:
     assert len(pipeline.functions) == 3
     assert pipeline["e"].__name__ == "f3"
 
-    with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
+    with pytest.raises(
+        ValueError,
+        match="Either `f` or `output_name` should be provided",
+    ):
         pipeline.drop()
 
 
@@ -528,7 +535,11 @@ def test_setting_defaults() -> None:
         def g(a):
             return a
 
-    @pipefunc(output_name="c", defaults={"a": "a_new", "b": "b_new"}, renames={"a": "b", "b": "a"})
+    @pipefunc(
+        output_name="c",
+        defaults={"a": "a_new", "b": "b_new"},
+        renames={"a": "b", "b": "a"},
+    )
     def h(a="a", b="b"):
         return a, b
 
@@ -722,7 +733,9 @@ def test_pipeline_getitem_exception() -> None:
     pipeline = Pipeline([f])
     with pytest.raises(
         KeyError,
-        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
+        match=re.escape(
+            "No function with output name `'d'` in the pipeline, only `['c']`",
+        ),
     ):
         pipeline["d"]
 
@@ -1095,7 +1108,10 @@ def test_run_multiple_outputs_list() -> None:
     assert len(pipeline.leaf_nodes) == 2
     y1 = 2 + 1
     y2 = 1
-    assert pipeline.run(["z1", "z2"], kwargs={"a": 1, "b": 2}) == (1 * 2 + y1, 1 * 2 + y2)
+    assert pipeline.run(["z1", "z2"], kwargs={"a": 1, "b": 2}) == (
+        1 * 2 + y1,
+        1 * 2 + y2,
+    )
 
 
 def test_disjoint_pipefuncs() -> None:
@@ -1115,3 +1131,30 @@ def test_disjoint_pipefuncs() -> None:
     assert func(a=3, b=4) == (7, 12)
     func2 = pipeline.func(["d", "c"])
     assert func2(a=3, b=4) == (12, 7)
+
+
+def test_run_allow_unused() -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int, m: int = 0) -> int:
+        return 2 + n + m
+
+    @pipefunc(output_name="y")
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    pipeline = Pipeline([fa, fb])
+    assert pipeline.run(output_name="y", kwargs={"n": 1, "m": 2, "b": 3}) == 30
+    with pytest.raises(UnusedParametersError, match="Unused keyword arguments: `b`."):
+        pipeline.run(
+            output_name="x",
+            kwargs={"n": 1, "m": 2, "b": 3},
+            allow_unused=False,
+        )
+    assert (
+        pipeline.run(
+            output_name="x",
+            kwargs={"n": 1, "m": 2, "b": 3},
+            allow_unused=True,
+        )
+        == 5
+    )
