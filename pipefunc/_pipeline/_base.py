@@ -1586,8 +1586,9 @@ class Pipeline:
             If a single integer is provided, the figure will be a square.
             If ``None``, the size will be determined automatically.
         collapse_scopes
-            Whether to collapse functions with the same scope into a single node.
-            If a sequence of scopes is provided, only functions with those scopes are collapsed.
+            Whether to collapse scopes in the graph.
+            If ``True``, scopes are collapsed into a single node.
+            If a sequence of scope names, only the specified scopes are collapsed.
         filename
             The filename to save the figure to, if provided.
         style
@@ -1632,6 +1633,7 @@ class Pipeline:
     def visualize_graphviz_widget(
         self,
         *,
+        collapse_scopes: bool | Sequence[str] = False,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
@@ -1652,6 +1654,10 @@ class Pipeline:
 
         Parameters
         ----------
+        collapse_scopes
+            Whether to collapse scopes in the graph.
+            If ``True``, scopes are collapsed into a single node.
+            If a sequence of scope names, only the specified scopes are collapsed.
         orient
             Graph orientation, controlling the main direction of the graph flow.
             Options are:
@@ -1678,6 +1684,7 @@ class Pipeline:
         from graphviz_anywidget import graphviz_widget
 
         graph = self.visualize_graphviz(
+            collapse_scopes=collapse_scopes,
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
             return_type="graphviz",
