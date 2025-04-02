@@ -1259,7 +1259,7 @@ class NestedPipeFunc(PipeFunc):
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
-        f = NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
+        f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
         f._bound = self._bound.copy()
         return f

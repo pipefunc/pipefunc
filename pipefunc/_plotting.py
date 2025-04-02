@@ -382,7 +382,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "CollapsedScope": (
             nodes.collapsed_scope,
             {
-                "fillcolor": style.collapsed_scope_node_color,
+                "fillcolor": style.func_node_color,
                 "shape": "box",
                 "style": "filled,rounded",
                 "color": style.collapsed_scope_node_color,
