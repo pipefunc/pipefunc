@@ -14,6 +14,13 @@ if TYPE_CHECKING:
 ScopeName = str
 
 
+class CollapsedScope(NestedPipeFunc):
+    """A collapsed scope in the pipeline graph."""
+
+    def __init__(self, scope_name: ScopeName, functions: list[PipeFunc]) -> None:
+        super().__init__(functions, function_name=scope_name)
+
+
 def _unique_output_scope(func: PipeFunc) -> ScopeName | None:
     """Determine the scope of the output of a node."""
     assert isinstance(func, PipeFunc)
@@ -71,7 +78,7 @@ def _get_collapsed_scope_graph(
         ):
             new_pipeline_funcs.extend(funcs_in_scope)
         else:
-            nested_pipefunc = NestedPipeFunc(funcs_in_scope, function_name=scope)
+            nested_pipefunc = CollapsedScope(scope, funcs_in_scope)
             new_pipeline_funcs.append(nested_pipefunc)
 
     collapsed_pipeline = Pipeline(new_pipeline_funcs)  # type: ignore[arg-type]
