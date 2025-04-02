@@ -66,14 +66,11 @@ def _get_collapsed_scope_graph(
     new_pipeline_funcs = other_funcs[:]
 
     for scope, funcs_in_scope in grouped_funcs.items():
-        # Check if collapsing would create a cycle
         if _would_create_cycle(graph, funcs_in_scope) or not _is_combinable_mapspecs(
             funcs_in_scope,
         ):
-            # Don't collapse, just add the functions individually
             new_pipeline_funcs.extend(funcs_in_scope)
         else:
-            # Safe to collapse, create a nested function
             nested_pipefunc = NestedPipeFunc(funcs_in_scope, function_name=scope)
             new_pipeline_funcs.append(nested_pipefunc)
 

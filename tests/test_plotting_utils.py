@@ -77,11 +77,8 @@ def test_nested_pipefunc_uncombinable_mapspecs() -> None:
     pipeline = Pipeline([f, g])
     pipeline.update_scope("foo", inputs={"a", "b"}, outputs={"c", "d"})
 
-    with pytest.raises(
-        ValueError,
-        match="Cannot combine MapSpecs with different input and output mappings",
-    ):
-        _get_collapsed_scope_graph(pipeline.graph, scopes_to_collapse=True)
+    graph = _get_collapsed_scope_graph(pipeline.graph, scopes_to_collapse=True)
+    assert len(graph.nodes()) == 4
 
     pipeline = Pipeline([f, g])
     pipeline.update_scope("foo", inputs={"a", "b"}, outputs={"c", "d"})
