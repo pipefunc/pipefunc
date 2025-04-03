@@ -198,13 +198,13 @@ def _generate_node_label(
         assert target_func is not None
         title = f"Grouped Inputs ({target_func.__name__})"
         label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
-        # for param_name in node:
-        #     type_string = type_as_string(hints[param_name]) if param_name in hints else None
-        #     default_value = defaults.get(param_name, _empty) if defaults else _empty
-        #     mapspec = arg_mapspec.get(param_name)
-        #     display_name = mapspec or param_name
-        #     formatted_label = _format_type_and_default(display_name, type_string, default_value)
-        #     label += f"<TR><TD>{formatted_label}</TD></TR>"
+        for param_name in node:
+            type_string = type_as_string(hints[param_name]) if param_name in hints else None
+            default_value = defaults.get(param_name, _empty) if defaults else _empty
+            mapspec = arg_mapspec.get(param_name)
+            display_name = mapspec or param_name
+            formatted_label = _format_type_and_default(display_name, type_string, default_value)
+            label += f"<TR><TD>{formatted_label}</TD></TR>"
         label += "</TABLE>"
         return label
 
