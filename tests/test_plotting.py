@@ -223,13 +223,24 @@ def test_visualize_graphviz_with_typing():
 
 @pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
 def test_collapse_scope_plot_with_mapspecs():
-    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="foo")
     def f(a: int, b: int) -> int:
         return a + b
 
-    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]", scope="foo")
     def g(c: int) -> int:
         return c * 2
 
-    pipeline = Pipeline([f, g], scope="foo")
+    @pipefunc(output_name="e", mapspec="foo.d[i] -> bar.e[i]", renames={"d": "foo.d", "e": "bar.e"})
+    def h(d: int) -> int:
+        return d * 3
+
+    pipeline = Pipeline([f, g, h])
+    results = pipeline.map(inputs={"foo.a": [1, 2], "foo.b": 3})
+    assert results["foo.c"].output.tolist() == [4, 5]
+    assert results["foo.d"].output.tolist() == [8, 10]
+    assert results["bar.e"].output.tolist() == [24, 30]
+
+    # Test that both work
     pipeline.visualize_graphviz(collapse_scopes=True)
+    pipeline.visualize_graphviz(collapse_scopes=False)
