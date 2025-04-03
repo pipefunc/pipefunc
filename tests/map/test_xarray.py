@@ -175,7 +175,7 @@ def test_no_inputs_to_xarray(tmp_path: Path):
         return 1
 
     pipeline = Pipeline([f])
-    results = pipeline.map({}, storage="dict", run_folder=tmp_path, parallel=False)
+    results = pipeline.map({}, parallel=False, storage="dict")
     ds = results.to_xarray()
     assert "y" in ds.variables
 
