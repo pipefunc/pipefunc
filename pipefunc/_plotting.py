@@ -450,25 +450,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     }
     legend_items = {}  # For legend
 
-    # Create grouped parameter nodes
-    if grouped_params:
-        legend_items["Grouped Inputs"] = node_configs["Grouped Inputs"]
-
-    for target_func, params in grouped_params.items():
-        grouped_node_name = grouped_node_names[target_func]
-        label = _generate_node_label(
-            params,
-            hints,
-            defaults,
-            edge_labels_info.arg_mapspec,
-            False,  # include_full_mapspec not relevant for grouped params
-            target_func,
-            True,  # is_grouped
-        )
-        attribs = {**node_defaults, **node_configs["Grouped Inputs"], "label": label}
-        digraph.node(grouped_node_name, **attribs)
-
-    # Create regular nodes (skip grouped parameters)
+    # Create nodes (regular nodes and grouped nodes)
     for node in graph.nodes:
         # Skip parameters that are part of a group
         if isinstance(node, str) and node in params_to_group:
@@ -513,6 +495,27 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         attribs = {**node_defaults, **node_configs[node_type_key], "label": label}
         digraph.node(str(node), **attribs)
 
+        # Create the associated "Grouped Inputs" node if this is a target PipeFunc
+        if isinstance(node, PipeFunc) and node in grouped_params:
+            grouped_node_name = grouped_node_names[node]
+            params_list = grouped_params[node]
+            group_label = _generate_node_label(
+                params_list,
+                hints,
+                defaults,
+                edge_labels_info.arg_mapspec,
+                False,  # include_full_mapspec not relevant for grouped params
+                node,  # target_func is this PipeFunc
+                True,  # is_grouped
+            )
+            group_config = node_configs["Grouped Inputs"]
+            group_attribs = {**node_defaults, **group_config, "label": group_label}
+            digraph.node(grouped_node_name, **group_attribs)
+
+            # Add to legend if not already present
+            if "Grouped Inputs" not in legend_items:
+                legend_items["Grouped Inputs"] = group_config
+
     # Add edges with appropriate colors and labels
     edge_colors = {
         "output": style.output_edge_color or style.func_node_color,
@@ -524,46 +527,13 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "grouped": style.grouped_args_edge_color or style.grouped_args_node_color,
     }
 
-    # Track processed group edges to avoid duplicates
-    processed_grouped_edges = set()
-
+    # Process regular edges (skip edges from grouped parameters)
     for a, b in graph.edges:
-        # Skip individual parameters that are part of a group
+        # Skip edges from parameters that are being grouped
         if isinstance(a, str) and a in params_to_group:
-            # Get the target function
-            target_func = b
-            assert isinstance(target_func, PipeFunc)
-
-            # Get the group node name
-            group_node_name = grouped_node_names[target_func]
-
-            # Check if we've already processed this group->target edge
-            edge_key = (group_node_name, str(target_func))
-            if edge_key in processed_grouped_edges:
-                continue
-
-            # Add an edge from the group node to the target function
-            edge_color = edge_colors["grouped"]
-
-            # Create a label that shows all params in the group
-            label = ", ".join(grouped_params[target_func])
-            if len(label) > 30:
-                label = f"{len(grouped_params[target_func])} inputs"
-
-            digraph.edge(
-                group_node_name,
-                str(target_func),
-                color=edge_color,
-                label=label,
-                tooltip=f"<<b>{html.escape(label)}</b>>",
-                penwidth="1.01",
-                fontcolor="black" if len(label) < 20 else "transparent",
-            )
-
-            processed_grouped_edges.add(edge_key)
             continue
 
-        # Normal edge processing for non-grouped parameters
+        # Determine edge properties for non-grouped sources
         if isinstance(a, PipeFunc):
             edge_color = edge_colors["output"]
             if (a, b) in edge_labels_info.outputs_mapspec:
@@ -573,7 +543,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 label = edge_labels_info.outputs[(a, b)]
             else:
                 label = ", ".join(at_least_tuple(graph.edges[(a, b)].get("arg", "?")))
-        elif isinstance(a, str):
+        elif isinstance(a, str):  # Regular ungrouped input parameter
             edge_color = edge_colors["input"]
             if (a, b) in edge_labels_info.inputs_mapspec:
                 edge_color = edge_colors["input_mapspec"]
@@ -599,6 +569,24 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             tooltip=f"<<b>{html.escape(label)}</b>>",
             penwidth="1.01",
             fontcolor="transparent",
+        )
+
+    # Add edges from grouped parameter nodes to their target functions
+    for target_func, grouped_node_name in grouped_node_names.items():
+        params_list = grouped_params[target_func]
+        # Create a label that shows all params in the group
+        label = ", ".join(params_list)
+        if len(label) > 30:
+            label = f"{len(params_list)} inputs"
+
+        digraph.edge(
+            grouped_node_name,
+            str(target_func),
+            color=edge_colors["grouped"],
+            label=label,
+            tooltip=f"<<b>{html.escape(label)}</b>>",
+            penwidth="1.01",
+            fontcolor="black" if len(label) < 20 else "transparent",
         )
 
     # Create legend
