@@ -340,8 +340,8 @@ def test_calling_add_with_autogen_mapspec(dim: int | Literal["?"]):
     results = pipeline.map(
         inputs={"vector": [1, 2, 3], "factor": [1, 2, 3]},
         internal_shapes={"foo_out": (dim,)},
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
     assert results["bar_out"].output.tolist() == [1, 4, 9]
 
@@ -352,7 +352,7 @@ def test_validation_parallel():
         ValueError,
         match="Cannot use an executor without `parallel=True`",
     ):
-        pipeline.map({}, parallel=False, executor=Executor())
+        pipeline.map({}, executor=Executor(), parallel=False, storage="dict")
 
 
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")

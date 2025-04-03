@@ -142,7 +142,6 @@ def test_eager_scheduler_with_mapspec(tmp_path: Path):
     """Test that the eager scheduler works with MapSpec functions."""
     pipeline = Pipeline([multiply_by_two, sum_values])
     run_folder = tmp_path / "mapspec"
-
     inputs = {"x": [1, 2, 3, 4, 5]}
     result = pipeline.map(
         scheduling_strategy="eager",
@@ -233,7 +232,6 @@ def test_eager_scheduler_without_returning_results(tmp_path: Path):
         return_results=False,
         show_progress=False,
         parallel=False,
-        storage="dict",
     )
 
     # Result should be an empty dict
@@ -418,6 +416,7 @@ def test_eager_scheduler_with_long_dependency_chain(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=True,
     )
     assert result["a"].output == 1
     assert result["b"].output == 2
@@ -471,6 +470,7 @@ def test_eager_scheduler_with_diamond_pattern(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=True,
     )
 
     assert result["start"].output == 10

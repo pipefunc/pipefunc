@@ -1060,7 +1060,7 @@ def test_growing_axis(tmp_path: Path) -> None:
 def test_storage_options_invalid():
     f = PipeFunc(lambda x: x, "y")
     with pytest.raises(ValueError, match="Storage class `invalid` not found"):
-        Pipeline([f]).map({"x": 1}, None, storage="invalid")
+        Pipeline([f]).map({"x": 1}, None, parallel=False, storage="invalid")
 
 
 @pytest.mark.skipif(not has_zarr, reason="zarr not installed")
@@ -1077,7 +1077,13 @@ def test_custom_executor():
         return x
 
     pipeline = Pipeline([f])
-    results = pipeline.map({"x": [1, 2]}, None, executor=ThreadPoolExecutor())
+    results = pipeline.map(
+        {"x": [1, 2]},
+        None,
+        executor=ThreadPoolExecutor(),
+        parallel=True,
+        storage="dict",
+    )
     assert results["y"].output.tolist() == [1, 2]
 
 
@@ -1107,7 +1113,12 @@ def test_independent_axes_2():
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3], "z": [3, 4, 5]}
     internal_shapes = {"y": (3,)}
-    r = pipeline.map(inputs, internal_shapes=internal_shapes, parallel=False)
+    r = pipeline.map(
+        inputs,
+        internal_shapes=internal_shapes,
+        parallel=False,
+        storage="dict",
+    )
     assert r["y"].output == [1, 2, 3]
     assert r["r"].output.tolist() == [4, 6, 8]
     assert pipeline.independent_axes_in_mapspecs("r") == set()
@@ -1243,13 +1254,13 @@ def test_missing_inputs():
     pipeline = Pipeline([f])
     inputs = {}
     with pytest.raises(ValueError, match="Missing inputs"):
-        pipeline.map(inputs, parallel=False)
+        pipeline.map(inputs, parallel=False, storage="dict")
 
     with pytest.raises(
         ValueError,
         match="Got extra inputs: `not_used` that are not accepted by this pipeline",
     ):
-        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False)
+        pipeline.map({"x": 1, "not_used": 1}, None, parallel=False, storage="dict")
 
 
 def test_map_without_mapspec(tmp_path: Path) -> None:
@@ -1331,7 +1342,7 @@ def test_bound_2():
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": 2, "b": 3}
     r1 = pipeline("e", **inputs)
-    r2 = pipeline.map(inputs, parallel=False)
+    r2 = pipeline.map(inputs, parallel=False, storage="dict")
     assert r1 == r2["e"].output == 24
 
 
@@ -1346,7 +1357,7 @@ def test_bound_3():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"c": "c", "b": "b"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     d = ("b", "c", "x_f")
     assert r["d"].output == d
     assert r["e"].output == ("c_fixed", d, "x_g")
@@ -1365,7 +1376,7 @@ def test_bound_4():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["x"].output == "a"
     assert r["y"].output == ("a_g", "a")
     assert pipeline("x", a="a") == "a"
@@ -1383,7 +1394,7 @@ def test_bound_5():
 
     pipeline = Pipeline([f, g], debug=True)
     inputs = {"a": "a", "b": "b"}
-    r = pipeline.map(inputs, parallel=False)
+    r = pipeline.map(inputs, parallel=False, storage="dict")
     assert r["c"].output == ("a", "b")
     assert r["d"].output == ("b", "c_bound", 1)
     assert pipeline("c", a="a", b="b") == ("a", "b")
@@ -1461,14 +1472,14 @@ def test_map_func_exception():
         ValueError,
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
-        pipeline.map({"x": [1, 2, 3]}, None, parallel=False)
+        pipeline.map({"x": [1, 2, 3]}, None, parallel=False, storage="dict")
 
     pipeline = Pipeline([f])
     with pytest.raises(
         ValueError,
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
-        pipeline.map({"x": 1}, None, parallel=False)
+        pipeline.map({"x": 1}, None, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("dim", [3, "?"])
@@ -1483,13 +1494,13 @@ def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
 
     pipeline = Pipeline([f, g])
     inputs = {"x": 1}
-    r1 = pipeline.map(inputs, parallel=False)
+    r1 = pipeline.map(inputs, parallel=False, storage="dict")
     assert r1["y"].output == [1, 1, 1]
     assert r1["z"].output.tolist() == [1, 1, 1]
 
     f_no_shape = f.copy(internal_shape=None)
     pipeline = Pipeline([f_no_shape, g])
-    r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False)
+    r2 = pipeline.map(inputs, internal_shapes={"y": 3}, parallel=False, storage="dict")
     assert r2["y"].output == [1, 1, 1]
     assert r2["z"].output.tolist() == [1, 1, 1]
 
@@ -1647,7 +1658,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
 
     # Test missing executor
     with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
-        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)})
+        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)}, parallel=True)
 
     # Dict storage with different executors
     r = pipeline.map(
@@ -1657,6 +1668,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
             "": ThreadPoolExecutor(max_workers=2),
         },
         storage={"": "dict"},
+        parallel=True,
     )
     thread_names = r["y1"].output.tolist()
     assert len(thread_names) > 1
@@ -1776,9 +1788,9 @@ def test_nested_pipefunc_map_no_mapspec() -> None:
         return c * d * x
 
     pipeline = Pipeline([f, g, h])
-    results_before = pipeline.map({"a": 1, "b": 2})
+    results_before = pipeline.map({"a": 1, "b": 2}, parallel=False, storage="dict")
     pipeline.nest_funcs({"c", "d"})
-    results_after = pipeline.map({"a": 1, "b": 2})
+    results_after = pipeline.map({"a": 1, "b": 2}, parallel=False, storage="dict")
     assert results_after["e"].output == results_before["e"].output
 
 
@@ -1797,15 +1809,31 @@ def test_nested_pipefunc_map_with_mapspec() -> None:
 
     pipeline = Pipeline([f, g, h])
     pipeline_copy = pipeline.copy()
-    results_before = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
+    results_before = pipeline.map(
+        {"a": [1, 2], "b": [3, 4]},
+        parallel=False,
+        storage="dict",
+    )
     nested = pipeline.nest_funcs({"c", "d"})
-    results_after = pipeline.map({"a": [1, 2], "b": [3, 4]}, parallel=False)
+    results_after = pipeline.map(
+        {"a": [1, 2], "b": [3, 4]},
+        parallel=False,
+        storage="dict",
+    )
     assert results_after["e"].output == results_before["e"].output
     assert str(nested.mapspec) == "a[i], b[i] -> c[i], d[i]"
     pipeline_copy.add_mapspec_axis("x", axis="j")
     pipeline.add_mapspec_axis("x", axis="j")
-    results_before = pipeline_copy.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
-    results_after = pipeline.map({"a": [1, 2], "b": [3, 4], "x": [5, 6]}, parallel=False)
+    results_before = pipeline_copy.map(
+        {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
+        parallel=False,
+        storage="dict",
+    )
+    results_after = pipeline.map(
+        {"a": [1, 2], "b": [3, 4], "x": [5, 6]},
+        parallel=False,
+        storage="dict",
+    )
     assert results_after["e"].output.tolist() == results_before["e"].output.tolist()
 
 
@@ -1821,11 +1849,11 @@ def test_profiling_and_parallel_unsupported_warning() -> None:
 
     test_pipeline_with_profile_true = Pipeline([a], profile=True)
     with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
-        test_pipeline_with_profile_true.map({"val": [1]})
+        test_pipeline_with_profile_true.map({"val": [1]}, parallel=True, storage="dict")
 
     test_pipeline_with_profile_none = Pipeline([a_profile], profile=None)
     with pytest.warns(UserWarning, match="`profile=True` is not supported with `parallel=True`"):
-        test_pipeline_with_profile_none.map({"val": [1]})
+        test_pipeline_with_profile_none.map({"val": [1]}, parallel=True, storage="dict")
 
 
 def test_map_with_auto_subpipeline(tmp_path: Path):
@@ -1848,6 +1876,7 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
         run_folder=run_folder,
         auto_subpipeline=True,
         show_progress=False,
+        parallel=False,
     )
 
     assert result["final"].output == "Used direct_value"
@@ -1861,4 +1890,5 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
             run_folder=run_folder,
             auto_subpipeline=False,
             show_progress=False,
+            parallel=False,
         )

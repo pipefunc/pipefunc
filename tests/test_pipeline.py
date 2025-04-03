@@ -761,7 +761,7 @@ def test_parameterless_pipefunc() -> None:
     assert pipeline() == 1
     assert pipeline.topological_generations.root_args == []
     assert pipeline.topological_generations.function_lists == [[pipeline["c"]]]
-    r = pipeline.map({}, storage="dict", parallel=False)
+    r = pipeline.map({}, parallel=False, storage="dict")
     assert r["c"].output == 1
 
     @pipefunc(output_name="d")
@@ -780,7 +780,7 @@ def test_parameterless_pipefunc() -> None:
         [pipeline["c"], pipeline["d"]],
         [pipeline["e"]],
     ]
-    r = pipeline.map({}, storage="dict", parallel=False)
+    r = pipeline.map({}, parallel=False, storage="dict")
     assert r["e"].output == 3
 
 
@@ -823,7 +823,7 @@ def test_unpicklable_run(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
 
-    r = pipeline.map({"a": 1}, storage="dict", parallel=False)
+    r = pipeline.map({"a": 1}, parallel=False, storage="dict")
     assert isinstance(r["y"].output, Unpicklable)
     assert r["z"].output == 1
 
@@ -839,7 +839,12 @@ def test_unpicklable_run_with_mapspec():
 
     pipeline = Pipeline([f, g])
     inputs = {"a": [1, 2, 3, 4]}
-    r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
+    r = pipeline.map(
+        inputs,
+        parallel=True,
+        storage="dict",
+        executor=ThreadPoolExecutor(max_workers=2),
+    )
     assert isinstance(r["y"].output, np.ndarray)
     assert r["z"].output.tolist() == [1, 2, 3, 4]
 
