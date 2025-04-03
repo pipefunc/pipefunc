@@ -133,7 +133,10 @@ def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) ->
         return False  # No cycle
 
 
-def _find_exclusive_parameters(graph: nx.DiGraph) -> dict[PipeFunc, list[str]]:
+def _find_exclusive_parameters(
+    graph: nx.DiGraph,
+    min_arg_group_size: int = 2,
+) -> dict[PipeFunc, list[str]]:
     grouped_params: dict[PipeFunc, list[str]] = defaultdict(list)
     all_output_names = {
         name for func in _functions_from_graph(graph) for name in at_least_tuple(func.output_name)
@@ -151,19 +154,23 @@ def _find_exclusive_parameters(graph: nx.DiGraph) -> dict[PipeFunc, list[str]]:
     for func in grouped_params:  # noqa: PLC0206
         grouped_params[func].sort()
 
-    return {func: params for func, params in grouped_params.items() if len(params) > 1}
+    return {
+        func: params for func, params in grouped_params.items() if len(params) >= min_arg_group_size
+    }
 
 
-def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
+def create_grouped_parameter_graph(
+    graph: nx.DiGraph,
+    min_arg_group_size: int | None,
+) -> nx.DiGraph:
     """Group exclusive input parameters for a function.
-
-    Creates a new graph where exclusive input parameters for a function
-    (if more than one) are grouped into a single tuple node.
 
     Parameters
     ----------
     graph
         The directed graph representing the pipeline.
+    min_arg_group_size
+        The minimum number of parameters in a group to be grouped. If None, no grouping is done.
 
     Returns
     -------
@@ -173,7 +180,10 @@ def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
 
     """
     new_graph = graph.copy()
-    groups_to_create = _find_exclusive_parameters(graph)
+    if min_arg_group_size is None:
+        return new_graph
+    min_arg_group_size = max(min_arg_group_size, 2)
+    groups_to_create = _find_exclusive_parameters(graph, min_arg_group_size)
 
     if not groups_to_create:
         return new_graph  # Return copy if no grouping needed

@@ -297,7 +297,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     *,
     figsize: tuple[int, int] | int | None = None,
     collapse_scopes: bool | Sequence[str] = False,
-    group_exclusive_inputs: bool = True,
+    min_arg_group_size: int | None = None,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -322,8 +322,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         Whether to collapse scopes in the graph.
         If ``True``, scopes are collapsed into a single node.
         If a sequence of scope names, only the specified scopes are collapsed.
-    group_exclusive_inputs
-        Whether to group parameters that are used exclusively by a single `PipeFunc`.
+    min_arg_group_size
+        The minimum number of parameters in a group to be grouped. If None, no grouping is done.
     filename
         The filename to save the figure to, if provided.
     style
@@ -355,7 +355,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
-    plot_graph = create_grouped_parameter_graph(graph) if group_exclusive_inputs else graph
+    plot_graph = (
+        create_grouped_parameter_graph(graph, min_arg_group_size)
+        if min_arg_group_size is not None and min_arg_group_size > 1
+        else graph
+    )
 
     if style is None:
         style = GraphvizStyle()
@@ -405,7 +409,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             {
                 "fillcolor": style.grouped_args_node_color,
                 "shape": "rectangle",
-                "style": "filled,dashed",
+                "style": "filled,solid",
             },
         ),
         "PipeFunc": (
