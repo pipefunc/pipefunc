@@ -5,7 +5,7 @@ import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 import numpy as np
@@ -61,6 +61,7 @@ class _Nodes:
     """Contains lists of different node types for the purpose of graph visualization."""
 
     arg: list[str] = field(default_factory=list)
+    grouped_args: list[tuple[str, ...]] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
     collapsed_scope: list[CollapsedScope] = field(default_factory=list)
@@ -71,6 +72,8 @@ class _Nodes:
         """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
+        elif isinstance(node, tuple):
+            self.grouped_args.append(node)
         elif isinstance(node, CollapsedScope):
             self.collapsed_scope.append(node)
         elif isinstance(node, NestedPipeFunc):
@@ -137,6 +140,8 @@ class _Labels(NamedTuple):
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
                     inputs[edge] = a
+            elif isinstance(a, tuple):
+                inputs[edge] = ", ".join(a)
             elif isinstance(a, PipeFunc):
                 output_str = []
                 with_mapspec = False
@@ -161,7 +166,7 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
-NodeType = Union[str, PipeFunc, _Bound, _Resources, NestedPipeFunc, CollapsedScope, tuple[str, ...]]
+NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | tuple[str, ...]
 
 
 def _generate_node_label(
@@ -385,7 +390,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         },
         **graphviz_kwargs,
     )
-    hints = _all_type_annotations(graph)
+    hints = _all_type_annotations(plot_graph)
     nodes = _Nodes.from_graph(graph)
     labels = _Labels.from_graph(graph)
 
@@ -395,6 +400,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             nodes.arg,
             {
                 "fillcolor": style.arg_node_color,
+                "shape": "rectangle",
+                "style": "filled,dashed",
+            },
+        ),
+        "GroupedArgs": (
+            nodes.grouped_args,
+            {
+                "fillcolor": style.grouped_args_node_color,
                 "shape": "rectangle",
                 "style": "filled,dashed",
             },
@@ -468,6 +481,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         a, b = edge
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
+        elif isinstance(a, tuple):
+            edge_color = edge_colors["inputs"] or style.grouped_args_node_color
         elif isinstance(a, PipeFunc):
             edge_color = edge_colors["outputs"] or style.func_node_color
         elif isinstance(a, _Bound):
