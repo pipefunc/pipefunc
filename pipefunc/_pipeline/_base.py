@@ -1576,6 +1576,7 @@ class Pipeline:
         *,
         figsize: tuple[int, int] | int | None = None,
         collapse_scopes: bool | Sequence[str] = False,
+        min_arg_group_size: int | None = None,
         filename: str | Path | None = None,
         style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1596,6 +1597,9 @@ class Pipeline:
             Whether to collapse scopes in the graph.
             If ``True``, scopes are collapsed into a single node.
             If a sequence of scope names, only the specified scopes are collapsed.
+        min_arg_group_size
+            Minimum number of parameters to combine into a single node. Only applies to
+            parameters used exclusively by one PipeFunc. If None, no grouping is performed.
         filename
             The filename to save the figure to, if provided.
         style
@@ -1628,6 +1632,7 @@ class Pipeline:
             self.defaults,
             figsize=figsize,
             collapse_scopes=collapse_scopes,
+            min_arg_group_size=min_arg_group_size,
             filename=filename,
             style=style,
             orient=orient,

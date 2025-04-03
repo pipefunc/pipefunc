@@ -323,7 +323,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         If ``True``, scopes are collapsed into a single node.
         If a sequence of scope names, only the specified scopes are collapsed.
     min_arg_group_size
-        The minimum number of parameters in a group to be grouped. If None, no grouping is done.
+        Minimum number of parameters to combine into a single node. Only applies to
+        parameters used exclusively by one PipeFunc. If None, no grouping is performed.
     filename
         The filename to save the figure to, if provided.
     style

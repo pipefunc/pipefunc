@@ -143,7 +143,8 @@ def _find_exclusive_parameters(
     }
     for node in graph.nodes:
         # Check if it's an input parameter (string, not an output of another func)
-        if isinstance(node, str) and node not in all_output_names:
+        if isinstance(node, str):
+            assert node not in all_output_names
             successors = list(graph.successors(node))
             # Check if it has exactly one successor which is a PipeFunc
             if len(successors) == 1 and isinstance(successors[0], PipeFunc):
