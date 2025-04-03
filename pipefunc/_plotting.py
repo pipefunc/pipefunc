@@ -13,7 +13,10 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
-from pipefunc._plotting_utils import CollapsedScope, collapsed_scope_graph
+from pipefunc._plotting_utils import (
+    CollapsedScope,
+    collapsed_scope_graph,
+)
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 

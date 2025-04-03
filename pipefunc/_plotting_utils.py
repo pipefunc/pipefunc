@@ -130,3 +130,44 @@ def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) ->
         return True  # Cycle found  # noqa: TRY300
     except nx.NetworkXNoCycle:
         return False  # No cycle
+
+
+def find_exclusive_parameters(graph: nx.DiGraph) -> tuple[dict[PipeFunc, list[str]], set[str]]:
+    """Identifies parameters used exclusively by a single PipeFunc node.
+
+    Args:
+        graph: The pipeline's NetworkX DiGraph.
+
+    Returns:
+        A tuple containing:
+        - A dictionary mapping each PipeFunc to a list of its exclusive parameters.
+        - A set of all parameter names that are part of any group.
+
+    """
+    grouped_params: dict[PipeFunc, list[str]] = defaultdict(list)
+    params_to_group: set[str] = set()
+    all_output_names = {
+        name for func in _functions_from_graph(graph) for name in at_least_tuple(func.output_name)
+    }
+
+    for node in graph.nodes:
+        if isinstance(node, str) and node not in all_output_names:
+            successors = list(graph.successors(node))
+            if len(successors) == 1 and isinstance(successors[0], PipeFunc):
+                target_func = successors[0]
+                # Ensure this param isn't an input to another *different* function indirectly
+                # (This check might be overly strict, but safer initially)
+                is_exclusive = True
+                # Check if this parameter node has any other successors, even indirect ones
+                # that aren't the target_func or its descendants
+                # A simpler check: just rely on the direct successor count. If more complex
+                # exclusivity is needed, this part could be enhanced.
+                if is_exclusive:
+                    grouped_params[target_func].append(node)
+                    params_to_group.add(node)
+
+    # Sort the parameters within each group for consistent labeling
+    for func in grouped_params:  # noqa: PLC0206
+        grouped_params[func].sort()
+
+    return dict(grouped_params), params_to_group
