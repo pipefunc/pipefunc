@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 import networkx as nx
@@ -184,7 +185,7 @@ def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
     # Process each group
     for target_func, params_list in groups_to_create.items():
         # Create the new grouped node (tuple of sorted names)
-        grouped_node = tuple(sorted(params_list))
+        grouped_node = _GroupedArgs(args=tuple(sorted(params_list)))
 
         # Add the new node and the edge to the target function
         if grouped_node not in new_graph:  # Should not exist yet
@@ -204,3 +205,13 @@ def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
                 new_graph.remove_node(param_name)
 
     return new_graph
+
+
+@dataclass(frozen=True)
+class _GroupedArgs:
+    """A tuple of exclusive input parameters for a function."""
+
+    args: tuple[str, ...]
+
+    def __str__(self) -> str:
+        return "___".join(self.args)

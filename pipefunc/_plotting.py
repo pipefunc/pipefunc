@@ -15,6 +15,7 @@ from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
     CollapsedScope,
+    _GroupedArgs,
     collapsed_scope_graph,
     create_grouped_parameter_graph,
 )
@@ -61,7 +62,7 @@ class _Nodes:
     """Contains lists of different node types for the purpose of graph visualization."""
 
     arg: list[str] = field(default_factory=list)
-    grouped_args: list[tuple[str, ...]] = field(default_factory=list)
+    grouped_args: list[_GroupedArgs] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
     collapsed_scope: list[CollapsedScope] = field(default_factory=list)
@@ -72,7 +73,7 @@ class _Nodes:
         """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
-        elif isinstance(node, tuple):
+        elif isinstance(node, _GroupedArgs):
             self.grouped_args.append(node)
         elif isinstance(node, CollapsedScope):
             self.collapsed_scope.append(node)
@@ -140,8 +141,8 @@ class _Labels(NamedTuple):
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
                     inputs[edge] = a
-            elif isinstance(a, tuple):
-                inputs[edge] = ", ".join(a)
+            elif isinstance(a, _GroupedArgs):
+                inputs[edge] = str(a)
             elif isinstance(a, PipeFunc):
                 output_str = []
                 with_mapspec = False
@@ -166,7 +167,7 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
-NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | tuple[str, ...]
+NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | _GroupedArgs
 
 
 def _generate_node_label(
@@ -196,11 +197,11 @@ def _generate_node_label(
 
         return " ".join(parts)
 
-    if isinstance(node, tuple):  # Handle grouped parameters
+    if isinstance(node, _GroupedArgs):
         title = "Grouped Inputs"
         label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR>'
 
-        for param_name in node:
+        for param_name in node.args:
             type_string = type_as_string(hints[param_name]) if param_name in hints else None
             default_value = defaults.get(param_name, _empty) if defaults else _empty
             mapspec = arg_mapspec.get(param_name)
@@ -390,8 +391,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         },
         **graphviz_kwargs,
     )
-    hints = _all_type_annotations(plot_graph)
-    nodes = _Nodes.from_graph(graph)
+    hints = _all_type_annotations(graph)
+    nodes = _Nodes.from_graph(plot_graph)
     labels = _Labels.from_graph(graph)
 
     # Define a mapping for node configurations
@@ -476,13 +477,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "inputs_mapspec": style.input_mapspec_edge_color,
         "bound": style.bound_edge_color,
         "resources": style.resources_edge_color,
+        "grouped_args": style.grouped_args_edge_color,
     }
     for edge in graph.edges:
         a, b = edge
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
-        elif isinstance(a, tuple):
-            edge_color = edge_colors["inputs"] or style.grouped_args_node_color
+        elif isinstance(a, _GroupedArgs):
+            edge_color = edge_colors["grouped_args"] or style.grouped_args_node_color
         elif isinstance(a, PipeFunc):
             edge_color = edge_colors["outputs"] or style.func_node_color
         elif isinstance(a, _Bound):
@@ -490,6 +492,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         else:
             assert isinstance(a, _Resources)
             edge_color = edge_colors["resources"] or style.resources_node_color
+
         if edge in labels.outputs_mapspec:
             edge_color = edge_colors["outputs_mapspec"]  # type: ignore[assignment]
             label = labels.outputs_mapspec[edge]
