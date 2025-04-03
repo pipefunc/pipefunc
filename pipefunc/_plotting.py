@@ -13,10 +13,12 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
+from pipefunc._plotting_utils import CollapsedScope, collapsed_scope_graph
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     import graphviz
@@ -57,6 +59,7 @@ class _Nodes:
     arg: list[str] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
+    collapsed_scope: list[CollapsedScope] = field(default_factory=list)
     bound: list[_Bound] = field(default_factory=list)
     resources: list[_Resources] = field(default_factory=list)
 
@@ -64,6 +67,8 @@ class _Nodes:
         """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
+        elif isinstance(node, CollapsedScope):
+            self.collapsed_scope.append(node)
         elif isinstance(node, NestedPipeFunc):
             self.nested_func.append(node)
         elif isinstance(node, PipeFunc):
@@ -153,7 +158,7 @@ class _Labels(NamedTuple):
 
 
 def _generate_node_label(
-    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc,
+    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
@@ -188,9 +193,14 @@ def _generate_node_label(
         mapspec = arg_mapspec.get(node)
         label = _format_type_and_default(mapspec or node, type_string, default_value)
 
-    elif isinstance(node, PipeFunc | NestedPipeFunc):
+    elif isinstance(node, PipeFunc | NestedPipeFunc | CollapsedScope):
         name = str(node).split(" → ")[0]
-        label = f'<TABLE BORDER="0"><TR><TD><B>{html.escape(name)}</B></TD></TR><HR/>'
+        if isinstance(node, CollapsedScope):
+            assert node.function_name is not None
+            content = f"Scope: {html.escape(node.function_name)}"
+        else:
+            content = html.escape(name)
+        label = f'<TABLE BORDER="0"><TR><TD><B>{content}</B></TD></TR><HR/>'
 
         for i, output in enumerate(at_least_tuple(node.output_name)):
             name = str(node.mapspec.outputs[i]) if node.mapspec else output
@@ -232,6 +242,7 @@ class GraphvizStyle:
     nested_func_node_color: str = _COLORS["red"]
     bound_node_color: str = _COLORS["red"]
     resources_node_color: str = _COLORS["orange"]
+    collapsed_scope_node_color: str = _COLORS["blue"]
     # Edges
     arg_edge_color: str | None = None  # default is arg_node_color
     output_edge_color: str | None = None  # default is func_node_color
@@ -257,6 +268,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     defaults: dict[str, Any] | None = None,
     *,
     figsize: tuple[int, int] | int | None = None,
+    collapse_scopes: bool | Sequence[str] = False,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -277,6 +289,10 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         The width and height of the figure in inches.
         If a single integer is provided, the figure will be a square.
         If ``None``, the size will be determined automatically.
+    collapse_scopes
+        Whether to collapse scopes in the graph.
+        If ``True``, scopes are collapsed into a single node.
+        If a sequence of scope names, only the specified scopes are collapsed.
     filename
         The filename to save the figure to, if provided.
     style
@@ -304,6 +320,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     """
     requires("graphviz", reason="visualize_graphviz", extras="plotting")
     import graphviz
+
+    if collapse_scopes:
+        graph = collapsed_scope_graph(graph, collapse_scopes)
 
     if style is None:
         style = GraphvizStyle()
@@ -358,6 +377,17 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 "shape": "box",
                 "style": "filled,rounded",
                 "color": style.nested_func_node_color,
+            },
+        ),
+        "CollapsedScope": (
+            nodes.collapsed_scope,
+            {
+                "fillcolor": style.func_node_color,
+                "shape": "box",
+                "style": "filled,rounded",
+                "color": style.collapsed_scope_node_color,
+                "penwidth": "2.0",
+                "peripheries": "2",  # Double border to indicate collapsed scope
             },
         ),
         "Bound": (
