@@ -214,4 +214,4 @@ class _GroupedArgs:
     args: tuple[str, ...]
 
     def __str__(self) -> str:
-        return "___".join(self.args)
+        return "-".join(self.args)
