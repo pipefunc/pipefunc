@@ -369,7 +369,7 @@ def test_with_progress() -> None:
     r_map = pipeline.map(
         inputs={"a": [1, 2, 3]},
         show_progress=True,
-        parallel=False,
+        parallel=True,
         storage="dict",
     )
     assert r_map["out"].output.tolist() == [1, 2, 3]
