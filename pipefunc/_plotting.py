@@ -199,7 +199,7 @@ def _generate_node_label(
 
     if isinstance(node, _GroupedArgs):
         title = "Grouped Inputs"
-        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR>'
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
 
         for param_name in node.args:
             type_string = type_as_string(hints[param_name]) if param_name in hints else None
