@@ -118,6 +118,7 @@ def test_to_xarray_from_step(tmp_path: Path):
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         run_folder=tmp_path,
         parallel=False,
+        storage="dict",
     )
     mapspecs = pipeline.mapspecs()
     output_name = results["y"].output_name
@@ -215,8 +216,8 @@ def test_to_dataframe(tmp_path: Path):
             "at_bats": baseball_df["at_bats"],
             "home_runs": baseball_df["home_runs"],
         },
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
     df = result.to_dataframe()
     assert set(df.columns.tolist()) == {

@@ -61,8 +61,8 @@ def test_dynamic_internal_shape(
     results = pipeline.map(
         {},
         run_folder=tmp_path if use_run_folder else None,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
         storage="dict",
     )
     expected_sum = 12
@@ -157,8 +157,9 @@ def test_2d_internal_shape_non_dynamic(
     results = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     if return_results:
         assert results["y"].output.tolist() == expected_y
@@ -207,9 +208,10 @@ def test_2d_internal_shape(
     results = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
+        parallel=False,
+        storage="dict",
     )
     if return_results:
         assert results["y"].output.tolist() == expected_y
@@ -219,11 +221,12 @@ def test_2d_internal_shape(
     _ = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         cleanup=False,
         show_progress=True,
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
+        parallel=False,
+        storage="dict",
     )
     assert before == counters
 
@@ -241,7 +244,13 @@ def test_internal_shape_2nd_step(tmp_path: Path, dim: Literal["?"] | None) -> No
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    results = pipeline.map({}, run_folder=tmp_path, parallel=False, show_progress=True)
+    results = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        show_progress=True,
+        parallel=False,
+        storage="dict",
+    )
     # Optionally check that results is a dict if available
     if isinstance(results, dict):
         assert isinstance(results, dict)
@@ -263,7 +272,13 @@ def test_internal_shape_2nd_step2(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    _ = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    _ = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     run_info = RunInfo.load(tmp_path)
     assert run_info.shapes == {"x": ("?",), "y": ("?",)}
     assert run_info.resolved_shapes == {"x": (7,), "y": (7,)}
@@ -287,7 +302,13 @@ def test_first_returns_2d(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    result = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    result = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     expected_y = (2 * load_outputs("x", run_folder=tmp_path)).tolist()
     if return_results:
         assert result["y"].output.tolist() == (2 * result["x"].output).tolist()
@@ -315,7 +336,13 @@ def test_first_returns_2d_but_1d_internal(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    result = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    result = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     if return_results:
         assert np.all(result["y"].output[0] == (2 * result["x"].output[0]))
     expected_y0 = 2 * load_outputs("x", run_folder=tmp_path)[0]
@@ -367,10 +394,10 @@ def test_dimension_mismatch_bug_with_autogen_axes(
     results = pipeline.map(
         {"jobs": jobs},
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
-        parallel=False,
-        storage="dict",
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_processed = ["0, 0", "0, 0", "1, 1"]
     if return_results:
@@ -412,10 +439,10 @@ def test_dynamic_internal_shape_with_size_1(
     expected_x = [[0, 0]]
     r = pipeline.map(
         inputs={"n": [1, 1]},
-        parallel=False,
-        storage=storage,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage=storage,
     )
     if return_results:
         assert r["x"].output.tolist() == expected_x
@@ -448,9 +475,10 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
         pipeline["z"].internal_shape = (2,)
     r = pipeline.map(
         inputs={"n": 4},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_z = [6, 6]
     if return_results:
@@ -465,9 +493,10 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     ]
     r = pipeline.map(
         inputs={"n": [4, 4]},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_z2 = [[6, 6], [6, 6]]
     if return_results:
@@ -498,9 +527,10 @@ def test_simple_2d(
     x = np.array([[0, 1, 2], [3, 4, 5]])
     r = pipeline.map(
         inputs={"x": x},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_y = [
         [0, 1, 2],
@@ -608,9 +638,9 @@ def test_inhomogeneous_array(
     results = pipeline.map(
         {},
         run_folder=tmp_path,
-        storage=storage_id,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
+        storage=storage_id,
     )
     if return_results:
         assert results["x"].output[0] == ("yo", ("lo",))
