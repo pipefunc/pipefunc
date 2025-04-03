@@ -164,10 +164,13 @@ def find_exclusive_parameters(graph: nx.DiGraph) -> tuple[dict[PipeFunc, list[st
                 # exclusivity is needed, this part could be enhanced.
                 if is_exclusive:
                     grouped_params[target_func].append(node)
-                    params_to_group.add(node)
 
     # Sort the parameters within each group for consistent labeling
     for func in grouped_params:  # noqa: PLC0206
         grouped_params[func].sort()
+
+    # Remove groups with just one parameter
+    grouped_params = {func: params for func, params in grouped_params.items() if len(params) > 1}
+    params_to_group = {param for params in grouped_params.values() for param in params}
 
     return dict(grouped_params), params_to_group

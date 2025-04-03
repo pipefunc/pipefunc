@@ -449,20 +449,15 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             continue
 
         # Determine node type and configuration
-        if isinstance(node, str):
-            node_type_key = "Argument"
-        elif isinstance(node, CollapsedScope):
-            node_type_key = "CollapsedScope"
-        elif isinstance(node, NestedPipeFunc):
-            node_type_key = "NestedPipeFunc"
-        elif isinstance(node, PipeFunc):
-            node_type_key = "PipeFunc"
-        elif isinstance(node, _Bound):
-            node_type_key = "Bound"
-        elif isinstance(node, _Resources):
-            node_type_key = "Resources"
-        else:
-            continue  # Should not happen
+        mapping = {
+            str: "Argument",
+            CollapsedScope: "CollapsedScope",
+            NestedPipeFunc: "NestedPipeFunc",
+            PipeFunc: "PipeFunc",
+            _Bound: "Bound",
+            _Resources: "Resources",
+        }
+        node_type_key = mapping[type(node)]
 
         # Add to legend items if not already present
         if node_type_key not in legend_items:
@@ -475,8 +470,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             defaults,
             labels.arg_mapspec,
             include_full_mapspec,
-            None,  # target_func
-            False,  # is_grouped
+            target_func=None,
+            is_grouped=False,
         )
 
         # Handle HTML-like labels properly
