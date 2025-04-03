@@ -136,7 +136,7 @@ def test_to_xarray_from_step(tmp_path: Path):
     assert da.coords["x"].to_numpy().tolist() == expected_coords["x"]
 
 
-def test_xarray_from_result():
+def test_xarray_from_result(tmp_path: Path):
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -147,15 +147,15 @@ def test_xarray_from_result():
     def returns_custom_object(a: int) -> dict:
         return {"a": a}
 
-    pipeline = Pipeline([double_it, returns_array, returns_custom_object])
+    pipeline = Pipeline([double_it, returns_array, returns_custom_object])  # type: ignore[list-item]
     inputs = {"x": [1, 2, 3], "a": 10}
-    results = pipeline.map(inputs, run_folder="tmp_path", parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "returns_array" in ds.coords
     assert "returns_custom_object" in ds.data_vars
 
 
-def test_loop_over_list_with_elements_with_shape() -> None:
+def test_loop_over_list_with_elements_with_shape(tmp_path: Path) -> None:
     # See PR #587
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x: list[list[int]]) -> int:
@@ -163,24 +163,24 @@ def test_loop_over_list_with_elements_with_shape() -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": [[1, 2], [3, 4], [5, 6]]}
-    results = pipeline.map(inputs, run_folder="tmp_path", parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
     assert results["y"].output.tolist() == [2, 2, 2]
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "x" in ds.coords
 
 
-def test_no_inputs_to_xarray():
+def test_no_inputs_to_xarray(tmp_path: Path):
     @pipefunc(output_name="y")
     def f() -> int:
         return 1
 
     pipeline = Pipeline([f])
-    results = pipeline.map({}, storage="dict", parallel=False)
+    results = pipeline.map({}, storage="dict", run_folder=tmp_path, parallel=False)
     ds = results.to_xarray()
     assert "y" in ds.variables
 
 
-def test_to_dataframe():
+def test_to_dataframe(tmp_path: Path):
     data = {
         "player": ["Player A", "Player B", "Player C", "Player D", "Player E"],
         "at_bats": [200, 300, 330, 250, 175],

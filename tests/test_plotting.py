@@ -236,7 +236,11 @@ def test_collapse_scope_plot_with_mapspecs():
         return d * 3
 
     pipeline = Pipeline([f, g, h])
-    results = pipeline.map(inputs={"foo.a": [1, 2], "foo.b": 3})
+    results = pipeline.map(
+        inputs={"foo.a": [1, 2], "foo.b": 3},
+        parallel=False,
+        storage="dict",
+    )
     assert results["foo.c"].output.tolist() == [4, 5]
     assert results["foo.d"].output.tolist() == [8, 10]
     assert results["bar.e"].output.tolist() == [24, 30]

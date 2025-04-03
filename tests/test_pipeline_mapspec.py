@@ -314,7 +314,7 @@ def test_mapping_over_default() -> None:
         return a + b
 
     pipeline = Pipeline([f])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]})
+    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, parallel=False, storage="dict")
     assert r_map["out"].output.tolist() == [2, 4, 6]
 
 
@@ -366,11 +366,21 @@ def test_with_progress() -> None:
         return sum(out)
 
     pipeline = Pipeline([f, g])
-    r_map = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True)
+    r_map = pipeline.map(
+        inputs={"a": [1, 2, 3]},
+        show_progress=True,
+        parallel=False,
+        storage="dict",
+    )
     assert r_map["out"].output.tolist() == [1, 2, 3]
     assert r_map["out_sum"].output == 6
 
-    r_map_sequential = pipeline.map(inputs={"a": [1, 2, 3]}, show_progress=True, parallel=False)
+    r_map_sequential = pipeline.map(
+        inputs={"a": [1, 2, 3]},
+        show_progress=True,
+        parallel=False,
+        storage="dict",
+    )
     assert r_map_sequential["out"].output.tolist() == [1, 2, 3]
     assert r_map_sequential["out_sum"].output == 6
 

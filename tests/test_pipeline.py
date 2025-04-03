@@ -928,7 +928,11 @@ def test_double_output_then_iterate_over_single_axis_gen_job(dim: int | Literal[
             PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
         ],
     )
-    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False)
+    results = pipeline.map(
+        {"x": np.arange(3), "y": np.arange(3)},
+        parallel=False,
+        storage="dict",
+    )
     assert results["c"].output.shape == (3, 10)
 
 
@@ -1021,7 +1025,7 @@ def test_nested_pipefunc_in_pipeline_renames() -> None:
     assert func.pipeline.functions[0].renames == {}
     r = pipeline.run("test.y", kwargs={"test.n": 2})
     assert r == 8
-    r = pipeline.map(inputs={"test.n": 2}, storage="dict", parallel=False)
+    r = pipeline.map(inputs={"test.n": 2}, parallel=False, storage="dict")
     assert r["test.y"].output == 8
 
 

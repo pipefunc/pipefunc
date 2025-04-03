@@ -278,6 +278,6 @@ def test_update_scope_from_faq() -> None:
     pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
     kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
     assert pipeline(**kwargs) == 15
-    results = pipeline.map(inputs=kwargs)
+    results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
