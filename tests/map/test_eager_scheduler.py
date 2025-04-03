@@ -273,6 +273,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result1["c"].output == "c(b(a))"
@@ -289,6 +291,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
         run_folder=run_folder,
         cleanup=False,  # Don't clean up to test caching
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result2["c"].output == "c(b(a))"

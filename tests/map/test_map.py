@@ -1352,7 +1352,7 @@ def test_map_with_partial(tmp_path: Path) -> None:
     assert r["z"].output == 6
 
     partial = pipeline.subpipeline(output_names={"y"})
-    r = partial.map(inputs, tmp_path)
+    r = partial.map(inputs, tmp_path, parallel=False, storage="dict")
     assert len(r) == 1
     assert r["y"].output.tolist() == [1, 2, 3]
 
