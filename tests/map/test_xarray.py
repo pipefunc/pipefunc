@@ -21,7 +21,7 @@ def test_to_xarray_1_dim(tmp_path: Path):
 
     pipeline = Pipeline([double_it])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     output_name = results["y"].output_name
     mapspecs = pipeline.mapspecs()
 
@@ -40,7 +40,7 @@ def test_to_xarray_2_dim(tmp_path: Path):
 
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     output_name = results["z"].output_name
     mapspecs = pipeline.mapspecs()
 
@@ -61,7 +61,7 @@ def test_to_xarray_2_dim_zipped(tmp_path: Path):
 
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3], "y": [4, 5, 6], "z": [7, 8]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     output_name = results["r"].output_name
     mapspecs = pipeline.mapspecs()
 
@@ -86,7 +86,7 @@ def test_to_xarray_1_dim_2_funcs(tmp_path: Path):
 
     pipeline = Pipeline([f, g])
     inputs = {"x": [1, 2, 3]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
 
     output_name = results["z"].output_name
     mapspecs = pipeline.mapspecs()
@@ -149,7 +149,7 @@ def test_xarray_from_result(tmp_path: Path):
 
     pipeline = Pipeline([double_it, returns_array, returns_custom_object])  # type: ignore[list-item]
     inputs = {"x": [1, 2, 3], "a": 10}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "returns_array" in ds.coords
     assert "returns_custom_object" in ds.data_vars
@@ -163,7 +163,7 @@ def test_loop_over_list_with_elements_with_shape(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": [[1, 2], [3, 4], [5, 6]]}
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, storage="dict")
     assert results["y"].output.tolist() == [2, 2, 2]
     ds = xarray_dataset_from_results(inputs, results, pipeline)
     assert "x" in ds.coords

@@ -107,8 +107,8 @@ def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
     lst = list(range(n))
     pipeline_nd.map(
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
 
 
@@ -118,7 +118,7 @@ def test_large_nd_sweep_from_faq_eager(pipeline_nd: Pipeline) -> None:
     lst = list(range(n))
     pipeline_nd.map(
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
-        storage="dict",
         parallel=False,
+        storage="dict",
         scheduling_strategy="eager",
     )

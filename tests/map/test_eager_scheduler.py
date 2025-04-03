@@ -232,6 +232,7 @@ def test_eager_scheduler_without_returning_results(tmp_path: Path):
         return_results=False,
         show_progress=False,
         parallel=False,
+        storage="dict",
     )
 
     # Result should be an empty dict
@@ -520,9 +521,9 @@ def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
         scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
-        storage=storage,
         show_progress=False,
         parallel=False,
+        storage=storage,
     )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -568,10 +569,10 @@ def test_eager_scheduler_with_persist_memory(
     result = pipeline.map(
         scheduling_strategy="eager",
         inputs={},
-        storage="dict",  # Memory-based storage
         persist_memory=persist_memory,
         show_progress=False,
         parallel=False,
+        storage="dict",
     )
 
     assert result["a"].output == "a"
@@ -619,8 +620,8 @@ def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
 
     assert result["matrix"].output.tolist() == [[4, 5], [8, 10], [12, 15]]

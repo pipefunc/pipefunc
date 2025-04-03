@@ -127,7 +127,7 @@ def test_exception(tmp_path: Path) -> None:
         TypeError,
         match=re.escape("Internal shape for 'x' must be a tuple of integers or '?'."),
     ):
-        pipeline.map({"n": 4}, run_folder=tmp_path, parallel=False)
+        pipeline.map({"n": 4}, run_folder=tmp_path, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("return_results", [True, False])
@@ -389,12 +389,12 @@ def test_dynamic_internal_shape_with_irregular_output(tmp_path: Path) -> None:
         ValueError,
         match=re.escape("Output shape (3,) of function 'f' (output 'x') does not match"),
     ):
-        pipeline.map(inputs={"n": [2, 3]}, run_folder=tmp_path, parallel=False)
+        pipeline.map(inputs={"n": [2, 3]}, run_folder=tmp_path, parallel=False, storage="dict")
     with pytest.raises(
         ValueError,
         match=re.escape("Output shape (1,) of function 'f' (output 'x') does not match"),
     ):
-        pipeline.map(inputs={"n": [2, 1]}, run_folder=tmp_path, parallel=False)
+        pipeline.map(inputs={"n": [2, 1]}, run_folder=tmp_path, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("storage", ["dict", "file_array"])
