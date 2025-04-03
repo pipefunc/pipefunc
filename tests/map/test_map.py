@@ -1692,7 +1692,7 @@ def test_pipeline_with_heterogeneous_executor() -> None:
         ("y1", "y2"): ThreadPoolExecutor(max_workers=2),
         "": ProcessPoolExecutor(max_workers=2),
     }
-    results = pipeline.map(inputs, executor=executor, parallel=True)
+    results = pipeline.map(inputs, executor=executor, parallel=True, storage="dict")
 
     # Check if ThreadPoolExecutor was used for f
     thread_names = results["y1"].output.tolist()
@@ -1709,7 +1709,12 @@ def test_pipeline_with_heterogeneous_executor() -> None:
 
     # Test missing executor
     with pytest.raises(ValueError, match=re.escape("No executor found for output `('y1', 'y2')`.")):
-        pipeline.map(inputs, executor={"z": ProcessPoolExecutor(max_workers=2)}, parallel=True)
+        pipeline.map(
+            inputs,
+            executor={"z": ProcessPoolExecutor(max_workers=2)},
+            parallel=True,
+            storage="dict",
+        )
 
     # Dict storage with different executors
     r = pipeline.map(
