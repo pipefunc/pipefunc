@@ -184,6 +184,7 @@ def test_eager_scheduler_with_multiple_outputs(tmp_path: Path):
         show_progress=False,
         return_results=True,
         parallel=True,
+        storage="dict",
     )
 
     assert result["out1"].output == "first"
@@ -418,6 +419,7 @@ def test_eager_scheduler_with_long_dependency_chain(tmp_path: Path):
         run_folder=run_folder,
         show_progress=False,
         parallel=True,
+        storage="dict",
     )
     assert result["a"].output == 1
     assert result["b"].output == 2
@@ -472,6 +474,7 @@ def test_eager_scheduler_with_diamond_pattern(tmp_path: Path):
         run_folder=run_folder,
         show_progress=False,
         parallel=True,
+        storage="dict",
     )
 
     assert result["start"].output == 10
