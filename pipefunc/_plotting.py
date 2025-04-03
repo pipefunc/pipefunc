@@ -387,7 +387,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     )
 
     hints = _all_type_annotations(graph)
-    edge_labels_info = _Labels.from_graph(graph)
+    labels = _Labels.from_graph(graph)
 
     # Node defaults and configurations
     node_defaults = {
@@ -473,7 +473,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             node,
             hints,
             defaults,
-            edge_labels_info.arg_mapspec,
+            labels.arg_mapspec,
             include_full_mapspec,
             None,  # target_func
             False,  # is_grouped
@@ -495,7 +495,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 params_list,
                 hints,
                 defaults,
-                edge_labels_info.arg_mapspec,
+                labels.arg_mapspec,
                 include_full_mapspec=False,  # not relevant for grouped params
                 target_func=node,  # this PipeFunc
                 is_grouped=True,
@@ -528,28 +528,28 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         # Determine edge properties for non-grouped sources
         if isinstance(a, PipeFunc):
             edge_color = edge_colors["output"]
-            if (a, b) in edge_labels_info.outputs_mapspec:
+            if (a, b) in labels.outputs_mapspec:
                 edge_color = edge_colors["output_mapspec"]
-                label = edge_labels_info.outputs_mapspec[(a, b)]
-            elif (a, b) in edge_labels_info.outputs:
-                label = edge_labels_info.outputs[(a, b)]
+                label = labels.outputs_mapspec[(a, b)]
+            elif (a, b) in labels.outputs:
+                label = labels.outputs[(a, b)]
             else:
                 label = ", ".join(at_least_tuple(graph.edges[(a, b)].get("arg", "?")))
         elif isinstance(a, str):  # Regular ungrouped input parameter
             edge_color = edge_colors["input"]
-            if (a, b) in edge_labels_info.inputs_mapspec:
+            if (a, b) in labels.inputs_mapspec:
                 edge_color = edge_colors["input_mapspec"]
-                label = edge_labels_info.inputs_mapspec[(a, b)]
-            elif (a, b) in edge_labels_info.inputs:
-                label = edge_labels_info.inputs[(a, b)]
+                label = labels.inputs_mapspec[(a, b)]
+            elif (a, b) in labels.inputs:
+                label = labels.inputs[(a, b)]
             else:
                 label = a
         elif isinstance(a, _Bound):
             edge_color = edge_colors["bound"]
-            label = edge_labels_info.bound[(a, b)]
+            label = labels.bound[(a, b)]
         elif isinstance(a, _Resources):
             edge_color = edge_colors["resources"]
-            label = edge_labels_info.resources[(a, b)]
+            label = labels.resources[(a, b)]
         else:
             continue
 
