@@ -197,15 +197,14 @@ def _generate_node_label(
         assert isinstance(node, list)
         assert target_func is not None
         title = f"Grouped Inputs ({target_func.__name__})"
-        label = f'<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0"><TR><TD BORDER="0"><B>{title}</B></TD></TR><HR/>'
-        for param_name in node:
-            type_string = type_as_string(hints[param_name]) if param_name in hints else None
-            default_value = defaults.get(param_name, _empty) if defaults else _empty
-            mapspec = arg_mapspec.get(param_name)
-            display_name = mapspec or param_name
-            formatted_label = _format_type_and_default(display_name, type_string, default_value)
-            # Use ALIGN="LEFT" for better readability in the table
-            label += f'<TR><TD ALIGN="LEFT">{formatted_label}</TD></TR>'
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
+        # for param_name in node:
+        #     type_string = type_as_string(hints[param_name]) if param_name in hints else None
+        #     default_value = defaults.get(param_name, _empty) if defaults else _empty
+        #     mapspec = arg_mapspec.get(param_name)
+        #     display_name = mapspec or param_name
+        #     formatted_label = _format_type_and_default(display_name, type_string, default_value)
+        #     label += f"<TR><TD>{formatted_label}</TD></TR>"
         label += "</TABLE>"
         return label
 
@@ -222,10 +221,10 @@ def _generate_node_label(
         name = str(node).split(" → ")[0]
         if isinstance(node, CollapsedScope):
             assert node.function_name is not None
-            content = f"Scope: {html.escape(node.function_name)}"
+            title = f"Scope: {html.escape(node.function_name)}"
         else:
-            content = html.escape(name)
-        label = f'<TABLE BORDER="0"><TR><TD><B>{content}</B></TD></TR><HR/>'
+            title = html.escape(name)
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
 
         for i, output in enumerate(at_least_tuple(node.output_name)):
             name = str(node.mapspec.outputs[i]) if node.mapspec else output
@@ -360,9 +359,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
 
     # Find exclusive parameters for grouping
     grouped_params, params_to_group = find_exclusive_parameters(graph)
-    grouped_node_names = {
-        target_func: f"__group_{id(target_func)}" for target_func in grouped_params
-    }
+    grouped_node_names = {target_func: f"group_{id(target_func)}" for target_func in grouped_params}
 
     graph_attr: dict[str, Any] = {
         "rankdir": orient,
@@ -382,14 +379,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         comment="Graph Visualization",
         graph_attr=graph_attr,
         node_attr={
-            "shape": "plaintext",
+            "shape": "rectangle",
             "fontname": style.font_name,
             "fontsize": str(style.font_size),
-            "style": "filled",
-        },
-        edge_attr={
-            "fontname": style.font_name,
-            "fontsize": str(style.edge_font_size),
         },
         **graphviz_kwargs,
     )
@@ -399,14 +391,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
 
     # Node defaults and configurations
     node_defaults = {
-        "width": "0",
-        "height": "0",
-        "margin": "0.1",
+        "width": "0.75",
+        "height": "0.5",
+        "margin": "0.05",
         "penwidth": "1",
-        "color": "black",
+        "color": "black",  # Border color
     }
 
-    # Node configurations for styling and legend
+    # Define a mapping for node configurations
     node_configs = {
         "Argument": {
             "fillcolor": style.arg_node_color,
@@ -504,9 +496,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 hints,
                 defaults,
                 edge_labels_info.arg_mapspec,
-                False,  # include_full_mapspec not relevant for grouped params
-                node,  # target_func is this PipeFunc
-                True,  # is_grouped
+                include_full_mapspec=False,  # not relevant for grouped params
+                target_func=node,  # this PipeFunc
+                is_grouped=True,
             )
             group_config = node_configs["Grouped Inputs"]
             group_attribs = {**node_defaults, **group_config, "label": group_label}
