@@ -24,6 +24,7 @@ def test_linear_pipeline_would_create_cycle() -> None:
 
     assert _would_create_cycle(pipeline.graph, [pipeline["x"], pipeline["z"]])
     assert not _would_create_cycle(pipeline.graph, [pipeline["x"], pipeline["y"]])
+    assert not _would_create_cycle(pipeline.graph, [pipeline["x"]])
     assert not _would_create_cycle(pipeline.graph, [pipeline["y"], pipeline["z"]])
     assert not _would_create_cycle(pipeline.graph, [pipeline["x"], pipeline["y"], pipeline["z"]])
     new_graph = collapsed_scope_graph(pipeline.graph, ["scope"])
