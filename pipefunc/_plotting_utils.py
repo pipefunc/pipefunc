@@ -182,25 +182,16 @@ def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
     for params in groups_to_create.values():
         params_in_any_group.update(params)
 
-    # Process each group
     for target_func, params_list in groups_to_create.items():
-        # Create the new grouped node (tuple of sorted names)
         grouped_node = _GroupedArgs(args=tuple(sorted(params_list)))
 
-        # Add the new node and the edge to the target function
         if grouped_node not in new_graph:  # Should not exist yet
             new_graph.add_node(grouped_node)
-        # Add edge from the *new* grouped node to the target function
-        # Preserve original edge data if needed (e.g., 'arg'), though less relevant here.
-        # For simplicity, add a basic edge. Labeling happens during plotting.
         new_graph.add_edge(grouped_node, target_func)
 
-        # Remove the original individual parameter nodes and their edges
         for param_name in params_list:
-            # Remove edge first to avoid errors if node is removed before edge
             if new_graph.has_edge(param_name, target_func):
                 new_graph.remove_edge(param_name, target_func)
-            # Remove node only if it's still in the graph (might be shared, though unlikely for exclusive)
             if new_graph.has_node(param_name):
                 new_graph.remove_node(param_name)
 

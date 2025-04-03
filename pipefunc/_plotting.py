@@ -198,9 +198,7 @@ def _generate_node_label(
         return " ".join(parts)
 
     if isinstance(node, _GroupedArgs):
-        title = "Grouped Inputs"
-        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
-
+        label = '<TABLE BORDER="0">'
         for param_name in node.args:
             type_string = type_as_string(hints[param_name]) if param_name in hints else None
             default_value = defaults.get(param_name, _empty) if defaults else _empty
