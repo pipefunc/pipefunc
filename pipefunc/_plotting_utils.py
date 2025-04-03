@@ -39,7 +39,7 @@ def _functions_from_graph(graph: nx.DiGraph) -> list[PipeFunc]:
     return [node for node in graph.nodes() if isinstance(node, PipeFunc)]
 
 
-def _get_collapsed_scope_graph(
+def collapsed_scope_graph(
     graph: nx.DiGraph,
     scopes_to_collapse: Literal[True] | Sequence[ScopeName],
 ) -> nx.DiGraph:
@@ -130,13 +130,3 @@ def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) ->
         return True  # Cycle found  # noqa: TRY300
     except nx.NetworkXNoCycle:
         return False  # No cycle
-
-
-def maybe_collapse_scope(
-    graph: nx.DiGraph,
-    collapse_scopes: bool | Sequence[str],
-) -> nx.DiGraph:
-    """Return a new Pipeline instance with collapsed scopes if requested."""
-    if collapse_scopes:
-        return _get_collapsed_scope_graph(graph, collapse_scopes)
-    return graph

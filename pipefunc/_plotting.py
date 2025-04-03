@@ -13,7 +13,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
-from pipefunc._plotting_utils import CollapsedScope, maybe_collapse_scope
+from pipefunc._plotting_utils import CollapsedScope, collapsed_scope_graph
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
@@ -322,7 +322,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     import graphviz
 
     if collapse_scopes:
-        graph = maybe_collapse_scope(graph, collapse_scopes)
+        graph = collapsed_scope_graph(graph, collapse_scopes)
 
     if style is None:
         style = GraphvizStyle()

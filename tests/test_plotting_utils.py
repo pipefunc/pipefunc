@@ -1,7 +1,7 @@
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc._plotting_utils import _get_collapsed_scope_graph, _would_create_cycle
+from pipefunc._plotting_utils import _would_create_cycle, collapsed_scope_graph
 
 
 def test_linear_pipeline_would_create_cycle() -> None:
@@ -26,7 +26,7 @@ def test_linear_pipeline_would_create_cycle() -> None:
     assert not _would_create_cycle(pipeline.graph, [pipeline["x"], pipeline["y"]])
     assert not _would_create_cycle(pipeline.graph, [pipeline["y"], pipeline["z"]])
     assert not _would_create_cycle(pipeline.graph, [pipeline["x"], pipeline["y"], pipeline["z"]])
-    new_graph = _get_collapsed_scope_graph(pipeline.graph, ["scope"])
+    new_graph = collapsed_scope_graph(pipeline.graph, ["scope"])
     assert len(pipeline.graph.nodes) == 3
     assert len(new_graph.nodes) == 3  # No change
 
@@ -46,7 +46,7 @@ def test_get_collapsed_scope_graph() -> None:
 
     pipeline = Pipeline([f, g, h])
     pipeline.update_scope("scope", inputs="*", outputs="*")
-    new_graph = _get_collapsed_scope_graph(pipeline.graph, ["scope"])
+    new_graph = collapsed_scope_graph(pipeline.graph, ["scope"])
     assert len(new_graph.nodes) == 1
 
 
@@ -60,7 +60,7 @@ def test_get_collapsed_scope_graph_each_scope_only_once() -> None:
         return 2 * x
 
     pipeline = Pipeline([f, g])
-    new_graph = _get_collapsed_scope_graph(pipeline.graph, ["scope"])
+    new_graph = collapsed_scope_graph(pipeline.graph, ["scope"])
     assert len(pipeline.graph.nodes) == 2 + 2  # 2 functions + 2 inputs
     assert len(new_graph.nodes) == 2 + 2  # no change
 
@@ -77,7 +77,7 @@ def test_nested_pipefunc_uncombinable_mapspecs() -> None:
     pipeline = Pipeline([f, g])
     pipeline.update_scope("foo", inputs={"a", "b"}, outputs={"c", "d"})
 
-    graph = _get_collapsed_scope_graph(pipeline.graph, scopes_to_collapse=True)
+    graph = collapsed_scope_graph(pipeline.graph, scopes_to_collapse=True)
     assert len(graph.nodes()) == 4
 
     pipeline = Pipeline([f, g])
