@@ -164,22 +164,7 @@ def create_grouped_parameter_graph(
     graph: nx.DiGraph,
     min_arg_group_size: int | None,
 ) -> nx.DiGraph:
-    """Group exclusive input parameters for a function.
-
-    Parameters
-    ----------
-    graph
-        The directed graph representing the pipeline.
-    min_arg_group_size
-        The minimum number of parameters in a group to be grouped. If None, no grouping is done.
-
-    Returns
-    -------
-    nx.DiGraph
-        A new graph with grouped parameter nodes replacing individual parameter nodes
-        where applicable.
-
-    """
+    """New graph with grouped exclusive input parameters for a function."""
     new_graph = graph.copy()
     if min_arg_group_size is None:
         return new_graph
