@@ -219,3 +219,17 @@ def test_visualize_graphviz_with_typing():
 
     pipeline = Pipeline([f, g])
     pipeline.visualize_graphviz(return_type="html")
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+def test_collapse_scope_plot_with_mapspecs():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]")
+    def g(c: int) -> int:
+        return c * 2
+
+    pipeline = Pipeline([f, g], scope="foo")
+    pipeline.visualize_graphviz(collapse_scopes=True)

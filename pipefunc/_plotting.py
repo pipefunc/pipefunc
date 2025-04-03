@@ -569,9 +569,6 @@ def visualize_matplotlib(
     def func_with_mapspec(func: PipeFunc) -> str:
         """Add mapspec to function output if applicable."""
         s = str(func)
-        if isinstance(func, CollapsedScope):
-            assert func.function_name is not None
-            s = s.replace(func.function_name, f"Scope: {func.function_name}")
         if not func.mapspec:
             return s
         for spec in func.mapspec.outputs:
