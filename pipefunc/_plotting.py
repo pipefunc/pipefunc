@@ -5,7 +5,7 @@ import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
 
 import networkx as nx
 import numpy as np
@@ -16,6 +16,7 @@ from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
     CollapsedScope,
     collapsed_scope_graph,
+    find_exclusive_parameters,
 )
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
@@ -160,12 +161,17 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
+NodeType = Union[str, PipeFunc, _Bound, _Resources, NestedPipeFunc, CollapsedScope, list[str]]
+
+
 def _generate_node_label(
-    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope,
+    node: NodeType,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
     include_full_mapspec: bool,  # noqa: FBT001
+    target_func: PipeFunc | None = None,
+    is_grouped: bool = False,
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -186,6 +192,22 @@ def _generate_node_label(
             parts.append(f" = {default_value}")
 
         return " ".join(parts)
+
+    if is_grouped:  # Handle grouped parameters
+        assert isinstance(node, list)
+        assert target_func is not None
+        title = f"Grouped Inputs ({target_func.__name__})"
+        label = f'<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0"><TR><TD BORDER="0"><B>{title}</B></TD></TR><HR/>'
+        for param_name in node:
+            type_string = type_as_string(hints[param_name]) if param_name in hints else None
+            default_value = defaults.get(param_name, _empty) if defaults else _empty
+            mapspec = arg_mapspec.get(param_name)
+            display_name = mapspec or param_name
+            formatted_label = _format_type_and_default(display_name, type_string, default_value)
+            # Use ALIGN="LEFT" for better readability in the table
+            label += f'<TR><TD ALIGN="LEFT">{formatted_label}</TD></TR>'
+        label += "</TABLE>"
+        return label
 
     if isinstance(node, _Bound | _Resources):
         return f"<b>{html.escape(node.name)}</b>"
@@ -246,6 +268,7 @@ class GraphvizStyle:
     bound_node_color: str = _COLORS["red"]
     resources_node_color: str = _COLORS["orange"]
     collapsed_scope_node_color: str = _COLORS["blue"]
+    grouped_args_node_color: str = _COLORS["lightgreen"]
     # Edges
     arg_edge_color: str | None = None  # default is arg_node_color
     output_edge_color: str | None = None  # default is func_node_color
@@ -253,6 +276,7 @@ class GraphvizStyle:
     resources_edge_color: str | None = None  # default is resources_node_color
     input_mapspec_edge_color: str = _COLORS["darkgreen"]
     output_mapspec_edge_color: str = _COLORS["blue"]
+    grouped_args_edge_color: str | None = None  # default uses node color
     # Font
     font_name: str = "Helvetica"
     font_size: int = 12
@@ -332,6 +356,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if graphviz_kwargs is None:
         graphviz_kwargs = {}
 
+    grouped_params, params_to_group = find_exclusive_parameters(graph)
+    grouped_node_names = {
+        target_func: f"__group_{id(target_func)}" for target_func in grouped_params
+    }
+
     graph_attr: dict[str, Any] = {
         "rankdir": orient,
         "fontsize": str(style.font_size),
@@ -359,7 +388,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     nodes = _Nodes.from_graph(graph)
     labels = _Labels.from_graph(graph)
 
-    # Define a mapping for node configurations
+    # Define node configuration
     node_types: dict[str, tuple[list, dict]] = {
         "Argument": (
             nodes.arg,
@@ -401,6 +430,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             nodes.resources,
             {"fillcolor": style.resources_node_color, "shape": "hexagon", "style": "filled"},
         ),
+        "GroupedInputs": (
+            [],  # No pre-collected nodes
+            {
+                "fillcolor": style.grouped_args_node_color,
+                "shape": "note",
+                "style": "filled",
+            },
+        ),
     }
     node_defaults = {
         "width": "0.75",
@@ -409,23 +446,52 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "penwidth": "1",
         "color": "black",  # Border color
     }
-    # Add nodes to visual graph
+
+    # Add grouped parameter nodes
     legend_items: dict[str, dict[str, Any]] = {}
+    if grouped_params:
+        legend_items["Grouped Inputs"] = node_types["GroupedInputs"][1]
+
+    for target_func, params in grouped_params.items():
+        grouped_node_name = grouped_node_names[target_func]
+        label = _generate_node_label(
+            params,
+            hints,
+            defaults,
+            labels.arg_mapspec,
+            False,  # include_full_mapspec not relevant for grouped params
+            target_func,
+            True,  # is_grouped
+        )
+        attribs = dict(node_defaults, **node_types["GroupedInputs"][1], label=label)
+        digraph.node(grouped_node_name, **attribs)
+
+    # Add regular nodes (skip grouped parameters)
     for legend_label, (nodelist, config) in node_types.items():
+        if legend_label == "GroupedInputs":
+            continue  # Already handled above
+
         if nodelist:  # Only add legend entry if nodes of this type exist
             legend_items[legend_label] = config
+
         for node in nodelist:  # type: ignore[attr-defined]
+            # Skip parameters that are part of a group
+            if isinstance(node, str) and node in params_to_group:
+                continue
+
             label = _generate_node_label(
                 node,
                 hints,
                 defaults,
                 labels.arg_mapspec,
                 include_full_mapspec,
+                None,  # target_func
+                False,  # is_grouped
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
 
-    # Add edges and labels with function outputs
+    # Add edges and labels
     edge_colors: dict[str, str | None] = {
         "outputs": style.output_edge_color,
         "outputs_mapspec": style.output_mapspec_edge_color,
@@ -433,9 +499,53 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "inputs_mapspec": style.input_mapspec_edge_color,
         "bound": style.bound_edge_color,
         "resources": style.resources_edge_color,
+        "grouped": style.grouped_args_edge_color,
     }
+
+    # Track processed group edges to avoid duplicates
+    processed_grouped_edges = set()
+
     for edge in graph.edges:
         a, b = edge
+
+        # Skip individual parameters that are part of a group
+        if isinstance(a, str) and a in params_to_group:
+            # Get the target function (b must be a PipeFunc)
+            target_func = b
+            assert isinstance(target_func, PipeFunc)
+
+            # Get the group node name
+            group_node_name = grouped_node_names[target_func]
+
+            # Check if we've already processed this group->target edge
+            edge_key = (group_node_name, str(target_func))
+            if edge_key in processed_grouped_edges:
+                continue
+
+            # Add an edge from the group node to the target function
+            edge_color = edge_colors["grouped"] or style.grouped_args_node_color
+
+            # Create a label that shows all params in the group
+            label = ", ".join(grouped_params[target_func])
+            if len(label) > 30:
+                label = f"{len(grouped_params[target_func])} inputs"
+
+            digraph.edge(
+                group_node_name,
+                str(target_func),
+                color=edge_color,
+                label=label,
+                tooltip=f"<<b>{html.escape(label)}</b>>",
+                penwidth="1.01",
+                fontcolor="black" if len(label) < 20 else "transparent",
+                fontname=style.font_name,
+                fontsize=str(style.edge_font_size),
+            )
+
+            processed_grouped_edges.add(edge_key)
+            continue
+
+        # Normal edge processing for non-grouped parameters
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
         elif isinstance(a, PipeFunc):
@@ -445,6 +555,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         else:
             assert isinstance(a, _Resources)
             edge_color = edge_colors["resources"] or style.resources_node_color
+
         if edge in labels.outputs_mapspec:
             edge_color = edge_colors["outputs_mapspec"]  # type: ignore[assignment]
             label = labels.outputs_mapspec[edge]
@@ -472,6 +583,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
             fontsize=str(style.edge_font_size),
         )
 
+    # Create legend
     if show_legend and legend_items:
         legend_subgraph = graphviz.Digraph(
             name="cluster_legend",
@@ -486,13 +598,29 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 "fillcolor": style.legend_background_color,
             },
         )
-        for i, (name, config) in enumerate(legend_items.items()):
+
+        # Sort legend items for consistent display
+        sorted_legend_items = dict(sorted(legend_items.items()))
+        prev_node_name = None
+
+        for i, (name, config) in enumerate(sorted_legend_items.items()):
             node_name = f"legend_{i}"
-            attribs = {**node_defaults, "label": name, **config}
-            del attribs["margin"]  # Remove margin for legend nodes, to make them more compact
+            attribs = dict(node_defaults, label=name, **config)
+
+            # Handle special shapes for legend items
+            if name == "Grouped Inputs":
+                attribs["shape"] = "note"
+
+            # Remove margin for legend nodes for more compact display
+            if "margin" in attribs:
+                del attribs["margin"]
+
             legend_subgraph.node(node_name, **attribs)
-            if i > 0:
-                legend_subgraph.edge(f"legend_{i - 1}", node_name, style="invis")
+
+            if prev_node_name is not None:
+                legend_subgraph.edge(prev_node_name, node_name, style="invis")
+
+            prev_node_name = node_name
 
         digraph.subgraph(legend_subgraph)
 
