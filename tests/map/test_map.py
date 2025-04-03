@@ -327,6 +327,7 @@ def test_simple_from_step(tmp_path: Path) -> None:
         run_folder=tmp_path,
         internal_shapes={"x": (4,)},
         parallel=False,
+        storage="dict",
     )
     assert results["sum"].output == 12
     assert results["sum"].output_name == "sum"
@@ -443,6 +444,7 @@ def test_simple_from_step_nd(tmp_path: Path) -> None:
         run_folder=tmp_path,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         parallel=False,
+        storage="dict",
     )
     assert results["sum"].output == 21.0
     assert results["sum"].output_name == "sum"
@@ -624,20 +626,38 @@ def test_pipeline_loading_existing_results(tmp_path: Path) -> None:
     pipeline = Pipeline([(f, "x[i] -> z[i]"), g, h])
     inputs = {"x": [1, 2, 3]}
 
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results["sum_"].output == 9
     assert results["r1"].output == -9
     assert results["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
-    results2 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    results2 = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=False,
+        parallel=False,
+        storage="dict",
+    )
     assert results2["sum_"].output == 9
     assert results2["sum_"].output_name == "sum_"
     assert counters["f"] == 3
     assert counters["g"] == 1
 
-    results3 = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results3 = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results3["sum_"].output == 9
     assert results3["sum_"].output_name == "sum_"
     assert counters["f"] == 6
@@ -654,7 +674,13 @@ def test_run_info_compare(tmp_path: Path) -> None:
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3]}
 
-    results = pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        cleanup=True,
+        parallel=False,
+        storage="dict",
+    )
     assert results["z"].output.tolist() == [2, 3, 4]
     assert results["z"].output_name == "z"
     load_xarray_dataset(run_folder=tmp_path)
@@ -662,7 +688,7 @@ def test_run_info_compare(tmp_path: Path) -> None:
 
     inputs = {"x": [1, 2, 3, 4]}
     with pytest.raises(ValueError, match="Shapes do not match previous run"):
-        pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+        pipeline.map(inputs, run_folder=tmp_path, cleanup=False, parallel=False, storage="dict")
 
 
 def test_nd_input_list(tmp_path: Path) -> None:
@@ -825,8 +851,9 @@ def test_reusing_axis_names_and_double_map_reduce(tmp_path: Path) -> None:
     results = pipeline.map(
         {"x": [1, 2, 3], "z": 1},
         run_folder=tmp_path,
-        parallel=False,
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
+        parallel=False,
+        storage="dict",
     )
     assert results["y"].output.tolist() == [1, 2, 3]
     assert results["yz"].output.tolist() == [2, 3, 4]
@@ -868,8 +895,8 @@ def test_from_step_2_dim_array_2(storage: str, tmp_path: Path) -> None:
         inputs,
         tmp_path,
         internal_shapes,  # type: ignore[arg-type]
-        storage=storage,
         parallel=False,
+        storage=storage,
     )
     assert results["c"].output.shape == (2, 2)
     assert results["c"].store is not None
@@ -1066,6 +1093,7 @@ def test_growing_axis(tmp_path: Path) -> None:
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
         run_folder=tmp_path,
         parallel=False,
+        storage="dict",
     )
 
 
@@ -1200,6 +1228,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": slice(1, None), "j": 0},
         parallel=False,
+        storage="dict",
     )
     assert y[slice(1, None), 0].tolist() == [6, 8]
     assert results["z"].output.tolist() == [
@@ -1213,6 +1242,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": slice(2, 0, -1), "j": slice(1, None)},
         parallel=False,
+        storage="dict",
     )
     assert y[slice(2, 0, -1), slice(1, None)].tolist() == [[9], [7]]
     assert results["z"].output.tolist() == [
@@ -1226,6 +1256,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
         tmp_path,
         fixed_indices={"i": 2, "j": 0},
         parallel=False,
+        storage="dict",
     )
     assert results["z"].output.tolist() == [[None, None], [None, None], [(3, 8), None]]
 
@@ -1235,6 +1266,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
             tmp_path,
             fixed_indices={"i": 2000, "j": 1},
             parallel=False,
+            storage="dict",
         )
 
     with pytest.raises(
@@ -1246,6 +1278,7 @@ def test_fixed_indices(tmp_path: Path) -> None:
             tmp_path,
             fixed_indices={"not_an_index": 0},
             parallel=False,
+            storage="dict",
         )
 
 
@@ -1456,8 +1489,8 @@ def test_internal_shapes(storage: str, tmp_path: Path) -> None:
         inputs,
         tmp_path if storage == "file_array" else None,
         internal_shapes,  # type: ignore[arg-type]
-        storage=storage,
         parallel=False,
+        storage=storage,
     )
     assert results["r"].output.shape == (2, 4, 5)
 
@@ -1610,9 +1643,9 @@ def test_pipeline_with_heterogeneous_storage(tmp_path: Path) -> None:
     }
     results = pipeline.map(
         inputs,
+        run_folder=tmp_path,
         parallel=False,
         storage=storage,
-        run_folder=tmp_path,
     )
     assert results["y1"].output.tolist() == [0, 1, 2]
     assert results["z"].output.tolist() == [2, 3, 4]
@@ -1779,15 +1812,15 @@ def test_pipeline_loading_existing_results_with_internal_shape(
     pipeline = Pipeline([f, g])
     inputs = {"x": 1}
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=True, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=False)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=False, parallel=False, storage="dict")
     assert counters["f"] == 1
     assert counters["g"] == 10
 
-    pipeline.map(inputs, run_folder=tmp_path, parallel=False, cleanup=True)
+    pipeline.map(inputs, run_folder=tmp_path, cleanup=True, parallel=False, storage="dict")
     assert counters["f"] == 2
     assert counters["g"] == 20
 
@@ -1895,6 +1928,7 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
         auto_subpipeline=True,
         show_progress=False,
         parallel=False,
+        storage="dict",
     )
 
     assert result["final"].output == "Used direct_value"
@@ -1909,4 +1943,5 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
             auto_subpipeline=False,
             show_progress=False,
             parallel=False,
+            storage="dict",
         )
