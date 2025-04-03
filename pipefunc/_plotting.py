@@ -5,7 +5,7 @@ import inspect
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
 
 import networkx as nx
 import numpy as np
@@ -13,7 +13,11 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
-from pipefunc._plotting_utils import CollapsedScope, collapsed_scope_graph
+from pipefunc._plotting_utils import (
+    CollapsedScope,
+    collapsed_scope_graph,
+    create_grouped_parameter_graph,
+)
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
@@ -157,8 +161,11 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
+NodeType = Union[str, PipeFunc, _Bound, _Resources, NestedPipeFunc, CollapsedScope, tuple[str, ...]]
+
+
 def _generate_node_label(
-    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope,
+    node: NodeType,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
@@ -184,6 +191,21 @@ def _generate_node_label(
 
         return " ".join(parts)
 
+    if isinstance(node, tuple):  # Handle grouped parameters
+        title = "Grouped Inputs"
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR>'
+
+        for param_name in node:
+            type_string = type_as_string(hints[param_name]) if param_name in hints else None
+            default_value = defaults.get(param_name, _empty) if defaults else _empty
+            mapspec = arg_mapspec.get(param_name)
+            display_name = mapspec or param_name
+            formatted_label = _format_type_and_default(display_name, type_string, default_value)
+            label += f"<TR><TD>{formatted_label}</TD></TR>"
+
+        label += "</TABLE>"
+        return label
+
     if isinstance(node, _Bound | _Resources):
         return f"<b>{html.escape(node.name)}</b>"
 
@@ -197,10 +219,10 @@ def _generate_node_label(
         name = str(node).split(" → ")[0]
         if isinstance(node, CollapsedScope):
             assert node.function_name is not None
-            content = f"Scope: {html.escape(node.function_name)}"
+            title = f"Scope: {html.escape(node.function_name)}"
         else:
-            content = html.escape(name)
-        label = f'<TABLE BORDER="0"><TR><TD><B>{content}</B></TD></TR><HR/>'
+            title = html.escape(name)
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
 
         for i, output in enumerate(at_least_tuple(node.output_name)):
             name = str(node.mapspec.outputs[i]) if node.mapspec else output
@@ -243,6 +265,7 @@ class GraphvizStyle:
     bound_node_color: str = _COLORS["red"]
     resources_node_color: str = _COLORS["orange"]
     collapsed_scope_node_color: str = _COLORS["blue"]
+    grouped_args_node_color: str = _COLORS["lightgreen"]
     # Edges
     arg_edge_color: str | None = None  # default is arg_node_color
     output_edge_color: str | None = None  # default is func_node_color
@@ -250,6 +273,7 @@ class GraphvizStyle:
     resources_edge_color: str | None = None  # default is resources_node_color
     input_mapspec_edge_color: str = _COLORS["darkgreen"]
     output_mapspec_edge_color: str = _COLORS["blue"]
+    grouped_args_edge_color: str | None = None  # default uses node color
     # Font
     font_name: str = "Helvetica"
     font_size: int = 12
@@ -269,6 +293,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     *,
     figsize: tuple[int, int] | int | None = None,
     collapse_scopes: bool | Sequence[str] = False,
+    group_exclusive_inputs: bool = True,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -293,6 +318,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         Whether to collapse scopes in the graph.
         If ``True``, scopes are collapsed into a single node.
         If a sequence of scope names, only the specified scopes are collapsed.
+    group_exclusive_inputs
+        Whether to group parameters that are used exclusively by a single `PipeFunc`.
     filename
         The filename to save the figure to, if provided.
     style
@@ -324,6 +351,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
+    # Apply parameter grouping if requested
+    if group_exclusive_inputs:
+        graph = create_grouped_parameter_graph(graph)
+    plot_graph = create_grouped_parameter_graph(graph) if group_exclusive_inputs else graph
+
     if style is None:
         style = GraphvizStyle()
     if graphviz_kwargs is None:
@@ -341,6 +373,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         graph_attr["ratio"] = "fill"
     if style.background_color:
         graph_attr["bgcolor"] = style.background_color
+
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",

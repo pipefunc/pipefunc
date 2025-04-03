@@ -130,3 +130,77 @@ def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) ->
         return True  # Cycle found  # noqa: TRY300
     except nx.NetworkXNoCycle:
         return False  # No cycle
+
+
+def _find_exclusive_parameters(graph: nx.DiGraph) -> dict[PipeFunc, list[str]]:
+    grouped_params: dict[PipeFunc, list[str]] = defaultdict(list)
+    all_output_names = {
+        name for func in _functions_from_graph(graph) for name in at_least_tuple(func.output_name)
+    }
+    for node in graph.nodes:
+        # Check if it's an input parameter (string, not an output of another func)
+        if isinstance(node, str) and node not in all_output_names:
+            successors = list(graph.successors(node))
+            # Check if it has exactly one successor which is a PipeFunc
+            if len(successors) == 1 and isinstance(successors[0], PipeFunc):
+                target_func = successors[0]
+                grouped_params[target_func].append(node)
+
+    # Sort the parameters within each group for consistent labeling
+    for func in grouped_params:  # noqa: PLC0206
+        grouped_params[func].sort()
+
+    return {func: params for func, params in grouped_params.items() if len(params) > 1}
+
+
+def create_grouped_parameter_graph(graph: nx.DiGraph) -> nx.DiGraph:
+    """Group exclusive input parameters for a function.
+
+    Creates a new graph where exclusive input parameters for a function
+    (if more than one) are grouped into a single tuple node.
+
+    Parameters
+    ----------
+    graph
+        The directed graph representing the pipeline.
+
+    Returns
+    -------
+    nx.DiGraph
+        A new graph with grouped parameter nodes replacing individual parameter nodes
+        where applicable.
+
+    """
+    new_graph = graph.copy()
+    groups_to_create = _find_exclusive_parameters(graph)
+
+    if not groups_to_create:
+        return new_graph  # Return copy if no grouping needed
+
+    params_in_any_group: set[str] = set()
+    for params in groups_to_create.values():
+        params_in_any_group.update(params)
+
+    # Process each group
+    for target_func, params_list in groups_to_create.items():
+        # Create the new grouped node (tuple of sorted names)
+        grouped_node = tuple(sorted(params_list))
+
+        # Add the new node and the edge to the target function
+        if grouped_node not in new_graph:  # Should not exist yet
+            new_graph.add_node(grouped_node)
+        # Add edge from the *new* grouped node to the target function
+        # Preserve original edge data if needed (e.g., 'arg'), though less relevant here.
+        # For simplicity, add a basic edge. Labeling happens during plotting.
+        new_graph.add_edge(grouped_node, target_func)
+
+        # Remove the original individual parameter nodes and their edges
+        for param_name in params_list:
+            # Remove edge first to avoid errors if node is removed before edge
+            if new_graph.has_edge(param_name, target_func):
+                new_graph.remove_edge(param_name, target_func)
+            # Remove node only if it's still in the graph (might be shared, though unlikely for exclusive)
+            if new_graph.has_node(param_name):
+                new_graph.remove_node(param_name)
+
+    return new_graph
