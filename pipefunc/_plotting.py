@@ -357,9 +357,6 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
-    # Apply parameter grouping if requested
-    if group_exclusive_inputs:
-        graph = create_grouped_parameter_graph(graph)
     plot_graph = create_grouped_parameter_graph(graph) if group_exclusive_inputs else graph
 
     if style is None:
@@ -393,7 +390,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     )
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(plot_graph)
-    labels = _Labels.from_graph(graph)
+    labels = _Labels.from_graph(plot_graph)
 
     # Define a mapping for node configurations
     node_types: dict[str, tuple[list, dict]] = {
@@ -479,7 +476,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "resources": style.resources_edge_color,
         "grouped_args": style.grouped_args_edge_color,
     }
-    for edge in graph.edges:
+    for edge in plot_graph.edges:
         a, b = edge
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
