@@ -41,3 +41,6 @@ def test_simple_sweep(tmp_path: Path) -> None:
     for i, combo in enumerate(sweep.generate()):
         run_folder = tmp_path / f"sweep_{i}"
         results = pipeline.map(combo, run_folder=run_folder, parallel=False, storage="dict")
+        assert results["sum"].output > 0
+        assert results["sum"].output_name == "sum"
+        assert load_outputs("sum", run_folder=run_folder) > 0
