@@ -179,7 +179,7 @@ def create_grouped_parameter_graph(
         params_in_any_group.update(params)
 
     for target_func, params_list in groups_to_create.items():
-        grouped_node = _GroupedArgs(args=tuple(sorted(params_list)))
+        grouped_node = GroupedArgs(args=tuple(sorted(params_list)))
 
         if grouped_node not in new_graph:  # Should not exist yet
             new_graph.add_node(grouped_node)
@@ -195,7 +195,7 @@ def create_grouped_parameter_graph(
 
 
 @dataclass(frozen=True)
-class _GroupedArgs:
+class GroupedArgs:
     """A tuple of exclusive input parameters for a function."""
 
     args: tuple[str, ...]

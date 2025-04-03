@@ -15,7 +15,7 @@ from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
     CollapsedScope,
-    _GroupedArgs,
+    GroupedArgs,
     collapsed_scope_graph,
     create_grouped_parameter_graph,
 )
@@ -62,7 +62,7 @@ class _Nodes:
     """Contains lists of different node types for the purpose of graph visualization."""
 
     arg: list[str] = field(default_factory=list)
-    grouped_args: list[_GroupedArgs] = field(default_factory=list)
+    grouped_args: list[GroupedArgs] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
     collapsed_scope: list[CollapsedScope] = field(default_factory=list)
@@ -73,7 +73,7 @@ class _Nodes:
         """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
-        elif isinstance(node, _GroupedArgs):
+        elif isinstance(node, GroupedArgs):
             self.grouped_args.append(node)
         elif isinstance(node, CollapsedScope):
             self.collapsed_scope.append(node)
@@ -141,7 +141,7 @@ class _Labels(NamedTuple):
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
                     inputs[edge] = a
-            elif isinstance(a, _GroupedArgs):
+            elif isinstance(a, GroupedArgs):
                 inputs[edge] = str(a)
             elif isinstance(a, PipeFunc):
                 output_str = []
@@ -167,7 +167,7 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
-NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | _GroupedArgs
+NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | GroupedArgs
 
 
 def _generate_node_label(
@@ -197,7 +197,7 @@ def _generate_node_label(
 
         return " ".join(parts)
 
-    if isinstance(node, _GroupedArgs):
+    if isinstance(node, GroupedArgs):
         label = '<TABLE BORDER="0">'
         for param_name in node.args:
             type_string = type_as_string(hints[param_name]) if param_name in hints else None
@@ -483,7 +483,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         a, b = edge
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
-        elif isinstance(a, _GroupedArgs):
+        elif isinstance(a, GroupedArgs):
             edge_color = edge_colors["grouped_args"] or style.grouped_args_node_color
         elif isinstance(a, PipeFunc):
             edge_color = edge_colors["outputs"] or style.func_node_color
