@@ -253,7 +253,7 @@ def test_collapse_scope_plot_with_mapspecs():
 @pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
 @pytest.mark.parametrize("min_arg_group_size", [None, 2, 3])
 def test_min_arg_group_size(min_arg_group_size: int | None):
-    @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="foo")
+    @pipefunc(output_name="d", mapspec="foo.a[i] -> foo.d[i]", scope="foo")
     def f(a: int, b: int, c: int) -> int:
         return a + b + c
 
