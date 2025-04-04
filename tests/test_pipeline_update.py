@@ -232,7 +232,7 @@ def test_scope_with_mapspec() -> None:
     assert str(f.mapspec) == "foo.a[i] -> foo.c[i]"
     pipeline = Pipeline([f])
     assert pipeline.mapspecs_as_strings == ["foo.a[i] -> foo.c[i]"]
-    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1}, storage="dict", parallel=False)
+    results = pipeline.map({"foo": {"a": [0, 1, 2]}, "b": 1}, parallel=False, storage="dict")
     assert results["foo.c"].output.tolist() == [1, 2, 3]
 
 
@@ -278,6 +278,6 @@ def test_update_scope_from_faq() -> None:
     pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
     kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
     assert pipeline(**kwargs) == 15
-    results = pipeline.map(inputs=kwargs)
+    results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
