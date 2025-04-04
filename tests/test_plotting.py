@@ -265,6 +265,7 @@ def test_min_arg_group_size(min_arg_group_size: int | None):
     pipeline.visualize_graphviz(min_arg_group_size=min_arg_group_size)
 
 
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
 def test_min_arg_group_size_with_ungroupable():
     @pipefunc(output_name="d")
     def f(a: int) -> int:
