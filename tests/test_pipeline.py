@@ -841,9 +841,9 @@ def test_unpicklable_run_with_mapspec():
     inputs = {"a": [1, 2, 3, 4]}
     r = pipeline.map(
         inputs,
+        executor=ThreadPoolExecutor(max_workers=2),
         parallel=True,
         storage="dict",
-        executor=ThreadPoolExecutor(max_workers=2),
     )
     assert isinstance(r["y"].output, np.ndarray)
     assert r["z"].output.tolist() == [1, 2, 3, 4]

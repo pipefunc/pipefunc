@@ -1723,8 +1723,8 @@ def test_pipeline_with_heterogeneous_executor() -> None:
             "z": ProcessPoolExecutor(max_workers=2),
             "": ThreadPoolExecutor(max_workers=2),
         },
-        storage={"": "dict"},
         parallel=True,
+        storage={"": "dict"},
     )
     thread_names = r["y1"].output.tolist()
     assert len(thread_names) > 1

@@ -170,7 +170,7 @@ def test_loop_over_list_with_elements_with_shape(tmp_path: Path) -> None:
     assert "x" in ds.coords
 
 
-def test_no_inputs_to_xarray(tmp_path: Path):
+def test_no_inputs_to_xarray() -> None:
     @pipefunc(output_name="y")
     def f() -> int:
         return 1
@@ -181,7 +181,7 @@ def test_no_inputs_to_xarray(tmp_path: Path):
     assert "y" in ds.variables
 
 
-def test_to_dataframe(tmp_path: Path):
+def test_to_dataframe() -> None:
     data = {
         "player": ["Player A", "Player B", "Player C", "Player D", "Player E"],
         "at_bats": [200, 300, 330, 250, 175],
