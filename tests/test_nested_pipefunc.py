@@ -25,7 +25,7 @@ def test_nested_pipefunc_defaults() -> None:
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)
     assert pipeline(a=1) == (3, 3)
-    r = pipeline.map(inputs={"a": 1})
+    r = pipeline.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["c"].output == 3
     assert r["d"].output == 3
     nf.update_defaults({"a": 5, "b": 10})
@@ -112,11 +112,11 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
         ValueError,
         match=re.escape("Got extra inputs: `b_` that are not accepted by this pipeline"),
     ):
-        pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
-    r = pipeline_nested_test.map(inputs={"n_": 1})
+        pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000}, parallel=False, storage="dict")
+    r = pipeline_nested_test.map(inputs={"n_": 1}, parallel=False, storage="dict")
     assert r["x"].output == 3
     assert r["y"].output == 6
-    r = pipeline_nested_test.map(inputs={"n_": 1})
+    r = pipeline_nested_test.map(inputs={"n_": 1}, parallel=False, storage="dict")
     assert r["x"].output == 3
     assert r["y"].output == 6
 
@@ -428,7 +428,7 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline1["d"].defaults == {"scope.b": 2}
     assert pipeline1.defaults == {"scope.b": 2}
     assert pipeline1("d", a=1) == 4
-    r = pipeline1.map(inputs={"a": 1})
+    r = pipeline1.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     assert pipeline1.info() == {  # Should not have "c"
         "required_inputs": ("a",),
@@ -443,7 +443,7 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline["d"].defaults == {"scope.b": 2}
     assert pipeline.defaults == {"scope.b": 2}
     assert pipeline("e", a=1) == 5
-    r = pipeline.map(inputs={"a": 1})
+    r = pipeline.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["e"].output == 5
 
 
@@ -458,13 +458,13 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
 
     pipeline = Pipeline([f, g])
     assert pipeline(a=1, b=1) == (1 + (1 + 2)) == 4
-    r = pipeline.map(inputs={"a": 1, "b": 1})
+    r = pipeline.map(inputs={"a": 1, "b": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     nf = NestedPipeFunc([f, g], output_name="d")
     assert nf(a=1, b=1) == 1 + (1 + 2) == 4
     pipeline2 = Pipeline([nf])
     assert pipeline2(a=1, b=1) == 4
-    r = pipeline2.map(inputs={"a": 1, "b": 1})
+    r = pipeline2.map(inputs={"a": 1, "b": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     with pytest.raises(ValueError, match=re.escape("Missing value for argument `b`")):
         pipeline2(a=1)
@@ -472,10 +472,10 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
         ValueError,
         match=re.escape("Missing inputs: `b`"),
     ):
-        pipeline2.map(inputs={"a": 1})
+        pipeline2.map(inputs={"a": 1}, parallel=False, storage="dict")
     pipeline2.update_defaults({"b": 10})
     assert pipeline2(a=1) == 10 + (1 + 2) == 13
-    r = pipeline2.map(inputs={"a": 1})
+    r = pipeline2.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["d"].output == 13
 
 
@@ -497,7 +497,7 @@ def test_nest_bound(scope: str) -> None:
     )
     y = 2 * (2 + 4 + 0) * 1
     assert pipeline_nested_test.run(f"{scope}y", kwargs={f"{scope}n": 4}) == y
-    r = pipeline_nested_test.map(inputs={f"{scope}n": 4})
+    r = pipeline_nested_test.map(inputs={f"{scope}n": 4}, parallel=False, storage="dict")
     assert r[f"{scope}y"].output == y
     with pytest.raises(ValueError, match=re.escape(f"Missing value for argument `{scope}n`")):
         pipeline_nested_test.run(f"{scope}y", kwargs={})
@@ -505,7 +505,7 @@ def test_nest_bound(scope: str) -> None:
         ValueError,
         match=re.escape(f"Missing inputs: `{scope}n`."),
     ):
-        pipeline_nested_test.map(inputs={})
+        pipeline_nested_test.map(inputs={}, parallel=False, storage="dict")
 
 
 def test_annotations_nested_pipefunc() -> None:
@@ -714,7 +714,7 @@ def test_nested_pipefunc_different_scopes_for_outputs() -> None:
     }
 
     # Verify execution
-    r = pipeline.map(inputs={"a": 1, "b": 2})
+    r = pipeline.map(inputs={"a": 1, "b": 2}, parallel=False, storage="dict")
     assert r["scope1.c"].output == 3.5
     assert r["scope2.d"].output == "sum:3"
     assert r["scope1.e"].output == 3

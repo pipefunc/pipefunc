@@ -142,15 +142,14 @@ def test_eager_scheduler_with_mapspec(tmp_path: Path):
     """Test that the eager scheduler works with MapSpec functions."""
     pipeline = Pipeline([multiply_by_two, sum_values])
     run_folder = tmp_path / "mapspec"
-
     inputs = {"x": [1, 2, 3, 4, 5]}
     result = pipeline.map(
         scheduling_strategy="eager",
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
 
     assert result["sum"].output == 30  # 2 + 4 + 6 + 8 + 10 = 30
@@ -184,6 +183,8 @@ def test_eager_scheduler_with_multiple_outputs(tmp_path: Path):
         run_folder=run_folder,
         show_progress=False,
         return_results=True,
+        parallel=True,
+        storage="dict",
     )
 
     assert result["out1"].output == "first"
@@ -202,18 +203,18 @@ def test_eager_scheduler_with_multiple_outputs(tmp_path: Path):
 
 
 # Test with custom executor
-def test_eager_scheduler_with_custom_executor(tmp_path: Path):
+def test_eager_scheduler_with_custom_executor():
     """Test that the eager scheduler works with a custom executor."""
     pipeline = Pipeline([task_a, task_b, task_c, task_d, task_e])
-    run_folder = tmp_path / "custom_executor"
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         result = pipeline.map(
             scheduling_strategy="eager",
             inputs={},
-            run_folder=run_folder,
             executor=executor,
             show_progress=False,
+            parallel=True,
+            storage="dict",
         )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -272,6 +273,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result1["c"].output == "c(b(a))"
@@ -288,6 +291,8 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
         run_folder=run_folder,
         cleanup=False,  # Don't clean up to test caching
         show_progress=False,
+        parallel=False,
+        storage="dict",
     )
 
     assert result2["c"].output == "c(b(a))"
@@ -417,6 +422,8 @@ def test_eager_scheduler_with_long_dependency_chain(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=True,
+        storage="dict",
     )
     assert result["a"].output == 1
     assert result["b"].output == 2
@@ -470,6 +477,8 @@ def test_eager_scheduler_with_diamond_pattern(tmp_path: Path):
         inputs={},
         run_folder=run_folder,
         show_progress=False,
+        parallel=True,
+        storage="dict",
     )
 
     assert result["start"].output == 10
@@ -519,9 +528,9 @@ def test_eager_scheduler_with_different_storage(tmp_path: Path, storage: str):
         scheduling_strategy="eager",
         inputs={},
         run_folder=run_folder,
-        storage=storage,
         show_progress=False,
         parallel=False,
+        storage=storage,
     )
 
     assert result["e"].output == "e(c(a),d(b))"
@@ -550,28 +559,27 @@ def test_eager_scheduler_error_handling(tmp_path: Path):
             inputs={},
             run_folder=run_folder,
             show_progress=False,
+            parallel=True,
+            storage="dict",
         )
 
 
 # Test with persist_memory
 @pytest.mark.parametrize("persist_memory", [True, False])
 def test_eager_scheduler_with_persist_memory(
-    tmp_path: Path,
     persist_memory: bool,  # noqa: FBT001
 ):
     """Test that the eager scheduler respects the persist_memory parameter."""
     pipeline = Pipeline([task_a, task_b])
-    run_folder = tmp_path / f"persist_{persist_memory}"
 
     # Use memory-based storage
     result = pipeline.map(
         scheduling_strategy="eager",
         inputs={},
-        run_folder=run_folder,
-        storage="dict",  # Memory-based storage
         persist_memory=persist_memory,
         show_progress=False,
         parallel=False,
+        storage="dict",
     )
 
     assert result["a"].output == "a"
@@ -619,8 +627,8 @@ def test_eager_scheduler_with_complex_mapspec(tmp_path: Path):
         inputs=inputs,
         run_folder=run_folder,
         show_progress=False,
-        storage="dict",
         parallel=False,
+        storage="dict",
     )
 
     assert result["matrix"].output.tolist() == [[4, 5], [8, 10], [12, 15]]

@@ -191,7 +191,13 @@ def test_slurm_executor_map_exception(
         ValueError,
         match="Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.map_async` instead.",
     ):
-        pipeline.map({}, tmp_path, executor=MockSlurmExecutor(cores_per_node=1))
+        pipeline.map(
+            {},
+            tmp_path,
+            executor=MockSlurmExecutor(cores_per_node=1),
+            parallel=True,
+            storage="dict",
+        )
 
 
 @pytest.mark.asyncio
