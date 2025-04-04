@@ -356,11 +356,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
-    plot_graph = (
-        create_grouped_parameter_graph(graph, min_arg_group_size)
-        if min_arg_group_size is not None and min_arg_group_size > 1
-        else graph
-    )
+    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
 
     if style is None:
         style = GraphvizStyle()
