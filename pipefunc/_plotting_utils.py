@@ -138,13 +138,9 @@ def _find_exclusive_parameters(
     min_arg_group_size: int = 2,
 ) -> dict[PipeFunc, list[str]]:
     grouped_params: dict[PipeFunc, list[str]] = defaultdict(list)
-    all_output_names = {
-        name for func in _functions_from_graph(graph) for name in at_least_tuple(func.output_name)
-    }
+
     for node in graph.nodes:
-        # Check if it's an input parameter (string, not an output of another func)
         if isinstance(node, str):
-            assert node not in all_output_names
             successors = list(graph.successors(node))
             # Check if it has exactly one successor which is a PipeFunc
             if len(successors) == 1 and isinstance(successors[0], PipeFunc):
