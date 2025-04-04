@@ -13,7 +13,12 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc
 from pipefunc._pipeline._base import _Bound, _Resources
-from pipefunc._plotting_utils import CollapsedScope, collapsed_scope_graph
+from pipefunc._plotting_utils import (
+    CollapsedScope,
+    GroupedArgs,
+    collapsed_scope_graph,
+    create_grouped_parameter_graph,
+)
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
 
@@ -57,6 +62,7 @@ class _Nodes:
     """Contains lists of different node types for the purpose of graph visualization."""
 
     arg: list[str] = field(default_factory=list)
+    grouped_args: list[GroupedArgs] = field(default_factory=list)
     func: list[PipeFunc] = field(default_factory=list)
     nested_func: list[NestedPipeFunc] = field(default_factory=list)
     collapsed_scope: list[CollapsedScope] = field(default_factory=list)
@@ -67,6 +73,8 @@ class _Nodes:
         """Appends a node to the appropriate list based on its type."""
         if isinstance(node, str):
             self.arg.append(node)
+        elif isinstance(node, GroupedArgs):
+            self.grouped_args.append(node)
         elif isinstance(node, CollapsedScope):
             self.collapsed_scope.append(node)
         elif isinstance(node, NestedPipeFunc):
@@ -133,6 +141,8 @@ class _Labels(NamedTuple):
                     inputs[edge] = f"{a}={_trim(default_value)}"
                 else:
                     inputs[edge] = a
+            elif isinstance(a, GroupedArgs):
+                inputs[edge] = str(a)
             elif isinstance(a, PipeFunc):
                 output_str = []
                 with_mapspec = False
@@ -157,8 +167,11 @@ class _Labels(NamedTuple):
         return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
+NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | GroupedArgs
+
+
 def _generate_node_label(
-    node: str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope,
+    node: NodeType,
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
@@ -184,6 +197,19 @@ def _generate_node_label(
 
         return " ".join(parts)
 
+    if isinstance(node, GroupedArgs):
+        label = '<TABLE BORDER="0">'
+        for param_name in node.args:
+            type_string = type_as_string(hints[param_name]) if param_name in hints else None
+            default_value = defaults.get(param_name, _empty) if defaults else _empty
+            mapspec = arg_mapspec.get(param_name)
+            display_name = mapspec or param_name
+            formatted_label = _format_type_and_default(display_name, type_string, default_value)
+            label += f"<TR><TD>{formatted_label}</TD></TR>"
+
+        label += "</TABLE>"
+        return label
+
     if isinstance(node, _Bound | _Resources):
         return f"<b>{html.escape(node.name)}</b>"
 
@@ -197,10 +223,10 @@ def _generate_node_label(
         name = str(node).split(" → ")[0]
         if isinstance(node, CollapsedScope):
             assert node.function_name is not None
-            content = f"Scope: {html.escape(node.function_name)}"
+            title = f"Scope: {html.escape(node.function_name)}"
         else:
-            content = html.escape(name)
-        label = f'<TABLE BORDER="0"><TR><TD><B>{content}</B></TD></TR><HR/>'
+            title = html.escape(name)
+        label = f'<TABLE BORDER="0"><TR><TD><B>{title}</B></TD></TR><HR/>'
 
         for i, output in enumerate(at_least_tuple(node.output_name)):
             name = str(node.mapspec.outputs[i]) if node.mapspec else output
@@ -243,6 +269,7 @@ class GraphvizStyle:
     bound_node_color: str = _COLORS["red"]
     resources_node_color: str = _COLORS["orange"]
     collapsed_scope_node_color: str = _COLORS["blue"]
+    grouped_args_node_color: str = _COLORS["lightgreen"]
     # Edges
     arg_edge_color: str | None = None  # default is arg_node_color
     output_edge_color: str | None = None  # default is func_node_color
@@ -250,6 +277,7 @@ class GraphvizStyle:
     resources_edge_color: str | None = None  # default is resources_node_color
     input_mapspec_edge_color: str = _COLORS["darkgreen"]
     output_mapspec_edge_color: str = _COLORS["blue"]
+    grouped_args_edge_color: str | None = None  # default uses node color
     # Font
     font_name: str = "Helvetica"
     font_size: int = 12
@@ -269,6 +297,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     *,
     figsize: tuple[int, int] | int | None = None,
     collapse_scopes: bool | Sequence[str] = False,
+    min_arg_group_size: int | None = None,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -293,6 +322,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         Whether to collapse scopes in the graph.
         If ``True``, scopes are collapsed into a single node.
         If a sequence of scope names, only the specified scopes are collapsed.
+    min_arg_group_size
+        Minimum number of parameters to combine into a single node. Only applies to
+        parameters used exclusively by one PipeFunc. If None, no grouping is performed.
     filename
         The filename to save the figure to, if provided.
     style
@@ -324,6 +356,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
+    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
+
     if style is None:
         style = GraphvizStyle()
     if graphviz_kwargs is None:
@@ -341,6 +375,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         graph_attr["ratio"] = "fill"
     if style.background_color:
         graph_attr["bgcolor"] = style.background_color
+
     # Graphviz Setup
     digraph = graphviz.Digraph(
         comment="Graph Visualization",
@@ -353,8 +388,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         **graphviz_kwargs,
     )
     hints = _all_type_annotations(graph)
-    nodes = _Nodes.from_graph(graph)
-    labels = _Labels.from_graph(graph)
+    nodes = _Nodes.from_graph(plot_graph)
+    labels = _Labels.from_graph(plot_graph)
 
     # Define a mapping for node configurations
     node_types: dict[str, tuple[list, dict]] = {
@@ -364,6 +399,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 "fillcolor": style.arg_node_color,
                 "shape": "rectangle",
                 "style": "filled,dashed",
+            },
+        ),
+        "GroupedArgs": (
+            nodes.grouped_args,
+            {
+                "fillcolor": style.grouped_args_node_color,
+                "shape": "rectangle",
+                "style": "filled,solid",
             },
         ),
         "PipeFunc": (
@@ -430,11 +473,14 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         "inputs_mapspec": style.input_mapspec_edge_color,
         "bound": style.bound_edge_color,
         "resources": style.resources_edge_color,
+        "grouped_args": style.grouped_args_edge_color,
     }
-    for edge in graph.edges:
+    for edge in plot_graph.edges:
         a, b = edge
         if isinstance(a, str):
             edge_color = edge_colors["inputs"] or style.arg_node_color
+        elif isinstance(a, GroupedArgs):
+            edge_color = edge_colors["grouped_args"] or style.grouped_args_node_color
         elif isinstance(a, PipeFunc):
             edge_color = edge_colors["outputs"] or style.func_node_color
         elif isinstance(a, _Bound):
@@ -442,6 +488,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         else:
             assert isinstance(a, _Resources)
             edge_color = edge_colors["resources"] or style.resources_node_color
+
         if edge in labels.outputs_mapspec:
             edge_color = edge_colors["outputs_mapspec"]  # type: ignore[assignment]
             label = labels.outputs_mapspec[edge]

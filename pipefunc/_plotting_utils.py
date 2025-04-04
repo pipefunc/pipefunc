@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 import networkx as nx
@@ -130,3 +131,70 @@ def _would_create_cycle(graph: nx.DiGraph, funcs_to_collapse: list[PipeFunc]) ->
         return True  # Cycle found  # noqa: TRY300
     except nx.NetworkXNoCycle:
         return False  # No cycle
+
+
+def _find_exclusive_parameters(
+    graph: nx.DiGraph,
+    min_arg_group_size: int = 2,
+) -> dict[PipeFunc, list[str]]:
+    grouped_params: dict[PipeFunc, list[str]] = defaultdict(list)
+
+    for node in graph.nodes:
+        if isinstance(node, str):
+            successors = list(graph.successors(node))
+            # Check if it has exactly one successor which is a PipeFunc
+            if len(successors) == 1 and isinstance(successors[0], PipeFunc):
+                target_func = successors[0]
+                grouped_params[target_func].append(node)
+
+    # Sort the parameters within each group for consistent labeling
+    for func in grouped_params:  # noqa: PLC0206
+        grouped_params[func].sort()
+
+    return {
+        func: params for func, params in grouped_params.items() if len(params) >= min_arg_group_size
+    }
+
+
+def create_grouped_parameter_graph(
+    graph: nx.DiGraph,
+    min_arg_group_size: int | None,
+) -> nx.DiGraph:
+    """New graph with grouped exclusive input parameters for a function."""
+    new_graph = graph.copy()
+    if min_arg_group_size is None:
+        return new_graph
+    min_arg_group_size = max(min_arg_group_size, 2)
+    groups_to_create = _find_exclusive_parameters(graph, min_arg_group_size)
+
+    if not groups_to_create:
+        return new_graph  # Return copy if no grouping needed
+
+    params_in_any_group: set[str] = set()
+    for params in groups_to_create.values():
+        params_in_any_group.update(params)
+
+    for target_func, params_list in groups_to_create.items():
+        grouped_node = GroupedArgs(args=tuple(sorted(params_list)))
+
+        if grouped_node not in new_graph:  # Should not exist yet
+            new_graph.add_node(grouped_node)
+        new_graph.add_edge(grouped_node, target_func)
+
+        for param_name in params_list:
+            if new_graph.has_edge(param_name, target_func):
+                new_graph.remove_edge(param_name, target_func)
+            if new_graph.has_node(param_name):
+                new_graph.remove_node(param_name)
+
+    return new_graph
+
+
+@dataclass(frozen=True)
+class GroupedArgs:
+    """A tuple of exclusive input parameters for a function."""
+
+    args: tuple[str, ...]
+
+    def __str__(self) -> str:
+        return "-".join(self.args)
