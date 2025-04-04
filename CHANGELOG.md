@@ -5,6 +5,51 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.63.0 (2025-04-04)
+
+### ✨ Enhancements
+
+- Group parameters that are used by a single `PipeFunc` in `visualize_graphviz` ([#700](https://github.com/pipefunc/pipefunc/pull/700))
+
+### 🧪 Testing
+
+- Test with `tmp_path` and always specify `parallel` and `storage` explicitly ([#701](https://github.com/pipefunc/pipefunc/pull/701))
+
+### 📊 Stats
+
+- `.py`: +467 lines, -159 lines
+
+## v0.62.0 (2025-04-03)
+
+### ✨ Enhancements
+
+- Allow collapsing scopes in Graphviz visualization ([#693](https://github.com/pipefunc/pipefunc/pull/693))
+
+### 📊 Stats
+
+- `.py`: +348 lines, -12 lines
+
+## v0.61.0 (2025-04-01)
+
+### ✨ Enhancements
+
+- Add `Pipeline.run(..., allow_unused=True)` ([#698](https://github.com/pipefunc/pipefunc/pull/698))
+
+### 🧹 Maintenance
+
+- Unpin bokeh<3.7 ([#685](https://github.com/pipefunc/pipefunc/pull/685))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.60.0 ([#697](https://github.com/pipefunc/pipefunc/pull/697))
+
+### 📊 Stats
+
+- `.py`: +26 lines, -3 lines
+- `.md`: +55 lines, -0 lines
+- `.yml`: +4 lines, -4 lines
+- `.toml`: +2 lines, -1 lines
+
 ## v0.60.0 (2025-03-28)
 
 ### ✨ Enhancements
