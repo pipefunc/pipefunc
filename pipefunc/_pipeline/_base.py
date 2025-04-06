@@ -1466,7 +1466,13 @@ class Pipeline:
         replace_none_in_axes(mapspecs, non_root_inputs, multi_output_mapping)  # type: ignore[arg-type]
         return create_missing_mapspecs(self.functions, non_root_inputs)  # type: ignore[arg-type]
 
-    def add_mapspec_axis(self, *parameter: str, axis: str) -> None:
+    def add_mapspec_axis(
+        self,
+        *parameter: str,
+        axis: str,
+        start_at: OUTPUT_TYPE | None = None,
+        stop_at: OUTPUT_TYPE | None = None,
+    ) -> None:
         """Add a new axis to ``parameter``'s `MapSpec`.
 
         Parameters
@@ -1477,11 +1483,25 @@ class Pipeline:
             The axis to add to the `MapSpec` of all functions that depends on
             ``parameter``. Provide a new axis name to add a new axis or an
             existing axis name to zip the parameter with the existing axis.
+        start_at
+            The output name of the function where the modification should
+            start. If None, starts from the beginning of the list.
+        stop_at
+            The output name of the function where the modification should
+            stop. If None, continues to the end of the list. The function
+            with this output name IS INCLUDED in the modification.
 
         """
         self._autogen_mapspec_axes()
         for p in parameter:
-            add_mapspec_axis(p, dims={}, axis=axis, functions=self.sorted_functions)
+            add_mapspec_axis(
+                p,
+                dims={},
+                axis=axis,
+                functions=self.sorted_functions,
+                start_at=start_at,
+                stop_at=stop_at,
+            )
         self._clear_internal_cache()
         self.validate()
 
