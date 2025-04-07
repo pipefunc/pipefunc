@@ -799,7 +799,7 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
-        return {name: NoAnnotation for name in self.output_name}
+        return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
     def requires_mapping(self) -> bool:
