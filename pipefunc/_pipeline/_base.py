@@ -1577,6 +1577,7 @@ class Pipeline:
         figsize: tuple[int, int] | int | None = None,
         collapse_scopes: bool | Sequence[str] = False,
         min_arg_group_size: int | None = None,
+        hide_default_args: bool = False,
         filename: str | Path | None = None,
         style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1600,6 +1601,8 @@ class Pipeline:
         min_arg_group_size
             Minimum number of parameters to combine into a single node. Only applies to
             parameters used exclusively by one PipeFunc. If None, no grouping is performed.
+        hide_default_args
+            Whether to hide default arguments in the graph.
         filename
             The filename to save the figure to, if provided.
         style
@@ -1633,6 +1636,7 @@ class Pipeline:
             figsize=figsize,
             collapse_scopes=collapse_scopes,
             min_arg_group_size=min_arg_group_size,
+            hide_default_args=hide_default_args,
             filename=filename,
             style=style,
             orient=orient,

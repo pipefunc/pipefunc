@@ -273,3 +273,13 @@ def test_min_arg_group_size_with_ungroupable():
 
     pipeline = Pipeline([f])
     pipeline.visualize_graphviz(min_arg_group_size=2)
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+def test_hide_default_args():
+    @pipefunc(output_name="d")
+    def f(a: int, b: int = 1) -> int:
+        return a + b
+
+    pipeline = Pipeline([f])
+    pipeline.visualize_graphviz(hide_default_args=True)

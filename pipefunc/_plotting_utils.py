@@ -198,3 +198,15 @@ class GroupedArgs:
 
     def __str__(self) -> str:
         return "-".join(self.args)
+
+
+def hide_default_args_graph(graph: nx.DiGraph, defaults: dict[str, Any]) -> nx.DiGraph:
+    """Hide default arguments in the graph."""
+    new_graph = graph.copy()
+    for key in defaults:
+        if key not in new_graph:  # pragma: no cover
+            # This should not happen!
+            msg = f"Default argument '{key}' not found in graph, please report this as a bug."
+            raise RuntimeError(msg)
+        new_graph.remove_node(key)
+    return new_graph
