@@ -210,3 +210,13 @@ def hide_default_args_graph(graph: nx.DiGraph, defaults: dict[str, Any]) -> nx.D
             raise RuntimeError(msg)
         new_graph.remove_node(key)
     return new_graph
+
+
+def all_unique_output_scopes(graph: nx.DiGraph) -> list[ScopeName]:
+    """Get all unique output scopes in the graph."""
+    scopes = set()
+    for func in _functions_from_graph(graph):
+        scope = _unique_output_scope(func)
+        if scope is not None:
+            scopes.add(scope)
+    return sorted(scopes)

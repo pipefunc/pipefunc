@@ -16,6 +16,7 @@ from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
     CollapsedScope,
     GroupedArgs,
+    all_unique_output_scopes,
     collapsed_scope_graph,
     create_grouped_parameter_graph,
     hide_default_args_graph,
@@ -28,10 +29,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import graphviz
+    import graphviz_anywidget
     import holoviews as hv
     import IPython.display
+    import ipywidgets
     import matplotlib.pyplot as plt
-
 
 _empty = inspect.Parameter.empty
 MAX_LABEL_LENGTH = 20
@@ -165,7 +167,15 @@ class _Labels(NamedTuple):
                 assert isinstance(a, _Resources)
                 resources[edge] = a.name
 
-        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
+        return cls(
+            outputs,
+            outputs_mapspec,
+            inputs,
+            inputs_mapspec,
+            bound,
+            resources,
+            arg_mapspec,
+        )
 
 
 NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | GroupedArgs
@@ -205,7 +215,11 @@ def _generate_node_label(
             default_value = defaults.get(param_name, _empty) if defaults else _empty
             mapspec = arg_mapspec.get(param_name)
             display_name = mapspec or param_name
-            formatted_label = _format_type_and_default(display_name, type_string, default_value)
+            formatted_label = _format_type_and_default(
+                display_name,
+                type_string,
+                default_value,
+            )
             label += f"<TR><TD>{formatted_label}</TD></TR>"
 
         label += "</TABLE>"
@@ -421,7 +435,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         ),
         "PipeFunc": (
             nodes.func,
-            {"fillcolor": style.func_node_color, "shape": "box", "style": "filled,rounded"},
+            {
+                "fillcolor": style.func_node_color,
+                "shape": "box",
+                "style": "filled,rounded",
+            },
         ),
         "NestedPipeFunc": (
             nodes.nested_func,
@@ -445,11 +463,19 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         ),
         "Bound": (
             nodes.bound,
-            {"fillcolor": style.bound_node_color, "shape": "hexagon", "style": "filled"},
+            {
+                "fillcolor": style.bound_node_color,
+                "shape": "hexagon",
+                "style": "filled",
+            },
         ),
         "Resources": (
             nodes.resources,
-            {"fillcolor": style.resources_node_color, "shape": "hexagon", "style": "filled"},
+            {
+                "fillcolor": style.resources_node_color,
+                "shape": "hexagon",
+                "style": "filled",
+            },
         ),
     }
     node_defaults = {
@@ -569,6 +595,152 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         return HTML(html_content)
 
     return digraph
+
+
+def visualize_graphviz_widget(
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None = None,
+    *,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+) -> ipywidgets.VBox:
+    """Create an interactive visualization of the pipeline as a directed graph.
+
+    Creates a widget that allows interactive exploration of the pipeline graph.
+    The widget provides the following interactions:
+
+    - Zoom: Use mouse scroll
+    - Pan: Click and drag
+    - Node selection: Click on nodes to highlight connected nodes
+    - Multi-select: Shift-click on nodes to select multiple routes
+    - Search: Use the search box to highlight matching nodes
+    - Reset view: Press Escape
+
+    Requires the `graphviz-anywidget` package to be installed, which is maintained
+    by the pipefunc authors, see https://github.com/pipefunc/graphviz-anywidget
+
+    Parameters
+    ----------
+    graph
+        The directed graph representing the pipeline.
+    defaults
+        The default values for the pipeline.
+    orient
+        Graph orientation, controlling the main direction of the graph flow.
+        Options are:
+        - 'TB': Top to bottom
+        - 'LR': Left to right
+        - 'BT': Bottom to top
+        - 'RL': Right to left
+    graphviz_kwargs
+        Graphviz-specific keyword arguments for customizing the graph's appearance.
+
+    Returns
+    -------
+    ipywidgets.VBox
+        Interactive widget containing the graph visualization.
+
+    """
+    requires(
+        "graphviz_anywidget",
+        "graphviz",
+        reason="visualize_graphviz_widget",
+        extras="plotting",
+    )
+    import graphviz
+    from graphviz_anywidget import GraphvizAnyWidget, graphviz_widget
+
+    gv_graph = visualize_graphviz(
+        graph,
+        defaults=defaults,
+        orient=orient,
+        graphviz_kwargs=graphviz_kwargs,
+        return_type="graphviz",
+    )
+    assert isinstance(gv_graph, graphviz.Digraph)
+
+    dot_source = _rerender_gv_source(
+        graph,
+        defaults,
+        orient,
+        graphviz_kwargs,
+    )
+    widget = graphviz_widget(dot_source)
+    graphviz_anywidget = widget.children[-1]
+    assert isinstance(graphviz_anywidget, GraphvizAnyWidget)
+    extra_widgets = _extra_widgets(
+        graphviz_anywidget,
+        graph,
+        defaults,
+        orient,
+        graphviz_kwargs,
+    )
+    widget.children = (extra_widgets, *widget.children)
+    return widget
+
+
+def _rerender_gv_source(
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+    show_default_args: bool = True,  # noqa: FBT001, FBT002
+    collapse_scopes: bool | Sequence[str] = False,  # noqa: FBT002
+) -> str:
+    gv_graph = visualize_graphviz(
+        graph,
+        defaults=defaults,
+        orient=orient,
+        collapse_scopes=collapse_scopes,
+        hide_default_args=not show_default_args,
+        graphviz_kwargs=graphviz_kwargs,
+        return_type="graphviz",
+    )
+    return gv_graph.source
+
+
+def _extra_widgets(
+    graphviz_anywidget: graphviz_anywidget.GraphvizAnyWidget,
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+) -> ipywidgets.HBox:
+    """Extra widgets for the graphviz widget."""
+    import ipywidgets
+
+    show_default_args = ipywidgets.Checkbox(value=True, description="Show default args")
+
+    scope_boxes = [
+        ipywidgets.Checkbox(value=True, description=scope)
+        for scope in all_unique_output_scopes(graph)
+    ]
+
+    def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
+        """Observer function to update the widget's dot source."""
+        active_scopes = [box.description for box in scope_boxes if box.value]
+        collapse_all = all(box.value for box in scope_boxes)
+        # Determine if we should collapse based on active scopes or all if none selected specifically
+        collapse_scopes_setting: bool | list[str] = collapse_all or active_scopes
+        if not any(box.value for box in scope_boxes):  # Don't collapse if none are checked
+            collapse_scopes_setting = False
+
+        new_dot_source = _rerender_gv_source(
+            graph,
+            defaults,
+            orient,
+            graphviz_kwargs,
+            show_default_args=show_default_args.value,
+            collapse_scopes=collapse_scopes_setting,
+        )
+        graphviz_anywidget.dot_source = new_dot_source
+
+    # Attach the observer to all checkboxes
+    show_default_args.observe(_update_dot_source, names="value")
+    for box in scope_boxes:
+        box.observe(_update_dot_source, names="value")
+
+    return ipywidgets.HBox([*scope_boxes, show_default_args])
 
 
 def visualize_matplotlib(
@@ -697,10 +869,15 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
     node_index_dict = {node: index for index, node in enumerate(graph.nodes)}
 
     # Extract edge info using the lookup dictionary
-    edges = np.array([(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges])
+    edges = np.array(
+        [(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges],
+    )
 
     # Create Nodes and Graph
-    nodes = hv.Nodes((x, y, node_indices, node_labels, node_types), vdims=["label", "type"])
+    nodes = hv.Nodes(
+        (x, y, node_indices, node_labels, node_types),
+        vdims=["label", "type"],
+    )
     graph = hv.Graph((edges, nodes))
 
     plot_opts = {
@@ -709,7 +886,10 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         "padding": 0.1,
         "xaxis": None,
         "yaxis": None,
-        "node_color": hv.dim("type").categorize({"str": "lightgreen", "func": "skyblue"}, "gray"),
+        "node_color": hv.dim("type").categorize(
+            {"str": "lightgreen", "func": "skyblue"},
+            "gray",
+        ),
         "edge_color": "black",
     }
 
@@ -717,7 +897,11 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    plot = graph * labels.opts(text_font_size="8pt", text_color="black", bgcolor="white")
+    plot = graph * labels.opts(
+        text_font_size="8pt",
+        text_color="black",
+        bgcolor="white",
+    )
     if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None
