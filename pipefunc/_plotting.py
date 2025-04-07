@@ -18,6 +18,7 @@ from pipefunc._plotting_utils import (
     GroupedArgs,
     collapsed_scope_graph,
     create_grouped_parameter_graph,
+    hide_default_args_graph,
 )
 from pipefunc._utils import at_least_tuple, is_running_in_ipynb, requires
 from pipefunc.typing import NoAnnotation, type_as_string
@@ -298,6 +299,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     figsize: tuple[int, int] | int | None = None,
     collapse_scopes: bool | Sequence[str] = False,
     min_arg_group_size: int | None = None,
+    hide_default_args: bool = False,
     filename: str | Path | None = None,
     style: GraphvizStyle | None = None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -325,6 +327,8 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     min_arg_group_size
         Minimum number of parameters to combine into a single node. Only applies to
         parameters used exclusively by one PipeFunc. If None, no grouping is performed.
+    hide_default_args
+        Whether to hide default arguments in the graph.
     filename
         The filename to save the figure to, if provided.
     style
@@ -357,6 +361,12 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
     plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
+
+    if hide_default_args:
+        if defaults is None:  # pragma: no cover
+            msg = "`defaults` must be provided if `hide_default_args=True`."
+            raise ValueError(msg)
+        plot_graph = hide_default_args_graph(plot_graph, defaults)
 
     if style is None:
         style = GraphvizStyle()
