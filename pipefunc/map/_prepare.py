@@ -93,7 +93,7 @@ def _expand_output_name_in_executor(
             if _output_name == "":
                 normalized[""] = ex
                 continue
-            # single element of output_name of tuple might be provided
+            # single element of tuple output_name might be provided
             output_name = pipeline[_output_name].output_name
             if output_name in normalized:
                 msg = f"Executor for `{output_name}` is already set."
