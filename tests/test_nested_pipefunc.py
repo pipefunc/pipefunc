@@ -748,3 +748,71 @@ def test_nested_pipefunc_scope_removal() -> None:
 
     # Verify execution works with unscoped parameters
     assert pipeline(a=2, b=3) == (5, 10)
+
+
+def test_nested_pipefunc_preserve_cache_on_join() -> None:
+    # First check that the cache is preserved when combining pipelines with normal pipefuncs
+    @pipefunc(output_name="c", cache=True)
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d", cache=False)
+    def g(c: int) -> int:
+        return c * 2
+
+    @pipefunc(output_name="e", cache=True)
+    def h(d: int) -> int:
+        return d * 3
+
+    pipeline1 = Pipeline([f, g])
+    pipeline2 = Pipeline([h])
+    pipeline = pipeline1 | pipeline2
+    assert pipeline["c"].cache
+    assert not pipeline["d"].cache
+    assert pipeline["e"].cache
+    assert pipeline(a=1, b=2) == 18
+    assert pipeline.cache is not None
+    assert pipeline.cache.cache == {
+        ("c", (("a", 1), ("b", 2))): 3,
+        ("e", (("a", 1), ("b", 2))): 18,
+    }
+
+    # Check that the cache is preserved when combining pipelines and f+g is NestedPipeFunc
+    nf = NestedPipeFunc([f, g])
+    pipeline1 = Pipeline([nf])
+    pipeline2 = Pipeline([h])
+    pipeline = pipeline1 | pipeline2
+    assert pipeline.cache is not None
+    assert not pipeline.cache.cache
+    assert pipeline[("c", "d")].cache
+    assert pipeline["e"].cache
+    assert pipeline(a=1, b=2) == 18
+    assert pipeline.cache.cache == {
+        ("c-d", (("a", 1), ("b", 2))): (3, 6),
+        ("e", (("a", 1), ("b", 2))): 18,
+    }
+
+
+def test_nested_pipefunc_preserve_cache_on_combine_bug() -> None:
+    # Similar to previous test but unlike that test this used to be a bug
+
+    @pipefunc(output_name="x")
+    def fa(n: int, m: int = 0) -> int:
+        return 2 + n + m
+
+    @pipefunc(output_name="y")
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    @pipefunc(output_name="z")
+    def fc(y: int) -> int:
+        return 3 * y
+
+    p1 = Pipeline([NestedPipeFunc([fa, fb], ("x", "y"), function_name="my function")])
+    p1[("x", "y")].cache = True  # Enable caching after the pipeline is created
+
+    p2 = Pipeline([fc])
+    p = p1 | p2
+
+    assert p1[("x", "y")].cache
+    assert p[("x", "y")].cache

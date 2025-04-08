@@ -1155,6 +1155,9 @@ class NestedPipeFunc(PipeFunc):
         - "element": Allocate resources for each element in the mapspec.
 
         If no mapspec is defined, this parameter is ignored.
+    cache
+        Flag indicating whether the wrapped function should be cached.
+        If None, cache will be set to True if any of the `PipeFunc` instances have caching enabled.
     bound
         Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
         that are fixed. Even when providing different values, the bound values will be
@@ -1208,6 +1211,7 @@ class NestedPipeFunc(PipeFunc):
         resources: dict | Resources | None = None,
         resources_scope: Literal["map", "element"] = "map",
         bound: dict[str, Any] | None = None,
+        cache: bool | None = None,
         variant: str | dict[str | None, str] | None = None,
         variant_group: str | None = None,  # deprecated
     ) -> None:
@@ -1223,7 +1227,9 @@ class NestedPipeFunc(PipeFunc):
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
-        self.cache = any(f.cache for f in self.pipeline.functions)
+        self.cache: bool = (
+            cache if cache is not None else any(f.cache for f in self.pipeline.functions)
+        )
         _maybe_variant_group_error(variant_group, variant)
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
@@ -1250,10 +1256,11 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "function_name": self.function_name,
             "renames": self._renames,
-            "bound": self._bound,
             "mapspec": self.mapspec,
             "resources": self.resources,
             "resources_scope": self.resources_scope,
+            "bound": self._bound,
+            "cache": self.cache,
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
@@ -1262,6 +1269,7 @@ class NestedPipeFunc(PipeFunc):
         f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
         f._bound = self._bound.copy()
+        f.debug = self.debug
         return f
 
     def _combine_mapspecs(self) -> MapSpec | None:
