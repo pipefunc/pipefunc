@@ -88,8 +88,11 @@ def _expand_output_name_in_executor(
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> dict[OUTPUT_TYPE, Executor] | None:
     if isinstance(executor, dict):
-        normalized = {}
+        normalized: dict[OUTPUT_TYPE, Executor] = {}
         for _output_name, ex in executor.items():
+            if _output_name == "":
+                normalized[""] = ex
+                continue
             # single element of output_name of tuple might be provided
             output_name = pipeline[_output_name].output_name
             if output_name in normalized:
@@ -99,7 +102,7 @@ def _expand_output_name_in_executor(
         return normalized
     if executor is not None:
         return {"": executor}
-    return executor
+    return None
 
 
 def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
