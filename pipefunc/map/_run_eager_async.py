@@ -143,7 +143,7 @@ def run_map_eager_async(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
+    pipeline, run_info, store, outputs, _, executor_dict, chunksizes, progress = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -151,6 +151,7 @@ def run_map_eager_async(
         output_names=output_names,
         parallel=True,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
