@@ -142,7 +142,7 @@ def test_plotting_resources() -> None:
 @pytest.fixture
 def everything_pipeline() -> Pipeline:
     @pipefunc(output_name="c")
-    def f(a: int, b: int) -> int: ...  # type: ignore[empty-body]
+    def f(a: int, b: int, aa=1, bb=2, cc=3, dd=4) -> int: ...  # type: ignore[empty-body]
     @pipefunc(output_name="d", mapspec="... -> d[j]")
     def g(b: int, c: int, x: int = 1) -> int: ...  # type: ignore[empty-body]
     @pipefunc(
@@ -256,6 +256,25 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
         None,
     )
     assert orient_dropdown is not None
+
+    # Check that group args toggle is present
+    group_args_toggle = next(
+        (
+            item
+            for item in extra_controls_hbox.children
+            if isinstance(item, ipywidgets.ToggleButton) and "Group args" in item.description
+        ),
+        None,
+    )
+    assert group_args_toggle is not None
+    assert group_args_toggle.value is False
+    assert group_args_toggle.description == "Group args"
+    assert group_args_toggle.icon == "plus-square-o"
+    assert group_args_toggle.button_style == "info"
+    group_args_toggle.value = True  # Simulate click
+    assert group_args_toggle.description == "Ungroup args"
+    assert group_args_toggle.icon == "minus-square-o"
+    assert group_args_toggle.button_style == "success"
 
 
 @pytest.mark.skipif(

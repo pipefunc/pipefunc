@@ -363,13 +363,13 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
-    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
-
     if hide_default_args:
         if defaults is None:  # pragma: no cover
             msg = "`defaults` must be provided if `hide_default_args=True`."
             raise ValueError(msg)
-        plot_graph = hide_default_args_graph(plot_graph, defaults)
+        graph = hide_default_args_graph(graph, defaults)
+
+    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
 
     if style is None:
         style = GraphvizStyle()
@@ -646,13 +646,16 @@ def _rerender_gv_source(
     defaults: dict[str, Any] | None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
-    hide_default_args: bool = False,  # noqa: FBT001, FBT002
-    collapse_scopes: bool | Sequence[str] = False,  # noqa: FBT002
+    *,
+    group_args: bool = False,
+    hide_default_args: bool = False,
+    collapse_scopes: bool | Sequence[str] = False,
 ) -> str:
     gv_graph = visualize_graphviz(
         graph,
         defaults=defaults,
         orient=orient,
+        min_arg_group_size=2 if group_args else None,
         collapse_scopes=collapse_scopes,
         hide_default_args=hide_default_args,
         graphviz_kwargs=graphviz_kwargs,
@@ -661,7 +664,7 @@ def _rerender_gv_source(
     return gv_graph.source
 
 
-def _extra_controls_factory(
+def _extra_controls_factory(  # noqa: PLR0915
     graphviz_anywidget: graphviz_anywidget.GraphvizAnyWidget,
     *,
     graph: nx.DiGraph,
@@ -699,6 +702,17 @@ def _extra_controls_factory(
         )
         final_widgets.append(hide_defaults_toggle)
 
+    # Group args
+    group_args_toggle = ipywidgets.ToggleButton(
+        value=False,
+        description="Group args",
+        tooltip="Group arguments into a single node",
+        icon="plus-square-o",
+        button_style="info",
+        layout=ipywidgets.Layout(width="auto"),
+    )
+    final_widgets.append(group_args_toggle)
+
     # Scope Collapse
     unique_scopes = all_unique_output_scopes(graph)
     scope_toggles = []
@@ -726,7 +740,6 @@ def _extra_controls_factory(
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
         hide_defaults_value = False
-        current_orient = orient_dropdown.value
 
         if hide_defaults_toggle:
             hide_defaults_value = hide_defaults_toggle.value
@@ -738,6 +751,15 @@ def _extra_controls_factory(
                 hide_defaults_toggle.description = "Show default args"
                 hide_defaults_toggle.button_style = "warning"
                 hide_defaults_toggle.icon = "eye"
+
+        if group_args_toggle.value:
+            group_args_toggle.description = "Ungroup args"
+            group_args_toggle.icon = "minus-square-o"
+            group_args_toggle.button_style = "success"
+        else:
+            group_args_toggle.description = "Group args"
+            group_args_toggle.icon = "plus-square-o"
+            group_args_toggle.button_style = "info"
 
         selected_scopes = []
         if scope_toggles:
@@ -753,8 +775,9 @@ def _extra_controls_factory(
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
-            current_orient,
+            orient_dropdown.value,
             graphviz_kwargs,
+            group_args=group_args_toggle.value,
             hide_default_args=hide_defaults_value,
             collapse_scopes=selected_scopes,
         )
@@ -764,6 +787,7 @@ def _extra_controls_factory(
     orient_dropdown.observe(_update_dot_source, names="value")
     if hide_defaults_toggle:
         hide_defaults_toggle.observe(_update_dot_source, names="value")
+    group_args_toggle.observe(_update_dot_source, names="value")
     if scope_toggles:
         for toggle in scope_toggles:
             toggle.observe(_update_dot_source, names="value")
