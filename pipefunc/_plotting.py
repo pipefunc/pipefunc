@@ -742,6 +742,8 @@ def _extra_controls_factory(  # noqa: PLR0915
         current_orient = orient_dropdown.value
 
         hide_defaults_value = False
+        current_orient = orient_dropdown.value
+
         if hide_defaults_toggle:
             hide_defaults_value = hide_defaults_toggle.value
             if hide_defaults_value:
