@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import html
 import inspect
 import re
@@ -647,36 +648,21 @@ def visualize_graphviz_widget(
         reason="visualize_graphviz_widget",
         extras="plotting",
     )
-    import graphviz
-    from graphviz_anywidget import GraphvizAnyWidget, graphviz_widget
+    from graphviz_anywidget import graphviz_widget
 
-    gv_graph = visualize_graphviz(
-        graph,
+    factory = functools.partial(
+        _extra_controls_factory,
+        graph=graph,
         defaults=defaults,
         orient=orient,
         graphviz_kwargs=graphviz_kwargs,
-        return_type="graphviz",
     )
-    assert isinstance(gv_graph, graphviz.Digraph)
-
-    dot_source = _rerender_gv_source(
-        graph,
-        defaults,
-        orient,
-        graphviz_kwargs,
+    initial_dot_source = _rerender_gv_source(graph, defaults, orient, graphviz_kwargs)
+    return graphviz_widget(
+        dot_source=initial_dot_source,
+        extra_controls_factory=factory,
+        controls=True,
     )
-    widget = graphviz_widget(dot_source)
-    graphviz_anywidget = widget.children[-1]
-    assert isinstance(graphviz_anywidget, GraphvizAnyWidget)
-    extra_widgets = _extra_widgets(
-        graphviz_anywidget,
-        graph,
-        defaults,
-        orient,
-        graphviz_kwargs,
-    )
-    widget.children = (extra_widgets, *widget.children)
-    return widget
 
 
 def _rerender_gv_source(
@@ -684,7 +670,7 @@ def _rerender_gv_source(
     defaults: dict[str, Any] | None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
-    show_default_args: bool = True,  # noqa: FBT001, FBT002
+    hide_default_args: bool = False,  # noqa: FBT001, FBT002
     collapse_scopes: bool | Sequence[str] = False,  # noqa: FBT002
 ) -> str:
     gv_graph = visualize_graphviz(
@@ -692,15 +678,16 @@ def _rerender_gv_source(
         defaults=defaults,
         orient=orient,
         collapse_scopes=collapse_scopes,
-        hide_default_args=not show_default_args,
+        hide_default_args=hide_default_args,
         graphviz_kwargs=graphviz_kwargs,
         return_type="graphviz",
     )
     return gv_graph.source
 
 
-def _extra_widgets(
+def _extra_controls_factory(
     graphviz_anywidget: graphviz_anywidget.GraphvizAnyWidget,
+    *,
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -709,33 +696,39 @@ def _extra_widgets(
     """Extra widgets for the graphviz widget."""
     import ipywidgets
 
-    show_default_args = ipywidgets.Checkbox(value=True, description="Show default args")
+    show_default_args = ipywidgets.ToggleButton(
+        value=True,
+        description="Hide default args",
+        icon="eye-slash",
+        layout=ipywidgets.Layout(width="auto"),
+        button_style="primary",
+    )
 
     scope_boxes = [
-        ipywidgets.Checkbox(value=True, description=scope)
+        ipywidgets.Checkbox(value=False, description=scope)
         for scope in all_unique_output_scopes(graph)
     ]
 
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
-        active_scopes = [box.description for box in scope_boxes if box.value]
-        collapse_all = all(box.value for box in scope_boxes)
-        # Determine if we should collapse based on active scopes or all if none selected specifically
-        collapse_scopes_setting: bool | list[str] = collapse_all or active_scopes
-        if not any(box.value for box in scope_boxes):  # Don't collapse if none are checked
-            collapse_scopes_setting = False
+        if show_default_args.value:
+            show_default_args.description = "Hide default args"
+            show_default_args.button_style = "primary"
+        else:
+            show_default_args.description = "Show default args"
+            show_default_args.button_style = "warning"
 
+        collapse_scopes = [box.description for box in scope_boxes if box.value]
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
             orient,
             graphviz_kwargs,
-            show_default_args=show_default_args.value,
-            collapse_scopes=collapse_scopes_setting,
+            hide_default_args=not show_default_args.value,
+            collapse_scopes=collapse_scopes,
         )
         graphviz_anywidget.dot_source = new_dot_source
 
-    # Attach the observer to all checkboxes
     show_default_args.observe(_update_dot_source, names="value")
     for box in scope_boxes:
         box.observe(_update_dot_source, names="value")
