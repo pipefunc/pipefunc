@@ -1262,6 +1262,7 @@ class NestedPipeFunc(PipeFunc):
         f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
         f._bound = self._bound.copy()
+        f.cache = self.cache
         return f
 
     def _combine_mapspecs(self) -> MapSpec | None:
