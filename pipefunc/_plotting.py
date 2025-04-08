@@ -674,6 +674,31 @@ def _extra_controls_factory(
 
     final_widgets = []
 
+    # Orientation Dropdown
+    orient_options = ["TB", "LR", "BT", "RL"]
+    orient_dropdown = ipywidgets.Dropdown(
+        options=orient_options,
+        value=orient,
+        description="Orient:",
+        tooltip="Change graph orientation",
+        style={"description_width": "initial"},
+        layout=ipywidgets.Layout(width="auto"),
+    )
+    final_widgets.append(orient_dropdown)
+
+    # Hide Defaults
+    hide_defaults_toggle = None
+    if defaults:
+        hide_defaults_toggle = ipywidgets.ToggleButton(
+            value=False,
+            description="Show default args",
+            tooltip="Toggle visibility of default arguments",
+            icon="eye",
+            layout=ipywidgets.Layout(width="auto"),
+            button_style="warning",
+        )
+        final_widgets.append(hide_defaults_toggle)
+
     # Scope Collapse
     unique_scopes = all_unique_output_scopes(graph)
     scope_toggles = []
@@ -697,23 +722,12 @@ def _extra_controls_factory(
         scopes_accordion.set_title(0, "Collapse Scopes")
         final_widgets.append(scopes_accordion)
 
-    # Hide Defaults
-    hide_defaults_toggle = None
-    if defaults:
-        hide_defaults_toggle = ipywidgets.ToggleButton(
-            value=False,
-            description="Show default args",
-            tooltip="Toggle visibility of default arguments",
-            icon="eye",
-            layout=ipywidgets.Layout(width="auto", height="auto"),
-            button_style="warning",
-        )
-        final_widgets.append(hide_defaults_toggle)
-
     # Callback Function
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
         hide_defaults_value = False
+        current_orient = orient_dropdown.value
+
         if hide_defaults_toggle:
             hide_defaults_value = hide_defaults_toggle.value
             if hide_defaults_value:
@@ -739,7 +753,7 @@ def _extra_controls_factory(
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
-            orient,
+            current_orient,
             graphviz_kwargs,
             hide_default_args=hide_defaults_value,
             collapse_scopes=selected_scopes,
@@ -747,6 +761,7 @@ def _extra_controls_factory(
         graphviz_anywidget.dot_source = new_dot_source
 
     # Attach Observers
+    orient_dropdown.observe(_update_dot_source, names="value")
     if hide_defaults_toggle:
         hide_defaults_toggle.observe(_update_dot_source, names="value")
     if scope_toggles:
