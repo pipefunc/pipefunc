@@ -168,15 +168,7 @@ class _Labels(NamedTuple):
                 assert isinstance(a, _Resources)
                 resources[edge] = a.name
 
-        return cls(
-            outputs,
-            outputs_mapspec,
-            inputs,
-            inputs_mapspec,
-            bound,
-            resources,
-            arg_mapspec,
-        )
+        return cls(outputs, outputs_mapspec, inputs, inputs_mapspec, bound, resources, arg_mapspec)
 
 
 NodeType = str | PipeFunc | _Bound | _Resources | NestedPipeFunc | CollapsedScope | GroupedArgs
@@ -216,11 +208,7 @@ def _generate_node_label(
             default_value = defaults.get(param_name, _empty) if defaults else _empty
             mapspec = arg_mapspec.get(param_name)
             display_name = mapspec or param_name
-            formatted_label = _format_type_and_default(
-                display_name,
-                type_string,
-                default_value,
-            )
+            formatted_label = _format_type_and_default(display_name, type_string, default_value)
             label += f"<TR><TD>{formatted_label}</TD></TR>"
 
         label += "</TABLE>"
@@ -436,11 +424,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         ),
         "PipeFunc": (
             nodes.func,
-            {
-                "fillcolor": style.func_node_color,
-                "shape": "box",
-                "style": "filled,rounded",
-            },
+            {"fillcolor": style.func_node_color, "shape": "box", "style": "filled,rounded"},
         ),
         "NestedPipeFunc": (
             nodes.nested_func,
@@ -464,19 +448,11 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         ),
         "Bound": (
             nodes.bound,
-            {
-                "fillcolor": style.bound_node_color,
-                "shape": "hexagon",
-                "style": "filled",
-            },
+            {"fillcolor": style.bound_node_color, "shape": "hexagon", "style": "filled"},
         ),
         "Resources": (
             nodes.resources,
-            {
-                "fillcolor": style.resources_node_color,
-                "shape": "hexagon",
-                "style": "filled",
-            },
+            {"fillcolor": style.resources_node_color, "shape": "hexagon", "style": "filled"},
         ),
     }
     node_defaults = {
@@ -906,15 +882,10 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
     node_index_dict = {node: index for index, node in enumerate(graph.nodes)}
 
     # Extract edge info using the lookup dictionary
-    edges = np.array(
-        [(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges],
-    )
+    edges = np.array([(node_index_dict[edge[0]], node_index_dict[edge[1]]) for edge in graph.edges])
 
     # Create Nodes and Graph
-    nodes = hv.Nodes(
-        (x, y, node_indices, node_labels, node_types),
-        vdims=["label", "type"],
-    )
+    nodes = hv.Nodes((x, y, node_indices, node_labels, node_types), vdims=["label", "type"])
     graph = hv.Graph((edges, nodes))
 
     plot_opts = {
@@ -923,10 +894,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
         "padding": 0.1,
         "xaxis": None,
         "yaxis": None,
-        "node_color": hv.dim("type").categorize(
-            {"str": "lightgreen", "func": "skyblue"},
-            "gray",
-        ),
+        "node_color": hv.dim("type").categorize({"str": "lightgreen", "func": "skyblue"}, "gray"),
         "edge_color": "black",
     }
 
@@ -934,11 +902,7 @@ def visualize_holoviews(graph: nx.DiGraph, *, show: bool = False) -> hv.Graph | 
 
     # Create Labels and add them to the graph
     labels = hv.Labels(graph.nodes, ["x", "y"], "label")
-    plot = graph * labels.opts(
-        text_font_size="8pt",
-        text_color="black",
-        bgcolor="white",
-    )
+    plot = graph * labels.opts(text_font_size="8pt", text_color="black", bgcolor="white")
     if show:  # pragma: no cover
         bokeh.plotting.show(hv.render(plot))
         return None
