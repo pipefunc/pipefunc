@@ -697,23 +697,10 @@ def _extra_controls_factory(
     import ipywidgets
 
     final_widgets = []  # List to hold widgets for the final HBox
-    hide_defaults_toggle = None  # Initialize as None
-
-    # --- Hide Defaults Toggle Button (Conditional) ---
-    if defaults:
-        hide_defaults_toggle = ipywidgets.ToggleButton(
-            value=False,
-            description="Show default args",
-            tooltip="Toggle visibility of default arguments",
-            icon="eye",
-            layout=ipywidgets.Layout(width="auto"),
-            button_style="warning",
-        )
 
     # --- Scope Collapse Controls (Conditional Accordion) ---
     unique_scopes = all_unique_output_scopes(graph)
     scope_checkboxes = []
-    # Accordion will be added first if created
     if unique_scopes:
         scope_checkboxes = [
             ipywidgets.Checkbox(
@@ -731,8 +718,17 @@ def _extra_controls_factory(
         scopes_accordion.set_title(0, "Collapse Scopes")
         final_widgets.append(scopes_accordion)
 
-    # Add hide defaults toggle *if* it was created
-    if hide_defaults_toggle:
+    # --- Hide Defaults Toggle Button (Conditional) ---
+    hide_defaults_toggle = None  # Initialize as None
+    if defaults:
+        hide_defaults_toggle = ipywidgets.ToggleButton(
+            value=False,
+            description="Show default args",
+            tooltip="Toggle visibility of default arguments",
+            icon="eye",
+            layout=ipywidgets.Layout(width="auto"),
+            button_style="warning",
+        )
         final_widgets.append(hide_defaults_toggle)
 
     # --- Callback Function ---
