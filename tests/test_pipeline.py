@@ -1181,6 +1181,7 @@ def test_executor_for_single_element_of_output_name_tuple() -> None:
         executor={"c": ThreadPoolExecutor(max_workers=2)},
         parallel=True,
         storage={"c": "dict"},
+        chunksizes={"c": 1},
     )
     assert r["c"].output[0] == 3
     assert r["d"].output[0] == 4
