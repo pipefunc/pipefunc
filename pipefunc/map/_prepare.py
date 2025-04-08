@@ -58,10 +58,7 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
-    if executor is not None and not isinstance(executor, dict):
-        executor = {"": executor}
-    elif isinstance(executor, dict):
-        executor = executor.copy()  # this dict might be mutated, so we copy it
+    executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
@@ -84,6 +81,25 @@ def prepare_run(
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
     return pipeline, run_info, store, outputs, parallel, executor, progress
+
+
+def _expand_output_name_in_executor(
+    pipeline: Pipeline,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+) -> dict[OUTPUT_TYPE, Executor] | None:
+    if executor is not None and not isinstance(executor, dict):
+        executor = {"": executor}
+    elif isinstance(executor, dict):
+        normalized = {}
+        for _output_name, ex in executor.items():
+            # single element of output_name of tuple might be provided
+            output_name = pipeline[_output_name].output_name
+            if output_name in normalized:
+                msg = f"Executor for `{output_name}` is already set."
+                raise ValueError(msg)
+            normalized[output_name] = ex
+        return normalized
+    return executor
 
 
 def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
