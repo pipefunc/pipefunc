@@ -5,6 +5,28 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.64.0 (2025-04-08)
+
+### ✨ Enhancements
+
+- Add "show default args" and collapsable scopes to widget ([#706](https://github.com/pipefunc/pipefunc/pull/706))
+- Allow hiding nodes with default values ([#703](https://github.com/pipefunc/pipefunc/pull/703))
+
+### 🧹 Maintenance
+
+- Pin `numcodecs<0.16.0` ([#704](https://github.com/pipefunc/pipefunc/pull/704))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.63.0 ([#702](https://github.com/pipefunc/pipefunc/pull/702))
+
+### 📊 Stats
+
+- `.py`: +360 lines, -23 lines
+- `.md`: +45 lines, -0 lines
+- `.yml`: +4 lines, -2 lines
+- `.toml`: +2 lines, -2 lines
+
 ## v0.63.0 (2025-04-04)
 
 ### ✨ Enhancements
