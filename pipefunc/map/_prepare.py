@@ -87,9 +87,7 @@ def _expand_output_name_in_executor(
     pipeline: Pipeline,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> dict[OUTPUT_TYPE, Executor] | None:
-    if executor is not None and not isinstance(executor, dict):
-        executor = {"": executor}
-    elif isinstance(executor, dict):
+    if isinstance(executor, dict):
         normalized = {}
         for _output_name, ex in executor.items():
             # single element of output_name of tuple might be provided
@@ -99,6 +97,8 @@ def _expand_output_name_in_executor(
                 raise ValueError(msg)
             normalized[output_name] = ex
         return normalized
+    if executor is not None:
+        return {"": executor}
     return executor
 
 
