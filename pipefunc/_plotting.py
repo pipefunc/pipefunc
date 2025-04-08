@@ -739,10 +739,7 @@ def _extra_controls_factory(  # noqa: PLR0915
     # Callback Function
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
-        current_orient = orient_dropdown.value
-
         hide_defaults_value = False
-        current_orient = orient_dropdown.value
 
         if hide_defaults_toggle:
             hide_defaults_value = hide_defaults_toggle.value
@@ -778,7 +775,7 @@ def _extra_controls_factory(  # noqa: PLR0915
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
-            current_orient,
+            orient_dropdown.value,
             graphviz_kwargs,
             group_args=group_args_toggle.value,
             hide_default_args=hide_defaults_value,
