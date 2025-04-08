@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import html
 import inspect
 import re
@@ -16,6 +17,7 @@ from pipefunc._pipeline._base import _Bound, _Resources
 from pipefunc._plotting_utils import (
     CollapsedScope,
     GroupedArgs,
+    all_unique_output_scopes,
     collapsed_scope_graph,
     create_grouped_parameter_graph,
     hide_default_args_graph,
@@ -28,10 +30,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import graphviz
+    import graphviz_anywidget
     import holoviews as hv
     import IPython.display
+    import ipywidgets
     import matplotlib.pyplot as plt
-
 
 _empty = inspect.Parameter.empty
 MAX_LABEL_LENGTH = 20
@@ -569,6 +572,188 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         return HTML(html_content)
 
     return digraph
+
+
+def visualize_graphviz_widget(
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None = None,
+    *,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+) -> ipywidgets.VBox:
+    """Create an interactive visualization of the pipeline as a directed graph.
+
+    Creates a widget that allows interactive exploration of the pipeline graph.
+    The widget provides the following interactions:
+
+    - Zoom: Use mouse scroll
+    - Pan: Click and drag
+    - Node selection: Click on nodes to highlight connected nodes
+    - Multi-select: Shift-click on nodes to select multiple routes
+    - Search: Use the search box to highlight matching nodes
+    - Reset view: Press Escape
+
+    Requires the `graphviz-anywidget` package to be installed, which is maintained
+    by the pipefunc authors, see https://github.com/pipefunc/graphviz-anywidget
+
+    Parameters
+    ----------
+    graph
+        The directed graph representing the pipeline.
+    defaults
+        The default values for the pipeline.
+    orient
+        Graph orientation, controlling the main direction of the graph flow.
+        Options are:
+        - 'TB': Top to bottom
+        - 'LR': Left to right
+        - 'BT': Bottom to top
+        - 'RL': Right to left
+    graphviz_kwargs
+        Graphviz-specific keyword arguments for customizing the graph's appearance.
+
+    Returns
+    -------
+    ipywidgets.VBox
+        Interactive widget containing the graph visualization.
+
+    """
+    requires(
+        "graphviz_anywidget",
+        "graphviz",
+        reason="visualize_graphviz_widget",
+        extras="plotting",
+    )
+    from graphviz_anywidget import graphviz_widget
+
+    factory = functools.partial(
+        _extra_controls_factory,
+        graph=graph,
+        defaults=defaults,
+        orient=orient,
+        graphviz_kwargs=graphviz_kwargs,
+    )
+    initial_dot_source = _rerender_gv_source(graph, defaults, orient, graphviz_kwargs)
+    return graphviz_widget(
+        dot_source=initial_dot_source,
+        extra_controls_factory=factory,
+        controls=True,
+    )
+
+
+def _rerender_gv_source(
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+    hide_default_args: bool = False,  # noqa: FBT001, FBT002
+    collapse_scopes: bool | Sequence[str] = False,  # noqa: FBT002
+) -> str:
+    gv_graph = visualize_graphviz(
+        graph,
+        defaults=defaults,
+        orient=orient,
+        collapse_scopes=collapse_scopes,
+        hide_default_args=hide_default_args,
+        graphviz_kwargs=graphviz_kwargs,
+        return_type="graphviz",
+    )
+    return gv_graph.source
+
+
+def _extra_controls_factory(
+    graphviz_anywidget: graphviz_anywidget.GraphvizAnyWidget,
+    *,
+    graph: nx.DiGraph,
+    defaults: dict[str, Any] | None,
+    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    graphviz_kwargs: dict[str, Any] | None = None,
+) -> ipywidgets.HBox:
+    """Extra widgets for the graphviz widget."""
+    import ipywidgets
+
+    final_widgets = []
+
+    # Scope Collapse
+    unique_scopes = all_unique_output_scopes(graph)
+    scope_toggles = []
+    if unique_scopes:
+        scope_toggles = [
+            ipywidgets.ToggleButton(
+                value=False,
+                description=scope,
+                tooltip=f"Collapse/Expand scope: {scope}",
+                icon="plus-square-o",
+                button_style="info",
+                layout=ipywidgets.Layout(width="95%"),
+            )
+            for scope in unique_scopes
+        ]
+        scopes_vbox = ipywidgets.VBox(scope_toggles)
+        scopes_accordion = ipywidgets.Accordion(
+            children=[scopes_vbox],
+            selected_index=None,
+        )
+        scopes_accordion.set_title(0, "Collapse Scopes")
+        final_widgets.append(scopes_accordion)
+
+    # Hide Defaults
+    hide_defaults_toggle = None
+    if defaults:
+        hide_defaults_toggle = ipywidgets.ToggleButton(
+            value=False,
+            description="Show default args",
+            tooltip="Toggle visibility of default arguments",
+            icon="eye",
+            layout=ipywidgets.Layout(width="auto", height="auto"),
+            button_style="warning",
+        )
+        final_widgets.append(hide_defaults_toggle)
+
+    # Callback Function
+    def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
+        """Observer function to update the widget's dot source."""
+        hide_defaults_value = False
+        if hide_defaults_toggle:
+            hide_defaults_value = hide_defaults_toggle.value
+            if hide_defaults_value:
+                hide_defaults_toggle.description = "Hide default args"
+                hide_defaults_toggle.button_style = "primary"
+                hide_defaults_toggle.icon = "eye-slash"
+            else:
+                hide_defaults_toggle.description = "Show default args"
+                hide_defaults_toggle.button_style = "warning"
+                hide_defaults_toggle.icon = "eye"
+
+        selected_scopes = []
+        if scope_toggles:
+            for toggle in scope_toggles:
+                if toggle.value:
+                    selected_scopes.append(toggle.description)
+                    toggle.button_style = "success"
+                    toggle.icon = "minus-square-o"
+                else:
+                    toggle.button_style = "info"
+                    toggle.icon = "plus-square-o"
+
+        new_dot_source = _rerender_gv_source(
+            graph,
+            defaults,
+            orient,
+            graphviz_kwargs,
+            hide_default_args=hide_defaults_value,
+            collapse_scopes=selected_scopes,
+        )
+        graphviz_anywidget.dot_source = new_dot_source
+
+    # Attach Observers
+    if hide_defaults_toggle:
+        hide_defaults_toggle.observe(_update_dot_source, names="value")
+    if scope_toggles:
+        for toggle in scope_toggles:
+            toggle.observe(_update_dot_source, names="value")
+
+    return ipywidgets.HBox(final_widgets, layout=ipywidgets.Layout(gap="10px"))
 
 
 def visualize_matplotlib(
