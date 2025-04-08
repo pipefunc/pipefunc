@@ -696,31 +696,33 @@ def _extra_controls_factory(
     """Extra widgets for the graphviz widget."""
     import ipywidgets
 
-    final_widgets = []  # List to hold widgets for the final HBox
+    final_widgets = []
 
-    # --- Scope Collapse Controls (Conditional Accordion) ---
+    # --- Scope Collapse Controls (Conditional Accordion with ToggleButtons) ---
     unique_scopes = all_unique_output_scopes(graph)
-    scope_checkboxes = []
+    scope_toggles = []
     if unique_scopes:
-        scope_checkboxes = [
-            ipywidgets.Checkbox(
+        scope_toggles = [
+            ipywidgets.ToggleButton(
                 value=False,
                 description=scope,
-                indent=False,
+                tooltip=f"Collapse/Expand scope: {scope}",
+                icon="plus-square-o",
+                button_style="info",
+                layout=ipywidgets.Layout(width="95%"),
             )
             for scope in unique_scopes
         ]
-        scopes_vbox = ipywidgets.VBox(scope_checkboxes)
-        # re: style https://github.com/jupyter-widgets/ipywidgets/issues/2415
+        scopes_vbox = ipywidgets.VBox(scope_toggles)
         scopes_accordion = ipywidgets.Accordion(
             children=[scopes_vbox],
-            selected_index=None,  # Start collapsed
+            selected_index=None,
         )
         scopes_accordion.set_title(0, "Collapse Scopes")
         final_widgets.append(scopes_accordion)
 
     # --- Hide Defaults Toggle Button (Conditional) ---
-    hide_defaults_toggle = None  # Initialize as None
+    hide_defaults_toggle = None
     if defaults:
         hide_defaults_toggle = ipywidgets.ToggleButton(
             value=False,
@@ -748,8 +750,15 @@ def _extra_controls_factory(
                 hide_defaults_toggle.icon = "eye"
 
         selected_scopes = []
-        if scope_checkboxes:
-            selected_scopes = [cb.description for cb in scope_checkboxes if cb.value]
+        if scope_toggles:
+            for toggle in scope_toggles:
+                if toggle.value:
+                    selected_scopes.append(toggle.description)
+                    toggle.button_style = "success"
+                    toggle.icon = "minus-square-o"
+                else:
+                    toggle.button_style = "info"
+                    toggle.icon = "plus-square-o"
 
         new_dot_source = _rerender_gv_source(
             graph,
@@ -764,9 +773,9 @@ def _extra_controls_factory(
     # --- Attach Observers ---
     if hide_defaults_toggle:
         hide_defaults_toggle.observe(_update_dot_source, names="value")
-    if scope_checkboxes:
-        for cb in scope_checkboxes:
-            cb.observe(_update_dot_source, names="value")
+    if scope_toggles:
+        for toggle in scope_toggles:
+            toggle.observe(_update_dot_source, names="value")
 
     return ipywidgets.HBox(final_widgets, layout=ipywidgets.Layout(gap="10px"))
 
