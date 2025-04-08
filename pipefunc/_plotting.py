@@ -696,44 +696,89 @@ def _extra_controls_factory(
     """Extra widgets for the graphviz widget."""
     import ipywidgets
 
-    show_default_args = ipywidgets.ToggleButton(
-        value=True,
-        description="Hide default args",
-        icon="eye-slash",
-        layout=ipywidgets.Layout(width="auto"),
-        button_style="primary",
-    )
+    final_widgets = []  # List to hold widgets for the final HBox
+    hide_defaults_toggle = None  # Initialize as None
 
-    scope_boxes = [
-        ipywidgets.Checkbox(value=False, description=scope)
-        for scope in all_unique_output_scopes(graph)
-    ]
+    # --- Hide Defaults Toggle Button (Conditional) ---
+    if defaults:
+        hide_defaults_toggle = ipywidgets.ToggleButton(
+            value=False,
+            description="Show default args",
+            tooltip="Toggle visibility of default arguments",
+            icon="eye",
+            layout=ipywidgets.Layout(width="auto"),
+            button_style="warning",
+        )
 
+    # --- Scope Collapse Controls (Conditional Accordion) ---
+    unique_scopes = all_unique_output_scopes(graph)
+    scope_checkboxes = []
+    # Accordion will be added first if created
+    if unique_scopes:
+        scope_checkboxes = [
+            ipywidgets.Checkbox(
+                value=False,
+                description=scope,
+                indent=False,
+            )
+            for scope in unique_scopes
+        ]
+        scopes_vbox = ipywidgets.VBox(scope_checkboxes)
+        scopes_accordion = ipywidgets.Accordion(
+            children=[scopes_vbox],
+            selected_index=None,  # Start collapsed
+        )
+        scopes_accordion.set_title(0, "Collapse Scopes")
+        final_widgets.append(scopes_accordion)
+
+    # Add hide defaults toggle *if* it was created
+    if hide_defaults_toggle:
+        final_widgets.append(hide_defaults_toggle)
+
+    # --- Callback Function ---
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
-        if show_default_args.value:
-            show_default_args.description = "Hide default args"
-            show_default_args.button_style = "primary"
-        else:
-            show_default_args.description = "Show default args"
-            show_default_args.button_style = "warning"
+        hide_defaults_value = False
+        # Update toggle button appearance only if it exists
+        if hide_defaults_toggle:
+            hide_defaults_value = hide_defaults_toggle.value
+            if hide_defaults_value:
+                hide_defaults_toggle.description = "Hide default args"
+                hide_defaults_toggle.button_style = "primary"
+                hide_defaults_toggle.icon = "eye-slash"
+            else:
+                hide_defaults_toggle.description = "Show default args"
+                hide_defaults_toggle.button_style = "warning"
+                hide_defaults_toggle.icon = "eye"
 
-        collapse_scopes = [box.description for box in scope_boxes if box.value]
+        # Get selected scopes only if checkboxes exist
+        selected_scopes = []
+        if scope_checkboxes:
+            selected_scopes = [cb.description for cb in scope_checkboxes if cb.value]
+
+        # Rerender the graph source
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
             orient,
             graphviz_kwargs,
-            hide_default_args=not show_default_args.value,
-            collapse_scopes=collapse_scopes,
+            hide_default_args=hide_defaults_value,  # Use determined value
+            collapse_scopes=selected_scopes,
         )
+        # Update the graph widget
         graphviz_anywidget.dot_source = new_dot_source
 
-    show_default_args.observe(_update_dot_source, names="value")
-    for box in scope_boxes:
-        box.observe(_update_dot_source, names="value")
+    # --- Attach Observers ---
+    # Observe toggle button only if it exists
+    if hide_defaults_toggle:
+        hide_defaults_toggle.observe(_update_dot_source, names="value")
+    # Observe checkboxes only if they were created
+    if scope_checkboxes:
+        for cb in scope_checkboxes:
+            cb.observe(_update_dot_source, names="value")
 
-    return ipywidgets.HBox([*scope_boxes, show_default_args])
+    # --- Return Final Layout ---
+    return ipywidgets.HBox(final_widgets, layout=ipywidgets.Layout(gap="10px"))
 
 
 def visualize_matplotlib(
