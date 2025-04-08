@@ -711,6 +711,7 @@ def _extra_controls_factory(
             for scope in unique_scopes
         ]
         scopes_vbox = ipywidgets.VBox(scope_checkboxes)
+        # re: style https://github.com/jupyter-widgets/ipywidgets/issues/2415
         scopes_accordion = ipywidgets.Accordion(
             children=[scopes_vbox],
             selected_index=None,  # Start collapsed
@@ -735,7 +736,6 @@ def _extra_controls_factory(
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
         hide_defaults_value = False
-        # Update toggle button appearance only if it exists
         if hide_defaults_toggle:
             hide_defaults_value = hide_defaults_toggle.value
             if hide_defaults_value:
@@ -747,33 +747,27 @@ def _extra_controls_factory(
                 hide_defaults_toggle.button_style = "warning"
                 hide_defaults_toggle.icon = "eye"
 
-        # Get selected scopes only if checkboxes exist
         selected_scopes = []
         if scope_checkboxes:
             selected_scopes = [cb.description for cb in scope_checkboxes if cb.value]
 
-        # Rerender the graph source
         new_dot_source = _rerender_gv_source(
             graph,
             defaults,
             orient,
             graphviz_kwargs,
-            hide_default_args=hide_defaults_value,  # Use determined value
+            hide_default_args=hide_defaults_value,
             collapse_scopes=selected_scopes,
         )
-        # Update the graph widget
         graphviz_anywidget.dot_source = new_dot_source
 
     # --- Attach Observers ---
-    # Observe toggle button only if it exists
     if hide_defaults_toggle:
         hide_defaults_toggle.observe(_update_dot_source, names="value")
-    # Observe checkboxes only if they were created
     if scope_checkboxes:
         for cb in scope_checkboxes:
             cb.observe(_update_dot_source, names="value")
 
-    # --- Return Final Layout ---
     return ipywidgets.HBox(final_widgets, layout=ipywidgets.Layout(gap="10px"))
 
 
