@@ -705,7 +705,7 @@ def _extra_controls_factory(
             description="Show default args",
             tooltip="Toggle visibility of default arguments",
             icon="eye",
-            layout=ipywidgets.Layout(width="auto"),
+            layout=ipywidgets.Layout(width="auto", height="auto"),
             button_style="warning",
         )
         final_widgets.append(hide_defaults_toggle)
