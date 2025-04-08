@@ -1649,7 +1649,6 @@ class Pipeline:
     def visualize_graphviz_widget(
         self,
         *,
-        collapse_scopes: bool | Sequence[str] = False,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
@@ -1670,10 +1669,6 @@ class Pipeline:
 
         Parameters
         ----------
-        collapse_scopes
-            Whether to collapse scopes in the graph.
-            If ``True``, scopes are collapsed into a single node.
-            If a sequence of scope names, only the specified scopes are collapsed.
         orient
             Graph orientation, controlling the main direction of the graph flow.
             Options are:
@@ -1690,24 +1685,14 @@ class Pipeline:
             Interactive widget containing the graph visualization.
 
         """
-        requires(
-            "graphviz_anywidget",
-            "graphviz",
-            reason="visualize_graphviz_widget",
-            extras="plotting",
-        )
-        import graphviz
-        from graphviz_anywidget import graphviz_widget
+        from pipefunc._plotting import visualize_graphviz_widget
 
-        graph = self.visualize_graphviz(
-            collapse_scopes=collapse_scopes,
+        return visualize_graphviz_widget(
+            self.graph,
+            defaults=self.defaults,
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
-            return_type="graphviz",
         )
-        assert isinstance(graph, graphviz.Digraph)
-        dot_source = graph.source
-        return graphviz_widget(dot_source)
 
     def visualize_matplotlib(
         self,

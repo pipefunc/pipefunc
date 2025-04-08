@@ -240,6 +240,11 @@ if __name__ == "__main__":
         allow_missing=["defaults", "graph"],
     )
     compare_param_descriptions(
+        pipefunc._plotting.visualize_graphviz_widget,
+        pipefunc.Pipeline.visualize_graphviz_widget,
+        allow_missing=["defaults", "graph"],
+    )
+    compare_param_descriptions(
         pipefunc._plotting.visualize_holoviews,
         pipefunc.Pipeline.visualize_holoviews,
         allow_missing=["graph"],
