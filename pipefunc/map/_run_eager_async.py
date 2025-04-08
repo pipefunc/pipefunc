@@ -143,7 +143,7 @@ def run_map_eager_async(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, _, executor_dict, chunksizes, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -160,33 +160,33 @@ def run_map_eager_async(
         in_async=True,
     )
 
-    multi_run_manager = maybe_multi_run_manager(executor_dict)
+    multi_run_manager = maybe_multi_run_manager(prep.executor)
 
     async def _run_pipeline() -> ResultDict:
-        with _maybe_executor(executor_dict, parallel=True) as ex:
+        with _maybe_executor(prep.executor, parallel=True) as ex:
             assert ex is not None
-            dependency_info = _build_dependency_graph(pipeline)
+            dependency_info = _build_dependency_graph(prep.pipeline)
             await _eager_scheduler_loop_async(
                 dependency_info=dependency_info,
                 executor=ex,
-                run_info=run_info,
-                store=store,
-                outputs=outputs,
+                run_info=prep.run_info,
+                store=prep.store,
+                outputs=prep.outputs,
                 fixed_indices=fixed_indices,
-                chunksizes=chunksizes,
-                progress=progress,
+                chunksizes=prep.chunksizes,
+                progress=prep.progress,
                 return_results=return_results,
-                cache=pipeline.cache,
+                cache=prep.pipeline.cache,
                 multi_run_manager=multi_run_manager,
             )
-        _maybe_persist_memory(store, persist_memory)
-        return outputs
+        _maybe_persist_memory(prep.store, persist_memory)
+        return prep.outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
+    if prep.progress is not None:
+        prep.progress.attach_task(task)
 
-    return AsyncMap(task, run_info, progress, multi_run_manager)
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
 
 
 async def _eager_scheduler_loop_async(

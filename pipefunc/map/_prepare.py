@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
 from pipefunc._utils import at_least_tuple
@@ -28,6 +28,17 @@ if TYPE_CHECKING:
     from ._result import StoreType
 
 
+class Prepared(NamedTuple):
+    pipeline: Pipeline
+    run_info: RunInfo
+    store: dict[str, StoreType]
+    outputs: ResultDict
+    parallel: bool
+    executor: dict[OUTPUT_TYPE, Executor] | None
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None
+    progress: ProgressTracker | None
+
+
 def prepare_run(
     *,
     pipeline: Pipeline,
@@ -44,16 +55,7 @@ def prepare_run(
     auto_subpipeline: bool,
     show_progress: bool,
     in_async: bool,
-) -> tuple[
-    Pipeline,
-    RunInfo,
-    dict[str, StoreType],
-    ResultDict,
-    bool,
-    dict[OUTPUT_TYPE, Executor] | None,
-    int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    ProgressTracker | None,
-]:
+) -> Prepared:
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
@@ -84,7 +86,7 @@ def prepare_run(
     if parallel and any(func.profile for func in pipeline.functions):
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
-    return pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress
+    return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
 
 
 T = TypeVar("T")
