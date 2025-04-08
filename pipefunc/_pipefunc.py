@@ -1227,7 +1227,9 @@ class NestedPipeFunc(PipeFunc):
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
-        self.cache = cache if cache is not None else any(f.cache for f in self.pipeline.functions)
+        self.cache: bool = (
+            cache if cache is not None else any(f.cache for f in self.pipeline.functions)
+        )
         _maybe_variant_group_error(variant_group, variant)
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
