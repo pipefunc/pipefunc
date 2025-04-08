@@ -103,7 +103,7 @@ def _expand_output_name_in_dict(
         # single element of tuple output_name might be provided
         output_name = pipeline[name].output_name
         if output_name in expanded:
-            msg = f"{which} `{output_name=}` is already set."
+            msg = f"{which} for `{output_name=}` is already set."
             raise ValueError(msg)
         expanded[output_name] = value
     return expanded

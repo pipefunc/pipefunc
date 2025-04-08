@@ -1171,20 +1171,42 @@ def test_run_allow_unused() -> None:
 
 def test_executor_for_single_element_of_output_name_tuple() -> None:
     # Tests if _expand_output_name_in_executor works correctly
-    @pipefunc(output_name=("c", "d"))
+    @pipefunc(output_name=("c", "d"), mapspec="a[i], b[i] -> c[i], d[i]")
     def f(a, b):
         return a + b, a + b + 1
 
     pipeline = Pipeline([f])
-    r = pipeline.map({"a": 1, "b": 2}, executor={"c": ThreadPoolExecutor(max_workers=2)})
-    assert r["c"].output == 3
-    assert r["d"].output == 4
+    r = pipeline.map(
+        {"a": [1], "b": [2]},
+        executor={"c": ThreadPoolExecutor(max_workers=2)},
+        parallel=True,
+        storage={"c": "dict"},
+    )
+    assert r["c"].output[0] == 3
+    assert r["d"].output[0] == 4
+    assert r["c"].store.storage_id == "dict"  # type: ignore[union-attr]
+    assert r["d"].store.storage_id == "dict"  # type: ignore[union-attr]
 
-    with pytest.raises(ValueError, match=re.escape("Executor for `('c', 'd')` is already set.")):
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Executor for `output_name=('c', 'd')` is already set."),
+    ):
         pipeline.map(
-            {"a": 1, "b": 2},
+            {"a": [1], "b": [2]},
             executor={
                 "c": ThreadPoolExecutor(max_workers=2),
                 "d": ThreadPoolExecutor(max_workers=2),
+            },
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Storage for `output_name=('c', 'd')` is already set."),
+    ):
+        pipeline.map(
+            {"a": [1], "b": [2]},
+            storage={
+                "c": "dict",
+                "d": "dict",
             },
         )
