@@ -363,13 +363,13 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     if collapse_scopes:
         graph = collapsed_scope_graph(graph, collapse_scopes)
 
-    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
-
     if hide_default_args:
         if defaults is None:  # pragma: no cover
             msg = "`defaults` must be provided if `hide_default_args=True`."
             raise ValueError(msg)
-        plot_graph = hide_default_args_graph(plot_graph, defaults)
+        graph = hide_default_args_graph(graph, defaults)
+
+    plot_graph = create_grouped_parameter_graph(graph, min_arg_group_size)
 
     if style is None:
         style = GraphvizStyle()
