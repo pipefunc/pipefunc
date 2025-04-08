@@ -250,6 +250,13 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     )
     assert scope_accordion is None
 
+    # Check that orient dropdown is present
+    orient_dropdown = next(
+        (item for item in extra_controls_hbox.children if isinstance(item, ipywidgets.Dropdown)),
+        None,
+    )
+    assert orient_dropdown is not None
+
 
 @pytest.mark.skipif(
     not has_anywidget or not has_graphviz,
