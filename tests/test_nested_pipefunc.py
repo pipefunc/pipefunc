@@ -751,6 +751,7 @@ def test_nested_pipefunc_scope_removal() -> None:
 
 
 def test_nested_pipefunc_preserve_cache_on_combine() -> None:
+    # First check that the cache is preserved when combining pipelines with normal pipefuncs
     @pipefunc(output_name="c", cache=True)
     def f(a: int, b: int) -> int:
         return a + b
