@@ -674,7 +674,7 @@ def _extra_controls_factory(
 
     final_widgets = []
 
-    # --- Scope Collapse Controls (Conditional Accordion with ToggleButtons) ---
+    # Scope Collapse
     unique_scopes = all_unique_output_scopes(graph)
     scope_toggles = []
     if unique_scopes:
@@ -697,7 +697,7 @@ def _extra_controls_factory(
         scopes_accordion.set_title(0, "Collapse Scopes")
         final_widgets.append(scopes_accordion)
 
-    # --- Hide Defaults Toggle Button (Conditional) ---
+    # Hide Defaults
     hide_defaults_toggle = None
     if defaults:
         hide_defaults_toggle = ipywidgets.ToggleButton(
@@ -710,7 +710,7 @@ def _extra_controls_factory(
         )
         final_widgets.append(hide_defaults_toggle)
 
-    # --- Callback Function ---
+    # Callback Function
     def _update_dot_source(change: dict | None = None) -> None:  # noqa: ARG001
         """Observer function to update the widget's dot source."""
         hide_defaults_value = False
@@ -746,7 +746,7 @@ def _extra_controls_factory(
         )
         graphviz_anywidget.dot_source = new_dot_source
 
-    # --- Attach Observers ---
+    # Attach Observers
     if hide_defaults_toggle:
         hide_defaults_toggle.observe(_update_dot_source, names="value")
     if scope_toggles:
