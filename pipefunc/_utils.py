@@ -11,7 +11,7 @@ import socket
 import sys
 import warnings
 from collections.abc import Callable
-from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
@@ -453,3 +453,45 @@ def parse_function_docstring(
 def is_classmethod(func: Callable) -> bool:
     """Check if a function is a classmethod."""
     return inspect.ismethod(func) and func.__self__ is not None
+
+
+class LocalExecutor(Executor):
+    """Executes tasks synchronously in the local process but returns a Future.
+
+    This executor runs the function immediately upon submission,
+    capturing the result or exception in a standard Future object.
+    Useful for testing or scenarios where the overhead of actual
+    asynchronous execution is not desired, but the Future interface
+    is still required.
+    """
+
+    def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future:
+        """Executes the function synchronously and returns a completed Future.
+
+        Parameters
+        ----------
+        fn
+            The function to execute.
+        *args
+            Positional arguments for the function.
+        **kwargs
+            Keyword arguments for the function.
+
+        Returns
+        -------
+        concurrent.futures.Future
+            A future object that is already completed with the result or exception
+            of the function call.
+
+        """
+        future: Future[Any] = Future()
+        try:
+            result = fn(*args, **kwargs)
+            future.set_result(result)
+        except Exception as e:  # noqa: BLE001
+            future.set_exception(e)
+        return future
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:  # noqa: FBT001, FBT002
+        """No-op shutdown for the synchronous local executor."""
+        # Nothing to shut down
