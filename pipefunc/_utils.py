@@ -460,7 +460,7 @@ class LocalExecutor(Executor):
 
     Parameters
     ----------
-    debug
+    raise_exceptions
         Whether to raise an exception when an error occurs. If ``False``, the error is
         captured and the future is set to an exception.
 
@@ -472,8 +472,8 @@ class LocalExecutor(Executor):
 
     """
 
-    def __init__(self, *, debug: bool = False) -> None:
-        self.debug = debug
+    def __init__(self, *, raise_exceptions: bool = False) -> None:
+        self.raise_exceptions = raise_exceptions
 
     def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future:
         """Executes the function synchronously and returns a completed Future.
@@ -499,7 +499,7 @@ class LocalExecutor(Executor):
             result = fn(*args, **kwargs)
             future.set_result(result)
         except Exception as e:
-            if self.debug:
+            if self.raise_exceptions:
                 raise
             future.set_exception(e)
         return future
