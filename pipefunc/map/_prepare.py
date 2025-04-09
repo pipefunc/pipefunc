@@ -83,6 +83,7 @@ def prepare_run(
     outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
     store = run_info.init_store()
     progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    # TODO: Check what happens if `in_async=True`, can parallel be False?
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)
