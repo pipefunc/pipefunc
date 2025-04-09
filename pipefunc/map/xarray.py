@@ -186,5 +186,7 @@ def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     """Convert an xarray dataset to a pandas dataframe."""
+    if not ds.coords:
+        ...
     df = ds.to_dataframe().reset_index(drop=True)
     return _split_tuple_columns(df)
