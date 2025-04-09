@@ -64,7 +64,8 @@ def prepare_run(
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     if in_async and not parallel and executor is None:
-        executor = LocalExecutor()
+        print("🚧 Using LocalExecutor in async mode. Use for debugging only!")
+        executor = LocalExecutor(debug=True)
     executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
