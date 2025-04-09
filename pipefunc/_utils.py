@@ -458,12 +458,22 @@ def is_classmethod(func: Callable) -> bool:
 class LocalExecutor(Executor):
     """Executes tasks synchronously in the local process but returns a Future.
 
+    Parameters
+    ----------
+    debug
+        Whether to raise an exception when an error occurs. If ``False``, the error is
+        captured and the future is set to an exception.
+
     This executor runs the function immediately upon submission,
     capturing the result or exception in a standard Future object.
     Useful for testing or scenarios where the overhead of actual
     asynchronous execution is not desired, but the Future interface
     is still required.
+
     """
+
+    def __init__(self, *, debug: bool = False) -> None:
+        self.debug = debug
 
     def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future:
         """Executes the function synchronously and returns a completed Future.
@@ -488,7 +498,9 @@ class LocalExecutor(Executor):
         try:
             result = fn(*args, **kwargs)
             future.set_result(result)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
+            if self.debug:
+                raise
             future.set_exception(e)
         return future
 

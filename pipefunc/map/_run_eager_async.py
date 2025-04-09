@@ -86,7 +86,7 @@ def run_map_eager_async(
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
     parallel
         Whether to run the functions in parallel. If ``True``, a `LocalExecutor` is used but only
-        if ``executor`` is ``None``.
+        if ``executor`` is ``None``. Use for debugging only!
     executor
         The executor to use for parallel execution. Can be specified as:
 
