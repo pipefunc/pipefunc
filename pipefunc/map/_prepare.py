@@ -64,7 +64,11 @@ def prepare_run(
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
     if in_async and not parallel and executor is None:
-        print("🚧 Using LocalExecutor in async mode. Use for debugging only!")
+        print(
+            "🚧 WARNING: map_async(parallel=False) called. Using synchronous LocalExecutor."
+            " The calling thread/process will block. This mode is intended for debugging only."
+            " If sequential execution is needed, consider using pipeline.map instead.",
+        )
         executor = LocalExecutor(raise_exceptions=True)
     executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
