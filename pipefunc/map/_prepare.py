@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import LocalExecutor, at_least_tuple
 
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
@@ -63,6 +63,13 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
+    if in_async and not parallel and executor is None:
+        print(
+            "🚧 WARNING: map_async(parallel=False) called. Using synchronous LocalExecutor."
+            " The calling thread/process will block. This mode is intended for debugging only."
+            " If sequential execution is needed, consider using pipeline.map instead.",
+        )
+        executor = LocalExecutor(raise_exceptions=True)
     executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
@@ -80,6 +87,7 @@ def prepare_run(
     outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
     store = run_info.init_store()
     progress = init_tracker(store, pipeline.sorted_functions, show_progress, in_async)
+    # TODO: Check what happens if `in_async=True`, can parallel be False?
     if executor is None and _cannot_be_parallelized(pipeline):
         parallel = False
     _check_parallel(parallel, store, executor)

@@ -43,6 +43,7 @@ def run_map_eager_async(
     internal_shapes: UserShapeDict | None = None,
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
+    parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
     storage: StorageType = "file_array",
@@ -83,6 +84,9 @@ def run_map_eager_async(
         If a `PipeFunc` has an ``internal_shape`` argument *and* it is provided here, the provided value is used.
     output_names
         The output(s) to calculate. If ``None``, the entire pipeline is run and all outputs are computed.
+    parallel
+        Whether to run the functions in parallel. If ``True``, a `LocalExecutor` is used but only
+        if ``executor`` is ``None``. Use for debugging only!
     executor
         The executor to use for parallel execution. Can be specified as:
 
@@ -149,7 +153,7 @@ def run_map_eager_async(
         run_folder=run_folder,
         internal_shapes=internal_shapes,
         output_names=output_names,
-        parallel=True,
+        parallel=parallel,
         executor=executor,
         chunksizes=chunksizes,
         storage=storage,
