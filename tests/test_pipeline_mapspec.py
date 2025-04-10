@@ -425,3 +425,13 @@ def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa
     pipeline_sum = Pipeline([generate_ints, double_it])
     results = pipeline_sum.map({}, show_progress=show_progress, parallel=False, storage="dict")
     assert results["y"].output.tolist() == []
+
+
+def test_add_nd_mapspec_axis() -> None:
+    @pipefunc(output_name="x")
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    pipeline.add_mapspec_axis("a", axis="i, j")
+    assert str(pipeline["x"].mapspec) == "a[i, j] -> x[i, j]"
