@@ -237,7 +237,7 @@ class FileArray(StorageBase):
         """Return a list of booleans indicating which elements are missing."""
         # We use os.listdir to check if a file exists instead of checking with
         # self._index_to_file(i).is_file() because this is more efficient.
-        existing_files = set(os.listdir(self.folder))
+        existing_files = set(os.listdir(self.folder))  # noqa: PTH208
         return [self.filename_template.format(i) not in existing_files for i in range(self.size)]
 
     @property
