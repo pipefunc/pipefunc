@@ -1477,6 +1477,7 @@ class Pipeline:
             The axis to add to the `MapSpec` of all functions that depends on
             ``parameter``. Provide a new axis name to add a new axis or an
             existing axis name to zip the parameter with the existing axis.
+            Can be a comma-separated string to add multiple axes at once.
 
         """
         self._autogen_mapspec_axes()

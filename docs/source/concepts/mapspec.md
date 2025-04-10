@@ -14,6 +14,7 @@ kernelspec:
 # Understanding `mapspec`
 
 ```{try-notebook}
+
 ```
 
 ```{contents} ToC
@@ -428,6 +429,49 @@ This will produce:
 
 - A 2D array `y` where each element `y[i, j]` is `2 * x[i] + b[j]`.
 - A 1D array `sum` where each element `sum[j]` is the sum of `y` values along the `i` axis for the corresponding `b[j]`.
+
+**Example 3: Adding Multi-Dimensional Axes**
+
+You can also introduce multiple dimensions at once by providing a comma-separated string to the `axis` parameter.
+This is useful for adding axes that represent, for example, a 2D grid or higher-dimensional parameter spaces.
+
+Consider a simple pipeline with one function:
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+
+@pipefunc(output_name="y")
+def process(x):
+    return x * 2
+
+pipeline_nd = Pipeline([process])
+```
+
+Now, let's add a 2D axis `i, j` to the input `x`:
+
+```{code-cell} ipython3
+pipeline_nd.add_mapspec_axis("x", axis="i, j")
+
+# Check the generated mapspec string
+print(pipeline_nd.mapspecs_as_strings)
+pipeline_nd.visualize()
+```
+
+**Explanation:**
+
+1.  **`add_mapspec_axis("x", axis="i, j")`:** This adds two new dimensions, indexed by `i` and `j`, to the input `x` simultaneously.
+2.  **Resulting `mapspec`:** The function `process` now has the `mapspec="x[i, j] -> y[i, j]"`. The pipeline expects a 2D array-like input for `x` and will produce a 2D output `y` of the same shape.
+
+**Running the Pipeline:**
+
+```{code-cell} ipython3
+import numpy as np
+
+result = pipeline_nd.map({"x": np.array([[1, 2], [3, 4]])})
+print(result["y"].output)
+```
+
+This demonstrates how easily you can extend the dimensionality of your pipeline inputs using `add_mapspec_axis` with comma-separated indices.
 
 **Key Takeaway:**
 

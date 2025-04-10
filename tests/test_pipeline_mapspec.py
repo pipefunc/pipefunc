@@ -4,6 +4,7 @@ import importlib.util
 from concurrent.futures import Executor
 from typing import Literal
 
+import numpy as np
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
@@ -425,3 +426,116 @@ def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa
     pipeline_sum = Pipeline([generate_ints, double_it])
     results = pipeline_sum.map({}, show_progress=show_progress, parallel=False, storage="dict")
     assert results["y"].output.tolist() == []
+
+
+def test_add_nd_mapspec_axis() -> None:
+    @pipefunc(output_name="x")
+    def f(a):
+        return a
+
+    pipeline = Pipeline([f])
+    pipeline.add_mapspec_axis("a", axis="i, j")
+    assert str(pipeline["x"].mapspec) == "a[i, j] -> x[i, j]"
+
+
+def test_add_nd_mapspec_axis_to_existing_1d() -> None:
+    """Test adding a 2D axis 'k, l' to input 'a' which already has axis 'i'."""
+
+    @pipefunc(output_name="result", mapspec="a[i] -> result[i]")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i, k, l] -> result[i, k, l]"
+
+
+def test_add_nd_mapspec_axis_to_existing_mixed() -> None:
+    """Test adding a 2D axis 'k, l' to input 'b' which has 'j', while 'a' has 'i'."""
+
+    @pipefunc(output_name="result", mapspec="a[i], b[j] -> result[i, j]")
+    def func(a, b):
+        return a + b
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("b", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i], b[j, k, l] -> result[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_to_existing_nd() -> None:
+    """Test adding a 2D axis 'k, l' to input 'a' which already has 'i, j'."""
+
+    @pipefunc(output_name="result", mapspec="a[i, j] -> result[i, j]")
+    def func(a):
+        return a
+
+    pipeline = Pipeline([func])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+    assert str(pipeline["result"].mapspec) == "a[i, j, k, l] -> result[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_propagates() -> None:
+    """Test adding 2D axis 'k, l' to 'a' propagates through 'c'."""
+
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f_c(a):
+        return a
+
+    @pipefunc(output_name="d", mapspec="c[i], b[j] -> d[i, j]")
+    def f_d(c, b):
+        return c + b
+
+    pipeline = Pipeline([f_c, f_d])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[i, k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "c[i, k, l], b[j] -> d[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_fan_in() -> None:
+    """Test adding 2D axis 'k, l' to 'a' in a fan-in structure."""
+
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+    def f_c(a):
+        return a
+
+    @pipefunc(output_name="d", mapspec="b[j] -> d[j]")
+    def f_d(b):
+        return b
+
+    @pipefunc(output_name="e", mapspec="c[i], d[j] -> e[i, j]")
+    def f_e(c, d):
+        return c + d
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[i, k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "b[j] -> d[j]"  # Unchanged
+    assert str(pipeline["e"].mapspec) == "c[i, k, l], d[j] -> e[i, j, k, l]"
+
+
+def test_add_nd_mapspec_axis_fan_out() -> None:
+    """Test adding 2D axis 'k, l' to 'a' in a fan-out structure."""
+
+    @pipefunc(output_name="c", mapspec="... -> c[i]")
+    def f_c(a):
+        return [a, a, a]
+
+    @pipefunc(output_name="d", mapspec="b[j] -> d[j]")
+    def f_d(b):
+        return b
+
+    @pipefunc(output_name="e", mapspec="c[i], d[j] -> e[i, j]")
+    def f_e(c, d):
+        return c + d
+
+    pipeline = Pipeline([f_c, f_d, f_e])
+    pipeline.add_mapspec_axis("a", axis="k, l")
+
+    assert str(pipeline["c"].mapspec) == "a[k, l] -> c[i, k, l]"
+    assert str(pipeline["d"].mapspec) == "b[j] -> d[j]"  # Unchanged
+    assert str(pipeline["e"].mapspec) == "c[i, k, l], d[j] -> e[i, j, k, l]"
+    results = pipeline.map({"a": np.array([[1]]), "b": [1, 2]})
+    assert results["e"].output.tolist() == [[[[2]], [[3]]], [[[2]], [[3]]], [[[2]], [[3]]]]
+    assert results["e"].output.shape == (3, 2, 1, 1)
