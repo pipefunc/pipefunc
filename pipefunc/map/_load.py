@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     """Load the outputs of a run.
 
+    Allows loading outputs even from partial runs that failed.
+    Map results are returned as `numpy.masked_array`s where missing values
+    are masked.
+
     Parameters
     ----------
     output_names
@@ -38,6 +42,10 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
 
 def load_all_outputs(run_folder: str | Path) -> dict[str, Any]:
     """Load all outputs of a run.
+
+    Allows loading outputs even from partial runs that failed.
+    Map results are returned as `numpy.masked_array`s where missing values
+    are masked.
 
     Parameters
     ----------
