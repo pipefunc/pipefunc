@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -109,7 +110,7 @@ def _xarray(
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
-    coord_mapping: dict[tuple[str, ...], dict[str, list[str]]] = defaultdict(
+    coord_mapping: dict[tuple[str, ...], dict[str, list[Any]]] = defaultdict(
         lambda: defaultdict(list),
     )
     dims: set[str] = set()
@@ -135,7 +136,14 @@ def _xarray(
             names = list(dct.keys())
             name = ":".join(names)
             arrays = list(itertools.chain.from_iterable(dct.values()))
-            array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
+            first = arrays[0]
+            if isinstance(first, np.ndarray) and first.ndim > 1:  # not supported in pandas
+                shape = first.shape
+                array = np.empty(shape, dtype=object)
+                for i in np.ndindex(shape):
+                    array[i] = tuple(arr[i] for arr in arrays)
+            else:
+                array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
@@ -169,8 +177,23 @@ def _xarray_dataset(
     ds = xr.merge(to_merge, compat="override")
     for name in single_output_names:
         array = data_loader(name)
-        ds[name] = array if isinstance(array, np.ndarray) else ((), array)
+        if isinstance(array, np.ndarray):
+            if array.ndim == 1:
+                ds[name] = array
+            else:
+                # Wrap in DimensionlessArray to avoid xarray trying to interpret
+                # the data and requiring dimensions, resulting in an error
+                ds[name] = ((), DimensionlessArray(array))
+        else:
+            ds[name] = ((), array)
     return ds
+
+
+@dataclass
+class DimensionlessArray:
+    """A class to represent an array without dimensions."""
+
+    arr: np.ndarray
 
 
 def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -189,4 +212,8 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     if not ds.coords:
         ...
     df = ds.to_dataframe().reset_index(drop=True)
+    # Identify if a column is a DimensionlessArray
+    for col in df.columns:
+        if isinstance(df[col].iloc[0], DimensionlessArray):
+            df[col] = df[col].apply(lambda x: x.arr)
     return _split_tuple_columns(df)

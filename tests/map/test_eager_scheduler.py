@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_outputs
+from pipefunc.map import load_all_outputs, load_outputs
 from pipefunc.map._run import run_map
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.typing import Array
@@ -282,6 +282,10 @@ def test_eager_scheduler_with_caching(tmp_path: Path):
     assert load_outputs("a", run_folder=run_folder) == "a"
     assert load_outputs("b", run_folder=run_folder) == "b(a)"
     assert load_outputs("c", run_folder=run_folder) == "c(b(a))"
+    outs = load_all_outputs(run_folder=run_folder)
+    assert outs["a"] == "a"
+    assert outs["b"] == "b(a)"
+    assert outs["c"] == "c(b(a))"
     assert call_counts == {"a": 1, "b": 1, "c": 1}
 
     # Second run should use cache

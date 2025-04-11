@@ -403,6 +403,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     hints = _all_type_annotations(graph)
     nodes = _Nodes.from_graph(plot_graph)
     labels = _Labels.from_graph(plot_graph)
+    arg_mapspec_before_grouping = _Labels.from_graph(graph).arg_mapspec
 
     # Define a mapping for node configurations
     node_types: dict[str, tuple[list, dict]] = {
@@ -472,7 +473,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 node,
                 hints,
                 defaults,
-                labels.arg_mapspec,
+                arg_mapspec_before_grouping,
                 include_full_mapspec,
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)

@@ -1,4 +1,4 @@
-"""Custom type hinting utilities for pipefunc."""  # noqa: A005
+"""Custom type hinting utilities for pipefunc."""
 
 import re
 import warnings
