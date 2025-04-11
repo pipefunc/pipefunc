@@ -178,7 +178,10 @@ class FileArray(StorageBase):
         sub_array = load(file)
         if internal_indices:
             sub_array = np.asarray(sub_array)
-            return sub_array[internal_indices]
+            try:
+                return sub_array[internal_indices]
+            except IndexError:
+                return np.ma.masked
         return sub_array
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
