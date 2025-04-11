@@ -658,7 +658,7 @@ def _validate_internal_shape(
     func: PipeFunc,
 ) -> None:
     if func.mapspec and any(name.endswith("*") for name in func.mapspec.output_indices):
-        return
+        return  # Irregular shapes
     shape = np.shape(output)[: len(internal_shape)]
     if shape != internal_shape:
         msg = (
