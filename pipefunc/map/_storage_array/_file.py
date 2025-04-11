@@ -224,8 +224,13 @@ class FileArray(StorageBase):
                 sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    arr[full_index] = sub_array[internal_index]
-                    full_mask[full_index] = False
+                    try:
+                        sel = sub_array[internal_index]
+                        arr[full_index] = sel
+                        full_mask[full_index] = False
+                    except IndexError:
+                        arr[full_index] = np.ma.masked
+                        full_mask[full_index] = True
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)

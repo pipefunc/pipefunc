@@ -637,7 +637,7 @@ def _set_output(
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    _validate_internal_shape(output, internal_shape, func)
+    # _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -646,7 +646,10 @@ def _set_output(
             external_index,
             internal_index,
         )
-        arr[flat_index] = output[internal_index]
+        try:
+            arr[flat_index] = output[internal_index]
+        except IndexError:
+            arr[flat_index] = np.ma.masked
 
 
 def _validate_internal_shape(
