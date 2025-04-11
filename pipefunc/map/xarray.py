@@ -209,6 +209,9 @@ def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     """Convert an xarray dataset to a pandas dataframe."""
+    if not ds.coords:
+        # Return a single row dataframe if there are no coordinates
+        return pd.DataFrame({data_var: [value.data] for data_var, value in ds.data_vars.items()})
     df = ds.to_dataframe().reset_index(drop=True)
     # Identify if a column is a DimensionlessArray
     for col in df.columns:
