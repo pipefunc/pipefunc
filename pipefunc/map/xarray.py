@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -174,28 +175,29 @@ def _xarray_dataset(
     # Remove the DataArrays that are already appear in other DataArrays' coords
     to_merge = [v for k, v in data_arrays.items() if k not in all_coords]
     ds = xr.merge(to_merge, compat="override")
-    dim_gen = _dim_generator()
     for name in single_output_names:
         array = data_loader(name)
         if isinstance(array, np.ndarray):
             if array.ndim == 1:
                 ds[name] = array
             else:
-                dims = [dim_gen() for _ in range(array.ndim)]
-                ds[name] = (dims, array)
+                # Wrap in DimensionlessArray to avoid xarray trying to interpret
+                # the data and requiring dimensions, resulting in an error
+                ds[name] = ((), DimensionlessArray(array))
         else:
             ds[name] = ((), array)
     return ds
 
 
-def _dim_generator() -> Callable[[], str]:
-    """Generate a dimension name."""
-    cnt = itertools.count(0)
+@dataclass
+class DimensionlessArray:
+    """A class to represent an array without dimensions."""
 
-    def _generate() -> str:
-        return f"unnamed_{next(cnt)}"
+    arr: np.ndarray
 
-    return _generate
+    def __repr__(self) -> str:
+        """Represent the array as a string."""
+        return str(self.arr.tolist())
 
 
 def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -212,4 +214,8 @@ def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
 def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
     """Convert an xarray dataset to a pandas dataframe."""
     df = ds.to_dataframe().reset_index(drop=True)
+    # Identify if a column is a DimensionlessArray
+    for col in df.columns:
+        if isinstance(df[col].iloc[0], DimensionlessArray):
+            df[col] = df[col].apply(lambda x: x.arr)
     return _split_tuple_columns(df)
