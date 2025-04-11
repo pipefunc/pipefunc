@@ -930,6 +930,12 @@ class PipeFunc(Generic[T]):
             return f"{name}-{pipefunc_hash}"
         return name
 
+    @functools.cached_property
+    def _irregular_output(self) -> bool:
+        if self.mapspec is None:
+            return False
+        return any(name.endswith("*") for name in self.mapspec.output_indices)
+
 
 def pipefunc(
     output_name: OUTPUT_TYPE,
