@@ -45,6 +45,7 @@ class FileArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT001, FBT002
         *,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
@@ -60,6 +61,7 @@ class FileArray(StorageBase):
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
 
     def __repr__(self) -> str:
         return (
@@ -178,7 +180,16 @@ class FileArray(StorageBase):
         sub_array = load(file)
         if internal_indices:
             sub_array = np.asarray(sub_array)
-            return sub_array[internal_indices]
+            try:
+                return sub_array[internal_indices]
+            except IndexError as e:
+                if not self.irregular:
+                    msg = (
+                        f"Index {internal_indices} out of bounds for array "
+                        f"with shape {sub_array.shape}"
+                    )
+                    raise IndexError(msg) from e
+                return np.ma.masked
         return sub_array
 
     def to_array(self, *, splat_internal: bool | None = None) -> np.ma.core.MaskedArray:
@@ -224,8 +235,19 @@ class FileArray(StorageBase):
                 sub_array = np.asarray(sub_array)  # could be a list
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)
-                    arr[full_index] = sub_array[internal_index]
-                    full_mask[full_index] = False
+                    try:
+                        sel = sub_array[internal_index]
+                        arr[full_index] = sel
+                        full_mask[full_index] = False
+                    except IndexError as e:
+                        if not self.irregular:
+                            msg = (
+                                f"Index {internal_index} out of bounds for array "
+                                f"with shape {sub_array.shape}"
+                            )
+                            raise IndexError(msg) from e
+                        arr[full_index] = np.ma.masked
+                        full_mask[full_index] = True
             else:
                 for internal_index in iterate_shape_indices(self.resolved_internal_shape):
                     full_index = select_by_mask(self.shape_mask, external_index, internal_index)

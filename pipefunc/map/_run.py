@@ -646,7 +646,12 @@ def _set_output(
             external_index,
             internal_index,
         )
-        arr[flat_index] = output[internal_index]
+        try:
+            arr[flat_index] = output[internal_index]
+        except IndexError:
+            if not func._irregular_output:
+                raise
+            arr[flat_index] = np.ma.masked
 
 
 def _validate_internal_shape(
@@ -654,6 +659,8 @@ def _validate_internal_shape(
     internal_shape: tuple[int, ...],
     func: PipeFunc,
 ) -> None:
+    if func._irregular_output:
+        return
     shape = np.shape(output)[: len(internal_shape)]
     if shape != internal_shape:
         msg = (
