@@ -45,9 +45,9 @@ class FileArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT001, FBT002
         *,
         filename_template: str = FILENAME_TEMPLATE,
-        irregular: bool = False,
     ) -> None:
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"

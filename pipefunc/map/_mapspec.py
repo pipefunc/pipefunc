@@ -535,3 +535,10 @@ def trace_dependencies(mapspecs: list[MapSpec]) -> dict[str, dict[str, tuple[str
         output_name: {name: order_like_mapspec_axes(name, axs) for name, axs in dct.items()}
         for output_name, dct in reordered.items()
     }
+
+
+def is_irregular(mapspec: MapSpec | None) -> bool:
+    """Check if the mapspec is irregular."""
+    if mapspec is None:
+        return False
+    return any(name.endswith("*") for name in mapspec.output_indices)

@@ -38,7 +38,7 @@ from pipefunc._utils import (
     requires,
 )
 from pipefunc.lazy import evaluate_lazy
-from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
+from pipefunc.map._mapspec import ArraySpec, MapSpec, is_irregular, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
 from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
@@ -932,9 +932,7 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def _irregular_output(self) -> bool:
-        if self.mapspec is None:
-            return False
-        return any(name.endswith("*") for name in self.mapspec.output_indices)
+        return is_irregular(self.mapspec)
 
 
 def pipefunc(
