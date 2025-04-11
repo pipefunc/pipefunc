@@ -13,13 +13,48 @@ if TYPE_CHECKING:
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
-    """Load the outputs of a run."""
+    """Load the outputs of a run.
+
+    Parameters
+    ----------
+    output_names
+        The names of the outputs to load. If empty, no outputs are loaded.
+    run_folder
+        The ``run_folder`` used in ``pipeline.map`` or ``pipeline.map_async``.
+
+    See Also
+    --------
+    load_all_outputs
+        For loading all outputs.
+
+    """
     run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
     outputs = [_load_from_store(output_name, store).value for output_name in output_names]
     outputs = [_maybe_load_array(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
+
+
+def load_all_outputs(run_folder: str | Path) -> dict[str, Any]:
+    """Load all outputs of a run.
+
+    Parameters
+    ----------
+    run_folder
+        The ``run_folder`` used in ``pipeline.map`` or ``pipeline.map_async``.
+
+    See Also
+    --------
+    load_outputs
+        For loading specific outputs.
+
+    """
+    run_folder = Path(run_folder)
+    run_info = RunInfo.load(run_folder)
+    output_names = run_info.all_output_names
+    outputs = load_outputs(*output_names, run_folder=run_folder)
+    return dict(zip(output_names, outputs))
 
 
 def load_xarray_dataset(
