@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
@@ -9,6 +8,8 @@ from ._run import _load_from_store, _maybe_load_array
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import xarray as xr
 
 
@@ -32,7 +33,6 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
         For loading all outputs.
 
     """
-    run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
     outputs = [_load_from_store(output_name, store).value for output_name in output_names]
@@ -58,7 +58,6 @@ def load_all_outputs(run_folder: str | Path) -> dict[str, Any]:
         For loading specific outputs.
 
     """
-    run_folder = Path(run_folder)
     run_info = RunInfo.load(run_folder)
     output_names = run_info.all_output_names
     outputs = load_outputs(*output_names, run_folder=run_folder)
