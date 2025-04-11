@@ -228,3 +228,45 @@ def test_to_dataframe() -> None:
         "hits",
         "home_runs",
     }
+
+
+def test_2d_mapspec() -> None:
+    # NotImplementedError: > 1 ndim Categorical are not supported at this time
+    @pipefunc(output_name="x1")
+    def x1() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="x2")
+    def x2() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="y", mapspec="x1[i, j], x2[i, j] -> y[i, j]")
+    def f(x1: npt.NDArray[np.int_], x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        return x1 + x2
+
+    pipeline = Pipeline([x1, x2, f])
+    results = pipeline.map({}, parallel=False, storage="dict")
+    ds = results.to_xarray()
+    df = results.to_dataframe()
+
+
+def test_2d_mapspec_with_nested_array() -> None:
+    # MissingDimensionsError: cannot set variable 'x2' with 2-dimensional data without
+    # explicit dimension names. Pass a tuple of (dims, data) instead.
+    @pipefunc(output_name="x1")
+    def x1() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="x2")
+    def x2() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="y", mapspec="x1[i, j] -> y[i, j]")
+    def f(x1: npt.NDArray[np.int_], x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        return np.ones((2, 2))
+
+    pipeline = Pipeline([x1, x2, f])
+
+    results = pipeline.map({}, parallel=False, storage="dict")
+    ds = results.to_xarray()
+    df = results.to_dataframe()
