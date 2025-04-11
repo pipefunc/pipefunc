@@ -637,7 +637,7 @@ def _set_output(
     external_shape = external_shape_from_mask(shape, shape_mask)
     internal_shape = internal_shape_from_mask(shape, shape_mask)
     external_index = _shape_to_key(external_shape, linear_index)
-    # _validate_internal_shape(output, internal_shape, func)
+    _validate_internal_shape(output, internal_shape, func)
     for internal_index in iterate_shape_indices(internal_shape):
         flat_index = _indices_to_flat_index(
             external_shape,
@@ -657,6 +657,8 @@ def _validate_internal_shape(
     internal_shape: tuple[int, ...],
     func: PipeFunc,
 ) -> None:
+    if func.mapspec and any(name.endswith("*") for name in func.mapspec.output_indices):
+        return
     shape = np.shape(output)[: len(internal_shape)]
     if shape != internal_shape:
         msg = (
