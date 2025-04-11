@@ -59,8 +59,10 @@ def load_all_outputs(run_folder: str | Path) -> dict[str, Any]:
 
     """
     run_info = RunInfo.load(run_folder)
-    output_names = run_info.all_output_names
+    output_names = sorted(run_info.all_output_names)
     outputs = load_outputs(*output_names, run_folder=run_folder)
+    if len(output_names) == 1:
+        return {output_names[0]: outputs}
     return dict(zip(output_names, outputs))
 
 

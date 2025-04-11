@@ -12,7 +12,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._load import load_outputs
+from pipefunc.map._load import load_all_outputs, load_outputs
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
 from pipefunc.map._run_info import RunInfo, map_shapes
@@ -1950,3 +1950,21 @@ def test_map_with_auto_subpipeline(tmp_path: Path):
             parallel=False,
             storage="dict",
         )
+
+
+def test_pipeline_map_single_output_load_all_outputs(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        return x + 1
+
+    pipeline = Pipeline([f])
+    inputs = {"x": [1, 2, 3]}
+    r = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        parallel=False,
+        storage="dict",
+    )
+    assert r["y"].output.tolist() == [2, 3, 4]
+    outputs = load_all_outputs(run_folder=tmp_path)
+    assert outputs["y"].tolist() == [2, 3, 4]
