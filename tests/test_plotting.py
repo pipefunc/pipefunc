@@ -142,7 +142,7 @@ def test_plotting_resources() -> None:
 @pytest.fixture
 def everything_pipeline() -> Pipeline:
     @pipefunc(output_name="c")
-    def f(a: int, b: int) -> int: ...  # type: ignore[empty-body]
+    def f(a: int, b: int, aa=1, bb=2, cc=3, dd=4) -> int: ...  # type: ignore[empty-body]
     @pipefunc(output_name="d", mapspec="... -> d[j]")
     def g(b: int, c: int, x: int = 1) -> int: ...  # type: ignore[empty-body]
     @pipefunc(
@@ -159,6 +159,22 @@ def everything_pipeline() -> Pipeline:
     def i2(i1: dict[str, int]): ...
 
     i = NestedPipeFunc([i1, i2], output_name="i2")
+    return Pipeline([f, g, h, i])
+
+
+@pytest.fixture
+def scoped_pipeline() -> Pipeline:
+    """Pipeline fixture with functions defined within scopes."""
+
+    @pipefunc(output_name="c", scope="scope1")
+    def f(a: int, b: int = 5) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(output_name="d", scope="scope1")
+    def g(c: int) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(output_name="e", scope="scope2")
+    def h(a: int, d: int = 10) -> int: ...  # type: ignore[empty-body]
+    @pipefunc(output_name="f")  # No scope
+    def i(e: int) -> int: ...  # type: ignore[empty-body]
+
     return Pipeline([f, g, h, i])
 
 
@@ -195,16 +211,142 @@ def test_visualize_graphviz(
 )
 def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     # Note: Not sure how to test this properly, just make sure it runs
+    import ipywidgets
+
     widget = everything_pipeline.visualize(backend="graphviz_widget")
-    first, second = widget.children
+    extra_controls_hbox, second, *last = widget.children
     reset_button, freeze, direction_selector, search_input, search_type_selector, case_toggle = (
-        first.children
+        second.children
     )
     reset_button.click()
     direction_selector.value = "downstream"
     search_input.value = "c"
     search_type_selector.value = "included"
     case_toggle.value = True
+
+    # Check for hide defaults toggle (everything_pipeline has defaults)
+    hide_defaults_toggle = next(
+        (
+            item
+            for item in extra_controls_hbox.children
+            if isinstance(item, ipywidgets.ToggleButton) and "default args" in item.description
+        ),
+        None,
+    )
+    assert hide_defaults_toggle is not None
+    assert hide_defaults_toggle.value is False
+    # Simulate click
+    hide_defaults_toggle.value = True  # Trigger the observer
+    assert hide_defaults_toggle.description == "Hide default args"
+    assert hide_defaults_toggle.icon == "eye-slash"
+    hide_defaults_toggle.value = False  # Trigger again
+    assert hide_defaults_toggle.description == "Show default args"
+    assert hide_defaults_toggle.icon == "eye"
+
+    # Check that scope accordion is NOT present (everything_pipeline has no scopes)
+    scope_accordion = next(
+        (item for item in extra_controls_hbox.children if isinstance(item, ipywidgets.Accordion)),
+        None,
+    )
+    assert scope_accordion is None
+
+    # Check that orient dropdown is present
+    orient_dropdown = next(
+        (item for item in extra_controls_hbox.children if isinstance(item, ipywidgets.Dropdown)),
+        None,
+    )
+    assert orient_dropdown is not None
+
+    # Check that group args toggle is present
+    group_args_toggle = next(
+        (
+            item
+            for item in extra_controls_hbox.children
+            if isinstance(item, ipywidgets.ToggleButton) and "Group args" in item.description
+        ),
+        None,
+    )
+    assert group_args_toggle is not None
+    assert group_args_toggle.value is False
+    assert group_args_toggle.description == "Group args"
+    assert group_args_toggle.icon == "plus-square-o"
+    assert group_args_toggle.button_style == "info"
+    group_args_toggle.value = True  # Simulate click
+    assert group_args_toggle.description == "Ungroup args"
+    assert group_args_toggle.icon == "minus-square-o"
+    assert group_args_toggle.button_style == "success"
+
+
+@pytest.mark.skipif(
+    not has_anywidget or not has_graphviz,
+    reason="graphviz-anywidget not installed",
+)
+def test_plotting_widget_controls(scoped_pipeline: Pipeline) -> None:
+    """Test the extra controls (scope collapse, hide defaults) on the widget."""
+    # Note: Still hard to test the visual output or exact dot source changes easily.
+    # Focus on widget creation and interaction without errors.
+    import ipywidgets
+
+    widget = scoped_pipeline.visualize(backend="graphviz_widget")
+    assert isinstance(widget, ipywidgets.VBox)
+
+    # Find controls
+    extra_controls_hbox = widget.children[0]  # The HBox from _extra_controls_factory
+
+    # Check for hide defaults toggle (scoped_pipeline has defaults)
+    hide_defaults_toggle = next(
+        (
+            item
+            for item in extra_controls_hbox.children
+            if isinstance(item, ipywidgets.ToggleButton) and "default args" in item.description
+        ),
+        None,
+    )
+    assert hide_defaults_toggle is not None
+    assert hide_defaults_toggle.value is False
+    # Simulate click
+    hide_defaults_toggle.value = True  # Trigger the observer
+    assert hide_defaults_toggle.description == "Hide default args"
+    assert hide_defaults_toggle.icon == "eye-slash"
+    hide_defaults_toggle.value = False  # Trigger again
+    assert hide_defaults_toggle.description == "Show default args"
+    assert hide_defaults_toggle.icon == "eye"
+
+    # Check for scope collapse accordion and toggles (scoped_pipeline has scopes)
+    scope_accordion = next(
+        (item for item in extra_controls_hbox.children if isinstance(item, ipywidgets.Accordion)),
+        None,
+    )
+    assert scope_accordion is not None
+    assert scope_accordion.get_title(0) == "Collapse Scopes"
+    scope_vbox = scope_accordion.children[0]
+    assert isinstance(scope_vbox, ipywidgets.VBox)
+    scope_toggles = scope_vbox.children
+    assert len(scope_toggles) == 2  # scope1, scope2
+    assert {toggle.description for toggle in scope_toggles} == {"scope1", "scope2"}
+
+    # Simulate clicking scope toggles
+    scope1_toggle = next(t for t in scope_toggles if t.description == "scope1")
+    scope2_toggle = next(t for t in scope_toggles if t.description == "scope2")
+
+    assert scope1_toggle.value is False
+    assert scope1_toggle.icon == "plus-square-o"
+    scope1_toggle.value = True  # Trigger observer
+    assert scope1_toggle.value is True
+    assert scope1_toggle.icon == "minus-square-o"
+
+    assert scope2_toggle.value is False
+    assert scope2_toggle.icon == "plus-square-o"
+    scope2_toggle.value = True  # Trigger observer
+    assert scope2_toggle.value is True
+    assert scope2_toggle.icon == "minus-square-o"
+
+    # Collapse one scope
+    scope1_toggle.value = False  # Trigger observer
+    assert scope1_toggle.value is False
+    assert scope1_toggle.icon == "plus-square-o"
+    assert scope2_toggle.value is True  # Should remain collapsed
+    assert scope2_toggle.icon == "minus-square-o"
 
 
 @pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
@@ -219,3 +361,67 @@ def test_visualize_graphviz_with_typing():
 
     pipeline = Pipeline([f, g])
     pipeline.visualize_graphviz(return_type="html")
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+def test_collapse_scope_plot_with_mapspecs():
+    @pipefunc(output_name="c", mapspec="a[i] -> c[i]", scope="foo")
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d", mapspec="c[i] -> d[i]", scope="foo")
+    def g(c: int) -> int:
+        return c * 2
+
+    @pipefunc(output_name="e", mapspec="foo.d[i] -> bar.e[i]", renames={"d": "foo.d", "e": "bar.e"})
+    def h(d: int) -> int:
+        return d * 3
+
+    pipeline = Pipeline([f, g, h])
+    results = pipeline.map(
+        inputs={"foo.a": [1, 2], "foo.b": 3},
+        parallel=False,
+        storage="dict",
+    )
+    assert results["foo.c"].output.tolist() == [4, 5]
+    assert results["foo.d"].output.tolist() == [8, 10]
+    assert results["bar.e"].output.tolist() == [24, 30]
+
+    # Test that both work
+    pipeline.visualize_graphviz(collapse_scopes=True)
+    pipeline.visualize_graphviz(collapse_scopes=False)
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+@pytest.mark.parametrize("min_arg_group_size", [None, 1, 2, 3])
+def test_min_arg_group_size(min_arg_group_size: int | None):
+    @pipefunc(output_name="d", mapspec="foo.a[i] -> foo.d[i]", scope="foo")
+    def f(a: int, b: int, c: int) -> int:
+        return a + b + c
+
+    @pipefunc(output_name="e")
+    def g(d: int, x: int):
+        return d + x
+
+    pipeline = Pipeline([f, g])
+    pipeline.visualize_graphviz(min_arg_group_size=min_arg_group_size)
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+def test_min_arg_group_size_with_ungroupable():
+    @pipefunc(output_name="d")
+    def f(a: int) -> int:
+        return a
+
+    pipeline = Pipeline([f])
+    pipeline.visualize_graphviz(min_arg_group_size=2)
+
+
+@pytest.mark.skipif(not has_graphviz or not has_graphviz_exec, reason="graphviz not installed")
+def test_hide_default_args():
+    @pipefunc(output_name="d")
+    def f(a: int, b: int = 1) -> int:
+        return a + b
+
+    pipeline = Pipeline([f])
+    pipeline.visualize_graphviz(hide_default_args=True)

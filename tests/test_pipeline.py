@@ -77,7 +77,11 @@ def test_pipeline_and_all_arg_combinations() -> None:
     assert f_nested.renames == {}
     f_nested.update_renames({"a": "a1", "b": "b1"})
     assert f_nested.renames == {"a": "a1", "b": "b1"}
-    f_nested.update_renames({"a": "a2", "b": "b2"}, overwrite=True, update_from="original")
+    f_nested.update_renames(
+        {"a": "a2", "b": "b2"},
+        overwrite=True,
+        update_from="original",
+    )
     assert f_nested.renames == {"a": "a2", "b": "b2"}
     assert f_nested.parameters == ("a2", "b2", "x")
     f_nested_copy = f_nested.copy()
@@ -435,7 +439,10 @@ def test_drop_from_pipeline() -> None:
     assert len(pipeline.functions) == 3
     assert pipeline["e"].__name__ == "f3"
 
-    with pytest.raises(ValueError, match="Either `f` or `output_name` should be provided"):
+    with pytest.raises(
+        ValueError,
+        match="Either `f` or `output_name` should be provided",
+    ):
         pipeline.drop()
 
 
@@ -528,7 +535,11 @@ def test_setting_defaults() -> None:
         def g(a):
             return a
 
-    @pipefunc(output_name="c", defaults={"a": "a_new", "b": "b_new"}, renames={"a": "b", "b": "a"})
+    @pipefunc(
+        output_name="c",
+        defaults={"a": "a_new", "b": "b_new"},
+        renames={"a": "b", "b": "a"},
+    )
     def h(a="a", b="b"):
         return a, b
 
@@ -722,7 +733,9 @@ def test_pipeline_getitem_exception() -> None:
     pipeline = Pipeline([f])
     with pytest.raises(
         KeyError,
-        match=re.escape("No function with output name `'d'` in the pipeline, only `['c']`"),
+        match=re.escape(
+            "No function with output name `'d'` in the pipeline, only `['c']`",
+        ),
     ):
         pipeline["d"]
 
@@ -748,7 +761,7 @@ def test_parameterless_pipefunc() -> None:
     assert pipeline() == 1
     assert pipeline.topological_generations.root_args == []
     assert pipeline.topological_generations.function_lists == [[pipeline["c"]]]
-    r = pipeline.map({})
+    r = pipeline.map({}, parallel=False, storage="dict")
     assert r["c"].output == 1
 
     @pipefunc(output_name="d")
@@ -767,7 +780,7 @@ def test_parameterless_pipefunc() -> None:
         [pipeline["c"], pipeline["d"]],
         [pipeline["e"]],
     ]
-    r = pipeline.map({})
+    r = pipeline.map({}, parallel=False, storage="dict")
     assert r["e"].output == 3
 
 
@@ -810,7 +823,7 @@ def test_unpicklable_run(tmp_path: Path) -> None:
 
     pipeline = Pipeline([f, g])
 
-    r = pipeline.map({"a": 1}, storage="dict", parallel=False)
+    r = pipeline.map({"a": 1}, parallel=False, storage="dict")
     assert isinstance(r["y"].output, Unpicklable)
     assert r["z"].output == 1
 
@@ -826,7 +839,12 @@ def test_unpicklable_run_with_mapspec():
 
     pipeline = Pipeline([f, g])
     inputs = {"a": [1, 2, 3, 4]}
-    r = pipeline.map(inputs, storage="dict", executor=ThreadPoolExecutor(max_workers=2))
+    r = pipeline.map(
+        inputs,
+        executor=ThreadPoolExecutor(max_workers=2),
+        parallel=True,
+        storage="dict",
+    )
     assert isinstance(r["y"].output, np.ndarray)
     assert r["z"].output.tolist() == [1, 2, 3, 4]
 
@@ -886,7 +904,7 @@ def test_double_output_then_iterate_over_single_axis():
             PipeFunc(f2, "c", mapspec="a[:, j] -> c[j]"),
         ],
     )
-    pipeline.map({"x": np.arange(3), "y": np.arange(3)})
+    pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False, storage="dict")
     assert pipeline.mapspec_axes == {
         "a": ("i", "j"),
         "b": ("i", "j"),
@@ -915,7 +933,11 @@ def test_double_output_then_iterate_over_single_axis_gen_job(dim: int | Literal[
             PipeFunc(f2, "c", mapspec="a[:, j, k] -> c[j, k]"),
         ],
     )
-    results = pipeline.map({"x": np.arange(3), "y": np.arange(3)}, parallel=False)
+    results = pipeline.map(
+        {"x": np.arange(3), "y": np.arange(3)},
+        parallel=False,
+        storage="dict",
+    )
     assert results["c"].output.shape == (3, 10)
 
 
@@ -951,12 +973,16 @@ def test_pipeline_map_zero_size() -> None:
     result = pipeline.map(
         {"mock_complete": [0], "mock_incomplete": [1, 2, 3]},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
     # Now with empty complete
     result = pipeline.map(
         {"mock_complete": [], "mock_incomplete": [0, 1, 2, 3]},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
 
@@ -965,6 +991,8 @@ def test_pipeline_map_zero_size() -> None:
     result = pipeline.map(
         {"mock_complete": [0, 1, 2, 3], "mock_incomplete": []},
         internal_shapes={"incomplete": ("?",)},
+        parallel=False,
+        storage="dict",
     )
     assert result["result"].output == [0, 1, 2, 3]
 
@@ -1002,7 +1030,7 @@ def test_nested_pipefunc_in_pipeline_renames() -> None:
     assert func.pipeline.functions[0].renames == {}
     r = pipeline.run("test.y", kwargs={"test.n": 2})
     assert r == 8
-    r = pipeline.map(inputs={"test.n": 2})
+    r = pipeline.map(inputs={"test.n": 2}, parallel=False, storage="dict")
     assert r["test.y"].output == 8
 
 
@@ -1070,3 +1098,116 @@ def test_deepcopy_with_cache() -> None:
 
     pipeline = Pipeline([f], cache_type="hybrid")
     copy.deepcopy(pipeline)
+
+
+def test_run_multiple_outputs_list() -> None:
+    @pipefunc(output_name=("y1", "y2"))
+    def f(a, b):
+        return a + b, 1
+
+    @pipefunc(output_name="z1")
+    def g(a, b, y1):
+        return a * b + y1
+
+    @pipefunc(output_name="z2")
+    def h(a, b, y2):
+        return a * b + y2
+
+    pipeline = Pipeline([f, g, h])
+    assert len(pipeline.leaf_nodes) == 2
+    y1 = 2 + 1
+    y2 = 1
+    assert pipeline.run(["z1", "z2"], kwargs={"a": 1, "b": 2}) == (
+        1 * 2 + y1,
+        1 * 2 + y2,
+    )
+
+
+def test_disjoint_pipefuncs() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(a, b):
+        return a * b
+
+    pipeline = Pipeline([f, g])
+    assert pipeline.run(["c", "d"], kwargs={"a": 3, "b": 4}) == (7, 12)
+    assert pipeline.func("c")(a=3, b=4) == 7
+    assert pipeline.func("d")(a=3, b=4) == 12
+    func = pipeline.func(["c", "d"])
+    assert func(a=3, b=4) == (7, 12)
+    func2 = pipeline.func(["d", "c"])
+    assert func2(a=3, b=4) == (12, 7)
+
+
+def test_run_allow_unused() -> None:
+    @pipefunc(output_name="x")
+    def fa(n: int, m: int = 0) -> int:
+        return 2 + n + m
+
+    @pipefunc(output_name="y")
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    pipeline = Pipeline([fa, fb])
+    assert pipeline.run(output_name="y", kwargs={"n": 1, "m": 2, "b": 3}) == 30
+    with pytest.raises(UnusedParametersError, match="Unused keyword arguments: `b`."):
+        pipeline.run(
+            output_name="x",
+            kwargs={"n": 1, "m": 2, "b": 3},
+            allow_unused=False,
+        )
+    assert (
+        pipeline.run(
+            output_name="x",
+            kwargs={"n": 1, "m": 2, "b": 3},
+            allow_unused=True,
+        )
+        == 5
+    )
+
+
+def test_executor_for_single_element_of_output_name_tuple() -> None:
+    # Tests if _expand_output_name_in_executor works correctly
+    @pipefunc(output_name=("c", "d"), mapspec="a[i], b[i] -> c[i], d[i]")
+    def f(a, b):
+        return a + b, a + b + 1
+
+    pipeline = Pipeline([f])
+    r = pipeline.map(
+        {"a": [1], "b": [2]},
+        executor={"c": ThreadPoolExecutor(max_workers=2)},
+        parallel=True,
+        storage={"c": "dict"},
+        chunksizes={"c": 1},
+    )
+    assert r["c"].output[0] == 3
+    assert r["d"].output[0] == 4
+    assert r["c"].store.storage_id == "dict"  # type: ignore[union-attr]
+    assert r["d"].store.storage_id == "dict"  # type: ignore[union-attr]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Executor for `output_name=('c', 'd')` is already set."),
+    ):
+        pipeline.map(
+            {"a": [1], "b": [2]},
+            executor={
+                "c": ThreadPoolExecutor(max_workers=2),
+                "d": ThreadPoolExecutor(max_workers=2),
+            },
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape("Storage for `output_name=('c', 'd')` is already set."),
+    ):
+        pipeline.map(
+            {"a": [1], "b": [2]},
+            storage={
+                "c": "dict",
+                "d": "dict",
+            },
+        )

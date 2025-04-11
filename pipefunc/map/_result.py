@@ -10,6 +10,7 @@ from pipefunc._utils import requires
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
+    import pandas as pd
     import xarray as xr
 
     from pipefunc import Pipeline
@@ -70,7 +71,7 @@ class ResultDict(dict[str, Result]):
         return text
 
     def to_xarray(self, *, load_intermediate: bool = True) -> xr.Dataset:
-        """Load the xarray dataset from the results as returned by `pipefunc.Pipeline.map`."""
+        """Convert the results to an `xarray.Dataset`."""
         if self._pipeline is None or self._inputs is None:
             msg = (
                 "The `to_xarray` method can only be used when the `ResultDict` was created"
@@ -86,3 +87,10 @@ class ResultDict(dict[str, Result]):
             self._pipeline,
             load_intermediate=load_intermediate,
         )
+
+    def to_dataframe(self, *, load_intermediate: bool = True) -> pd.DataFrame:
+        """Convert the results to a `pandas.DataFrame`."""
+        ds = self.to_xarray(load_intermediate=load_intermediate)  # ensures xarray is installed
+        from .xarray import xarray_dataset_to_dataframe
+
+        return xarray_dataset_to_dataframe(ds)

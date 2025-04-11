@@ -166,7 +166,7 @@ def test_resources_func_with_variable() -> None:
     pipeline = Pipeline([j])
     result = pipeline(a=2, b=3)
     assert result == 6
-    result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False)
+    result = pipeline.map(inputs={"a": 2, "b": 3}, parallel=False, storage="dict")
     assert result["i"].output == 6
 
 

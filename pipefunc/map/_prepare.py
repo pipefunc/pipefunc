@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
 from pipefunc._utils import at_least_tuple
@@ -14,6 +14,7 @@ from ._result import ResultDict
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -27,6 +28,17 @@ if TYPE_CHECKING:
     from ._result import StoreType
 
 
+class Prepared(NamedTuple):
+    pipeline: Pipeline
+    run_info: RunInfo
+    store: dict[str, StoreType]
+    outputs: ResultDict
+    parallel: bool
+    executor: dict[OUTPUT_TYPE, Executor] | None
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None
+    progress: ProgressTracker | None
+
+
 def prepare_run(
     *,
     pipeline: Pipeline,
@@ -36,21 +48,14 @@ def prepare_run(
     output_names: set[OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
     storage: str | dict[OUTPUT_TYPE, str],
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
     show_progress: bool,
     in_async: bool,
-) -> tuple[
-    Pipeline,
-    RunInfo,
-    dict[str, StoreType],
-    ResultDict,
-    bool,
-    dict[OUTPUT_TYPE, Executor] | None,
-    ProgressTracker | None,
-]:
+) -> Prepared:
     if not parallel and executor:
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
@@ -58,20 +63,18 @@ def prepare_run(
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)
-    if executor is not None and not isinstance(executor, dict):
-        executor = {"": executor}
-    elif isinstance(executor, dict):
-        executor = executor.copy()  # this dict might be mutated, so we copy it
+    executor = _expand_output_name_in_executor(pipeline, executor)
     validate_slurm_executor(executor, in_async)
     _validate_complete_inputs(pipeline, inputs)
     validate_consistent_axes(pipeline.mapspecs(ordered=False))
     _validate_fixed_indices(fixed_indices, inputs, pipeline)
+    chunksizes = _expand_output_name_in_chunksizes(pipeline, chunksizes)
     run_info = RunInfo.create(
         run_folder,
         pipeline,
         inputs,
         internal_shapes,
-        storage=storage,
+        storage=_expand_output_name_in_storage(pipeline, storage),
         cleanup=cleanup,
     )
     outputs = ResultDict(_inputs_=inputs, _pipeline_=pipeline)
@@ -83,7 +86,58 @@ def prepare_run(
     if parallel and any(func.profile for func in pipeline.functions):
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
-    return pipeline, run_info, store, outputs, parallel, executor, progress
+    return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
+
+
+T = TypeVar("T")
+
+
+def _expand_output_name_in_dict(
+    pipeline: Pipeline,
+    dct: dict[OUTPUT_TYPE | Literal[""], T],
+    which: str,
+) -> dict[OUTPUT_TYPE | Literal[""], T]:
+    expanded: dict[OUTPUT_TYPE | Literal[""], T] = {}
+    for name, value in dct.items():
+        if name == "":
+            expanded[""] = value
+            continue
+        # single element of tuple output_name might be provided
+        output_name = pipeline[name].output_name
+        if output_name in expanded:
+            msg = f"{which} for `{output_name=}` is already set."
+            raise ValueError(msg)
+        expanded[output_name] = value
+    return expanded
+
+
+def _expand_output_name_in_executor(
+    pipeline: Pipeline,
+    executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
+) -> dict[OUTPUT_TYPE, Executor] | None:
+    if isinstance(executor, dict):
+        return _expand_output_name_in_dict(pipeline, executor, "Executor")
+    if executor is not None:
+        return {"": executor}
+    return None
+
+
+def _expand_output_name_in_storage(
+    pipeline: Pipeline,
+    storage: str | dict[OUTPUT_TYPE, str],
+) -> dict[OUTPUT_TYPE, str] | str:
+    if isinstance(storage, dict):
+        return _expand_output_name_in_dict(pipeline, storage, "Storage")
+    return storage
+
+
+def _expand_output_name_in_chunksizes(
+    pipeline: Pipeline,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+) -> int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None:
+    if isinstance(chunksizes, dict):
+        return _expand_output_name_in_dict(pipeline, chunksizes, "Chunksize")
+    return chunksizes
 
 
 def _cannot_be_parallelized(pipeline: Pipeline) -> bool:

@@ -1,5 +1,6 @@
 import re
 
+import networkx as nx
 import pytest
 
 from pipefunc import ErrorSnapshot, NestedPipeFunc, Pipeline, VariantPipeline, pipefunc
@@ -24,7 +25,7 @@ def test_nested_pipefunc_defaults() -> None:
     assert nf.output_name == ("c", "d")
     assert nf(a=1) == (3, 3)
     assert pipeline(a=1) == (3, 3)
-    r = pipeline.map(inputs={"a": 1})
+    r = pipeline.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["c"].output == 3
     assert r["d"].output == 3
     nf.update_defaults({"a": 5, "b": 10})
@@ -111,11 +112,11 @@ def test_nested_pipefunc_bound_in_pipeline() -> None:
         ValueError,
         match=re.escape("Got extra inputs: `b_` that are not accepted by this pipeline"),
     ):
-        pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000})
-    r = pipeline_nested_test.map(inputs={"n_": 1})
+        pipeline_nested_test.map(inputs={"n_": 1, "b_": 10000000}, parallel=False, storage="dict")
+    r = pipeline_nested_test.map(inputs={"n_": 1}, parallel=False, storage="dict")
     assert r["x"].output == 3
     assert r["y"].output == 6
-    r = pipeline_nested_test.map(inputs={"n_": 1})
+    r = pipeline_nested_test.map(inputs={"n_": 1}, parallel=False, storage="dict")
     assert r["x"].output == 3
     assert r["y"].output == 6
 
@@ -225,12 +226,12 @@ def test_nested_pipefunc_variants() -> None:
         [vp.with_variant("add").functions[0], g],
         variant="add",
     )
-    assert nf.variant == "add"
+    assert nf.variant == {None: "add"}
     nf2 = NestedPipeFunc(
         [vp.with_variant("sub").functions[0], g],
         variant="sub",
     )
-    assert nf2.variant == "sub"
+    assert nf2.variant == {None: "sub"}
 
     vp = VariantPipeline([nf, nf2])
     pipeline_add = vp.with_variant("add")
@@ -242,19 +243,19 @@ def test_nested_pipefunc_variants() -> None:
 
 
 def test_nested_pipefunc_variant_groups() -> None:
-    @pipefunc(output_name="c", variant_group="op", variant="add")
+    @pipefunc(output_name="c", variant={"op": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="c", variant_group="op", variant="sub")
+    @pipefunc(output_name="c", variant={"op": "sub"})
     def f2(a, b):
         return a - b
 
-    @pipefunc(output_name="d", variant_group="mult", variant="yes")
+    @pipefunc(output_name="d", variant={"mult": "yes"})
     def g(c):
         return c * 2
 
-    @pipefunc(output_name="d", variant_group="mult", variant="no")
+    @pipefunc(output_name="d", variant={"mult": "no"})
     def g2(c):
         return c
 
@@ -264,8 +265,7 @@ def test_nested_pipefunc_variant_groups() -> None:
             vp.with_variant({"op": "add", "mult": "yes"}).functions[0],
             vp.with_variant({"op": "add", "mult": "yes"}).functions[1],
         ],
-        variant_group="op_mult",
-        variant="add_yes",
+        variant={"op_mult": "add_yes"},
     )
 
     nf2 = NestedPipeFunc(
@@ -273,8 +273,7 @@ def test_nested_pipefunc_variant_groups() -> None:
             vp.with_variant({"op": "sub", "mult": "no"}).functions[0],
             vp.with_variant({"op": "sub", "mult": "no"}).functions[1],
         ],
-        variant_group="op_mult",
-        variant="sub_no",
+        variant={"op_mult": "sub_no"},
     )
 
     vp = VariantPipeline([nf, nf2])
@@ -337,7 +336,7 @@ def test_nested_pipefunc_error_snapshot() -> None:
     assert nf.error_snapshot.kwargs == {"a": 1, "b": 2}
 
 
-def test_nested_pipefunc_no_leaf_node() -> None:
+def test_nested_pipefunc_no_unique_leaf_node() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
         return a + b
@@ -346,19 +345,17 @@ def test_nested_pipefunc_no_leaf_node() -> None:
     def g(a, b):
         return a + b
 
-    with pytest.raises(
-        ValueError,
-        match="The provided `pipefuncs` should have only one leaf node, not 2.",
-    ):
-        NestedPipeFunc([f, g])
+    nf = NestedPipeFunc([f, g])
+    assert nf.output_name == ("c", "d")
+    assert nf(a=1, b=2) == (3, 3)
 
 
 def test_nested_pipefunc_variant_different_output_name() -> None:
-    @pipefunc(output_name="sum_", variant_group="op", variant="add")
+    @pipefunc(output_name="sum_", variant={"op": "add"})
     def f(a, b):
         return a + b
 
-    @pipefunc(output_name="diff", variant_group="op", variant="sub")
+    @pipefunc(output_name="diff", variant={"op": "sub"})
     def f2(a, b):
         return a - b
 
@@ -376,14 +373,12 @@ def test_nested_pipefunc_variant_different_output_name() -> None:
 
     nf = NestedPipeFunc(
         [vp_add.functions[0], vp_add.functions[1]],
-        variant_group="op",
-        variant="add",
+        variant={"op": "add"},
         output_name="double",
     )
     nf2 = NestedPipeFunc(
         [vp_sub.functions[0], vp_sub.functions[2]],
-        variant_group="op",
-        variant="sub",
+        variant={"op": "sub"},
         output_name="half",
     )
 
@@ -433,7 +428,7 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline1["d"].defaults == {"scope.b": 2}
     assert pipeline1.defaults == {"scope.b": 2}
     assert pipeline1("d", a=1) == 4
-    r = pipeline1.map(inputs={"a": 1})
+    r = pipeline1.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     assert pipeline1.info() == {  # Should not have "c"
         "required_inputs": ("a",),
@@ -448,7 +443,7 @@ def test_join_pipeline_with_nested_preserves_defaults() -> None:
     assert pipeline["d"].defaults == {"scope.b": 2}
     assert pipeline.defaults == {"scope.b": 2}
     assert pipeline("e", a=1) == 5
-    r = pipeline.map(inputs={"a": 1})
+    r = pipeline.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["e"].output == 5
 
 
@@ -463,13 +458,13 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
 
     pipeline = Pipeline([f, g])
     assert pipeline(a=1, b=1) == (1 + (1 + 2)) == 4
-    r = pipeline.map(inputs={"a": 1, "b": 1})
+    r = pipeline.map(inputs={"a": 1, "b": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     nf = NestedPipeFunc([f, g], output_name="d")
     assert nf(a=1, b=1) == 1 + (1 + 2) == 4
     pipeline2 = Pipeline([nf])
     assert pipeline2(a=1, b=1) == 4
-    r = pipeline2.map(inputs={"a": 1, "b": 1})
+    r = pipeline2.map(inputs={"a": 1, "b": 1}, parallel=False, storage="dict")
     assert r["d"].output == 4
     with pytest.raises(ValueError, match=re.escape("Missing value for argument `b`")):
         pipeline2(a=1)
@@ -477,10 +472,10 @@ def test_bound_inside_nested_pipefunc_and_other_function_uses_same_parameter() -
         ValueError,
         match=re.escape("Missing inputs: `b`"),
     ):
-        pipeline2.map(inputs={"a": 1})
+        pipeline2.map(inputs={"a": 1}, parallel=False, storage="dict")
     pipeline2.update_defaults({"b": 10})
     assert pipeline2(a=1) == 10 + (1 + 2) == 13
-    r = pipeline2.map(inputs={"a": 1})
+    r = pipeline2.map(inputs={"a": 1}, parallel=False, storage="dict")
     assert r["d"].output == 13
 
 
@@ -502,7 +497,7 @@ def test_nest_bound(scope: str) -> None:
     )
     y = 2 * (2 + 4 + 0) * 1
     assert pipeline_nested_test.run(f"{scope}y", kwargs={f"{scope}n": 4}) == y
-    r = pipeline_nested_test.map(inputs={f"{scope}n": 4})
+    r = pipeline_nested_test.map(inputs={f"{scope}n": 4}, parallel=False, storage="dict")
     assert r[f"{scope}y"].output == y
     with pytest.raises(ValueError, match=re.escape(f"Missing value for argument `{scope}n`")):
         pipeline_nested_test.run(f"{scope}y", kwargs={})
@@ -510,7 +505,7 @@ def test_nest_bound(scope: str) -> None:
         ValueError,
         match=re.escape(f"Missing inputs: `{scope}n`."),
     ):
-        pipeline_nested_test.map(inputs={})
+        pipeline_nested_test.map(inputs={}, parallel=False, storage="dict")
 
 
 def test_annotations_nested_pipefunc() -> None:
@@ -528,3 +523,296 @@ def test_annotations_nested_pipefunc() -> None:
     nf2 = NestedPipeFunc([f, g], output_name="d")
     assert nf2.parameter_annotations == {"a": int, "b": int}
     assert nf2.output_annotation == {"d": int}
+
+
+def test_nested_pipefunc_with_scoped_pipefuncs() -> None:
+    @pipefunc(output_name="c", scope="foo")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d", scope="foo")
+    def g(c):
+        return c
+
+    nf = NestedPipeFunc([f, g])
+    assert nf.parameter_scopes == {"foo"}
+    assert nf(foo={"a": 1, "b": 2}) == (3, 3)
+
+
+def test_disjoint_nested_pipefuncs() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(a, b):
+        return a * b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c"].output == 7
+    assert r["d"].output == 12
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs() -> None:
+    @pipefunc(output_name=("c1", "c2"))
+    def f(a, b):
+        return 2 * a, 2 * b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c1", "c2", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c1"].output == 6
+    assert r["c2"].output == 8
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7
+
+
+def test_disjoint_nested_pipefuncs_multiple_ouputs_mixed() -> None:
+    @pipefunc(output_name="c")
+    def f(a, b):
+        return a + b
+
+    @pipefunc(output_name=("d1", "d2"))
+    def g(a, b):
+        return a * b, a + b
+
+    nested = NestedPipeFunc([f, g])
+    assert nested.parameters == ("a", "b")
+    assert nested.output_name == ("c", "d1", "d2")
+    pipeline = Pipeline([nested])
+    r = pipeline.map(inputs={"a": 3, "b": 4}, parallel=False, storage="dict")
+    assert r["c"].output == 7
+    assert r["d1"].output == 12
+    assert r["d2"].output == 7
+
+
+def test_linear_pipeline_nest_outer_funcs_error() -> None:
+    @pipefunc(output_name="x")
+    def f():
+        return 1
+
+    @pipefunc(output_name="y")
+    def g(x):
+        return x + 1
+
+    @pipefunc(output_name="z")
+    def h(y):
+        return y * 2
+
+    pipeline = Pipeline([f, g, h])
+    r = pipeline.map(inputs={}, parallel=False, storage="dict")
+    assert r["z"].output == 4
+    assert pipeline() == 4
+
+    # Should not be possible to nest functions that have a dependency in the middle of the pipeline
+    with pytest.raises(
+        nx.exception.NetworkXUnfeasible,
+        match="Graph contains a cycle or graph changed during iteration",
+    ):
+        pipeline.nest_funcs({"x", "z"})
+
+
+def test_nested_pipefunc_with_multiple_outputs_then_adding_scope_annotation() -> None:
+    # Tests regression fixed in https://github.com/pipefunc/pipefunc/pull/695
+    @pipefunc(output_name=("c", "d"))
+    def f(a: int, b: int) -> tuple[int, int]:
+        return a + b, a * b
+
+    @pipefunc(output_name="e")
+    def g(c: int, d: int) -> int:
+        return c + d
+
+    # Validating that the pipeline has correct output annotations
+    normal_pipeline = Pipeline([f, g], scope="foo")
+    assert normal_pipeline.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
+    assert normal_pipeline.all_output_names == {"foo.c", "foo.d", "foo.e"}
+    assert normal_pipeline.root_args() == ("foo.a", "foo.b")
+
+    nf = NestedPipeFunc([f, g])
+    pipeline = Pipeline([nf])
+    assert pipeline("e", a=1, b=2) == 5
+    assert pipeline.output_annotations == {"e": int, "c": int, "d": int}
+    pipeline.update_scope("foo", inputs="*", outputs="*")
+    assert pipeline.root_args() == ("foo.a", "foo.b")
+    assert pipeline.all_output_names == {"foo.c", "foo.d", "foo.e"}
+    assert pipeline.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
+
+    pipeline2 = Pipeline([nf], scope="foo")
+    assert pipeline2.output_annotations == {"foo.e": int, "foo.c": int, "foo.d": int}
+
+
+def test_nested_pipefunc_single_output_with_scope() -> None:
+    """Test that a nested pipefunc with a single output correctly handles scopes."""
+
+    @pipefunc(output_name="c")
+    def f(a: int, b: float) -> float:
+        return a + b
+
+    @pipefunc(output_name="d")
+    def g(c: float) -> int:
+        return int(c)
+
+    # Create nested pipefunc with single output
+    nf = NestedPipeFunc([f, g], output_name="d")
+    assert nf.output_annotation == {"d": int}
+
+    # Add scope directly to nested pipefunc
+    nf.update_scope("my_scope", inputs="*", outputs="*")
+    assert nf.output_annotation == {"my_scope.d": int}
+
+    # We don't test parameter_annotations here because it doesn't
+    # handle scopes in the same way as output_annotation yet
+
+    # Verify execution still works
+    assert nf(my_scope={"a": 1, "b": 2.5}) == 3
+
+    # Create pipeline with the nested pipefunc
+    pipeline = Pipeline([nf])
+    assert pipeline.output_annotations == {"my_scope.d": int}
+
+
+def test_nested_pipefunc_different_scopes_for_outputs() -> None:
+    """Test that a nested pipefunc correctly handles different scopes for different outputs."""
+
+    @pipefunc(output_name=("c", "d"))
+    def f(a: int, b: int) -> tuple[float, str]:
+        return a + b + 0.5, f"sum:{a + b}"
+
+    @pipefunc(output_name=("e", "f"))
+    def g(c: float, d: str) -> tuple[int, str]:
+        return int(c), f"processed:{d}"
+
+    # Create nested pipefunc with multiple outputs
+    nf = NestedPipeFunc([f, g])
+
+    # Test output annotations before scopes
+    assert nf.output_annotation == {"c": float, "d": str, "e": int, "f": str}
+
+    # Create pipeline with the nested pipefunc
+    pipeline = Pipeline([nf])
+
+    # Apply different scopes to different outputs
+    pipeline.update_scope("scope1", outputs={"c", "e"})
+    pipeline.update_scope("scope2", outputs={"d", "f"})
+
+    # Check that output annotations reflect the different scopes
+    assert pipeline.output_annotations == {
+        "scope1.c": float,
+        "scope2.d": str,
+        "scope1.e": int,
+        "scope2.f": str,
+    }
+
+    # Verify execution
+    r = pipeline.map(inputs={"a": 1, "b": 2}, parallel=False, storage="dict")
+    assert r["scope1.c"].output == 3.5
+    assert r["scope2.d"].output == "sum:3"
+    assert r["scope1.e"].output == 3
+    assert r["scope2.f"].output == "processed:sum:3"
+
+
+def test_nested_pipefunc_scope_removal() -> None:
+    """Test that a nested pipefunc correctly handles scope removal."""
+
+    @pipefunc(output_name="c", scope="original")
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d", scope="original")
+    def g(c: int) -> int:
+        return c * 2
+
+    # Create nested pipefunc with scoped functions
+    nf = NestedPipeFunc([f, g])
+    assert nf.output_annotation == {"original.c": int, "original.d": int}
+
+    # Create pipeline with the nested pipefunc
+    pipeline = Pipeline([nf])
+    assert pipeline.output_annotations == {"original.c": int, "original.d": int}
+
+    # Remove scopes
+    pipeline.update_scope(None, inputs="*", outputs="*")
+
+    # Check that output annotations reflect the removed scopes
+    assert pipeline.output_annotations == {"c": int, "d": int}
+
+    # Verify execution works with unscoped parameters
+    assert pipeline(a=2, b=3) == (5, 10)
+
+
+def test_nested_pipefunc_preserve_cache_on_join() -> None:
+    # First check that the cache is preserved when combining pipelines with normal pipefuncs
+    @pipefunc(output_name="c", cache=True)
+    def f(a: int, b: int) -> int:
+        return a + b
+
+    @pipefunc(output_name="d", cache=False)
+    def g(c: int) -> int:
+        return c * 2
+
+    @pipefunc(output_name="e", cache=True)
+    def h(d: int) -> int:
+        return d * 3
+
+    pipeline1 = Pipeline([f, g])
+    pipeline2 = Pipeline([h])
+    pipeline = pipeline1 | pipeline2
+    assert pipeline["c"].cache
+    assert not pipeline["d"].cache
+    assert pipeline["e"].cache
+    assert pipeline(a=1, b=2) == 18
+    assert pipeline.cache is not None
+    assert pipeline.cache.cache == {
+        ("c", (("a", 1), ("b", 2))): 3,
+        ("e", (("a", 1), ("b", 2))): 18,
+    }
+
+    # Check that the cache is preserved when combining pipelines and f+g is NestedPipeFunc
+    nf = NestedPipeFunc([f, g])
+    pipeline1 = Pipeline([nf])
+    pipeline2 = Pipeline([h])
+    pipeline = pipeline1 | pipeline2
+    assert pipeline.cache is not None
+    assert not pipeline.cache.cache
+    assert pipeline[("c", "d")].cache
+    assert pipeline["e"].cache
+    assert pipeline(a=1, b=2) == 18
+    assert pipeline.cache.cache == {
+        ("c-d", (("a", 1), ("b", 2))): (3, 6),
+        ("e", (("a", 1), ("b", 2))): 18,
+    }
+
+
+def test_nested_pipefunc_preserve_cache_on_combine_bug() -> None:
+    # Similar to previous test but unlike that test this used to be a bug
+
+    @pipefunc(output_name="x")
+    def fa(n: int, m: int = 0) -> int:
+        return 2 + n + m
+
+    @pipefunc(output_name="y")
+    def fb(x: int, b: int) -> int:
+        return 2 * x * b
+
+    @pipefunc(output_name="z")
+    def fc(y: int) -> int:
+        return 3 * y
+
+    p1 = Pipeline([NestedPipeFunc([fa, fb], ("x", "y"), function_name="my function")])
+    p1[("x", "y")].cache = True  # Enable caching after the pipeline is created
+
+    p2 = Pipeline([fc])
+    p = p1 | p2
+
+    assert p1[("x", "y")].cache
+    assert p[("x", "y")].cache

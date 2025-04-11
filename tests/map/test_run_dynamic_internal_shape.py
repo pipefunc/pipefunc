@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import random
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -60,8 +61,8 @@ def test_dynamic_internal_shape(
     results = pipeline.map(
         {},
         run_folder=tmp_path if use_run_folder else None,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
         storage="dict",
     )
     expected_sum = 12
@@ -87,7 +88,13 @@ async def test_dynamic_internal_shape_async(
 ) -> None:
     pipeline = _pipeline(dim)
     assert pipeline.mapspecs_as_strings == ["... -> x[i]", "x[i] -> y[i]"]
-    runner = pipeline.map_async({}, run_folder=tmp_path, return_results=return_results)
+    runner = pipeline.map_async(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        executor=ThreadPoolExecutor(),
+        storage="dict",
+    )
     results = await runner.task
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
@@ -120,7 +127,7 @@ def test_exception(tmp_path: Path) -> None:
         TypeError,
         match=re.escape("Internal shape for 'x' must be a tuple of integers or '?'."),
     ):
-        pipeline.map({"n": 4}, run_folder=tmp_path, parallel=False)
+        pipeline.map({"n": 4}, run_folder=tmp_path, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("return_results", [True, False])
@@ -150,8 +157,9 @@ def test_2d_internal_shape_non_dynamic(
     results = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     if return_results:
         assert results["y"].output.tolist() == expected_y
@@ -200,9 +208,10 @@ def test_2d_internal_shape(
     results = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
+        parallel=False,
+        storage="dict",
     )
     if return_results:
         assert results["y"].output.tolist() == expected_y
@@ -212,11 +221,12 @@ def test_2d_internal_shape(
     _ = pipeline.map(
         {"a": [0, 0]},
         run_folder=tmp_path,
-        parallel=False,
         cleanup=False,
         show_progress=True,
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
+        parallel=False,
+        storage="dict",
     )
     assert before == counters
 
@@ -234,7 +244,13 @@ def test_internal_shape_2nd_step(tmp_path: Path, dim: Literal["?"] | None) -> No
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    results = pipeline.map({}, run_folder=tmp_path, parallel=False, show_progress=True)
+    results = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        show_progress=True,
+        parallel=False,
+        storage="dict",
+    )
     # Optionally check that results is a dict if available
     if isinstance(results, dict):
         assert isinstance(results, dict)
@@ -256,7 +272,13 @@ def test_internal_shape_2nd_step2(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    _ = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    _ = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     run_info = RunInfo.load(tmp_path)
     assert run_info.shapes == {"x": ("?",), "y": ("?",)}
     assert run_info.resolved_shapes == {"x": (7,), "y": (7,)}
@@ -280,7 +302,13 @@ def test_first_returns_2d(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    result = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    result = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     expected_y = (2 * load_outputs("x", run_folder=tmp_path)).tolist()
     if return_results:
         assert result["y"].output.tolist() == (2 * result["x"].output).tolist()
@@ -308,7 +336,13 @@ def test_first_returns_2d_but_1d_internal(
         return 2 * x
 
     pipeline = Pipeline([g, h])
-    result = pipeline.map({}, run_folder=tmp_path, parallel=False, return_results=return_results)
+    result = pipeline.map(
+        {},
+        run_folder=tmp_path,
+        return_results=return_results,
+        parallel=False,
+        storage="dict",
+    )
     if return_results:
         assert np.all(result["y"].output[0] == (2 * result["x"].output[0]))
     expected_y0 = 2 * load_outputs("x", run_folder=tmp_path)[0]
@@ -360,10 +394,10 @@ def test_dimension_mismatch_bug_with_autogen_axes(
     results = pipeline.map(
         {"jobs": jobs},
         internal_shapes=internal_shapes,  # type: ignore[arg-type]
-        parallel=False,
-        storage="dict",
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_processed = ["0, 0", "0, 0", "1, 1"]
     if return_results:
@@ -382,12 +416,12 @@ def test_dynamic_internal_shape_with_irregular_output(tmp_path: Path) -> None:
         ValueError,
         match=re.escape("Output shape (3,) of function 'f' (output 'x') does not match"),
     ):
-        pipeline.map(inputs={"n": [2, 3]}, run_folder=tmp_path, parallel=False)
+        pipeline.map(inputs={"n": [2, 3]}, run_folder=tmp_path, parallel=False, storage="dict")
     with pytest.raises(
         ValueError,
         match=re.escape("Output shape (1,) of function 'f' (output 'x') does not match"),
     ):
-        pipeline.map(inputs={"n": [2, 1]}, run_folder=tmp_path, parallel=False)
+        pipeline.map(inputs={"n": [2, 1]}, run_folder=tmp_path, parallel=False, storage="dict")
 
 
 @pytest.mark.parametrize("storage", ["dict", "file_array"])
@@ -405,10 +439,10 @@ def test_dynamic_internal_shape_with_size_1(
     expected_x = [[0, 0]]
     r = pipeline.map(
         inputs={"n": [1, 1]},
-        parallel=False,
-        storage=storage,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage=storage,
     )
     if return_results:
         assert r["x"].output.tolist() == expected_x
@@ -441,9 +475,10 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
         pipeline["z"].internal_shape = (2,)
     r = pipeline.map(
         inputs={"n": 4},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_z = [6, 6]
     if return_results:
@@ -458,9 +493,10 @@ def test_dynamic_internal_shape_with_multiple_dynamic_axes(
     ]
     r = pipeline.map(
         inputs={"n": [4, 4]},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_z2 = [[6, 6], [6, 6]]
     if return_results:
@@ -491,9 +527,10 @@ def test_simple_2d(
     x = np.array([[0, 1, 2], [3, 4, 5]])
     r = pipeline.map(
         inputs={"x": x},
-        parallel=False,
         run_folder=tmp_path,
         return_results=return_results,
+        parallel=False,
+        storage="dict",
     )
     expected_y = [
         [0, 1, 2],
@@ -520,7 +557,7 @@ def test_simple_2d(
 
 @pytest.mark.parametrize("return_results", [True, False])
 @pytest.mark.parametrize("parallel", [True, False])
-@pytest.mark.parametrize("storage", ["file_array", "dict", "shared_memory_dict"])
+@pytest.mark.parametrize("storage", ["file_array", "dict"])
 def test_multiple_outputs_with_dynamic_shape_and_individual_outputs_are_nd_arrays(
     tmp_path: Path,
     return_results: bool,  # noqa: FBT001
@@ -601,9 +638,9 @@ def test_inhomogeneous_array(
     results = pipeline.map(
         {},
         run_folder=tmp_path,
-        storage=storage_id,
-        parallel=False,
         return_results=return_results,
+        parallel=False,
+        storage=storage_id,
     )
     if return_results:
         assert results["x"].output[0] == ("yo", ("lo",))

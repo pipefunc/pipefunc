@@ -42,7 +42,7 @@ def test_post_execution_hook_with_map() -> None:
 
     pipeline = Pipeline([f])
     inputs = {"x": [1, 2, 3]}
-    pipeline.map(inputs, run_folder="my_run_folder", parallel=False)
+    pipeline.map(inputs, parallel=False, storage="dict")
 
     assert len(hook_calls) == 3
     assert hook_calls[0] == ("y", 2, {"x": 1})

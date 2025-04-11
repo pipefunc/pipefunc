@@ -250,7 +250,7 @@ def test_is_min_version() -> None:
     assert is_min_version("numpy", "1.0.0")
     assert not is_min_version("pipefunc", "999.0.0")
 
-    major, minor, patch = map(int, np.__version__.split("."))
+    major, minor, patch = map(int, np.__version__.split("."))  # noqa: RUF048
 
     assert is_min_version("numpy", f"{major}.{minor}.{patch - 1}")
     assert not is_min_version("numpy", f"{major}.{minor}.{patch + 1}")

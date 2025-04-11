@@ -144,7 +144,7 @@ def run_map_eager(
 
     """
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
-    pipeline, run_info, store, outputs, parallel, executor_dict, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -152,6 +152,7 @@ def run_map_eager(
         output_names=output_names,
         parallel=parallel,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -160,30 +161,30 @@ def run_map_eager(
         in_async=False,
     )
 
-    if progress is not None:
-        progress.display()
+    if prep.progress is not None:
+        prep.progress.display()
 
-    dependency_info = _build_dependency_graph(pipeline)
+    dependency_info = _build_dependency_graph(prep.pipeline)
 
-    with _maybe_executor(executor_dict, parallel) as ex:
+    with _maybe_executor(prep.executor, prep.parallel) as ex:
         _eager_scheduler_loop(
             dependency_info=dependency_info,
             executor=ex,
-            run_info=run_info,
-            store=store,
-            outputs=outputs,
+            run_info=prep.run_info,
+            store=prep.store,
+            outputs=prep.outputs,
             fixed_indices=fixed_indices,
-            chunksizes=chunksizes,
-            progress=progress,
+            chunksizes=prep.chunksizes,
+            progress=prep.progress,
             return_results=return_results,
-            cache=pipeline.cache,
+            cache=prep.pipeline.cache,
         )
 
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
+    if prep.progress is not None:  # final update
+        prep.progress.update_progress(force=True)
 
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    _maybe_persist_memory(prep.store, persist_memory)
+    return prep.outputs
 
 
 def _build_dependency_graph(pipeline: Pipeline) -> _DependencyInfo:

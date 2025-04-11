@@ -233,7 +233,7 @@ def test_pipeline_map(tmp_path: Path) -> None:
     pipeline = Pipeline([foo, bar])
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
-    results = pipeline.map(model, run_folder=tmp_path, parallel=False)
+    results = pipeline.map(model, run_folder=tmp_path, parallel=False, storage="dict")
     out = results["foo"].output
     assert out.shape == (2, 2)
     assert out.tolist() == [[3.0, 4.0], [5.0, 6.0]]

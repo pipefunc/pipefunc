@@ -206,7 +206,7 @@ if __name__ == "__main__":
         pipefunc.NestedPipeFunc.update_bound,
     )
 
-    # map vs map_async
+    # map and map_async
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         run_map,
@@ -237,6 +237,11 @@ if __name__ == "__main__":
     compare_param_descriptions(
         pipefunc._plotting.visualize_graphviz,
         pipefunc.Pipeline.visualize_graphviz,
+        allow_missing=["defaults", "graph"],
+    )
+    compare_param_descriptions(
+        pipefunc._plotting.visualize_graphviz_widget,
+        pipefunc.Pipeline.visualize_graphviz_widget,
         allow_missing=["defaults", "graph"],
     )
     compare_param_descriptions(

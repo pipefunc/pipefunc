@@ -151,16 +151,25 @@ class PipeFunc(Generic[T]):
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -210,9 +219,9 @@ class PipeFunc(Generic[T]):
         | None = None,
         resources_variable: str | None = None,
         resources_scope: Literal["map", "element"] = "map",
-        variant: str | None = None,
-        variant_group: str | None = None,
         scope: str | None = None,
+        variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
     ) -> None:
         """Function wrapper class for pipeline functions with additional attributes."""
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
@@ -232,8 +241,8 @@ class PipeFunc(Generic[T]):
         self.resources = Resources.maybe_from_dict(resources)
         self.resources_variable = resources_variable
         self.resources_scope: Literal["map", "element"] = resources_scope
-        self.variant: str | None = variant
-        self.variant_group: str | None = variant_group
+        _maybe_variant_group_error(variant_group, variant)
+        self.variant = _ensure_variant(variant)
         self.profiling_stats: ProfilingStats | None
         if scope is not None:
             self.update_scope(scope, inputs="*", outputs="*")
@@ -567,12 +576,6 @@ class PipeFunc(Generic[T]):
     def _validate(self) -> None:
         self._validate_names()
         self._validate_mapspec()
-        if self.variant is None and self.variant_group is not None:
-            msg = (
-                f"`variant_group={self.variant_group!r}` cannot be set without"
-                f" a corresponding `variant`."
-            )
-            raise ValueError(msg)
 
     def _validate_names(self) -> None:
         if common := set(self._defaults) & set(self._bound):
@@ -642,7 +645,7 @@ class PipeFunc(Generic[T]):
             "resources_variable": self.resources_variable,
             "resources_scope": self.resources_scope,
             "variant": self.variant,
-            "variant_group": self.variant_group,
+            "variant_group": None,  # deprecated
         }
         assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
         kwargs.update(update)
@@ -796,7 +799,7 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
-        return {name: NoAnnotation for name in self.output_name}
+        return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
     def requires_mapping(self) -> bool:
@@ -948,8 +951,8 @@ def pipefunc(
     resources_variable: str | None = None,
     resources_scope: Literal["map", "element"] = "map",
     scope: str | None = None,
-    variant: str | None = None,
-    variant_group: str | None = None,
+    variant: str | dict[str | None, str] | None = None,
+    variant_group: str | None = None,  # deprecated
 ) -> Callable[[Callable[..., Any]], PipeFunc]:
     """A decorator that wraps a function in a PipeFunc instance.
 
@@ -1041,16 +1044,25 @@ def pipefunc(
         or ``func(**{"foo.a": 1, "foo.b": 2, "bar.a": 3, "bar.b": 4})``.
     variant
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Returns
     -------
@@ -1106,7 +1118,7 @@ def pipefunc(
             resources_variable=resources_variable,
             resources_scope=resources_scope,
             variant=variant,
-            variant_group=variant_group,
+            variant_group=variant_group,  # deprecated
             scope=scope,
         )
 
@@ -1135,22 +1147,43 @@ class NestedPipeFunc(PipeFunc):
         Same as the `PipeFunc` class. However, if it is ``None`` here, it is inferred from
         from the `PipeFunc` instances. Specifically, it takes the maximum of the resources.
         Unlike the `PipeFunc` class, the `resources` argument cannot be a callable.
+    resources_scope
+        Same as the `PipeFunc` class.
+        Determines how resources are allocated in relation to the mapspec:
+
+        - "map": Allocate resources for the entire mapspec operation (default).
+        - "element": Allocate resources for each element in the mapspec.
+
+        If no mapspec is defined, this parameter is ignored.
+    cache
+        Flag indicating whether the wrapped function should be cached.
+        If None, cache will be set to True if any of the `PipeFunc` instances have caching enabled.
     bound
         Same as the `PipeFunc` class. Bind arguments to the functions. These are arguments
         that are fixed. Even when providing different values, the bound values will be
         used. Must be in terms of the renamed argument names.
     variant
+        Same as the `PipeFunc` class.
         Identifies this function as an alternative implementation in a
-        `VariantPipeline`. When multiple functions share the same `output_name`,
-        the variant allows selecting which implementation to use (e.g., "fast"
-        vs "accurate"). Only one variant can be selected for execution in
-        the pipeline.
+        `VariantPipeline` and specifies which variant groups it belongs to.
+        When multiple functions share the same `output_name`, variants allow
+        selecting which implementation to use during pipeline execution.
+
+        Can be specified in two formats:
+        - A string (e.g., ``"fast"``): Places the function in the default unnamed
+          group (None) with the specified variant name. Equivalent to ``{None: "fast"}``.
+        - A dictionary (e.g., ``{"algorithm": "fast", "optimization": "level1"}``):
+          Assigns the function to multiple variant groups simultaneously, with a
+          specific variant name in each group.
+
+        Functions with the same `output_name` but different variant specifications
+        represent alternative implementations. The {meth}`VariantPipeline.with_variant`
+        method selects which variants to use for execution. For example, you might
+        have "preprocessing" variants ("v1"/"v2") independent from "computation"
+        variants ("fast"/"accurate"), allowing you to select specific combinations
+        like ``{"preprocessing": "v1", "computation": "fast"}``.
     variant_group
-        Groups related variants together, allowing independent selection of
-        variants from different groups. For example, you might have a "preprocess"
-        group with variants "v1"/"v2" and a "compute" group with variants
-        "fast"/"accurate". If not provided and `variant` is specified, the variant
-        is placed in an unnamed group (None).
+        DEPRECATED in v0.58.0: Use `variant` instead.
 
     Attributes
     ----------
@@ -1176,25 +1209,29 @@ class NestedPipeFunc(PipeFunc):
         renames: dict[str, str] | None = None,
         mapspec: str | MapSpec | None = None,
         resources: dict | Resources | None = None,
+        resources_scope: Literal["map", "element"] = "map",
         bound: dict[str, Any] | None = None,
-        variant: str | None = None,
-        variant_group: str | None = None,
+        cache: bool | None = None,
+        variant: str | dict[str | None, str] | None = None,
+        variant_group: str | None = None,  # deprecated
     ) -> None:
         from pipefunc import Pipeline
 
         self._pipelines: weakref.WeakSet[Pipeline] = weakref.WeakSet()
         _validate_nested_pipefunc(pipefuncs, resources)
         self.resources = _maybe_max_resources(resources, pipefuncs)
+        self.resources_scope = resources_scope
         functions = [f.copy(resources=self.resources) for f in pipefuncs]
         self.pipeline = Pipeline(functions)  # type: ignore[arg-type]
-        _validate_single_leaf_node(self.pipeline.leaf_nodes)
         _validate_output_name(output_name, self._all_outputs)
         self._output_name: OUTPUT_TYPE = output_name or self._all_outputs
         self.function_name = function_name
         self.debug = False  # The underlying PipeFuncs will handle this
-        self.cache = any(f.cache for f in self.pipeline.functions)
-        self.variant = variant
-        self.variant_group = variant_group
+        self.cache: bool = (
+            cache if cache is not None else any(f.cache for f in self.pipeline.functions)
+        )
+        _maybe_variant_group_error(variant_group, variant)
+        self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}
@@ -1219,17 +1256,20 @@ class NestedPipeFunc(PipeFunc):
             "output_name": self._output_name,
             "function_name": self.function_name,
             "renames": self._renames,
-            "bound": self._bound,
             "mapspec": self.mapspec,
             "resources": self.resources,
+            "resources_scope": self.resources_scope,
+            "bound": self._bound,
+            "cache": self.cache,
             "variant": self.variant,
-            "variant_group": self.variant_group,
+            "variant_group": None,  # deprecated
         }
         assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
         kwargs.update(update)
-        f = NestedPipeFunc(**kwargs)  # type: ignore[arg-type]
+        f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
         f._bound = self._bound.copy()
+        f.debug = self.debug
         return f
 
     def _combine_mapspecs(self) -> MapSpec | None:
@@ -1249,8 +1289,10 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                k,
-                inspect.Parameter.KEYWORD_ONLY,
+                # Technically, this is not correct because the parameter name
+                # might contain a scope, however, the validation will catch this.
+                name=k.split(sep=".", maxsplit=1)[-1],
+                kind=inspect.Parameter.KEYWORD_ONLY,
                 # TODO: Do we need defaults here?
                 # default=...,  # noqa: ERA001
             )
@@ -1260,8 +1302,11 @@ class NestedPipeFunc(PipeFunc):
     @functools.cached_property
     def output_annotation(self) -> dict[str, Any]:
         return {
-            name: self.pipeline[name].output_annotation[name]
-            for name in at_least_tuple(self._output_name)
+            name: self.pipeline[original_name].output_annotation[original_name]
+            for name, original_name in zip(
+                at_least_tuple(self.output_name),
+                at_least_tuple(self._output_name),
+            )
         }
 
     @functools.cached_property
@@ -1287,7 +1332,8 @@ class NestedPipeFunc(PipeFunc):
 
     @functools.cached_property
     def func(self) -> Callable[..., tuple[Any, ...]]:  # type: ignore[override]
-        func = self.pipeline.func(self.pipeline.unique_leaf_node.output_name)
+        outputs = [f.output_name for f in self.pipeline.leaf_nodes]
+        func = self.pipeline.func(outputs)
         return _NestedFuncWrapper(func.call_full_output, self._output_name, self.function_name)
 
     @functools.cached_property
@@ -1454,12 +1500,6 @@ def _validate_nested_pipefunc(
         raise TypeError(msg)
 
 
-def _validate_single_leaf_node(leaf_nodes: list[PipeFunc]) -> None:
-    if len(leaf_nodes) > 1:
-        msg = f"The provided `pipefuncs` should have only one leaf node, not {len(leaf_nodes)}."
-        raise ValueError(msg)
-
-
 def _validate_output_name(output_name: OUTPUT_TYPE | None, all_outputs: tuple[str, ...]) -> None:
     if output_name is None:
         return
@@ -1589,3 +1629,23 @@ def _pydantic_defaults(
         elif field_.default is not PydanticUndefined:
             defaults[new_name] = field_.default
     return defaults
+
+
+def _ensure_variant(variant: str | dict[str | None, str] | None) -> dict[str | None, str]:
+    """Ensure that the variant is in the correct format."""
+    # Convert string variant to dict with None as group
+    if isinstance(variant, str):
+        return {None: variant}
+    return variant or {}
+
+
+def _maybe_variant_group_error(
+    variant_group: str | None,
+    variant: str | dict[str | None, str] | None,
+) -> None:
+    if variant_group is not None:  # TODO: remove in 2025-09
+        msg = (
+            "The `variant_group` parameter has been removed in v0.58.0."
+            f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
+        )
+        raise ValueError(msg)
