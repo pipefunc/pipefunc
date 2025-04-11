@@ -242,7 +242,7 @@ def test_to_dataframe_with_single_output() -> None:
     # Check xarray
     ds = result.to_xarray()
     assert ds["y"].shape == ()
-    assert ds["y"].values == 1
+    assert ds["y"].to_numpy() == 1
 
     # Check dataframe
     df = result.to_dataframe()
