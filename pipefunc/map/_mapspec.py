@@ -62,7 +62,7 @@ class ArraySpec:
             msg = f"Array name '{self.name}' is not a valid Python identifier"
             raise ValueError(msg)
         for i in self.axes:
-            if not (i is None or i.isidentifier()):
+            if not (i is None or i.removesuffix("*").isidentifier()):
                 msg = f"Index name '{i}' is not a valid Python identifier."
                 raise ValueError(msg)
 
