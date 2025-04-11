@@ -174,10 +174,28 @@ def _xarray_dataset(
     # Remove the DataArrays that are already appear in other DataArrays' coords
     to_merge = [v for k, v in data_arrays.items() if k not in all_coords]
     ds = xr.merge(to_merge, compat="override")
+    dim_gen = _dim_generator()
     for name in single_output_names:
         array = data_loader(name)
-        ds[name] = array if isinstance(array, np.ndarray) else ((), array)
+        if isinstance(array, np.ndarray):
+            if array.ndim == 1:
+                ds[name] = array
+            else:
+                dims = [dim_gen() for _ in range(array.ndim)]
+                ds[name] = (dims, array)
+        else:
+            ds[name] = ((), array)
     return ds
+
+
+def _dim_generator() -> Callable[[], str]:
+    """Generate a dimension name."""
+    cnt = itertools.count(0)
+
+    def _generate() -> str:
+        return f"unnamed_{next(cnt)}"
+
+    return _generate
 
 
 def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
