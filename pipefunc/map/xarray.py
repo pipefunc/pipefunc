@@ -109,7 +109,7 @@ def _xarray(
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
-    coord_mapping: dict[tuple[str, ...], dict[str, list[str]]] = defaultdict(
+    coord_mapping: dict[tuple[str, ...], dict[str, list[Any]]] = defaultdict(
         lambda: defaultdict(list),
     )
     dims: set[str] = set()
@@ -135,7 +135,14 @@ def _xarray(
             names = list(dct.keys())
             name = ":".join(names)
             arrays = list(itertools.chain.from_iterable(dct.values()))
-            array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
+            first = arrays[0]
+            if isinstance(first, np.ndarray) and first.ndim > 1:  # not supported in pandas
+                shape = first.shape
+                array = np.empty(shape, dtype=object)
+                for i in np.ndindex(shape):
+                    array[i] = tuple(arr[i] for arr in arrays)
+            else:
+                array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
