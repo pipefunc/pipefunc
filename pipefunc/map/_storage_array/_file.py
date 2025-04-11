@@ -47,6 +47,7 @@ class FileArray(StorageBase):
         shape_mask: tuple[bool, ...] | None = None,
         *,
         filename_template: str = FILENAME_TEMPLATE,
+        irregular: bool = False,
     ) -> None:
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
@@ -60,6 +61,7 @@ class FileArray(StorageBase):
         self.filename_template = str(filename_template)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
 
     def __repr__(self) -> str:
         return (
@@ -180,7 +182,13 @@ class FileArray(StorageBase):
             sub_array = np.asarray(sub_array)
             try:
                 return sub_array[internal_indices]
-            except IndexError:
+            except IndexError as e:
+                if not self.irregular:
+                    msg = (
+                        f"Index {internal_indices} out of bounds for array "
+                        f"with shape {sub_array.shape}"
+                    )
+                    raise IndexError(msg) from e
                 return np.ma.masked
         return sub_array
 
@@ -231,7 +239,13 @@ class FileArray(StorageBase):
                         sel = sub_array[internal_index]
                         arr[full_index] = sel
                         full_mask[full_index] = False
-                    except IndexError:
+                    except IndexError as e:
+                        if not self.irregular:
+                            msg = (
+                                f"Index {internal_index} out of bounds for array "
+                                f"with shape {sub_array.shape}"
+                            )
+                            raise IndexError(msg) from e
                         arr[full_index] = np.ma.masked
                         full_mask[full_index] = True
             else:
