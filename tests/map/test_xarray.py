@@ -228,3 +228,24 @@ def test_to_dataframe() -> None:
         "hits",
         "home_runs",
     }
+
+
+def test_to_dataframe_with_single_output() -> None:
+    @pipefunc(output_name="y")
+    def f() -> int:
+        return 1
+
+    pipeline = Pipeline([f])
+    result = pipeline.map({}, parallel=False, storage="dict")
+    assert result["y"].output == 1
+
+    # Check xarray
+    ds = result.to_xarray()
+    assert ds["y"].shape == ()
+    assert ds["y"].values == 1
+
+    # Check dataframe
+    df = result.to_dataframe()
+    assert df.shape == (1, 1)
+    assert df.columns.tolist() == ["y"]
+    assert df.iloc[0]["y"] == 1
