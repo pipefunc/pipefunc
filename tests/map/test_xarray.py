@@ -8,7 +8,7 @@ import pandas as pd
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
-from pipefunc.map.xarray import load_xarray, xarray_dataset_from_results
+from pipefunc.map.xarray import DimensionlessArray, load_xarray, xarray_dataset_from_results
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -247,7 +247,14 @@ def test_2d_mapspec() -> None:
     pipeline = Pipeline([x1, x2, f])
     results = pipeline.map({}, parallel=False, storage="dict")
     ds = results.to_xarray()
+    assert "x1:x2" in ds.coords
+    assert ds["x1:x2"].to_numpy().tolist() == [[(1, 1), (2, 2)], [(3, 3), (4, 4)]]
     df = results.to_dataframe()
+    assert "x1" in df.columns
+    assert "x2" in df.columns
+    assert df.x1.tolist() == [1, 2, 3, 4]
+    assert df.x2.tolist() == [1, 2, 3, 4]
+    assert df.y.tolist() == [2, 4, 6, 8]
 
 
 def test_2d_mapspec_with_nested_array() -> None:
@@ -262,11 +269,28 @@ def test_2d_mapspec_with_nested_array() -> None:
         return np.array([[1, 2], [3, 4]])
 
     @pipefunc(output_name="y", mapspec="x1[i, j] -> y[i, j]")
-    def f(x1: npt.NDArray[np.int_], x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
-        return np.ones((2, 2))
+    def f(x1: int, x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        return x1 + x2
 
     pipeline = Pipeline([x1, x2, f])
 
     results = pipeline.map({}, parallel=False, storage="dict")
     ds = results.to_xarray()
+    assert "x1" in ds.coords
+    assert "x2" in ds.data_vars
+    assert ds["x1"].to_numpy().tolist() == [[1, 2], [3, 4]]
+    assert ds["x2"].data.shape == ()
+    assert isinstance(ds["x2"].data.item(), DimensionlessArray)
+    assert ds["x2"].data.item().arr.tolist() == [[1, 2], [3, 4]]
     df = results.to_dataframe()
+    assert "x1" in df.columns
+    assert "x2" in df.columns
+    assert df.x1.tolist() == [1, 2, 3, 4]
+    assert df.x2.iloc[0].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[1].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[2].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[3].tolist() == [[1, 2], [3, 4]]
+    assert df.y.iloc[0].tolist() == [[2, 3], [4, 5]]
+    assert df.y.iloc[1].tolist() == [[3, 4], [5, 6]]
+    assert df.y.iloc[2].tolist() == [[4, 5], [6, 7]]
+    assert df.y.iloc[3].tolist() == [[5, 6], [7, 8]]

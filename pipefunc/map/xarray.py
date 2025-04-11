@@ -195,10 +195,6 @@ class DimensionlessArray:
 
     arr: np.ndarray
 
-    def __repr__(self) -> str:
-        """Represent the array as a string."""
-        return str(self.arr.tolist())
-
 
 def _split_tuple_columns(df: pd.DataFrame) -> pd.DataFrame:
     result_df = df.copy()
