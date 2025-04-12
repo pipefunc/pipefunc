@@ -5,6 +5,89 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.68.0 (2025-04-11)
+
+### 🐛 Bug Fixes
+
+- Fix single size `pandas.DataFrame` ([#716](https://github.com/pipefunc/pipefunc/pull/716))
+- Fix 2 ND elements in `xarray` issues ([#728](https://github.com/pipefunc/pipefunc/pull/728))
+- Display mapspec index in grouped Graphviz nodes ([#719](https://github.com/pipefunc/pipefunc/pull/719))
+
+### ✨ Enhancements
+
+- Add `load_all_outputs` ([#725](https://github.com/pipefunc/pipefunc/pull/725))
+
+### 📦 Dependencies
+
+- ⬆️ Update python to v3.13.3 ([#714](https://github.com/pipefunc/pipefunc/pull/714))
+
+### 📊 Stats
+
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +196 lines, -11 lines
+
+## v0.67.0 (2025-04-10)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#679](https://github.com/pipefunc/pipefunc/pull/679))
+
+### ✨ Enhancements
+
+- Allow adding ND axis with `add_mapspec_axis` ([#717](https://github.com/pipefunc/pipefunc/pull/717))
+
+### 📊 Stats
+
+- `.py`: +127 lines, -5 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +44 lines, -0 lines
+
+## v0.66.0 (2025-04-08)
+
+### 🤖 CI
+
+- Set `fetch-depth: 0` ([#713](https://github.com/pipefunc/pipefunc/pull/713))
+
+### 🧹 Maintenance
+
+- Refactor `prepare_run` return type ([#712](https://github.com/pipefunc/pipefunc/pull/712))
+
+### ✨ Enhancements
+
+- Allow providing single `output_name` of tuple in `executor`, `storage`, `chunksizes` ([#711](https://github.com/pipefunc/pipefunc/pull/711))
+
+### 📊 Stats
+
+- `.yml`: +2 lines, -0 lines
+- `.py`: +150 lines, -48 lines
+
+## v0.65.1 (2025-04-08)
+
+### 🐛 Bug Fixes
+
+- Fix that `NestedPipeFunc.copy` preserves cache ([#710](https://github.com/pipefunc/pipefunc/pull/710))
+
+### 📊 Stats
+
+- `.py`: +78 lines, -2 lines
+
+## v0.65.0 (2025-04-08)
+
+### ✨ Enhancements
+
+- Add Group Args to `visualize_graphviz_widget` ([#709](https://github.com/pipefunc/pipefunc/pull/709))
+- Add `orient` widget to `visualize_graphviz_widget` ([#708](https://github.com/pipefunc/pipefunc/pull/708))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.64.0 ([#707](https://github.com/pipefunc/pipefunc/pull/707))
+
+### 📊 Stats
+
+- `.md`: +22 lines, -0 lines
+- `.py`: +86 lines, -21 lines
+
 ## v0.64.0 (2025-04-08)
 
 ### ✨ Enhancements
@@ -2070,21 +2153,21 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - Include `pipefunc.map.adaptive` integration in docs ([#149](https://github.com/pipefunc/pipefunc/pull/149))
 - Validate inputs to `PipeFunc` ([#148](https://github.com/pipefunc/pipefunc/pull/148))
 - Add `PipeFunc.update_bound` to allow fixed parameters ([#110](https://github.com/pipefunc/pipefunc/pull/110))
+- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
+- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 
 ### 📊 Stats
 
-- `.py`: +1150 lines, -466 lines
-- `.md`: +1 lines, -1 lines
-- `.yml`: +4 lines, -0 lines
+- `.py`: +1174 lines, -475 lines
+- `.md`: +3 lines, -3 lines
+- `.yml`: +15 lines, -3 lines
 - `.ipynb`: +67 lines, -3 lines
-- `.toml`: +1 lines, -1 lines
+- `.toml`: +17 lines, -14 lines
 
 ## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
-- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
-- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now) ([a9302d7](https://github.com/pipefunc/pipefunc/commit/a9302d7))
 - Drop support for Python 3.8 and 3.9 ([#142](https://github.com/pipefunc/pipefunc/pull/142))
 - Factor out simplify functions to simplify module ([#141](https://github.com/pipefunc/pipefunc/pull/141))
@@ -2111,12 +2194,12 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ### 📊 Stats
 
-- `.py`: +1794 lines, -883 lines
-- `.yml`: +15 lines, -17 lines
-- `.md`: +20 lines, -2 lines
+- `.py`: +1771 lines, -875 lines
+- `.yml`: +11 lines, -21 lines
+- `.md`: +18 lines, -0 lines
 - `.ipynb`: +46 lines, -14 lines
 - `.py}`: +32 lines, -20 lines
-- `.toml`: +20 lines, -17 lines
+- `.toml`: +10 lines, -10 lines
 
 ## v0.12.0 (2024-05-30)
 
