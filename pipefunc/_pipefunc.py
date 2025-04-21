@@ -712,7 +712,7 @@ class PipeFunc(Generic[T]):
             self.post_execution_hook(self, result, kwargs)
         return result
 
-    def _call_signature(self) -> inspect.Signature:
+    def __signature__(self) -> inspect.Signature:
         if self._output_picker is None:
             output_annotations = self.output_annotation
             if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
