@@ -647,7 +647,7 @@ class PipeFunc(Generic[T]):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
+        assert_complete_kwargs(kwargs, PipeFunc.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
@@ -1287,7 +1287,7 @@ class NestedPipeFunc(PipeFunc):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
+        assert_complete_kwargs(kwargs, NestedPipeFunc.__init__, skip={"self"})
         kwargs.update(update)
         f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
