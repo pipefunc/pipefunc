@@ -695,10 +695,10 @@ def test_wrapping_pipefunc_in_pipefunc() -> None:
         return input
 
     assert test(input2=1) == 1
-    PipeFunc(
+    test2 = PipeFunc(
         func=test,
         output_name="test2",
         renames={"input2": "input3"},
         mapspec="input3[i] -> test2[i]",
     )
-    assert test(input3=1) == 1
+    assert test2(input3=1) == 1
