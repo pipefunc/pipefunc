@@ -801,7 +801,7 @@ class PipeFunc(Generic[T]):
             return dict(zip(self.output_name, get_args(hint)))
         return dict.fromkeys(self.output_name, NoAnnotation)
 
-    def __signature__(self) -> inspect.Signature:
+    def _call_signature(self) -> inspect.Signature:
         if self._output_picker is None:
             output_annotations = self.output_annotation
             if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
