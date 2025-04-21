@@ -726,6 +726,7 @@ class PipeFunc(Generic[T]):
                 return_annotation = output_annotations[self.output_name]
         else:
             return_annotation = inspect.Parameter.empty
+
         parameters = [
             inspect.Parameter(
                 name=name,
@@ -734,6 +735,7 @@ class PipeFunc(Generic[T]):
                 annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
             )
             for name in self.parameters
+            if name not in self.bound
         ]
         return inspect.Signature(parameters, return_annotation=return_annotation)
 
