@@ -38,17 +38,17 @@ def test_pipefunc_basic_signature() -> None:
     assert param_a.name == "a"
     assert param_a.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
     assert param_a.default == inspect.Parameter.empty
-    assert param_a.annotation == int
+    assert param_a.annotation is int
 
     # Parameter 'b'
     param_b = sig.parameters["b"]
     assert param_b.name == "b"
     assert param_b.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
     assert param_b.default == "default"
-    assert param_b.annotation == str
+    assert param_b.annotation is str
 
     # Return annotation
-    assert sig.return_annotation == float
+    assert sig.return_annotation is float
 
 
 def test_pipefunc_signature_with_renames() -> None:
@@ -57,10 +57,10 @@ def test_pipefunc_signature_with_renames() -> None:
     sig = pf.__signature__
 
     assert list(sig.parameters.keys()) == ["alpha", "beta"]
-    assert sig.parameters["alpha"].annotation == int
-    assert sig.parameters["beta"].annotation == str
+    assert sig.parameters["alpha"].annotation is int
+    assert sig.parameters["beta"].annotation is str
     assert sig.parameters["beta"].default == "default"
-    assert sig.return_annotation == float
+    assert sig.return_annotation is float
 
 
 def test_pipefunc_signature_with_defaults_override() -> None:
@@ -83,8 +83,8 @@ def test_pipefunc_signature_with_bound_params() -> None:
 
     # 'b' should not be in the signature parameters as it's bound
     assert list(sig.parameters.keys()) == ["a"]
-    assert sig.parameters["a"].annotation == int
-    assert sig.return_annotation == float
+    assert sig.parameters["a"].annotation is int
+    assert sig.return_annotation is float
 
 
 def test_pipefunc_signature_with_multiple_outputs() -> None:
@@ -93,7 +93,7 @@ def test_pipefunc_signature_with_multiple_outputs() -> None:
     sig = pf.__signature__
 
     assert list(sig.parameters.keys()) == ["x"]
-    assert sig.parameters["x"].annotation == int
+    assert sig.parameters["x"].annotation is int
     # The return annotation should be Tuple[int, str]
     assert sig.return_annotation == tuple[int, str]
 
@@ -131,7 +131,7 @@ def test_pipefunc_signature_updates_on_change() -> None:
     sig2 = pf.__signature__
     assert list(sig2.parameters.keys()) == ["b"]  # 'alpha' is now bound
     assert sig2.parameters["b"].default == "new_default"
-    assert sig2.return_annotation == float
+    assert sig2.return_annotation is float
 
 
 def test_pipefunc_signature_with_scope() -> None:
@@ -141,10 +141,10 @@ def test_pipefunc_signature_with_scope() -> None:
     sig = pf.__signature__
 
     assert list(sig.parameters.keys()) == ["my_scope.a", "my_scope.b"]
-    assert sig.parameters["my_scope.a"].annotation == int
-    assert sig.parameters["my_scope.b"].annotation == str
+    assert sig.parameters["my_scope.a"].annotation is int
+    assert sig.parameters["my_scope.b"].annotation is str
     assert sig.parameters["my_scope.b"].default == "default"
-    assert sig.return_annotation == float  # Output scope doesn't affect return annotation type
+    assert sig.return_annotation is float  # Output scope doesn't affect return annotation type
 
 
 def test_pipefunc_signature_callable_class() -> None:
@@ -154,10 +154,10 @@ def test_pipefunc_signature_callable_class() -> None:
     sig = pf.__signature__
 
     assert list(sig.parameters.keys()) == ["data", "factor"]
-    assert sig.parameters["data"].annotation == dict
-    assert sig.parameters["factor"].annotation == int
+    assert sig.parameters["data"].annotation is dict
+    assert sig.parameters["factor"].annotation is int
     assert sig.parameters["factor"].default == 2
-    assert sig.return_annotation == dict
+    assert sig.return_annotation is dict
 
 
 # --- Tests for NestedPipeFunc.__signature__ ---
@@ -171,22 +171,22 @@ def test_nestedpipefunc_signature() -> None:
         return float(x + len(y))
 
     @pipefunc("final")
-    def func2(intermediate: float, z: bool = True) -> str:
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
         return f"{intermediate}_{z}"
 
-    nf = NestedPipeFunc([func1, func2])
+    nf = NestedPipeFunc([func1, func2], ("intermediate", "final"))
     sig = nf.__signature__
 
     # Parameters should be the external inputs (x, y, z), excluding intermediates
     assert list(sig.parameters.keys()) == ["x", "y", "z"]
 
     # Check parameter details
-    assert sig.parameters["x"].annotation == int
+    assert sig.parameters["x"].annotation is int
     assert sig.parameters["x"].default == inspect.Parameter.empty
-    assert sig.parameters["y"].annotation == str
+    assert sig.parameters["y"].annotation is str
     assert sig.parameters["y"].default == "y"
-    assert sig.parameters["z"].annotation == bool
-    assert sig.parameters["z"].default == True
+    assert sig.parameters["z"].annotation is bool
+    assert sig.parameters["z"].default is True
 
     # Check return annotation (combines outputs)
     assert nf.output_name == ("intermediate", "final")
@@ -201,7 +201,7 @@ def test_nestedpipefunc_signature_with_renames_and_defaults() -> None:
         return float(x + len(y))
 
     @pipefunc("final")
-    def func2(intermediate: float, z: bool = True) -> str:
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
         return f"{intermediate}_{z}"
 
     # Rename an input and an output, provide new default
@@ -216,9 +216,9 @@ def test_nestedpipefunc_signature_with_renames_and_defaults() -> None:
 
     # Check parameters
     assert list(sig.parameters.keys()) == ["input_x", "y", "z"]
-    assert sig.parameters["input_x"].annotation == int
+    assert sig.parameters["input_x"].annotation is int
     assert sig.parameters["y"].default == "y"
-    assert sig.parameters["z"].default == False  # Updated default
+    assert sig.parameters["z"].default is False  # Updated default
 
     # Check return annotation (includes renamed output)
     assert nf.output_name == ("intermediate", "result")
@@ -233,7 +233,7 @@ def test_nestedpipefunc_signature_with_bound() -> None:
         return float(x + len(y))
 
     @pipefunc("final")
-    def func2(intermediate: float, z: bool = True) -> str:
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
         return f"{intermediate}_{z}"
 
     # Bind one of the inputs
@@ -242,8 +242,8 @@ def test_nestedpipefunc_signature_with_bound() -> None:
 
     # 'y' should be excluded from the signature
     assert list(sig.parameters.keys()) == ["x", "z"]
-    assert sig.parameters["x"].annotation == int
-    assert sig.parameters["z"].default == True
+    assert sig.parameters["x"].annotation is int
+    assert sig.parameters["z"].default is True
 
     # Check return annotation
     assert nf.output_name == ("intermediate", "final")
@@ -275,9 +275,9 @@ def test_pipefunc_signature_partial_annotation() -> None:
     sig = pf.__signature__
 
     assert list(sig.parameters.keys()) == ["a", "b"]
-    assert sig.parameters["a"].annotation == int
+    assert sig.parameters["a"].annotation is int
     assert sig.parameters["b"].annotation == inspect.Parameter.empty
-    assert sig.return_annotation == str
+    assert sig.return_annotation is str
 
 
 def test_pipefunc_signature_with_renamed_output_tuple() -> None:
