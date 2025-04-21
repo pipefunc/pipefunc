@@ -802,28 +802,25 @@ class PipeFunc(Generic[T]):
         return dict.fromkeys(self.output_name, NoAnnotation)
 
     def __signature__(self) -> inspect.Signature:
-        annotations = self.parameter_annotations
         if self._output_picker is None:
             output_annotations = self.output_annotation
             if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
                 return_annotation = inspect.Parameter.empty
             elif isinstance(self.output_name, tuple):
                 return_annotations = tuple(output_annotations[name] for name in self.output_name)
-                return_annotation = tuple[return_annotations]
+                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
             else:
                 return_annotation = output_annotations[self.output_name]
         else:
             return_annotation = inspect.Parameter.empty
-        parameters = self.parameters
-        defaults = self.defaults
         parameters = [
             inspect.Parameter(
                 name=name,
                 kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                default=defaults.get(name, inspect.Parameter.empty),
-                annotation=annotations.get(name, inspect.Parameter.empty),
+                default=self.defaults.get(name, inspect.Parameter.empty),
+                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
             )
-            for name in parameters
+            for name in self.parameters
         ]
         return inspect.Signature(parameters, return_annotation=return_annotation)
 
