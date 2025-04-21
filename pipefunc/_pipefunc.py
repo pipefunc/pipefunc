@@ -712,6 +712,29 @@ class PipeFunc(Generic[T]):
             self.post_execution_hook(self, result, kwargs)
         return result
 
+    def _call_signature(self) -> inspect.Signature:
+        if self._output_picker is None:
+            output_annotations = self.output_annotation
+            if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
+                return_annotation = inspect.Parameter.empty
+            elif isinstance(self.output_name, tuple):
+                return_annotations = tuple(output_annotations[name] for name in self.output_name)
+                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
+            else:
+                return_annotation = output_annotations[self.output_name]
+        else:
+            return_annotation = inspect.Parameter.empty
+        parameters = [
+            inspect.Parameter(
+                name=name,
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=self.defaults.get(name, inspect.Parameter.empty),
+                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
+            )
+            for name in self.parameters
+        ]
+        return inspect.Signature(parameters, return_annotation=return_annotation)
+
     @property
     def profile(self) -> bool:
         """Return whether profiling is enabled for the wrapped function."""
@@ -800,29 +823,6 @@ class PipeFunc(Generic[T]):
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
         return dict.fromkeys(self.output_name, NoAnnotation)
-
-    def _call_signature(self) -> inspect.Signature:
-        if self._output_picker is None:
-            output_annotations = self.output_annotation
-            if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
-                return_annotation = inspect.Parameter.empty
-            elif isinstance(self.output_name, tuple):
-                return_annotations = tuple(output_annotations[name] for name in self.output_name)
-                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
-            else:
-                return_annotation = output_annotations[self.output_name]
-        else:
-            return_annotation = inspect.Parameter.empty
-        parameters = [
-            inspect.Parameter(
-                name=name,
-                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                default=self.defaults.get(name, inspect.Parameter.empty),
-                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
-            )
-            for name in self.parameters
-        ]
-        return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @functools.cached_property
     def requires_mapping(self) -> bool:
