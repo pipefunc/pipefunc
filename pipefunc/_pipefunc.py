@@ -714,6 +714,7 @@ class PipeFunc(Generic[T]):
 
     @functools.cached_property
     def __signature__(self) -> inspect.Signature:
+        """Return the signature of `__call__` with renamed parameters."""
         if self._output_picker is None:
             output_annotations = self.output_annotation
             if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
