@@ -840,6 +840,7 @@ def test_nestedpipefunc_with_default_and_bound() -> None:
 def test_nestedpipefunc_annotations_with_renames_and_defaults() -> None:
     """Test NestedPipeFunc signature with renames and defaults."""
 
+    # xref: bug fixed in https://github.com/pipefunc/pipefunc/pull/737
     @pipefunc("intermediate")
     def func1(x: int, y: str = "y") -> float:
         return float(x + len(y))
