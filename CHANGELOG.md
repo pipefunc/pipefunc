@@ -5,7 +5,50 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.69.0 (2025-04-30)
+
+### ✨ Enhancements
+
+- Add `PipeFunc.__signature__` (allows doubly wrapping `PipeFunc`) ([#727](https://github.com/pipefunc/pipefunc/pull/727))
+- Make `output_name` of `NestedPipeFunc` depend on the topological ordering ([#735](https://github.com/pipefunc/pipefunc/pull/735))
+- Ensure deterministic order in generations and `Pipeline.sorted_functions` ([#736](https://github.com/pipefunc/pipefunc/pull/736))
+- Make `output_name` of `NestedPipeFunc` depend on the topological ordering ([84baccf](https://github.com/pipefunc/pipefunc/commit/84baccf))
+
+### 🐛 Bug Fixes
+
+- Fix `NestedPipeFunc.parameter_annotations` with renames ([#737](https://github.com/pipefunc/pipefunc/pull/737))
+- Fix creating `NestedPipeFunc` and binding a existing default ([#734](https://github.com/pipefunc/pipefunc/pull/734))
+
+### 📦 Dependencies
+
+- ⬆️ Update astral-sh/setup-uv action to v6 ([#732](https://github.com/pipefunc/pipefunc/pull/732))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#733](https://github.com/pipefunc/pipefunc/pull/733))
+- [pre-commit.ci] pre-commit autoupdate ([#731](https://github.com/pipefunc/pipefunc/pull/731))
+- [pre-commit.ci] pre-commit autoupdate ([#730](https://github.com/pipefunc/pipefunc/pull/730))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.68.0 ([#729](https://github.com/pipefunc/pipefunc/pull/729))
+
+### 📊 Stats
+
+- `.yml`: +3 lines, -3 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +93 lines, -10 lines
+- `.py`: +468 lines, -10 lines
+
 ## v0.68.0 (2025-04-11)
+
+### Closed Issues
+
+- Running in parallel when some inputs can't be pickled ([#726](https://github.com/pipefunc/pipefunc/issues/726))
+- Difficulties renaming existing pipefunc ([#723](https://github.com/pipefunc/pipefunc/issues/723))
+- Allowing debugging of intermediate results when pipeline fails midway ([#722](https://github.com/pipefunc/pipefunc/issues/722))
+- Allowing DFS parallelization in .map ([#721](https://github.com/pipefunc/pipefunc/issues/721))
+- Make results numpy array optional ([#472](https://github.com/pipefunc/pipefunc/issues/472))
 
 ### 🐛 Bug Fixes
 
@@ -37,17 +80,18 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 - Allow adding ND axis with `add_mapspec_axis` ([#717](https://github.com/pipefunc/pipefunc/pull/717))
 
+### 🤖 CI
+
+- Set `fetch-depth: 0` ([#713](https://github.com/pipefunc/pipefunc/pull/713))
+
 ### 📊 Stats
 
 - `.py`: +127 lines, -5 lines
+- `.yml`: +2 lines, -0 lines
 - `.yaml`: +1 lines, -1 lines
 - `.md`: +44 lines, -0 lines
 
 ## v0.66.0 (2025-04-08)
-
-### 🤖 CI
-
-- Set `fetch-depth: 0` ([#713](https://github.com/pipefunc/pipefunc/pull/713))
 
 ### 🧹 Maintenance
 
@@ -59,7 +103,6 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ### 📊 Stats
 
-- `.yml`: +2 lines, -0 lines
 - `.py`: +150 lines, -48 lines
 
 ## v0.65.1 (2025-04-08)
@@ -2153,21 +2196,21 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 - Include `pipefunc.map.adaptive` integration in docs ([#149](https://github.com/pipefunc/pipefunc/pull/149))
 - Validate inputs to `PipeFunc` ([#148](https://github.com/pipefunc/pipefunc/pull/148))
 - Add `PipeFunc.update_bound` to allow fixed parameters ([#110](https://github.com/pipefunc/pipefunc/pull/110))
-- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
-- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 
 ### 📊 Stats
 
-- `.py`: +1174 lines, -475 lines
-- `.md`: +3 lines, -3 lines
-- `.yml`: +15 lines, -3 lines
+- `.py`: +1150 lines, -466 lines
+- `.md`: +1 lines, -1 lines
+- `.yml`: +4 lines, -0 lines
 - `.ipynb`: +67 lines, -3 lines
-- `.toml`: +17 lines, -14 lines
+- `.toml`: +1 lines, -1 lines
 
 ## v0.13.0 (2024-06-02)
 
 ### 📝 Other
 
+- Make `versioningit` an optional runtime dependency ([#144](https://github.com/pipefunc/pipefunc/pull/144))
+- Set MyST in .github/update-environment.py ([#143](https://github.com/pipefunc/pipefunc/pull/143))
 - Fix `pipeline.mapspecs_as_strings` statement (which is a property now) ([a9302d7](https://github.com/pipefunc/pipefunc/commit/a9302d7))
 - Drop support for Python 3.8 and 3.9 ([#142](https://github.com/pipefunc/pipefunc/pull/142))
 - Factor out simplify functions to simplify module ([#141](https://github.com/pipefunc/pipefunc/pull/141))
@@ -2194,12 +2237,12 @@ GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
 ### 📊 Stats
 
-- `.py`: +1771 lines, -875 lines
-- `.yml`: +11 lines, -21 lines
-- `.md`: +18 lines, -0 lines
+- `.py`: +1794 lines, -883 lines
+- `.yml`: +15 lines, -17 lines
+- `.md`: +20 lines, -2 lines
 - `.ipynb`: +46 lines, -14 lines
 - `.py}`: +32 lines, -20 lines
-- `.toml`: +10 lines, -10 lines
+- `.toml`: +20 lines, -17 lines
 
 ## v0.12.0 (2024-05-30)
 
