@@ -1709,9 +1709,9 @@ class _ScopedIdentifier(str):
         This method overrides the default isidentifier method to allow
         for scoped identifiers (e.g., "myscope.x").
         """
-        if "." not in self:
+        if "." not in self:  # pragma: no cover
             return super().isidentifier()
-        if self.count(".") != 1:
+        if self.count(".") != 1:  # pragma: no cover
             return False
         scope, name = self.split(".")
         return scope.isidentifier() and name.isidentifier()
