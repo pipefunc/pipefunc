@@ -647,7 +647,7 @@ class PipeFunc(Generic[T]):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
+        assert_complete_kwargs(kwargs, PipeFunc.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
@@ -711,6 +711,36 @@ class PipeFunc(Generic[T]):
         if self.post_execution_hook is not None:
             self.post_execution_hook(self, result, kwargs)
         return result
+
+    @functools.cached_property
+    def __signature__(self) -> inspect.Signature:
+        """Return the signature of `__call__` with renamed parameters.
+
+        If *any* of the output annotations are `NoAnnotation`, the return annotation
+        is set to `inspect.Parameter.empty`.
+        """
+        if self._output_picker is None:
+            output_annotations = self.output_annotation
+            if any(v is NoAnnotation for v in output_annotations.values()):
+                return_annotation = inspect.Parameter.empty
+            elif isinstance(self.output_name, tuple):
+                return_annotations = tuple(output_annotations[name] for name in self.output_name)
+                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
+            else:
+                return_annotation = output_annotations[self.output_name]
+        else:
+            return_annotation = inspect.Parameter.empty
+        parameters = [
+            inspect.Parameter(
+                name=name if "." not in name else _ScopedIdentifier(name),
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=self.defaults.get(name, inspect.Parameter.empty),
+                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
+            )
+            for name in self.parameters
+            if name not in self.bound
+        ]
+        return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
     def profile(self) -> bool:
@@ -1266,7 +1296,7 @@ class NestedPipeFunc(PipeFunc):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
+        assert_complete_kwargs(kwargs, NestedPipeFunc.__init__, skip={"self"})
         kwargs.update(update)
         f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
@@ -1655,3 +1685,33 @@ def _maybe_variant_group_error(
             f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
         )
         raise ValueError(msg)
+
+
+class _ScopedIdentifier(str):
+    """String subclass that represents a scoped identifier in a `inspect.Signature`.
+
+    Its main use is to allow
+    >>> Parameter(ScopedIdentifier("myscope.x"), kind=Parameter.POSITIONAL_OR_KEYWORD)
+    where the following is not possible
+    >>> Parameter("myscope.x", kind=Parameter.POSITIONAL_OR_KEYWORD)
+    because "myscope.x" is not a valid identifier.
+
+    Another alternative considered to represent a scoped parameter was to use TypedDict and
+    only include the scoped name in the key but this has more limitations such as not
+    containing defaults and making parameters KEYWORD_ONLY due to changed order.
+    """
+
+    __slots__ = ()
+
+    def isidentifier(self) -> bool:
+        """Check if the string is a valid identifier.
+
+        This method overrides the default isidentifier method to allow
+        for scoped identifiers (e.g., "myscope.x").
+        """
+        if "." not in self:  # pragma: no cover
+            return super().isidentifier()
+        if self.count(".") != 1:  # pragma: no cover
+            return False
+        scope, name = self.split(".")
+        return scope.isidentifier() and name.isidentifier()
