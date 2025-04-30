@@ -1315,7 +1315,11 @@ class NestedPipeFunc(PipeFunc):
     def parameter_annotations(self) -> dict[str, Any]:
         """Return the type annotations of the wrapped function's parameters."""
         annotations = self.pipeline.parameter_annotations
-        return {p: annotations[p] for p in self.parameters if p in annotations}
+        return {
+            p: annotations[p_original]
+            for p in self.parameters
+            if (p_original := self._inverse_renames.get(p, p)) in annotations
+        }
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
