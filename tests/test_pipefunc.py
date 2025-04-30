@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import pickle
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -702,3 +703,34 @@ def test_wrapping_pipefunc_in_pipefunc() -> None:
         mapspec="input3[i] -> test2[i]",
     )
     assert test2(input3=1) == 1
+
+
+def test_wrapping_pipefunc_with_scope_in_pipefunc() -> None:
+    @pipefunc(
+        output_name="test",
+        renames={"input": "x.input2"},
+    )
+    def test(input: int) -> int:  # noqa: A002
+        return input
+
+    assert test.parameter_annotations == {"x.input2": int}
+    assert test.output_annotation == {"test": int}
+    parameter = test.original_parameters["input"]
+    assert isinstance(parameter, inspect.Parameter)
+    assert parameter.default is inspect.Parameter.empty
+    assert parameter.name == "input"
+    assert parameter.annotation == "int"
+
+    assert test(x={"input2": 1}) == 1
+    test2 = PipeFunc(
+        func=test,
+        output_name="test2",
+        renames={"x.input2": "x.input3"},
+    )
+    assert test2(x={"input3": 1}) == 1
+
+    parameter = test2.original_parameters["x.input2"]
+    assert isinstance(parameter, inspect.Parameter)
+    assert parameter.default is inspect.Parameter.empty
+    assert parameter.name == "x.input2"
+    assert parameter.annotation is int
