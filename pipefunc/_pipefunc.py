@@ -1235,10 +1235,12 @@ class NestedPipeFunc(PipeFunc):
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}
-        self._defaults: dict[str, Any] = {
-            k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
-        }
         self._bound: dict[str, Any] = bound or {}
+        self._defaults: dict[str, Any] = {
+            k: v
+            for k, v in self.pipeline.defaults.items()
+            if k in self.parameters and k not in self._bound
+        }
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.post_execution_hook = None
