@@ -22,7 +22,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, TypeVar, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -726,34 +726,16 @@ class PipeFunc(Generic[T]):
                 return_annotation = output_annotations[self.output_name]
         else:
             return_annotation = inspect.Parameter.empty
-        scopes = self.parameter_scopes
         parameters = [
             inspect.Parameter(
-                name=name,
-                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD
-                if not scopes
-                else inspect.Parameter.KEYWORD_ONLY,
+                name=name if "." not in name else _ScopedIdentifier(name),
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 default=self.defaults.get(name, inspect.Parameter.empty),
                 annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
             )
             for name in self.parameters
-            if name not in self.bound and "." not in name
+            if name not in self.bound
         ]
-        for scope in scopes:
-            annotation = TypedDict(
-                scope,
-                {
-                    name.split(".", 1)[1]: self.parameter_annotations.get(name, Any)
-                    for name in self.parameters
-                    if name.startswith(f"{scope}.")
-                },
-            )
-            p = inspect.Parameter(
-                name=scope,
-                kind=inspect.Parameter.KEYWORD_ONLY,
-                annotation=annotation,
-            )
-            parameters.append(p)
         return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
@@ -1696,16 +1678,27 @@ def _maybe_variant_group_error(
 
 
 class _ScopedIdentifier(str):
-    """String subclass that represents a scoped identifier.
+    """String subclass that represents a scoped identifier in a `inspect.Signature`.
 
     Its main use is to allow
     >>> Parameter(ScopedIdentifier("myscope.x"), kind=Parameter.POSITIONAL_OR_KEYWORD)
     where the following is not possible
     >>> Parameter("myscope.x", kind=Parameter.POSITIONAL_OR_KEYWORD)
     because "myscope.x" is not a valid identifier.
+
+    Another alternative considered to represent a scoped parameter was to use TypedDict and
+    only include the scoped name in the key but this has more limitations such as not
+    containing defaults and making parameters KEYWORD_ONLY due to changed order.
     """
 
-    def isidentifier(self):
+    __slots__ = ()
+
+    def isidentifier(self) -> bool:
+        """Check if the string is a valid identifier.
+
+        This method overrides the default isidentifier method to allow
+        for scoped identifiers (e.g., "myscope.x").
+        """
         if "." not in self:
             return super().isidentifier()
         if self.count(".") != 1:
