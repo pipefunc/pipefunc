@@ -307,3 +307,18 @@ def test_scoped_parameter():
     parameter = test.__signature__.parameters["y.input2"]
     assert parameter.annotation is int
     assert parameter.default == 1
+
+
+def test_pipefunc_signature_with_multiple_output_names_and_one_no_annotation():
+    @pipefunc(output_name="a")
+    def f() -> int:
+        return 1
+
+    @pipefunc(output_name="b")
+    def g(a: int):
+        return f"hello_{a}"
+
+    nf = NestedPipeFunc([f, g], output_name=("a", "b"))
+    assert nf.output_annotation == {"a": int, "b": NoAnnotation}
+    sig = nf.__signature__
+    assert sig.return_annotation is inspect.Parameter.empty

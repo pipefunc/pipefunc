@@ -721,7 +721,7 @@ class PipeFunc(Generic[T]):
         """
         if self._output_picker is None:
             output_annotations = self.output_annotation
-            if any(isinstance(v, NoAnnotation) for v in output_annotations.values()):
+            if any(v is NoAnnotation for v in output_annotations.values()):
                 return_annotation = inspect.Parameter.empty
             elif isinstance(self.output_name, tuple):
                 return_annotations = tuple(output_annotations[name] for name in self.output_name)
