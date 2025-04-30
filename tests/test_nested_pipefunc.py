@@ -835,3 +835,28 @@ def test_nestedpipefunc_with_default_and_bound() -> None:
     assert nf.bound == {"y": "bound_y_value"}
     result = nf(x=1, y="xx")
     assert result == (14.0, "14.0_True")
+
+
+def test_nestedpipefunc_annotations_with_renames_and_defaults() -> None:
+    """Test NestedPipeFunc signature with renames and defaults."""
+
+    # xref: bug fixed in https://github.com/pipefunc/pipefunc/pull/737
+    @pipefunc("intermediate")
+    def func1(x: int, y: str = "y") -> float:
+        return float(x + len(y))
+
+    @pipefunc("final")
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+        return f"{intermediate}_{z}"
+
+    # Rename an input and an output, provide new default
+    nf = NestedPipeFunc(
+        [func1, func2],
+        renames={"x": "input_x", "final": "result"},
+    )
+    assert nf.parameter_annotations == {
+        "input_x": int,
+        "y": str,
+        "z": bool,
+    }
+    assert nf.output_annotation == {"intermediate": float, "result": str}
