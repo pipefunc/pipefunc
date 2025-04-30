@@ -886,7 +886,8 @@ def test_wrapping_pipefunc_with_scope_in_nested_pipefunc() -> None:
 
     x = original_parameters["scope.x"]
     assert x.name == "scope.x"
-    # TODO: both `default` and `annotation` are not set for `original_parameters`
+    # NOTE: both `default` and `annotation` are not set for `original_parameters`
+    # see comment in NestedPipeFunc.original_parameters
     assert x.default is inspect.Parameter.empty
     assert x.annotation is inspect.Parameter.empty
 

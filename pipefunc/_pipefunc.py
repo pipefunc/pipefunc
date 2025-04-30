@@ -1323,9 +1323,9 @@ class NestedPipeFunc(PipeFunc):
             k: inspect.Parameter(
                 name=k if "." not in k else _ScopedIdentifier(k),
                 kind=inspect.Parameter.KEYWORD_ONLY,
-                # TODO: Add defaults and annotations
-                # default=...,  # noqa: ERA001
-                # annotation=...,  # noqa: ERA001
+                # `default` and `annotations` not set because they requires `original_parameters`
+                default=inspect.Parameter.empty,
+                annotation=inspect.Parameter.empty,
             )
             for k in sorted(parameters)
         }
