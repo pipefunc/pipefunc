@@ -1321,12 +1321,11 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                # Technically, this is not correct because the parameter name
-                # might contain a scope, however, the validation will catch this.
-                name=k.split(sep=".", maxsplit=1)[-1],
+                name=k if "." not in k else _ScopedIdentifier(k),
                 kind=inspect.Parameter.KEYWORD_ONLY,
-                # TODO: Do we need defaults here?
-                # default=...,  # noqa: ERA001
+                # `default` and `annotations` not set because they requires `original_parameters`
+                default=inspect.Parameter.empty,
+                annotation=inspect.Parameter.empty,
             )
             for k in sorted(parameters)
         }
