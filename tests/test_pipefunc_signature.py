@@ -140,7 +140,7 @@ def test_pipefunc_signature_with_scope() -> None:
     pf.update_scope("my_scope", inputs={"a", "b"}, outputs={"c"})
     sig = pf.__signature__
 
-    assert list(sig.parameters.keys()) == ["my_scope.a", "my_scope.b"]
+    assert list(sig.parameters.keys()) == ["my_scope"]
     assert sig.parameters["my_scope.a"].annotation is int
     assert sig.parameters["my_scope.b"].annotation is str
     assert sig.parameters["my_scope.b"].default == "default"

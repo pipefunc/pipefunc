@@ -22,7 +22,7 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, TypeVar, get_args, get_origin
 
 import cloudpickle
 
@@ -726,17 +726,34 @@ class PipeFunc(Generic[T]):
                 return_annotation = output_annotations[self.output_name]
         else:
             return_annotation = inspect.Parameter.empty
-
+        scopes = self.parameter_scopes
         parameters = [
             inspect.Parameter(
                 name=name,
-                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD
+                if not scopes
+                else inspect.Parameter.KEYWORD_ONLY,
                 default=self.defaults.get(name, inspect.Parameter.empty),
                 annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
             )
             for name in self.parameters
-            if name not in self.bound
+            if name not in self.bound and "." not in name
         ]
+        for scope in scopes:
+            annotation = TypedDict(
+                scope,
+                {
+                    name.split(".", 1)[1]: self.parameter_annotations.get(name, Any)
+                    for name in self.parameters
+                    if name.startswith(f"{scope}.")
+                },
+            )
+            p = inspect.Parameter(
+                name=scope,
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                annotation=annotation,
+            )
+            parameters.append(p)
         return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
@@ -1676,3 +1693,22 @@ def _maybe_variant_group_error(
             f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
         )
         raise ValueError(msg)
+
+
+class _ScopedIdentifier(str):
+    """String subclass that represents a scoped identifier.
+
+    Its main use is to allow
+    >>> Parameter(ScopedIdentifier("myscope.x"), kind=Parameter.POSITIONAL_OR_KEYWORD)
+    where the following is not possible
+    >>> Parameter("myscope.x", kind=Parameter.POSITIONAL_OR_KEYWORD)
+    because "myscope.x" is not a valid identifier.
+    """
+
+    def isidentifier(self):
+        if "." not in self:
+            return super().isidentifier()
+        if self.count(".") != 1:
+            return False
+        scope, name = self.split(".")
+        return scope.isidentifier() and name.isidentifier()
