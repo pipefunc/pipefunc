@@ -2,6 +2,7 @@ import inspect
 from typing import Any
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
+from pipefunc.typing import NoAnnotation
 
 
 # --- Helper Functions ---
@@ -208,9 +209,9 @@ def test_nestedpipefunc_signature_with_renames_and_defaults() -> None:
     nf = NestedPipeFunc(
         [func1, func2],
         renames={"x": "input_x", "final": "result"},
-        output_name=("intermediate", "result"),  # Explicitly set output name including rename
     )
     nf.update_defaults({"z": False})  # Override default for z
+    assert nf.output_name == ("intermediate", "result")
 
     sig = nf.__signature__
 
@@ -262,7 +263,7 @@ def test_pipefunc_signature_no_annotation() -> None:
     assert list(sig.parameters.keys()) == ["a", "b"]
     assert sig.parameters["a"].annotation == inspect.Parameter.empty
     assert sig.parameters["b"].annotation == inspect.Parameter.empty
-    assert sig.return_annotation == inspect.Parameter.empty  # Cannot infer return type
+    assert sig.return_annotation == NoAnnotation
 
 
 def test_pipefunc_signature_partial_annotation() -> None:
