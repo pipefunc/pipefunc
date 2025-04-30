@@ -1,3 +1,4 @@
+import inspect
 import re
 
 import networkx as nx
@@ -860,3 +861,35 @@ def test_nestedpipefunc_annotations_with_renames_and_defaults() -> None:
         "z": bool,
     }
     assert nf.output_annotation == {"intermediate": float, "result": str}
+
+
+def test_wrapping_pipefunc_with_scope_in_nested_pipefunc() -> None:
+    @pipefunc(
+        output_name="a",
+        renames={"x": "scope.x"},
+    )
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="b")
+    def g(y: int) -> str:
+        return str(y)
+
+    nf = NestedPipeFunc([f, g], output_name=("a", "b"))
+    assert nf.output_annotation == {"a": int, "b": str}
+    assert nf.parameter_annotations == {"scope.x": int, "y": int}
+    assert nf.bound == {}
+    assert nf.defaults == {}
+    assert nf.renames == {}
+
+    original_parameters = nf.original_parameters
+
+    x = original_parameters["scope.x"]
+    assert x.name == "scope.x"
+    assert x.default is inspect.Parameter.empty
+    assert x.annotation is inspect.Parameter.empty
+
+    y = original_parameters["y"]
+    assert y.name == "y"
+    assert y.default is inspect.Parameter.empty
+    assert y.annotation is inspect.Parameter.empty
