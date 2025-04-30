@@ -263,7 +263,7 @@ def test_pipefunc_signature_no_annotation() -> None:
     assert list(sig.parameters.keys()) == ["a", "b"]
     assert sig.parameters["a"].annotation == inspect.Parameter.empty
     assert sig.parameters["b"].annotation == inspect.Parameter.empty
-    assert sig.return_annotation == NoAnnotation
+    assert sig.return_annotation == inspect.Parameter.empty
 
 
 def test_pipefunc_signature_partial_annotation() -> None:
