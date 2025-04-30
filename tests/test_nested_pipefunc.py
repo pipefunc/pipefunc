@@ -816,3 +816,18 @@ def test_nested_pipefunc_preserve_cache_on_combine_bug() -> None:
 
     assert p1[("x", "y")].cache
     assert p[("x", "y")].cache
+
+
+def test_nestedpipefunc_with_default_and_bound() -> None:
+    """Test NestedPipeFunc excludes bound parameters."""
+
+    @pipefunc("intermediate")
+    def func1(x: int, y: str = "y") -> float:
+        return float(x + len(y))
+
+    @pipefunc("final")
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+        return f"{intermediate}_{z}"
+
+    # Bind one of the inputs
+    nf = NestedPipeFunc([func1, func2], bound={"y": "bound_y_value"})
