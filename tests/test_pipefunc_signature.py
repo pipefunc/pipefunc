@@ -293,3 +293,16 @@ def test_pipefunc_signature_with_renamed_output_tuple() -> None:
     # The signature's return annotation reflects the types based on the *original*
     # function's return type hint, before the output name renaming.
     assert sig.return_annotation == tuple[int, str]
+
+
+def test_scoped_parameter():
+    @pipefunc(
+        output_name="test",
+        renames={"input": "y.input2"},
+    )
+    def test(input: int = 1) -> Any:  # noqa: A002
+        return input
+
+    parameter = test.__signature__.parameters["y.input2"]
+    assert parameter.annotation is int
+    assert parameter.default == 1
