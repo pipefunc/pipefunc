@@ -1443,6 +1443,11 @@ class Pipeline:
                     assert isinstance(x, PipeFunc)
                     generation_functions.append(x)
             if generation_functions:
+                # Ensure deterministic ordering in the generation
+                generation_functions = sorted(
+                    generation_functions,
+                    key=lambda f: at_least_tuple(f.output_name),
+                )
                 function_lists.append(generation_functions)
 
         return Generations(root_args, function_lists)

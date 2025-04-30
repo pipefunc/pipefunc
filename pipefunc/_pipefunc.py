@@ -1317,10 +1317,10 @@ class NestedPipeFunc(PipeFunc):
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
-        outputs: set[str] = set()
-        for f in self.pipeline.functions:
-            outputs.update(at_least_tuple(f.output_name))
-        return tuple(sorted(outputs))
+        outputs: list[str] = []
+        for f in self.pipeline.sorted_functions:
+            outputs.extend(at_least_tuple(f.output_name))
+        return tuple(outputs)
 
     @functools.cached_property
     def _all_inputs(self) -> tuple[str, ...]:
