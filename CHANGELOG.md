@@ -5,6 +5,37 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.70.0 (2025-05-01)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.7.2 ([#651](https://github.com/pipefunc/pipefunc/pull/651))
+
+### ✨ Enhancements
+
+- Add type casting for result `numpy.ndarray`s using type annotations ([#740](https://github.com/pipefunc/pipefunc/pull/740))
+
+### 📊 Stats
+
+- `.json`: +1 lines, -1 lines
+- `.py`: +190 lines, -49 lines
+- `other`: +1 lines, -1 lines
+
+## v0.69.1 (2025-04-30)
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.69.0 ([#738](https://github.com/pipefunc/pipefunc/pull/738))
+
+### 🐛 Bug Fixes
+
+- Use `_ScopedIdentifier` trick in `PipeFunc.original_parameters`  ([#739](https://github.com/pipefunc/pipefunc/pull/739))
+
+### 📊 Stats
+
+- `.md`: +58 lines, -15 lines
+- `.py`: +71 lines, -5 lines
+
 ## v0.69.0 (2025-04-30)
 
 ### ✨ Enhancements
