@@ -60,39 +60,30 @@ class ResultDict(dict[str, Result]):
         super().__init__(*args, **kwargs)
 
     def type_cast(self, *, inplace: bool = True) -> ResultDict:
-        """Casts NumPy array dtypes within results based on pipeline annotations.
+        """Casts NumPy array dtypes using pipeline annotations.
 
-        Iterates through arrays resulting from MapSpec operations and if
-        its corresponding pipeline annotation is a numeric or boolean type
-        (e.g., `np.int64`, `float`), casts the array's dtype accordingly using
-        `ndarray.astype()`.
-
-        This is useful after `pipeline.map` operations which yield arrays
-        with `dtype=object`. It ensures arrays have specific numerical dtypes.
-
-        Note:
-            - Only affects NumPy array outputs. Other types are unchanged.
-            - Requires the original pipeline's annotations.
+        Applies `ndarray.astype()` to array outputs from `MapSpec` operations,
+        using the numeric/boolean type annotation (e.g., `np.int64`, `float`)
+        from the original pipeline. Primarily used to convert object arrays
+        from `pipeline.map` results.
 
         Parameters
         ----------
         inplace : bool, optional
-            If True (default), modifies the `ResultDict` and its `Result`
-            objects in place. If False, returns a new `ResultDict` with
-            modified copies of the relevant `Result` objects.
+            If True (default), modifies this `ResultDict` in place.
+            If False, returns a modified copy.
 
         Returns
         -------
         ResultDict
-            The `ResultDict` with dtypes cast (potentially self if inplace).
+            The `ResultDict` with dtypes cast.
 
         Raises
         ------
         ValueError
-            If the `ResultDict` was not created by `pipeline.map` or
-            `pipeline.map_async`.
+            If the `ResultDict` was not created by `pipeline.map`.
         TypeError, ValueError
-            Potentially raised by `ndarray.astype()` if casting is invalid.
+            If `ndarray.astype()` fails during casting.
 
         """
         if self._pipeline is None:  # pragma: no cover

@@ -75,3 +75,17 @@ def test_type_cast(type_: type, numpy_type: type) -> None:
         assert ds["y"].dtype == object
         # Check that the original result is not modified
         assert result["y"].output.dtype == object
+
+
+def test_type_cast_with_incorrect_annotation() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double(x: int) -> int:
+        return (x,)  # type: ignore[return-value]
+
+    pipeline = Pipeline([double])
+    x = np.arange(10, dtype=np.int_)
+    result = pipeline.map({"x": x}, parallel=False, storage="dict")
+    assert result["y"].output.dtype == object
+    with pytest.warns(UserWarning, match="Could not cast output 'y' to <class 'int'> due to error"):
+        result = result.type_cast(inplace=False)
+    assert result["y"].output.dtype == object
