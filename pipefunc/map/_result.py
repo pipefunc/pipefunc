@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import copy
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeAlias
+
+import numpy as np
 
 from pipefunc._utils import requires
 
@@ -56,6 +59,32 @@ class ResultDict(dict[str, Result]):
         self._inputs = _inputs_
         super().__init__(*args, **kwargs)
 
+    def type_cast(self, *, inplace: bool = True) -> ResultDict:
+        """Type cast the object ``numpy.ndarray``s to type specified in the annotations.
+
+        If ``inplace`` is ``True``, the type cast is done in place. Otherwise, a new
+        ``ResultDict`` is returned with the type cast results.
+        """
+        if self._pipeline is None:  # pragma: no cover
+            msg = "ResultDict was not created by Pipeline.map"
+            raise ValueError(msg)
+        result = self.copy() if not inplace else self  # shallow copy
+        for output_name, annotation in self._pipeline.output_annotations.items():
+            if output_name not in self._pipeline.mapspec_names:
+                continue  # not an array
+            if _is_np_subdtype(annotation):
+                if not inplace:  # avoid modifying the original if inplace=False
+                    result[output_name] = copy.deepcopy(result[output_name])
+                result[output_name].output = result[output_name].output.astype(annotation)
+        return result
+
+    def copy(self) -> ResultDict:
+        """Return a shallow copy of the ResultDict."""
+        new_dict = ResultDict(self)
+        new_dict._pipeline = self._pipeline
+        new_dict._inputs = self._inputs
+        return new_dict
+
     def __repr__(self) -> str:
         text = super().__repr__()
         if len(text) > MAX_RESULT_LENGTH:
@@ -70,8 +99,12 @@ class ResultDict(dict[str, Result]):
             return text[:MAX_RESULT_LENGTH] + "..."
         return text
 
-    def to_xarray(self, *, load_intermediate: bool = True) -> xr.Dataset:
-        """Convert the results to an `xarray.Dataset`."""
+    def to_xarray(self, *, load_intermediate: bool = True, type_cast: bool = True) -> xr.Dataset:
+        """Convert the results to an `xarray.Dataset`.
+
+        If ``type_cast`` is ``True``, the object ``numpy.ndarray``s are type cast to the
+        types specified in the annotations.
+        """
         if self._pipeline is None or self._inputs is None:
             msg = (
                 "The `to_xarray` method can only be used when the `ResultDict` was created"
@@ -81,16 +114,37 @@ class ResultDict(dict[str, Result]):
         requires("xarray", reason="to_xarray", extras="xarray")
         from .xarray import xarray_dataset_from_results
 
+        result = self.type_cast(inplace=False) if type_cast else self
+
         return xarray_dataset_from_results(
             self._inputs,
-            self,
+            result,
             self._pipeline,
             load_intermediate=load_intermediate,
         )
 
-    def to_dataframe(self, *, load_intermediate: bool = True) -> pd.DataFrame:
+    def to_dataframe(
+        self,
+        *,
+        load_intermediate: bool = True,
+        type_cast: bool = True,
+    ) -> pd.DataFrame:
         """Convert the results to a `pandas.DataFrame`."""
-        ds = self.to_xarray(load_intermediate=load_intermediate)  # ensures xarray is installed
+        ds = self.to_xarray(  # ensures xarray is installed
+            load_intermediate=load_intermediate,
+            type_cast=type_cast,
+        )
         from .xarray import xarray_dataset_to_dataframe
 
         return xarray_dataset_to_dataframe(ds)
+
+
+def _is_np_subdtype(annotation: Any) -> bool:
+    try:
+        return (
+            np.issubdtype(annotation, np.integer)
+            or np.issubdtype(annotation, np.floating)
+            or np.issubdtype(annotation, np.bool_)
+        )
+    except TypeError:
+        return False
