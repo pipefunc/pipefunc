@@ -101,8 +101,9 @@ class ResultDict(dict[str, Result]):
                     casted_array = result[output_name].output.astype(annotation)
                 except (TypeError, ValueError) as e:
                     warnings.warn(
-                        f"Could not cast output '{output_name}' to {annotation} "
-                        f"due to error: {e}. Leaving as original dtype.",
+                        f"Could not cast output '{output_name}' to {annotation}"
+                        f" due to error: {e}. Likely due to an incorrect type annotation."
+                        " Leaving as original dtype.",
                         UserWarning,
                         stacklevel=2,
                     )
@@ -146,11 +147,11 @@ class ResultDict(dict[str, Result]):
         requires("xarray", reason="to_xarray", extras="xarray")
         from .xarray import xarray_dataset_from_results
 
-        result = self.type_cast(inplace=False) if type_cast else self
+        results = self.type_cast(inplace=False) if type_cast else self
 
         return xarray_dataset_from_results(
             self._inputs,
-            result,
+            results,
             self._pipeline,
             load_intermediate=load_intermediate,
         )
