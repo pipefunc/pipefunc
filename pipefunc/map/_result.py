@@ -60,10 +60,40 @@ class ResultDict(dict[str, Result]):
         super().__init__(*args, **kwargs)
 
     def type_cast(self, *, inplace: bool = True) -> ResultDict:
-        """Type cast the object ``numpy.ndarray``s to type specified in the annotations.
+        """Casts NumPy array dtypes within results based on pipeline annotations.
 
-        If ``inplace`` is ``True``, the type cast is done in place. Otherwise, a new
-        ``ResultDict`` is returned with the type cast results.
+        Iterates through arrays resulting from MapSpec operations and if
+        its corresponding pipeline annotation is a numeric or boolean type
+        (e.g., `np.int64`, `float`), casts the array's dtype accordingly using
+        `ndarray.astype()`.
+
+        This is useful after `pipeline.map` operations which yield arrays
+        with `dtype=object`. It ensures arrays have specific numerical dtypes.
+
+        Note:
+            - Only affects NumPy array outputs. Other types are unchanged.
+            - Requires the original pipeline's annotations.
+
+        Parameters
+        ----------
+        inplace : bool, optional
+            If True (default), modifies the `ResultDict` and its `Result`
+            objects in place. If False, returns a new `ResultDict` with
+            modified copies of the relevant `Result` objects.
+
+        Returns
+        -------
+        ResultDict
+            The `ResultDict` with dtypes cast (potentially self if inplace).
+
+        Raises
+        ------
+        ValueError
+            If the `ResultDict` was not created by `pipeline.map` or
+            `pipeline.map_async`.
+        TypeError, ValueError
+            Potentially raised by `ndarray.astype()` if casting is invalid.
+
         """
         if self._pipeline is None:  # pragma: no cover
             msg = "ResultDict was not created by Pipeline.map"
@@ -75,7 +105,18 @@ class ResultDict(dict[str, Result]):
             if _is_np_subdtype(annotation):
                 if not inplace:  # avoid modifying the original if inplace=False
                     result[output_name] = copy.deepcopy(result[output_name])
-                result[output_name].output = result[output_name].output.astype(annotation)
+
+                try:
+                    casted_array = result[output_name].output.astype(annotation)
+                except (TypeError, ValueError) as e:
+                    warnings.warn(
+                        f"Could not cast output '{output_name}' to {annotation} "
+                        f"due to error: {e}. Leaving as original dtype.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                else:
+                    result[output_name].output = casted_array
         return result
 
     def copy(self) -> ResultDict:
