@@ -87,5 +87,5 @@ def test_type_cast_with_incorrect_annotation() -> None:
     result = pipeline.map({"x": x}, parallel=False, storage="dict")
     assert result["y"].output.dtype == object
     with pytest.warns(UserWarning, match="Could not cast output 'y' to <class 'int'> due to error"):
-        result = result.type_cast(inplace=False)
+        result = result.type_cast()
     assert result["y"].output.dtype == object
