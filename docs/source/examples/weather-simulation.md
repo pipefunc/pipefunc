@@ -28,7 +28,7 @@ from pipefunc import Pipeline, pipefunc
 
 # Step 1: Simulate Temperature Data
 @pipefunc(output_name="temperature", mapspec="city[i], day[j] -> temperature[i, j]")
-def simulate_temperature(city, day):
+def simulate_temperature(city: str, day) -> float:
     np.random.seed(hash(city) % 2**32)  # For reproducibility
     mean_temp = 20 + (hash(city) % 10)  # Base temp varies by city
     temp_variation = 5 * np.sin(day.dayofyear * (2 * np.pi / 365))  # Seasonal variation
