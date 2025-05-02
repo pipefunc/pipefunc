@@ -24,7 +24,6 @@ import numpy as np
 import pandas as pd
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_xarray_dataset
 
 
 # Step 1: Simulate Temperature Data
@@ -58,14 +57,14 @@ cities = ["New York", "Los Angeles", "Chicago"]
 days = pd.date_range("2023-01-01", "2023-01-10")  # 10 days
 
 # Run the pipeline
-pipeline_weather.map({"city": cities, "day": days}, run_folder="weather_simulation_results")
+results = pipeline_weather.map({"city": cities, "day": days}, run_folder="weather_simulation_results")
 
 # Load and display the xarray dataset
-weather_dataset = load_xarray_dataset(run_folder="weather_simulation_results")
+weather_dataset = results.to_xarray()
 display(weather_dataset)
 
 # Plot temperatures for each city
-weather_dataset.temperature.astype(float).plot.line(
+weather_dataset.temperature.plot.line(
     x="day",
     hue="city",
     marker="o",
@@ -81,6 +80,6 @@ weather_dataset.temperature.astype(float).plot.line(
 
 - **Automatic `xarray.Dataset`**: The `pipeline.map()` call ensures that the data is structured into an N-dimensional format, representing the outputs naturally as an `xarray.Dataset`.
 
-- **Retrieving with `load_xarray_dataset`**: Quickly access the results organized by city and day indices without manually constructing them.
+- **Convert to `xarray.Dataset`**: Quickly access the results organized by city and day indices without manually constructing them.
 
 This showcases `pipefunc`'s powerful ability to manage multi-dimensional computations and data structuring, presenting an efficient workflow for simulating and analyzing temperature variations.
