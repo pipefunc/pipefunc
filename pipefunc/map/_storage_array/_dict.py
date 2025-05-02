@@ -38,6 +38,7 @@ class DictArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
+        irregular: bool = False,  # noqa: FBT001, FBT002
         *,
         mapping: MutableMapping[tuple[int, ...], Any] | None = None,
     ) -> None:
@@ -52,6 +53,7 @@ class DictArray(StorageBase):
         self.shape = tuple(shape)
         self.shape_mask = tuple(shape_mask) if shape_mask is not None else (True,) * len(shape)
         self.internal_shape = tuple(internal_shape) if internal_shape is not None else ()
+        self.irregular = irregular
         if mapping is None:
             mapping = {}
         self._dict: dict[tuple[int, ...], Any] = mapping  # type: ignore[assignment]
@@ -126,7 +128,13 @@ class DictArray(StorageBase):
             return self._internal_mask()
         if internal_key:
             arr = np.asarray(data)
-            return arr[internal_key]
+            try:
+                return arr[internal_key]
+            except IndexError as e:
+                if not self.irregular:
+                    msg = f"Index {internal_key} out of bounds for array with shape {arr.shape}"
+                    raise IndexError(msg) from e
+                return np.ma.masked
         return data
 
     def _slice_indices(self, key: tuple[int | slice, ...], shape: tuple[int, ...]) -> list[range]:
