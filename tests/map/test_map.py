@@ -12,7 +12,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.map._load import load_all_outputs, load_outputs, load_xarray_dataset
+from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
 from pipefunc.map._run_info import RunInfo, map_shapes
@@ -348,9 +348,13 @@ def test_simple_from_step(tmp_path: Path) -> None:
     # Load from the run folder
     if has_xarray:
         ds = load_xarray_dataset("y", run_folder=tmp_path)
+        df = load_dataframe("y", run_folder=tmp_path)
         assert "x" in ds.coords
+        assert "x" in df.columns
         ds = load_xarray_dataset("y", run_folder=tmp_path, load_intermediate=False)
+        df = load_dataframe("y", run_folder=tmp_path, load_intermediate=False)
         assert "x" not in ds.coords
+        assert "x" not in df.columns
 
         # Load from the results
         ds = xarray_dataset_from_results(inputs, results, pipeline)
