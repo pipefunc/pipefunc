@@ -125,7 +125,7 @@ class MapSpec:
         input_indices: set[str] = {index for x in self.inputs for index in x.indices}
 
         if unused_indices := input_indices - output_indices:
-            msg = f"Input array have indices that do not appear in the output: {unused_indices}"
+            msg = f"Input arrays have indices that do not appear in the output: {unused_indices}"
             raise ValueError(msg)
 
     @property
@@ -440,7 +440,7 @@ def _validate_shapes(
     output_names: tuple[str, ...],
 ) -> None:
     if extra_names := input_shapes.keys() - input_names:
-        msg = f"Got extra array {extra_names} that are not accepted by this map."
+        msg = f"Got extra array(s) {extra_names} that are not accepted by this map."
         raise ValueError(msg)
     if missing_names := input_names - input_shapes.keys():
         msg = f"Inputs expected by this map were not provided: {missing_names}"

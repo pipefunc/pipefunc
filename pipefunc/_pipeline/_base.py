@@ -1121,7 +1121,7 @@ class Pipeline:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
-        that the defaults can be applied to.
+        the defaults can be applied to.
 
         If `overwrite` is `False`, the new defaults will be added to the existing
         defaults. If `overwrite` is `True`, the existing defaults will be replaced
@@ -1202,7 +1202,7 @@ class Pipeline:
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         ``inputs`` are the root arguments of the pipeline. Inputs to functions
         which are outputs of other functions are considered to be outputs.

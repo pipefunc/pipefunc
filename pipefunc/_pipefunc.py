@@ -102,7 +102,7 @@ class PipeFunc(Generic[T]):
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -469,7 +469,7 @@ class PipeFunc(Generic[T]):
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format `f"{scope}.{name}"`.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
 
@@ -876,7 +876,7 @@ class PipeFunc(Generic[T]):
         """Prepare the state of the current object for pickling.
 
         The state includes all picklable instance variables.
-        For non-picklable instance variable,  they are transformed
+        For non-picklable instance variables, they are transformed
         into a picklable form or ignored.
 
         Returns
@@ -1025,7 +1025,7 @@ def pipefunc(
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -1588,7 +1588,7 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
     if "." in name:
         old_scope, name = name.split(".", 1)
         warnings.warn(
-            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
+            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{scope}'.",
             stacklevel=3,
         )
     return f"{scope}.{name}"
