@@ -80,7 +80,7 @@ def load_xarray_dataset(
     run_folder
         The folder where the pipeline run was stored.
     load_intermediate
-        Whether to load intermediate outputs as coordinates.
+        Whether to load intermediate outputs.
 
     Returns
     -------
@@ -95,6 +95,37 @@ def load_xarray_dataset(
         run_info.mapspecs,
         run_info.inputs,
         run_folder=run_folder,
-        output_names=output_name,  # type: ignore[arg-type]
+        output_names=output_name or None,  # type: ignore[arg-type]
         load_intermediate=load_intermediate,
     )
+
+
+def load_dataframe(
+    *output_name: str,
+    run_folder: str | Path,
+    load_intermediate: bool = True,
+) -> Any:
+    """Load the output(s) of a `pipeline.map` as a `pandas.DataFrame`.
+
+    Parameters
+    ----------
+    output_name
+        The names of the outputs to load. If empty, all outputs are loaded.
+    run_folder
+        The folder where the pipeline run was stored.
+    load_intermediate
+        Whether to load intermediate outputs.
+
+    Returns
+    -------
+        A `pandas.DataFrame` containing the outputs of the pipeline run.
+
+    """
+    from .xarray import xarray_dataset_to_dataframe
+
+    ds = load_xarray_dataset(
+        *output_name,
+        run_folder=run_folder,
+        load_intermediate=load_intermediate,
+    )
+    return xarray_dataset_to_dataframe(ds)

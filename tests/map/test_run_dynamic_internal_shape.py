@@ -11,7 +11,7 @@ import numpy.typing as npt
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import load_xarray_dataset
+from pipefunc.map import load_dataframe, load_xarray_dataset
 from pipefunc.map._load import load_outputs
 from pipefunc.map._run_info import RunInfo
 from pipefunc.map._shapes import shape_is_resolved
@@ -106,6 +106,8 @@ async def test_dynamic_internal_shape_async(
     if has_xarray:
         load_xarray_dataset("x", run_folder=tmp_path)
         load_xarray_dataset("y", run_folder=tmp_path)
+        load_dataframe("x", run_folder=tmp_path)
+        load_dataframe("y", run_folder=tmp_path)
 
 
 def test_exception(tmp_path: Path) -> None:
