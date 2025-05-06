@@ -15,6 +15,7 @@ import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.map import FileArray
 from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -1211,3 +1212,27 @@ def test_executor_for_single_element_of_output_name_tuple() -> None:
                 "d": "dict",
             },
         )
+
+
+def test_file_array_as_input(tmp_path: Path) -> None:
+    arr = FileArray.from_array(tmp_path / "arr", array=[1, 2])
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x):
+        return x
+
+    pipeline = Pipeline([f])
+
+    results = pipeline.map({"x": arr}, parallel=False, storage="dict")
+    assert results["y"].output.tolist() == [1, 2]
+
+    # Now without mapspec
+
+    @pipefunc(output_name="y")
+    def f_no_mapspec(x):
+        return x
+
+    pipeline = Pipeline([f_no_mapspec])
+
+    results = pipeline.map({"x": arr}, parallel=False, storage="dict")
+    assert results["y"].output.tolist() == [1, 2]

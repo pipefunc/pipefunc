@@ -273,6 +273,14 @@ class FileArray(StorageBase):
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
 
+    @classmethod
+    def from_array(cls, folder: str | Path, array: list[Any] | np.ndarray) -> FileArray:
+        """Create a FileArray from an existing array or list."""
+        file_array = FileArray(folder, np.shape(array))
+        for index, value in np.ndenumerate(array):
+            file_array.dump(index, value)
+        return file_array
+
 
 def _read(name: str | Path) -> bytes:
     """Load file contents as a bytestring."""
