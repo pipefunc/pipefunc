@@ -1215,7 +1215,7 @@ def test_executor_for_single_element_of_output_name_tuple() -> None:
 
 
 def test_file_array_as_input(tmp_path: Path) -> None:
-    arr = FileArray.from_array(tmp_path / "arr", array=[1, 2])
+    arr = FileArray.from_array(tmp_path / "arr", data=[1, 2])
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):

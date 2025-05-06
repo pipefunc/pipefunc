@@ -260,6 +260,78 @@ This hybrid approach allows you to optimize the overall pipeline execution by as
 
 ---
 
+## Handling Large Input Arrays with `SlurmExecutor`
+
+When working with `pipeline.map_async` and `SlurmExecutor`, especially for `MapSpec` operations that process elements of large arrays (e.g., long lists of complex objects or large NumPy arrays), directly passing these large arrays in the `inputs` dictionary can be inefficient.
+Each distributed task (Slurm job) might end up pickling and transferring a copy of the entire large input, even if it only needs a small slice or element.
+This can lead to:
+
+*   Slow task submission and increased overhead.
+*   High memory usage on the node submitting the jobs.
+
+**Solution: Use `FileArray.from_array()`**
+
+To mitigate this, `pipefunc` offers `FileArray.from_array()`.
+This classmethod allows you to pre-serialize your large array-like input to disk.
+You then pass the lightweight `FileArray` object to `pipeline.map_async`.
+
+**How it works:**
+
+1.  **Pre-serialize:** You explicitly save your large input data to a directory using `FileArray.from_array(folder, data)`. This creates a `FileArray` structure where your data is stored on disk, typically with each element or chunk as a separate file.
+2.  **Pass Lightweight Object:** The `FileArray` instance itself (which is small, containing metadata like the folder path and shape) is passed in the `inputs` dictionary to `pipeline.map_async`.
+3.  **Efficient Worker Access:** When a `MapSpec` like `x[i] -> y[i]` processes this `FileArray` (where `x` is the `FileArray`), `pipefunc`'s internal `MapSpec` machinery invokes `FileArray.__getitem__((i,))`. This method efficiently loads only the specific element `i` from disk *on the worker node*.
+
+This way, only the small `FileArray` object and the necessary element index (or slice information) are pickled and sent to the Slurm worker, not the entire large dataset.
+
+**Example:**
+
+```python
+from pathlib import Path
+import numpy as np
+from pipefunc import Pipeline, pipefunc
+from pipefunc.map import FileArray # Import FileArray
+from adaptive_scheduler import SlurmExecutor
+
+# Your large input data
+large_data = np.arange(1_000_000)
+
+# Define a shared folder accessible by all Slurm nodes
+shared_input_folder = Path("/mnt/shared/my_large_input_data") # Ensure this path is correct
+
+# Create a FileArray from your data
+file_array_input = FileArray.from_array(shared_input_folder, large_data)
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]", resources={"cpus": 1}, resources_scope="element")
+def process_element(x: int) -> int:
+    # This function receives individual elements from the FileArray
+    return x * 2
+
+pipeline = Pipeline([process_element])
+
+# The `run_folder` for pipeline.map_async should also be on a shared filesystem
+run_folder = Path("/mnt/shared/my_run_output_slurm")
+
+# Pass the FileArray object to pipeline.map_async
+runner = pipeline.map_async(
+    inputs={"x": file_array_input},
+    run_folder=run_folder,
+    executor=SlurmExecutor(cores_per_node=1),
+)
+# results = await runner.task
+# print(results["y"].output[:5])
+```
+
+**Important Considerations:**
+
+*   **Shared Filesystem:** The `folder` used for `FileArray.from_array()` and the `run_folder` for `pipeline.map_async` **must be on a filesystem accessible by all Slurm worker nodes** with the *exact same path*.
+*   **Input Type:** This method is most beneficial for array-like inputs that are processed element-wise by a `MapSpec`.
+*   **Non-MapSpec Functions:** If a `FileArray` is passed as an input to a function that is *not* iterated over by a `MapSpec` (i.e., the function expects the whole array-like object), then `FileArray.to_array()` will be called internally by `pipefunc`. This will load the entire array into memory on the worker where that function runs.
+*   **Data Locality & Filesystem Performance:** While this reduces serialization overhead, data still needs to be read from disk by the workers. The performance of your shared filesystem will play a role.
+
+Using `FileArray.from_array()` for large inputs can significantly improve the performance and scalability of your distributed `pipefunc` workflows on SLURM.
+
+---
+
 ## Summary
 
 - **SlurmExecutor vs. Function Resources:**
@@ -275,6 +347,8 @@ This hybrid approach allows you to optimize the overall pipeline execution by as
   Use `parallelization_mode="internal"` in {class}`~pipefunc.resources.Resources` so that while SLURM allocates the requested resources, your function can handle internal parallelism. The `resources_variable` parameter injects the allocated `Resources` object.
 - **Dictionary of Executors:**
   You can pass a dict to the `executor` argument so that different functions run on different executors (for example, fast functions can use a ThreadPoolExecutor, while heavy ones run on SLURM).
+- **Handling Large Input Arrays:**
+  Use `FileArray.from_array()` to pre-serialize large input arrays to disk. This allows you to pass a lightweight `FileArray` object to `pipeline.map_async`, which efficiently loads only the required elements on the worker nodes.
 
 ---
 
