@@ -156,7 +156,28 @@ class FileValueRef:
 
     @classmethod
     def from_data(cls, data: Any, path: Path) -> FileValueRef:
-        """Serializes data to a file and returns a FileValueRef to it."""
+        """Serializes data to the given file path and returns a FileValueRef to it.
+
+        This is useful for preparing a single large, non-iterable object
+        for use with `pipeline.map` in distributed environments.
+        The object is stored once on disk, and the lightweight FileValueRef
+        can be passed to tasks, which then load the data on demand.
+
+        Parameters
+        ----------
+        data
+            The Python object to serialize and store.
+        path
+            The full file path (including filename) where the data will be stored.
+            This path must be accessible by all worker nodes if used in
+            a distributed setting.
+
+        Returns
+        -------
+        FileValueRef
+            A new FileValueRef instance pointing to the stored data.
+
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         dump(data, path)
         return cls(path=path)

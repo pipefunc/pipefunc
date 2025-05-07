@@ -1229,7 +1229,7 @@ def test_file_array_as_input(tmp_path: Path) -> None:
     results = pipeline.map(inputs, parallel=False, storage="dict", run_folder=tmp_path / "run")
     assert results["y"].output.tolist() == [70, 71]
     df = results.to_dataframe()
-    assert df.columns == ["x1", "y"]
+    assert df.columns.to_list() == ["x1", "y"]
 
     # Now without mapspec
 
