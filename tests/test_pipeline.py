@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 has_psutil = importlib.util.find_spec("psutil") is not None
 has_rich = importlib.util.find_spec("rich") is not None
+has_xarray = importlib.util.find_spec("xarray") is not None
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -1228,8 +1229,9 @@ def test_file_array_as_input(tmp_path: Path) -> None:
 
     results = pipeline.map(inputs, parallel=False, storage="dict", run_folder=tmp_path / "run")
     assert results["y"].output.tolist() == [70, 71]
-    df = results.to_dataframe()
-    assert df.columns.to_list() == ["x1", "y"]
+    if has_xarray:
+        df = results.to_dataframe()
+        assert df.columns.to_list() == ["x1", "y"]
 
     # Now without mapspec
 
