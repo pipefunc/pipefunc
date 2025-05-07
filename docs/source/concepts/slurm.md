@@ -313,12 +313,12 @@ runner = pipeline.map_async(
 
 ### 2. Single Large Non-Iterable Inputs
 
-For single, potentially large, non-iterable inputs (e.g., a large configuration dictionary, a pre-trained model object) that need to be passed to multiple jobs without re-serializing each time, use {class}`~pipefunc.helpers.FileValueReference.from_data`.
+For single, potentially large, non-iterable inputs (e.g., a large configuration dictionary, a pre-trained model object) that need to be passed to multiple jobs without re-serializing each time, use {class}`~pipefunc.helpers.FileValueRef.from_data`.
 
 **How it works:**
 
-1.  **Pre-serialize:** Save your single large object to a file using `FileValueReference.from_data(data, path)`.
-2.  **Pass Lightweight Object:** Pass the `FileValueReference` instance (small, containing the file path) in the `inputs` dictionary.
+1.  **Pre-serialize:** Save your single large object to a file using `FileValueRef.from_data(data, path)`.
+2.  **Pass Lightweight Object:** Pass the `FileValueRef` instance (small, containing the file path) in the `inputs` dictionary.
 3.  **Efficient Worker Access:** `pipefunc` will automatically load the object from the referenced file on the worker node just before it's needed by your function.
 
 **Example:**
@@ -326,12 +326,12 @@ For single, potentially large, non-iterable inputs (e.g., a large configuration 
 ```python
 from pathlib import Path
 from pipefunc import Pipeline, pipefunc, resources
-from pipefunc.helpers import FileValueReference # Import FileValueReference
+from pipefunc.helpers import FileValueRef # Import FileValueRef
 from adaptive_scheduler import SlurmExecutor
 
 large_config_object = {"param_a": "value_a", "data": list(range(100_000))}
 shared_file_path = Path("/mnt/shared/my_large_config.pkl") # Accessible by Slurm nodes
-file_ref_input = FileValueReference.from_data(large_config_object, shared_file_path)
+file_ref_input = FileValueRef.from_data(large_config_object, shared_file_path)
 
 @pipefunc(output_name="y", resources={"cpus": 1})
 def use_config(config: dict, task_id: int) -> str:
@@ -355,10 +355,10 @@ runner = pipeline.map_async(
 
 **Important Considerations for Both Methods:**
 
-- **Shared Filesystem:** The `folder` (for `FileArray.from_data`) or `path` (for `FileValueReference.from_data`) and the `run_folder` for `pipeline.map_async` **must be on a filesystem accessible by all Slurm worker nodes** with the _exact same path_.
+- **Shared Filesystem:** The `folder` (for `FileArray.from_data`) or `path` (for `FileValueRef.from_data`) and the `run_folder` for `pipeline.map_async` **must be on a filesystem accessible by all Slurm worker nodes** with the _exact same path_.
 - **Non-MapSpec Functions:**
   - If a `FileArray` is passed as an input to a function _not_ iterated by a `MapSpec`, `FileArray.to_array()` will load the entire array into memory on the worker.
-  - `FileValueReference` is primarily for non-MapSpec'd inputs or inputs where the entire object is needed per MapSpec iteration.
+  - `FileValueRef` is primarily for non-MapSpec'd inputs or inputs where the entire object is needed per MapSpec iteration.
 - **Data Locality & Filesystem Performance:** While serialization overhead is reduced, data still needs to be read from disk by the workers. The performance of your shared filesystem will be a factor.
 
 By using these techniques, you can significantly improve the performance and scalability of your distributed `pipefunc` workflows on SLURM when dealing with large inputs.

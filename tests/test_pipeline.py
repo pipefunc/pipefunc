@@ -15,7 +15,7 @@ import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
-from pipefunc.helpers import FileValueReference
+from pipefunc.helpers import FileValueRef
 from pipefunc.map import FileArray
 from pipefunc.typing import Array  # noqa: TC001
 
@@ -1217,7 +1217,7 @@ def test_executor_for_single_element_of_output_name_tuple() -> None:
 
 def test_file_array_as_input(tmp_path: Path) -> None:
     arr = FileArray.from_data(data=[1, 2], folder=tmp_path / "arr")
-    value = FileValueReference.from_data(data=69, path=tmp_path / "value")
+    value = FileValueRef.from_data(data=69, path=tmp_path / "value")
     inputs = {"x1": arr, "x2": value}
 
     @pipefunc(output_name="y", mapspec="x1[i] -> y[i]")

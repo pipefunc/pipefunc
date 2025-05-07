@@ -25,7 +25,7 @@ from pipefunc._utils import (
     prod,
 )
 from pipefunc.cache import HybridCache, to_hashable
-from pipefunc.helpers import FileValueReference
+from pipefunc.helpers import FileValueRef
 
 from ._adaptive_scheduler_slurm_executor import (
     maybe_finalize_slurm_executors,
@@ -1014,7 +1014,7 @@ def _execute_single(
 def _maybe_load_data(x: Any) -> Any:
     if isinstance(x, StorageBase):
         return x.to_array()
-    if isinstance(x, FileValueReference):
+    if isinstance(x, FileValueRef):
         return x.load()
     return x
 

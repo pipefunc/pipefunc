@@ -128,7 +128,7 @@ def get_attribute_factory(
     return _wrapped
 
 
-class FileValueReference:
+class FileValueRef:
     """A reference to a value stored in a file.
 
     This class provides a way to store and load values from files, which is useful
@@ -141,7 +141,7 @@ class FileValueReference:
 
     Examples
     --------
-    >>> ref = FileValueReference.from_data([1, 2, 3], Path("data.pkl"))
+    >>> ref = FileValueRef.from_data([1, 2, 3], Path("data.pkl"))
     >>> ref.load()
     [1, 2, 3]
 
@@ -155,8 +155,8 @@ class FileValueReference:
         return load(self.path)
 
     @classmethod
-    def from_data(cls, data: Any, path: Path) -> FileValueReference:
-        """Serializes data to a file and returns a FileValueReference to it."""
+    def from_data(cls, data: Any, path: Path) -> FileValueRef:
+        """Serializes data to a file and returns a FileValueRef to it."""
         path.parent.mkdir(parents=True, exist_ok=True)
         dump(data, path)
         return cls(path=path)
