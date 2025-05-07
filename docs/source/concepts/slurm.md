@@ -274,7 +274,7 @@ The lightweight reference objects are then passed to `pipeline.map_async`.
 
 ### 1. Large Array-Like Inputs (for `MapSpec` iteration)
 
-For large array-like inputs (e.g., lists of objects, large NumPy arrays) that are processed element-wise a `MapSpec`, use {class}`~pipefunc.map.FileArray.from_data`.
+For large array-like inputs (e.g., lists of objects, large NumPy arrays) that are processed element-wise a `MapSpec`, use {class}`~pipefunc.helpers.FileArray.from_data`.
 
 **How it works:**
 
@@ -288,7 +288,7 @@ For large array-like inputs (e.g., lists of objects, large NumPy arrays) that ar
 from pathlib import Path
 import numpy as np
 from pipefunc import Pipeline, pipefunc
-from pipefunc.map import FileArray # Import FileArray
+from pipefunc.helpers import FileArray # Import FileArray
 from adaptive_scheduler import SlurmExecutor # Assuming SlurmExecutor is used
 
 large_array_data = np.arange(1_000_000)
