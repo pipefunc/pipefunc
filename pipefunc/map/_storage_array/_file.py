@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from pipefunc.map._types import ShapeTuple
+
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -274,7 +275,7 @@ class FileArray(StorageBase):
         return True
 
     @classmethod
-    def from_array(cls, folder: str | Path, data: list[Any] | np.ndarray) -> FileArray:
+    def from_data(cls, data: list[Any] | np.ndarray, folder: str | Path) -> FileArray:
         """Create a FileArray from an existing list or NumPy array.
 
         This method serializes the provided `data` (which can be a Python list
@@ -289,12 +290,12 @@ class FileArray(StorageBase):
 
         Parameters
         ----------
+        data
+            The list or NumPy-like array to store in the FileArray.
         folder
             The directory where the FileArray will store its data files.
             This folder must be accessible by all worker nodes if used in
             a distributed setting.
-        data
-            The list or NumPy-like array to store in the FileArray.
 
         Returns
         -------

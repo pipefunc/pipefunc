@@ -21,7 +21,6 @@ from pipefunc._utils import (
     get_ncores,
     handle_error,
     is_running_in_ipynb,
-    load,
     prod,
 )
 from pipefunc.cache import HybridCache, to_hashable
@@ -32,6 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
+from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
@@ -456,7 +456,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_arrays(selected)
+    _load_data(selected)
     return selected
 
 
@@ -945,46 +945,6 @@ def _maybe_execute_single(
     return _execute_single(*args)
 
 
-class _StoredValue(NamedTuple):
-    value: Any
-    exists: bool
-
-
-def _load_from_store(
-    output_name: OUTPUT_TYPE,
-    store: dict[str, StoreType],
-    *,
-    return_output: bool = True,
-) -> _StoredValue:
-    outputs: list[Any] = []
-    all_exist = True
-
-    for name in at_least_tuple(output_name):
-        storage = store[name]
-        if isinstance(storage, StorageBase):
-            outputs.append(storage)
-        elif isinstance(storage, Path):
-            if storage.is_file():
-                outputs.append(load(storage) if return_output else None)
-            else:
-                all_exist = False
-                outputs.append(None)
-        else:
-            assert isinstance(storage, DirectValue)
-            if storage.exists():
-                outputs.append(storage.value)
-            else:
-                all_exist = False
-                outputs.append(None)
-
-    if not return_output:
-        outputs = None  # type: ignore[assignment]
-    elif len(outputs) == 1:
-        outputs = outputs[0]
-
-    return _StoredValue(outputs, all_exist)
-
-
 def _execute_single(
     func: PipeFunc,
     kwargs: dict[str, Any],
@@ -997,7 +957,7 @@ def _execute_single(
         return output
 
     # Otherwise, run the function
-    _load_arrays(kwargs)
+    _load_data(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -1010,15 +970,9 @@ def _execute_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_array(x: Any) -> Any:
-    if isinstance(x, StorageBase):
-        return x.to_array()
-    return x
-
-
-def _load_arrays(kwargs: dict[str, Any]) -> None:
+def _load_data(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_array(v)
+        kwargs[k] = maybe_load_data(v)
 
 
 class _KwargsTask(NamedTuple):
