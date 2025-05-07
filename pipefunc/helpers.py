@@ -128,7 +128,7 @@ def get_attribute_factory(
     return _wrapped
 
 
-class FileValueRef:
+class FileValue:
     """A reference to a value stored in a file.
 
     This class provides a way to store and load values from files, which is useful
@@ -141,7 +141,7 @@ class FileValueRef:
 
     Examples
     --------
-    >>> ref = FileValueRef.from_data([1, 2, 3], Path("data.pkl"))
+    >>> ref = FileValue.from_data([1, 2, 3], Path("data.pkl"))
     >>> ref.load()
     [1, 2, 3]
 
@@ -155,12 +155,12 @@ class FileValueRef:
         return load(self.path)
 
     @classmethod
-    def from_data(cls, data: Any, path: Path) -> FileValueRef:
-        """Serializes data to the given file path and returns a FileValueRef to it.
+    def from_data(cls, data: Any, path: Path) -> FileValue:
+        """Serializes data to the given file path and returns a FileValue to it.
 
         This is useful for preparing a single large, non-iterable object
         for use with `pipeline.map` in distributed environments.
-        The object is stored once on disk, and the lightweight FileValueRef
+        The object is stored once on disk, and the lightweight FileValue
         can be passed to tasks, which then load the data on demand.
 
         Parameters
@@ -174,8 +174,8 @@ class FileValueRef:
 
         Returns
         -------
-        FileValueRef
-            A new FileValueRef instance pointing to the stored data.
+        FileValue
+            A new FileValue instance pointing to the stored data.
 
         """
         path.parent.mkdir(parents=True, exist_ok=True)
