@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import dump, load
-from pipefunc.map import FileArray  # To keep in the same namespace as FileValue
+from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 __all__ = [
-    "FileArray",
+    "FileArray",  # To keep in the same namespace as FileValue
     "FileValue",
     "collect_kwargs",
     "get_attribute_factory",

@@ -21,7 +21,6 @@ from pipefunc._utils import (
     get_ncores,
     handle_error,
     is_running_in_ipynb,
-    load,
     prod,
 )
 from pipefunc.cache import HybridCache, to_hashable
@@ -32,7 +31,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
-from ._load import maybe_load_data
+from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
@@ -944,46 +943,6 @@ def _maybe_execute_single(
         assert progress is not None
         return _wrap_with_status_update(_execute_single, status, progress)(*args)
     return _execute_single(*args)
-
-
-class _StoredValue(NamedTuple):
-    value: Any
-    exists: bool
-
-
-def _load_from_store(
-    output_name: OUTPUT_TYPE,
-    store: dict[str, StoreType],
-    *,
-    return_output: bool = True,
-) -> _StoredValue:
-    outputs: list[Any] = []
-    all_exist = True
-
-    for name in at_least_tuple(output_name):
-        storage = store[name]
-        if isinstance(storage, StorageBase):
-            outputs.append(storage)
-        elif isinstance(storage, Path):
-            if storage.is_file():
-                outputs.append(load(storage) if return_output else None)
-            else:
-                all_exist = False
-                outputs.append(None)
-        else:
-            assert isinstance(storage, DirectValue)
-            if storage.exists():
-                outputs.append(storage.value)
-            else:
-                all_exist = False
-                outputs.append(None)
-
-    if not return_output:
-        outputs = None  # type: ignore[assignment]
-    elif len(outputs) == 1:
-        outputs = outputs[0]
-
-    return _StoredValue(outputs, all_exist)
 
 
 def _execute_single(

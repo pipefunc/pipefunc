@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-from pipefunc._utils import requires
+from pipefunc._utils import (
+    at_least_tuple,
+    load,
+    requires,
+)
 from pipefunc.helpers import FileValue
 
-from ._run import _load_from_store
+from ._result import DirectValue
 from ._run_info import RunInfo
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import xarray as xr
+
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+
+    from ._result import StoreType
 
 
 def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
@@ -140,3 +147,43 @@ def maybe_load_data(x: Any) -> Any:
     if isinstance(x, FileValue):
         return x.load()
     return x
+
+
+class _StoredValue(NamedTuple):
+    value: Any
+    exists: bool
+
+
+def _load_from_store(
+    output_name: OUTPUT_TYPE,
+    store: dict[str, StoreType],
+    *,
+    return_output: bool = True,
+) -> _StoredValue:
+    outputs: list[Any] = []
+    all_exist = True
+
+    for name in at_least_tuple(output_name):
+        storage = store[name]
+        if isinstance(storage, StorageBase):
+            outputs.append(storage)
+        elif isinstance(storage, Path):
+            if storage.is_file():
+                outputs.append(load(storage) if return_output else None)
+            else:
+                all_exist = False
+                outputs.append(None)
+        else:
+            assert isinstance(storage, DirectValue)
+            if storage.exists():
+                outputs.append(storage.value)
+            else:
+                all_exist = False
+                outputs.append(None)
+
+    if not return_output:
+        outputs = None  # type: ignore[assignment]
+    elif len(outputs) == 1:
+        outputs = outputs[0]
+
+    return _StoredValue(outputs, all_exist)
