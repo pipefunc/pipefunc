@@ -330,13 +330,12 @@ class ChunkedFileArray(StorageBase):
             chunk_idx, idx_in_chunk = instance._get_element_chunk_location(linear_idx)
             data_for_chunks[chunk_idx].append((idx_in_chunk, value_element))
 
-        num_chunks = math.ceil(instance.size / instance.chunk_size) if instance.size > 0 else 0
+        num_chunks = math.ceil(instance.size / instance.chunk_size)
         for chunk_idx in range(num_chunks):
             chunk_len = instance._get_chunk_len(chunk_idx)
-            current_chunk_data = [np.ma.masked] * chunk_len
-            if chunk_idx in data_for_chunks:
-                for idx_in_chunk, value_for_item in data_for_chunks[chunk_idx]:
-                    current_chunk_data[idx_in_chunk] = value_for_item
+            current_chunk_data = [None] * chunk_len
+            for idx_in_chunk, value_for_item in data_for_chunks[chunk_idx]:
+                current_chunk_data[idx_in_chunk] = value_for_item
             instance._save_chunk_data(chunk_idx, current_chunk_data)
 
         return instance
