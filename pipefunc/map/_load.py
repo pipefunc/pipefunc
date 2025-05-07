@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
+from pipefunc.helpers import FileValue
 
-from ._run import _load_from_store, _maybe_load_data
+from ._run import _load_from_store
 from ._run_info import RunInfo
+from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,7 +38,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
     outputs = [_load_from_store(output_name, store).value for output_name in output_names]
-    outputs = [_maybe_load_data(o) for o in outputs]
+    outputs = [maybe_load_data(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
 
@@ -129,3 +131,12 @@ def load_dataframe(
         load_intermediate=load_intermediate,
     )
     return xarray_dataset_to_dataframe(ds)
+
+
+def maybe_load_data(x: Any) -> Any:
+    """Load data if it is a `FileValue` or `StorageBase`."""
+    if isinstance(x, StorageBase):
+        return x.to_array()
+    if isinstance(x, FileValue):
+        return x.load()
+    return x

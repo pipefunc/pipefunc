@@ -25,7 +25,6 @@ from pipefunc._utils import (
     prod,
 )
 from pipefunc.cache import HybridCache, to_hashable
-from pipefunc.helpers import FileValue
 
 from ._adaptive_scheduler_slurm_executor import (
     maybe_finalize_slurm_executors,
@@ -33,6 +32,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
+from ._load import maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
@@ -1011,17 +1011,9 @@ def _execute_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_data(x: Any) -> Any:
-    if isinstance(x, StorageBase):
-        return x.to_array()
-    if isinstance(x, FileValue):
-        return x.load()
-    return x
-
-
 def _load_data(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_data(v)
+        kwargs[k] = maybe_load_data(v)
 
 
 class _KwargsTask(NamedTuple):
