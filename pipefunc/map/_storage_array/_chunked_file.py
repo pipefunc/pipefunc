@@ -224,7 +224,8 @@ class ChunkedFileArray(StorageBase):
         if not sliced_data_flat:
             data_array = np.array([], dtype=object)
         else:
-            data_array = np.array(sliced_data_flat, dtype=object)
+            data_array: np.ndarray = np.empty(len(sliced_data_flat), dtype=object)
+            data_array[:] = sliced_data_flat
 
         reshaped_array = np.ma.masked_array(data_array, mask=mask_flat)
         if numpy_slice_output_shape:  # only reshape if the output is not scalar
