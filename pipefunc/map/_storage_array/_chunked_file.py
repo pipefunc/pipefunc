@@ -254,20 +254,6 @@ class ChunkedFileArray(StorageBase):
 
             if conceptual_element is not np.ma.masked:
                 element_array = np.asarray(conceptual_element)
-                if element_array.shape != self.resolved_internal_shape:
-                    # This can happen if internal_shape is e.g. () but element is not scalar
-                    # or if elements have inconsistent shapes (though dump should prevent this)
-                    # For now, let's treat this as an error or handle as masked
-                    for internal_coords in iterate_shape_indices(self.resolved_internal_shape):
-                        full_coord = select_by_mask(
-                            self.shape_mask,
-                            external_coords,
-                            internal_coords,
-                        )
-                        arr_data[full_coord] = np.ma.masked
-                        arr_mask[full_coord] = True  # Ensure it's masked
-                        continue
-
                 for internal_coords in iterate_shape_indices(self.resolved_internal_shape):
                     full_coord = select_by_mask(self.shape_mask, external_coords, internal_coords)
                     arr_data[full_coord] = element_array[internal_coords]
