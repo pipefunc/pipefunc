@@ -180,16 +180,10 @@ def test_from_data_chunked(tmp_path: Path):
 
 
 def test_chunk_size_equals_array_size(tmp_path: Path):
-    shape = (5,)
     chunk_size = 5
-    arr = ChunkedFileArray(tmp_path, shape, chunk_size=chunk_size)
-    assert len(list(arr._files())) == 1
-
     data_to_dump = list(range(5))
-    # This dump means: set all elements in the slice arr[:] to the *sequence* data_to_dump
-    # So arr[0] = data_to_dump[0], arr[1] = data_to_dump[1], etc.
-    arr.dump((slice(None),), data_to_dump)
-
+    arr = ChunkedFileArray.from_data(data_to_dump, tmp_path, chunk_size=chunk_size)
+    assert len(list(arr._files())) == 1
     loaded_chunk = load(arr._get_chunk_path(0))
     assert loaded_chunk == data_to_dump  # The chunk itself should contain the list
     assert np.array_equal(arr.to_array(), np.array(data_to_dump))
@@ -202,7 +196,8 @@ def test_chunk_size_greater_than_array_size(tmp_path: Path):
     assert len(list(arr._files())) == 1
 
     data_to_dump = list(range(3))
-    arr.dump((slice(None),), data_to_dump)
+    for i, v in enumerate(data_to_dump):
+        arr.dump((i,), v)
 
     loaded_chunk = load(arr._get_chunk_path(0))
     assert loaded_chunk == data_to_dump

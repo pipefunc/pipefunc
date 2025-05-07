@@ -42,7 +42,7 @@ class ChunkedFileArray(StorageBase):
         shape_mask: tuple[bool, ...] | None = None,
         *,
         filename_template: str = FILENAME_TEMPLATE,
-        chunk_size: int = 1,
+        chunk_size: int = 10,
     ) -> None:
         if internal_shape and shape_mask is None:
             msg = "shape_mask must be provided if internal_shape is provided"
@@ -128,7 +128,8 @@ class ChunkedFileArray(StorageBase):
             return None
         try:
             return load(chunk_path)
-        except Exception:  # Catches EOFError, pickle errors etc.
+        except Exception:  # Catches EOFError, pickle errors etc.  # noqa: BLE001
+            chunk_path.unlink(missing_ok=True)  # Remove the file if unreadable
             return None
 
     def _save_chunk_data(self, chunk_file_idx: int, chunk_data: list[Any]) -> None:
@@ -300,33 +301,15 @@ class ChunkedFileArray(StorageBase):
 
     def dump(self, key: tuple[int | slice, ...], value: Any) -> None:
         normalized_key_for_dump = self._normalize_key(key, for_dump=True)
-
         target_external_coords = list(
-            itertools.product(
-                *self._slice_indices(normalized_key_for_dump, self.resolved_shape),
-            ),
-        )
-        num_targets = len(target_external_coords)
-
-        # Determine if 'value' should be distributed or broadcast
-        value_is_distributable_sequence = (
-            isinstance(value, list | tuple | np.ndarray)
-            and
-            # Check if `value` itself is not an internal element to be placed.
-            # This is a heuristic: if internal_shape is defined and np.shape(value) matches it,
-            # then `value` is likely a single conceptual element.
-            # Otherwise, if len(value) matches num_targets, it's likely a sequence to distribute.
-            not (self.internal_shape and np.shape(value) == self.resolved_internal_shape)
-            and len(value) == num_targets
+            itertools.product(*self._slice_indices(normalized_key_for_dump, self.resolved_shape)),
         )
 
         chunk_updates: defaultdict[int, dict[int, Any]] = defaultdict(dict)
-        for i, external_coords_tuple in enumerate(target_external_coords):
-            current_value_to_set = value[i] if value_is_distributable_sequence else value
-
+        for external_coords_tuple in target_external_coords:
             linear_external_idx = np.ravel_multi_index(external_coords_tuple, self.resolved_shape)
             chunk_file_idx, idx_in_chunk = self._get_element_chunk_location(linear_external_idx)
-            chunk_updates[chunk_file_idx][idx_in_chunk] = current_value_to_set
+            chunk_updates[chunk_file_idx][idx_in_chunk] = value
 
         for chunk_file_idx, updates_in_chunk in chunk_updates.items():
             current_chunk_len = self._get_chunk_len(chunk_file_idx)
@@ -336,10 +319,6 @@ class ChunkedFileArray(StorageBase):
 
             if len(chunk_data) < current_chunk_len:  # Ensure list is long enough
                 chunk_data.extend([np.ma.masked] * (current_chunk_len - len(chunk_data)))
-            elif (
-                len(chunk_data) > current_chunk_len
-            ):  # Should not happen if _get_chunk_len is correct
-                chunk_data = chunk_data[:current_chunk_len]
 
             for idx_in_chunk, val_to_set in updates_in_chunk.items():
                 if self.internal_shape:
