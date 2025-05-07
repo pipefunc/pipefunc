@@ -196,17 +196,13 @@ class ChunkedFileArray(StorageBase):
             return np.asarray(element)[internal_coords] if internal_coords else element
 
         # Slice access
-        iter_slice_indices = self._slice_indices(normalized_key, self.full_shape)
-
-        numpy_slice_output_shape_parts = [
-            len(iter_slice_indices[d])
-            for d, k_part in enumerate(normalized_key)
-            if isinstance(k_part, slice)
-        ]
-        numpy_slice_output_shape = tuple(numpy_slice_output_shape_parts) or ()
+        slice_indices = self._slice_indices(normalized_key, self.full_shape)
+        new_shape = tuple(
+            len(range_) for k, range_ in zip(normalized_key, slice_indices) if isinstance(k, slice)
+        )
 
         sliced_data_flat = []
-        for full_coord in itertools.product(*iter_slice_indices):
+        for full_coord in itertools.product(*slice_indices):
             external_coords = tuple(full_coord[i] for i, m in enumerate(self.shape_mask) if m)
             internal_coords = tuple(full_coord[i] for i, m in enumerate(self.shape_mask) if not m)
             linear_external_idx = np.ravel_multi_index(external_coords, self.resolved_shape)
@@ -220,16 +216,11 @@ class ChunkedFileArray(StorageBase):
                 sliced_data_flat.append(final_val)
 
         mask_flat = [x is np.ma.masked for x in sliced_data_flat]
-        # Ensure correct dtype for empty or all-masked scenarios before reshape
-        if not sliced_data_flat:
-            data_array = np.array([], dtype=object)
-        else:
-            data_array: np.ndarray = np.empty(len(sliced_data_flat), dtype=object)
-            data_array[:] = sliced_data_flat
+        data_array: np.ndarray = np.empty(len(sliced_data_flat), dtype=object)
+        data_array[:] = sliced_data_flat
 
         reshaped_array = np.ma.masked_array(data_array, mask=mask_flat)
-        if numpy_slice_output_shape:  # only reshape if the output is not scalar
-            reshaped_array = reshaped_array.reshape(numpy_slice_output_shape)
+        reshaped_array = reshaped_array.reshape(new_shape)
 
         return (
             reshaped_array.item()
