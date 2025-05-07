@@ -25,6 +25,7 @@ from pipefunc._utils import (
     prod,
 )
 from pipefunc.cache import HybridCache, to_hashable
+from pipefunc.helpers import FileValueReference
 
 from ._adaptive_scheduler_slurm_executor import (
     maybe_finalize_slurm_executors,
@@ -456,7 +457,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_arrays(selected)
+    _load_data(selected)
     return selected
 
 
@@ -997,7 +998,7 @@ def _execute_single(
         return output
 
     # Otherwise, run the function
-    _load_arrays(kwargs)
+    _load_data(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -1010,15 +1011,17 @@ def _execute_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_array(x: Any) -> Any:
+def _maybe_load_data(x: Any) -> Any:
     if isinstance(x, StorageBase):
         return x.to_array()
+    if isinstance(x, FileValueReference):
+        return x.load()
     return x
 
 
-def _load_arrays(kwargs: dict[str, Any]) -> None:
+def _load_data(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_array(v)
+        kwargs[k] = _maybe_load_data(v)
 
 
 class _KwargsTask(NamedTuple):

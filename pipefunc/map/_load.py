@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
 
-from ._run import _load_from_store, _maybe_load_array
+from ._run import _load_from_store, _maybe_load_data
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ def load_outputs(*output_names: str, run_folder: str | Path) -> Any:
     run_info = RunInfo.load(run_folder)
     store = run_info.init_store()
     outputs = [_load_from_store(output_name, store).value for output_name in output_names]
-    outputs = [_maybe_load_array(o) for o in outputs]
+    outputs = [_maybe_load_data(o) for o in outputs]
     return outputs[0] if len(output_names) == 1 else outputs
 
 

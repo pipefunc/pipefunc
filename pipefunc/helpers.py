@@ -1,8 +1,15 @@
 """Provides `pipefunc.helpers` module with various tools."""
 
+from __future__ import annotations
+
 import inspect
-from collections.abc import Callable
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from pipefunc._utils import dump, load
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class _ReturnsKwargs:
@@ -119,3 +126,37 @@ def get_attribute_factory(
     _wrapped.__signature__ = sig  # type: ignore[attr-defined]
     _wrapped.__name__ = function_name
     return _wrapped
+
+
+class FileValueReference:
+    """A reference to a value stored in a file.
+
+    This class provides a way to store and load values from files, which is useful
+    for passing large objects between processes without serializing them directly.
+
+    Parameters
+    ----------
+    path
+        Path to the file containing the serialized value.
+
+    Examples
+    --------
+    >>> ref = FileValueReference.from_data([1, 2, 3], Path("data.pkl"))
+    >>> ref.load()
+    [1, 2, 3]
+
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path).absolute()
+
+    def load(self) -> Any:
+        """Load the stored data from disk."""
+        return load(self.path)
+
+    @classmethod
+    def from_data(cls, data: Any, path: Path) -> FileValueReference:
+        """Serializes data to a file and returns a FileValueReference to it."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        dump(data, path)
+        return cls(path=path)

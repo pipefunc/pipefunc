@@ -14,6 +14,7 @@ import xarray as xr
 
 from ._load import load_outputs
 from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
+from ._run import _maybe_load_data
 from ._run_info import RunInfo
 
 if TYPE_CHECKING:
@@ -118,6 +119,7 @@ def _xarray(
         dims.update(axes)
         if name in inputs:
             array = inputs[name]
+            array = _maybe_load_data(array)
             if not isinstance(array, np.ndarray):
                 array = _to_array(array, (len(array),))
         elif load_intermediate:
