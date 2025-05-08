@@ -372,3 +372,29 @@ async def test_start_periodic_updates_error_handling():
         widget._start_periodic_updates()
         mock_print.assert_called_once()
         assert "Error starting periodic updates" in mock_print.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_update_periodically_cancellation():
+    """Test that CancelledError is properly handled in _update_periodically."""
+    widget = AsyncMapStatusWidget(display=False)
+
+    # Create a long-running mock task
+    mock_task = MagicMock()
+    mock_task.done.return_value = False
+    widget._task = mock_task
+
+    # Create a real task for the update loop
+    update_task = asyncio.create_task(widget._update_periodically())
+
+    # Give it a moment to start running
+    await asyncio.sleep(0.1)
+
+    # Now cancel it
+    update_task.cancel()
+
+    # This should complete without error if CancelledError is properly handled
+    await update_task
+
+    # No assertions needed - if CancelledError isn't handled,
+    # the test will fail with an unhandled exception
