@@ -18,7 +18,7 @@ class AsyncMapStatusWidget:
         self._widget: ipywidgets.Output | None = None
         self._widget = ipywidgets.Output()
         self._start_time = time.time()
-        self._start_datetime = datetime.now().strftime("%H:%M:%S")
+        self._start_datetime = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
 
         with self._widget:
             self._widget.clear_output(wait=True)
@@ -60,8 +60,18 @@ class AsyncMapStatusWidget:
         style = styles.get(status, styles["running"])
 
         # Build the compact HTML content on a single line
+        div_styles = [
+            "display: flex",
+            "align-items: center",
+            "font-size: 14px",
+            "padding: 5px 10px",
+            "border-radius: 4px",
+            "background-color: #f8f9fa",
+            f"border-left: 3px solid {style['color']}",
+        ]
+        div_style = "; ".join(div_styles)
         html_content = f"""
-        <div style="display: flex; align-items: center; font-size: 14px; padding: 5px 10px; border-radius: 4px; background-color: #f8f9fa; border-left: 3px solid {style["color"]};">
+        <div style="{div_style}">
             <span style="color: {style["color"]}; font-weight: bold; margin-right: 5px;">
                 {style["icon"]} {style["message"]}
             </span>
@@ -74,8 +84,9 @@ class AsyncMapStatusWidget:
         if status == "failed" and error is not None:
             error_text = str(error)
             # Truncate error if too long
-            if len(error_text) > 50:
-                error_text = error_text[:47] + "..."
+            n_chars = 300
+            if len(error_text) > n_chars:
+                error_text = error_text[: n_chars - 3] + "..."
 
             html_content += f"""
             <span style="margin-left: 10px; color: #e74c3c; font-size: 12px;">
@@ -97,7 +108,9 @@ class AsyncMapStatusWidget:
             if future.cancelled():
                 self._display_status("cancelled")
             elif future.exception():
-                self._display_status("failed", future.exception())
+                exception = future.exception()
+                assert isinstance(exception, Exception)
+                self._display_status("failed", exception)
             elif not future.done():
                 self._display_status("running")
             else:
