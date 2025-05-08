@@ -58,11 +58,11 @@ class AsyncMapStatusWidget:
     def __init__(self, initial_update_interval: float = 0.1, *, display: bool = True) -> None:
         """Initialize the status widget."""
         self._status_widget = ipywidgets.Output()
-        self._traceback_widget = ipywidgets.Output(layout=ipywidgets.Layout(visibility="hidden"))
+        self._traceback_widget = ipywidgets.Output(layout=ipywidgets.Layout(display="none"))
         self._traceback_button = ipywidgets.Button(
             description="Show traceback",
             button_style="info",
-            layout=ipywidgets.Layout(width="100%", visibility="hidden"),
+            layout=ipywidgets.Layout(width="100%", display="none"),
         )
         self._traceback_button.add_class("custom-button")
         self._traceback_button.on_click(self._toggle_traceback)
@@ -72,7 +72,7 @@ class AsyncMapStatusWidget:
         )
 
         self._traceback_visible = False
-        self._start_time = time.time()
+        self._start_time = time.monotonic()
         self._start_datetime = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
         self._update_interval = initial_update_interval
         self._task: asyncio.Task | None = None
@@ -85,7 +85,7 @@ class AsyncMapStatusWidget:
 
     def _get_elapsed_time(self) -> float:
         """Get elapsed time in seconds since widget creation."""
-        return time.time() - self._start_time
+        return time.monotonic() - self._start_time
 
     def _get_style(self, status: StatusType) -> StyleInfo:
         """Get style information for the given status."""
@@ -97,10 +97,10 @@ class AsyncMapStatusWidget:
 
         if self._traceback_visible:
             self._traceback_button.description = "Hide traceback"
-            self._traceback_widget.layout.visibility = "visible"
+            self._traceback_widget.layout.display = "block"
         else:
             self._traceback_button.description = "Show traceback"
-            self._traceback_widget.layout.visibility = "hidden"
+            self._traceback_widget.layout.display = "none"
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
         """Refresh the display with current status."""
@@ -146,7 +146,7 @@ class AsyncMapStatusWidget:
 
         if status == "failed" and error is not None:
             self._exception = error
-            self._traceback_button.layout.visibility = "visible"
+            self._traceback_button.layout.display = "block"
 
             with self._traceback_widget:
                 self._traceback_widget.clear_output(wait=True)
@@ -167,8 +167,8 @@ class AsyncMapStatusWidget:
                 )
                 console.print(tb)
         else:
-            self._traceback_button.layout.visibility = "hidden"
-            self._traceback_widget.layout.visibility = "hidden"
+            self._traceback_button.layout.display = "none"
+            self._traceback_widget.layout.display = "none"
 
     async def _update_periodically(self) -> None:
         """Periodically update the widget while the task is running."""
