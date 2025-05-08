@@ -160,7 +160,7 @@ def run_map(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -176,26 +176,26 @@ def run_map(
         show_progress=show_progress,
         in_async=False,
     )
-    if progress is not None:
-        progress.display()
-    with _maybe_executor(executor, parallel) as ex:
-        for gen in pipeline.topological_generations.function_lists:
+    if prep.progress is not None:
+        prep.progress.display()
+    with _maybe_executor(prep.executor, parallel) as ex:
+        for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
-                run_info=run_info,
-                store=store,
-                outputs=outputs,
+                run_info=prep.run_info,
+                store=prep.store,
+                outputs=prep.outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
-                chunksizes=chunksizes,
-                progress=progress,
+                chunksizes=prep.chunksizes,
+                progress=prep.progress,
                 return_results=return_results,
                 cache=pipeline.cache,
             )
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    if prep.progress is not None:  # final update
+        prep.progress.update_progress(force=True)
+    _maybe_persist_memory(prep.store, persist_memory)
+    return prep.outputs
 
 
 @dataclass
