@@ -23,7 +23,6 @@ from pipefunc._utils import (
     is_running_in_ipynb,
     prod,
 )
-
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -47,8 +46,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets import ProgressTracker
-    from pipefunc._widgets import AsyncMapStatusWidget
+    from pipefunc._widgets import AsyncMapStatusWidget, ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
