@@ -379,9 +379,8 @@ def run_map_async(
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
+    status_widget = maybe_async_map_status_widget(task)
     if is_running_in_ipynb():  # pragma: no cover
-        status_widget = maybe_async_map_status_widget(task)
-
         if prep.progress is not None:
             prep.progress.display()
         if multi_run_manager is not None:

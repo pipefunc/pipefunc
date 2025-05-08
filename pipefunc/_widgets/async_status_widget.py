@@ -121,7 +121,8 @@ class AsyncMapStatusWidget:
 
         if len(error_text) > max_chars:
             return error_text[: max_chars - 3] + "..."
-        return error_text
+
+        return f"{type(error)}: {error_text}"
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
         """Refresh the display with current status."""

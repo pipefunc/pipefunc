@@ -188,7 +188,6 @@ def run_map_eager_async(
         prep.progress.attach_task(task)
 
     status_widget = maybe_async_map_status_widget(task)
-
     return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
 
 
