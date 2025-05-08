@@ -141,11 +141,13 @@ class AsyncMapStatusWidget:
                 self._refresh_display("running")
                 await asyncio.sleep(self._update_interval)
                 elapsed = self._get_elapsed_time()
-                if elapsed > 10:  # noqa: PLR2004
+                if elapsed < 10:  # noqa: PLR2004
+                    pass
+                elif elapsed < 100:  # noqa: PLR2004
                     self._update_interval = 1.0
-                elif elapsed > 100:  # noqa: PLR2004
+                elif elapsed < 1000:  # noqa: PLR2004
                     self._update_interval = 10.0
-                elif elapsed > 1000:  # noqa: PLR2004
+                else:
                     self._update_interval = 60.0
         except asyncio.CancelledError:
             # Expected when the main task finishes
