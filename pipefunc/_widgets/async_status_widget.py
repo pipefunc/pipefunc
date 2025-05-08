@@ -62,6 +62,7 @@ class AsyncMapStatusWidget:
         self._traceback_button = ipywidgets.Button(
             description="Show traceback",
             button_style="info",
+            icon="search",
             layout=ipywidgets.Layout(width="100%", display="none"),
         )
         self._traceback_button.add_class("custom-button")
@@ -97,9 +98,13 @@ class AsyncMapStatusWidget:
 
         if self._traceback_visible:
             self._traceback_button.description = "Hide traceback"
+            self._traceback_button.button_style = "danger"
+            self._traceback_button.icon = "close"
             self._traceback_widget.layout.display = "block"
         else:
             self._traceback_button.description = "Show traceback"
+            self._traceback_button.button_style = "info"
+            self._traceback_button.icon = "search"
             self._traceback_widget.layout.display = "none"
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
