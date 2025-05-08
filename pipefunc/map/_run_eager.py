@@ -179,10 +179,8 @@ def run_map_eager(
             return_results=return_results,
             cache=prep.pipeline.cache,
         )
-
     if prep.progress is not None:  # final update
         prep.progress.update_progress(force=True)
-
     _maybe_persist_memory(prep.store, persist_memory)
     return prep.outputs
 
