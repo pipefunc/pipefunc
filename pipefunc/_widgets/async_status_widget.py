@@ -177,8 +177,7 @@ class AsyncMapStatusWidget:
 
     async def _update_periodically(self) -> None:
         """Periodically update the widget while the task is running."""
-        if self._task is None:
-            return
+        assert self._task is not None
 
         try:
             while not self._task.done():
