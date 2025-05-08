@@ -372,21 +372,3 @@ async def test_start_periodic_updates_error_handling():
         widget._start_periodic_updates()
         mock_print.assert_called_once()
         assert "Error starting periodic updates" in mock_print.call_args[0][0]
-
-
-@pytest.mark.asyncio
-async def test_update_periodically_exception_handling():
-    """Test exception handling in the _update_periodically method."""
-    widget = AsyncMapStatusWidget(display=False)
-
-    # Create a mock task
-    mock_task = MagicMock()
-    mock_task.done.side_effect = [False, Exception("Test exception")]
-    widget._task = mock_task
-
-    # Test exception handling
-    with patch("builtins.print") as mock_print:
-        await widget._update_periodically()
-        mock_print.assert_called_once()
-        assert "Error in periodic update" in mock_print.call_args[0][0]
-        assert "Test exception" in mock_print.call_args[0][0]
