@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
+import IPython.display
 import ipywidgets
-from IPython.display import HTML, display
 
 StatusType = Literal["initializing", "running", "done", "cancelled", "failed"]
 
@@ -53,7 +53,7 @@ _STYLES: dict[StatusType, StyleInfo] = {
 class AsyncMapStatusWidget:
     """Manages an ipywidgets.Output widget to display the status of an asyncio.Task."""
 
-    def __init__(self, initial_update_interval: float = 0.1) -> None:
+    def __init__(self, initial_update_interval: float = 0.1, *, display: bool = True) -> None:
         """Initialize the status widget."""
         self._widget = ipywidgets.Output()
         self._start_time = time.time()
@@ -61,9 +61,9 @@ class AsyncMapStatusWidget:
         self._update_interval = initial_update_interval
         self._task: asyncio.Task | None = None
         self._update_timer: asyncio.Task | None = None
-
-        # Initialize display
         self._refresh_display("initializing")
+        if display:
+            self.display()
 
     def _get_elapsed_time(self) -> float:
         """Get elapsed time in seconds since widget creation."""
@@ -128,7 +128,7 @@ class AsyncMapStatusWidget:
         with self._widget:
             self._widget.clear_output(wait=True)
             html_content = self._create_html_content(status, error)
-            display(HTML(html_content))
+            IPython.display.display(IPython.display.HTML(html_content))
 
     async def _update_periodically(self) -> None:
         """Periodically update the widget while the task is running."""
@@ -182,7 +182,7 @@ class AsyncMapStatusWidget:
 
     def display(self) -> None:
         """Display the widget in the current cell."""
-        display(self._widget)
+        IPython.display.display(self._widget)
 
     def attach_task(self, task: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.

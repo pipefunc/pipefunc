@@ -23,6 +23,7 @@ from pipefunc._utils import (
     is_running_in_ipynb,
     prod,
 )
+from pipefunc._widgets.helpers import maybe_async_map_status_widget
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -46,7 +47,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets import AsyncMapStatusWidget, ProgressTracker
+    from pipefunc._widgets.async_status_widget import AsyncMapStatusWidget
+    from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
@@ -204,7 +206,7 @@ class AsyncMap:
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
-    status_widget: AsyncMapStatusWidget
+    status_widget: AsyncMapStatusWidget | None
 
     def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
@@ -222,7 +224,8 @@ class AsyncMap:
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
         if is_running_in_ipynb():
-            self.status_widget.display()
+            if self.status_widget is not None:
+                self.status_widget.display()
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
@@ -377,17 +380,15 @@ def run_map_async(
         prep.progress.attach_task(task)
 
     if is_running_in_ipynb():  # pragma: no cover
-        status_widget = AsyncMapStatusWidget()
-        status_widget.attach_task(task)
-        status_widget.display()
+        status_widget = maybe_async_map_status_widget(task)
 
-        # Display other widgets if they exist
         if prep.progress is not None:
             prep.progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
 
-    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
+
 
 def _maybe_persist_memory(
     store: dict[str, StoreType],

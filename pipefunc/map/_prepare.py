@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.map._types import UserShapeDict
 
     from ._result import StoreType

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
+from pipefunc._widgets.helpers import maybe_async_map_status_widget
 from pipefunc.map._run import (
     AsyncMap,
     _maybe_executor,
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._result import ResultDict
@@ -186,13 +187,9 @@ def run_map_eager_async(
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
-    if is_running_in_ipynb():  # pragma: no cover
-        # Create and display the status widget if in a notebook environment
-        status_widget = AsyncMapStatusWidget()
-        status_widget.attach_task(task)
-        status_widget.display()
+    status_widget = maybe_async_map_status_widget(task)
 
-    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
 
 
 async def _eager_scheduler_loop_async(

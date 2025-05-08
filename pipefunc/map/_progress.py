@@ -11,7 +11,7 @@ from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
     from pipefunc import PipeFunc
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
 
     from ._result import StoreType
 
@@ -72,7 +72,7 @@ def init_tracker(
     if not show_progress:
         return None
     requires("ipywidgets", reason="show_progress", extras="ipywidgets")
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
 
     progress = {}
     for func in functions:
