@@ -19,7 +19,7 @@ def maybe_async_map_status_widget(task: asyncio.Task) -> AsyncMapStatusWidget | 
     """Create an AsyncMapStatusWidget and attach it to a task."""
     if not is_running_in_ipynb():
         return None
-    if not has_ipywidgets:
+    if not has_ipywidgets:  # pragma: no cover
         print(
             "⚠️ `pipeline.map_async` provides task status visualization with ipywidgets."
             " Install with: pip install ipywidgets",
