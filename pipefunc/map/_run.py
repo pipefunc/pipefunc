@@ -178,7 +178,7 @@ def run_map(
     )
     if prep.progress is not None:
         prep.progress.display()
-    with _maybe_executor(prep.executor, parallel) as ex:
+    with _maybe_executor(prep.executor, prep.parallel) as ex:
         for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
@@ -190,7 +190,7 @@ def run_map(
                 chunksizes=prep.chunksizes,
                 progress=prep.progress,
                 return_results=return_results,
-                cache=pipeline.cache,
+                cache=prep.pipeline.cache,
             )
     if prep.progress is not None:  # final update
         prep.progress.update_progress(force=True)
