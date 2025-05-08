@@ -53,19 +53,12 @@ _STYLES: dict[StatusType, StyleInfo] = {
 class AsyncMapStatusWidget:
     """Manages an ipywidgets.Output widget to display the status of an asyncio.Task."""
 
-    # Status style definitions
-
-    def __init__(self, update_interval: float = 1.0) -> None:
-        """Initialize the status widget.
-
-        Args:
-            update_interval: Seconds between status updates while the task is running
-
-        """
+    def __init__(self, initial_update_interval: float = 0.1) -> None:
+        """Initialize the status widget."""
         self._widget = ipywidgets.Output()
         self._start_time = time.time()
         self._start_datetime = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
-        self._update_interval = update_interval
+        self._update_interval = initial_update_interval
         self._task: asyncio.Task | None = None
         self._update_timer: asyncio.Task | None = None
 
@@ -81,16 +74,7 @@ class AsyncMapStatusWidget:
         return _STYLES.get(status, _STYLES["running"])
 
     def _create_html_content(self, status: StatusType, error: Exception | None = None) -> str:
-        """Create the HTML content for the status display.
-
-        Args:
-            status: Current status of the task
-            error: Exception object if the task failed
-
-        Returns:
-            HTML content string
-
-        """
+        """Create the HTML content for the status display."""
         style = self._get_style(status)
         elapsed = self._get_elapsed_time()
 
@@ -140,13 +124,7 @@ class AsyncMapStatusWidget:
         return error_text
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
-        """Refresh the display with current status.
-
-        Args:
-            status: Current status of the task
-            error: Exception object if the task failed
-
-        """
+        """Refresh the display with current status."""
         if self._widget is None:
             return
 
@@ -164,7 +142,13 @@ class AsyncMapStatusWidget:
             while not self._task.done():
                 self._refresh_display("running")
                 await asyncio.sleep(self._update_interval)
-
+                elapsed = self._get_elapsed_time()
+                if elapsed > 10:  # noqa: PLR2004
+                    self._update_interval = 1.0
+                elif elapsed > 100:  # noqa: PLR2004
+                    self._update_interval = 10.0
+                elif elapsed > 1000:  # noqa: PLR2004
+                    self._update_interval = 60.0
         except asyncio.CancelledError:
             # Expected when the main task finishes
             pass
@@ -182,8 +166,10 @@ class AsyncMapStatusWidget:
 
         This is called automatically when the task completes.
 
-        Args:
-            future: The completed future/task
+        Parameters
+        ----------
+        future
+            The completed future/task
 
         """
         self._stop_periodic_updates()
@@ -205,8 +191,10 @@ class AsyncMapStatusWidget:
     def attach_task(self, task: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.
 
-        Args:
-            task: The asyncio.Task to monitor
+        Parameters
+        ----------
+        task
+            The asyncio.Task to monitor
 
         """
         self._task = task
