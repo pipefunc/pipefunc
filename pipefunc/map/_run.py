@@ -331,7 +331,7 @@ def run_map_async(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, _, executor_dict, chunksizes, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -348,37 +348,37 @@ def run_map_async(
         in_async=True,
     )
 
-    multi_run_manager = maybe_multi_run_manager(executor_dict)
+    multi_run_manager = maybe_multi_run_manager(prep.executor)
 
     async def _run_pipeline() -> ResultDict:
-        with _maybe_executor(executor_dict, parallel=True) as ex:
+        with _maybe_executor(prep.executor, parallel=True) as ex:
             assert ex is not None
-            for gen in pipeline.topological_generations.function_lists:
+            for gen in prep.pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
                     generation=gen,
-                    run_info=run_info,
-                    store=store,
-                    outputs=outputs,
+                    run_info=prep.run_info,
+                    store=prep.store,
+                    outputs=prep.outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
-                    chunksizes=chunksizes,
-                    progress=progress,
+                    chunksizes=prep.chunksizes,
+                    progress=prep.progress,
                     return_results=return_results,
-                    cache=pipeline.cache,
+                    cache=prep.pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
-        _maybe_persist_memory(store, persist_memory)
-        return outputs
+        _maybe_persist_memory(prep.store, persist_memory)
+        return prep.outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
+    if prep.progress is not None:
+        prep.progress.attach_task(task)
     if is_running_in_ipynb():  # pragma: no cover
-        if progress is not None:
-            progress.display()
+        if prep.progress is not None:
+            prep.progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
-    return AsyncMap(task, run_info, progress, multi_run_manager)
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
 
 
 def _maybe_persist_memory(
