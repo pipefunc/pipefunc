@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import time
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
 import IPython.display
 import ipywidgets
+from rich.console import Console
+from rich.traceback import Traceback
 
 StatusType = Literal["initializing", "running", "done", "cancelled", "failed"]
 
@@ -56,13 +57,19 @@ class AsyncMapStatusWidget:
 
     def __init__(self, initial_update_interval: float = 0.1, *, display: bool = True) -> None:
         """Initialize the status widget."""
-        self._widget = ipywidgets.Output()
+        self._main_widget = ipywidgets.VBox()
+        self._status_widget = ipywidgets.Output()
+        self._traceback_widget = ipywidgets.Output()
+        self._traceback_button = None
+        self._traceback_visible = False
+
         self._start_time = time.time()
         self._start_datetime = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
         self._update_interval = initial_update_interval
         self._task: asyncio.Task | None = None
         self._update_timer: asyncio.Task | None = None
-        self._error_traceback: str | None = None
+        self._exception: Exception | None = None
+
         self._refresh_display("initializing")
         if display:
             self.display()
@@ -75,88 +82,109 @@ class AsyncMapStatusWidget:
         """Get style information for the given status."""
         return _STYLES.get(status, _STYLES["running"])
 
-    def _create_html_content(self, status: StatusType, error: Exception | None = None) -> str:
-        """Create the HTML content for the status display."""
-        style = self._get_style(status)
-        elapsed = self._get_elapsed_time()
+    def _toggle_traceback(self, _) -> None:
+        """Toggle the visibility of the traceback widget."""
+        self._traceback_visible = not self._traceback_visible
 
-        # Main container styles
-        div_style = "; ".join(
-            [
-                "display: flex",
-                "flex-direction: column",
-                "font-size: 14px",
-                "padding: 5px 10px",
-                "border-radius: 4px",
-                "background-color: #f8f9fa",
-                f"border-left: 3px solid {style.color}",
-            ],
-        )
-
-        # Status line styles
-        status_line_style = "display: flex; align-items: center; width: 100%"
-
-        # Build the HTML structure
-        html = f"""
-        <div style="{div_style}">
-            <div style="{status_line_style}">
-                <span style="color: {style.color}; font-weight: bold; margin-right: 5px;">
-                    {style.icon} {style.message}
-                </span>
-                <span style="color: #666; margin-left: auto; font-size: 12px;">
-                    Started: {self._start_datetime} | Elapsed: {elapsed:.1f}s
-                </span>
-            </div>
-        """
-
-        # Add error details if applicable
-        if status == "failed" and error is not None:
-            error_text = str(error)
-            error_id = f"error-{hash(error_text) & 0xFFFFFFFF}"
-
-            html += f"""
-            <div style="margin-top: 5px; color: #e74c3c; font-size: 12px;">
-                <div style="display: flex; align-items: center;">
-                    <span style="font-weight: bold;">{type(error).__name__}: {error_text}</span>
-                    <a href="#" id="{error_id}-toggle"
-                       style="margin-left: 10px; color: #3498db; text-decoration: underline; cursor: pointer;"
-                       onclick="
-                         const tracebackElem = document.getElementById('{error_id}');
-                         const linkElem = document.getElementById('{error_id}-toggle');
-                         if (tracebackElem.style.display === 'block') {{
-                           tracebackElem.style.display = 'none';
-                           linkElem.textContent = 'show traceback';
-                         }} else {{
-                           tracebackElem.style.display = 'block';
-                           linkElem.textContent = 'hide traceback';
-                         }}
-                         return false;
-                       "
-                    >show traceback</a>
-                </div>
-                <pre id="{error_id}" style="display: none; margin-top: 5px; overflow-x: auto; white-space: pre-wrap; background-color: #f0f0f0; padding: 8px; border-radius: 4px; font-size: 11px; color: #333; max-height: 300px; overflow-y: auto;">{self._error_traceback or "No traceback available"}</pre>
-            </div>
-            """
-
-        html += "</div>"
-        return html
-
-    def _format_error_message(self, error: Exception) -> str:
-        """Format and truncate error message if needed."""
-        error_text = str(error)
-        max_chars = 300
-
-        if len(error_text) > max_chars:
-            return error_text[: max_chars - 3] + "..."
-
-        return f"{type(error)}: {error_text}"
+        if self._traceback_visible:
+            self._traceback_button.description = "Hide traceback"
+            self._main_widget.children = (
+                self._status_widget,
+                self._traceback_button,
+                self._traceback_widget,
+            )
+        else:
+            self._traceback_button.description = "Show traceback"
+            self._main_widget.children = (self._status_widget, self._traceback_button)
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
         """Refresh the display with current status."""
-        with self._widget:
-            self._widget.clear_output(wait=True)
-            html_content = self._create_html_content(status, error)
-            IPython.display.display(IPython.display.HTML(html_content))
+        with self._status_widget:
+            self._status_widget.clear_output(wait=True)
+            style = self._get_style(status)
+            elapsed = self._get_elapsed_time()
+
+            # Create container with nice styling
+            container_style = "; ".join(
+                [
+                    "display: flex",
+                    "flex-direction: column",
+                    "font-size: 13px",
+                    "padding: 5px 8px",
+                    "border-radius: 4px",
+                    "background-color: #f8f9fa",
+                    f"border-left: 3px solid {style.color}",
+                    "margin-bottom: 5px",
+                ],
+            )
+
+            # Build status line with better styling
+            status_html = f"""
+            <div style="{container_style}">
+                <div style="display: flex; align-items: center; width: 100%">
+                    <span style="color: {style.color}; font-weight: bold; margin-right: 10px;">
+                        {style.icon} {style.message}
+                    </span>
+                    <span style="color: #666; margin-left: auto; font-size: 12px;">
+                        Started: {self._start_datetime} | Elapsed: {elapsed:.1f}s
+                    </span>
+                </div>
+            """
+
+            # Add error details with better styling
+            if status == "failed" and error is not None:
+                status_html += f"""
+                <div style="color: #e74c3c; font-weight: bold; margin-top: 8px; font-size: 14px;">
+                    {type(error).__name__}: {error!s}
+                </div>
+                """
+
+            status_html += "</div>"
+            IPython.display.display(IPython.display.HTML(status_html))
+
+        # Update the traceback widgets if there's an error
+        if status == "failed" and error is not None:
+            self._exception = error
+
+            # Create a styled button
+            if self._traceback_button is None:
+                self._traceback_button = ipywidgets.Button(
+                    description="Show traceback",
+                    button_style="info",
+                    layout=ipywidgets.Layout(width="100%"),
+                )
+                self._traceback_button.add_class("custom-button")
+                self._traceback_button.on_click(self._toggle_traceback)
+
+            # Update the traceback with rich HTML output
+            with self._traceback_widget:
+                self._traceback_widget.clear_output(wait=True)
+
+                # Create a string IO console with HTML output
+                console = Console(
+                    width=100,
+                    color_system="truecolor",
+                    record=True,
+                    highlight=True,
+                    force_jupyter=True,
+                )
+
+                tb = Traceback.from_exception(
+                    type(error),
+                    error,
+                    error.__traceback__,
+                    width=100,
+                    show_locals=False,
+                )
+
+                # # Print and capture the rich traceback
+                console.print(tb)
+
+            # Update the main widget structure
+            self._main_widget.children = (self._status_widget, self._traceback_button)
+        else:
+            # No error, just show the status widget
+            self._main_widget.children = (self._status_widget,)
 
     async def _update_periodically(self) -> None:
         """Periodically update the widget while the task is running."""
@@ -206,16 +234,13 @@ class AsyncMapStatusWidget:
         elif future.exception():
             exception = future.exception()
             assert isinstance(exception, Exception)
-            # Capture the traceback
-            tb = traceback.format_exception(type(exception), exception, exception.__traceback__)
-            self._error_traceback = "".join(tb)
             self._refresh_display("failed", exception)
         else:
             self._refresh_display("done")
 
     def display(self) -> None:
         """Display the widget in the current cell."""
-        IPython.display.display(self._widget)
+        IPython.display.display(self._main_widget)
 
     def attach_task(self, task: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.
