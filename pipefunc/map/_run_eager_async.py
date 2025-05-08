@@ -186,6 +186,12 @@ def run_map_eager_async(
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
+    if is_running_in_ipynb():  # pragma: no cover
+        # Create and display the status widget if in a notebook environment
+        status_widget = AsyncMapStatusWidget()
+        status_widget.attach_task(task)
+        status_widget.display()
+
     return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
 
 

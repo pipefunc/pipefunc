@@ -23,7 +23,7 @@ from pipefunc._utils import (
     is_running_in_ipynb,
     prod,
 )
-from pipefunc._widgets.async_status_widget import AsyncMapStatusWidget
+
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets import AsyncMapStatusWidget
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
@@ -205,7 +206,7 @@ class AsyncMap:
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
-    _status_widget: AsyncMapStatusWidget | None = None
+    status_widget: AsyncMapStatusWidget
 
     def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
@@ -223,13 +224,7 @@ class AsyncMap:
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
         if is_running_in_ipynb():
-            try:
-                from IPython.display import display as ipython_display
-            except ImportError:  # Should not happen if is_running_in_ipynb is true
-                pass
-            else:
-                if self._status_widget is not None:
-                    ipython_display(self._status_widget)
+            self.status_widget.display()
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
@@ -358,7 +353,6 @@ def run_map_async(
     )
 
     multi_run_manager = maybe_multi_run_manager(executor_dict)
-    status_widget_instance: AsyncMapStatusWidget | None = None
 
     async def _run_pipeline() -> ResultDict:
         with _maybe_executor(executor_dict, parallel=True) as ex:
@@ -386,9 +380,9 @@ def run_map_async(
 
     if is_running_in_ipynb():  # pragma: no cover
         # Create and display the status widget if in a notebook environment
-        status_widget_instance = AsyncMapStatusWidget()
-        status_widget_instance.attach_task(task)
-        status_widget_instance.display()
+        status_widget = AsyncMapStatusWidget()
+        status_widget.attach_task(task)
+        status_widget.display()
 
         # Display other widgets if they exist
         if progress is not None:
@@ -396,7 +390,7 @@ def run_map_async(
         if multi_run_manager is not None:
             multi_run_manager.display()
 
-    return AsyncMap(task, run_info, progress, multi_run_manager, status_widget_instance)
+    return AsyncMap(task, run_info, progress, multi_run_manager, status_widget)
 
 
 def _maybe_persist_memory(

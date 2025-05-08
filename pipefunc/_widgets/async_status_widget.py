@@ -125,9 +125,6 @@ class AsyncMapStatusWidget:
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
         """Refresh the display with current status."""
-        if self._widget is None:
-            return
-
         with self._widget:
             self._widget.clear_output(wait=True)
             html_content = self._create_html_content(status, error)
@@ -185,8 +182,7 @@ class AsyncMapStatusWidget:
 
     def display(self) -> None:
         """Display the widget in the current cell."""
-        if self._widget is not None:
-            display(self._widget)
+        display(self._widget)
 
     def attach_task(self, task: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.
