@@ -394,7 +394,7 @@ async def test_update_periodically_cancellation():
     update_task.cancel()
 
     # This should complete without error if CancelledError is properly handled
-    await update_task
-
-    # No assertions needed - if CancelledError isn't handled,
+    r = await update_task
+    assert r is None
+    # If CancelledError isn't handled,
     # the test will fail with an unhandled exception
