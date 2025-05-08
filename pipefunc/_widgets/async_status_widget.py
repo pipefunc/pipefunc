@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -61,6 +62,7 @@ class AsyncMapStatusWidget:
         self._update_interval = initial_update_interval
         self._task: asyncio.Task | None = None
         self._update_timer: asyncio.Task | None = None
+        self._error_traceback: str | None = None
         self._refresh_display("initializing")
         if display:
             self.display()
@@ -82,7 +84,7 @@ class AsyncMapStatusWidget:
         div_style = "; ".join(
             [
                 "display: flex",
-                "align-items: center",
+                "flex-direction: column",
                 "font-size: 14px",
                 "padding: 5px 10px",
                 "border-radius: 4px",
@@ -91,24 +93,49 @@ class AsyncMapStatusWidget:
             ],
         )
 
+        # Status line styles
+        status_line_style = "display: flex; align-items: center; width: 100%"
+
         # Build the HTML structure
         html = f"""
         <div style="{div_style}">
-            <span style="color: {style.color}; font-weight: bold; margin-right: 5px;">
-                {style.icon} {style.message}
-            </span>
-            <span style="color: #666; margin-left: auto; font-size: 12px;">
-                Started: {self._start_datetime} | Elapsed: {elapsed:.1f}s
-            </span>
+            <div style="{status_line_style}">
+                <span style="color: {style.color}; font-weight: bold; margin-right: 5px;">
+                    {style.icon} {style.message}
+                </span>
+                <span style="color: #666; margin-left: auto; font-size: 12px;">
+                    Started: {self._start_datetime} | Elapsed: {elapsed:.1f}s
+                </span>
+            </div>
         """
 
         # Add error details if applicable
         if status == "failed" and error is not None:
-            error_text = self._format_error_message(error)
+            error_text = str(error)
+            error_id = f"error-{hash(error_text) & 0xFFFFFFFF}"
+
             html += f"""
-            <span style="margin-left: 10px; color: #e74c3c; font-size: 12px;">
-                {type(error).__name__}: {error_text}
-            </span>
+            <div style="margin-top: 5px; color: #e74c3c; font-size: 12px;">
+                <div style="display: flex; align-items: center;">
+                    <span style="font-weight: bold;">{type(error).__name__}: {error_text}</span>
+                    <a href="#" id="{error_id}-toggle"
+                       style="margin-left: 10px; color: #3498db; text-decoration: underline; cursor: pointer;"
+                       onclick="
+                         const tracebackElem = document.getElementById('{error_id}');
+                         const linkElem = document.getElementById('{error_id}-toggle');
+                         if (tracebackElem.style.display === 'block') {{
+                           tracebackElem.style.display = 'none';
+                           linkElem.textContent = 'show traceback';
+                         }} else {{
+                           tracebackElem.style.display = 'block';
+                           linkElem.textContent = 'hide traceback';
+                         }}
+                         return false;
+                       "
+                    >show traceback</a>
+                </div>
+                <pre id="{error_id}" style="display: none; margin-top: 5px; overflow-x: auto; white-space: pre-wrap; background-color: #f0f0f0; padding: 8px; border-radius: 4px; font-size: 11px; color: #333; max-height: 300px; overflow-y: auto;">{self._error_traceback or "No traceback available"}</pre>
+            </div>
             """
 
         html += "</div>"
@@ -179,6 +206,9 @@ class AsyncMapStatusWidget:
         elif future.exception():
             exception = future.exception()
             assert isinstance(exception, Exception)
+            # Capture the traceback
+            tb = traceback.format_exception(type(exception), exception, exception.__traceback__)
+            self._error_traceback = "".join(tb)
             self._refresh_display("failed", exception)
         else:
             self._refresh_display("done")
