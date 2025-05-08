@@ -195,7 +195,7 @@ class AsyncMapStatusWidget:
         except asyncio.CancelledError:
             # Expected when the main task finishes
             pass
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001  # pragma: no cover
             print(f"Error in periodic update: {e}")
 
     def _stop_periodic_updates(self) -> None:

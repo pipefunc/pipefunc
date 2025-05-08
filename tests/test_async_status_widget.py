@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -277,7 +277,7 @@ async def test_update_interval_adjustment():
     """Test update interval adjustment based on elapsed time."""
     widget = AsyncMapStatusWidget(display=False)
 
-    # Mock a task to prevent early return
+    # Create a mock task that never finishes
     mock_task = MagicMock()
     mock_task.done.return_value = False
     widget._task = mock_task
@@ -285,53 +285,40 @@ async def test_update_interval_adjustment():
     # Test initial interval
     assert widget._update_interval == 0.1
 
-    # Test adjustment with different elapsed times
-    async def mock_sleep(_):
-        """Mock asyncio.sleep to prevent actual waiting."""
+    # Define a function to check interval adjustment with a specific elapsed time
+    async def test_interval_with_elapsed_time(elapsed_time, expected_interval):
+        """Test interval adjustment for a specific elapsed time."""
+        # Reset interval to initial value
+        widget._update_interval = 0.1
 
-    # Create a simplified version that only does one iteration of the while loop
-    async def run_one_periodic_update():
-        """Run one iteration of the update loop."""
-        widget._refresh_display("running")
-        # Skip asyncio.sleep since we mocked it
-        elapsed = widget._get_elapsed_time()
-        if elapsed < 10:
-            pass
-        elif elapsed < 100:
-            widget._update_interval = 1.0
-        elif elapsed < 1000:
-            widget._update_interval = 10.0
-        else:
-            widget._update_interval = 60.0
+        # Make the first while loop iteration run once and then exit
+        done_after_one_iteration = [False]
 
-    with (
-        patch.object(widget, "_get_elapsed_time") as mock_elapsed,
-        patch("asyncio.sleep", mock_sleep),
-        patch.object(widget, "_refresh_display"),
-    ):
-        # Test with elapsed < 10s (no change)
-        mock_elapsed.return_value = 5.0
-        widget._update_interval = 0.1  # Reset to initial value
-        await run_one_periodic_update()
-        assert widget._update_interval == 0.1
+        def mock_done():
+            if done_after_one_iteration[0]:
+                return True
+            done_after_one_iteration[0] = True
+            return False
 
-        # Test with 10s < elapsed < 100s
-        mock_elapsed.return_value = 50.0
-        widget._update_interval = 0.1  # Reset to initial value
-        await run_one_periodic_update()
-        assert widget._update_interval == 1.0
+        mock_task.done = mock_done
 
-        # Test with 100s < elapsed < 1000s
-        mock_elapsed.return_value = 500.0
-        widget._update_interval = 0.1  # Reset to initial value
-        await run_one_periodic_update()
-        assert widget._update_interval == 10.0
+        # Mock elapsed time and asyncio.sleep
+        with (
+            patch.object(widget, "_get_elapsed_time", return_value=elapsed_time),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            patch.object(widget, "_refresh_display"),
+        ):
+            # Run the actual method
+            await widget._update_periodically()
 
-        # Test with elapsed > 1000s
-        mock_elapsed.return_value = 1500.0
-        widget._update_interval = 0.1  # Reset to initial value
-        await run_one_periodic_update()
-        assert widget._update_interval == 60.0
+            # Check if interval was updated correctly
+            assert widget._update_interval == expected_interval
+
+    # Test with different elapsed times
+    await test_interval_with_elapsed_time(5.0, 0.1)  # < 10s: no change
+    await test_interval_with_elapsed_time(50.0, 1.0)  # 10-100s: 1.0s
+    await test_interval_with_elapsed_time(500.0, 10.0)  # 100-1000s: 10.0s
+    await test_interval_with_elapsed_time(1500.0, 60.0)  # >1000s: 60.0s
 
 
 @pytest.mark.asyncio
@@ -385,3 +372,21 @@ async def test_start_periodic_updates_error_handling():
         widget._start_periodic_updates()
         mock_print.assert_called_once()
         assert "Error starting periodic updates" in mock_print.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_update_periodically_exception_handling():
+    """Test exception handling in the _update_periodically method."""
+    widget = AsyncMapStatusWidget(display=False)
+
+    # Create a mock task
+    mock_task = MagicMock()
+    mock_task.done.side_effect = [False, Exception("Test exception")]
+    widget._task = mock_task
+
+    # Test exception handling
+    with patch("builtins.print") as mock_print:
+        await widget._update_periodically()
+        mock_print.assert_called_once()
+        assert "Error in periodic update" in mock_print.call_args[0][0]
+        assert "Test exception" in mock_print.call_args[0][0]
