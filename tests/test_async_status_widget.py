@@ -398,3 +398,26 @@ async def test_update_periodically_cancellation():
     assert r is None
     # If CancelledError isn't handled,
     # the test will fail with an unhandled exception
+
+
+@pytest.mark.asyncio
+async def test_widget_error_display_without_rich():
+    """Test error display when rich is not installed."""
+    widget = AsyncMapStatusWidget(display=False)
+    error = ValueError("Test error message")
+
+    # Patch has_rich to be False to simulate rich not being installed
+    with (
+        patch("pipefunc._widgets.async_status_widget.has_rich", new=False),
+        patch("builtins.print") as mock_print,
+        patch.object(widget._status_widget, "clear_output"),
+    ):
+        widget._refresh_display("failed", error)
+
+        # Check that the error was printed with the fallback method
+        mock_print.assert_any_call(error)
+
+        # Check button visibility (should be visible for error states)
+        assert widget._traceback_button.layout.display == "block"
+        assert widget._traceback_widget.layout.display == "none"
+        assert widget._exception is error
