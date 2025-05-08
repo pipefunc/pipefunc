@@ -373,34 +373,21 @@ def run_map_async(
         return prep.outputs
 
     task = asyncio.create_task(_run_pipeline())
-<<<<<<< HEAD
-    if progress is not None:
-        progress.attach_task(task)
+    if prep.progress is not None:
+        prep.progress.attach_task(task)
 
     if is_running_in_ipynb():  # pragma: no cover
-        # Create and display the status widget if in a notebook environment
         status_widget = AsyncMapStatusWidget()
         status_widget.attach_task(task)
         status_widget.display()
 
         # Display other widgets if they exist
-        if progress is not None:
-            progress.display()
-        if multi_run_manager is not None:
-            multi_run_manager.display()
-
-    return AsyncMap(task, run_info, progress, multi_run_manager, status_widget)
-=======
-    if prep.progress is not None:
-        prep.progress.attach_task(task)
-    if is_running_in_ipynb():  # pragma: no cover
         if prep.progress is not None:
             prep.progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
-    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
->>>>>>> upstream/main
 
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager)
 
 def _maybe_persist_memory(
     store: dict[str, StoreType],
