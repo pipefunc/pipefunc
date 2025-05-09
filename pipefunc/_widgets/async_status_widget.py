@@ -4,7 +4,6 @@ import asyncio
 import html
 import importlib.util
 import time
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -95,7 +94,7 @@ class AsyncMapStatusWidget:
         """
         # Create UI components
         self._status_html_widget = ipywidgets.HTML()
-        self._traceback_html_widget = ipywidgets.HTML(layout=ipywidgets.Layout(display="none"))
+        self._traceback_widget = ipywidgets.Output(layout=ipywidgets.Layout(display="none"))
         self._traceback_button = ipywidgets.Button(
             description="Show traceback",
             button_style="info",
@@ -107,7 +106,7 @@ class AsyncMapStatusWidget:
 
         # Create main container
         self._main_widget = ipywidgets.VBox(
-            [self._status_html_widget, self._traceback_button, self._traceback_html_widget],
+            [self._status_html_widget, self._traceback_button, self._traceback_widget],
         )
 
         # Initialize state
@@ -141,13 +140,13 @@ class AsyncMapStatusWidget:
             self._traceback_button.description = "Hide traceback"
             self._traceback_button.button_style = "danger"
             self._traceback_button.icon = "close"
-            self._traceback_html_widget.layout.display = "block"
+            self._traceback_widget.layout.display = "block"
         else:
             # Hide traceback
             self._traceback_button.description = "Show traceback"
             self._traceback_button.button_style = "info"
             self._traceback_button.icon = "search"
-            self._traceback_html_widget.layout.display = "none"
+            self._traceback_widget.layout.display = "none"
 
     def _create_status_html(
         self,
@@ -204,49 +203,36 @@ class AsyncMapStatusWidget:
             self._show_error_traceback(error)
         else:
             self._traceback_button.layout.display = "none"
-            self._traceback_html_widget.layout.display = "none"
-            if self._traceback_visible:  # Reset button if it was visible
-                self._traceback_visible = False
-                self._traceback_button.description = "Show traceback"
-                self._traceback_button.button_style = "info"
-                self._traceback_button.icon = "search"
+            self._traceback_widget.layout.display = "none"
 
     def _show_error_traceback(self, error: Exception) -> None:
         """Display error traceback in the traceback widget."""
         self._exception = error
         self._traceback_button.layout.display = "block"
-        traceback_html_content = ""
-        if has_rich:
-            from rich.console import Console
-            from rich.traceback import Traceback
+        with self._traceback_widget:
+            self._traceback_widget.clear_output(wait=True)
+            if has_rich:
+                from rich.console import Console
+                from rich.traceback import Traceback
 
-            console = Console(
-                width=100,
-                color_system="truecolor",
-                record=True,
-                highlight=True,
-                force_jupyter=True,
-            )
-            tb = Traceback.from_exception(
-                type(error),
-                error,
-                error.__traceback__,
-                width=100,
-                show_locals=False,
-            )
-            console.print(tb)
-            traceback_html_content = console.export_html(clear=True, inline_styles=True)
-        else:
-            tb_str = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-            traceback_html_content = f"<pre>{html.escape(tb_str)}</pre>"
-
-        self._traceback_html_widget.value = traceback_html_content
-        # Ensure traceback is hidden initially; _toggle_traceback handles visibility
-        self._traceback_html_widget.layout.display = "none"
-        self._traceback_visible = False
-        self._traceback_button.description = "Show traceback"
-        self._traceback_button.button_style = "info"
-        self._traceback_button.icon = "search"
+                # Use rich for colored traceback formatting
+                console = Console(
+                    width=100,
+                    color_system="truecolor",
+                    record=True,
+                    highlight=True,
+                    force_jupyter=True,  # Required for proper rendering in Jupyter
+                )
+                tb = Traceback.from_exception(
+                    type(error),
+                    error,
+                    error.__traceback__,
+                    width=100,
+                    show_locals=False,
+                )
+                console.print(tb)
+            else:
+                print(error)
 
     def _adjust_update_interval(self, elapsed: float) -> None:
         """Adjust the update interval based on elapsed time."""
