@@ -152,13 +152,7 @@ async def test_progress_tracker_failed(mock_progress_dict, mock_task):
     progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
     assert not progress._all_completed()
     mock_progress_dict["test"].mark_complete(n=49)
-
-    def f():
-        msg = "Failed"
-        raise RuntimeError(msg)
-
     future = Future()
     future.set_exception(Exception("Failed"))
     mock_progress_dict["test"].mark_complete(n=1, future=future)
-
     assert progress._all_completed()
