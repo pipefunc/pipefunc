@@ -31,7 +31,7 @@ class Status:
 
     @property
     def n_left(self) -> int:
-        return self.n_total - self.n_completed - self.n_failed  # type: ignore[operator]
+        return self.n_total - self.n_attempted  # type: ignore[operator]
 
     def mark_in_progress(self, *, n: int = 1) -> None:
         if self.start_time is None:
@@ -59,7 +59,7 @@ class Status:
             return 0.0
         if self.n_total == 0:
             return 1.0
-        return self.n_completed / self.n_total
+        return self.n_attempted / self.n_total
 
     @property
     def n_attempted(self) -> int:

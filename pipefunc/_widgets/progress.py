@@ -136,7 +136,7 @@ class ProgressTracker:
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
-                progress_bar.bar_style = "success"
+                progress_bar.bar_style = "success" if status.n_failed == 0 else "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
             else:
@@ -149,7 +149,9 @@ class ProgressTracker:
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
         labels = self.labels[name]
-        iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
+        iterations_label = (
+            f"✅ {status.n_completed:,} | ❌ {status.n_failed:,} | ⏳ {status.n_left:,}"
+        )
         labels["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
@@ -160,7 +162,7 @@ class ProgressTracker:
         else:
             estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
-        speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+        speed = f"{status.n_attempted / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
         labels["estimated_time"].value = _span(
             "estimate-label",
