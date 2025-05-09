@@ -111,7 +111,7 @@ async def test_widget_error_display():
 
     # Check button visibility (should be visible for error states)
     assert widget._traceback_button.layout.display == "block"
-    assert widget._traceback_widget.layout.display == "none"  # Traceback area initially hidden
+    assert widget._traceback_widget.layout.display == "none"
     assert widget._exception is error
 
 
@@ -460,5 +460,5 @@ async def test_widget_error_display_without_rich():
 
         # Check button visibility (should be visible for error states)
         assert widget._traceback_button.layout.display == "block"
-        assert widget._traceback_widget.layout.display == "none"  # Traceback area initially hidden
+        assert widget._traceback_widget.layout.display == "none"
         assert widget._exception is error
