@@ -233,6 +233,10 @@ class AsyncMapStatusWidget:
                 )
                 console.print(tb)
             else:
+                print(
+                    "⚠️ No rich installed, using fallback `print`."
+                    " Run `pip install rich` to get full traceback.",
+                )
                 print(self._exception)
 
     def _adjust_update_interval(self, elapsed: float) -> None:
