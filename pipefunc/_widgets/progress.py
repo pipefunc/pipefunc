@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import IPython.display
 import ipywidgets as widgets
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, clip
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -69,7 +69,7 @@ class ProgressTracker:
         self._min_auto_update_interval: float = 0.1
         self._max_auto_update_interval: float = 10.0
         self._first_auto_update_interval: float = 1.0
-        self._sync_update_interval: float = 0.1
+        self._sync_update_interval: float = 0.01
         self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
         self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
         self.buttons: dict[OUTPUT_TYPE, widgets.Button] = {
@@ -109,6 +109,7 @@ class ProgressTracker:
         self._initial_update_period: float = 30.0
         self._initial_max_update_interval: float = 1.0
         self.start_time: float = 0.0
+        self._marked_completed: set[OUTPUT_TYPE] = set()
         if display:
             self.display()
         if self.task is not None:
@@ -121,34 +122,39 @@ class ProgressTracker:
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
+        now = time.monotonic()
+        return_early = False
         if not self.in_async and not force:
             assert self.task is None
             # If not in asyncio, `update_progress` is called after each iteration,
             # so, we throttle the updates to avoid excessive updates.
-            now = time.monotonic()
             if now - self.last_update_time < self._sync_update_interval:
-                return
-            self.last_update_time = time.monotonic()
+                return_early = True
 
         for name, status in self.progress_dict.items():
-            if status.progress == 0:
+            if status.progress == 0 or name in self._marked_completed:
                 continue
+            if return_early and status.progress < 1.0:
+                return
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
                 progress_bar.bar_style = "success" if status.n_failed == 0 else "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
+                self._marked_completed.add(name)
             else:
                 progress_bar.remove_class("completed-progress")
                 progress_bar.add_class("animated-progress")
             self._update_labels(name, status)
         if self._all_completed():
             self._mark_completed()
+        self.last_update_time = time.monotonic()
+        # Set the update interval to 50 times the total time this method took
+        self._sync_update_interval = clip(50 * (self.last_update_time - now), 0.01, 1.0)
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
-        labels = self.labels[name]
         completed = f"✅ {status.n_completed:,}"
         failed = f"❌ {status.n_failed:,}"
         left = f"⏳ {status.n_left:,}"
@@ -156,10 +162,13 @@ class ProgressTracker:
             iterations_label = f"{completed} | {left}"
         else:
             iterations_label = f"{completed} | {failed} | {left}"
+
+        labels = self.labels[name]
         labels["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
+
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
             eta = "Completed"

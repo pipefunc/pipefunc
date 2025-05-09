@@ -453,3 +453,8 @@ def parse_function_docstring(
 def is_classmethod(func: Callable) -> bool:
     """Check if a function is a classmethod."""
     return inspect.ismethod(func) and func.__self__ is not None
+
+
+def clip(x: float, min_value: float, max_value: float) -> float:
+    """Clip a value to a range."""
+    return max(min_value, min(x, max_value))
