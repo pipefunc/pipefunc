@@ -214,15 +214,10 @@ class ProgressTracker:
         if self.auto_update:
             self._toggle_auto_update()
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
-            self.auto_update_interval_label.value = _span(
-                "interval-label",
-                "Completed with errors ❌",
-            )
+            msg = "Completed with errors ❌"
         else:
-            self.auto_update_interval_label.value = _span(
-                "interval-label",
-                "Completed all tasks 🎉",
-            )
+            msg = "Completed all tasks 🎉"
+        self.auto_update_interval_label.value = _span("interval-label", msg)
         for button in self.buttons.values():
             button.disabled = True
 
