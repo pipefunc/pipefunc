@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import importlib.util
 import time
 from dataclasses import dataclass
@@ -92,7 +93,7 @@ class AsyncMapStatusWidget:
 
         """
         # Create UI components
-        self._status_widget = ipywidgets.Output()
+        self._status_html_widget = ipywidgets.HTML()
         self._traceback_widget = ipywidgets.Output(layout=ipywidgets.Layout(display="none"))
         self._traceback_button = ipywidgets.Button(
             description="Show traceback",
@@ -105,7 +106,7 @@ class AsyncMapStatusWidget:
 
         # Create main container
         self._main_widget = ipywidgets.VBox(
-            [self._status_widget, self._traceback_button, self._traceback_widget],
+            [self._status_html_widget, self._traceback_button, self._traceback_widget],
         )
 
         # Initialize state
@@ -136,6 +137,7 @@ class AsyncMapStatusWidget:
 
         if self._traceback_visible:
             # Show traceback
+            self._print_traceback()
             self._traceback_button.description = "Hide traceback"
             self._traceback_button.button_style = "danger"
             self._traceback_button.icon = "close"
@@ -167,7 +169,7 @@ class AsyncMapStatusWidget:
             ],
         )
 
-        html = f"""
+        html_content = f"""
         <div style="{container_style}">
             <div style="display: flex; align-items: center; width: 100%">
                 <span style="color: {style.color}; font-weight: bold; margin-right: 10px;">
@@ -181,37 +183,33 @@ class AsyncMapStatusWidget:
 
         # Add error details if applicable
         if error is not None:
-            html += f"""
+            html_content += f"""
             <div style="color: #e74c3c; font-weight: bold; margin-top: 8px; font-size: 14px;">
-                {type(error).__name__}: {error!s}
+                {type(error).__name__}: {html.escape(str(error))}
             </div>
             """
 
-        html += "</div>"
-        return html
+        html_content += "</div>"
+        return html_content
 
     def _refresh_display(self, status: StatusType, error: Exception | None = None) -> None:
         """Refresh the display with current status."""
-        with self._status_widget:
-            self._status_widget.clear_output(wait=True)
-            style = self._get_style(status)
-            elapsed = self._get_elapsed_time()
-
-            status_html = self._create_status_html(style, elapsed, error)
-            IPython.display.display(IPython.display.HTML(status_html))
+        style = self._get_style(status)
+        elapsed = self._get_elapsed_time()
+        status_html = self._create_status_html(style, elapsed, error)
+        self._status_html_widget.value = status_html
 
         # Handle error display if applicable
         if status == "failed" and error is not None:
-            self._show_error_traceback(error)
+            self._exception = error
+            self._traceback_button.layout.display = "block"
         else:
             self._traceback_button.layout.display = "none"
             self._traceback_widget.layout.display = "none"
 
-    def _show_error_traceback(self, error: Exception) -> None:
+    def _print_traceback(self) -> None:
         """Display error traceback in the traceback widget."""
-        self._exception = error
-        self._traceback_button.layout.display = "block"
-
+        assert self._exception is not None
         with self._traceback_widget:
             self._traceback_widget.clear_output(wait=True)
             if has_rich:
@@ -227,15 +225,19 @@ class AsyncMapStatusWidget:
                     force_jupyter=True,  # Required for proper rendering in Jupyter
                 )
                 tb = Traceback.from_exception(
-                    type(error),
-                    error,
-                    error.__traceback__,
+                    type(self._exception),
+                    self._exception,
+                    self._exception.__traceback__,
                     width=100,
                     show_locals=False,
                 )
                 console.print(tb)
             else:
-                print(error)
+                print(
+                    "⚠️ No rich installed, using fallback `print`."
+                    " Run `pip install rich` to get full traceback.",
+                )
+                print(self._exception)
 
     def _adjust_update_interval(self, elapsed: float) -> None:
         """Adjust the update interval based on elapsed time."""

@@ -1,8 +1,9 @@
 """Tests for async status widget functionality."""
 
 import asyncio
+import contextlib
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -20,7 +21,7 @@ def widget():
 async def test_widget_initialization():
     """Test widget initialization and basic properties."""
     widget = AsyncMapStatusWidget(display=False)
-    assert widget._status_widget is not None
+    assert widget._status_html_widget is not None
     assert widget._main_widget is not None
     assert widget._traceback_widget is not None
     assert widget._traceback_button is not None
@@ -63,14 +64,22 @@ async def test_widget_display_refresh():
     widget = AsyncMapStatusWidget(display=False)
 
     # Test with running status
-    with patch.object(widget._status_widget, "clear_output") as mock_clear:
+    with patch.object(
+        type(widget._status_html_widget),
+        "value",
+        new_callable=PropertyMock,
+    ) as mock_value_setter:
         widget._refresh_display("running")
-        mock_clear.assert_called_once_with(wait=True)
+        mock_value_setter.assert_called_once()
 
     # Test with done status
-    with patch.object(widget._status_widget, "clear_output") as mock_clear:
+    with patch.object(
+        type(widget._status_html_widget),
+        "value",
+        new_callable=PropertyMock,
+    ) as mock_value_setter:
         widget._refresh_display("done")
-        mock_clear.assert_called_once_with(wait=True)
+        mock_value_setter.assert_called_once()
 
     # Check button visibility (should be hidden for non-error states)
     assert widget._traceback_button.layout.display == "none"
@@ -84,9 +93,15 @@ async def test_widget_error_display():
     error = ValueError("Test error message")
 
     # Display with error
-    with patch.object(widget._status_widget, "clear_output") as mock_clear:
+    with (
+        patch.object(
+            type(widget._status_html_widget),
+            "value",
+            new_callable=PropertyMock,
+        ) as mock_status_value,
+    ):
         widget._refresh_display("failed", error)
-        mock_clear.assert_called_once_with(wait=True)
+        mock_status_value.assert_called_once()
 
     # Check button visibility (should be visible for error states)
     assert widget._traceback_button.layout.display == "block"
@@ -182,7 +197,9 @@ async def test_widget_task_cancellation():
         mock_refresh.reset_mock()
 
         task.cancel()
-        await asyncio.sleep(0.1)  # Give time for callback to execute
+        with contextlib.suppress(asyncio.CancelledError):
+            await task  # Allow task to process cancellation
+        await asyncio.sleep(0.01)  # Give time for done_callback to execute
 
         # Should end with cancelled status
         mock_refresh.assert_called_with("cancelled")
@@ -410,14 +427,7 @@ async def test_widget_error_display_without_rich():
     with (
         patch("pipefunc._widgets.async_status_widget.has_rich", new=False),
         patch("builtins.print") as mock_print,
-        patch.object(widget._status_widget, "clear_output"),
     ):
         widget._refresh_display("failed", error)
-
-        # Check that the error was printed with the fallback method
-        mock_print.assert_any_call(error)
-
-        # Check button visibility (should be visible for error states)
-        assert widget._traceback_button.layout.display == "block"
-        assert widget._traceback_widget.layout.display == "none"
-        assert widget._exception is error
+        widget._toggle_traceback(None)
+        mock_print.assert_called_with(error)
