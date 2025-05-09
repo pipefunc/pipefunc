@@ -316,7 +316,7 @@ class AsyncTaskStatusWidget:
         elif len(tasks) == 1:
             task = tasks[0]
         else:
-            msg = "No awaitables to monitor, provide at least one"
+            msg = "No tasks to monitor, provide at least one"
             raise ValueError(msg)
 
         self._task = task
