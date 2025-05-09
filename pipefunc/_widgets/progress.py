@@ -123,16 +123,19 @@ class ProgressTracker:
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         now = time.monotonic()
+        return_early = False
         if not self.in_async and not force:
             assert self.task is None
             # If not in asyncio, `update_progress` is called after each iteration,
             # so, we throttle the updates to avoid excessive updates.
             if now - self.last_update_time < self._sync_update_interval:
-                return
+                return_early = True
 
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
+            if return_early and status.progress < 1.0:
+                return
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
