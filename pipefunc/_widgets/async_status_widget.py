@@ -66,7 +66,7 @@ _STYLES: dict[StatusType, StyleInfo] = {
 }
 
 
-class AsyncMapStatusWidget:
+class AsyncTaskStatusWidget:
     """Displays an interactive widget to monitor the status of an asyncio.Task.
 
     Features:

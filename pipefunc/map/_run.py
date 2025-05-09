@@ -23,7 +23,7 @@ from pipefunc._utils import (
     is_running_in_ipynb,
     prod,
 )
-from pipefunc._widgets.helpers import maybe_async_map_status_widget
+from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets.async_status_widget import AsyncMapStatusWidget
+    from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
     from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.cache import _CacheBase
 
@@ -206,7 +206,7 @@ class AsyncMap:
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
-    status_widget: AsyncMapStatusWidget | None
+    status_widget: AsyncTaskStatusWidget | None
 
     def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
@@ -379,7 +379,7 @@ def run_map_async(
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
-    status_widget = maybe_async_map_status_widget(task)
+    status_widget = maybe_async_task_status_widget(task)
     if is_running_in_ipynb():  # pragma: no cover
         if prep.progress is not None:
             prep.progress.display()
