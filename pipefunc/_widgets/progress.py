@@ -109,6 +109,7 @@ class ProgressTracker:
         self._initial_update_period: float = 30.0
         self._initial_max_update_interval: float = 1.0
         self.start_time: float = 0.0
+        self._bars_completed: int = 0
         if display:
             self.display()
         if self.task is not None:
