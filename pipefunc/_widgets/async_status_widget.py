@@ -299,15 +299,22 @@ class AsyncTaskStatusWidget:
         """Display the widget in the current cell."""
         IPython.display.display(self._main_widget)
 
-    def attach_task(self, task: asyncio.Task) -> None:
+    def attach_task(self, *tasks: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.
 
         Parameters
         ----------
-        task
-            The asyncio.Task to monitor
+        tasks
+            The asyncio.Task(s) to monitor
 
         """
+        if len(tasks) > 1:
+            task = asyncio.gather(*tasks)
+        elif len(tasks) == 1:
+            task = tasks[0]
+        else:
+            msg = "No tasks to monitor, provide at least one task"
+            raise ValueError(msg)
         self._task = task
         task.add_done_callback(self.update_status)
         self._refresh_display("running")
