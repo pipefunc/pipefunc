@@ -99,15 +99,9 @@ async def test_widget_error_display():
             "value",
             new_callable=PropertyMock,
         ) as mock_status_value,
-        patch.object(
-            type(widget._traceback_widget),
-            "value",
-            new_callable=PropertyMock,
-        ) as mock_traceback_value,
     ):
         widget._refresh_display("failed", error)
         mock_status_value.assert_called_once()
-        mock_traceback_value.assert_called_once()
 
     # Check button visibility (should be visible for error states)
     assert widget._traceback_button.layout.display == "block"
@@ -120,14 +114,7 @@ async def test_widget_toggle_traceback():
     """Test toggling traceback visibility."""
     widget = AsyncMapStatusWidget(display=False)
     error = ValueError("Test error message")
-
-    with patch.object(
-        type(widget._traceback_widget),
-        "value",
-        new_callable=PropertyMock,
-    ) as mock_tb_value:
-        widget._refresh_display("failed", error)
-        mock_tb_value.assert_called_once()
+    widget._refresh_display("failed", error)
 
     # Initially traceback is hidden
     assert widget._traceback_visible is False
@@ -439,26 +426,8 @@ async def test_widget_error_display_without_rich():
     # Patch has_rich to be False to simulate rich not being installed
     with (
         patch("pipefunc._widgets.async_status_widget.has_rich", new=False),
-        patch.object(
-            type(widget._status_html_widget),
-            "value",
-            new_callable=PropertyMock,
-        ) as mock_status_value,
-        patch.object(
-            type(widget._traceback_widget),
-            "value",
-            new_callable=PropertyMock,
-        ) as mock_traceback_value,
+        patch("builtins.print") as mock_print,
     ):
         widget._refresh_display("failed", error)
-
-        mock_status_value.assert_called_once()
-        mock_traceback_value.assert_called_once()
-        html_output = mock_traceback_value.call_args[0][0]
-        assert "<pre>" in html_output
-        assert "ValueError: Test error message" in html_output
-
-        # Check button visibility (should be visible for error states)
-        assert widget._traceback_button.layout.display == "block"
-        assert widget._traceback_widget.layout.display == "none"
-        assert widget._exception is error
+        widget._toggle_traceback(None)
+        mock_print.assert_called_with(error)
