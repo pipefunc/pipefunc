@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._widgets.helpers import maybe_async_map_status_widget
+from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.map._run import (
     AsyncMap,
     _maybe_executor,
@@ -187,7 +187,7 @@ def run_map_eager_async(
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
-    status_widget = maybe_async_map_status_widget(task)
+    status_widget = maybe_async_task_status_widget(task)
     return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
 
 

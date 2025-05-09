@@ -7,20 +7,20 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from pipefunc._widgets.async_status_widget import AsyncMapStatusWidget, StatusType
-from pipefunc._widgets.helpers import maybe_async_map_status_widget
+from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget, StatusType
+from pipefunc._widgets.helpers import maybe_async_task_status_widget
 
 
 @pytest.fixture
 def widget():
     """Create a widget instance for testing."""
-    return AsyncMapStatusWidget(display=False)
+    return AsyncTaskStatusWidget(display=False)
 
 
 @pytest.mark.asyncio
 async def test_widget_initialization():
     """Test widget initialization and basic properties."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     assert widget._status_html_widget is not None
     assert widget._main_widget is not None
     assert widget._traceback_widget is not None
@@ -37,7 +37,7 @@ async def test_widget_initialization():
 @pytest.mark.asyncio
 async def test_widget_status_styles():
     """Test that all status types have associated styles."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     statuses: list[StatusType] = ["initializing", "running", "done", "cancelled", "failed"]
 
     for status in statuses:
@@ -50,7 +50,7 @@ async def test_widget_status_styles():
 @pytest.mark.asyncio
 async def test_widget_elapsed_time():
     """Test elapsed time calculation."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     start_time = widget._start_time
     await asyncio.sleep(0.1)
     elapsed = widget._get_elapsed_time()
@@ -61,7 +61,7 @@ async def test_widget_elapsed_time():
 @pytest.mark.asyncio
 async def test_widget_display_refresh():
     """Test display refresh with different statuses."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Test with running status
     with patch.object(
@@ -89,7 +89,7 @@ async def test_widget_display_refresh():
 @pytest.mark.asyncio
 async def test_widget_error_display():
     """Test error display with traceback button."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     error = ValueError("Test error message")
 
     # Display with error
@@ -112,7 +112,7 @@ async def test_widget_error_display():
 @pytest.mark.asyncio
 async def test_widget_toggle_traceback():
     """Test toggling traceback visibility."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     error = ValueError("Test error message")
     widget._refresh_display("failed", error)
 
@@ -140,7 +140,7 @@ async def test_widget_toggle_traceback():
 @pytest.mark.asyncio
 async def test_widget_task_attachment():
     """Test attaching a task to the widget."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     async def test_task():
         await asyncio.sleep(0.1)
@@ -159,7 +159,7 @@ async def test_widget_task_attachment():
 @pytest.mark.asyncio
 async def test_widget_task_completion():
     """Test widget updates on task completion."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     async def test_task():
         await asyncio.sleep(0.1)
@@ -183,7 +183,7 @@ async def test_widget_task_completion():
 @pytest.mark.asyncio
 async def test_widget_task_cancellation():
     """Test widget updates on task cancellation."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     async def test_task():
         await asyncio.sleep(1)
@@ -208,7 +208,7 @@ async def test_widget_task_cancellation():
 @pytest.mark.asyncio
 async def test_widget_task_failure():
     """Test widget updates on task failure."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     msg = "Test error"
 
@@ -238,7 +238,7 @@ async def test_widget_task_failure():
 @pytest.mark.asyncio
 async def test_widget_periodic_updates():
     """Test periodic updates of the widget."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Create a simple task that runs for a bit
     async def test_task():
@@ -264,7 +264,7 @@ async def test_widget_periodic_updates():
 @pytest.mark.asyncio
 async def test_stop_periodic_updates():
     """Test stopping periodic updates."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Create a mock task
     mock_task = MagicMock()
@@ -282,7 +282,7 @@ async def test_stop_periodic_updates():
 @pytest.mark.asyncio
 async def test_widget_display_method():
     """Test the display method."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     with patch("IPython.display.display") as mock_display:
         widget.display()
@@ -292,7 +292,7 @@ async def test_widget_display_method():
 @pytest.mark.asyncio
 async def test_update_interval_adjustment():
     """Test update interval adjustment based on elapsed time."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Create a mock task that never finishes
     mock_task = MagicMock()
@@ -339,21 +339,21 @@ async def test_update_interval_adjustment():
 
 
 @pytest.mark.asyncio
-async def test_maybe_async_map_status_widget_no_ipynb():
-    """Test maybe_async_map_status_widget when not in ipynb."""
+async def test_maybe_async_task_status_widget_no_ipynb():
+    """Test maybe_async_task_status_widget when not in ipynb."""
     with patch("pipefunc._utils.is_running_in_ipynb", return_value=False):
 
         async def test_task():
             return "done"
 
         task = asyncio.create_task(test_task())
-        widget = maybe_async_map_status_widget(task)
+        widget = maybe_async_task_status_widget(task)
         assert widget is None
 
 
 @pytest.mark.asyncio
-async def test_maybe_async_map_status_widget_with_ipywidgets():
-    """Test maybe_async_map_status_widget when all requirements are met."""
+async def test_maybe_async_task_status_widget_with_ipywidgets():
+    """Test maybe_async_task_status_widget when all requirements are met."""
     with (
         patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True),
     ):
@@ -362,15 +362,15 @@ async def test_maybe_async_map_status_widget_with_ipywidgets():
             return "done"
 
         task = asyncio.create_task(test_task())
-        widget = maybe_async_map_status_widget(task)
+        widget = maybe_async_task_status_widget(task)
         assert widget is not None
-        assert isinstance(widget, AsyncMapStatusWidget)
+        assert isinstance(widget, AsyncTaskStatusWidget)
 
 
 @pytest.mark.asyncio
 async def test_start_periodic_updates_error_handling():
     """Test error handling in _start_periodic_updates."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Test RuntimeError handling
     with (
@@ -394,7 +394,7 @@ async def test_start_periodic_updates_error_handling():
 @pytest.mark.asyncio
 async def test_update_periodically_cancellation():
     """Test that CancelledError is properly handled in _update_periodically."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
 
     # Create a long-running mock task
     mock_task = MagicMock()
@@ -420,7 +420,7 @@ async def test_update_periodically_cancellation():
 @pytest.mark.asyncio
 async def test_widget_error_display_without_rich():
     """Test error display when rich is not installed."""
-    widget = AsyncMapStatusWidget(display=False)
+    widget = AsyncTaskStatusWidget(display=False)
     error = ValueError("Test error message")
 
     # Patch has_rich to be False to simulate rich not being installed
