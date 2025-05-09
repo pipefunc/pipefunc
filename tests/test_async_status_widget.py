@@ -453,5 +453,5 @@ async def test_multiple_tasks():
 async def test_multiple_tasks_no_tasks():
     """Test that an error is raised if no tasks are provided."""
     widget = AsyncTaskStatusWidget(display=False)
-    with pytest.raises(ValueError, match="No tasks to monitor, provide at least one task"):
+    with pytest.raises(ValueError, match="No tasks to monitor, provide at least one"):
         widget.attach_task()
