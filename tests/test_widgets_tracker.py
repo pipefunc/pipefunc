@@ -1,25 +1,27 @@
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from concurrent.futures import Future
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from ipywidgets import HTML, Button, FloatProgress, VBox
 
 from pipefunc._widgets.progress import ProgressTracker
+from pipefunc.map._progress import Status
 
 
 @pytest.fixture
 def mock_status():
-    return MagicMock(
-        progress=0.5,
+    return Status(
+        n_total=100,
+        n_in_progress=50,
         n_completed=50,
-        n_left=50,
+        n_failed=0,
         start_time=100,
         end_time=None,
-        elapsed_time=MagicMock(return_value=10),
     )
 
 
 @pytest.fixture
-def mock_progress_dict(mock_status):
+def mock_progress_dict(mock_status) -> dict[str, Status]:
     return {"test": mock_status}
 
 
@@ -89,7 +91,7 @@ async def test_progress_tracker_auto_update_progress(mock_progress_dict, mock_ta
 async def test_progress_tracker_all_completed(mock_progress_dict, mock_task):
     progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
     assert not progress._all_completed()
-    mock_progress_dict["test"].progress = 1.0
+    mock_progress_dict["test"].mark_complete(n=50)
     assert progress._all_completed()
 
 
@@ -143,3 +145,14 @@ async def test_progress_tracker_display(mock_progress_dict, mock_task):
         progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
         progress.display()
         assert mock_display.call_count == 2  # display on HTML and VBox
+
+
+@pytest.mark.asyncio
+async def test_progress_tracker_failed(mock_progress_dict, mock_task):
+    progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
+    assert not progress._all_completed()
+    mock_progress_dict["test"].mark_complete(n=49)
+    future = Future()
+    future.set_exception(Exception("Failed"))
+    mock_progress_dict["test"].mark_complete(n=1, future=future)
+    assert progress._all_completed()
