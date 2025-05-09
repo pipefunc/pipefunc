@@ -137,6 +137,7 @@ class AsyncMapStatusWidget:
 
         if self._traceback_visible:
             # Show traceback
+            self._show_error_traceback()
             self._traceback_button.description = "Hide traceback"
             self._traceback_button.button_style = "danger"
             self._traceback_button.icon = "close"
@@ -200,15 +201,16 @@ class AsyncMapStatusWidget:
 
         # Handle error display if applicable
         if status == "failed" and error is not None:
-            self._show_error_traceback(error)
+            self._exception = error
+            self._traceback_button.layout.display = "block"
         else:
             self._traceback_button.layout.display = "none"
             self._traceback_widget.layout.display = "none"
 
-    def _show_error_traceback(self, error: Exception) -> None:
+    def _show_error_traceback(self) -> None:
         """Display error traceback in the traceback widget."""
-        self._exception = error
-        self._traceback_button.layout.display = "block"
+        error = self._exception
+        assert error is not None
         with self._traceback_widget:
             self._traceback_widget.clear_output(wait=True)
             if has_rich:
