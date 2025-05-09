@@ -23,7 +23,7 @@ async def test_widget_initialization():
     widget = AsyncMapStatusWidget(display=False)
     assert widget._status_html_widget is not None
     assert widget._main_widget is not None
-    assert widget._traceback_html_widget is not None
+    assert widget._traceback_widget is not None
     assert widget._traceback_button is not None
     assert widget._start_time <= time.monotonic()
     assert widget._update_interval == 0.1
@@ -31,7 +31,7 @@ async def test_widget_initialization():
     assert widget._update_timer is None
     assert widget._traceback_visible is False
     assert widget._traceback_button.layout.display == "none"
-    assert widget._traceback_html_widget.layout.display == "none"
+    assert widget._traceback_widget.layout.display == "none"
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_widget_display_refresh():
 
     # Check button visibility (should be hidden for non-error states)
     assert widget._traceback_button.layout.display == "none"
-    assert widget._traceback_html_widget.layout.display == "none"
+    assert widget._traceback_widget.layout.display == "none"
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_widget_error_display():
             new_callable=PropertyMock,
         ) as mock_status_value,
         patch.object(
-            type(widget._traceback_html_widget),
+            type(widget._traceback_widget),
             "value",
             new_callable=PropertyMock,
         ) as mock_traceback_value,
@@ -111,7 +111,7 @@ async def test_widget_error_display():
 
     # Check button visibility (should be visible for error states)
     assert widget._traceback_button.layout.display == "block"
-    assert widget._traceback_html_widget.layout.display == "none"  # Traceback area initially hidden
+    assert widget._traceback_widget.layout.display == "none"  # Traceback area initially hidden
     assert widget._exception is error
 
 
@@ -122,7 +122,7 @@ async def test_widget_toggle_traceback():
     error = ValueError("Test error message")
 
     with patch.object(
-        type(widget._traceback_html_widget),
+        type(widget._traceback_widget),
         "value",
         new_callable=PropertyMock,
     ) as mock_tb_value:
@@ -131,12 +131,12 @@ async def test_widget_toggle_traceback():
 
     # Initially traceback is hidden
     assert widget._traceback_visible is False
-    assert widget._traceback_html_widget.layout.display == "none"
+    assert widget._traceback_widget.layout.display == "none"
 
     # Toggle to show
     widget._toggle_traceback({})
     assert widget._traceback_visible is True
-    assert widget._traceback_html_widget.layout.display == "block"
+    assert widget._traceback_widget.layout.display == "block"
     assert widget._traceback_button.description == "Hide traceback"
     assert widget._traceback_button.button_style == "danger"
     assert widget._traceback_button.icon == "close"
@@ -144,7 +144,7 @@ async def test_widget_toggle_traceback():
     # Toggle to hide
     widget._toggle_traceback({})
     assert widget._traceback_visible is False
-    assert widget._traceback_html_widget.layout.display == "none"
+    assert widget._traceback_widget.layout.display == "none"
     assert widget._traceback_button.description == "Show traceback"
     assert widget._traceback_button.button_style == "info"
     assert widget._traceback_button.icon == "search"
@@ -445,7 +445,7 @@ async def test_widget_error_display_without_rich():
             new_callable=PropertyMock,
         ) as mock_status_value,
         patch.object(
-            type(widget._traceback_html_widget),
+            type(widget._traceback_widget),
             "value",
             new_callable=PropertyMock,
         ) as mock_traceback_value,
@@ -460,7 +460,5 @@ async def test_widget_error_display_without_rich():
 
         # Check button visibility (should be visible for error states)
         assert widget._traceback_button.layout.display == "block"
-        assert (
-            widget._traceback_html_widget.layout.display == "none"
-        )  # Traceback area initially hidden
+        assert widget._traceback_widget.layout.display == "none"  # Traceback area initially hidden
         assert widget._exception is error
