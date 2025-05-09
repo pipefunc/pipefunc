@@ -309,7 +309,7 @@ class AsyncTaskStatusWidget:
             If multiple are provided, they will be gathered.
 
         """
-        task: asyncio.Future
+        assert all(isinstance(task, asyncio.Future) for task in tasks)
 
         if len(tasks) > 1:
             task = asyncio.gather(*tasks)
