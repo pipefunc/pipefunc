@@ -209,8 +209,7 @@ class AsyncMapStatusWidget:
 
     def _print_traceback(self) -> None:
         """Display error traceback in the traceback widget."""
-        error = self._exception
-        assert error is not None
+        assert self._exception is not None
         with self._traceback_widget:
             self._traceback_widget.clear_output(wait=True)
             if has_rich:
@@ -226,15 +225,15 @@ class AsyncMapStatusWidget:
                     force_jupyter=True,  # Required for proper rendering in Jupyter
                 )
                 tb = Traceback.from_exception(
-                    type(error),
-                    error,
-                    error.__traceback__,
+                    type(self._exception),
+                    self._exception,
+                    self._exception.__traceback__,
                     width=100,
                     show_locals=False,
                 )
                 console.print(tb)
             else:
-                print(error)
+                print(self._exception)
 
     def _adjust_update_interval(self, elapsed: float) -> None:
         """Adjust the update interval based on elapsed time."""
