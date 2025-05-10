@@ -1496,6 +1496,12 @@ class ErrorSnapshot:
 
         display(HTML(f"<pre>{self}</pre>"))
 
+    def __getstate__(self) -> bytes:
+        return cloudpickle.dumps(self.__dict__)
+
+    def __setstate__(self, state: bytes) -> None:
+        self.__dict__.update(cloudpickle.loads(state))
+
 
 def _validate_identifier(name: str, value: Any) -> None:
     if "." in value:
