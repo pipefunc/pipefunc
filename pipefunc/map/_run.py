@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from adaptive_scheduler import MultiRunManager
 
     from pipefunc import PipeFunc, Pipeline
+    from pipefunc._pipefunc import ErrorSnapshot
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
     from pipefunc._widgets.progress import ProgressTracker
@@ -823,8 +824,19 @@ def _submit(
 def _process_chunk(
     chunk: list[int],
     process_index: functools.partial[tuple[Any, ...]],
-) -> list[Any]:
-    return list(map(process_index, chunk))
+) -> list[Any | ErrorSnapshot]:
+    from pipefunc._pipefunc import ErrorSnapshot, PipeFunc
+
+    results: list[Any | ErrorSnapshot] = []
+    for i in chunk:
+        try:
+            results.append(process_index(i))
+        except Exception:  # noqa: BLE001, PERF203
+            func = process_index.keywords["func"]
+            assert isinstance(func, PipeFunc)
+            assert isinstance(func.error_snapshot, ErrorSnapshot)
+            results.append(func.error_snapshot)
+    return results
 
 
 def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ...]]:
@@ -1179,18 +1191,26 @@ def _output_from_mapspec_task(
     run_info: RunInfo,
     return_results: bool,  # noqa: FBT001
 ) -> tuple[np.ndarray, ...] | None:
+    from pipefunc._pipefunc import ErrorSnapshot
+
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
         for name in at_least_tuple(func.output_name)
     )
-
+    errors = []
     first = True
     for index, outputs in zip(args.missing, outputs_list):
+        if isinstance(outputs, ErrorSnapshot):
+            errors.append(outputs)
+            continue
         if first:
             shape = _maybe_resolve_shapes_from_map(func, store, args, outputs, return_results)
             first = False
         _update_result_array(args.result_arrays, index, outputs, shape, args.mask, func)
         _update_array(func, arrays, shape, args.mask, index, outputs, in_post_process=True)
+
+    if errors:
+        raise errors[0].exception
 
     first = True
     for index in args.existing:
