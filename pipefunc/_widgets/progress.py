@@ -77,10 +77,18 @@ def _get_scope_hue(output_name: OUTPUT_TYPE) -> int | None:
     return hash_value % 360
 
 
-def _get_scope_border_color(hue: int | None) -> str:
-    if hue is None:
-        return "#999999"
-    return f"hsl({hue}, 70%, 70%)"
+def _scope_border_color(hue: int | None) -> str:
+    return f"hsl({hue}, 70%, 70%)" if hue is not None else "#999999"
+
+
+def _scope_background_color_css(hue: int) -> str:
+    return textwrap.dedent(
+        f"""
+        .scope-bg-{hue} {{
+            background-color: hsla({hue}, 70%, 95%, 0.75);
+        }}
+        """,
+    )
 
 
 class ProgressTracker:
@@ -316,7 +324,7 @@ class ProgressTracker:
                 layout=widgets.Layout(justify_content="space-between"),
             )
             hue = _get_scope_hue(name)
-            border_color = _get_scope_border_color(hue)
+            border_color = _scope_border_color(hue)
             border = f"1px solid {border_color}"
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
@@ -409,13 +417,7 @@ class ProgressTracker:
         )
         hues = {hue for name in self.progress_dict if (hue := _get_scope_hue(name)) is not None}
         for hue in hues:
-            style += textwrap.dedent(
-                f"""
-                .scope-bg-{hue} {{
-                    background-color: hsla({hue}, 70%, 95%, 0.75);
-                }}
-                """,
-            )
+            style += _scope_background_color_css(hue)
         style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
         IPython.display.display(self._widgets())
