@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     from pipefunc.map._progress import Status
 
 
+_IPYWIDGETS_MAJOR_VERSION = int(widgets.__version__.split(".")[0])
+
+
 def _span(class_name: str, value: str) -> str:
     return f'<span class="{class_name}">{value}</span>'
 
@@ -32,13 +35,26 @@ def _create_button(
 
 
 def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
+    description = ", ".join(at_least_tuple(name))
+    styles = [
+        "direction: rtl",  # Reverses text direction so ellipsis appears at the beginning
+        "display: inline-block",  # Allows block-like behavior within the inline flow
+        "width: 100%",  # Ensures span takes full available width
+        "white-space: nowrap",  # Prevents text from wrapping to a new line
+        "overflow: hidden",  # Hides text that extends beyond the container
+        "text-overflow: ellipsis",  # Shows "..." when text is truncated
+    ]
+    style = "; ".join(styles)
+    tooltip = {"tooltip" if _IPYWIDGETS_MAJOR_VERSION >= 8 else "description_tooltip": description}  # noqa: PLR2004
     return widgets.FloatProgress(
         value=progress,
         max=1.0,
-        description=", ".join(at_least_tuple(name)),
+        description=f"<span style='{style}'>{description}</span>",
+        description_allow_html=True,
         layout={"width": "95%"},
         bar_style="info",
         style={"description_width": "150px"},
+        **tooltip,
     )
 
 
