@@ -134,7 +134,7 @@ async def test_progress_tracker_cancel_calculation(mock_progress_dict, mock_task
 @pytest.mark.asyncio
 async def test_progress_tracker_widgets(mock_progress_dict, mock_task):
     progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
-    widgets = progress._widgets()
+    widgets = progress._widgets
     assert isinstance(widgets, VBox)
     assert len(widgets.children) > 0
 
@@ -169,7 +169,7 @@ async def test_progress_tracker_color_by_scope(mock_task):
     }
     progress = ProgressTracker(progress_dict, mock_task, display=False)
 
-    widgets = progress._widgets()
+    widgets = progress._widgets
     assert len(widgets.children) == len(progress_dict) + 2
     borders = {child.layout.border for child in widgets.children[: len(progress_dict)]}
     assert len(borders) == 3  # 3 different scopes, foo, bar, None
