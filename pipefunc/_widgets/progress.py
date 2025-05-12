@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import textwrap
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -63,17 +64,31 @@ def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=_span(class_name, initial_value))
 
 
-def _get_scope_color(output_name: OUTPUT_TYPE) -> str:
-    """Generate a consistent color based on the scope of the name."""
+def _get_scope_hue(output_name: OUTPUT_TYPE) -> int | None:
+    """Extract scope and calculate a consistent hue value from it."""
     output_name = at_least_tuple(output_name)
     all_have_scope = all("." in name for name in output_name)
     if not all_have_scope:
-        return "#999999"
+        return None
+
     scope = output_name[0].split(".")[0]
     # Convert string to int (0-255)
     hash_value = int(hashlib.md5(scope.encode()).hexdigest(), 16)  # noqa: S324
-    hue = hash_value % 360
-    return f"hsl({hue}, 70%, 70%)"
+    return hash_value % 360
+
+
+def _scope_border_color(hue: int | None) -> str:
+    return f"hsl({hue}, 70%, 70%)" if hue is not None else "#999999"
+
+
+def _scope_background_color_css(hue: int) -> str:
+    return textwrap.dedent(
+        f"""
+        .scope-bg-{hue} {{
+            background-color: hsla({hue}, 70%, 95%, 0.75);
+        }}
+        """,
+    )
 
 
 class ProgressTracker:
@@ -308,13 +323,16 @@ class ProgressTracker:
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
             )
-            border_color = _get_scope_color(name)
+            hue = _get_scope_hue(name)
+            border_color = _scope_border_color(hue)
             border = f"1px solid {border_color}"
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(border=border, margin="2px 0", padding="2px"),
             )
             container.add_class("container")
+            if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
+                container.add_class(f"scope-bg-{hue}")
             progress_containers.append(container)
 
         buttons = self.buttons
@@ -330,8 +348,9 @@ class ProgressTracker:
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
-        style = """
-        <style>
+        style = textwrap.dedent(
+            """
+            <style>
             .progress {
                 border-radius: 5px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -365,10 +384,6 @@ class ProgressTracker:
                     background-position: 40px 0;
                 }
             }
-            .container {
-                border-radius: 10px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            }
             .percent-label {
                 margin-left: 10px;
                 font-weight: bold;
@@ -394,7 +409,15 @@ class ProgressTracker:
             .widget-button {
                 margin-top: 5px;
             }
-        </style>
-        """
+            .container {
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            """,
+        )
+        hues = {hue for name in self.progress_dict if (hue := _get_scope_hue(name)) is not None}
+        for hue in hues:
+            style += _scope_background_color_css(hue)
+        style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
         IPython.display.display(self._widgets())
