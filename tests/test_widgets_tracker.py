@@ -172,4 +172,4 @@ async def test_progress_tracker_color_by_scope(mock_task):
     widgets = progress._widgets()
     assert len(widgets.children) == len(progress_dict) + 2
     borders = {child.layout.border for child in widgets.children[: len(progress_dict)]}
-    assert len(borders) == 3
+    assert len(borders) == 3  # 3 different scopes, foo, bar, None
