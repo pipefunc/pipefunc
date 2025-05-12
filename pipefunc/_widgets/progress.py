@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import textwrap
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -339,8 +340,9 @@ class ProgressTracker:
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
-        style = """
-        <style>
+        style = textwrap.dedent(
+            """
+            <style>
             .progress {
                 border-radius: 5px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -374,23 +376,6 @@ class ProgressTracker:
                     background-position: 40px 0;
                 }
             }
-            .container {
-                border-radius: 10px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            }
-        """
-
-        # Set background color for each scope
-        hues = {_get_scope_hue(name) for name in self.progress_dict}
-        for hue in hues:
-            if hue is not None:
-                style += f"""
-                .scope-bg-{hue} {{
-                    background-color: hsla({hue}, 70%, 95%, 0.75);
-                }}
-            """
-
-        style += """
             .percent-label {
                 margin-left: 10px;
                 font-weight: bold;
@@ -416,7 +401,24 @@ class ProgressTracker:
             .widget-button {
                 margin-top: 5px;
             }
-        </style>
-        """
+            .container {
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            """,
+        )
+
+        # Set background color for each scope
+        hues = {hue for name in self.progress_dict if (hue := _get_scope_hue(name)) is not None}
+        for hue in hues:
+            style += textwrap.dedent(
+                f"""
+                .scope-bg-{hue} {{
+                    background-color: hsla({hue}, 70%, 95%, 0.75);
+                }}
+                """,
+            )
+
+        style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
         IPython.display.display(self._widgets())
