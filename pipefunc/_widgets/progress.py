@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import textwrap
 import time
@@ -116,6 +117,7 @@ class ProgressTracker:
         self._first_auto_update_interval: float = 1.0
         self._sync_update_interval: float = 0.01
         self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
+        self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
         self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
         self.buttons: dict[OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button(
@@ -188,6 +190,8 @@ class ProgressTracker:
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
                 self._marked_completed.add(name)
+                if status.progress == 1.0:  # Newly completed
+                    self._progress_vboxes[name].add_class("pulse-animation")
             else:
                 progress_bar.remove_class("completed-progress")
                 progress_bar.add_class("animated-progress")
@@ -314,9 +318,9 @@ class ProgressTracker:
                 progress_bar.add_class("completed-progress")
         self.auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
+    @functools.cached_property
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
-        progress_containers = []
         for name in self.progress_dict:
             labels = self.labels[name]
             labels_box = widgets.HBox(
@@ -330,21 +334,19 @@ class ProgressTracker:
                 [self.progress_bars[name], labels_box],
                 layout=widgets.Layout(border=border, margin="2px 4px", padding="2px"),
             )
+            self._progress_vboxes[name] = container
             container.add_class("container")
             if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
                 container.add_class(f"scope-bg-{hue}")
-            progress_containers.append(container)
 
         buttons = self.buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
             layout=widgets.Layout(justify_content="center"),
         )
-        parts = (
-            [*progress_containers, button_box, self.auto_update_interval_label]
-            if self.task
-            else progress_containers
-        )
+        parts = list(self._progress_vboxes.values())
+        if self.task:
+            parts.extend([button_box, self.auto_update_interval_label])
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
@@ -384,6 +386,29 @@ class ProgressTracker:
                     background-position: 40px 0;
                 }
             }
+
+            /* Pulse animation for completed tasks */
+            @keyframes balanced-pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4);
+                    border-color: rgba(46, 204, 113, 0.8);
+                    transform: scale(1);
+                }
+                40% {
+                    box-shadow: 0 0 0 5px rgba(46, 204, 113, 0.2);
+                    border-color: rgba(46, 204, 113, 0.9);
+                    transform: scale(1.005);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+                    border-color: inherit;
+                    transform: scale(1);
+                }
+            }
+            .pulse-animation {
+                animation: balanced-pulse 1.5s ease-out 1;
+            }
+
             .percent-label {
                 margin-left: 10px;
                 font-weight: bold;
@@ -428,4 +453,4 @@ class ProgressTracker:
             style += _scope_background_color_css(hue)
         style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
-        IPython.display.display(self._widgets())
+        IPython.display.display(self._widgets)
