@@ -156,3 +156,20 @@ async def test_progress_tracker_failed(mock_progress_dict, mock_task):
     future.set_exception(Exception("Failed"))
     mock_progress_dict["test"].mark_complete(n=1, future=future)
     assert progress._all_completed()
+
+
+@pytest.mark.asyncio
+async def test_progress_tracker_color_by_scope(mock_task):
+    progress_dict = {
+        "foo.a": Status(n_total=100),
+        "foo.b": Status(n_total=100),
+        "bar.a": Status(n_total=100),
+        "bar.b": Status(n_total=100),
+        "c": Status(n_total=100),
+    }
+    progress = ProgressTracker(progress_dict, mock_task, display=False)
+
+    widgets = progress._widgets()
+    assert len(widgets.children) == len(progress_dict) + 2
+    borders = {child.layout.border for child in widgets.children[: len(progress_dict)]}
+    assert len(borders) == 3  # 3 different scopes, foo, bar, None

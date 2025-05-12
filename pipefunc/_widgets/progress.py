@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +61,19 @@ def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatPro
 
 def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=_span(class_name, initial_value))
+
+
+def _get_scope_color(output_name: OUTPUT_TYPE) -> str:
+    """Generate a consistent color based on the scope of the name."""
+    output_name = at_least_tuple(output_name)
+    all_have_scope = all("." in name for name in output_name)
+    if not all_have_scope:
+        return "#999999"
+    scope = output_name[0].split(".")[0]
+    # Convert string to int (0-255)
+    hash_value = int(hashlib.md5(scope.encode()).hexdigest(), 16)  # noqa: S324
+    hue = hash_value % 360
+    return f"hsl({hue}, 70%, 70%)"
 
 
 class ProgressTracker:
@@ -294,9 +308,11 @@ class ProgressTracker:
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
             )
+            border_color = _get_scope_color(name)
+            border = f"1px solid {border_color}"
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(border="1px solid #999999", margin="2px 0", padding="2px"),
+                layout=widgets.Layout(border=border, margin="2px 0", padding="2px"),
             )
             container.add_class("container")
             progress_containers.append(container)
