@@ -35,7 +35,7 @@ class Prepared(NamedTuple):
     outputs: ResultDict
     parallel: bool
     executor: dict[OUTPUT_TYPE, Executor] | None
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None
     progress: ProgressTracker | None
 
 
@@ -48,7 +48,7 @@ def prepare_run(
     output_names: set[OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     storage: str | dict[OUTPUT_TYPE, str],
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
@@ -133,8 +133,8 @@ def _expand_output_name_in_storage(
 
 def _expand_output_name_in_chunksizes(
     pipeline: Pipeline,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-) -> int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None:
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+) -> int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None:
     if isinstance(chunksizes, dict):
         return _expand_output_name_in_dict(pipeline, chunksizes, "Chunksize")
     return chunksizes

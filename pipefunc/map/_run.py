@@ -66,7 +66,7 @@ def run_map(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -242,7 +242,7 @@ def run_map_async(
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     storage: StorageType = "file_array",
     persist_memory: bool = True,
     cleanup: bool = True,
@@ -840,23 +840,30 @@ def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ..
 
 def _chunksize_for_func(
     func: PipeFunc,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     num_iterations: int,
     executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
-    if chunksizes is not None:
-        chunksize = chunksizes.get(func.output_name, None)
-        if chunksize is None:
-            chunksize = chunksizes.get("", 1)
-        if callable(chunksize):
-            chunksize = chunksize(num_iterations)
-        if not isinstance(chunksize, int) or chunksize <= 0:
-            msg = f"Invalid chunksize {chunksize} for {func.output_name}"
-            raise ValueError(msg)
-        return chunksize
-    return _get_optimal_chunk_size(num_iterations, executor)
+    if chunksizes is None:
+        return _get_optimal_chunk_size(num_iterations, executor)
+    chunksize = None
+    if func.output_name in chunksizes:
+        chunksize = chunksizes[func.output_name]
+    elif "" in chunksizes:
+        chunksize = chunksizes[""]
+
+    if callable(chunksize):
+        chunksize = chunksize(num_iterations)
+
+    if chunksize is None:
+        chunksize = _get_optimal_chunk_size(num_iterations, executor)
+
+    if not isinstance(chunksize, int) or chunksize <= 0:
+        msg = f"Invalid chunksize {chunksize} for {func.output_name}"
+        raise ValueError(msg)
+    return chunksize
 
 
 def _get_optimal_chunk_size(
@@ -896,7 +903,7 @@ def _maybe_parallel_map(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -997,7 +1004,7 @@ def _run_and_process_generation(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
@@ -1024,7 +1031,7 @@ async def _run_and_process_generation_async(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
@@ -1082,7 +1089,7 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     progress: ProgressTracker | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
@@ -1150,7 +1157,7 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
