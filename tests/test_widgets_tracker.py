@@ -173,3 +173,6 @@ async def test_progress_tracker_color_by_scope(mock_task):
     assert len(widgets.children) == len(progress_dict) + 2
     borders = {child.layout.border for child in widgets.children[: len(progress_dict)]}
     assert len(borders) == 3  # 3 different scopes, foo, bar, None
+    with patch("pipefunc._widgets.progress.IPython.display.display") as mock_display:
+        progress.display()
+        assert mock_display.call_count == 2
