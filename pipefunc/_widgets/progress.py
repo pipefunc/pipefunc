@@ -63,16 +63,25 @@ def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=_span(class_name, initial_value))
 
 
-def _get_scope_color(output_name: OUTPUT_TYPE) -> str:
-    """Generate a consistent color based on the scope of the name."""
+def _get_scope_hue(output_name: OUTPUT_TYPE) -> tuple[bool, int]:
+    """Extract scope and calculate a consistent hue value from it."""
     output_name = at_least_tuple(output_name)
     all_have_scope = all("." in name for name in output_name)
     if not all_have_scope:
-        return "#999999"
+        return False, 0
+
     scope = output_name[0].split(".")[0]
     # Convert string to int (0-255)
     hash_value = int(hashlib.md5(scope.encode()).hexdigest(), 16)  # noqa: S324
     hue = hash_value % 360
+    return True, hue
+
+
+def _get_scope_color(output_name: OUTPUT_TYPE) -> str:
+    """Generate a consistent color based on the scope of the name."""
+    has_scope, hue = _get_scope_hue(output_name)
+    if not has_scope:
+        return "#999999"
     return f"hsl({hue}, 70%, 70%)"
 
 
@@ -315,6 +324,13 @@ class ProgressTracker:
                 layout=widgets.Layout(border=border, margin="2px 0", padding="2px"),
             )
             container.add_class("container")
+
+            # Create a unique class name based on scope
+            has_scope, hue = _get_scope_hue(name)
+            if has_scope:
+                scope_class = f"scope-bg-{hue}"
+                container.add_class(scope_class)
+
             progress_containers.append(container)
 
         buttons = self.buttons
@@ -369,6 +385,19 @@ class ProgressTracker:
                 border-radius: 10px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             }
+        """
+
+        # Generate dynamic CSS for all possible scope colors (0-359 hues)
+        for name in self.progress_dict:
+            has_scope, hue = _get_scope_hue(name)
+            if has_scope:
+                style += f"""
+                .scope-bg-{hue} {{
+                    background-color: hsla({hue}, 70%, 95%, 0.6);
+                }}
+            """
+
+        style += """
             .percent-label {
                 margin-left: 10px;
                 font-weight: bold;
