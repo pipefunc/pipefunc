@@ -328,7 +328,7 @@ class ProgressTracker:
             border = f"1px solid {border_color}"
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(border=border, margin="2px 0", padding="2px"),
+                layout=widgets.Layout(border=border, margin="2px 4px", padding="2px"),
             )
             container.add_class("container")
             if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
@@ -412,6 +412,14 @@ class ProgressTracker:
             .container {
                 border-radius: 10px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s ease-in-out;
+                position: relative;
+                top: 0;
+            }
+            .container:hover {
+                transform: scale(1.005);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+                top: -2px;
             }
             """,
         )
