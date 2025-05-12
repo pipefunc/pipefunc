@@ -407,8 +407,6 @@ class ProgressTracker:
             }
             """,
         )
-
-        # Set background color for each scope
         hues = {hue for name in self.progress_dict if (hue := _get_scope_hue(name)) is not None}
         for hue in hues:
             style += textwrap.dedent(
@@ -418,7 +416,6 @@ class ProgressTracker:
                 }}
                 """,
             )
-
         style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
         IPython.display.display(self._widgets())
