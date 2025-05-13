@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import json
-import os
 import shutil
 import tempfile
 import warnings
@@ -72,10 +71,10 @@ class RunInfo:
         inputs: dict[str, Any],
         internal_shapes: UserShapeDict | None = None,
         *,
-        storage: str | dict[OUTPUT_TYPE, str],
+        storage: str | dict[OUTPUT_TYPE, str] | None,
         cleanup: bool = True,
     ) -> RunInfo:
-        run_folder = _maybe_run_folder(run_folder, storage)
+        storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
         if run_folder is not None:
             if cleanup:
@@ -268,16 +267,23 @@ def _requires_serialization(storage: str | dict[OUTPUT_TYPE, str]) -> bool:
     return any(get_storage_class(s).requires_serialization for s in storage.values())
 
 
-def _maybe_run_folder(
+def _resolve_storage_and_run_folder(
     run_folder: str | Path | None,
-    storage: str | dict[OUTPUT_TYPE, str],
-) -> Path | None:
-    if run_folder is None and _requires_serialization(storage):
-        run_folder = tempfile.mkdtemp()
-        if os.getenv("READTHEDOCS") is None:
-            msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{run_folder}`."
-            warnings.warn(msg, stacklevel=2)
-    return Path(run_folder) if run_folder is not None else None
+    storage: str | dict[OUTPUT_TYPE, str] | None,
+) -> tuple[str | dict[OUTPUT_TYPE, str], Path | None]:
+    if run_folder is not None:
+        return storage or "file_array", Path(run_folder)
+
+    if storage is None:
+        return "dict", None
+
+    if _requires_serialization(storage):
+        temp_folder = Path(tempfile.mkdtemp())
+        msg = f"{storage} storage requires a `run_folder`. Using temporary folder: `{temp_folder}`."
+        warnings.warn(msg, stacklevel=2)
+        return storage, temp_folder
+
+    return storage, None
 
 
 def _construct_internal_shapes(
@@ -298,9 +304,8 @@ def _construct_internal_shapes(
     return internal_shapes
 
 
-def _cleanup_run_folder(run_folder: str | Path) -> None:
+def _cleanup_run_folder(run_folder: Path) -> None:
     """Remove the run folder and its contents."""
-    run_folder = Path(run_folder)
     shutil.rmtree(run_folder, ignore_errors=True)
 
 
