@@ -36,6 +36,8 @@ if TYPE_CHECKING:
     import ipywidgets
     import matplotlib.pyplot as plt
 
+    from pipefunc._pipeline._types import OUTPUT_TYPE
+
 _empty = inspect.Parameter.empty
 MAX_LABEL_LENGTH = 20
 
@@ -180,6 +182,7 @@ def _generate_node_label(
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
     include_full_mapspec: bool,  # noqa: FBT001
+    extra_lines: dict[OUTPUT_TYPE, str] | None = None,
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
@@ -239,9 +242,14 @@ def _generate_node_label(
             default_value = defaults.get(output, _empty) if defaults else _empty
             formatted_label = _format_type_and_default(name, type_string, default_value)
             label += f"<TR><TD>{formatted_label}</TD></TR>"
+
         if include_full_mapspec and node.mapspec:
             s = html.escape(str(node.mapspec))
             label += f'<HR/><TR><TD><FONT FACE="Courier New">{s}</FONT></TD></TR>'
+
+        if extra_lines and output in extra_lines:
+            extra_text = extra_lines[output]
+            label += f"<HR/><TR><TD>{extra_text}</TD></TR>"
 
         label += "</TABLE>"
     else:  # pragma: no cover
@@ -309,6 +317,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
     graphviz_kwargs: dict[str, Any] | None = None,
     show_legend: bool = True,
     include_full_mapspec: bool = False,
+    extra_lines: dict[OUTPUT_TYPE, str] | None = None,
     return_type: Literal["graphviz", "html"] | None = None,
 ) -> graphviz.Digraph | IPython.display.HTML:
     """Visualize the pipeline as a directed graph using Graphviz.
@@ -344,6 +353,9 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
         Whether to show the legend in the graph visualization.
     include_full_mapspec
         Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
+    extra_lines
+        Dictionary mapping output names to additional text that will be displayed as extra
+        lines in the node labels.
     return_type
         The format to return the visualization in.
         If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -475,6 +487,7 @@ def visualize_graphviz(  # noqa: PLR0912, C901, PLR0915
                 defaults,
                 arg_mapspec_before_grouping,
                 include_full_mapspec,
+                extra_lines,
             )
             attribs = dict(node_defaults, label=f"<{label}>", **config)
             digraph.node(str(node), **attribs)
@@ -581,6 +594,7 @@ def visualize_graphviz_widget(
     *,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
+    extra_lines: dict[OUTPUT_TYPE, str] | None = None,
 ) -> ipywidgets.VBox:
     """Create an interactive visualization of the pipeline as a directed graph.
 
@@ -612,6 +626,9 @@ def visualize_graphviz_widget(
         - 'RL': Right to left
     graphviz_kwargs
         Graphviz-specific keyword arguments for customizing the graph's appearance.
+    extra_lines
+        Dictionary mapping output names to additional text that will be displayed as extra
+        lines in the node labels.
 
     Returns
     -------
@@ -633,8 +650,15 @@ def visualize_graphviz_widget(
         defaults=defaults,
         orient=orient,
         graphviz_kwargs=graphviz_kwargs,
+        extra_lines=extra_lines,
     )
-    initial_dot_source = _rerender_gv_source(graph, defaults, orient, graphviz_kwargs)
+    initial_dot_source = _rerender_gv_source(
+        graph,
+        defaults,
+        orient,
+        graphviz_kwargs,
+        extra_lines=extra_lines,
+    )
     return graphviz_widget(
         dot_source=initial_dot_source,
         extra_controls_factory=factory,
@@ -651,6 +675,7 @@ def _rerender_gv_source(
     group_args: bool = False,
     hide_default_args: bool = False,
     collapse_scopes: bool | Sequence[str] = False,
+    extra_lines: dict[OUTPUT_TYPE, str] | None = None,
 ) -> str:
     gv_graph = visualize_graphviz(
         graph,
@@ -660,6 +685,7 @@ def _rerender_gv_source(
         collapse_scopes=collapse_scopes,
         hide_default_args=hide_default_args,
         graphviz_kwargs=graphviz_kwargs,
+        extra_lines=extra_lines,
         return_type="graphviz",
     )
     return gv_graph.source
@@ -672,6 +698,7 @@ def _extra_controls_factory(  # noqa: PLR0915
     defaults: dict[str, Any] | None,
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
+    extra_lines: dict[OUTPUT_TYPE, str] | None = None,
 ) -> ipywidgets.HBox:
     """Extra widgets for the graphviz widget."""
     import ipywidgets
@@ -781,6 +808,7 @@ def _extra_controls_factory(  # noqa: PLR0915
             group_args=group_args_toggle.value,
             hide_default_args=hide_defaults_value,
             collapse_scopes=selected_scopes,
+            extra_lines=extra_lines,
         )
         graphviz_anywidget.dot_source = new_dot_source
 
