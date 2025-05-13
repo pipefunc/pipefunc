@@ -4,6 +4,7 @@ import importlib.util
 import re
 import sys
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -94,7 +95,13 @@ def test_simple(storage, tmp_path: Path) -> None:
     assert all(all(mask) for mask in masks.values())
     assert shapes == {"x": (4,), "y": (4,)}
     # Test `map` and a tmp run_folder
-    results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
+    ctx = (
+        nullcontext()
+        if storage in ("dict", "zarr_memory")
+        else pytest.warns(UserWarning, match="storage requires")
+    )
+    with ctx:
+        results2 = pipeline.map(inputs, run_folder=None, parallel=False, storage=storage)
     assert results2["sum"].output == 12
 
     axes = pipeline.mapspec_axes
