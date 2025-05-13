@@ -276,7 +276,11 @@ def test_update_scope_from_faq() -> None:
 
     pipeline = Pipeline([f, g_func])
     # all outputs except foo.y, so only bar.z, which becomes baz.z
-    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+    with pytest.warns(
+        UserWarning,
+        match="Parameter 'z' already has a scope 'bar', replacing it with 'baz'",
+    ):
+        pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
     kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
     assert pipeline(**kwargs) == 15
     results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")
