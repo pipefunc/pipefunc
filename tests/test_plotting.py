@@ -359,7 +359,8 @@ def test_visualize_graphviz_with_typing():
     def g(b: int, c: int, x: int = 1) -> int:
         return b + c + x
 
-    pipeline = Pipeline([f, g])
+    with pytest.warns(UserWarning, match="Unresolvable type hint: `UnresolvableTypeHere`"):
+        pipeline = Pipeline([f, g])
     pipeline.visualize_graphviz(return_type="html")
 
 

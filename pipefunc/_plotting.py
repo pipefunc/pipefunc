@@ -793,7 +793,7 @@ def _extra_controls_factory(  # noqa: PLR0915
         for toggle in scope_toggles:
             toggle.observe(_update_dot_source, names="value")
 
-    return ipywidgets.HBox(final_widgets, layout=ipywidgets.Layout(gap="10px"))
+    return ipywidgets.HBox(final_widgets)
 
 
 def visualize_matplotlib(
