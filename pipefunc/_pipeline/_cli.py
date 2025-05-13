@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import requires
 
+from ._pydantic import model_dump
+
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
@@ -253,8 +255,9 @@ def _validate_inputs_from_cli(
             )
             rich.print(msg)
             input_data[arg] = value
+
     model_instance = input_model.model_validate(input_data)
-    return model_instance.model_dump()
+    return model_dump(model_instance)
 
 
 def _validate_inputs_from_json(
@@ -273,7 +276,7 @@ def _validate_inputs_from_json(
     except json.JSONDecodeError:  # pragma: no cover
         raise
     model_instance = input_model.model_validate(input_data)
-    return model_instance.model_dump()
+    return model_dump(model_instance)
 
 
 def _validate_inputs(
