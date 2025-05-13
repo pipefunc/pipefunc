@@ -4,6 +4,7 @@ import argparse
 import inspect
 import json
 import sys
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -253,8 +254,8 @@ def _validate_inputs_from_cli(
             )
             rich.print(msg)
             input_data[arg] = value
-    model_instance = input_model.model_validate(input_data)
-    return model_instance.model_dump()
+
+    return _dump_model(input_data, input_model)
 
 
 def _validate_inputs_from_json(
@@ -272,8 +273,16 @@ def _validate_inputs_from_json(
         raise FileNotFoundError(msg) from None
     except json.JSONDecodeError:  # pragma: no cover
         raise
+    return _dump_model(input_data, input_model)
+
+
+def _dump_model(input_data: dict[str, Any], input_model: type[BaseModel]) -> dict[str, Any]:
+    """Dump a Pydantic model to a dictionary."""
     model_instance = input_model.model_validate(input_data)
-    return model_instance.model_dump()
+    with warnings.catch_warnings():
+        # Ignores warning about converting list to ndarray in _nd_array_with_ndim
+        warnings.filterwarnings("ignore", category=UserWarning)
+        return model_instance.model_dump()
 
 
 def _validate_inputs(
