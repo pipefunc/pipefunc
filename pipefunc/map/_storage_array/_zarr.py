@@ -77,7 +77,6 @@ class ZarrFileArray(StorageBase):
             shape=self.shape,
             dtype=bool,
             fill_value=True,
-            object_codec=object_codec,
             chunks=1,
         )
 
