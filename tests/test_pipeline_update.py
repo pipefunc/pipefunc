@@ -190,7 +190,8 @@ def test_set_pipeline_scope_on_init() -> None:
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
         pipeline.update_scope("a", "*")
-    pipeline.update_scope("foo", outputs="*")
+    with pytest.warns(UserWarning, match="Parameter 'c' already has a scope 'x'"):
+        pipeline.update_scope("foo", outputs="*")
     pipeline.update_scope("foo", outputs="*")  # twice should be fine
     assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
     pipeline.update_scope(None, {"x.b"})
