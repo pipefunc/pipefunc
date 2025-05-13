@@ -734,7 +734,7 @@ class Pipeline:
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
-        storage: StorageType = "file_array",
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -807,6 +807,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -883,7 +884,7 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
-        storage: StorageType = "file_array",
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
@@ -954,6 +955,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.

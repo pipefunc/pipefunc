@@ -49,7 +49,7 @@ def prepare_run(
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    storage: str | dict[OUTPUT_TYPE, str],
+    storage: str | dict[OUTPUT_TYPE, str] | None,
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
@@ -124,10 +124,11 @@ def _expand_output_name_in_executor(
 
 def _expand_output_name_in_storage(
     pipeline: Pipeline,
-    storage: str | dict[OUTPUT_TYPE, str],
-) -> dict[OUTPUT_TYPE, str] | str:
+    storage: str | dict[OUTPUT_TYPE, str] | None,
+) -> dict[OUTPUT_TYPE, str] | str | None:
     if isinstance(storage, dict):
         return _expand_output_name_in_dict(pipeline, storage, "Storage")
+    assert storage is None or isinstance(storage, str)
     return storage
 
 
