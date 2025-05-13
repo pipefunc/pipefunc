@@ -172,7 +172,7 @@ def test_pipeline_to_pydantic_without_griffe(monkeypatch):
     # Instantiate the model.
     instance = Model(x=10, y=5)
     # Since has_griffe is False, the field descriptions should be None.
-    field_info = instance.model_fields["x"]
+    field_info = Model.model_fields["x"]
     assert field_info.description is None, "Expected no description when griffe is not available."
     # Check that the instance validates the values as expected.
     assert instance.x == 10
@@ -208,11 +208,11 @@ def test_pipeline_to_pydantic_with_doc():
     instance = Model(x=10, y=5)
 
     # Verify that the field descriptions are populated (i.e. not None).
-    field_x_info = instance.model_fields["x"]
+    field_x_info = Model.model_fields["x"]
     assert field_x_info.description is not None
     assert "The first number." in field_x_info.description
 
-    field_y_info = instance.model_fields["y"]
+    field_y_info = Model.model_fields["y"]
     assert field_y_info.description is not None
     assert "The second number." in field_y_info.description
 
