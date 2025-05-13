@@ -6,6 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
+from pipefunc._pipeline._pydantic import model_dump
 from pipefunc.typing import safe_get_type_hints
 
 has_griffe = importlib.util.find_spec("griffe") is not None
@@ -79,9 +80,9 @@ def test_pipeline_input_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=1, y=2, z={"a": 1})
     expected = {"x": 1, "y": 2, "z": {"a": 1}}
-    assert model.model_dump() == expected
+    assert model_dump(model) == expected
     model = Model(x="1.0", y="2.0", z={"a": "1.0"})
-    assert model.model_dump() == expected
+    assert model_dump(model) == expected
     assert repr(model) == "InputModel(x=1, y=2, z={'a': 1})"
 
 
@@ -94,7 +95,7 @@ def test_pipeline_with_mapspec_input_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[1, 2, 3], y=2, z={"a": 1})
     expected = {"x": [1, 2, 3], "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["y"] == expected["y"]
@@ -112,7 +113,7 @@ def test_pipeline_2d_mapspec_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
     expected = {"x": np.array([[1, 2], [3, 4]]), "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["y"] == expected["y"]
@@ -134,7 +135,7 @@ def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
     x = [[[CustomObject(1), CustomObject(2)], [CustomObject(3), CustomObject(4)]]]
     model = Model(x=x, y=2, z={"a": 1})
     expected = {"x": np.array(x), "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["x"].shape == (1, 2, 2)
