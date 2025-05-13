@@ -335,7 +335,7 @@ class ProgressTracker:
                 layout=widgets.Layout(border=border, margin="2px 4px", padding="2px"),
             )
             self._progress_vboxes[name] = container
-            container.add_class("container")
+            container.add_class("progress-vbox")
             if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
                 container.add_class(f"scope-bg-{hue}")
 
@@ -434,14 +434,14 @@ class ProgressTracker:
             .widget-button {
                 margin-top: 5px;
             }
-            .container {
+            .progress-vbox {
                 border-radius: 10px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
                 transition: all 0.2s ease-in-out;
                 position: relative;
                 top: 0;
             }
-            .container:hover {
+            .progress-vbox:hover {
                 transform: scale(1.005);
                 box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
                 top: -2px;
