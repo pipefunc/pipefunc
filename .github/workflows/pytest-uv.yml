@@ -17,33 +17,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-
-      - name: Set up Python
-        run: uv venv --python ${{ matrix.python-version }}
-
-      - name: Install pipefunc (minimal)
-        run: |
-          # Install minimal dependencies for testing
-          uv pip install -e ".[test]"
-
       - name: Run pytest (minimal)
-        run: |
-          source .venv/bin/activate
-          pytest
-
-      - name: Install pipefunc (all dependencies)
-        run: |
-          if [[ ${{ matrix.python-version }} == "3.13t" ]]; then
-            # Install all optional dependencies that work with 3.13t
-            uv pip install -e ".[xarray,widgets,pandas,test]"
-          else
-            uv pip install -e ".[all,pydantic,test]"
-          fi
-
+        run: uvx nox -e pytest_min_deps-${{ matrix.python-version }}
       - name: Run pytest (all dependencies)
-        run: |
-          source .venv/bin/activate
-          pytest
+        run: uvx nox -e pytest_all_deps-${{ matrix.python-version }}
