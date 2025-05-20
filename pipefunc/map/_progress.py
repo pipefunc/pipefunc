@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pipefunc._utils import at_least_tuple, requires
+from pipefunc._utils import at_least_tuple, is_installed, is_running_in_ipynb, requires
 
 from ._shapes import shape_is_resolved
 from ._storage_array._base import StorageBase
@@ -76,9 +76,11 @@ class Status:
 def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
-    show_progress: bool,  # noqa: FBT001
+    show_progress: bool | None,
     in_async: bool,  # noqa: FBT001
 ) -> ProgressTracker | None:
+    if show_progress is None:
+        show_progress = is_running_in_ipynb() and is_installed("ipywidgets")
     if not show_progress:
         return None
     requires("ipywidgets", reason="show_progress", extras="ipywidgets")
