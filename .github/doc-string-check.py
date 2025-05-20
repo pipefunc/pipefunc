@@ -224,13 +224,12 @@ if __name__ == "__main__":
         pipefunc.Pipeline.map_async,
         run_map_async,
         allow_missing=["parallel", "pipeline", "scheduling_strategy"],
-        allow_discrepancy=["show_progress"],
     )
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         pipefunc.Pipeline.map_async,
         allow_missing=["parallel"],
-        allow_discrepancy=["show_progress", "executor"],
+        allow_discrepancy=["executor"],
     )
 
     # plotting

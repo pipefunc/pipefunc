@@ -739,7 +739,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -822,7 +822,8 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar. Only works if ``parallel=True``.
+            Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+            pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -889,7 +890,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
@@ -970,7 +971,8 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar.
+            Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+            pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
