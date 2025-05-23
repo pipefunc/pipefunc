@@ -66,7 +66,7 @@ from ._validation import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
     from concurrent.futures import Executor
     from pathlib import Path
 
@@ -481,7 +481,7 @@ class Pipeline:
                 g.add_edge(_Resources(f.resources_variable, f.output_name), f)
         return g
 
-    def func(self, output_name: OUTPUT_TYPE) -> _PipelineAsFunc:
+    def func(self, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> _PipelineAsFunc:
         """Create a composed function that can be called with keyword arguments.
 
         Parameters
@@ -494,12 +494,13 @@ class Pipeline:
             The composed function that can be called with keyword arguments.
 
         """
-        if f := self._internal_cache.func.get(output_name):
+        key = tuple(output_name) if isinstance(output_name, list) else output_name
+        if f := self._internal_cache.func.get(key):
             return f
-        root_args = self.root_args(output_name)
+        root_args = _root_args(self, output_name)
         assert isinstance(root_args, tuple)
         f = _PipelineAsFunc(self, output_name, root_args=root_args)
-        self._internal_cache.func[output_name] = f
+        self._internal_cache.func[key] = f
         return f
 
     @functools.cached_property
@@ -631,31 +632,15 @@ class Pipeline:
         _update_all_results(func, r, output_name, all_results, self.lazy)
         return all_results[output_name]
 
-    def run(
+    def _validate_run_output_name(
         self,
-        output_name: OUTPUT_TYPE,
-        *,
-        full_output: bool = False,
         kwargs: dict[str, Any],
-    ) -> Any:
-        """Execute the pipeline for a specific return value.
-
-        Parameters
-        ----------
-        output_name
-            The identifier for the return value of the pipeline.
-        full_output
-            Whether to return the outputs of all function executions
-            as a dictionary mapping function names to their return values.
-        kwargs
-            Keyword arguments to be passed to the pipeline functions.
-
-        Returns
-        -------
-            The return value of the pipeline or a dictionary mapping function
-            names to their return values if ``full_output`` is ``True``.
-
-        """
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+    ) -> None:
+        if isinstance(output_name, list):
+            for name in output_name:
+                self._validate_run_output_name(kwargs, name)
+            return
         if output_name in kwargs:
             msg = f"The `output_name='{output_name}'` argument cannot be provided in `kwargs={kwargs}`."
             raise ValueError(msg)
@@ -674,28 +659,70 @@ class Pipeline:
             )
             raise RuntimeError(msg)
 
+    def run(
+        self,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
+        *,
+        full_output: bool = False,
+        kwargs: dict[str, Any],
+        allow_unused: bool = False,
+    ) -> Any:
+        """Execute the pipeline for a specific return value.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the return value of the pipeline. Can be a single
+            output name or a list of output names.
+        full_output
+            Whether to return the outputs of all function executions
+            as a dictionary mapping function names to their return values.
+        kwargs
+            Keyword arguments to be passed to the pipeline functions.
+        allow_unused
+            Whether to allow unused keyword arguments. If ``False``, an error
+            is raised if any keyword arguments are unused. If ``True``, unused
+            keyword arguments are ignored.
+
+        Returns
+        -------
+            A dictionary mapping function names to their return values
+            if ``full_output`` is ``True``. Otherwise, the return value is the
+            return value of the pipeline function specified by ``output_name``.
+            If ``output_name`` is a list, the return value is a tuple of the
+            return values of the pipeline functions.
+
+        """
+        self._validate_run_output_name(kwargs, output_name)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
         used_parameters: set[str | None] = set()
-
-        self._run(
-            output_name=output_name,
-            flat_scope_kwargs=flat_scope_kwargs,
-            all_results=all_results,
-            full_output=full_output,
-            used_parameters=used_parameters,
-        )
+        output_names = [output_name] if not isinstance(output_name, list) else output_name
+        for _output_name in output_names:
+            self._run(
+                output_name=_output_name,
+                flat_scope_kwargs=flat_scope_kwargs,
+                all_results=all_results,
+                full_output=full_output,
+                used_parameters=used_parameters,
+            )
 
         # if has None, result was from cache, so we don't know which parameters were used
-        if None not in used_parameters and (
-            unused := flat_scope_kwargs.keys() - set(used_parameters)
+        if (
+            not allow_unused
+            and None not in used_parameters
+            and (unused := flat_scope_kwargs.keys() - set(used_parameters))
         ):
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. {kwargs=}, {used_parameters=}"
             raise UnusedParametersError(msg)
 
-        return all_results if full_output else all_results[output_name]
+        if full_output:
+            return all_results
+        if isinstance(output_name, list):
+            return tuple(all_results[k] for k in output_name)
+        return all_results[output_name]
 
     def map(
         self,
@@ -706,13 +733,13 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: StorageType = "file_array",
+        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -780,6 +807,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -794,7 +822,8 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar. Only works if ``parallel=True``.
+            Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+            pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -855,13 +884,13 @@ class Pipeline:
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: StorageType = "file_array",
+        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
@@ -927,6 +956,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -941,7 +971,8 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar.
+            Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+            pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -1094,7 +1125,7 @@ class Pipeline:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
-        that the defaults can be applied to.
+        the defaults can be applied to.
 
         If `overwrite` is `False`, the new defaults will be added to the existing
         defaults. If `overwrite` is `True`, the existing defaults will be replaced
@@ -1175,7 +1206,7 @@ class Pipeline:
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         ``inputs`` are the root arguments of the pipeline. Inputs to functions
         which are outputs of other functions are considered to be outputs.
@@ -1416,6 +1447,11 @@ class Pipeline:
                     assert isinstance(x, PipeFunc)
                     generation_functions.append(x)
             if generation_functions:
+                # Ensure deterministic ordering in the generation
+                generation_functions = sorted(
+                    generation_functions,
+                    key=lambda f: at_least_tuple(f.output_name),
+                )
                 function_lists.append(generation_functions)
 
         return Generations(root_args, function_lists)
@@ -1450,6 +1486,7 @@ class Pipeline:
             The axis to add to the `MapSpec` of all functions that depends on
             ``parameter``. Provide a new axis name to add a new axis or an
             existing axis name to zip the parameter with the existing axis.
+            Can be a comma-separated string to add multiple axes at once.
 
         """
         self._autogen_mapspec_axes()
@@ -1548,6 +1585,9 @@ class Pipeline:
         self,
         *,
         figsize: tuple[int, int] | int | None = None,
+        collapse_scopes: bool | Sequence[str] = False,
+        min_arg_group_size: int | None = None,
+        hide_default_args: bool = False,
         filename: str | Path | None = None,
         style: GraphvizStyle | None = None,
         orient: Literal["TB", "LR", "BT", "RL"] = "LR",
@@ -1564,6 +1604,15 @@ class Pipeline:
             The width and height of the figure in inches.
             If a single integer is provided, the figure will be a square.
             If ``None``, the size will be determined automatically.
+        collapse_scopes
+            Whether to collapse scopes in the graph.
+            If ``True``, scopes are collapsed into a single node.
+            If a sequence of scope names, only the specified scopes are collapsed.
+        min_arg_group_size
+            Minimum number of parameters to combine into a single node. Only applies to
+            parameters used exclusively by one PipeFunc. If None, no grouping is performed.
+        hide_default_args
+            Whether to hide default arguments in the graph.
         filename
             The filename to save the figure to, if provided.
         style
@@ -1595,6 +1644,9 @@ class Pipeline:
             self.graph,
             self.defaults,
             figsize=figsize,
+            collapse_scopes=collapse_scopes,
+            min_arg_group_size=min_arg_group_size,
+            hide_default_args=hide_default_args,
             filename=filename,
             style=style,
             orient=orient,
@@ -1643,23 +1695,14 @@ class Pipeline:
             Interactive widget containing the graph visualization.
 
         """
-        requires(
-            "graphviz_anywidget",
-            "graphviz",
-            reason="visualize_graphviz_widget",
-            extras="plotting",
-        )
-        import graphviz
-        from graphviz_anywidget import graphviz_widget
+        from pipefunc._plotting import visualize_graphviz_widget
 
-        graph = self.visualize_graphviz(
+        return visualize_graphviz_widget(
+            self.graph,
+            defaults=self.defaults,
             orient=orient,
             graphviz_kwargs=graphviz_kwargs,
-            return_type="graphviz",
         )
-        assert isinstance(graph, graphviz.Digraph)
-        dot_source = graph.source
-        return graphviz_widget(dot_source)
 
     def visualize_matplotlib(
         self,
@@ -2304,7 +2347,7 @@ class _PipelineAsFunc:
     def __init__(
         self,
         pipeline: Pipeline,
-        output_name: OUTPUT_TYPE,
+        output_name: OUTPUT_TYPE | list[OUTPUT_TYPE],
         root_args: tuple[str, ...],
     ) -> None:
         """Initialize the function wrapper."""
@@ -2528,7 +2571,7 @@ def _find_nodes_between(
 class _PipelineInternalCache:
     arg_combinations: dict[OUTPUT_TYPE, set[tuple[str, ...]]] = field(default_factory=dict)
     root_args: dict[OUTPUT_TYPE | None, tuple[str, ...]] = field(default_factory=dict)
-    func: dict[OUTPUT_TYPE, _PipelineAsFunc] = field(default_factory=dict)
+    func: dict[OUTPUT_TYPE | tuple[OUTPUT_TYPE, ...], _PipelineAsFunc] = field(default_factory=dict)
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
@@ -2548,3 +2591,13 @@ def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
         console = rich.get_console()
         console.print(table)
     return table
+
+
+def _root_args(pipeline: Pipeline, output_name: OUTPUT_TYPE | list[OUTPUT_TYPE]) -> tuple[str, ...]:
+    if not isinstance(output_name, list):
+        return pipeline.root_args(output_name)
+    root_args: list[str] = []
+    for name in output_name:
+        root_args.extend(pipeline.root_args(name))
+    # deduplicate while preserving order
+    return tuple(dict.fromkeys(root_args))

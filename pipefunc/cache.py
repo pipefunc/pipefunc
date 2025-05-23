@@ -20,6 +20,7 @@ import cloudpickle
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
+    from multiprocessing.managers import DictProxy, ListProxy, SyncManager
 
 
 class _CacheBase(abc.ABC):
@@ -42,15 +43,6 @@ class _CacheBase(abc.ABC):
     @abc.abstractmethod
     def clear(self) -> None:
         raise NotImplementedError
-
-    def __getstate__(self) -> object:
-        if hasattr(self, "shared") and self.shared:
-            return self.__dict__
-        msg = "Cannot pickle non-shared cache instances, use `shared=True`."
-        raise RuntimeError(msg)
-
-    def __setstate__(self, state: dict) -> None:
-        self.__dict__.update(state)
 
 
 class HybridCache(_CacheBase):
@@ -249,6 +241,31 @@ class HybridCache(_CacheBase):
         """Return the number of entries in the cache."""
         return len(self._cache_dict)
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Prepare the object for pickling."""
+        state = self.__dict__.copy()
+
+        if self.shared:
+            # Convert shared structures to regular ones
+            state["_cache_dict"] = _dict_to_regular(self._cache_dict)
+            state["_access_counts"] = _dict_to_regular(self._access_counts)
+            state["_computation_durations"] = _dict_to_regular(self._computation_durations)
+            # Remove unpicklable lock
+            state.pop("_cache_lock", None)
+
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the object after unpickling."""
+        self.__dict__.update(state)
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._access_counts = _create_shared_dict(manager, self._access_counts)  # type: ignore[arg-type]
+        self._computation_durations = _create_shared_dict(manager, self._computation_durations)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
+
 
 def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:  # noqa: FBT001
     return cloudpickle.loads(value) if allow_cloudpickle else value
@@ -343,6 +360,29 @@ class LRUCache(_CacheBase):
             for key in keys:
                 del self._cache_dict[key]
             del self._cache_queue[:]
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Prepare the object for pickling."""
+        state = self.__dict__.copy()
+
+        if self.shared:
+            # Convert shared structures to regular ones
+            state["_cache_dict"] = _dict_to_regular(self._cache_dict)
+            state["_cache_queue"] = _list_to_regular(self._cache_queue)
+            # Remove unpicklable lock
+            state.pop("_cache_lock", None)
+
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the object after unpickling."""
+        self.__dict__.update(state)
+        if not self.shared:
+            return
+        manager = Manager()
+        self._cache_dict = _create_shared_dict(manager, self._cache_dict)  # type: ignore[arg-type]
+        self._cache_queue = _create_shared_list(manager, self._cache_queue)  # type: ignore[arg-type]
+        self._cache_lock = manager.Lock()
 
 
 class SimpleCache(_CacheBase):
@@ -790,3 +830,28 @@ class UnhashableError(TypeError):
             f"Object of type {type(obj)} cannot be hashed using `pipefunc.cache.to_hashable`."
         )
         super().__init__(self.message)
+
+
+# Helper functions for pickling
+def _dict_to_regular(shared_dict: DictProxy) -> dict:
+    """Convert a shared dictionary to a regular dictionary."""
+    return dict(shared_dict.items())
+
+
+def _list_to_regular(shared_list: ListProxy) -> list:
+    """Convert a shared list to a regular list."""
+    return list(shared_list)
+
+
+def _create_shared_dict(manager: SyncManager, regular_dict: dict) -> DictProxy:
+    """Create a shared dictionary and populate it."""
+    shared_dict = manager.dict()
+    shared_dict.update(regular_dict)
+    return shared_dict
+
+
+def _create_shared_list(manager: SyncManager, regular_list: list) -> ListProxy:
+    """Create a shared list and populate it."""
+    shared_list = manager.list()
+    shared_list.extend(regular_list)
+    return shared_list

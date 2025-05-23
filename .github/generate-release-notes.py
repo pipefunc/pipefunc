@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run
 """Automatically generate release notes from GitHub issues and PRs.
 
 Run `uv run .github/generate-release-notes.py` to generate the release notes.
@@ -22,6 +23,7 @@ import datetime
 import functools
 import os
 import re
+import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -29,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 import git
 from diskcache import Cache
-from github import Github, Repository
+from github import Github, GithubException, Repository
 from rich.console import Console
 
 if TYPE_CHECKING:
@@ -52,7 +54,7 @@ def _print_substep(message: str) -> None:
 
 def _print_info(message: str) -> None:
     """Print an info message with a nice format."""
-    console.print(f"  ℹ️  {message}")  # noqa: RUF001
+    console.print(f"  ℹ️  {message}", width=300)  # noqa: RUF001
 
 
 def _print_error(message: str) -> None:
@@ -127,7 +129,12 @@ def _get_github_repo(gh: Github, remote: git.Remote) -> Repository.Repository:
         raise ValueError(msg)
 
     _print_info(f"Using repository {repo_name}")
-    return gh.get_repo(repo_name)
+    try:
+        return gh.get_repo(repo_name)
+    except GithubException.BadCredentialsException as e:
+        _print_error(f"Bad credentials for GitHub token: {e}")
+        _print_error("Run `echo $GITHUB_TOKEN > .github/GITHUB_TOKEN` to reset the token")
+        sys.exit(1)
 
 
 def _categorize_pr_title(pr_title: str) -> tuple[int, str]:
@@ -292,7 +299,7 @@ def _generate_release_notes(  # noqa: PLR0912, PLR0915
         "These release notes are automatically generated from commits and GitHub issues and PRs.\n",
     )
     lines.append(
-        "If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.\n\n",
+        "If it is out of date, please run\n\nGITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py\n\n",
     )
     # Generate notes for each release
     for i, (tag, tag_date) in enumerate(tags_with_dates):

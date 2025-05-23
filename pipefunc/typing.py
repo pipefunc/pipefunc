@@ -1,6 +1,7 @@
-"""Custom type hinting utilities for pipefunc."""  # noqa: A005
+"""Custom type hinting utilities for pipefunc."""
 
 import re
+import sys
 import warnings
 from collections.abc import Callable, Iterable
 from types import UnionType
@@ -56,7 +57,9 @@ class TypeCheckMemo(NamedTuple):
 
 def _evaluate_forwardref(ref: ForwardRef, memo: TypeCheckMemo) -> Any:
     """Evaluate a forward reference using the provided memo."""
-    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
+    if sys.version_info < (3, 13):
+        return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset())
+    return ref._evaluate(memo.globals, memo.locals, recursive_guard=frozenset(), type_params={})
 
 
 def _resolve_type(type_: Any, memo: TypeCheckMemo) -> Any:

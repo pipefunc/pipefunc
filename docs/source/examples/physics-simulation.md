@@ -237,7 +237,17 @@ print(f"Output shape: {output.shape}")
 print(f"Output:\n{output}")
 ```
 
-We can also load all data as `xarray.Dataset`:
+We can represent the results as a `pandas.DataFrame` or `xarray.Dataset`:
+
+```{code-cell} ipython3
+results.to_dataframe()
+```
+
+```{code-cell} ipython3
+results.to_xarray()
+```
+
+We can also load all data as `xarray.Dataset` using just the `run_folder`:
 
 ```{code-cell} ipython3
 from pipefunc.map import load_xarray_dataset
@@ -251,6 +261,14 @@ Or specify the `output_name` to load only specific outputs:
 ```{code-cell} ipython3
 avg_charge = load_xarray_dataset("average_charge", run_folder=run_folder)
 avg_charge
+```
+
+Or as `pandas.DataFrame`:
+
+```{code-cell} ipython3
+from pipefunc.map import load_dataframe
+
+load_dataframe(run_folder=run_folder)
 ```
 
 Now imagine that the electrostatics object is a very large object that we cannot afford to save and load from disk.

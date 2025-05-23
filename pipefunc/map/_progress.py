@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pipefunc._utils import at_least_tuple, requires
+from pipefunc._utils import at_least_tuple, is_installed, is_running_in_ipynb, requires
 
 from ._shapes import shape_is_resolved
 from ._storage_array._base import StorageBase
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from pipefunc import PipeFunc
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
 
     from ._result import StoreType
 
@@ -29,17 +31,26 @@ class Status:
 
     @property
     def n_left(self) -> int:
-        return self.n_total - self.n_completed - self.n_failed  # type: ignore[operator]
+        return self.n_total - self.n_attempted  # type: ignore[operator]
 
-    def mark_in_progress(self) -> None:
+    def mark_in_progress(self, *, n: int = 1) -> None:
         if self.start_time is None:
             self.start_time = time.monotonic()
-        self.n_in_progress += 1
+        self.n_in_progress += n
 
-    def mark_complete(self, _: Any = None) -> None:  # needs arg to be used as callback
-        self.n_in_progress -= 1
-        self.n_completed += 1
-        if self.n_completed == self.n_total:
+    def mark_complete(
+        self,
+        future: Future | None = None,
+        *,
+        n: int = 1,
+    ) -> None:
+        self.n_in_progress -= n
+        if future is not None and future.exception() is not None:
+            self.n_failed += n
+        else:
+            self.n_completed += n
+
+        if self.n_total is not None and self.n_attempted >= self.n_total:
             self.end_time = time.monotonic()
 
     @property
@@ -48,7 +59,11 @@ class Status:
             return 0.0
         if self.n_total == 0:
             return 1.0
-        return self.n_completed / self.n_total
+        return self.n_attempted / self.n_total
+
+    @property
+    def n_attempted(self) -> int:
+        return self.n_completed + self.n_failed
 
     def elapsed_time(self) -> float:
         if self.start_time is None:  # Happens when n_total is 0
@@ -61,13 +76,15 @@ class Status:
 def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
-    show_progress: bool,  # noqa: FBT001
+    show_progress: bool | None,
     in_async: bool,  # noqa: FBT001
 ) -> ProgressTracker | None:
+    if show_progress is None:
+        show_progress = is_running_in_ipynb() and is_installed("ipywidgets")
     if not show_progress:
         return None
     requires("ipywidgets", reason="show_progress", extras="ipywidgets")
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
 
     progress = {}
     for func in functions:

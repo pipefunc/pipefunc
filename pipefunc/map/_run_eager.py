@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._result import ResultDict
@@ -43,13 +43,13 @@ def run_map_eager(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: StorageType = "file_array",
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool = False,
+    show_progress: bool | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
@@ -122,6 +122,7 @@ def run_map_eager(
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -136,7 +137,8 @@ def run_map_eager(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. Only works if ``parallel=True``.
+        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -144,7 +146,7 @@ def run_map_eager(
 
     """
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
-    pipeline, run_info, store, outputs, parallel, executor_dict, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -152,6 +154,7 @@ def run_map_eager(
         output_names=output_names,
         parallel=parallel,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -160,30 +163,28 @@ def run_map_eager(
         in_async=False,
     )
 
-    if progress is not None:
-        progress.display()
+    if prep.progress is not None:
+        prep.progress.display()
 
-    dependency_info = _build_dependency_graph(pipeline)
+    dependency_info = _build_dependency_graph(prep.pipeline)
 
-    with _maybe_executor(executor_dict, parallel) as ex:
+    with _maybe_executor(prep.executor, prep.parallel) as ex:
         _eager_scheduler_loop(
             dependency_info=dependency_info,
             executor=ex,
-            run_info=run_info,
-            store=store,
-            outputs=outputs,
+            run_info=prep.run_info,
+            store=prep.store,
+            outputs=prep.outputs,
             fixed_indices=fixed_indices,
-            chunksizes=chunksizes,
-            progress=progress,
+            chunksizes=prep.chunksizes,
+            progress=prep.progress,
             return_results=return_results,
-            cache=pipeline.cache,
+            cache=prep.pipeline.cache,
         )
-
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
-
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    if prep.progress is not None:  # final update
+        prep.progress.update_progress(force=True)
+    _maybe_persist_memory(prep.store, persist_memory)
+    return prep.outputs
 
 
 def _build_dependency_graph(pipeline: Pipeline) -> _DependencyInfo:
@@ -254,7 +255,7 @@ class _FunctionTracker:
         store: dict[str, Any],
         fixed_indices: dict[str, int | slice] | None,
         executor: dict[OUTPUT_TYPE, Executor] | None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
         progress: ProgressTracker | None,
         return_results: bool,  # noqa: FBT001
         cache: _CacheBase | None,
@@ -383,7 +384,7 @@ def _eager_scheduler_loop(
     store: dict[str, Any],
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
@@ -431,7 +432,7 @@ def _process_completed_futures(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
@@ -474,7 +475,7 @@ def _update_dependencies_and_submit(
     store: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,

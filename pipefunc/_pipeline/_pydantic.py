@@ -86,7 +86,7 @@ def maybe_pydantic_model_to_dict(x: dict[str, Any] | BaseModel) -> dict[str, Any
     import pydantic
 
     assert isinstance(x, pydantic.BaseModel)
-    return x.model_dump()
+    return model_dump(x)
 
 
 def _maybe_ndarray_type_annotation_from_mapspec(
@@ -142,3 +142,12 @@ def _select_array_spec(parameter_name: str, mapspecs: list[MapSpec]) -> ArraySpe
             if spec.name == parameter_name:
                 return spec
     return None
+
+
+def model_dump(model_instance: BaseModel) -> dict[str, Any]:
+    """Dump a Pydantic model to a dictionary."""
+    with warnings.catch_warnings():
+        # Ignores `PydanticSerializationUnexpectedValue`
+        # Warning about returning ndarray instead of list (due to _nd_array_with_ndim)
+        warnings.filterwarnings("ignore", category=UserWarning)
+        return model_instance.model_dump()

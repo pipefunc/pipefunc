@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import functools
+import hashlib
+import textwrap
 import time
 from typing import TYPE_CHECKING, Any
 
 import IPython.display
 import ipywidgets as widgets
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, clip
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.map._progress import Status
+
+
+_IPYWIDGETS_MAJOR_VERSION = int(widgets.__version__.split(".")[0])
 
 
 def _span(class_name: str, value: str) -> str:
@@ -32,18 +38,58 @@ def _create_button(
 
 
 def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
+    description = ", ".join(at_least_tuple(name))
+    styles = [
+        "direction: rtl",  # Reverses text direction so ellipsis appears at the beginning
+        "display: inline-block",  # Allows block-like behavior within the inline flow
+        "width: 100%",  # Ensures span takes full available width
+        "white-space: nowrap",  # Prevents text from wrapping to a new line
+        "overflow: hidden",  # Hides text that extends beyond the container
+        "text-overflow: ellipsis",  # Shows "..." when text is truncated
+    ]
+    style = "; ".join(styles)
+    tooltip = {"tooltip" if _IPYWIDGETS_MAJOR_VERSION >= 8 else "description_tooltip": description}  # noqa: PLR2004
     return widgets.FloatProgress(
         value=progress,
         max=1.0,
-        description=", ".join(at_least_tuple(name)),
+        description=f"<span style='{style}'>{description}</span>",
+        description_allow_html=True,
         layout={"width": "95%"},
         bar_style="info",
         style={"description_width": "150px"},
+        **tooltip,
     )
 
 
 def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=_span(class_name, initial_value))
+
+
+def _get_scope_hue(output_name: OUTPUT_TYPE) -> int | None:
+    """Extract scope and calculate a consistent hue value from it."""
+    output_name = at_least_tuple(output_name)
+    all_have_scope = all("." in name for name in output_name)
+    if not all_have_scope:
+        return None
+
+    scope = output_name[0].split(".")[0]
+    # Convert string to int (0-255)
+    hash_value = int(hashlib.md5(scope.encode()).hexdigest(), 16)  # noqa: S324
+    return hash_value % 360
+
+
+def _scope_border_color(hue: int | None) -> str:
+    return f"hsl({hue}, 70%, 70%)" if hue is not None else "#999999"
+
+
+def _scope_background_color_css(hue: int) -> str:
+    return textwrap.dedent(
+        f"""
+        .scope-bg-{hue} {{
+            background-color: hsla({hue}, 70%, 95%, 0.75);
+        }}
+        """,
+    )
 
 
 class ProgressTracker:
@@ -69,8 +115,9 @@ class ProgressTracker:
         self._min_auto_update_interval: float = 0.1
         self._max_auto_update_interval: float = 10.0
         self._first_auto_update_interval: float = 1.0
-        self._sync_update_interval: float = 0.1
+        self._sync_update_interval: float = 0.01
         self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
+        self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
         self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
         self.buttons: dict[OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button(
@@ -109,6 +156,7 @@ class ProgressTracker:
         self._initial_update_period: float = 30.0
         self._initial_max_update_interval: float = 1.0
         self.start_time: float = 0.0
+        self._marked_completed: set[OUTPUT_TYPE] = set()
         if display:
             self.display()
         if self.task is not None:
@@ -121,46 +169,62 @@ class ProgressTracker:
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
+        now = time.monotonic()
+        return_early = False
         if not self.in_async and not force:
             assert self.task is None
             # If not in asyncio, `update_progress` is called after each iteration,
             # so, we throttle the updates to avoid excessive updates.
-            now = time.monotonic()
             if now - self.last_update_time < self._sync_update_interval:
-                return
-            self.last_update_time = time.monotonic()
+                return_early = True
 
         for name, status in self.progress_dict.items():
-            if status.progress == 0:
+            if status.progress == 0 or name in self._marked_completed:
                 continue
+            if return_early and status.progress < 1.0:
+                return
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
-                progress_bar.bar_style = "success"
+                progress_bar.bar_style = "success" if status.n_failed == 0 else "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
+                self._marked_completed.add(name)
+                if status.progress == 1.0:  # Newly completed
+                    self._progress_vboxes[name].add_class("pulse-animation")
             else:
                 progress_bar.remove_class("completed-progress")
                 progress_bar.add_class("animated-progress")
             self._update_labels(name, status)
         if self._all_completed():
             self._mark_completed()
+        self.last_update_time = time.monotonic()
+        # Set the update interval to 50 times the total time this method took
+        self._sync_update_interval = clip(50 * (self.last_update_time - now), 0.01, 1.0)
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
+        completed = f"✅ {status.n_completed:,}"
+        failed = f"❌ {status.n_failed:,}"
+        left = f"⏳ {status.n_left:,}"
+        if status.n_failed == 0:
+            iterations_label = f"{completed} | {left}"
+        else:
+            iterations_label = f"{completed} | {failed} | {left}"
+
         labels = self.labels[name]
-        iterations_label = f"✓ {status.n_completed:,} | ⏳ {status.n_left:,}"
         labels["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
+
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
             eta = "Completed"
         else:
             estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
             eta = f"ETA: {estimated_time_left:.2f} sec"
-        speed = f"{status.n_completed / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
+        speed = f"{status.n_attempted / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")
         labels["estimated_time"].value = _span(
             "estimate-label",
@@ -211,7 +275,11 @@ class ProgressTracker:
     def _mark_completed(self) -> None:
         if self.auto_update:
             self._toggle_auto_update()
-        self.auto_update_interval_label.value = _span("interval-label", "Completed all tasks 🎉")
+        if any(status.n_failed > 0 for status in self.progress_dict.values()):
+            msg = "Completed with errors ❌"
+        else:
+            msg = "Completed all tasks 🎉"
+        self.auto_update_interval_label.value = _span("interval-label", msg)
         for button in self.buttons.values():
             button.disabled = True
 
@@ -250,37 +318,41 @@ class ProgressTracker:
                 progress_bar.add_class("completed-progress")
         self.auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
+    @functools.cached_property
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
-        progress_containers = []
         for name in self.progress_dict:
             labels = self.labels[name]
             labels_box = widgets.HBox(
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
             )
+            hue = _get_scope_hue(name)
+            border_color = _scope_border_color(hue)
+            border = f"1px solid {border_color}"
             container = widgets.VBox(
                 [self.progress_bars[name], labels_box],
-                layout=widgets.Layout(border="1px solid #999999", margin="2px 0", padding="2px"),
+                layout=widgets.Layout(border=border, margin="2px 4px", padding="2px"),
             )
-            container.add_class("container")
-            progress_containers.append(container)
+            self._progress_vboxes[name] = container
+            container.add_class("progress-vbox")
+            if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
+                container.add_class(f"scope-bg-{hue}")
 
         buttons = self.buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
             layout=widgets.Layout(justify_content="center"),
         )
-        parts = (
-            [*progress_containers, button_box, self.auto_update_interval_label]
-            if self.task
-            else progress_containers
-        )
+        parts = list(self._progress_vboxes.values())
+        if self.task:
+            parts.extend([button_box, self.auto_update_interval_label])
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
-        style = """
-        <style>
+        style = textwrap.dedent(
+            """
+            <style>
             .progress {
                 border-radius: 5px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -314,10 +386,29 @@ class ProgressTracker:
                     background-position: 40px 0;
                 }
             }
-            .container {
-                border-radius: 10px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+
+            /* Pulse animation for completed tasks */
+            @keyframes balanced-pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4);
+                    border-color: rgba(46, 204, 113, 0.8);
+                    transform: scale(1);
+                }
+                40% {
+                    box-shadow: 0 0 0 5px rgba(46, 204, 113, 0.2);
+                    border-color: rgba(46, 204, 113, 0.9);
+                    transform: scale(1.005);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+                    border-color: inherit;
+                    transform: scale(1);
+                }
             }
+            .pulse-animation {
+                animation: balanced-pulse 1.5s ease-out 1;
+            }
+
             .percent-label {
                 margin-left: 10px;
                 font-weight: bold;
@@ -343,7 +434,23 @@ class ProgressTracker:
             .widget-button {
                 margin-top: 5px;
             }
-        </style>
-        """
+            .progress-vbox {
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s ease-in-out;
+                position: relative;
+                top: 0;
+            }
+            .progress-vbox:hover {
+                transform: scale(1.005);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+                top: -2px;
+            }
+            """,
+        )
+        hues = {hue for name in self.progress_dict if (hue := _get_scope_hue(name)) is not None}
+        for hue in hues:
+            style += _scope_background_color_css(hue)
+        style += "</style>"
         IPython.display.display(IPython.display.HTML(style))
-        IPython.display.display(self._widgets())
+        IPython.display.display(self._widgets)

@@ -94,7 +94,7 @@ def test_mapspec_init():
 
     with pytest.raises(
         ValueError,
-        match="Input array have indices that do not appear in the output: {'k'}",
+        match="Input arrays have indices that do not appear in the output: {'k'}",
     ):
         MapSpec((ArraySpec("a", ("i", "j")), ArraySpec("b", ("i", "k"))), (output,))
 
@@ -131,7 +131,7 @@ def test_mapspec_shape():
     with pytest.raises(ValueError, match="Dimension mismatch for arrays"):
         spec.shape({"a": (3, 4), "b": (3, 5)})
 
-    with pytest.raises(ValueError, match="Got extra array"):
+    with pytest.raises(ValueError, match=re.escape("Got extra array(s)")):
         spec.shape({"a": (3, 4), "b": (3, 4), "c": (3, 4)})
 
 
@@ -361,7 +361,7 @@ def test_larger_output_then_input():  # noqa: PLR0915
 def test_shape_exceptions():
     # Extra input arrays
     mapspec = MapSpec.from_string("a[i] -> b[i, j]")
-    with pytest.raises(ValueError, match="Got extra array"):
+    with pytest.raises(ValueError, match=re.escape("Got extra array(s)")):
         mapspec.shape({"a": (3,), "extra": (3,)}, internal_shapes={"b": (4,)})
 
     # Missing input arrays

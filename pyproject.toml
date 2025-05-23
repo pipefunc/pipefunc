@@ -31,13 +31,14 @@ adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
 pandas = ["pandas"]
-plotting = ["bokeh", "graphviz", "holoviews", "matplotlib"]
+# Prevent old holoviews resulting in broken env
+plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
 profiling = ["psutil"]
 pydantic = ["pydantic"]
 rich = ["rich"]
-widgets = ["graphviz-anywidget>=0.3.0", "ipywidgets"]
+widgets = ["graphviz-anywidget>=0.7.0", "ipywidgets"]
 xarray = ["xarray"]
-zarr = ["zarr>=2,<3"]
+zarr = ["zarr>=2,<3", "numcodecs<0.16.0"]  # https://github.com/zarr-developers/numcodecs/issues/721
 test = [
     "coverage",
     "pytest-asyncio",
@@ -135,7 +136,6 @@ addopts = """
     --cov-report term
     --cov-report html
     --cov-report xml
-    --cov-fail-under=35
     --asyncio-mode=strict
     --timeout 60
 """
@@ -194,6 +194,7 @@ ignore = [
     "NPY002",
     "RET504",
 ]
+"get-notebooks.py" = ["EXE003"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

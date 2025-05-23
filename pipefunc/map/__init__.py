@@ -2,7 +2,7 @@
 
 from contextlib import suppress as _suppress
 
-from ._load import load_outputs, load_xarray_dataset
+from ._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from ._mapspec import MapSpec
 from ._run import run_map, run_map_async
 from ._run_info import RunInfo
@@ -17,6 +17,8 @@ __all__ = [
     "RunInfo",
     "SharedMemoryDictArray",
     "StorageBase",
+    "load_all_outputs",
+    "load_dataframe",
     "load_outputs",
     "load_xarray_dataset",
     "register_storage",

@@ -21,9 +21,9 @@ from pipefunc._utils import (
     get_ncores,
     handle_error,
     is_running_in_ipynb,
-    load,
     prod,
 )
+from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
@@ -32,6 +32,7 @@ from ._adaptive_scheduler_slurm_executor import (
     maybe_update_slurm_executor_map,
     maybe_update_slurm_executor_single,
 )
+from ._load import _load_from_store, maybe_load_data
 from ._mapspec import MapSpec, _shape_to_key
 from ._prepare import prepare_run
 from ._result import DirectValue, Result, ResultDict
@@ -46,7 +47,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
+    from pipefunc._widgets.progress import ProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
@@ -64,13 +66,13 @@ def run_map(
     output_names: set[OUTPUT_TYPE] | None = None,
     parallel: bool = True,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: StorageType = "file_array",
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool = False,
+    show_progress: bool | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -139,6 +141,7 @@ def run_map(
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -153,14 +156,15 @@ def run_map(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. Only works if ``parallel=True``.
+        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, parallel, executor, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -168,6 +172,7 @@ def run_map(
         output_names=output_names,
         parallel=parallel,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -175,26 +180,26 @@ def run_map(
         show_progress=show_progress,
         in_async=False,
     )
-    if progress is not None:
-        progress.display()
-    with _maybe_executor(executor, parallel) as ex:
-        for gen in pipeline.topological_generations.function_lists:
+    if prep.progress is not None:
+        prep.progress.display()
+    with _maybe_executor(prep.executor, prep.parallel) as ex:
+        for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
                 generation=gen,
-                run_info=run_info,
-                store=store,
-                outputs=outputs,
+                run_info=prep.run_info,
+                store=prep.store,
+                outputs=prep.outputs,
                 fixed_indices=fixed_indices,
                 executor=ex,
-                chunksizes=chunksizes,
-                progress=progress,
+                chunksizes=prep.chunksizes,
+                progress=prep.progress,
                 return_results=return_results,
-                cache=pipeline.cache,
+                cache=prep.pipeline.cache,
             )
-    if progress is not None:  # final update
-        progress.update_progress(force=True)
-    _maybe_persist_memory(store, persist_memory)
-    return outputs
+    if prep.progress is not None:  # final update
+        prep.progress.update_progress(force=True)
+    _maybe_persist_memory(prep.store, persist_memory)
+    return prep.outputs
 
 
 @dataclass
@@ -203,6 +208,7 @@ class AsyncMap:
     run_info: RunInfo
     progress: ProgressTracker | None
     multi_run_manager: MultiRunManager | None
+    status_widget: AsyncTaskStatusWidget | None
 
     def result(self) -> ResultDict:
         if is_running_in_ipynb():  # pragma: no cover
@@ -220,6 +226,8 @@ class AsyncMap:
     def display(self) -> None:  # pragma: no cover
         """Display the pipeline widget."""
         if is_running_in_ipynb():
+            if self.status_widget is not None:
+                self.status_widget.display()
             if self.progress is not None:
                 self.progress.display()
             if self.multi_run_manager is not None:
@@ -236,13 +244,13 @@ def run_map_async(
     *,
     output_names: set[OUTPUT_TYPE] | None = None,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-    storage: StorageType = "file_array",
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+    storage: StorageType | None = None,
     persist_memory: bool = True,
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool = False,
+    show_progress: bool | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -309,6 +317,7 @@ def run_map_async(
 
         Available storage classes are registered in `pipefunc.map.storage_registry`.
         Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+        Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
     persist_memory
         Whether to write results to disk when memory based storage is used.
         Does not have any effect when file based storage is used.
@@ -323,14 +332,15 @@ def run_map_async(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar.
+        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
+        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
 
     """
-    pipeline, run_info, store, outputs, _, executor_dict, progress = prepare_run(
+    prep = prepare_run(
         pipeline=pipeline,
         inputs=inputs,
         run_folder=run_folder,
@@ -338,6 +348,7 @@ def run_map_async(
         output_names=output_names,
         parallel=True,
         executor=executor,
+        chunksizes=chunksizes,
         storage=storage,
         cleanup=cleanup,
         fixed_indices=fixed_indices,
@@ -346,37 +357,40 @@ def run_map_async(
         in_async=True,
     )
 
-    multi_run_manager = maybe_multi_run_manager(executor_dict)
+    multi_run_manager = maybe_multi_run_manager(prep.executor)
 
     async def _run_pipeline() -> ResultDict:
-        with _maybe_executor(executor_dict, parallel=True) as ex:
+        with _maybe_executor(prep.executor, parallel=True) as ex:
             assert ex is not None
-            for gen in pipeline.topological_generations.function_lists:
+            for gen in prep.pipeline.topological_generations.function_lists:
                 await _run_and_process_generation_async(
                     generation=gen,
-                    run_info=run_info,
-                    store=store,
-                    outputs=outputs,
+                    run_info=prep.run_info,
+                    store=prep.store,
+                    outputs=prep.outputs,
                     fixed_indices=fixed_indices,
                     executor=ex,
-                    chunksizes=chunksizes,
-                    progress=progress,
+                    chunksizes=prep.chunksizes,
+                    progress=prep.progress,
                     return_results=return_results,
-                    cache=pipeline.cache,
+                    cache=prep.pipeline.cache,
                     multi_run_manager=multi_run_manager,
                 )
-        _maybe_persist_memory(store, persist_memory)
-        return outputs
+        _maybe_persist_memory(prep.store, persist_memory)
+        return prep.outputs
 
     task = asyncio.create_task(_run_pipeline())
-    if progress is not None:
-        progress.attach_task(task)
+    if prep.progress is not None:
+        prep.progress.attach_task(task)
+
+    status_widget = maybe_async_task_status_widget(task)
     if is_running_in_ipynb():  # pragma: no cover
-        if progress is not None:
-            progress.display()
+        if prep.progress is not None:
+            prep.progress.display()
         if multi_run_manager is not None:
             multi_run_manager.display()
-    return AsyncMap(task, run_info, progress, multi_run_manager)
+
+    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
 
 
 def _maybe_persist_memory(
@@ -454,7 +468,7 @@ def _select_kwargs(
     input_keys = func.mapspec.input_keys(external_shape, index)  # type: ignore[arg-type]
     normalized_keys = {k: v[0] if len(v) == 1 else v for k, v in input_keys.items()}
     selected = {k: v[normalized_keys[k]] if k in normalized_keys else v for k, v in kwargs.items()}
-    _load_arrays(selected)
+    _load_data(selected)
     return selected
 
 
@@ -795,14 +809,16 @@ def _submit(
     executor: Executor,
     status: Status | None,
     progress: ProgressTracker | None,
+    chunksize: int,
     *args: Any,
 ) -> Future:
     if status is None:
         return executor.submit(func, *args)
     assert progress is not None
-    status.mark_in_progress()
+    status.mark_in_progress(n=chunksize)
     fut = executor.submit(func, *args)
-    fut.add_done_callback(status.mark_complete)
+    mark_complete = functools.partial(status.mark_complete, n=chunksize)
+    fut.add_done_callback(mark_complete)
     if not progress.in_async:
         fut.add_done_callback(progress.update_progress)
     return fut
@@ -828,23 +844,30 @@ def _chunk_indices(indices: list[int], chunksize: int) -> Iterable[tuple[int, ..
 
 def _chunksize_for_func(
     func: PipeFunc,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     num_iterations: int,
     executor: Executor,
 ) -> int:
     if isinstance(chunksizes, int):
         return chunksizes
-    if chunksizes is not None:
-        chunksize = chunksizes.get(func.output_name, None)
-        if chunksize is None:
-            chunksize = chunksizes.get("", 1)
-        if callable(chunksize):
-            chunksize = chunksize(num_iterations)
-        if not isinstance(chunksize, int) or chunksize <= 0:
-            msg = f"Invalid chunksize {chunksize} for {func.output_name}"
-            raise ValueError(msg)
-        return chunksize
-    return _get_optimal_chunk_size(num_iterations, executor)
+    if chunksizes is None:
+        return _get_optimal_chunk_size(num_iterations, executor)
+    chunksize = None
+    if func.output_name in chunksizes:
+        chunksize = chunksizes[func.output_name]
+    elif "" in chunksizes:
+        chunksize = chunksizes[""]
+
+    if callable(chunksize):
+        chunksize = chunksize(num_iterations)
+
+    if chunksize is None:
+        chunksize = _get_optimal_chunk_size(num_iterations, executor)
+
+    if not isinstance(chunksize, int) or chunksize <= 0:
+        msg = f"Invalid chunksize {chunksize} for {func.output_name}"
+        raise ValueError(msg)
+    return chunksize
 
 
 def _get_optimal_chunk_size(
@@ -867,6 +890,7 @@ def _get_optimal_chunk_size(
     """
     try:
         n_cores = get_ncores(executor)
+        n_cores = max(1, n_cores)
     except TypeError as e:
         warnings.warn(f"Automatic chunksize calculation failed with: {e}", stacklevel=2)
         n_cores = 1
@@ -883,7 +907,7 @@ def _maybe_parallel_map(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
     progress: ProgressTracker | None,
 ) -> list[Any]:
@@ -896,7 +920,7 @@ def _maybe_parallel_map(
         chunksize = _chunksize_for_func(func, chunksizes, len(indices), ex)
         chunks = list(_chunk_indices(indices, chunksize))
         process_chunk = functools.partial(_process_chunk, process_index=process_index)
-        return [_submit(process_chunk, ex, status, progress, chunk) for chunk in chunks]
+        return [_submit(process_chunk, ex, status, progress, len(chunk), chunk) for chunk in chunks]
     if status is not None:
         assert progress is not None
         process_index = _wrap_with_status_update(process_index, status, progress)  # type: ignore[assignment]
@@ -933,51 +957,11 @@ def _maybe_execute_single(
     if ex:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
-        return _submit(_execute_single, ex, status, progress, *args)
+        return _submit(_execute_single, ex, status, progress, 1, *args)
     if status is not None:
         assert progress is not None
         return _wrap_with_status_update(_execute_single, status, progress)(*args)
     return _execute_single(*args)
-
-
-class _StoredValue(NamedTuple):
-    value: Any
-    exists: bool
-
-
-def _load_from_store(
-    output_name: OUTPUT_TYPE,
-    store: dict[str, StoreType],
-    *,
-    return_output: bool = True,
-) -> _StoredValue:
-    outputs: list[Any] = []
-    all_exist = True
-
-    for name in at_least_tuple(output_name):
-        storage = store[name]
-        if isinstance(storage, StorageBase):
-            outputs.append(storage)
-        elif isinstance(storage, Path):
-            if storage.is_file():
-                outputs.append(load(storage) if return_output else None)
-            else:
-                all_exist = False
-                outputs.append(None)
-        else:
-            assert isinstance(storage, DirectValue)
-            if storage.exists():
-                outputs.append(storage.value)
-            else:
-                all_exist = False
-                outputs.append(None)
-
-    if not return_output:
-        outputs = None  # type: ignore[assignment]
-    elif len(outputs) == 1:
-        outputs = outputs[0]
-
-    return _StoredValue(outputs, all_exist)
 
 
 def _execute_single(
@@ -992,7 +976,7 @@ def _execute_single(
         return output
 
     # Otherwise, run the function
-    _load_arrays(kwargs)
+    _load_data(kwargs)
 
     def compute_fn() -> Any:
         try:
@@ -1005,15 +989,9 @@ def _execute_single(
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
 
-def _maybe_load_array(x: Any) -> Any:
-    if isinstance(x, StorageBase):
-        return x.to_array()
-    return x
-
-
-def _load_arrays(kwargs: dict[str, Any]) -> None:
+def _load_data(kwargs: dict[str, Any]) -> None:
     for k, v in kwargs.items():
-        kwargs[k] = _maybe_load_array(v)
+        kwargs[k] = maybe_load_data(v)
 
 
 class _KwargsTask(NamedTuple):
@@ -1030,7 +1008,7 @@ def _run_and_process_generation(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
@@ -1057,7 +1035,7 @@ async def _run_and_process_generation_async(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
@@ -1115,7 +1093,7 @@ def _submit_func(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
     progress: ProgressTracker | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
@@ -1183,7 +1161,7 @@ def _submit_generation(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: ProgressTracker | None,
     return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,

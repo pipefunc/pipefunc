@@ -1,7 +1,367 @@
 # Changelog
 
 These release notes are automatically generated from commits and GitHub issues and PRs.
-If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py`.
+If it is out of date, please run
+
+GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
+
+## v0.70.0 (2025-05-01)
+
+### 📦 Dependencies
+
+- ⬆️ Update ghcr.io/astral-sh/uv Docker tag to v0.7.2 ([#651](https://github.com/pipefunc/pipefunc/pull/651))
+
+### ✨ Enhancements
+
+- Add type casting for result `numpy.ndarray`s using type annotations ([#740](https://github.com/pipefunc/pipefunc/pull/740))
+
+### 📊 Stats
+
+- `.json`: +1 lines, -1 lines
+- `.py`: +190 lines, -49 lines
+- `other`: +1 lines, -1 lines
+
+## v0.69.1 (2025-04-30)
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.69.0 ([#738](https://github.com/pipefunc/pipefunc/pull/738))
+
+### 🐛 Bug Fixes
+
+- Use `_ScopedIdentifier` trick in `PipeFunc.original_parameters`  ([#739](https://github.com/pipefunc/pipefunc/pull/739))
+
+### 📊 Stats
+
+- `.md`: +58 lines, -15 lines
+- `.py`: +71 lines, -5 lines
+
+## v0.69.0 (2025-04-30)
+
+### ✨ Enhancements
+
+- Add `PipeFunc.__signature__` (allows doubly wrapping `PipeFunc`) ([#727](https://github.com/pipefunc/pipefunc/pull/727))
+- Make `output_name` of `NestedPipeFunc` depend on the topological ordering ([#735](https://github.com/pipefunc/pipefunc/pull/735))
+- Ensure deterministic order in generations and `Pipeline.sorted_functions` ([#736](https://github.com/pipefunc/pipefunc/pull/736))
+- Make `output_name` of `NestedPipeFunc` depend on the topological ordering ([84baccf](https://github.com/pipefunc/pipefunc/commit/84baccf))
+
+### 🐛 Bug Fixes
+
+- Fix `NestedPipeFunc.parameter_annotations` with renames ([#737](https://github.com/pipefunc/pipefunc/pull/737))
+- Fix creating `NestedPipeFunc` and binding a existing default ([#734](https://github.com/pipefunc/pipefunc/pull/734))
+
+### 📦 Dependencies
+
+- ⬆️ Update astral-sh/setup-uv action to v6 ([#732](https://github.com/pipefunc/pipefunc/pull/732))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#733](https://github.com/pipefunc/pipefunc/pull/733))
+- [pre-commit.ci] pre-commit autoupdate ([#731](https://github.com/pipefunc/pipefunc/pull/731))
+- [pre-commit.ci] pre-commit autoupdate ([#730](https://github.com/pipefunc/pipefunc/pull/730))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.68.0 ([#729](https://github.com/pipefunc/pipefunc/pull/729))
+
+### 📊 Stats
+
+- `.yml`: +3 lines, -3 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +93 lines, -10 lines
+- `.py`: +468 lines, -10 lines
+
+## v0.68.0 (2025-04-11)
+
+### Closed Issues
+
+- Running in parallel when some inputs can't be pickled ([#726](https://github.com/pipefunc/pipefunc/issues/726))
+- Difficulties renaming existing pipefunc ([#723](https://github.com/pipefunc/pipefunc/issues/723))
+- Allowing debugging of intermediate results when pipeline fails midway ([#722](https://github.com/pipefunc/pipefunc/issues/722))
+- Allowing DFS parallelization in .map ([#721](https://github.com/pipefunc/pipefunc/issues/721))
+- Make results numpy array optional ([#472](https://github.com/pipefunc/pipefunc/issues/472))
+
+### 🐛 Bug Fixes
+
+- Fix single size `pandas.DataFrame` ([#716](https://github.com/pipefunc/pipefunc/pull/716))
+- Fix 2 ND elements in `xarray` issues ([#728](https://github.com/pipefunc/pipefunc/pull/728))
+- Display mapspec index in grouped Graphviz nodes ([#719](https://github.com/pipefunc/pipefunc/pull/719))
+
+### ✨ Enhancements
+
+- Add `load_all_outputs` ([#725](https://github.com/pipefunc/pipefunc/pull/725))
+
+### 📦 Dependencies
+
+- ⬆️ Update python to v3.13.3 ([#714](https://github.com/pipefunc/pipefunc/pull/714))
+
+### 📊 Stats
+
+- `.yml`: +1 lines, -1 lines
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +196 lines, -11 lines
+
+## v0.67.0 (2025-04-10)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#679](https://github.com/pipefunc/pipefunc/pull/679))
+
+### ✨ Enhancements
+
+- Allow adding ND axis with `add_mapspec_axis` ([#717](https://github.com/pipefunc/pipefunc/pull/717))
+
+### 🤖 CI
+
+- Set `fetch-depth: 0` ([#713](https://github.com/pipefunc/pipefunc/pull/713))
+
+### 📊 Stats
+
+- `.py`: +127 lines, -5 lines
+- `.yml`: +2 lines, -0 lines
+- `.yaml`: +1 lines, -1 lines
+- `.md`: +44 lines, -0 lines
+
+## v0.66.0 (2025-04-08)
+
+### 🧹 Maintenance
+
+- Refactor `prepare_run` return type ([#712](https://github.com/pipefunc/pipefunc/pull/712))
+
+### ✨ Enhancements
+
+- Allow providing single `output_name` of tuple in `executor`, `storage`, `chunksizes` ([#711](https://github.com/pipefunc/pipefunc/pull/711))
+
+### 📊 Stats
+
+- `.py`: +150 lines, -48 lines
+
+## v0.65.1 (2025-04-08)
+
+### 🐛 Bug Fixes
+
+- Fix that `NestedPipeFunc.copy` preserves cache ([#710](https://github.com/pipefunc/pipefunc/pull/710))
+
+### 📊 Stats
+
+- `.py`: +78 lines, -2 lines
+
+## v0.65.0 (2025-04-08)
+
+### ✨ Enhancements
+
+- Add Group Args to `visualize_graphviz_widget` ([#709](https://github.com/pipefunc/pipefunc/pull/709))
+- Add `orient` widget to `visualize_graphviz_widget` ([#708](https://github.com/pipefunc/pipefunc/pull/708))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.64.0 ([#707](https://github.com/pipefunc/pipefunc/pull/707))
+
+### 📊 Stats
+
+- `.md`: +22 lines, -0 lines
+- `.py`: +86 lines, -21 lines
+
+## v0.64.0 (2025-04-08)
+
+### ✨ Enhancements
+
+- Add "show default args" and collapsable scopes to widget ([#706](https://github.com/pipefunc/pipefunc/pull/706))
+- Allow hiding nodes with default values ([#703](https://github.com/pipefunc/pipefunc/pull/703))
+
+### 🧹 Maintenance
+
+- Pin `numcodecs<0.16.0` ([#704](https://github.com/pipefunc/pipefunc/pull/704))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.63.0 ([#702](https://github.com/pipefunc/pipefunc/pull/702))
+
+### 📊 Stats
+
+- `.py`: +360 lines, -23 lines
+- `.md`: +45 lines, -0 lines
+- `.yml`: +4 lines, -2 lines
+- `.toml`: +2 lines, -2 lines
+
+## v0.63.0 (2025-04-04)
+
+### ✨ Enhancements
+
+- Group parameters that are used by a single `PipeFunc` in `visualize_graphviz` ([#700](https://github.com/pipefunc/pipefunc/pull/700))
+
+### 🧪 Testing
+
+- Test with `tmp_path` and always specify `parallel` and `storage` explicitly ([#701](https://github.com/pipefunc/pipefunc/pull/701))
+
+### 📊 Stats
+
+- `.py`: +467 lines, -159 lines
+
+## v0.62.0 (2025-04-03)
+
+### ✨ Enhancements
+
+- Allow collapsing scopes in Graphviz visualization ([#693](https://github.com/pipefunc/pipefunc/pull/693))
+
+### 📊 Stats
+
+- `.py`: +348 lines, -12 lines
+
+## v0.61.0 (2025-04-01)
+
+### ✨ Enhancements
+
+- Add `Pipeline.run(..., allow_unused=True)` ([#698](https://github.com/pipefunc/pipefunc/pull/698))
+
+### 🧹 Maintenance
+
+- Unpin bokeh<3.7 ([#685](https://github.com/pipefunc/pipefunc/pull/685))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.60.0 ([#697](https://github.com/pipefunc/pipefunc/pull/697))
+
+### 📊 Stats
+
+- `.py`: +26 lines, -3 lines
+- `.md`: +55 lines, -0 lines
+- `.yml`: +4 lines, -4 lines
+- `.toml`: +2 lines, -1 lines
+
+## v0.60.0 (2025-03-28)
+
+### ✨ Enhancements
+
+- Allow multiple leaf nodes in `NestedPipeFunc` ([#696](https://github.com/pipefunc/pipefunc/pull/696))
+- Allow scoped `PipeFunc`s inside `NestedPipeFunc` ([#692](https://github.com/pipefunc/pipefunc/pull/692))
+- Allow returning multiple outputs in `Pipeline.run` ([#694](https://github.com/pipefunc/pipefunc/pull/694))
+
+### 🐛 Bug Fixes
+
+- Fix `NestedPipeFunc.output_annotation` to handle renamed outputs with scopes ([#695](https://github.com/pipefunc/pipefunc/pull/695))
+
+### 🧹 Maintenance
+
+- Add `uv run` shebang to `get-notebooks.py` ([#691](https://github.com/pipefunc/pipefunc/pull/691))
+
+### 🧪 Testing
+
+- Skip flaky `test_pipeline_with_heterogeneous_executor` on nogil ([#690](https://github.com/pipefunc/pipefunc/pull/690))
+- Skip test_parallel_memory_storage on 3.13 ([#689](https://github.com/pipefunc/pipefunc/pull/689))
+- Actually test `NestedPipeFunc` with `SlurmExecutor` ([#687](https://github.com/pipefunc/pipefunc/pull/687))
+
+### 📊 Stats
+
+- `.md`: +13 lines, -23 lines
+- `.py`: +345 lines, -62 lines
+- `.toml`: +1 lines, -0 lines
+
+## v0.59.1 (2025-03-19)
+
+### 🐛 Bug Fixes
+
+- Fix missing `resources_scope` in `NestedPipeFunc` ([#686](https://github.com/pipefunc/pipefunc/pull/686))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.59.0 ([#684](https://github.com/pipefunc/pipefunc/pull/684))
+
+### 📊 Stats
+
+- `.py`: +50 lines, -4 lines
+- `.md`: +113 lines, -10 lines
+
+## v0.59.0 (2025-03-18)
+
+### ✨ Enhancements
+
+- Add `ResultDict.to_dataframe()` ([#681](https://github.com/pipefunc/pipefunc/pull/681))
+
+### 🧹 Maintenance
+
+- Pin bokeh<3.7 ([#682](https://github.com/pipefunc/pipefunc/pull/682))
+
+### 🤖 CI
+
+- Use `uv build` for PyPI releases ([#680](https://github.com/pipefunc/pipefunc/pull/680))
+
+### 📊 Stats
+
+- `.yml`: +5 lines, -12 lines
+- `.py`: +80 lines, -2 lines
+- `.toml`: +1 lines, -1 lines
+
+## v0.58.1 (2025-03-11)
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#676](https://github.com/pipefunc/pipefunc/pull/676))
+
+### 📦 Dependencies
+
+- ⬆️ Pin python to 3.13.2 ([#677](https://github.com/pipefunc/pipefunc/pull/677))
+
+### 🧪 Testing
+
+- Speedup tests ([#675](https://github.com/pipefunc/pipefunc/pull/675))
+
+### ✨ Enhancements
+
+- Select default initially in `VariantPipeline` selection widget ([#674](https://github.com/pipefunc/pipefunc/pull/674))
+
+### 📊 Stats
+
+- `.yml`: +2 lines, -2 lines
+- `.yaml`: +2 lines, -2 lines
+- `.py`: +128 lines, -23 lines
+
+## v0.58.0 (2025-03-06)
+
+### 🧪 Testing
+
+- Add `scheduling_strategy="eager"` benchmarks ([#669](https://github.com/pipefunc/pipefunc/pull/669))
+
+### ✨ Enhancements
+
+- Allow multiple variant groups per `PipeFunc` (breaking change) ([#673](https://github.com/pipefunc/pipefunc/pull/673))
+
+### 📊 Stats
+
+- `.md`: +11 lines, -11 lines
+- `.py`: +414 lines, -171 lines
+
+## v0.57.2 (2025-03-05)
+
+### 🐛 Bug Fixes
+
+- Prefix the SLURM job names with `executor.name` ([#671](https://github.com/pipefunc/pipefunc/pull/671))
+
+### 📊 Stats
+
+- `.py`: +9 lines, -4 lines
+
+## v0.57.1 (2025-03-05)
+
+### 🐛 Bug Fixes
+
+- Fix progress bar for `chunksize>1` ([#668](https://github.com/pipefunc/pipefunc/pull/668))
+- Fix deepcopy/serialization for `Pipeline` with shared cache ([#657](https://github.com/pipefunc/pipefunc/pull/657))
+- FIX `ResultDict.to_xarray` when no inputs ([#667](https://github.com/pipefunc/pipefunc/pull/667))
+- Prevent ZeroDivisionError in auto-chunks ([#666](https://github.com/pipefunc/pipefunc/pull/666))
+
+### 🧪 Testing
+
+- Add `auto_subpipeline` test ([#661](https://github.com/pipefunc/pipefunc/pull/661))
+
+### 📚 Documentation
+
+- Update `CHANGELOG.md` until v0.57.0 ([#664](https://github.com/pipefunc/pipefunc/pull/664))
+
+### 📊 Stats
+
+- `.md`: +60 lines, -1 lines
+- `.py`: +296 lines, -38 lines
 
 ## v0.57.0 (2025-03-04)
 
@@ -158,6 +518,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - `.py`: +30 lines, -2 lines
 
 ## v0.53.1 (2025-02-05)
+
+### Closed Issues
+
+- Stateful callable output caching ([#510](https://github.com/pipefunc/pipefunc/issues/510))
 
 ### 📦 Dependencies
 
@@ -329,6 +693,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 
 ## v0.50.3 (2025-01-24)
 
+### Closed Issues
+
+- BUG: Profiling `Pipeline.map` only works with `parallel=False` ([#547](https://github.com/pipefunc/pipefunc/issues/547))
+
 ### 🐛 Bug Fixes
 
 - Fix `ZeroDivisionError` in `ProgressBar` ([#596](https://github.com/pipefunc/pipefunc/pull/596))
@@ -348,6 +716,10 @@ If it is out of date, please run `GITHUB_TOKEN=$(gh auth token) uv run .github/g
 - `.py`: +179 lines, -45 lines
 
 ## v0.50.2 (2025-01-23)
+
+### Closed Issues
+
+- DOC: uv tip in tutorial.md is incorrect ([#588](https://github.com/pipefunc/pipefunc/issues/588))
 
 ### 🧹 Maintenance
 
