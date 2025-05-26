@@ -39,9 +39,9 @@ async def test_progress_tracker_init(mock_progress_dict: dict[OUTPUT_TYPE, Statu
 
     assert progress.task is None
     assert progress.progress_dict == mock_progress_dict
-    assert isinstance(progress.progress_bars["test"], FloatProgress)
-    assert isinstance(progress.labels["test"]["percentage"], HTML)
-    assert isinstance(progress.buttons["update"], Button)
+    assert isinstance(progress._progress_bars["test"], FloatProgress)
+    assert isinstance(progress._labels["test"]["percentage"], HTML)
+    assert isinstance(progress._buttons["update"], Button)
 
 
 @pytest.mark.asyncio
@@ -58,7 +58,7 @@ async def test_progress_tracker_update_progress(
 ) -> None:
     progress = ProgressTracker(mock_progress_dict, display=False)
     progress.update_progress()
-    assert progress.progress_bars["test"].value == 0.5
+    assert progress._progress_bars["test"].value == 0.5
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_progress_tracker_update_labels(
 ) -> None:
     progress = ProgressTracker(mock_progress_dict, display=False)
     progress._update_labels("test", mock_progress_dict["test"])
-    assert "50.0%" in progress.labels["test"]["percentage"].value
+    assert "50.0%" in progress._labels["test"]["percentage"].value
 
 
 @pytest.mark.asyncio
@@ -93,7 +93,7 @@ async def test_progress_tracker_auto_update_progress(
         patch("asyncio.sleep", return_value=None),  # Mock asyncio.sleep
     ):
         await progress._auto_update_progress()
-    assert progress.auto_update_interval_label.value != "Auto-update every: N/A"
+    assert progress._auto_update_interval_label.value != "Auto-update every: N/A"
     assert update_progress_mock.call_count == 2  # Ensure update_progress was called twice
 
 
@@ -113,8 +113,8 @@ async def test_progress_tracker_mark_completed(
 ) -> None:
     progress = ProgressTracker(mock_progress_dict, display=False)
     progress._mark_completed()
-    assert all(button.disabled for button in progress.buttons.values())
-    assert "Completed all tasks" in progress.auto_update_interval_label.value
+    assert all(button.disabled for button in progress._buttons.values())
+    assert "Completed all tasks" in progress._auto_update_interval_label.value
 
 
 @pytest.mark.asyncio
@@ -134,10 +134,10 @@ async def test_progress_tracker_set_auto_update(
     progress = ProgressTracker(mock_progress_dict, display=False)
     progress._set_auto_update(value=True)
     assert progress.auto_update
-    assert progress.buttons["toggle_auto_update"].description == "Stop Auto-Update"
+    assert progress._buttons["toggle_auto_update"].description == "Stop Auto-Update"
     progress._set_auto_update(value=False)
     assert not progress.auto_update
-    assert progress.buttons["toggle_auto_update"].description == "Start Auto-Update"
+    assert progress._buttons["toggle_auto_update"].description == "Start Auto-Update"
 
 
 @pytest.mark.asyncio
@@ -148,8 +148,8 @@ async def test_progress_tracker_cancel_calculation(
     progress = ProgressTracker(mock_progress_dict, mock_task, display=False)
     progress._cancel_calculation(None)
     assert mock_task.cancel.called
-    assert all(button.disabled for button in progress.buttons.values())
-    assert "Calculation cancelled" in progress.auto_update_interval_label.value
+    assert all(button.disabled for button in progress._buttons.values())
+    assert "Calculation cancelled" in progress._auto_update_interval_label.value
 
 
 @pytest.mark.asyncio

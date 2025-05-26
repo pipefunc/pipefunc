@@ -114,10 +114,10 @@ class ProgressTracker(ProgressTrackerBase):
             in_async=in_async,
         )
 
-        self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
+        self._progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
         self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
-        self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
-        self.buttons: dict[OUTPUT_TYPE, widgets.Button] = {
+        self._labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
+        self._buttons: dict[OUTPUT_TYPE, widgets.Button] = {
             "update": _create_button(
                 description="Update Progress",
                 button_style="info",
@@ -138,8 +138,8 @@ class ProgressTracker(ProgressTrackerBase):
             ),
         }
         for name, status in self.progress_dict.items():
-            self.progress_bars[name] = _create_progress_bar(name, status.progress)
-            self.labels[name] = {
+            self._progress_bars[name] = _create_progress_bar(name, status.progress)
+            self._labels[name] = {
                 "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
                 "estimated_time": _create_html_label(
                     "estimate-label",
@@ -147,7 +147,7 @@ class ProgressTracker(ProgressTrackerBase):
                 ),
                 "speed": _create_html_label("speed-label", "Speed: Calculating..."),
             }
-        self.auto_update_interval_label = _create_html_label(
+        self._auto_update_interval_label = _create_html_label(
             "interval-label",
             "Auto-update every: N/A",
         )
@@ -168,7 +168,7 @@ class ProgressTracker(ProgressTrackerBase):
                 continue
             if not force and status.progress < 1.0 and self._should_throttle_update(force):
                 return
-            progress_bar = self.progress_bars[name]
+            progress_bar = self._progress_bars[name]
             progress_bar.value = status.progress
             if status.progress >= 1.0:
                 progress_bar.bar_style = "success" if status.n_failed == 0 else "danger"
@@ -188,8 +188,8 @@ class ProgressTracker(ProgressTrackerBase):
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
-        iterations_label = self._get_status_text(status)
-        labels = self.labels[name]
+        iterations_label = self.get_status_text(status)
+        labels = self._labels[name]
         labels["percentage"].value = _span(
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
@@ -208,7 +208,7 @@ class ProgressTracker(ProgressTrackerBase):
         )
 
     def _update_auto_update_interval(self, new_interval: float) -> None:
-        self.auto_update_interval_label.value = _span(
+        self._auto_update_interval_label.value = _span(
             "interval-label",
             f"Auto-update every: {new_interval:.2f} sec",
         )
@@ -220,17 +220,17 @@ class ProgressTracker(ProgressTrackerBase):
             msg = "Completed with errors ❌"
         else:
             msg = "Completed all tasks 🎉"
-        self.auto_update_interval_label.value = _span("interval-label", msg)
-        for button in self.buttons.values():
+        self._auto_update_interval_label.value = _span("interval-label", msg)
+        for button in self._buttons.values():
             button.disabled = True
 
     def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
         """Set the auto-update feature to the given value."""
         super()._set_auto_update(value)
-        self.buttons["toggle_auto_update"].description = (
+        self._buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
-        self.buttons["toggle_auto_update"].button_style = (
+        self._buttons["toggle_auto_update"].button_style = (
             "danger" if self.auto_update else "success"
         )
 
@@ -241,20 +241,20 @@ class ProgressTracker(ProgressTrackerBase):
         self.update_progress()  # Update progress one last time
         if self.auto_update:
             self._toggle_auto_update()
-        for button in self.buttons.values():
+        for button in self._buttons.values():
             button.disabled = True
-        for progress_bar in self.progress_bars.values():
+        for progress_bar in self._progress_bars.values():
             if progress_bar.value < 1.0:
                 progress_bar.bar_style = "danger"
                 progress_bar.remove_class("animated-progress")
                 progress_bar.add_class("completed-progress")
-        self.auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
+        self._auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
     @functools.cached_property
     def _widgets(self) -> widgets.VBox:
         """Display the progress widgets with styles."""
         for name in self.progress_dict:
-            labels = self.labels[name]
+            labels = self._labels[name]
             labels_box = widgets.HBox(
                 [labels["percentage"], labels["estimated_time"], labels["speed"]],
                 layout=widgets.Layout(justify_content="space-between"),
@@ -263,7 +263,7 @@ class ProgressTracker(ProgressTrackerBase):
             border_color = _scope_border_color(hue)
             border = f"1px solid {border_color}"
             container = widgets.VBox(
-                [self.progress_bars[name], labels_box],
+                [self._progress_bars[name], labels_box],
                 layout=widgets.Layout(border=border, margin="2px 4px", padding="2px"),
             )
             self._progress_vboxes[name] = container
@@ -271,14 +271,14 @@ class ProgressTracker(ProgressTrackerBase):
             if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
                 container.add_class(f"scope-bg-{hue}")
 
-        buttons = self.buttons
+        buttons = self._buttons
         button_box = widgets.HBox(
             [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
             layout=widgets.Layout(justify_content="center"),
         )
         parts = list(self._progress_vboxes.values())
         if self.task:
-            parts.extend([button_box, self.auto_update_interval_label])
+            parts.extend([button_box, self._auto_update_interval_label])
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:

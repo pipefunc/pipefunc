@@ -48,8 +48,8 @@ class RichProgressTracker(ProgressTrackerBase):
         )
 
         # Rich-specific attributes
-        self.console = Console()
-        self.progress = Progress(
+        self._console = Console()
+        self._progress = Progress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}[/bold blue]"),
             BarColumn(),
@@ -58,21 +58,21 @@ class RichProgressTracker(ProgressTrackerBase):
             TimeElapsedColumn(),
             TimeRemainingColumn(),
             TextColumn("{task.fields[status]}"),
-            console=self.console,
+            console=self._console,
             auto_refresh=False,
         )
-        self.task_ids: dict[OUTPUT_TYPE, TaskID] = {}
+        self._task_ids: dict[OUTPUT_TYPE, TaskID] = {}
 
         # Create tasks in the progress bar
         for name, status in self.progress_dict.items():
             description = ", ".join(at_least_tuple(name))
-            task_id = self.progress.add_task(
+            task_id = self._progress.add_task(
                 description,
                 total=status.n_total,
                 completed=status.n_completed,
-                status=self._get_status_text(status),
+                status=self.get_status_text(status),
             )
-            self.task_ids[name] = task_id
+            self._task_ids[name] = task_id
 
         if display:
             self.display()
@@ -90,11 +90,11 @@ class RichProgressTracker(ProgressTrackerBase):
             if status.progress == 0 or name in self._marked_completed:
                 continue
 
-            task_id = self.task_ids[name]
-            self.progress.update(
+            task_id = self._task_ids[name]
+            self._progress.update(
                 task_id,
                 completed=status.n_completed,
-                status=self._get_status_text(status),
+                status=self.get_status_text(status),
             )
 
             if status.progress >= 1.0:
@@ -104,45 +104,45 @@ class RichProgressTracker(ProgressTrackerBase):
                     description = f"[bold green]✅ {txt}[/bold green]"
                 else:
                     description = f"[bold red]❌ {txt}[/bold red]"
-                self.progress.update(task_id, description=description)
+                self._progress.update(task_id, description=description)
 
         if self._all_completed():
             self._mark_completed()
 
-        self.progress.refresh()
+        self._progress.refresh()
         self.last_update_time = time.monotonic()
         self._update_sync_interval(self.last_update_time - now)
 
     def _mark_completed(self) -> None:
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
-            self.console.print("\n[bold red]Completed with errors ❌[/bold red]")
+            self._console.print("\n[bold red]Completed with errors ❌[/bold red]")
         else:
-            self.console.print("\n[bold green]Completed all tasks 🎉[/bold green]")
-        self.stop()
+            self._console.print("\n[bold green]Completed all tasks 🎉[/bold green]")
+        self._stop()
 
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
         if self.task is not None:
             self.task.cancel()
         self.update_progress(force=True)
-        self.console.print("\n[bold red]Calculation cancelled ❌[/bold red]")
+        self._console.print("\n[bold red]Calculation cancelled ❌[/bold red]")
 
         # Mark incomplete tasks as cancelled
         for name, status in self.progress_dict.items():
             if status.progress < 1.0:
-                task_id = self.task_ids[name]
+                task_id = self._task_ids[name]
                 description = (
                     f"[bold red]❌ {', '.join(at_least_tuple(name))} (cancelled)[/bold red]"
                 )
-                self.progress.update(task_id, description=description)
+                self._progress.update(task_id, description=description)
 
-        self.stop()
+        self._stop()
 
     def display(self) -> None:
         """Display the progress bars using Rich Live display."""
-        self.progress.start()
+        self._progress.start()
 
-    def stop(self) -> None:
+    def _stop(self) -> None:
         """Stop the live display."""
-        self.progress.refresh()
-        self.progress.stop()
+        self._progress.refresh()
+        self._progress.stop()

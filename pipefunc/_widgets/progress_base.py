@@ -16,6 +16,13 @@ if TYPE_CHECKING:
 class ProgressTrackerBase(ABC):
     """Base class for progress trackers with auto-update functionality."""
 
+    MIN_AUTO_UPDATE_INTERVAL = 0.1
+    MAX_AUTO_UPDATE_INTERVAL = 10.0
+    FIRST_AUTO_UPDATE_INTERVAL = 1.0
+    SYNC_UPDATE_INTERVAL = 0.01
+    INITIAL_UPDATE_PERIOD = 30.0
+    INITIAL_MAX_UPDATE_INTERVAL = 1.0
+
     def __init__(
         self,
         progress_dict: dict[OUTPUT_TYPE, Status],
@@ -29,15 +36,15 @@ class ProgressTrackerBase(ABC):
         self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
-        self.auto_update_task: asyncio.Task | None = None
+        self._auto_update_task: asyncio.Task | None = None
         self.in_async: bool = in_async
         self.last_update_time: float = 0.0
-        self._min_auto_update_interval: float = 0.1
-        self._max_auto_update_interval: float = 10.0
-        self._first_auto_update_interval: float = 1.0
-        self._sync_update_interval: float = 0.01
-        self._initial_update_period: float = 30.0
-        self._initial_max_update_interval: float = 1.0
+        self._min_auto_update_interval: float = self.MIN_AUTO_UPDATE_INTERVAL
+        self._max_auto_update_interval: float = self.MAX_AUTO_UPDATE_INTERVAL
+        self._first_auto_update_interval: float = self.FIRST_AUTO_UPDATE_INTERVAL
+        self._sync_update_interval: float = self.SYNC_UPDATE_INTERVAL
+        self._initial_update_period: float = self.INITIAL_UPDATE_PERIOD
+        self._initial_max_update_interval: float = self.INITIAL_MAX_UPDATE_INTERVAL
         self.start_time: float = 0.0
         self._marked_completed: set[OUTPUT_TYPE] = set()
 
@@ -59,6 +66,11 @@ class ProgressTrackerBase(ABC):
     @abstractmethod
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
+        ...
+
+    @abstractmethod
+    def display(self) -> None:
+        """Display the progress."""
         ...
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
@@ -109,10 +121,10 @@ class ProgressTrackerBase(ABC):
         """Set the auto-update feature to the given value."""
         self.auto_update = value
         if self.auto_update:
-            self.auto_update_task = asyncio.create_task(self._auto_update_progress())
-        elif self.auto_update_task is not None:
-            self.auto_update_task.cancel()
-            self.auto_update_task = None
+            self._auto_update_task = asyncio.create_task(self._auto_update_progress())
+        elif self._auto_update_task is not None:
+            self._auto_update_task.cancel()
+            self._auto_update_task = None
 
     def _should_throttle_update(self, force: bool) -> bool:  # noqa: FBT001
         """Check if update should be throttled (only for sync mode)."""
@@ -125,7 +137,7 @@ class ProgressTrackerBase(ABC):
         """Update the sync interval based on how long the update took."""
         self._sync_update_interval = clip(50 * update_duration, 0.01, 1.0)
 
-    def _get_status_text(self, status: Status) -> str:
+    def get_status_text(self, status: Status) -> str:
         """Generate status text for a task."""
         completed = f"✅ {status.n_completed:,}"
         failed = f"❌ {status.n_failed:,}"
