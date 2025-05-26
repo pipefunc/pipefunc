@@ -207,7 +207,7 @@ class ProgressTracker(ProgressTrackerBase):
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
 
-    def _update_auto_update_interval(self, new_interval: float) -> None:
+    def _update_auto_update_interval_text(self, new_interval: float) -> None:
         self._auto_update_interval_label.value = _span(
             "interval-label",
             f"Auto-update every: {new_interval:.2f} sec",

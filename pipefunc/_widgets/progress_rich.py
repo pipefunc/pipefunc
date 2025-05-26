@@ -138,6 +138,10 @@ class RichProgressTracker(ProgressTrackerBase):
 
         self._stop()
 
+    def _update_auto_update_interval_text(self, new_interval: float) -> None:
+        """Update the auto-update interval text."""
+        # no-op
+
     def display(self) -> None:
         """Display the progress bars using Rich Live display."""
         self._progress.start()
