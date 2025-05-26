@@ -194,7 +194,6 @@ class ProgressTracker(ProgressTrackerBase):
             "percent-label",
             f"{status.progress * 100:.1f}% | {iterations_label}",
         )
-
         elapsed_time = status.elapsed_time()
         if status.end_time is not None:
             eta = "Completed"
