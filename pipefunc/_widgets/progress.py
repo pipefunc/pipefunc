@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Any
 import IPython.display
 import ipywidgets as widgets
 
-from pipefunc._utils import at_least_tuple, clip
+from pipefunc._utils import at_least_tuple
+from pipefunc._widgets.progress_base import ProgressTrackerBase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,7 +93,7 @@ def _scope_background_color_css(hue: int) -> str:
     )
 
 
-class ProgressTracker:
+class ProgressTracker(ProgressTrackerBase):
     """Class to track progress and display it with ipywidgets."""
 
     def __init__(
@@ -105,17 +106,14 @@ class ProgressTracker:
         display: bool = True,
         in_async: bool = True,
     ) -> None:
-        self.task: asyncio.Task[None] | None = task
-        self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
-        self.target_progress_change: float = target_progress_change
-        self.auto_update: bool = auto_update
-        self.auto_update_task: asyncio.Task | None = None
-        self.in_async: bool = in_async
-        self.last_update_time: float = 0.0
-        self._min_auto_update_interval: float = 0.1
-        self._max_auto_update_interval: float = 10.0
-        self._first_auto_update_interval: float = 1.0
-        self._sync_update_interval: float = 0.01
+        super().__init__(
+            progress_dict,
+            task,
+            target_progress_change=target_progress_change,
+            auto_update=auto_update,
+            in_async=in_async,
+        )
+
         self.progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
         self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
         self.labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
@@ -153,35 +151,22 @@ class ProgressTracker:
             "interval-label",
             "Auto-update every: N/A",
         )
-        self._initial_update_period: float = 30.0
-        self._initial_max_update_interval: float = 1.0
-        self.start_time: float = 0.0
-        self._marked_completed: set[OUTPUT_TYPE] = set()
         if display:
             self.display()
         if self.task is not None:
             self._set_auto_update(auto_update)
 
-    def attach_task(self, task: asyncio.Task[Any]) -> None:
-        """Attach a new task to the progress tracker."""
-        self.task = task
-        self._set_auto_update(self.auto_update)
-
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         now = time.monotonic()
-        return_early = False
-        if not self.in_async and not force:
-            assert self.task is None
-            # If not in asyncio, `update_progress` is called after each iteration,
-            # so, we throttle the updates to avoid excessive updates.
-            if now - self.last_update_time < self._sync_update_interval:
-                return_early = True
+
+        if self._should_throttle_update(force):
+            return
 
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
-            if return_early and status.progress < 1.0:
+            if not force and status.progress < 1.0 and self._should_throttle_update(force):
                 return
             progress_bar = self.progress_bars[name]
             progress_bar.value = status.progress
@@ -199,8 +184,7 @@ class ProgressTracker:
         if self._all_completed():
             self._mark_completed()
         self.last_update_time = time.monotonic()
-        # Set the update interval to 50 times the total time this method took
-        self._sync_update_interval = clip(50 * (self.last_update_time - now), 0.01, 1.0)
+        self._update_sync_interval(self.last_update_time - now)
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
@@ -231,23 +215,6 @@ class ProgressTracker:
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
 
-    def _calculate_adaptive_interval_with_previous(self) -> float:
-        """Calculate a dynamic interval based on progress changes for all resources."""
-        min_interval = self._min_auto_update_interval
-        max_interval = self._max_auto_update_interval
-        shortest_interval = max_interval
-        current_time = time.monotonic()
-        for status in self.progress_dict.values():
-            if status.progress <= 0 or status.progress >= 1:
-                continue
-            assert status.start_time is not None
-            elapsed_time = current_time - status.start_time
-            progress_rate = status.progress / elapsed_time
-            estimated_time_for_target = self.target_progress_change / progress_rate
-            # Estimate time for target progress change
-            shortest_interval = min(shortest_interval, estimated_time_for_target)
-        return min(max(shortest_interval, min_interval), max_interval)
-
     async def _auto_update_progress(self) -> None:
         """Periodically update the progress."""
         self.start_time = time.monotonic()
@@ -269,9 +236,6 @@ class ProgressTracker:
             )
             await asyncio.sleep(new_interval)
 
-    def _all_completed(self) -> bool:
-        return all(status.progress >= 1.0 for status in self.progress_dict.values())
-
     def _mark_completed(self) -> None:
         if self.auto_update:
             self._toggle_auto_update()
@@ -283,24 +247,15 @@ class ProgressTracker:
         for button in self.buttons.values():
             button.disabled = True
 
-    def _toggle_auto_update(self, _: Any = None) -> None:
-        """Toggle the auto-update feature on or off."""
-        self._set_auto_update(not self.auto_update)
-
     def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
         """Set the auto-update feature to the given value."""
-        self.auto_update = value
+        super()._set_auto_update(value)
         self.buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
         self.buttons["toggle_auto_update"].button_style = (
             "danger" if self.auto_update else "success"
         )
-        if self.auto_update:
-            self.auto_update_task = asyncio.create_task(self._auto_update_progress())
-        elif self.auto_update_task is not None:
-            self.auto_update_task.cancel()
-            self.auto_update_task = None
 
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
