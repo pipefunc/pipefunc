@@ -188,14 +188,7 @@ class ProgressTracker(ProgressTrackerBase):
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
-        completed = f"✅ {status.n_completed:,}"
-        failed = f"❌ {status.n_failed:,}"
-        left = f"⏳ {status.n_left:,}"
-        if status.n_failed == 0:
-            iterations_label = f"{completed} | {left}"
-        else:
-            iterations_label = f"{completed} | {failed} | {left}"
-
+        iterations_label = self._get_status_text(status)
         labels = self.labels[name]
         labels["percentage"].value = _span(
             "percent-label",

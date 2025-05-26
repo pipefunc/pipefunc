@@ -1,6 +1,7 @@
 # pipefunc/_widgets/progress_rich.py
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -78,14 +79,10 @@ class RichProgressTracker(ProgressTrackerBase):
         if self.task is not None:
             self._set_auto_update(auto_update)
 
-    def _get_status_text(self, status: Status) -> str:
-        """Generate status text for a task."""
-        if status.n_failed == 0:
-            return f"✅ {status.n_completed:,} | ⏳ {status.n_left:,}"
-        return f"✅ {status.n_completed:,} | ❌ {status.n_failed:,} | ⏳ {status.n_left:,}"
-
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values."""
+        now = time.monotonic()
+
         if self._should_throttle_update(force):
             return
 
@@ -113,6 +110,8 @@ class RichProgressTracker(ProgressTrackerBase):
             self._mark_completed()
 
         self.progress.refresh()
+        self.last_update_time = time.monotonic()
+        self._update_sync_interval(self.last_update_time - now)
 
     def _mark_completed(self) -> None:
         if any(status.n_failed > 0 for status in self.progress_dict.values()):

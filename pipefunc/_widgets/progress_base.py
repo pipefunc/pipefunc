@@ -121,3 +121,12 @@ class ProgressTrackerBase(ABC):
     def _update_sync_interval(self, update_duration: float) -> None:
         """Update the sync interval based on how long the update took."""
         self._sync_update_interval = clip(50 * update_duration, 0.01, 1.0)
+
+    def _get_status_text(self, status: Status) -> str:
+        """Generate status text for a task."""
+        completed = f"✅ {status.n_completed:,}"
+        failed = f"❌ {status.n_failed:,}"
+        left = f"⏳ {status.n_left:,}"
+        if status.n_failed == 0:
+            return f"{completed} | {left}"
+        return f"{completed} | {failed} | {left}"
