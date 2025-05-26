@@ -92,8 +92,11 @@ class ProgressTrackerBase(ABC):
 
             if self._all_completed():
                 break
-
+            self._update_auto_update_interval(new_interval)
             await asyncio.sleep(new_interval)
+
+    def _update_auto_update_interval(self, new_interval: float) -> None:  # noqa: B027
+        """Update the auto-update interval."""
 
     def _all_completed(self) -> bool:
         return all(status.progress >= 1.0 for status in self.progress_dict.values())

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import functools
 import hashlib
 import textwrap
@@ -14,6 +13,7 @@ from pipefunc._utils import at_least_tuple
 from pipefunc._widgets.progress_base import ProgressTrackerBase
 
 if TYPE_CHECKING:
+    import asyncio
     from collections.abc import Callable
 
     from pipefunc._pipeline._types import OUTPUT_TYPE
@@ -208,26 +208,11 @@ class ProgressTracker(ProgressTrackerBase):
             f"Elapsed: {elapsed_time:.2f} sec | {eta}",
         )
 
-    async def _auto_update_progress(self) -> None:
-        """Periodically update the progress."""
-        self.start_time = time.monotonic()
-        while self.auto_update:
-            self.update_progress()
-            current_time = time.monotonic()
-            elapsed_since_start = current_time - self.start_time
-
-            new_interval = self._calculate_adaptive_interval_with_previous()
-            if elapsed_since_start <= self._initial_update_period:
-                new_interval = min(new_interval, self._initial_max_update_interval)
-
-            if self._all_completed():
-                break
-
-            self.auto_update_interval_label.value = _span(
-                "interval-label",
-                f"Auto-update every: {new_interval:.2f} sec",
-            )
-            await asyncio.sleep(new_interval)
+    def _update_auto_update_interval(self, new_interval: float) -> None:
+        self.auto_update_interval_label.value = _span(
+            "interval-label",
+            f"Auto-update every: {new_interval:.2f} sec",
+        )
 
     def _mark_completed(self) -> None:
         if self.auto_update:
