@@ -1,7 +1,6 @@
 # pipefunc/_widgets/progress_rich.py
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
@@ -17,6 +16,7 @@ from rich.progress import (
 )
 
 from pipefunc._utils import at_least_tuple
+from pipefunc._widgets.progress_base import ProgressTrackerBase
 
 if TYPE_CHECKING:
     import asyncio
@@ -25,24 +25,26 @@ if TYPE_CHECKING:
     from pipefunc.map._progress import Status
 
 
-class RichProgressTracker:
-    """Text-based progress tracker using rich.progress with the same interface as ProgressTracker."""
+class RichProgressTracker(ProgressTrackerBase):
+    """Text-based progress tracker using rich.progress."""
 
     def __init__(
         self,
         progress_dict: dict[OUTPUT_TYPE, Status],
         task: asyncio.Task[Any] | None = None,
         *,
+        target_progress_change: float = 0.05,
+        auto_update: bool = True,
         display: bool = True,
         in_async: bool = True,
-        refresh_interval: float = 0.1,
     ) -> None:
-        self.task: asyncio.Task[None] | None = task
-        self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
-        self._marked_completed: set[OUTPUT_TYPE] = set()
-        self.in_async: bool = in_async
-        self.last_update_time: float = 0.0
-        self.refresh_interval: float = refresh_interval
+        super().__init__(
+            progress_dict,
+            task,
+            target_progress_change=target_progress_change,
+            auto_update=auto_update,
+            in_async=in_async,
+        )
 
         # Rich-specific attributes
         self.console = Console()
@@ -73,6 +75,8 @@ class RichProgressTracker:
 
         if display:
             self.display()
+        if self.task is not None:
+            self._set_auto_update(auto_update)
 
     def _get_status_text(self, status: Status) -> str:
         """Generate status text for a task."""
@@ -80,12 +84,11 @@ class RichProgressTracker:
             return f"✅ {status.n_completed:,} | ⏳ {status.n_left:,}"
         return f"✅ {status.n_completed:,} | ❌ {status.n_failed:,} | ⏳ {status.n_left:,}"
 
-    def attach_task(self, task: asyncio.Task[Any]) -> None:
-        """Attach a new task to the progress tracker."""
-        self.task = task
-
-    def update_progress(self, _: Any = None, *, force: bool = False) -> None:  # noqa: ARG002
+    def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values."""
+        if self._should_throttle_update(force):
+            return
+
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
@@ -109,16 +112,7 @@ class RichProgressTracker:
         if self._all_completed():
             self._mark_completed()
 
-        self._maybe_refresh()
-
-    def _maybe_refresh(self) -> None:
-        now = time.monotonic()
-        if now - self.last_update_time > self.refresh_interval:
-            self.progress.refresh()
-            self.last_update_time = now
-
-    def _all_completed(self) -> bool:
-        return all(status.progress >= 1.0 for status in self.progress_dict.values())
+        self.progress.refresh()
 
     def _mark_completed(self) -> None:
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
@@ -131,7 +125,7 @@ class RichProgressTracker:
         """Cancel the ongoing calculation."""
         if self.task is not None:
             self.task.cancel()
-        self.update_progress()  # Update progress one last time
+        self.update_progress(force=True)
         self.console.print("\n[bold red]Calculation cancelled ❌[/bold red]")
 
         # Mark incomplete tasks as cancelled
@@ -147,14 +141,9 @@ class RichProgressTracker:
 
     def display(self) -> None:
         """Display the progress bars using Rich Live display."""
-        # self.progress.start()
+        self.progress.start()
 
     def stop(self) -> None:
         """Stop the live display."""
         self.progress.refresh()
         self.progress.stop()
-
-    @property
-    def auto_update(self) -> bool:
-        """Always True as Rich handles updates automatically."""
-        return True
