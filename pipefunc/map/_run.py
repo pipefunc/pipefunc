@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
     from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
@@ -206,7 +207,7 @@ def run_map(
 class AsyncMap:
     task: asyncio.Task[ResultDict]
     run_info: RunInfo
-    progress: ProgressTracker | None
+    progress: ProgressTracker | RichProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
 
@@ -808,7 +809,7 @@ def _submit(
     func: Callable[..., Any],
     executor: Executor,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
     chunksize: int,
     *args: Any,
 ) -> Future:
@@ -909,7 +910,7 @@ def _maybe_parallel_map(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
 ) -> list[Any]:
     if not indices:
         return []
@@ -931,7 +932,7 @@ def _maybe_parallel_map(
 def _wrap_with_status_update(
     func: Callable[..., Any],
     status: Status,
-    progress: ProgressTracker,
+    progress: ProgressTracker | RichProgressTracker,
 ) -> Callable[..., Any]:
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
@@ -946,7 +947,7 @@ def _wrap_with_status_update(
 def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -1009,7 +1010,7 @@ def _run_and_process_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -1036,7 +1037,7 @@ async def _run_and_process_generation_async(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -1094,7 +1095,7 @@ def _submit_func(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
-    progress: ProgressTracker | None = None,
+    progress: ProgressTracker | RichProgressTracker | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -1162,7 +1163,7 @@ def _submit_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: ProgressTracker | RichProgressTracker | None,
     return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
