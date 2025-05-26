@@ -160,13 +160,12 @@ class ProgressTracker(ProgressTrackerBase):
         """Update the progress values and labels."""
         now = time.monotonic()
 
-        if self._should_throttle_update(force):
-            return
+        return_early = self._should_throttle_update(force)
 
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
-            if not force and status.progress < 1.0 and self._should_throttle_update(force):
+            if return_early and status.progress < 1.0:
                 return
             progress_bar = self._progress_bars[name]
             progress_bar.value = status.progress
