@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -73,7 +73,7 @@ def run_map(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -251,7 +251,7 @@ def run_map_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.

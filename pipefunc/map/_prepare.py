@@ -54,7 +54,7 @@ def prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
-    show_progress: bool | None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,
 ) -> Prepared:
     if not parallel and executor:

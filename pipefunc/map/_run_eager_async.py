@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.map._run import (
@@ -52,7 +52,7 @@ def run_map_eager_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.

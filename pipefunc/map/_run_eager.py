@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures import FIRST_COMPLETED, Executor, Future, wait
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
@@ -50,7 +50,7 @@ def run_map_eager(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.

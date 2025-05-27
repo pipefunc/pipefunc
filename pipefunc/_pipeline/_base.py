@@ -739,7 +739,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -890,7 +890,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:

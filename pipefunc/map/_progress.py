@@ -74,22 +74,32 @@ class Status:
         return self.end_time - self.start_time
 
 
+def _progress_implementation() -> Literal["rich", "ipywidgets"] | None:
+    if is_running_in_ipynb() and is_installed("ipywidgets"):
+        return "ipywidgets"
+    if is_installed("rich"):
+        return "rich"
+    return None
+
+
 def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
-    show_progress: bool | None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,  # noqa: FBT001
-    implementation: Literal["rich", "ipywidgets"] = "rich",
 ) -> ProgressTracker | RichProgressTracker | None:
-    if show_progress is None:
-        show_progress = is_running_in_ipynb() and is_installed("ipywidgets")
-    if not show_progress:
+    if show_progress is False:
         return None
+    implementation = _progress_implementation() if show_progress is True else show_progress
     if implementation == "rich":
-        requires("ipywidgets", reason="show_progress", extras="ipywidgets")
-        from pipefunc._widgets.progress_rich import RichProgressTracker
+        requires("rich", reason="show_progress", extras="rich")
+        from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker
     elif implementation == "ipywidgets":
-        from pipefunc._widgets.progress import ProgressTracker
+        requires("ipywidgets", reason="show_progress", extras="ipywidgets")
+        from pipefunc._widgets.progress import ProgressTracker  # type: ignore[assignment]
+    else:
+        msg = f"Invalid implementation: {implementation}"
+        raise ValueError(msg)
 
     progress = {}
     for func in functions:
@@ -103,9 +113,4 @@ def init_tracker(
         else:
             size = 1
         progress[func.output_name] = Status(n_total=size)
-    if implementation == "rich":
-        return RichProgressTracker(progress, None, display=False, in_async=in_async)
-    if implementation == "ipywidgets":
-        return ProgressTracker(progress, None, display=False, in_async=in_async)
-    msg = f"Invalid implementation: {implementation}"
-    raise ValueError(msg)
+    return ProgressTracker(progress, None, display=False, in_async=in_async)
