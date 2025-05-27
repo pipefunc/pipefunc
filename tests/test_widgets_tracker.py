@@ -6,7 +6,7 @@ import pytest
 from ipywidgets import HTML, Button, FloatProgress, VBox
 
 from pipefunc._pipeline._types import OUTPUT_TYPE
-from pipefunc._widgets.progress_ipywidgets_ipywidgets import ProgressTracker
+from pipefunc._widgets.progress_ipywidgets import ProgressTracker
 from pipefunc.map._progress import Status
 
 
