@@ -74,7 +74,11 @@ class Status:
         return self.end_time - self.start_time
 
 
-def _progress_implementation() -> Literal["rich", "ipywidgets"] | None:
+def _progress_implementation(
+    show_progress: Literal[True, "rich", "ipywidgets"] | None,
+) -> Literal["rich", "ipywidgets"] | None:
+    if isinstance(show_progress, str):
+        return show_progress
     if is_running_in_ipynb() and is_installed("ipywidgets"):
         return "ipywidgets"
     if is_installed("rich"):
@@ -90,7 +94,7 @@ def init_tracker(
 ) -> ProgressTracker | RichProgressTracker | None:
     if show_progress is False:
         return None
-    implementation = _progress_implementation() if show_progress in (True, None) else show_progress
+    implementation = _progress_implementation(show_progress)
     if implementation == "rich":
         requires("rich", reason="show_progress", extras="rich")
         from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker
