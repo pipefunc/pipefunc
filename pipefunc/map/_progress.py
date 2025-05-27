@@ -87,10 +87,16 @@ def _progress_tracker_implementation(
 ) -> Literal["rich", "ipywidgets"] | None:
     if isinstance(show_progress, str):
         return show_progress
-    if is_running_in_ipynb() and is_installed("ipywidgets"):  # pragma: no cover
-        return "ipywidgets"
-    if is_installed("rich"):
-        return "rich"
+    if show_progress is True:
+        if is_running_in_ipynb() and is_installed("ipywidgets"):
+            return "ipywidgets"
+        if is_installed("rich"):
+            return "rich"
+    if show_progress is None and is_running_in_ipynb():
+        if is_installed("ipywidgets"):
+            return "ipywidgets"
+        if is_installed("rich"):
+            return "rich"
     return None  # pragma: no cover
 
 
