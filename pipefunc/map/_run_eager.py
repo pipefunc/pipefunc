@@ -148,7 +148,7 @@ def run_map_eager(
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
         - ``None`` (default): Auto-detect *for Jupyter environments only*.
-          If in Jupyter, uses `ipywidgets` if installed, falling back to `rich`
+          Uses `ipywidgets` if installed, falling back to `rich`
           if installed. No progress bar if not in a Jupyter notebook.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
