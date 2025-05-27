@@ -56,27 +56,22 @@ class ProgressTrackerBase(ABC):
     @abstractmethod
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
-        ...
 
     @abstractmethod
     def _mark_completed(self) -> None:
         """Mark the progress as completed."""
-        ...
 
     @abstractmethod
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
-        ...
 
     @abstractmethod
     def display(self) -> None:
         """Display the progress."""
-        ...
 
     @abstractmethod
     def _update_auto_update_interval_text(self, new_interval: float) -> None:
         """Update the auto-update interval."""
-        ...
 
     def _calculate_adaptive_interval_with_previous(self) -> float:
         """Calculate a dynamic interval based on progress changes for all resources."""

@@ -74,16 +74,16 @@ class Status:
         return self.end_time - self.start_time
 
 
-def _progress_implementation(
+def _progress_tracker_implementation(
     show_progress: Literal[True, "rich", "ipywidgets"] | None,
 ) -> Literal["rich", "ipywidgets"] | None:
     if isinstance(show_progress, str):
         return show_progress
-    if is_running_in_ipynb() and is_installed("ipywidgets"):
+    if is_running_in_ipynb() and is_installed("ipywidgets"):  # pragma: no cover
         return "ipywidgets"
     if is_installed("rich"):
         return "rich"
-    return None
+    return None  # pragma: no cover
 
 
 def init_tracker(
@@ -94,15 +94,15 @@ def init_tracker(
 ) -> ProgressTracker | RichProgressTracker | None:
     if show_progress is False:
         return None
-    implementation = _progress_implementation(show_progress)
+    implementation = _progress_tracker_implementation(show_progress)
     if implementation == "rich":
         requires("rich", reason="show_progress", extras="rich")
         from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker
     elif implementation == "ipywidgets":
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
         from pipefunc._widgets.progress import ProgressTracker  # type: ignore[assignment]
-    else:
-        msg = f"Invalid implementation: {implementation}"
+    else:  # pragma: no cover
+        msg = f"Invalid implementation: {implementation}, expected 'rich' or 'ipywidgets'."
         raise ValueError(msg)
 
     progress = {}
