@@ -12,8 +12,6 @@ from rich.progress import (
     SpinnerColumn,
     TaskID,
     TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
 )
 
 from pipefunc._utils import at_least_tuple
@@ -55,8 +53,8 @@ class RichProgressTracker(ProgressTrackerBase):
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
             MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
+            TextColumn("{task.fields[elapsed_time]}", style="progress.elapsed"),
+            TextColumn("{task.fields[remaining_time]}", style="progress.remaining"),
             console=self._console,
             auto_refresh=False,
         )
@@ -65,10 +63,13 @@ class RichProgressTracker(ProgressTrackerBase):
         # Create tasks in the progress bar
         for name, status in self.progress_dict.items():
             description = ", ".join(at_least_tuple(name))
+            elapsed_time = status.elapsed_time()
             task_id = self._progress.add_task(
                 description,
                 total=status.n_total,
                 completed=status.n_completed,
+                elapsed_time=_format_time(elapsed_time),
+                remaining_time=_format_time(status.eta(elapsed_time=elapsed_time)),
             )
             self._task_ids[name] = task_id
 
@@ -87,10 +88,13 @@ class RichProgressTracker(ProgressTrackerBase):
             if return_early and status.progress < 1.0:
                 return
             task_id = self._task_ids[name]
+            elapsed_time = status.elapsed_time()
             self._progress.update(
                 task_id,
                 total=status.n_total,
                 completed=status.n_completed,
+                elapsed_time=_format_time(elapsed_time),
+                remaining_time=_format_time(status.eta(elapsed_time=elapsed_time)),
             )
             if status.progress >= 1.0:
                 self._marked_completed.add(name)
@@ -145,3 +149,14 @@ class RichProgressTracker(ProgressTrackerBase):
         """Stop the live display."""
         self._progress.refresh()
         self._progress.stop()
+
+
+def _format_time(seconds: float | None) -> str:
+    if seconds is None:
+        return "--:--"
+    # Based on https://github.com/tqdm/tqdm/blob/master/tqdm/std.py
+    minutes, seconds = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if not hours:
+        return f"{minutes:02d}:{seconds:02d}"
+    return f"{hours:d}:{minutes:02d}:{seconds:02d}"

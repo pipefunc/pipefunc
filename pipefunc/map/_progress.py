@@ -73,6 +73,14 @@ class Status:
             return time.monotonic() - self.start_time
         return self.end_time - self.start_time
 
+    def eta(self, *, elapsed_time: float | None = None) -> float | None:
+        if elapsed_time is None:
+            elapsed_time = self.elapsed_time()
+        if elapsed_time == 0:
+            return None
+        progress = self.progress
+        return (1.0 - progress) * (elapsed_time / progress)
+
 
 def _progress_tracker_implementation(
     show_progress: Literal[True, "rich", "ipywidgets"] | None,
