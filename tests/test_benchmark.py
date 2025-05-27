@@ -67,6 +67,7 @@ def test_map_sequential_with_dict_storage(pipeline_mapspec: Pipeline) -> None:
         inputs={"a": a, "b": b},
         parallel=False,
         storage="dict",
+        show_progress=False,
     )
 
 
@@ -79,6 +80,7 @@ def test_map_sequential_with_dict_storage_eager(pipeline_mapspec: Pipeline) -> N
         inputs={"a": a, "b": b},
         parallel=False,
         storage="dict",
+        show_progress=False,
         scheduling_strategy="eager",
     )
 
@@ -109,6 +111,7 @@ def test_large_nd_sweep_from_faq(pipeline_nd: Pipeline) -> None:
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
         parallel=False,
         storage="dict",
+        show_progress=False,
     )
 
 
@@ -120,5 +123,6 @@ def test_large_nd_sweep_from_faq_eager(pipeline_nd: Pipeline) -> None:
         inputs={"a": lst, "b": lst, "x": lst, "y": lst},
         parallel=False,
         storage="dict",
+        show_progress=False,
         scheduling_strategy="eager",
     )
