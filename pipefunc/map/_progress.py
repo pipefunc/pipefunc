@@ -88,11 +88,11 @@ def _progress_tracker_implementation(
     if isinstance(show_progress, str):
         return show_progress
     if show_progress is True:
-        if is_running_in_ipynb() and is_installed("ipywidgets"):
+        if is_running_in_ipynb() and is_installed("ipywidgets"):  # pragma: no cover
             return "ipywidgets"
         if is_installed("rich"):
             return "rich"
-    if show_progress is None and is_running_in_ipynb():
+    if show_progress is None and is_running_in_ipynb():  # pragma: no cover
         if is_installed("ipywidgets"):
             return "ipywidgets"
         if is_installed("rich"):
@@ -117,9 +117,8 @@ def init_tracker(
         from pipefunc._widgets.progress_ipywidgets import (  # type: ignore[assignment]
             IPyWidgetsProgressTracker as ProgressTracker,
         )
-    else:  # pragma: no cover
-        msg = f"Invalid implementation: {implementation}, expected 'rich' or 'ipywidgets'."
-        raise ValueError(msg)
+    else:
+        return None
 
     progress = {}
     for func in functions:

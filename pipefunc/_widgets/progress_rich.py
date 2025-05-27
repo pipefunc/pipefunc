@@ -109,7 +109,7 @@ class RichProgressTracker(ProgressTrackerBase):
         self._update_sync_interval(self.last_update_time - t_start)
 
     def _mark_completed(self) -> None:
-        if self._completed:
+        if self._completed:  # pragma: no cover
             return
         self._completed = True
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
