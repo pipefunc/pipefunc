@@ -158,7 +158,7 @@ class ProgressTracker(ProgressTrackerBase):
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
-        now = time.monotonic()
+        t_start = time.monotonic()
         return_early = self._should_throttle_update(force)
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
@@ -181,11 +181,19 @@ class ProgressTracker(ProgressTrackerBase):
         if self._all_completed():
             self._mark_completed()
         self.last_update_time = time.monotonic()
-        self._update_sync_interval(self.last_update_time - now)
+        self._update_sync_interval(self.last_update_time - t_start)
+
+    def _status_text(self, status: Status) -> str:
+        completed = f"✅ {status.n_completed:,}"
+        failed = f"❌ {status.n_failed:,}"
+        left = f"⏳ {status.n_left:,}"
+        if status.n_failed == 0:
+            return f"{completed} | {left}"
+        return f"{completed} | {failed} | {left}"
 
     def _update_labels(self, name: OUTPUT_TYPE, status: Status) -> None:
         assert status.progress > 0
-        iterations_label = self.get_status_text(status)
+        iterations_label = self._status_text(status)
         labels = self._labels[name]
         labels["percentage"].value = _span(
             "percent-label",

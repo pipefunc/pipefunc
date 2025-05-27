@@ -57,7 +57,6 @@ class RichProgressTracker(ProgressTrackerBase):
             MofNCompleteColumn(),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
-            TextColumn("{task.fields[status]}"),
             console=self._console,
             auto_refresh=False,
         )
@@ -70,7 +69,6 @@ class RichProgressTracker(ProgressTrackerBase):
                 description,
                 total=status.n_total,
                 completed=status.n_completed,
-                status=self.get_status_text(status),
             )
             self._task_ids[name] = task_id
 
@@ -93,7 +91,6 @@ class RichProgressTracker(ProgressTrackerBase):
                 task_id,
                 total=status.n_total,
                 completed=status.n_completed,
-                status=self.get_status_text(status),
             )
             if status.progress >= 1.0:
                 self._marked_completed.add(name)
