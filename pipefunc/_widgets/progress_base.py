@@ -36,16 +36,16 @@ class ProgressTrackerBase(ABC):
         self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
-        self._auto_update_task: asyncio.Task | None = None
         self.in_async: bool = in_async
         self.last_update_time: float = 0.0
+        self.start_time: float = 0.0
+        self._auto_update_task: asyncio.Task | None = None
         self._min_auto_update_interval: float = self.MIN_AUTO_UPDATE_INTERVAL
         self._max_auto_update_interval: float = self.MAX_AUTO_UPDATE_INTERVAL
         self._first_auto_update_interval: float = self.FIRST_AUTO_UPDATE_INTERVAL
         self._sync_update_interval: float = self.SYNC_UPDATE_INTERVAL
         self._initial_update_period: float = self.INITIAL_UPDATE_PERIOD
         self._initial_max_update_interval: float = self.INITIAL_MAX_UPDATE_INTERVAL
-        self.start_time: float = 0.0
         self._marked_completed: set[OUTPUT_TYPE] = set()
 
     def attach_task(self, task: asyncio.Task[Any]) -> None:

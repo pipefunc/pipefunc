@@ -159,9 +159,7 @@ class ProgressTracker(ProgressTrackerBase):
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
         now = time.monotonic()
-
         return_early = self._should_throttle_update(force)
-
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue

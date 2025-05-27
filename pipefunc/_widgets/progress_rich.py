@@ -81,15 +81,13 @@ class RichProgressTracker(ProgressTrackerBase):
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values."""
-        now = time.monotonic()
-
-        if self._should_throttle_update(force):
-            return
-
+        t_start = time.monotonic()
+        return_early = self._should_throttle_update(force)
         for name, status in self.progress_dict.items():
             if status.progress == 0 or name in self._marked_completed:
                 continue
-
+            if return_early and status.progress < 1.0:
+                return
             task_id = self._task_ids[name]
             self._progress.update(
                 task_id,
@@ -97,7 +95,6 @@ class RichProgressTracker(ProgressTrackerBase):
                 completed=status.n_completed,
                 status=self.get_status_text(status),
             )
-
             if status.progress >= 1.0:
                 self._marked_completed.add(name)
                 txt = ", ".join(at_least_tuple(name))
@@ -112,7 +109,7 @@ class RichProgressTracker(ProgressTrackerBase):
 
         self._progress.refresh()
         self.last_update_time = time.monotonic()
-        self._update_sync_interval(self.last_update_time - now)
+        self._update_sync_interval(self.last_update_time - t_start)
 
     def _mark_completed(self) -> None:
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
