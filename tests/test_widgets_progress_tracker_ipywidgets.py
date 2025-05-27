@@ -204,16 +204,10 @@ def test_progress_tracker_mark_completed_with_errors(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test marking completion with errors."""
-    status_failed = Status(
-        n_total=100,
-        n_in_progress=0,
-        n_completed=99,
-        n_failed=1,
-    )
-
-    mock_progress_dict["failed_task"] = status_failed
+    mock_progress_dict["test"].n_failed = 50
+    mock_progress_dict["test"].n_in_progress = 0
     tracker = ProgressTracker(mock_progress_dict, display=False, auto_update=False)
-
-    tracker._mark_completed()
+    assert isinstance(tracker._widgets, VBox)  # initialize cached widgets
+    tracker.update_progress()
     assert "Completed with errors" in tracker._auto_update_interval_label.value
     assert "❌" in tracker._auto_update_interval_label.value
