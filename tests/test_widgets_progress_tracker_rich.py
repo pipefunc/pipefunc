@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pipefunc._widgets.progress_rich import RichProgressTracker
+from pipefunc._widgets.progress_rich import RichProgressTracker, _format_time
 from pipefunc.map._progress import Status
 
 
@@ -425,3 +425,11 @@ def test_rich_progress_tracker_early_return_throttling(
     # Verify that the method returned early by checking that task2 wasn't processed
     # (since task1 would cause early return before task2 is processed)
     assert tracker.progress_dict["task2"].n_completed == 0  # Should remain unchanged
+
+
+def test_format_time():
+    assert _format_time(0) == "00:00"
+    assert _format_time(1) == "00:01"
+    assert _format_time(60) == "01:00"
+    assert _format_time(3600) == "1:00:00"
+    assert _format_time(3600 * 24) == "24:00:00"
