@@ -94,11 +94,11 @@ def _progress_tracker_implementation(
             return "rich"
         msg = "No progress bar implementation found. Please install 'ipywidgets' or 'rich'."  # pragma: no cover
         raise ModuleNotFoundError(msg)  # pragma: no cover
-    if show_progress is None and is_running_in_ipynb():  # pragma: no cover
-        if is_installed("ipywidgets"):
-            return "ipywidgets"
-        if is_installed("rich"):
-            return "rich"
+    if (
+        show_progress is None and is_running_in_ipynb() and is_installed("ipywidgets")
+    ):  # pragma: no cover
+        return "ipywidgets"
+
     return None  # pragma: no cover
 
 

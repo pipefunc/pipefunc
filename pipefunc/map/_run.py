@@ -166,9 +166,9 @@ def run_map(
           Shown only if in a Jupyter notebook and `ipywidgets` is installed.
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
-        - ``None`` (default): Auto-detect *for Jupyter environments only*.
-          Uses `ipywidgets` if installed, falling back to `rich`
-          if installed. No progress bar if not in a Jupyter notebook.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -352,9 +352,9 @@ def run_map_async(
           Shown only if in a Jupyter notebook and `ipywidgets` is installed.
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
-        - ``None`` (default): Auto-detect *for Jupyter environments only*.
-          Uses `ipywidgets` if installed, falling back to `rich`
-          if installed. No progress bar if not in a Jupyter notebook.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
