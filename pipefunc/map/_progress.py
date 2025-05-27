@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from pipefunc import PipeFunc
-    from pipefunc._widgets.progress_ipywidgets import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
 
     from ._result import StoreType
@@ -99,17 +99,17 @@ def init_tracker(
     functions: list[PipeFunc],
     show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,  # noqa: FBT001
-) -> ProgressTracker | RichProgressTracker | None:
+) -> IPyWidgetsProgressTracker | RichProgressTracker | None:
     if show_progress is False:
         return None
     implementation = _progress_tracker_implementation(show_progress)
     if implementation == "rich":
         requires("rich", reason="show_progress", extras="rich")
-        from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker
+        from pipefunc._widgets.progress_rich import RichProgressTracker as IPyWidgetsProgressTracker
     elif implementation == "ipywidgets":
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
         from pipefunc._widgets.progress_ipywidgets import (  # type: ignore[assignment]
-            ProgressTracker,
+            IPyWidgetsProgressTracker,
         )
     else:  # pragma: no cover
         msg = f"Invalid implementation: {implementation}, expected 'rich' or 'ipywidgets'."
@@ -127,4 +127,4 @@ def init_tracker(
         else:
             size = 1
         progress[func.output_name] = Status(n_total=size)
-    return ProgressTracker(progress, None, display=False, in_async=in_async)
+    return IPyWidgetsProgressTracker(progress, None, display=False, in_async=in_async)

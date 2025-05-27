@@ -93,7 +93,7 @@ def _scope_background_color_css(hue: int) -> str:
     )
 
 
-class ProgressTracker(ProgressTrackerBase):
+class IPyWidgetsProgressTracker(ProgressTrackerBase):
     """Class to track progress and display it with ipywidgets."""
 
     def __init__(
@@ -219,6 +219,9 @@ class ProgressTracker(ProgressTrackerBase):
         )
 
     def _mark_completed(self) -> None:
+        if self._completed:
+            return
+        self._completed = True
         if self.auto_update:
             self._toggle_auto_update()
         if any(status.n_failed > 0 for status in self.progress_dict.values()):

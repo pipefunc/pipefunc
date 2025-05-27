@@ -1,4 +1,3 @@
-# pipefunc/_widgets/progress_rich.py
 from __future__ import annotations
 
 import time
