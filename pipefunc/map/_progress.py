@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from pipefunc import PipeFunc
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import ProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
 
     from ._result import StoreType
@@ -108,7 +108,9 @@ def init_tracker(
         from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker
     elif implementation == "ipywidgets":
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
-        from pipefunc._widgets.progress import ProgressTracker  # type: ignore[assignment]
+        from pipefunc._widgets.progress_ipywidgets import (  # type: ignore[assignment]
+            ProgressTracker,
+        )
     else:  # pragma: no cover
         msg = f"Invalid implementation: {implementation}, expected 'rich' or 'ipywidgets'."
         raise ValueError(msg)

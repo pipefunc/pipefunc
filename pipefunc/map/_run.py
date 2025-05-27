@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import ProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 

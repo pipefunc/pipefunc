@@ -6,7 +6,7 @@ import pytest
 from ipywidgets import HTML, Button, FloatProgress, VBox
 
 from pipefunc._pipeline._types import OUTPUT_TYPE
-from pipefunc._widgets.progress import ProgressTracker
+from pipefunc._widgets.progress_ipywidgets_ipywidgets import ProgressTracker
 from pipefunc.map._progress import Status
 
 
@@ -34,7 +34,7 @@ def mock_task() -> Mock:
 
 @pytest.mark.asyncio
 async def test_progress_tracker_init(mock_progress_dict: dict[OUTPUT_TYPE, Status]) -> None:
-    with patch("pipefunc._widgets.progress.IPython.display.display"):
+    with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display"):
         progress = ProgressTracker(mock_progress_dict, None)
 
     assert progress.task is None
@@ -162,7 +162,7 @@ async def test_progress_tracker_widgets(mock_progress_dict: dict[OUTPUT_TYPE, St
 
 @pytest.mark.asyncio
 async def test_progress_tracker_display(mock_progress_dict: dict[OUTPUT_TYPE, Status]) -> None:
-    with patch("pipefunc._widgets.progress.IPython.display.display") as mock_display:
+    with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
         progress = ProgressTracker(mock_progress_dict, display=False)
         progress.display()
         assert mock_display.call_count == 2  # display on HTML and VBox
@@ -195,6 +195,6 @@ async def test_progress_tracker_color_by_scope():
     assert len(widgets.children) == len(progress_dict) + 2
     borders = {child.layout.border for child in widgets.children[: len(progress_dict)]}
     assert len(borders) == 3  # 3 different scopes, foo, bar, None
-    with patch("pipefunc._widgets.progress.IPython.display.display") as mock_display:
+    with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
         progress.display()
         assert mock_display.call_count == 2
