@@ -46,7 +46,7 @@ async def test_progress_tracker_init(mock_progress_dict: dict[OUTPUT_TYPE, Statu
 
 @pytest.mark.asyncio
 async def test_progress_tracker_attach_task(mock_progress_dict):
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     new_task = AsyncMock()
     progress.attach_task(new_task)
     assert progress.task == new_task
@@ -56,7 +56,7 @@ async def test_progress_tracker_attach_task(mock_progress_dict):
 async def test_progress_tracker_update_progress(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     progress.update_progress()
     assert progress._progress_bars["test"].value == 0.5
 
@@ -65,7 +65,7 @@ async def test_progress_tracker_update_progress(
 async def test_progress_tracker_update_labels(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     progress._update_labels("test", mock_progress_dict["test"])
     assert "50.0%" in progress._labels["test"]["percentage"].value
 
@@ -74,7 +74,7 @@ async def test_progress_tracker_update_labels(
 async def test_progress_tracker_calculate_adaptive_interval(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     interval = progress._calculate_adaptive_interval_with_previous()
     assert 0.1 <= interval <= 10.0
 
@@ -83,7 +83,7 @@ async def test_progress_tracker_calculate_adaptive_interval(
 async def test_progress_tracker_auto_update_progress(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     progress.auto_update = True
     update_progress_mock = Mock()
     with (
@@ -101,7 +101,7 @@ async def test_progress_tracker_auto_update_progress(
 async def test_progress_tracker_all_completed(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     assert not progress._all_completed()
     mock_progress_dict["test"].mark_complete(n=50)
     assert progress._all_completed()
@@ -111,7 +111,7 @@ async def test_progress_tracker_all_completed(
 async def test_progress_tracker_mark_completed(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     progress._mark_completed()
     assert all(button.disabled for button in progress._buttons.values())
     assert "Completed all tasks" in progress._auto_update_interval_label.value
@@ -121,7 +121,7 @@ async def test_progress_tracker_mark_completed(
 async def test_progress_tracker_toggle_auto_update(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     initial_state = progress.auto_update
     progress._toggle_auto_update()
     assert progress.auto_update != initial_state
@@ -131,7 +131,7 @@ async def test_progress_tracker_toggle_auto_update(
 async def test_progress_tracker_set_auto_update(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     progress._set_auto_update(value=True)
     assert progress.auto_update
     assert progress._buttons["toggle_auto_update"].description == "Stop Auto-Update"
@@ -145,7 +145,7 @@ async def test_progress_tracker_cancel_calculation(
     mock_progress_dict: dict[OUTPUT_TYPE, Status],
     mock_task: Mock,
 ) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, mock_task, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict, mock_task)
     progress._cancel_calculation(None)
     assert mock_task.cancel.called
     assert all(button.disabled for button in progress._buttons.values())
@@ -154,7 +154,7 @@ async def test_progress_tracker_cancel_calculation(
 
 @pytest.mark.asyncio
 async def test_progress_tracker_widgets(mock_progress_dict: dict[OUTPUT_TYPE, Status]) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     widgets = progress._widgets
     assert isinstance(widgets, VBox)
     assert len(widgets.children) > 0
@@ -163,14 +163,14 @@ async def test_progress_tracker_widgets(mock_progress_dict: dict[OUTPUT_TYPE, St
 @pytest.mark.asyncio
 async def test_progress_tracker_display(mock_progress_dict: dict[OUTPUT_TYPE, Status]) -> None:
     with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
-        progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+        progress = IPyWidgetsProgressTracker(mock_progress_dict)
         progress.display()
         assert mock_display.call_count == 2  # display on HTML and VBox
 
 
 @pytest.mark.asyncio
 async def test_progress_tracker_failed(mock_progress_dict: dict[OUTPUT_TYPE, Status]) -> None:
-    progress = IPyWidgetsProgressTracker(mock_progress_dict, display=False)
+    progress = IPyWidgetsProgressTracker(mock_progress_dict)
     assert not progress._all_completed()
     mock_progress_dict["test"].mark_complete(n=49)
     future: Future[Any] = Future()
@@ -189,7 +189,7 @@ async def test_progress_tracker_color_by_scope():
         "c": Status(n_total=100),
     }
     mock_task = AsyncMock()
-    progress = IPyWidgetsProgressTracker(progress_dict, mock_task, display=False)
+    progress = IPyWidgetsProgressTracker(progress_dict, mock_task)
 
     widgets = progress._widgets
     assert len(widgets.children) == len(progress_dict) + 2
@@ -206,7 +206,7 @@ def test_progress_tracker_mark_completed_with_errors(
     """Test marking completion with errors."""
     mock_progress_dict["test"].n_failed = 50
     mock_progress_dict["test"].n_in_progress = 0
-    tracker = IPyWidgetsProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = IPyWidgetsProgressTracker(mock_progress_dict, auto_update=False)
     assert isinstance(tracker._widgets, VBox)  # initialize cached widgets
     tracker.update_progress()
     assert "Completed with errors" in tracker._auto_update_interval_label.value

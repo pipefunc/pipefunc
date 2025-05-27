@@ -84,7 +84,7 @@ def test_rich_progress_tracker_init_basic(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test basic initialization without auto-update."""
-    tracker = RichProgressTracker(mock_progress_dict, None, auto_update=False, display=False)
+    tracker = RichProgressTracker(mock_progress_dict, None, auto_update=False)
 
     assert tracker.progress_dict == mock_progress_dict
     assert tracker.task is None
@@ -100,27 +100,18 @@ async def test_rich_progress_tracker_init_with_task(
     mock_task: AsyncMock,
 ) -> None:
     """Test initialization with a task."""
-    tracker = RichProgressTracker(mock_progress_dict, mock_task, auto_update=False, display=False)
+    tracker = RichProgressTracker(mock_progress_dict, mock_task, auto_update=False)
 
     assert tracker.progress_dict == mock_progress_dict
     assert tracker.task == mock_task
     assert "test_task" in tracker._task_ids
 
 
-def test_rich_progress_tracker_init_with_display(
-    mock_progress_dict: dict[str | tuple[str, ...], Status],
-) -> None:
-    """Test initialization with display=True."""
-    with patch.object(RichProgressTracker, "display") as mock_display:
-        RichProgressTracker(mock_progress_dict, None, display=True, auto_update=False)
-        mock_display.assert_called_once()
-
-
 def test_rich_progress_tracker_update_progress(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test updating progress values."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     # Update status
     mock_progress_dict["test_task"].n_completed = 75
@@ -138,7 +129,7 @@ def test_rich_progress_tracker_update_progress_completed_task(
 ) -> None:
     """Test updating progress for a completed task."""
     mock_progress_dict["completed_task"] = mock_status_completed
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     # First update, completed_task should be marked as completed
     tracker.update_progress()
@@ -160,7 +151,7 @@ def test_rich_progress_tracker_update_progress_all_completed(
     }
     progress_dict["task2"].mark_complete(n=10)
 
-    tracker = RichProgressTracker(progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(progress_dict, auto_update=False)
 
     with patch.object(tracker, "_mark_completed") as mock_mark_completed:
         tracker.update_progress()
@@ -171,7 +162,7 @@ def test_rich_progress_tracker_mark_completed_success(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test marking completion with success."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     with patch.object(tracker, "_stop") as mock_stop:
         # Capture the console output
@@ -191,7 +182,7 @@ def test_rich_progress_tracker_mark_completed_with_errors(
 ) -> None:
     """Test marking completion with errors."""
     mock_progress_dict["failed_task"] = mock_status_failed
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     with patch.object(tracker, "_stop") as mock_stop:
         with patch.object(tracker._console, "print") as mock_print:
@@ -209,7 +200,7 @@ def test_rich_progress_tracker_update_progress_failed_task(
 ) -> None:
     """Test updating progress for a failed task."""
     progress_dict: dict[str | tuple[str, ...], Status] = {"failed_task": mock_status_failed}
-    tracker = RichProgressTracker(progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(progress_dict, auto_update=False)
 
     # This should not raise any exceptions
     tracker.update_progress()
@@ -223,12 +214,7 @@ def test_rich_progress_tracker_cancel_calculation(
     mock_task: AsyncMock,
 ) -> None:
     """Test cancelling calculation."""
-    tracker = RichProgressTracker(
-        mock_progress_dict_multiple,
-        mock_task,
-        display=False,
-        auto_update=False,
-    )
+    tracker = RichProgressTracker(mock_progress_dict_multiple, mock_task, auto_update=False)
 
     with patch.object(tracker, "_stop") as mock_stop:
         with patch.object(tracker._console, "print") as mock_print:
@@ -247,7 +233,7 @@ def test_rich_progress_tracker_cancel_calculation_no_task(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test cancelling calculation when no task is present."""
-    tracker = RichProgressTracker(mock_progress_dict, None, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, None, auto_update=False)
 
     with patch.object(tracker, "update_progress") as mock_update_progress:
         tracker._cancel_calculation(None)
@@ -258,7 +244,7 @@ def test_rich_progress_tracker_display(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test display method."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     with patch.object(tracker._progress, "start") as mock_start:
         tracker.display()
@@ -269,7 +255,7 @@ def test_rich_progress_tracker_stop(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test stop method."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
 
     with (
         patch.object(tracker._progress, "refresh") as mock_refresh,
@@ -284,7 +270,7 @@ def test_rich_progress_tracker_update_auto_update_interval_text(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test update_auto_update_interval_text method (no-op)."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
     # This is a no-op, so just call it for coverage
     tracker._update_auto_update_interval_text(0.1)
     # No assertion needed as it's a no-op
@@ -296,7 +282,6 @@ def test_rich_progress_tracker_update_progress_throttling(
     """Test progress update throttling behavior."""
     tracker = RichProgressTracker(
         mock_progress_dict_multiple,
-        display=False,
         auto_update=False,
         target_progress_change=0.01,
     )
@@ -321,7 +306,7 @@ def test_rich_progress_tracker_update_progress_task_progress_zero(
 ) -> None:
     """Test updating progress for a task with zero progress."""
     progress_dict: dict[str | tuple[str, ...], Status] = {"task_zero": mock_status_not_started}
-    tracker = RichProgressTracker(progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(progress_dict, auto_update=False)
 
     # This should not raise any exceptions
     tracker.update_progress()
@@ -334,11 +319,7 @@ def test_rich_progress_tracker_multiple_tasks_with_tuples(
     mock_progress_dict_multiple: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test handling multiple tasks including tuple names."""
-    tracker = RichProgressTracker(
-        mock_progress_dict_multiple,
-        display=False,
-        auto_update=False,
-    )
+    tracker = RichProgressTracker(mock_progress_dict_multiple, auto_update=False)
 
     # Check that all tasks are registered
     assert "task1" in tracker._task_ids
@@ -356,7 +337,7 @@ def test_rich_progress_tracker_all_completed_check(
     # Create a status that starts incomplete
     incomplete_status = Status(n_total=100, n_completed=50, n_failed=0)
     progress_dict: dict[str | tuple[str, ...], Status] = {"task1": incomplete_status}
-    tracker = RichProgressTracker(progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(progress_dict, auto_update=False)
 
     # Initially not all completed
     assert not tracker._all_completed()
@@ -372,7 +353,7 @@ def test_rich_progress_tracker_attach_task(
     mock_progress_dict: dict[str | tuple[str, ...], Status],
 ) -> None:
     """Test attaching a task to the tracker."""
-    tracker = RichProgressTracker(mock_progress_dict, display=False, auto_update=False)
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
     new_task = AsyncMock()
 
     tracker.attach_task(new_task)
@@ -392,7 +373,6 @@ async def test_rich_progress_tracker_with_auto_update(
         tracker = RichProgressTracker(
             mock_progress_dict,
             mock_task,
-            display=False,
             auto_update=True,
         )
 
@@ -406,7 +386,6 @@ def test_rich_progress_tracker_early_return_throttling(
     """Test early return in update_progress when throttling is active."""
     tracker = RichProgressTracker(
         mock_progress_dict_multiple,
-        display=False,
         auto_update=False,
         target_progress_change=0.01,
         in_async=False,  # Enable sync mode for throttling

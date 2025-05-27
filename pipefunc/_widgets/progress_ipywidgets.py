@@ -103,7 +103,6 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         *,
         target_progress_change: float = 0.05,
         auto_update: bool = True,
-        display: bool = True,
         in_async: bool = True,
     ) -> None:
         super().__init__(
@@ -151,8 +150,6 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             "interval-label",
             "Auto-update every: N/A",
         )
-        if display:
-            self.display()
         if self.task is not None:
             self._set_auto_update(auto_update)
 

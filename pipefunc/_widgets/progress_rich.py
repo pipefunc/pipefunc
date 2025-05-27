@@ -33,7 +33,6 @@ class RichProgressTracker(ProgressTrackerBase):
         *,
         target_progress_change: float = 0.05,
         auto_update: bool = True,
-        display: bool = True,
         in_async: bool = True,
     ) -> None:
         super().__init__(
@@ -72,8 +71,6 @@ class RichProgressTracker(ProgressTrackerBase):
             )
             self._task_ids[name] = task_id
 
-        if display:
-            self.display()
         if self.task is not None:
             self._set_auto_update(auto_update)
 
