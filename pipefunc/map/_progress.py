@@ -90,7 +90,7 @@ def init_tracker(
 ) -> ProgressTracker | RichProgressTracker | None:
     if show_progress is False:
         return None
-    implementation = _progress_implementation() if show_progress is True else show_progress
+    implementation = _progress_implementation() if show_progress in (True, None) else show_progress
     if implementation == "rich":
         requires("rich", reason="show_progress", extras="rich")
         from pipefunc._widgets.progress_rich import RichProgressTracker as ProgressTracker

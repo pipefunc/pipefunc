@@ -93,6 +93,7 @@ class RichProgressTracker(ProgressTrackerBase):
             task_id = self._task_ids[name]
             self._progress.update(
                 task_id,
+                total=status.n_total,
                 completed=status.n_completed,
                 status=self.get_status_text(status),
             )

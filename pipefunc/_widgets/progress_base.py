@@ -143,7 +143,7 @@ class ProgressTrackerBase(ABC):
         """Generate status text for a task."""
         completed = f"✅ {status.n_completed:,}"
         failed = f"❌ {status.n_failed:,}"
-        left = f"⏳ {status.n_left:,}"
+        left = "⏳ ?" if status.n_total is None else f"⏳ {status.n_left:,}"
         if status.n_failed == 0:
             return f"{completed} | {left}"
         return f"{completed} | {failed} | {left}"
