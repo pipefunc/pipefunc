@@ -412,3 +412,15 @@ def test_format_time():
     assert _format_time(60) == "01:00"
     assert _format_time(3600) == "1:00:00"
     assert _format_time(3600 * 24) == "24:00:00"
+
+
+def test_rich_progress_tracker_display_multiple_times(
+    mock_progress_dict: dict[str | tuple[str, ...], Status],
+) -> None:
+    """Test display method."""
+    tracker = RichProgressTracker(mock_progress_dict, auto_update=False)
+
+    tracker.display()
+
+    with pytest.raises(RuntimeError, match="Progress bar already started"):
+        tracker.display()

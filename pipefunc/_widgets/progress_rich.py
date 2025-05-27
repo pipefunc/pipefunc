@@ -142,6 +142,9 @@ class RichProgressTracker(ProgressTrackerBase):
 
     def display(self) -> None:
         """Display the progress bars using Rich Live display."""
+        if self._progress.live.is_started:
+            msg = "Progress bar already started, rich does not support multiple displays"
+            raise RuntimeError(msg)
         self._progress.start()
 
     def _stop(self) -> None:
