@@ -954,7 +954,7 @@ def _maybe_execute_single(
 ) -> Any:
     args = (func, kwargs, store, cache)  # args for _execute_single
     ex = _executor_for_func(func, executor)
-    if ex:
+    if ex is not None:
         assert executor is not None
         ex = maybe_update_slurm_executor_single(func, ex, executor, kwargs)
         return _submit(_execute_single, ex, status, progress, 1, *args)

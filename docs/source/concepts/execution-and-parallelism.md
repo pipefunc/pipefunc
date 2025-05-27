@@ -114,6 +114,7 @@ That includes:
 - `dask.distributed.Client().get_executor()`
 - `mpi4py.futures.MPIPoolExecutor()`
 - `loky.get_reusable_executor()`
+- `executorlib.SingleNodeExecutor`, `executorlib.SlurmClusterExecutor`, `executorlib.SlurmJobExecutor`, `executorlib.FluxClusterExecutor`, `executorlib.FluxJobExecutor`
 
 ```
 
