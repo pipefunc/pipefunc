@@ -197,7 +197,7 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
-    def info(self, *, print_table: bool = False) -> dict[str, Any] | None:
+    def info(self, *, print_table: bool = False) -> dict[str, tuple[str, ...]] | None:
         """Return information about inputs and outputs of the Pipeline.
 
         Parameters
@@ -236,7 +236,7 @@ class Pipeline:
         intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
-        info = {
+        info: dict[str, tuple[str, ...]] = {
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
             "inputs": inputs,
@@ -2595,7 +2595,7 @@ class _PipelineInternalCache:
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
-def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
+def _rich_info_table(info: dict[str, tuple[str, ...]], *, prints: bool = False) -> Table:
     """Create a rich table from a dictionary of information."""
     requires("rich", reason="print_table=True", extras="rich")
     import rich.table
