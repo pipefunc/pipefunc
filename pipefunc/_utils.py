@@ -330,7 +330,7 @@ def get_ncores(ex: Executor) -> int:  # noqa: PLR0911, PLR0912
             # This could be better but since there is `cores`, `cores_per_node`,
             # and `nodes`; and they can be `None`, we just return 1 for now.
             return 1
-    if is_imported("executorlib"):
+    if is_imported("executorlib"):  # pragma: no cover
         import executorlib
 
         if isinstance(ex, executorlib.BaseExecutor):
