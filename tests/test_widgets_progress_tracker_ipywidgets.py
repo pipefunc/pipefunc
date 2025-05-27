@@ -198,3 +198,22 @@ async def test_progress_tracker_color_by_scope():
     with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
         progress.display()
         assert mock_display.call_count == 2
+
+
+def test_progress_tracker_mark_completed_with_errors(
+    mock_progress_dict: dict[str | tuple[str, ...], Status],
+) -> None:
+    """Test marking completion with errors."""
+    status_failed = Status(
+        n_total=100,
+        n_in_progress=0,
+        n_completed=99,
+        n_failed=1,
+    )
+
+    mock_progress_dict["failed_task"] = status_failed
+    tracker = ProgressTracker(mock_progress_dict, display=False, auto_update=False)
+
+    tracker._mark_completed()
+    assert "Completed with errors" in tracker._auto_update_interval_label.value
+    assert "❌" in tracker._auto_update_interval_label.value
