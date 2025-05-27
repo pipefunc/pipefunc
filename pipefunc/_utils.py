@@ -337,7 +337,7 @@ def get_ncores(ex: Executor) -> int:
             ncores = ex.max_workers
             if ncores is None:
                 # In case the number of workers is not defined
-                return 1 
+                return 1
             return ncores
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
