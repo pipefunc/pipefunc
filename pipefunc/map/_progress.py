@@ -73,7 +73,7 @@ class Status:
             return time.monotonic() - self.start_time
         return self.end_time - self.start_time
 
-    def eta(self, *, elapsed_time: float | None = None) -> float | None:
+    def remaining_time(self, *, elapsed_time: float | None = None) -> float | None:
         if elapsed_time is None:
             elapsed_time = self.elapsed_time()
         if elapsed_time == 0:

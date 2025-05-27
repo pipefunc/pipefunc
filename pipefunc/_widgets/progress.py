@@ -203,7 +203,7 @@ class ProgressTracker(ProgressTrackerBase):
         if status.end_time is not None:
             eta = "Completed"
         else:
-            estimated_time_left = (1.0 - status.progress) * (elapsed_time / status.progress)
+            estimated_time_left = status.remaining_time(elapsed_time=elapsed_time)
             eta = f"ETA: {estimated_time_left:.2f} sec"
         speed = f"{status.n_attempted / elapsed_time:,.2f}" if elapsed_time > 0 else "∞"
         labels["speed"].value = _span("speed-label", f"Speed: {speed} iterations/sec")

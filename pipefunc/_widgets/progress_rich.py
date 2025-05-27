@@ -69,7 +69,7 @@ class RichProgressTracker(ProgressTrackerBase):
                 total=status.n_total,
                 completed=status.n_completed,
                 elapsed_time=_format_time(elapsed_time),
-                remaining_time=_format_time(status.eta(elapsed_time=elapsed_time)),
+                remaining_time=_format_time(status.remaining_time(elapsed_time=elapsed_time)),
             )
             self._task_ids[name] = task_id
 
@@ -94,7 +94,7 @@ class RichProgressTracker(ProgressTrackerBase):
                 total=status.n_total,
                 completed=status.n_completed,
                 elapsed_time=_format_time(elapsed_time),
-                remaining_time=_format_time(status.eta(elapsed_time=elapsed_time)),
+                remaining_time=_format_time(status.remaining_time(elapsed_time=elapsed_time)),
             )
             if status.progress >= 1.0:
                 self._marked_completed.add(name)
