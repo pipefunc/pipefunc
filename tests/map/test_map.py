@@ -1610,7 +1610,7 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
     pipeline = Pipeline([f, g, h, i])
     async_map = pipeline.map_async(
         {"x": [1, 2, 3]},
-        show_progress=True,
+        show_progress="ipywidgets",
         scheduling_strategy=scheduling_strategy,
         executor=ThreadPoolExecutor(),
     )
