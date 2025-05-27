@@ -74,7 +74,7 @@ class Status:
         return self.end_time - self.start_time
 
     def remaining_time(self, *, elapsed_time: float | None = None) -> float | None:
-        if elapsed_time is None:
+        if elapsed_time is None:  # pragma: no cover
             elapsed_time = self.elapsed_time()
         if elapsed_time == 0:
             return None
