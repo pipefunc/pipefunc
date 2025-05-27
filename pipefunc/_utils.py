@@ -330,6 +330,15 @@ def get_ncores(ex: Executor) -> int:
             # This could be better but since there is `cores`, `cores_per_node`,
             # and `nodes`; and they can be `None`, we just return 1 for now.
             return 1
+    if is_imported("executorlib"):
+        import executorlib
+
+        if isinstance(ex, executorlib.BaseExecutor):
+            ncores = ex.max_workers
+            if ncores is None:
+                # In case the number of workers is not defined
+                return 1 
+            return ncores
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
 
