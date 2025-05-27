@@ -224,7 +224,7 @@ def test_2d_internal_shape(
         {"a": [0, 0]},
         run_folder=tmp_path,
         cleanup=False,
-        show_progress=True,
+        show_progress="ipywidgets",
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
         parallel=False,
@@ -249,7 +249,7 @@ def test_internal_shape_2nd_step(tmp_path: Path, dim: Literal["?"] | None) -> No
     results = pipeline.map(
         {},
         run_folder=tmp_path,
-        show_progress=True,
+        show_progress="ipywidgets",
         parallel=False,
         storage="dict",
     )

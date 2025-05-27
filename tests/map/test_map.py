@@ -1589,7 +1589,7 @@ def test_parallel_memory_storage(storage: str):
 @pytest.mark.skipif(not has_ipywidgets, reason="ipywidgets not installed")
 @pytest.mark.asyncio
 async def test_map_async_with_progress(scheduling_strategy: Literal["generation", "eager"]) -> None:
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def f(x):
@@ -1610,13 +1610,13 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
     pipeline = Pipeline([f, g, h, i])
     async_map = pipeline.map_async(
         {"x": [1, 2, 3]},
-        show_progress=True,
+        show_progress="ipywidgets",
         scheduling_strategy=scheduling_strategy,
         executor=ThreadPoolExecutor(),
     )
     # Test that the progress tracker is working
     progress = async_map.progress
-    assert isinstance(progress, ProgressTracker)
+    assert isinstance(progress, IPyWidgetsProgressTracker)
     progress.update_progress()
     progress._first_auto_update_interval = 0.0
     progress._toggle_auto_update()  # Turn off auto update

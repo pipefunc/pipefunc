@@ -22,7 +22,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.map._types import UserShapeDict
 
     from ._result import StoreType
@@ -36,7 +37,7 @@ class Prepared(NamedTuple):
     parallel: bool
     executor: dict[OUTPUT_TYPE, Executor] | None
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None
-    progress: ProgressTracker | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None
 
 
 def prepare_run(
@@ -53,7 +54,7 @@ def prepare_run(
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
-    show_progress: bool | None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,
 ) -> Prepared:
     if not parallel and executor:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.map._run import (
@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._result import ResultDict
@@ -51,7 +52,7 @@ def run_map_eager_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
@@ -138,8 +139,18 @@ def run_map_eager_async(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
-        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
+        Whether to display a progress bar. Can be:
+
+        - ``True``: Display a progress bar. Auto-selects based on environment:
+          `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+        - ``False``: No progress bar.
+        - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+          Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+        - ``"rich"``: Force `rich` progress bar (text-based).
+          Shown only if `rich` is installed.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -202,7 +213,7 @@ async def _eager_scheduler_loop_async(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,
@@ -253,7 +264,7 @@ async def _process_completed_futures_async(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None,

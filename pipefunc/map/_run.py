@@ -10,7 +10,7 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -48,7 +48,8 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
-    from pipefunc._widgets.progress import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._progress import Status
@@ -72,7 +73,7 @@ def run_map(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -156,8 +157,18 @@ def run_map(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
-        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
+        Whether to display a progress bar. Can be:
+
+        - ``True``: Display a progress bar. Auto-selects based on environment:
+          `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+        - ``False``: No progress bar.
+        - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+          Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+        - ``"rich"``: Force `rich` progress bar (text-based).
+          Shown only if `rich` is installed.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -206,7 +217,7 @@ def run_map(
 class AsyncMap:
     task: asyncio.Task[ResultDict]
     run_info: RunInfo
-    progress: ProgressTracker | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
 
@@ -250,7 +261,7 @@ def run_map_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -332,8 +343,18 @@ def run_map_async(
         of providing the root arguments. If ``False``, all root arguments must be provided,
         and an exception is raised if any are missing.
     show_progress
-        Whether to display a progress bar. If ``None``, a progress bar is displayed if the
-        pipeline is run in a Jupyter notebook and ``ipywidgets`` is installed.
+        Whether to display a progress bar. Can be:
+
+        - ``True``: Display a progress bar. Auto-selects based on environment:
+          `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+        - ``False``: No progress bar.
+        - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+          Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+        - ``"rich"``: Force `rich` progress bar (text-based).
+          Shown only if `rich` is installed.
+        - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+          running in a Jupyter notebook and `ipywidgets` is installed.
+          Otherwise, no progress bar is shown.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -808,7 +829,7 @@ def _submit(
     func: Callable[..., Any],
     executor: Executor,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     chunksize: int,
     *args: Any,
 ) -> Future:
@@ -909,7 +930,7 @@ def _maybe_parallel_map(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
 ) -> list[Any]:
     if not indices:
         return []
@@ -931,7 +952,7 @@ def _maybe_parallel_map(
 def _wrap_with_status_update(
     func: Callable[..., Any],
     status: Status,
-    progress: ProgressTracker,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker,
 ) -> Callable[..., Any]:
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
@@ -946,7 +967,7 @@ def _wrap_with_status_update(
 def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -1009,7 +1030,7 @@ def _run_and_process_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -1036,7 +1057,7 @@ async def _run_and_process_generation_async(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -1094,7 +1115,7 @@ def _submit_func(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
-    progress: ProgressTracker | None = None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -1162,7 +1183,7 @@ def _submit_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: ProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
     return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
