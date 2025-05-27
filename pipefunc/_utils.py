@@ -298,7 +298,7 @@ def is_imported(package: str) -> bool:
     return package in sys.modules
 
 
-def get_ncores(ex: Executor) -> int:
+def get_ncores(ex: Executor) -> int:  # noqa: PLR0911, PLR0912
     """Return the maximum number of cores that an executor can use."""
     if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
         return ex._max_workers  # type: ignore[union-attr]
@@ -335,8 +335,7 @@ def get_ncores(ex: Executor) -> int:
 
         if isinstance(ex, executorlib.BaseExecutor):
             ncores = ex.max_workers
-            if ncores is None:
-                # In case the number of workers is not defined
+            if ncores is None:  # In case the number of workers is not defined
                 return 1
             return ncores
     msg = f"Cannot get number of cores for {ex.__class__}"
