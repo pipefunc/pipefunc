@@ -110,6 +110,7 @@ class RichProgressTracker(ProgressTrackerBase):
 
     def _mark_completed(self) -> None:
         if self._completed:  # pragma: no cover
+            # Avoids printing twice, doesn't happen in tests, but is possible in real life
             return
         self._completed = True
         if any(status.n_failed > 0 for status in self.progress_dict.values()):
