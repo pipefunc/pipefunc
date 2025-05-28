@@ -220,7 +220,9 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
     def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
         """Set the auto-update feature to the given value."""
         super()._set_auto_update(value)
-        if self._buttons is None:  # method can be called before buttons exist
+        if self._buttons is None:
+            # this method is called in `attach_task`, which might be before
+            # buttons are created
             return
         self._buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
