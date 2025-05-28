@@ -190,7 +190,8 @@ def test_set_pipeline_scope_on_init() -> None:
     assert pipeline(**{"x.a": 1, "x.b": 1}) == 2
     with pytest.raises(ValueError, match="The provided `scope='a'` cannot be identical "):
         pipeline.update_scope("a", "*")
-    pipeline.update_scope("foo", outputs="*")
+    with pytest.warns(UserWarning, match="Parameter 'c' already has a scope 'x'"):
+        pipeline.update_scope("foo", outputs="*")
     pipeline.update_scope("foo", outputs="*")  # twice should be fine
     assert pipeline("foo.c", x={"a": 1, "b": 1}) == 2
     pipeline.update_scope(None, {"x.b"})
@@ -275,7 +276,11 @@ def test_update_scope_from_faq() -> None:
 
     pipeline = Pipeline([f, g_func])
     # all outputs except foo.y, so only bar.z, which becomes baz.z
-    pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
+    with pytest.warns(
+        UserWarning,
+        match="Parameter 'z' already has a scope 'bar', replacing it with 'baz'",
+    ):
+        pipeline.update_scope("baz", inputs=None, outputs="*", exclude={"foo.y"})
     kwargs = {"foo.a": 1, "foo.b": 2, "bar.a": 3, "b": 4}
     assert pipeline(**kwargs) == 15
     results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")

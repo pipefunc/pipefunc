@@ -369,7 +369,7 @@ def test_with_progress() -> None:
     pipeline = Pipeline([f, g])
     r_map = pipeline.map(
         inputs={"a": [1, 2, 3]},
-        show_progress=True,
+        show_progress="ipywidgets",
         parallel=True,
         storage="dict",
     )
@@ -378,7 +378,7 @@ def test_with_progress() -> None:
 
     r_map_sequential = pipeline.map(
         inputs={"a": [1, 2, 3]},
-        show_progress=True,
+        show_progress="ipywidgets",
         parallel=False,
         storage="dict",
     )

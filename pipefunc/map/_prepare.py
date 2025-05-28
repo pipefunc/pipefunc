@@ -22,7 +22,8 @@ if TYPE_CHECKING:
 
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE
-    from pipefunc._widgets import ProgressTracker
+    from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+    from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.map._types import UserShapeDict
 
     from ._result import StoreType
@@ -35,8 +36,8 @@ class Prepared(NamedTuple):
     outputs: ResultDict
     parallel: bool
     executor: dict[OUTPUT_TYPE, Executor] | None
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None
-    progress: ProgressTracker | None
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | None
 
 
 def prepare_run(
@@ -48,12 +49,12 @@ def prepare_run(
     output_names: set[OUTPUT_TYPE] | None,
     parallel: bool,
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-    storage: str | dict[OUTPUT_TYPE, str],
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+    storage: str | dict[OUTPUT_TYPE, str] | None,
     cleanup: bool,
     fixed_indices: dict[str, int | slice] | None,
     auto_subpipeline: bool,
-    show_progress: bool,
+    show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,
 ) -> Prepared:
     if not parallel and executor:
@@ -124,17 +125,18 @@ def _expand_output_name_in_executor(
 
 def _expand_output_name_in_storage(
     pipeline: Pipeline,
-    storage: str | dict[OUTPUT_TYPE, str],
-) -> dict[OUTPUT_TYPE, str] | str:
+    storage: str | dict[OUTPUT_TYPE, str] | None,
+) -> dict[OUTPUT_TYPE, str] | str | None:
     if isinstance(storage, dict):
         return _expand_output_name_in_dict(pipeline, storage, "Storage")
+    assert storage is None or isinstance(storage, str)
     return storage
 
 
 def _expand_output_name_in_chunksizes(
     pipeline: Pipeline,
-    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None,
-) -> int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None:
+    chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
+) -> int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None:
     if isinstance(chunksizes, dict):
         return _expand_output_name_in_dict(pipeline, chunksizes, "Chunksize")
     return chunksizes

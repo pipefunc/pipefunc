@@ -15,6 +15,8 @@ import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, Pipeline, pipefunc
 from pipefunc.exceptions import UnusedParametersError
+from pipefunc.helpers import FileValue
+from pipefunc.map import FileArray
 from pipefunc.typing import Array  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
 
 has_psutil = importlib.util.find_spec("psutil") is not None
 has_rich = importlib.util.find_spec("rich") is not None
+has_xarray = importlib.util.find_spec("xarray") is not None
 
 
 def test_pipeline_and_all_arg_combinations() -> None:
@@ -1211,3 +1214,32 @@ def test_executor_for_single_element_of_output_name_tuple() -> None:
                 "d": "dict",
             },
         )
+
+
+def test_file_array_as_input(tmp_path: Path) -> None:
+    arr = FileArray.from_data(data=[1, 2], folder=tmp_path / "arr")
+    value = FileValue.from_data(data=69, path=tmp_path / "value")
+    inputs = {"x1": arr, "x2": value}
+
+    @pipefunc(output_name="y", mapspec="x1[i] -> y[i]")
+    def f(x1, x2):
+        return x1 + x2
+
+    pipeline = Pipeline([f])
+
+    results = pipeline.map(inputs, parallel=False, storage="dict", run_folder=tmp_path / "run")
+    assert results["y"].output.tolist() == [70, 71]
+    if has_xarray:
+        df = results.to_dataframe()
+        assert df.columns.to_list() == ["x1", "y"]
+
+    # Now without mapspec
+
+    @pipefunc(output_name="y")
+    def f_no_mapspec(x1, x2):
+        return x1 + x2
+
+    pipeline = Pipeline([f_no_mapspec])
+
+    results = pipeline.map(inputs, parallel=False, storage="dict", run_folder=tmp_path / "run")
+    assert results["y"].output.tolist() == [70, 71]

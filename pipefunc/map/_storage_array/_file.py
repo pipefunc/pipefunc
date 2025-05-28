@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from pipefunc.map._types import ShapeTuple
+
 storage_registry: dict[str, type[StorageBase]] = {}
 
 FILENAME_TEMPLATE = "__{:d}__.pickle"
@@ -294,6 +295,40 @@ class FileArray(StorageBase):
     def dump_in_subprocess(self) -> bool:
         """Indicates if the storage can be dumped in a subprocess and read by the main process."""
         return True
+
+    @classmethod
+    def from_data(cls, data: list[Any] | np.ndarray, folder: str | Path) -> FileArray:
+        """Create a FileArray from an existing list or NumPy array.
+
+        This method serializes the provided `data` (which can be a Python list
+        or a NumPy array) into the FileArray's on-disk format within the
+        specified `folder`. Each element of the input `data` is dumped
+        individually.
+
+        This is useful for preparing large datasets for use with `pipeline.map`
+        in distributed environments (like SLURM), as it allows `pipefunc` to
+        pass around a lightweight `FileArray` object instead of serializing
+        the entire large dataset for each task.
+
+        Parameters
+        ----------
+        data
+            The list or NumPy-like array to store in the FileArray.
+        folder
+            The directory where the FileArray will store its data files.
+            This folder must be accessible by all worker nodes if used in
+            a distributed setting.
+
+        Returns
+        -------
+        FileArray
+            A new FileArray instance populated with the provided data.
+
+        """
+        file_array = FileArray(folder, np.shape(data))
+        for index, value in np.ndenumerate(data):
+            file_array.dump(index, value)
+        return file_array
 
 
 def _read(name: str | Path) -> bytes:

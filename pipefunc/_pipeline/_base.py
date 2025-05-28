@@ -197,7 +197,7 @@ class Pipeline:
         if scope is not None:
             self.update_scope(scope, "*", "*")
 
-    def info(self, *, print_table: bool = False) -> dict[str, Any] | None:
+    def info(self, *, print_table: bool = False) -> dict[str, tuple[str, ...]] | None:
         """Return information about inputs and outputs of the Pipeline.
 
         Parameters
@@ -236,7 +236,7 @@ class Pipeline:
         intermediate_outputs = tuple(sorted(self.all_output_names - set(outputs)))
         required_inputs = tuple(sorted(arg for arg in inputs if arg not in self.defaults))
         optional_inputs = tuple(sorted(arg for arg in inputs if arg in self.defaults))
-        info = {
+        info: dict[str, tuple[str, ...]] = {
             "required_inputs": required_inputs,
             "optional_inputs": optional_inputs,
             "inputs": inputs,
@@ -733,13 +733,13 @@ class Pipeline:
         output_names: set[OUTPUT_TYPE] | None = None,
         parallel: bool = True,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: StorageType = "file_array",
+        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -807,6 +807,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -821,7 +822,18 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar. Only works if ``parallel=True``.
+            Whether to display a progress bar. Can be:
+
+            - ``True``: Display a progress bar. Auto-selects based on environment:
+              `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+            - ``False``: No progress bar.
+            - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+              Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+            - ``"rich"``: Force `rich` progress bar (text-based).
+              Shown only if `rich` is installed.
+            - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+              running in a Jupyter notebook and `ipywidgets` is installed.
+              Otherwise, no progress bar is shown.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -882,13 +894,13 @@ class Pipeline:
         *,
         output_names: set[OUTPUT_TYPE] | None = None,
         executor: Executor | dict[OUTPUT_TYPE, Executor] | None = None,
-        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int]] | None = None,
-        storage: StorageType = "file_array",
+        chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
+        storage: StorageType | None = None,
         persist_memory: bool = True,
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool = False,
+        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
@@ -954,6 +966,7 @@ class Pipeline:
 
             Available storage classes are registered in `pipefunc.map.storage_registry`.
             Common options include ``"file_array"``, ``"dict"``, and ``"shared_memory_dict"``.
+            Defaults to ``"file_array"`` if ``run_folder`` is provided, otherwise ``"dict"``.
         persist_memory
             Whether to write results to disk when memory based storage is used.
             Does not have any effect when file based storage is used.
@@ -968,7 +981,18 @@ class Pipeline:
             of providing the root arguments. If ``False``, all root arguments must be provided,
             and an exception is raised if any are missing.
         show_progress
-            Whether to display a progress bar.
+            Whether to display a progress bar. Can be:
+
+            - ``True``: Display a progress bar. Auto-selects based on environment:
+              `ipywidgets` in Jupyter (if installed), otherwise `rich` (if installed).
+            - ``False``: No progress bar.
+            - ``"ipywidgets"``: Force `ipywidgets` progress bar (HTML-based).
+              Shown only if in a Jupyter notebook and `ipywidgets` is installed.
+            - ``"rich"``: Force `rich` progress bar (text-based).
+              Shown only if `rich` is installed.
+            - ``None`` (default): Shows `ipywidgets` progress bar *only if*
+              running in a Jupyter notebook and `ipywidgets` is installed.
+              Otherwise, no progress bar is shown.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -1121,7 +1145,7 @@ class Pipeline:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
-        that the defaults can be applied to.
+        the defaults can be applied to.
 
         If `overwrite` is `False`, the new defaults will be added to the existing
         defaults. If `overwrite` is `True`, the existing defaults will be replaced
@@ -1202,7 +1226,7 @@ class Pipeline:
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format ``f"{scope}.{name}"``.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         ``inputs`` are the root arguments of the pipeline. Inputs to functions
         which are outputs of other functions are considered to be outputs.
@@ -1443,6 +1467,11 @@ class Pipeline:
                     assert isinstance(x, PipeFunc)
                     generation_functions.append(x)
             if generation_functions:
+                # Ensure deterministic ordering in the generation
+                generation_functions = sorted(
+                    generation_functions,
+                    key=lambda f: at_least_tuple(f.output_name),
+                )
                 function_lists.append(generation_functions)
 
         return Generations(root_args, function_lists)
@@ -2566,7 +2595,7 @@ class _PipelineInternalCache:
     func_defaults: dict[OUTPUT_TYPE, dict[str, Any]] = field(default_factory=dict)
 
 
-def _rich_info_table(info: dict[str, Any], *, prints: bool = False) -> Table:
+def _rich_info_table(info: dict[str, tuple[str, ...]], *, prints: bool = False) -> Table:
     """Create a rich table from a dictionary of information."""
     requires("rich", reason="print_table=True", extras="rich")
     import rich.table

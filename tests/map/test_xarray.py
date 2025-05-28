@@ -8,7 +8,7 @@ import pandas as pd
 
 from pipefunc import Pipeline, pipefunc
 from pipefunc.map import load_outputs
-from pipefunc.map.xarray import load_xarray, xarray_dataset_from_results
+from pipefunc.map.xarray import DimensionlessArray, load_xarray, xarray_dataset_from_results
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -228,3 +228,90 @@ def test_to_dataframe() -> None:
         "hits",
         "home_runs",
     }
+
+
+def test_to_dataframe_with_single_output() -> None:
+    @pipefunc(output_name="y")
+    def f() -> int:
+        return 1
+
+    pipeline = Pipeline([f])
+    result = pipeline.map({}, parallel=False, storage="dict")
+    assert result["y"].output == 1
+
+    # Check xarray
+    ds = result.to_xarray()
+    assert ds["y"].shape == ()
+    assert ds["y"].to_numpy() == 1
+
+    # Check dataframe
+    df = result.to_dataframe()
+    assert df.shape == (1, 1)
+    assert df.columns.tolist() == ["y"]
+    assert df.iloc[0]["y"] == 1
+
+
+def test_2d_mapspec() -> None:
+    # NotImplementedError: > 1 ndim Categorical are not supported at this time
+    @pipefunc(output_name="x1")
+    def x1() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="x2")
+    def x2() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="y", mapspec="x1[i, j], x2[i, j] -> y[i, j]")
+    def f(x1: npt.NDArray[np.int_], x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        return x1 + x2
+
+    pipeline = Pipeline([x1, x2, f])
+    results = pipeline.map({}, parallel=False, storage="dict")
+    ds = results.to_xarray()
+    assert "x1:x2" in ds.coords
+    assert ds["x1:x2"].to_numpy().tolist() == [[(1, 1), (2, 2)], [(3, 3), (4, 4)]]
+    df = results.to_dataframe()
+    assert "x1" in df.columns
+    assert "x2" in df.columns
+    assert df.x1.tolist() == [1, 2, 3, 4]
+    assert df.x2.tolist() == [1, 2, 3, 4]
+    assert df.y.tolist() == [2, 4, 6, 8]
+
+
+def test_2d_mapspec_with_nested_array() -> None:
+    # MissingDimensionsError: cannot set variable 'x2' with 2-dimensional data without
+    # explicit dimension names. Pass a tuple of (dims, data) instead.
+    @pipefunc(output_name="x1")
+    def x1() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="x2")
+    def x2() -> npt.NDArray[np.int_]:
+        return np.array([[1, 2], [3, 4]])
+
+    @pipefunc(output_name="y", mapspec="x1[i, j] -> y[i, j]")
+    def f(x1: int, x2: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+        return x1 + x2
+
+    pipeline = Pipeline([x1, x2, f])
+
+    results = pipeline.map({}, parallel=False, storage="dict")
+    ds = results.to_xarray()
+    assert "x1" in ds.coords
+    assert "x2" in ds.data_vars
+    assert ds["x1"].to_numpy().tolist() == [[1, 2], [3, 4]]
+    assert ds["x2"].data.shape == ()
+    assert isinstance(ds["x2"].data.item(), DimensionlessArray)
+    assert ds["x2"].data.item().arr.tolist() == [[1, 2], [3, 4]]
+    df = results.to_dataframe()
+    assert "x1" in df.columns
+    assert "x2" in df.columns
+    assert df.x1.tolist() == [1, 2, 3, 4]
+    assert df.x2.iloc[0].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[1].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[2].tolist() == [[1, 2], [3, 4]]
+    assert df.x2.iloc[3].tolist() == [[1, 2], [3, 4]]
+    assert df.y.iloc[0].tolist() == [[2, 3], [4, 5]]
+    assert df.y.iloc[1].tolist() == [[3, 4], [5, 6]]
+    assert df.y.iloc[2].tolist() == [[4, 5], [6, 7]]
+    assert df.y.iloc[3].tolist() == [[5, 6], [7, 8]]

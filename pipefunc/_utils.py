@@ -156,9 +156,9 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     return True
 
 
-def _format_table_row(row: list[str], widths: list[int], seperator: str = " | ") -> str:
+def _format_table_row(row: list[str], widths: list[int], separator: str = " | ") -> str:
     """Format a row of the table with specified column widths."""
-    return seperator.join(f"{cell:<{widths[i]}}" for i, cell in enumerate(row))
+    return separator.join(f"{cell:<{widths[i]}}" for i, cell in enumerate(row))
 
 
 def table(rows: list[Any], headers: list[str]) -> str:
@@ -170,13 +170,13 @@ def table(rows: list[Any], headers: list[str]) -> str:
 
     separator_line = [w * "-" for w in column_widths]
     table_rows = [
-        _format_table_row(separator_line, column_widths, seperator="-+-"),
+        _format_table_row(separator_line, column_widths, separator="-+-"),
         _format_table_row(headers, column_widths),
         _format_table_row(["-" * width for width in column_widths], column_widths),
     ]
     for row in rows:
         table_rows.append(_format_table_row(row, column_widths))  # noqa: PERF401
-    table_rows.append(_format_table_row(separator_line, column_widths, seperator="-+-"))
+    table_rows.append(_format_table_row(separator_line, column_widths, separator="-+-"))
 
     return "\n".join(table_rows)
 
@@ -298,7 +298,7 @@ def is_imported(package: str) -> bool:
     return package in sys.modules
 
 
-def get_ncores(ex: Executor) -> int:
+def get_ncores(ex: Executor) -> int:  # noqa: PLR0911, PLR0912
     """Return the maximum number of cores that an executor can use."""
     if isinstance(ex, ProcessPoolExecutor | ThreadPoolExecutor):
         return ex._max_workers  # type: ignore[union-attr]
@@ -330,6 +330,14 @@ def get_ncores(ex: Executor) -> int:
             # This could be better but since there is `cores`, `cores_per_node`,
             # and `nodes`; and they can be `None`, we just return 1 for now.
             return 1
+    if is_imported("executorlib"):  # pragma: no cover
+        import executorlib
+
+        if isinstance(ex, executorlib.BaseExecutor):
+            ncores = ex.max_workers
+            if ncores is None:  # In case the number of workers is not defined
+                return 1
+            return ncores
     msg = f"Cannot get number of cores for {ex.__class__}"
     raise TypeError(msg)
 
@@ -453,3 +461,8 @@ def parse_function_docstring(
 def is_classmethod(func: Callable) -> bool:
     """Check if a function is a classmethod."""
     return inspect.ismethod(func) and func.__self__ is not None
+
+
+def clip(x: float, min_value: float, max_value: float) -> float:
+    """Clip a value to a range."""
+    return max(min_value, min(x, max_value))

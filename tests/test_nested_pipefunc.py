@@ -1,3 +1,4 @@
+import inspect
 import re
 
 import networkx as nx
@@ -816,3 +817,81 @@ def test_nested_pipefunc_preserve_cache_on_combine_bug() -> None:
 
     assert p1[("x", "y")].cache
     assert p[("x", "y")].cache
+
+
+def test_nestedpipefunc_with_default_and_bound() -> None:
+    """Test NestedPipeFunc excludes bound parameters."""
+    # xref: bug fixed in https://github.com/pipefunc/pipefunc/pull/734
+
+    @pipefunc("intermediate")
+    def func1(x: int, y: str = "y") -> float:
+        return float(x + len(y))
+
+    @pipefunc("final")
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+        return f"{intermediate}_{z}"
+
+    # Bind one of the inputs
+    nf = NestedPipeFunc([func1, func2], bound={"y": "bound_y_value"})
+    assert nf.bound == {"y": "bound_y_value"}
+    result = nf(x=1, y="xx")
+    assert result == (14.0, "14.0_True")
+
+
+def test_nestedpipefunc_annotations_with_renames_and_defaults() -> None:
+    """Test NestedPipeFunc signature with renames and defaults."""
+
+    # xref: bug fixed in https://github.com/pipefunc/pipefunc/pull/737
+    @pipefunc("intermediate")
+    def func1(x: int, y: str = "y") -> float:
+        return float(x + len(y))
+
+    @pipefunc("final")
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+        return f"{intermediate}_{z}"
+
+    # Rename an input and an output, provide new default
+    nf = NestedPipeFunc(
+        [func1, func2],
+        renames={"x": "input_x", "final": "result"},
+    )
+    assert nf.parameter_annotations == {
+        "input_x": int,
+        "y": str,
+        "z": bool,
+    }
+    assert nf.output_annotation == {"intermediate": float, "result": str}
+
+
+def test_wrapping_pipefunc_with_scope_in_nested_pipefunc() -> None:
+    @pipefunc(
+        output_name="a",
+        renames={"x": "scope.x"},
+    )
+    def f(x: int) -> int:
+        return x
+
+    @pipefunc(output_name="b")
+    def g(y: int) -> str:
+        return str(y)
+
+    nf = NestedPipeFunc([f, g], output_name=("a", "b"))
+    assert nf.output_annotation == {"a": int, "b": str}
+    assert nf.parameter_annotations == {"scope.x": int, "y": int}
+    assert nf.bound == {}
+    assert nf.defaults == {}
+    assert nf.renames == {}
+
+    original_parameters = nf.original_parameters
+
+    x = original_parameters["scope.x"]
+    assert x.name == "scope.x"
+    # NOTE: both `default` and `annotation` are not set for `original_parameters`
+    # see comment in NestedPipeFunc.original_parameters
+    assert x.default is inspect.Parameter.empty
+    assert x.annotation is inspect.Parameter.empty
+
+    y = original_parameters["y"]
+    assert y.name == "y"
+    assert y.default is inspect.Parameter.empty
+    assert y.annotation is inspect.Parameter.empty

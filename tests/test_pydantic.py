@@ -6,6 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
+from pipefunc._pipeline._pydantic import model_dump
 from pipefunc.typing import safe_get_type_hints
 
 has_griffe = importlib.util.find_spec("griffe") is not None
@@ -79,9 +80,9 @@ def test_pipeline_input_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=1, y=2, z={"a": 1})
     expected = {"x": 1, "y": 2, "z": {"a": 1}}
-    assert model.model_dump() == expected
+    assert model_dump(model) == expected
     model = Model(x="1.0", y="2.0", z={"a": "1.0"})
-    assert model.model_dump() == expected
+    assert model_dump(model) == expected
     assert repr(model) == "InputModel(x=1, y=2, z={'a': 1})"
 
 
@@ -94,7 +95,7 @@ def test_pipeline_with_mapspec_input_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[1, 2, 3], y=2, z={"a": 1})
     expected = {"x": [1, 2, 3], "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["y"] == expected["y"]
@@ -112,7 +113,7 @@ def test_pipeline_2d_mapspec_as_pydantic_model() -> None:
     Model = pipeline.pydantic_model()  # noqa: N806
     model = Model(x=[[1, 2], [3, 4]], y=2, z={"a": 1})
     expected = {"x": np.array([[1, 2], [3, 4]]), "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["y"] == expected["y"]
@@ -134,7 +135,7 @@ def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
     x = [[[CustomObject(1), CustomObject(2)], [CustomObject(3), CustomObject(4)]]]
     model = Model(x=x, y=2, z={"a": 1})
     expected = {"x": np.array(x), "y": 2, "z": {"a": 1}}
-    out = model.model_dump()
+    out = model_dump(model)
     assert isinstance(out["x"], np.ndarray)
     assert np.array_equal(out["x"], expected["x"])  # type: ignore[arg-type]
     assert out["x"].shape == (1, 2, 2)
@@ -142,7 +143,7 @@ def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
     assert out["y"] == expected["y"]
 
 
-def test_pipeline_to_pydantic_without_griffe(monkeypatch):
+def test_pipeline_to_pydantic_without_griffe(monkeypatch) -> None:
     # Import the module where pipeline_to_pydantic is defined.
     # Adjust the import path according to your project structure.
     from pydantic import BaseModel
@@ -172,7 +173,7 @@ def test_pipeline_to_pydantic_without_griffe(monkeypatch):
     # Instantiate the model.
     instance = Model(x=10, y=5)
     # Since has_griffe is False, the field descriptions should be None.
-    field_info = instance.model_fields["x"]
+    field_info = Model.model_fields["x"]
     assert field_info.description is None, "Expected no description when griffe is not available."
     # Check that the instance validates the values as expected.
     assert instance.x == 10
@@ -180,7 +181,7 @@ def test_pipeline_to_pydantic_without_griffe(monkeypatch):
 
 
 @pytest.mark.skipif(not has_griffe, reason="requires griffe")
-def test_pipeline_to_pydantic_with_doc():
+def test_pipeline_to_pydantic_with_doc() -> None:
     @pipefunc("foo")
     def foo(x: int, y: int = 1) -> int:
         """
@@ -208,11 +209,11 @@ def test_pipeline_to_pydantic_with_doc():
     instance = Model(x=10, y=5)
 
     # Verify that the field descriptions are populated (i.e. not None).
-    field_x_info = instance.model_fields["x"]
+    field_x_info = Model.model_fields["x"]
     assert field_x_info.description is not None
     assert "The first number." in field_x_info.description
 
-    field_y_info = instance.model_fields["y"]
+    field_y_info = Model.model_fields["y"]
     assert field_y_info.description is not None
     assert "The second number." in field_y_info.description
 

@@ -102,7 +102,7 @@ class PipeFunc(Generic[T]):
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -469,7 +469,7 @@ class PipeFunc(Generic[T]):
         This method updates the names of the specified inputs and outputs by adding the provided
         scope as a prefix. The scope is added to the names using the format `f"{scope}.{name}"`.
         If an input or output name already starts with the scope prefix, it remains unchanged.
-        If their is an existing scope, it is replaced with the new scope.
+        If there is an existing scope, it is replaced with the new scope.
 
         Internally, simply calls `PipeFunc.update_renames` with  ``renames={name: f"{scope}.{name}", ...}``.
 
@@ -647,7 +647,7 @@ class PipeFunc(Generic[T]):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, PipeFunc, skip={"self", "scope"})
+        assert_complete_kwargs(kwargs, PipeFunc.__init__, skip={"self", "scope"})
         kwargs.update(update)
         return PipeFunc(**kwargs)  # type: ignore[arg-type,type-var]
 
@@ -711,6 +711,36 @@ class PipeFunc(Generic[T]):
         if self.post_execution_hook is not None:
             self.post_execution_hook(self, result, kwargs)
         return result
+
+    @functools.cached_property
+    def __signature__(self) -> inspect.Signature:
+        """Return the signature of `__call__` with renamed parameters.
+
+        If *any* of the output annotations are `NoAnnotation`, the return annotation
+        is set to `inspect.Parameter.empty`.
+        """
+        if self._output_picker is None:
+            output_annotations = self.output_annotation
+            if any(v is NoAnnotation for v in output_annotations.values()):
+                return_annotation = inspect.Parameter.empty
+            elif isinstance(self.output_name, tuple):
+                return_annotations = tuple(output_annotations[name] for name in self.output_name)
+                return_annotation = tuple[return_annotations]  # type: ignore[assignment, valid-type]
+            else:
+                return_annotation = output_annotations[self.output_name]
+        else:
+            return_annotation = inspect.Parameter.empty
+        parameters = [
+            inspect.Parameter(
+                name=name if "." not in name else _ScopedIdentifier(name),
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=self.defaults.get(name, inspect.Parameter.empty),
+                annotation=self.parameter_annotations.get(name, inspect.Parameter.empty),
+            )
+            for name in self.parameters
+            if name not in self.bound
+        ]
+        return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
     def profile(self) -> bool:
@@ -846,7 +876,7 @@ class PipeFunc(Generic[T]):
         """Prepare the state of the current object for pickling.
 
         The state includes all picklable instance variables.
-        For non-picklable instance variable,  they are transformed
+        For non-picklable instance variables, they are transformed
         into a picklable form or ignored.
 
         Returns
@@ -999,7 +1029,7 @@ def pipefunc(
         ``mapspec`` context*. Can be an int or a tuple of ints, or "?" for unknown
         dimensions, or a tuple with a mix of both. If not provided, the shape will be
         inferred from the first execution of the function. If provided, the shape will be
-        validated against the actual shape of the output. This parameters is required only
+        validated against the actual shape of the output. This parameter is required only
         when a `mapspec` like `... -> out[i]` is used, indicating that the shape cannot be
         derived from the inputs. In case there are multiple outputs, provide the shape for
         one of the outputs. This works because the shape of all outputs are required to be
@@ -1239,10 +1269,12 @@ class NestedPipeFunc(PipeFunc):
         self._output_picker = None
         self._profile = False
         self._renames: dict[str, str] = renames or {}
-        self._defaults: dict[str, Any] = {
-            k: v for k, v in self.pipeline.defaults.items() if k in self.parameters
-        }
         self._bound: dict[str, Any] = bound or {}
+        self._defaults: dict[str, Any] = {
+            k: v
+            for k, v in self.pipeline.defaults.items()
+            if k in self.parameters and k not in self._bound
+        }
         self.resources_variable = None  # not supported in NestedPipeFunc
         self.profiling_stats = None
         self.post_execution_hook = None
@@ -1268,7 +1300,7 @@ class NestedPipeFunc(PipeFunc):
             "variant": self.variant,
             "variant_group": None,  # deprecated
         }
-        assert_complete_kwargs(kwargs, NestedPipeFunc, skip={"self"})
+        assert_complete_kwargs(kwargs, NestedPipeFunc.__init__, skip={"self"})
         kwargs.update(update)
         f = self.__class__(**kwargs)  # type: ignore[arg-type]
         f._defaults = self._defaults.copy()
@@ -1293,12 +1325,11 @@ class NestedPipeFunc(PipeFunc):
         parameters = set(self._all_inputs) - set(self._all_outputs)
         return {
             k: inspect.Parameter(
-                # Technically, this is not correct because the parameter name
-                # might contain a scope, however, the validation will catch this.
-                name=k.split(sep=".", maxsplit=1)[-1],
+                name=k if "." not in k else _ScopedIdentifier(k),
                 kind=inspect.Parameter.KEYWORD_ONLY,
-                # TODO: Do we need defaults here?
-                # default=...,  # noqa: ERA001
+                # `default` and `annotations` not set because they requires `original_parameters`
+                default=inspect.Parameter.empty,
+                annotation=inspect.Parameter.empty,
             )
             for k in sorted(parameters)
         }
@@ -1317,14 +1348,18 @@ class NestedPipeFunc(PipeFunc):
     def parameter_annotations(self) -> dict[str, Any]:
         """Return the type annotations of the wrapped function's parameters."""
         annotations = self.pipeline.parameter_annotations
-        return {p: annotations[p] for p in self.parameters if p in annotations}
+        return {
+            p: annotations[p_original]
+            for p in self.parameters
+            if (p_original := self._inverse_renames.get(p, p)) in annotations
+        }
 
     @functools.cached_property
     def _all_outputs(self) -> tuple[str, ...]:
-        outputs: set[str] = set()
-        for f in self.pipeline.functions:
-            outputs.update(at_least_tuple(f.output_name))
-        return tuple(sorted(outputs))
+        outputs: list[str] = []
+        for f in self.pipeline.sorted_functions:
+            outputs.extend(at_least_tuple(f.output_name))
+        return tuple(outputs)
 
     @functools.cached_property
     def _all_inputs(self) -> tuple[str, ...]:
@@ -1557,7 +1592,7 @@ def _prepend_name_with_scope(name: str, scope: str | None) -> str:
     if "." in name:
         old_scope, name = name.split(".", 1)
         warnings.warn(
-            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{name}'.",
+            f"Parameter '{name}' already has a scope '{old_scope}', replacing it with '{scope}'.",
             stacklevel=3,
         )
     return f"{scope}.{name}"
@@ -1653,3 +1688,33 @@ def _maybe_variant_group_error(
             f" Use the `variant = {{{variant_group!r}: {variant!r}}}` parameter instead."
         )
         raise ValueError(msg)
+
+
+class _ScopedIdentifier(str):
+    """String subclass that represents a scoped identifier in a `inspect.Signature`.
+
+    Its main use is to allow
+    >>> Parameter(ScopedIdentifier("myscope.x"), kind=Parameter.POSITIONAL_OR_KEYWORD)
+    where the following is not possible
+    >>> Parameter("myscope.x", kind=Parameter.POSITIONAL_OR_KEYWORD)
+    because "myscope.x" is not a valid identifier.
+
+    Another alternative considered to represent a scoped parameter was to use TypedDict and
+    only include the scoped name in the key but this has more limitations such as not
+    containing defaults and making parameters KEYWORD_ONLY due to changed order.
+    """
+
+    __slots__ = ()
+
+    def isidentifier(self) -> bool:
+        """Check if the string is a valid identifier.
+
+        This method overrides the default isidentifier method to allow
+        for scoped identifiers (e.g., "myscope.x").
+        """
+        if "." not in self:  # pragma: no cover
+            return super().isidentifier()
+        if self.count(".") != 1:  # pragma: no cover
+            return False
+        scope, name = self.split(".")
+        return scope.isidentifier() and name.isidentifier()

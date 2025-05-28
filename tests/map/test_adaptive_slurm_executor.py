@@ -157,7 +157,7 @@ async def test_adaptive_slurm_executor(
         inputs,
         run_folder,
         executor=ex,  # type: ignore[arg-type]
-        show_progress=True,
+        show_progress="ipywidgets",
         scheduling_strategy=scheduling_strategy,
     )
     result = await runner.task
@@ -238,7 +238,7 @@ async def test_pipeline_no_resources(
         inputs,
         run_folder,
         executor=ex,  # type: ignore[arg-type]
-        show_progress=True,
+        show_progress="ipywidgets",
     )
     result = await runner.task
     assert isinstance(result, ResultDict)

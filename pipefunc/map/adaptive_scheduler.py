@@ -12,7 +12,7 @@ from pipefunc._utils import at_least_tuple, requires
 from pipefunc.map._shapes import shape_is_resolved
 from pipefunc.resources import Resources
 
-from ._run import _func_kwargs, _load_arrays, _select_kwargs
+from ._run import _func_kwargs, _load_data, _select_kwargs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -206,7 +206,7 @@ def _eval_resources(
 ) -> Resources:
     store = run_info.init_store()
     kwargs = _func_kwargs(func, run_info, store)
-    _load_arrays(kwargs)
+    _load_data(kwargs)
     if index is not None:
         shape = run_info.resolved_shapes[func.output_name]
         assert shape_is_resolved(shape)

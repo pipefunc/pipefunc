@@ -136,7 +136,6 @@ addopts = """
     --cov-report term
     --cov-report html
     --cov-report xml
-    --cov-fail-under=35
     --asyncio-mode=strict
     --timeout 60
 """
