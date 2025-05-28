@@ -11,6 +11,8 @@ import ipywidgets as widgets
 from pipefunc._utils import at_least_tuple
 from pipefunc._widgets.progress_base import ProgressTrackerBase
 
+from .helpers import hide, show
+
 if TYPE_CHECKING:
     import asyncio
     from collections.abc import Callable
@@ -224,6 +226,9 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         self._buttons["toggle_auto_update"].button_style = (
             "danger" if self.auto_update else "success"
         )
+        if self.task:
+            show(self._buttons_box)
+            show(self._auto_update_interval_label)
 
     def _cancel_calculation(self, _: Any) -> None:
         """Cancel the ongoing calculation."""
@@ -262,6 +267,10 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
                 on_click=self._cancel_calculation,
             ),
         }
+        self._buttons_box = widgets.HBox(
+            list(self._buttons.values()),
+            layout=widgets.Layout(justify_content="center"),
+        )
 
     def _create_progress_vboxes(self) -> None:
         self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
@@ -293,14 +302,15 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         self._progress_bars = _create_progress_bars(self.progress_dict)
         self._create_buttons()
         self._create_progress_vboxes()
-        parts = list(self._progress_vboxes.values())
-        if self.task:
-            button_box = widgets.HBox(
-                list(self._buttons.values()),
-                layout=widgets.Layout(justify_content="center"),
-            )
-            parts.extend([button_box, self._auto_update_interval_label])
-        return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
+        if not self.task:
+            hide(self._buttons_box)
+            hide(self._auto_update_interval_label)
+        children = [
+            *self._progress_vboxes.values(),
+            self._buttons_box,
+            self._auto_update_interval_label,
+        ]
+        return widgets.VBox(children, layout=widgets.Layout(max_width="700px"))
 
     def display(self) -> None:
         style = textwrap.dedent(
