@@ -138,8 +138,6 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             in_async=in_async,
         )
         self._widgets = self._create_widgets()
-        if self.task is not None:
-            self._set_auto_update(auto_update)
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values and labels."""
