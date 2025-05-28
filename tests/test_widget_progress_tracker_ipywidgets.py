@@ -207,7 +207,6 @@ def test_progress_tracker_mark_completed_with_errors(
     mock_progress_dict["test"].n_failed = 50
     mock_progress_dict["test"].n_in_progress = 0
     tracker = IPyWidgetsProgressTracker(mock_progress_dict, auto_update=False)
-    assert isinstance(tracker._widgets, VBox)  # initialize cached widgets
     tracker.update_progress()
     assert "Completed with errors" in tracker._auto_update_interval_label.value
     assert "❌" in tracker._auto_update_interval_label.value
