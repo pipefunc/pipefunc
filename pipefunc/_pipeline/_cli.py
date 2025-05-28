@@ -156,7 +156,7 @@ def cli(pipeline: Pipeline, description: str | None = None) -> None:
 
     rich.print("Inputs from CLI:", inputs)
     rich.print("Map kwargs from CLI:", map_kwargs)
-    results = pipeline.map(inputs, **map_kwargs)
+    results = pipeline.map(inputs, show_progress="rich", **map_kwargs)
     rich.print("\n\n[bold blue]Results:")
     for key, value in results.items():
         rich.print(f"[bold yellow]Output `{key}`:[/]", "\n", value.output, "\n")
