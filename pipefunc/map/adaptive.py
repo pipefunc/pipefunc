@@ -572,7 +572,7 @@ def _adaptive_wrapper(
     inputs_ = inputs.copy()
     for dim, val in zip(adaptive_dimensions, values):
         inputs_[dim] = val
-    results = pipeline.map(inputs_, run_folder=run_folder, **map_kwargs)
+    results = pipeline.map(inputs_, run_folder=run_folder, show_progress=False, **map_kwargs)
     return results[adaptive_output].output
 
 
