@@ -32,7 +32,7 @@ class ProgressTrackerBase(ABC):
         auto_update: bool = True,
         in_async: bool = True,
     ) -> None:
-        self.task: asyncio.Task[None] | None = task
+        self.task: asyncio.Task[None] | None = None
         self.progress_dict: dict[OUTPUT_TYPE, Status] = progress_dict
         self.target_progress_change: float = target_progress_change
         self.auto_update: bool = auto_update
@@ -48,6 +48,8 @@ class ProgressTrackerBase(ABC):
         self._initial_max_update_interval: float = self.INITIAL_MAX_UPDATE_INTERVAL
         self._marked_completed: set[OUTPUT_TYPE] = set()
         self._completed = False
+        if task is not None:
+            self.attach_task(task)
 
     def attach_task(self, task: asyncio.Task[Any]) -> None:
         """Attach a new task to the progress tracker."""
