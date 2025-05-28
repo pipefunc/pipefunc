@@ -143,7 +143,7 @@ def test_pipeline_3d_mapspec_as_pydantic_model_with_custom_objects() -> None:
     assert out["y"] == expected["y"]
 
 
-def test_pipeline_to_pydantic_without_griffe(monkeypatch):
+def test_pipeline_to_pydantic_without_griffe(monkeypatch) -> None:
     # Import the module where pipeline_to_pydantic is defined.
     # Adjust the import path according to your project structure.
     from pydantic import BaseModel
@@ -181,7 +181,7 @@ def test_pipeline_to_pydantic_without_griffe(monkeypatch):
 
 
 @pytest.mark.skipif(not has_griffe, reason="requires griffe")
-def test_pipeline_to_pydantic_with_doc():
+def test_pipeline_to_pydantic_with_doc() -> None:
     @pipefunc("foo")
     def foo(x: int, y: int = 1) -> int:
         """

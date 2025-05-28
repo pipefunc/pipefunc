@@ -11,6 +11,8 @@ from typing import Any, Literal
 import IPython.display
 import ipywidgets
 
+from .helpers import hide, show
+
 has_rich = importlib.util.find_spec("rich") is not None
 
 
@@ -141,13 +143,13 @@ class AsyncTaskStatusWidget:
             self._traceback_button.description = "Hide traceback"
             self._traceback_button.button_style = "danger"
             self._traceback_button.icon = "close"
-            self._traceback_widget.layout.display = "block"
+            show(self._traceback_widget)
         else:
             # Hide traceback
             self._traceback_button.description = "Show traceback"
             self._traceback_button.button_style = "info"
             self._traceback_button.icon = "search"
-            self._traceback_widget.layout.display = "none"
+            hide(self._traceback_widget)
 
     def _create_status_html(
         self,
@@ -202,10 +204,10 @@ class AsyncTaskStatusWidget:
         # Handle error display if applicable
         if status == "failed" and error is not None:
             self._exception = error
-            self._traceback_button.layout.display = "block"
+            show(self._traceback_button)
         else:
-            self._traceback_button.layout.display = "none"
-            self._traceback_widget.layout.display = "none"
+            hide(self._traceback_button)
+            hide(self._traceback_widget)
 
     def _print_traceback(self) -> None:
         """Display error traceback in the traceback widget."""

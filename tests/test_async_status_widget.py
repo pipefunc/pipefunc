@@ -35,7 +35,7 @@ async def test_widget_initialization():
 
 
 @pytest.mark.asyncio
-async def test_widget_status_styles():
+async def test_widget_status_styles() -> None:
     """Test that all status types have associated styles."""
     widget = AsyncTaskStatusWidget(display=False)
     statuses: list[StatusType] = ["initializing", "running", "done", "cancelled", "failed"]
