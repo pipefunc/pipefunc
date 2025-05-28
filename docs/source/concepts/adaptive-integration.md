@@ -53,7 +53,7 @@ from pipefunc.typing import Array
 
 @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
 def double_it(x: int, c: int) -> int:
-    return 2 * x + c
+    return x + c**2 / (c**2 + x ** 2)
 
 
 @pipefunc(output_name="sum_")
