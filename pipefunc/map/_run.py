@@ -680,11 +680,12 @@ def _set_output(
             internal_index,
         )
         try:
-            arr[flat_index] = output[internal_index]
+            _output = output[internal_index]
         except IndexError:
             if not func._irregular_output:
                 raise
-            arr[flat_index] = np.ma.masked
+            _output = np.ma.masked
+        arr[flat_index] = _output
 
 
 def _validate_internal_shape(
