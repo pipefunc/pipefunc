@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import hashlib
 import textwrap
 import time
@@ -62,8 +61,32 @@ def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatPro
     )
 
 
+def _create_progress_bars(
+    progress_dict: dict[OUTPUT_TYPE, Status],
+) -> dict[OUTPUT_TYPE, widgets.FloatProgress]:
+    return {
+        name: _create_progress_bar(name, status.progress) for name, status in progress_dict.items()
+    }
+
+
 def _create_html_label(class_name: str, initial_value: str) -> widgets.HTML:
     return widgets.HTML(value=_span(class_name, initial_value))
+
+
+def _create_labels(
+    progress_dict: dict[OUTPUT_TYPE, Status],
+) -> dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]]:
+    return {
+        name: {
+            "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
+            "estimated_time": _create_html_label(
+                "estimate-label",
+                "Elapsed: 0.00 sec | ETA: Calculating...",
+            ),
+            "speed": _create_html_label("speed-label", "Speed: Calculating..."),
+        }
+        for name, status in progress_dict.items()
+    }
 
 
 def _get_scope_hue(output_name: OUTPUT_TYPE) -> int | None:
@@ -112,44 +135,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             auto_update=auto_update,
             in_async=in_async,
         )
-
-        self._progress_bars: dict[OUTPUT_TYPE, widgets.FloatProgress] = {}
-        self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
-        self._labels: dict[OUTPUT_TYPE, dict[OUTPUT_TYPE, widgets.HTML]] = {}
-        self._buttons: dict[OUTPUT_TYPE, widgets.Button] = {
-            "update": _create_button(
-                description="Update Progress",
-                button_style="info",
-                icon="refresh",
-                on_click=self.update_progress,
-            ),
-            "toggle_auto_update": _create_button(
-                description="Start Auto-Update",
-                button_style="success",
-                icon="refresh",
-                on_click=self._toggle_auto_update,
-            ),
-            "cancel": _create_button(
-                description="Cancel Calculation",
-                button_style="danger",
-                icon="stop",
-                on_click=self._cancel_calculation,
-            ),
-        }
-        for name, status in self.progress_dict.items():
-            self._progress_bars[name] = _create_progress_bar(name, status.progress)
-            self._labels[name] = {
-                "percentage": _create_html_label("percent-label", f"{status.progress * 100:.1f}%"),
-                "estimated_time": _create_html_label(
-                    "estimate-label",
-                    "Elapsed: 0.00 sec | ETA: Calculating...",
-                ),
-                "speed": _create_html_label("speed-label", "Speed: Calculating..."),
-            }
-        self._auto_update_interval_label = _create_html_label(
-            "interval-label",
-            "Auto-update every: N/A",
-        )
+        self._widgets = self._create_widgets()
         if self.task is not None:
             self._set_auto_update(auto_update)
 
@@ -255,9 +241,30 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
                 progress_bar.add_class("completed-progress")
         self._auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
-    @functools.cached_property
-    def _widgets(self) -> widgets.VBox:
-        """Display the progress widgets with styles."""
+    def _create_buttons(self) -> None:
+        self._buttons: dict[OUTPUT_TYPE, widgets.Button] = {
+            "update": _create_button(
+                description="Update Progress",
+                button_style="info",
+                icon="refresh",
+                on_click=self.update_progress,
+            ),
+            "toggle_auto_update": _create_button(
+                description="Start Auto-Update",
+                button_style="success",
+                icon="refresh",
+                on_click=self._toggle_auto_update,
+            ),
+            "cancel": _create_button(
+                description="Cancel Calculation",
+                button_style="danger",
+                icon="stop",
+                on_click=self._cancel_calculation,
+            ),
+        }
+
+    def _create_progress_vboxes(self) -> None:
+        self._progress_vboxes: dict[OUTPUT_TYPE, widgets.VBox] = {}
         for name in self.progress_dict:
             labels = self._labels[name]
             labels_box = widgets.HBox(
@@ -276,13 +283,22 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
             if hue is not None:  # `background-color` is not settable for `VBox`, so use CSS classes
                 container.add_class(f"scope-bg-{hue}")
 
-        buttons = self._buttons
-        button_box = widgets.HBox(
-            [buttons["update"], buttons["toggle_auto_update"], buttons["cancel"]],
-            layout=widgets.Layout(justify_content="center"),
+    def _create_widgets(self) -> widgets.VBox:
+        """Display the progress widgets with styles."""
+        self._auto_update_interval_label = _create_html_label(
+            "interval-label",
+            "Auto-update every: N/A",
         )
+        self._labels = _create_labels(self.progress_dict)
+        self._progress_bars = _create_progress_bars(self.progress_dict)
+        self._create_buttons()
+        self._create_progress_vboxes()
         parts = list(self._progress_vboxes.values())
         if self.task:
+            button_box = widgets.HBox(
+                list(self._buttons.values()),
+                layout=widgets.Layout(justify_content="center"),
+            )
             parts.extend([button_box, self._auto_update_interval_label])
         return widgets.VBox(parts, layout=widgets.Layout(max_width="700px"))
 
