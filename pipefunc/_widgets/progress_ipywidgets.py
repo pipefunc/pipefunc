@@ -130,6 +130,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         auto_update: bool = True,
         in_async: bool = True,
     ) -> None:
+        self._buttons: dict[OUTPUT_TYPE, widgets.Button] | None = None
         super().__init__(
             progress_dict,
             task,
@@ -212,12 +213,15 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         else:
             msg = "Completed all tasks 🎉"
         self._auto_update_interval_label.value = _span("interval-label", msg)
+        assert self._buttons is not None
         for button in self._buttons.values():
             button.disabled = True
 
     def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
         """Set the auto-update feature to the given value."""
         super()._set_auto_update(value)
+        if self._buttons is None:  # method can be called before buttons exist
+            return
         self._buttons["toggle_auto_update"].description = (
             "Stop Auto-Update" if self.auto_update else "Start Auto-Update"
         )
@@ -235,6 +239,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         self.update_progress()  # Update progress one last time
         if self.auto_update:
             self._toggle_auto_update()
+        assert self._buttons is not None
         for button in self._buttons.values():
             button.disabled = True
         for progress_bar in self._progress_bars.values():
@@ -245,7 +250,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         self._auto_update_interval_label.value = _span("interval-label", "Calculation cancelled ❌")
 
     def _create_buttons(self) -> None:
-        self._buttons: dict[OUTPUT_TYPE, widgets.Button] = {
+        self._buttons = {
             "update": _create_button(
                 description="Update Progress",
                 button_style="info",
