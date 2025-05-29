@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any, Literal
 
-from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.map._run import (
     AsyncMap,
+    _async_map,
     _maybe_executor,
     _maybe_persist_memory,
     _process_task_async,
@@ -196,12 +195,7 @@ def run_map_eager_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    task = asyncio.create_task(_run_pipeline())
-    if prep.progress is not None:
-        prep.progress.attach_task(task)
-
-    status_widget = maybe_async_task_status_widget(task)
-    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
+    return _async_map(_run_pipeline, prep, multi_run_manager)
 
 
 async def _eager_scheduler_loop_async(

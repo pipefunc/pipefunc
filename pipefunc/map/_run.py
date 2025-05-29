@@ -40,7 +40,7 @@ from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_i
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterable, Sequence
+    from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
 
     import pydantic
     from adaptive_scheduler import MultiRunManager
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
+    from ._prepare import Prepared
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
@@ -400,7 +401,15 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    task = asyncio.create_task(_run_pipeline())
+    return _async_map(_run_pipeline, prep, multi_run_manager)
+
+
+def _async_map(
+    run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
+    prep: Prepared,
+    multi_run_manager: MultiRunManager | None,
+) -> AsyncMap:
+    task = asyncio.create_task(run_pipeline())
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
