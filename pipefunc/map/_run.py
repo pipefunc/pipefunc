@@ -27,6 +27,7 @@ from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
 
 from ._adaptive_scheduler_slurm_executor import (
+    is_slurm_executor,
     maybe_finalize_slurm_executors,
     maybe_multi_run_manager,
     maybe_update_slurm_executor_map,
@@ -921,6 +922,8 @@ def _get_optimal_chunk_size(
         balance between load distribution and overhead for most workloads
 
     """
+    if is_slurm_executor(executor):
+        return 1
     try:
         n_cores = get_ncores(executor)
         n_cores = max(1, n_cores)
