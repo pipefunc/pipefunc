@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._pipefunc import PipeFunc
 from pipefunc.map._run import (
+    _finalize_run_map,
     _KwargsTask,
     _maybe_executor,
-    _maybe_persist_memory,
     _process_task,
     _submit_func,
     prepare_run,
@@ -174,9 +174,6 @@ def run_map_eager(
         in_async=False,
     )
 
-    if prep.progress is not None:
-        prep.progress.display()
-
     dependency_info = _build_dependency_graph(prep.pipeline)
 
     with _maybe_executor(prep.executor, prep.parallel) as ex:
@@ -192,10 +189,7 @@ def run_map_eager(
             return_results=return_results,
             cache=prep.pipeline.cache,
         )
-    if prep.progress is not None:  # final update
-        prep.progress.update_progress(force=True)
-    _maybe_persist_memory(prep.store, persist_memory)
-    return prep.outputs
+    return _finalize_run_map(prep, persist_memory)
 
 
 def _build_dependency_graph(pipeline: Pipeline) -> _DependencyInfo:

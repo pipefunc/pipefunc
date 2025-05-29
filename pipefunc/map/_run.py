@@ -192,8 +192,7 @@ def run_map(
         show_progress=show_progress,
         in_async=False,
     )
-    if prep.progress is not None:
-        prep.progress.display()
+
     with _maybe_executor(prep.executor, prep.parallel) as ex:
         for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -208,6 +207,10 @@ def run_map(
                 return_results=return_results,
                 cache=prep.pipeline.cache,
             )
+    return _finalize_run_map(prep, persist_memory)
+
+
+def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # noqa: FBT001
     if prep.progress is not None:  # final update
         prep.progress.update_progress(force=True)
     _maybe_persist_memory(prep.store, persist_memory)
