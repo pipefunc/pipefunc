@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypeVar
 
 from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, is_running_in_ipynb
 
 from ._adaptive_scheduler_slurm_executor import validate_slurm_executor
 from ._mapspec import validate_consistent_axes
@@ -87,6 +87,9 @@ def prepare_run(
     if parallel and any(func.profile for func in pipeline.functions):
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
+    if not in_async and progress is not None and is_running_in_ipynb():  # pragma: no cover
+        # If in_async, the progress is displayed in the `_finalize_run_map_async` function
+        progress.display()
     return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
 
 

@@ -40,7 +40,7 @@ from ._shapes import external_shape_from_mask, internal_shape_from_mask, shape_i
 from ._storage_array._base import StorageBase, iterate_shape_indices, select_by_mask
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterable, Sequence
+    from collections.abc import Callable, Coroutine, Generator, Iterable, Sequence
 
     import pydantic
     from adaptive_scheduler import MultiRunManager
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
 
+    from ._prepare import Prepared
     from ._progress import Status
     from ._result import StoreType
     from ._run_info import RunInfo
@@ -191,8 +192,7 @@ def run_map(
         show_progress=show_progress,
         in_async=False,
     )
-    if prep.progress is not None:
-        prep.progress.display()
+
     with _maybe_executor(prep.executor, prep.parallel) as ex:
         for gen in prep.pipeline.topological_generations.function_lists:
             _run_and_process_generation(
@@ -207,6 +207,10 @@ def run_map(
                 return_results=return_results,
                 cache=prep.pipeline.cache,
             )
+    return _finalize_run_map(prep, persist_memory)
+
+
+def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # noqa: FBT001
     if prep.progress is not None:  # final update
         prep.progress.update_progress(force=True)
     _maybe_persist_memory(prep.store, persist_memory)
@@ -400,7 +404,15 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    task = asyncio.create_task(_run_pipeline())
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager)
+
+
+def _finalize_run_map_async(
+    run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
+    prep: Prepared,
+    multi_run_manager: MultiRunManager | None,
+) -> AsyncMap:
+    task = asyncio.create_task(run_pipeline())
     if prep.progress is not None:
         prep.progress.attach_task(task)
 
