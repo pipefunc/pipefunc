@@ -404,10 +404,10 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _async_map(_run_pipeline, prep, multi_run_manager)
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager)
 
 
-def _async_map(
+def _finalize_run_map_async(
     run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
     prep: Prepared,
     multi_run_manager: MultiRunManager | None,

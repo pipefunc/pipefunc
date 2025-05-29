@@ -88,6 +88,7 @@ def prepare_run(
         msg = "`profile=True` is not supported with `parallel=True` using process-based executors."
         warnings.warn(msg, UserWarning, stacklevel=2)
     if not in_async and progress is not None and is_running_in_ipynb():
+        # If in_async, the progress is displayed in the `_finalize_run_map_async` function
         progress.display()
     return Prepared(pipeline, run_info, store, outputs, parallel, executor, chunksizes, progress)
 

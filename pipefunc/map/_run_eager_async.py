@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc.map._run import (
     AsyncMap,
-    _async_map,
+    _finalize_run_map_async,
     _maybe_executor,
     _maybe_persist_memory,
     _process_task_async,
@@ -195,7 +195,7 @@ def run_map_eager_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _async_map(_run_pipeline, prep, multi_run_manager)
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager)
 
 
 async def _eager_scheduler_loop_async(
