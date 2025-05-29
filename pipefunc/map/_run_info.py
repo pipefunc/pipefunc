@@ -9,10 +9,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import cloudpickle
 import numpy as np
 
 from pipefunc._utils import at_least_tuple, dump, equal_dicts, first, load
 from pipefunc._version import __version__
+from pipefunc.helpers import FileArray, FileValue
 
 from ._mapspec import MapSpec
 from ._result import DirectValue
@@ -82,6 +84,7 @@ class RunInfo:
             else:
                 _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
+        inputs = _maybe_inputs_to_disk(pipeline, inputs, run_folder)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         resolved_shapes = shapes.copy()
         return cls(
@@ -145,7 +148,7 @@ class RunInfo:
         if self.run_folder is None:  # pragma: no cover
             msg = "Cannot get `input_paths` without `run_folder`."
             raise ValueError(msg)
-        return {k: _input_path(k, self.run_folder) for k in self.inputs}
+        return _input_paths(self.inputs, self.run_folder)
 
     @property
     def defaults_path(self) -> Path:
@@ -246,6 +249,33 @@ class RunInfo:
                     internal[name] = internal_shape_from_mask(new_shape, self.shape_masks[name])
         if has_updated:
             self.dump()
+
+
+# Max size for inputs in bytes (500 kB)
+_MAX_SIZE_BYTES_INPUT = 500 * 1024
+
+
+def _maybe_inputs_to_disk(
+    pipeline: Pipeline,
+    inputs: dict[str, Any],
+    run_folder: Path | None,
+) -> dict[str, Any]:
+    """If `run_folder` is set, dump inputs to disk if large serialization required."""
+    if run_folder is None:
+        return inputs
+    input_paths = _input_paths(inputs, run_folder)
+    for input_name, value in inputs.items():
+        dumped = cloudpickle.dumps(value)
+        if len(dumped) < _MAX_SIZE_BYTES_INPUT:
+            continue
+        path = input_paths[input_name].with_suffix("")
+        new_value: FileArray | FileValue
+        if input_name in pipeline.mapspec_names:
+            new_value = FileArray.from_data(value, path)
+        else:
+            new_value = FileValue.from_data(value, path)
+        inputs[input_name] = new_value
+    return inputs
 
 
 def _update_shape_in_store(
@@ -380,6 +410,10 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
 
 def _input_path(input_name: str, run_folder: Path) -> Path:
     return run_folder / "inputs" / f"{input_name}.cloudpickle"
+
+
+def _input_paths(inputs: dict[str, Any], run_folder: Path) -> dict[str, Path]:
+    return {k: _input_path(k, run_folder) for k in inputs}
 
 
 def _defaults_path(run_folder: Path) -> Path:
