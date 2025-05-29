@@ -268,6 +268,10 @@ def _maybe_inputs_to_disk(
         dumped = cloudpickle.dumps(value)
         if len(dumped) < _MAX_SIZE_BYTES_INPUT:
             continue
+        print(
+            f"Input `{input_name}` is too large ({len(dumped) / 1024} kB), "
+            "dumping to disk instead of serializing.",
+        )
         path = input_paths[input_name].with_suffix("")
         new_value: FileArray | FileValue
         if input_name in pipeline.mapspec_names:
