@@ -24,7 +24,7 @@ def validate_slurm_executor(
     if executor is None or in_async or not _adaptive_scheduler_imported():
         return
     for ex in executor.values():
-        if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+        if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
             msg = "Cannot use an `adaptive_scheduler.SlurmExecutor` in non-async mode, use `pipeline.map_async` instead."
             raise ValueError(msg)
 
@@ -36,7 +36,7 @@ def maybe_multi_run_manager(
         from adaptive_scheduler import MultiRunManager
 
         for ex in executor.values():
-            if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+            if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
                 return MultiRunManager()
     return None
 
@@ -47,7 +47,7 @@ def maybe_update_slurm_executor_single(
     executor: dict[OUTPUT_TYPE, Executor],
     kwargs: dict[str, Any],
 ) -> Executor:
-    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+    if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
         ex = _slurm_executor_for_single(ex, func, kwargs)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
@@ -61,7 +61,7 @@ def maybe_update_slurm_executor_map(
     process_index: functools.partial[tuple[Any, ...]],
     indices: list[int],
 ) -> Executor:
-    if _is_slurm_executor(ex) or _is_slurm_executor_type(ex):
+    if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
         ex = _slurm_executor_for_map(ex, process_index, indices)
         assert isinstance(executor, dict)
         executor[func.output_name] = ex  # type: ignore[assignment]
@@ -75,14 +75,14 @@ def maybe_finalize_slurm_executors(
 ) -> None:
     executors = _executors_for_generation(generation, executor)
     for ex in executors:
-        if _adaptive_scheduler_imported() and _is_slurm_executor(ex):
+        if _adaptive_scheduler_imported() and is_slurm_executor(ex):
             assert multi_run_manager is not None
             run_manager = ex.finalize()
             if run_manager is not None:  # is None if nothing was submitted
                 multi_run_manager.add_run_manager(run_manager)
 
 
-def _is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
+def is_slurm_executor(executor: Executor | None) -> TypeGuard[SlurmExecutor]:
     if executor is None or not _adaptive_scheduler_imported():  # pragma: no cover
         return False
     from adaptive_scheduler import SlurmExecutor
@@ -208,7 +208,7 @@ def _new_slurm_executor(
 ) -> SlurmExecutor:
     from adaptive_scheduler import SlurmExecutor
 
-    if _is_slurm_executor(executor):  # type: ignore[arg-type]
+    if is_slurm_executor(executor):  # type: ignore[arg-type]
         return executor.new(update=kwargs)
     assert isinstance(executor, type)
     assert issubclass(executor, SlurmExecutor)
