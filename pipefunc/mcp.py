@@ -33,9 +33,9 @@ HOW TO USE THIS MCP SERVER:
 4. Optionally specify a run_folder to save intermediate results
 
 INPUT FORMATS:
-- Single Values: {"param1": 5, "param2": 10} → Executes once with these specific values
-- Array Sweeps: {"param1": [1,2,3], "param2": [4,5]} → Creates parameter combinations based on mapspec
-- Mixed: {"data": [1,2,3], "constant": 10} → Arrays are swept, single values used for all iterations
+- Single Values: {{"param1": 5, "param2": 10}} → Executes once with these specific values
+- Array Sweeps: {{"param1": [1,2,3], "param2": [4,5]}} → Creates parameter combinations based on mapspec
+- Mixed: {{"data": [1,2,3], "constant": 10}} → Arrays are swept, single values used for all iterations
 
 MAPSPEC EXAMPLES:
 - "x[i] -> y[i]": Element-wise processing (x and y have same length)
@@ -49,6 +49,9 @@ Returns a dictionary with all pipeline outputs, including intermediate results. 
 - "shape": Array dimensions (if applicable)
 
 The pipeline automatically handles dependencies, execution order, caching, and parallelization, allowing you to focus on the computational logic rather than workflow management.
+
+PIPELINE DESCRIPTION:
+{pipeline_description}
 """
 
 _PIPELINE_DESCRIPTION_TEMPLATE = """\
@@ -183,10 +186,15 @@ def _format_tool_description(
     )
 
 
-def build_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str) -> fastmcp.FastMCP:
+def build_mcp_server(
+    pipeline_name: str,
+    pipeline: Pipeline,
+    version: str,
+) -> fastmcp.FastMCP:
     """Build the MCP server for the pipeline."""
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
     from fastmcp import Context, FastMCP
+    from fastmcp.utilities.types import get_cached_typeadapter
 
     # Generate all pipeline information sections
     documentation = _get_pipeline_documentation(pipeline)
@@ -204,12 +212,14 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str) -> fa
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
-    mcp = FastMCP(name=pipeline_name, version=version, instructions=_PIPEFUNC_INSTRUCTIONS)
-
-    @mcp.tool(
-        name="execute_pipeline",
-        description=description,
+    mcp = FastMCP(
+        name=pipeline_name,
+        version=version,
+        instructions=_PIPEFUNC_INSTRUCTIONS.format(
+            pipeline_description=pipeline.description or "No description provided.",
+        ),
     )
+
     def execute_pipeline(
         ctx: Context,  # noqa: ARG001
         input: Model,  # type: ignore[valid-type] # noqa: A002
@@ -233,6 +243,13 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str) -> fa
             }
         return str(output)
 
+    # This prevents the error:
+    # PydanticUserError: `TypeAdapter[<function build_mcp_server.<locals>.execute_pipeline at ...>]`
+    # is not fully defined; you should define `<function build_mcp_server.<locals>.execute_pipeline at ...>`
+    # and all referenced types, then call `.rebuild()` on the instance.
+    get_cached_typeadapter(execute_pipeline).json_schema()
+
+    mcp.add_tool(execute_pipeline, name="execute_pipeline", description=description)
     return mcp
 
 
