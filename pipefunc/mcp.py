@@ -247,6 +247,7 @@ def build_mcp_server(
     # PydanticUserError: `TypeAdapter[<function build_mcp_server.<locals>.execute_pipeline at ...>]`
     # is not fully defined; you should define `<function build_mcp_server.<locals>.execute_pipeline at ...>`
     # and all referenced types, then call `.rebuild()` on the instance.
+    # This seems hacky, but it works. It also needs to be called inside of the body of this function.
     get_cached_typeadapter(execute_pipeline).json_schema()
 
     mcp.add_tool(execute_pipeline, name="execute_pipeline", description=description)
