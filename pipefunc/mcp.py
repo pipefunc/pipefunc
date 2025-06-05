@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
     import fastmcp
 
     from pipefunc._pipeline._base import Pipeline
+
+logger = logging.getLogger(__name__)
 
 _PIPEFUNC_INSTRUCTIONS = """\
 This MCP server provides tools for executing Pipefunc computational pipelines.
@@ -227,11 +230,13 @@ def build_mcp_server(
         run_folder: str | None = None,
     ) -> str:
         """Execute pipeline with input values (works for both single values and arrays)."""
+        logger.info(f"Executing pipeline {pipeline.name=} with input: {input}")  # noqa: G004
         result = pipeline.map(
             inputs=input,
             parallel=parallel,
             run_folder=run_folder,
         )
+        logger.info(f"Pipeline {pipeline.name=} executed")  # noqa: G004
         # Convert ResultDict to a more readable format
         output = {}
         for key, result_obj in result.items():
