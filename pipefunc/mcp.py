@@ -16,42 +16,49 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PIPEFUNC_INSTRUCTIONS = """\
-This MCP server provides tools for executing Pipefunc computational pipelines.
+This MCP server executes Pipefunc computational pipelines.
+Pipefunc creates function pipelines as DAGs where functions are automatically connected based on input/output dependencies.
 
-WHAT IS PIPEFUNC?
-Pipefunc is a Python library for creating and executing function pipelines.
-It structures computational workflows as Directed Acyclic Graphs (DAGs) where functions are automatically connected based on their input/output dependencies.
-Simply annotate functions with @pipefunc, specify their outputs, and pipefunc handles the execution order, parallelization, and data flow.
-
-KEY CONCEPTS:
-- Pipeline: A sequence of interconnected functions forming a computational workflow
-- MapSpec: Defines how arrays are mapped between functions (e.g., "x[i] -> y[i]" for element-wise operations)
+CORE CONCEPTS:
+- Pipeline: Sequence of interconnected functions forming a computational workflow
+- MapSpec: String syntax defining how arrays map between functions
 - Parallel Execution: Automatically parallelizes computations across parameter combinations
-- Parameter Sweeps: Process multiple input combinations efficiently with caching and optimization
+- Parameter Sweeps: Process multiple input combinations efficiently
 
-HOW TO USE THIS MCP SERVER:
-1. Use the 'execute_pipeline' tool to run the computational pipeline
-2. Provide inputs as single values OR arrays/lists for parameter sweeps
-3. Set parallel=true for parallel execution (recommended for arrays)
-4. Optionally specify a run_folder to save intermediate results
+EXECUTION PARAMETERS:
+- input: Dictionary with parameter values (single values or arrays)
+- parallel: Boolean (default true) - enables parallel execution
+- run_folder: Optional string - directory to save intermediate results
 
 INPUT FORMATS:
-- Single Values: {{"param1": 5, "param2": 10}} → Executes once with these specific values
-- Array Sweeps: {{"param1": [1,2,3], "param2": [4,5]}} → Creates parameter combinations based on mapspec
-- Mixed: {{"data": [1,2,3], "constant": 10}} → Arrays are swept, single values used for all iterations
+1. Single values: {{"param1": 5, "param2": 10}} - executes once with these values
+2. Array sweeps: {{"param1": [1,2,3], "param2": [4,5]}} - creates parameter combinations based on mapspec
+3. Mixed: {{"data": [1,2,3], "constant": 10}} - arrays are swept, single values used for all iterations
 
-MAPSPEC EXAMPLES:
-- "x[i] -> y[i]": Element-wise processing (x and y have same length)
-- "a[i], b[j] -> result[i,j]": Cross-product (all combinations of a and b)
-- "x[i], y[i] -> z[i]": Zipped processing (pair x[0] with y[0], etc.)
-- "x[i, j] -> y[i, j]": Each element of x is processed with each element of y, input and output have same shape, x is provided as a list of lists.
+MAPSPEC SYNTAX:
+- "x[i] -> y[i]": Element-wise processing (same array length)
+- "a[i], b[j] -> result[i,j]": Cross-product (all combinations)
+- "x[i], y[i] -> z[i]": Zipped processing (paired elements)
+- "x[i,:] -> y[i]": Reduction across dimension
+- "... -> x[i]": Dynamic array generation
 
-OUTPUTS:
-Returns a dictionary with all pipeline outputs, including intermediate results. Each output contains:
-- "output": The computed result (converted to lists for JSON compatibility)
+INDEX RULES:
+- Same index letter ([i], [i]): Elements processed together (zipped)
+- Different indices ([i], [j]): Create cross-product combinations
+- No indices: Single values used for all iterations
+
+OUTPUT FORMAT:
+Returns dictionary with all pipeline outputs. Each output contains:
+- "output": Computed result (converted to JSON-compatible format)
 - "shape": Array dimensions (if applicable)
 
-The pipeline automatically handles dependencies, execution order, caching, and parallelization, allowing you to focus on the computational logic rather than workflow management.
+EXECUTION MODES:
+- parallel=true: Functions execute concurrently, faster for large sweeps
+- parallel=false: Sequential execution, more reliable for custom objects, better for debugging
+
+COMMON ISSUES:
+- Shape mismatches: Verify mapspec definitions match expected array dimensions
+- Type errors: Ensure input types match function parameter types
 
 PIPELINE DESCRIPTION:
 {pipeline_description}
@@ -63,7 +70,7 @@ Execute the pipeline with input values. This method works for both single values
 PIPELINE INFORMATION:
 {pipeline_info}
 
-MAPSPEC DEFINITIONS
+MAPSPEC DEFINITIONS:
 {mapspec_section}
 
 INPUT FORMAT:
