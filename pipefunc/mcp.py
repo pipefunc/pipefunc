@@ -2,46 +2,33 @@ from __future__ import annotations
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
-from pipefunc._pipeline._pydantic import maybe_pydantic_model_to_dict
 from pipefunc._utils import requires
 
 _PIPELINE_DESCRIPTION_TEMPLATE = """\
-{method_description}
+Execute the pipeline with input values. This method works for both single values and arrays/lists.
 
 PIPELINE INFORMATION:
 {pipeline_info}
 
+MAPSPEC DEFINITIONS
 {mapspec_section}
+
+INPUT FORMAT:
+{input_format}
 
 DETAILED PIPELINE DOCUMENTATION:
 {documentation}
 """
 
-_RUN_PIPELINE_DESCRIPTION = """\
-Execute the pipeline SEQUENTIALLY with single input values.
-
-Use this method when:
-- No mapspec is used in the entire pipeline!
-- You have single values (not arrays/lists) for each input parameter
-- You want sequential execution (one step after another)
-- You need a single result from the pipeline
-
-Input format: Provide single values for each parameter, e.g.:
-{"a": 5, "b": 10, "x": 2}
+_NO_MAPSPEC_INPUT_FORMAT = """\
+Single values only:
+  {"a": 5, "b": 10, "x": 2}
+  → Each parameter gets a single value
 
 This will execute the pipeline once with these specific values and return the result.
 """
 
-_MAP_PIPELINE_DESCRIPTION = """\
-Execute the pipeline in PARALLEL with arrays/lists of input values using mapspec.
-
-Use this method when:
-- You have arrays/lists of values for input parameters
-- You want parallel execution across parameter combinations
-- You need results for multiple input combinations
-- Your pipeline functions use mapspec (e.g., "x[i] -> y[i]")
-
-Input format examples:
+_MAPSPEC_INPUT_FORMAT = """\
 
 1. Simple element-wise mapping:
    {"x": [1, 2, 3, 4]}
@@ -63,9 +50,7 @@ Key concepts:
 - mapspec defines how inputs map to outputs (e.g., "x[i] -> y[i]" means element-wise)
 - Arrays with same index letter (like [i]) are processed together
 - Arrays with different indices (like [i] and [j]) create cross-products
-- Functions without mapspec receive entire arrays or single values
-
-Returns: A dictionary with all pipeline outputs, where each output contains the computed results.
+- Single values work regardless of mapspecs
 """
 
 
@@ -107,11 +92,10 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
     """Generate mapspec information section."""
     mapspecs = pipeline.mapspecs_as_strings
     if not mapspecs:
-        return "MAPSPEC: None (This pipeline uses sequential processing only)"
+        return "None (This pipeline processes single values only)"
 
     lines = [
-        "MAPSPEC DEFINITIONS:",
-        "The following mapspecs define how arrays are processed in parallel:",
+        "The following mapspecs define how arrays are processed:",
     ]
 
     for i, mapspec in enumerate(mapspecs, 1):
@@ -131,17 +115,23 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
     return "\n".join(lines)
 
 
+def _get_input_format_section(pipeline: Pipeline) -> str:
+    """Generate input format examples section."""
+    mapspecs = pipeline.mapspecs_as_strings
+    return _MAPSPEC_INPUT_FORMAT if mapspecs else _NO_MAPSPEC_INPUT_FORMAT
+
+
 def _format_tool_description(
-    method_description: str,
     pipeline_info: str,
     mapspec_section: str,
+    input_format: str,
     documentation: str,
 ) -> str:
     """Format a complete tool description using the template."""
     return _PIPELINE_DESCRIPTION_TEMPLATE.format(
-        method_description=method_description,
         pipeline_info=pipeline_info,
         mapspec_section=mapspec_section,
+        input_format=input_format,
         documentation=documentation,
     )
 
@@ -154,19 +144,13 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline):
     documentation = _get_pipeline_documentation(pipeline)
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
+    input_format = _get_input_format_section(pipeline)
 
-    # Format descriptions using the template
-    run_description = _format_tool_description(
-        method_description=_RUN_PIPELINE_DESCRIPTION,
-        pipeline_info=pipeline_info,
-        mapspec_section="NOTE: Sequential execution doesn't work with mapspecs and processes single values only.",
-        documentation=documentation,
-    )
-
-    map_description = _format_tool_description(
-        method_description=_MAP_PIPELINE_DESCRIPTION,
+    # Format description using the template
+    description = _format_tool_description(
         pipeline_info=pipeline_info,
         mapspec_section=mapspec_section,
+        input_format=input_format,
         documentation=documentation,
     )
 
@@ -175,29 +159,16 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline):
     mcp = FastMCP(name=pipeline_name, version="0.1.0")
 
     @mcp.tool(
-        name="run_pipeline",
-        description=run_description,
+        name="execute_pipeline",
+        description=description,
     )
-    def run_pipeline(
-        ctx: Context,
-        input: Model,
-    ) -> str:
-        """Run pipeline sequentially with single input values."""
-        kwargs = maybe_pydantic_model_to_dict(input)
-        result = pipeline.run(pipeline.unique_leaf_node, kwargs=kwargs)
-        return str(result)
-
-    @mcp.tool(
-        name="map_pipeline",
-        description=map_description,
-    )
-    def map_pipeline(
+    def execute_pipeline(
         ctx: Context,
         input: Model,
         parallel: bool = True,
         run_folder: str | None = None,
     ) -> str:
-        """Run pipeline in parallel with arrays of input values using mapspec."""
+        """Execute pipeline with input values (works for both single values and arrays)."""
         result = pipeline.map(
             inputs=input,
             parallel=parallel,
