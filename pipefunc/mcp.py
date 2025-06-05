@@ -90,12 +90,15 @@ def _get_pipeline_info_summary(pipeline_name: str, pipeline: Pipeline) -> str:
     info = pipeline.info()
     assert info is not None
 
+    def _format(key: str) -> str:
+        return ", ".join(info[key]) if info[key] else "None"
+
     lines = [
         f"Pipeline Name: {pipeline_name}",
-        f"Required Inputs: {', '.join(info['required_inputs']) if info['required_inputs'] else 'None'}",
-        f"Optional Inputs: {', '.join(info['optional_inputs']) if info['optional_inputs'] else 'None'}",
-        f"Outputs: {', '.join(info['outputs'])}",
-        f"Intermediate Outputs: {', '.join(info['intermediate_outputs']) if info['intermediate_outputs'] else 'None'}",
+        f"Required Inputs: {_format('required_inputs')}",
+        f"Optional Inputs: {_format('optional_inputs')}",
+        f"Outputs: {_format('outputs')}",
+        f"Intermediate Outputs: {_format('intermediate_outputs')}",
     ]
     return "\n".join(lines)
 
@@ -156,7 +159,7 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline):
     run_description = _format_tool_description(
         method_description=_RUN_PIPELINE_DESCRIPTION,
         pipeline_info=pipeline_info,
-        mapspec_section="NOTE: Sequential execution ignores mapspecs and processes single values only.",
+        mapspec_section="NOTE: Sequential execution doesn't work with mapspecs and processes single values only.",
         documentation=documentation,
     )
 
@@ -168,6 +171,7 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline):
     )
 
     Model = pipeline.pydantic_model()  # noqa: N806
+    Model.model_rebuild()  # Ensure all type references are resolved
     mcp = FastMCP(name=pipeline_name, version="0.1.0")
 
     @mcp.tool(
