@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._utils import requires
@@ -266,7 +266,11 @@ def build_mcp_server(
     return mcp
 
 
-def run_mcp_server(pipeline: Pipeline, version: str = "1.0.0") -> None:
+def run_mcp_server(
+    pipeline: Pipeline,
+    transport: Literal["stdio", "sse", "streamable-http"] = "stdio",
+    version: str = "1.0.0",
+) -> None:
     """Run the MCP server using stdio transport."""
     mcp = build_mcp_server(pipeline, version=version)
-    mcp.run(transport="stdio")
+    mcp.run(transport=transport)
