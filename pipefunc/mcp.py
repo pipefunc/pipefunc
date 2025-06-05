@@ -12,6 +12,44 @@ if TYPE_CHECKING:
 
     from pipefunc._pipeline._base import Pipeline
 
+_PIPEFUNC_INSTRUCTIONS = """\
+This MCP server provides tools for executing Pipefunc computational pipelines.
+
+WHAT IS PIPEFUNC?
+Pipefunc is a Python library for creating and executing function pipelines.
+It structures computational workflows as Directed Acyclic Graphs (DAGs) where functions are automatically connected based on their input/output dependencies.
+Simply annotate functions with @pipefunc, specify their outputs, and pipefunc handles the execution order, parallelization, and data flow.
+
+KEY CONCEPTS:
+- Pipeline: A sequence of interconnected functions forming a computational workflow
+- MapSpec: Defines how arrays are mapped between functions (e.g., "x[i] -> y[i]" for element-wise operations)
+- Parallel Execution: Automatically parallelizes computations across parameter combinations
+- Parameter Sweeps: Process multiple input combinations efficiently with caching and optimization
+
+HOW TO USE THIS MCP SERVER:
+1. Use the 'execute_pipeline' tool to run the computational pipeline
+2. Provide inputs as single values OR arrays/lists for parameter sweeps
+3. Set parallel=true for parallel execution (recommended for arrays)
+4. Optionally specify a run_folder to save intermediate results
+
+INPUT FORMATS:
+- Single Values: {"param1": 5, "param2": 10} → Executes once with these specific values
+- Array Sweeps: {"param1": [1,2,3], "param2": [4,5]} → Creates parameter combinations based on mapspec
+- Mixed: {"data": [1,2,3], "constant": 10} → Arrays are swept, single values used for all iterations
+
+MAPSPEC EXAMPLES:
+- "x[i] -> y[i]": Element-wise processing (x and y have same length)
+- "a[i], b[j] -> result[i,j]": Cross-product (all combinations of a and b)
+- "x[i], y[i] -> z[i]": Zipped processing (pair x[0] with y[0], etc.)
+
+OUTPUTS:
+Returns a dictionary with all pipeline outputs, including intermediate results. Each output contains:
+- "output": The computed result (converted to lists for JSON compatibility)
+- "shape": Array dimensions (if applicable)
+
+The pipeline automatically handles dependencies, execution order, caching, and parallelization, allowing you to focus on the computational logic rather than workflow management.
+"""
+
 _PIPELINE_DESCRIPTION_TEMPLATE = """\
 Execute the pipeline with input values. This method works for both single values and arrays/lists.
 
@@ -144,7 +182,7 @@ def _format_tool_description(
     )
 
 
-def build_mcp_server(pipeline_name: str, pipeline: Pipeline) -> fastmcp.FastMCP:
+def build_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str) -> fastmcp.FastMCP:
     """Build the MCP server for the pipeline."""
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
     from fastmcp import Context, FastMCP
@@ -165,7 +203,7 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline) -> fastmcp.FastMCP:
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
-    mcp = FastMCP(name=pipeline_name, version="0.1.0")
+    mcp = FastMCP(name=pipeline_name, version=version, instructions=_PIPEFUNC_INSTRUCTIONS)
 
     @mcp.tool(
         name="execute_pipeline",
@@ -197,7 +235,7 @@ def build_mcp_server(pipeline_name: str, pipeline: Pipeline) -> fastmcp.FastMCP:
     return mcp
 
 
-def run_mcp_server(pipeline_name: str, pipeline: Pipeline) -> None:
+def run_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str = "1.0.0") -> None:
     """Run the MCP server using stdio transport."""
-    mcp = build_mcp_server(pipeline_name, pipeline)
+    mcp = build_mcp_server(pipeline_name, pipeline, version=version)
     mcp.run(transport="stdio")
