@@ -41,6 +41,7 @@ MAPSPEC EXAMPLES:
 - "x[i] -> y[i]": Element-wise processing (x and y have same length)
 - "a[i], b[j] -> result[i,j]": Cross-product (all combinations of a and b)
 - "x[i], y[i] -> z[i]": Zipped processing (pair x[0] with y[0], etc.)
+- "x[i, j] -> y[i, j]": Each element of x is processed with each element of y, input and output have same shape, x is provided as a list of lists.
 
 OUTPUTS:
 Returns a dictionary with all pipeline outputs, including intermediate results. Each output contains:
