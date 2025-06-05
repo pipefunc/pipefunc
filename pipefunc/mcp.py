@@ -187,7 +187,6 @@ def _format_tool_description(
 
 
 def build_mcp_server(
-    pipeline_name: str,
     pipeline: Pipeline,
     version: str,
 ) -> fastmcp.FastMCP:
@@ -197,6 +196,7 @@ def build_mcp_server(
     from fastmcp.utilities.types import get_cached_typeadapter
 
     # Generate all pipeline information sections
+    pipeline_name = pipeline.name or "Unnamed Pipeline"
     documentation = _get_pipeline_documentation(pipeline)
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
@@ -254,7 +254,7 @@ def build_mcp_server(
     return mcp
 
 
-def run_mcp_server(pipeline_name: str, pipeline: Pipeline, version: str = "1.0.0") -> None:
+def run_mcp_server(pipeline: Pipeline, version: str = "1.0.0") -> None:
     """Run the MCP server using stdio transport."""
-    mcp = build_mcp_server(pipeline_name, pipeline, version=version)
+    mcp = build_mcp_server(pipeline, version=version)
     mcp.run(transport="stdio")
