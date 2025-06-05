@@ -188,7 +188,7 @@ def _format_tool_description(
 
 def build_mcp_server(
     pipeline: Pipeline,
-    version: str,
+    version: str = "1.0.0",
 ) -> fastmcp.FastMCP:
     """Build the MCP server for the pipeline."""
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
