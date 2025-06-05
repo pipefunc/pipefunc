@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import IPython.display
 import ipywidgets as widgets
 
-from pipefunc._utils import at_least_tuple, clip
+from pipefunc._utils import at_least_tuple
 from pipefunc._widgets.progress_base import ProgressTrackerBase
 
 from .helpers import hide, show
@@ -75,7 +75,9 @@ def _create_progress_bars(
     progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> dict[OUTPUT_TYPE, widgets.FloatProgress]:
     max_desc_length = max(len(_output_name_as_string(name)) for name in progress_dict)
-    description_width = f"{clip(max_desc_length * 8, 150, 400)}px"  # Assume 8px per character
+    description_width = (
+        f"min(max({max_desc_length * 8}px, 150px), 50vw)"  # Min 150px, max 50% viewport width
+    )
     return {
         name: _create_progress_bar(name, status.progress, description_width)
         for name, status in progress_dict.items()
