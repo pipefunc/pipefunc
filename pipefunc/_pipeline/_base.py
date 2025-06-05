@@ -1888,6 +1888,8 @@ class Pipeline:
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
             "validate_type_annotations": self.validate_type_annotations,
+            "name": self.name,
+            "description": self.description,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
