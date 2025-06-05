@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import IPython.display
 import ipywidgets as widgets
 
-from pipefunc._utils import at_least_tuple
+from pipefunc._utils import at_least_tuple, clip
 from pipefunc._widgets.progress_base import ProgressTrackerBase
 
 from .helpers import hide, show
@@ -39,8 +39,16 @@ def _create_button(
     return button
 
 
-def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatProgress:
-    description = ", ".join(at_least_tuple(name))
+def _output_name_as_string(name: OUTPUT_TYPE) -> str:
+    return ", ".join(at_least_tuple(name))
+
+
+def _create_progress_bar(
+    name: OUTPUT_TYPE,
+    progress: float,
+    description_width: str,
+) -> widgets.FloatProgress:
+    description = _output_name_as_string(name)
     styles = [
         "direction: rtl",  # Reverses text direction so ellipsis appears at the beginning
         "display: inline-block",  # Allows block-like behavior within the inline flow
@@ -58,7 +66,7 @@ def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatPro
         description_allow_html=True,
         layout={"width": "95%"},
         bar_style="info",
-        style={"description_width": "150px"},
+        style={"description_width": description_width},
         **tooltip,
     )
 
@@ -66,8 +74,11 @@ def _create_progress_bar(name: OUTPUT_TYPE, progress: float) -> widgets.FloatPro
 def _create_progress_bars(
     progress_dict: dict[OUTPUT_TYPE, Status],
 ) -> dict[OUTPUT_TYPE, widgets.FloatProgress]:
+    max_desc_length = max(len(_output_name_as_string(name)) for name in progress_dict)
+    description_width = f"{clip(max_desc_length * 8, 150, 400)}px"  # Assume 8px per character
     return {
-        name: _create_progress_bar(name, status.progress) for name, status in progress_dict.items()
+        name: _create_progress_bar(name, status.progress, description_width)
+        for name, status in progress_dict.items()
     }
 
 
