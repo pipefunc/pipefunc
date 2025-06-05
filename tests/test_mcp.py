@@ -42,80 +42,6 @@ def complex_pipeline():
     return Pipeline([compute_values, sum_values])
 
 
-class TestMCPDocumentationGeneration:
-    """Test MCP documentation generation functions."""
-
-    def test_get_pipeline_instruction_template(self):
-        """Test pipeline instruction template generation."""
-        from pipefunc.mcp import get_pipeline_instruction_template
-
-        template = get_pipeline_instruction_template()
-
-        assert isinstance(template, str)
-        assert "Execute the pipeline with input values" in template
-        assert "PIPELINE INFORMATION" in template
-        assert "mapspecs define how arrays are processed" in template
-
-    def test_format_pipeline_description_simple(self, simple_pipeline):
-        """Test pipeline description formatting for simple pipeline."""
-        from pipefunc.mcp import format_pipeline_description
-
-        description = format_pipeline_description(simple_pipeline)
-
-        assert isinstance(description, str)
-        assert "Required Inputs: x, y" in description
-        assert "Outputs: result" in description
-        assert "Pipeline Name:" in description
-
-    def test_format_pipeline_description_complex(self, complex_pipeline):
-        """Test pipeline description formatting for complex pipeline."""
-        from pipefunc.mcp import format_pipeline_description
-
-        description = format_pipeline_description(complex_pipeline)
-
-        assert isinstance(description, str)
-        assert "MAPSPEC DEFINITIONS" in description
-        assert "x[i] -> values[i]" in description
-
-    def test_format_pipeline_info_simple(self, simple_pipeline):
-        """Test pipeline info formatting for simple pipeline."""
-        from pipefunc.mcp import format_pipeline_info
-
-        info = format_pipeline_info(simple_pipeline)
-
-        assert isinstance(info, str)
-        assert "Parameters" in info
-        assert "Required" in info
-
-    def test_format_pipeline_info_complex(self, complex_pipeline):
-        """Test pipeline info formatting for complex pipeline."""
-        from pipefunc.mcp import format_pipeline_info
-
-        info = format_pipeline_info(complex_pipeline)
-
-        assert isinstance(info, str)
-        # Should contain parameter information
-        assert "x" in info
-
-    def test_format_mapspec_docs_simple(self, simple_pipeline):
-        """Test mapspec documentation for simple pipeline."""
-        from pipefunc.mcp import format_mapspec_docs
-
-        docs = format_mapspec_docs(simple_pipeline)
-
-        # Simple pipeline has no mapspecs, so should be empty
-        assert docs == ""
-
-    def test_format_mapspec_docs_complex(self, complex_pipeline):
-        """Test mapspec documentation for complex pipeline."""
-        from pipefunc.mcp import format_mapspec_docs
-
-        docs = format_mapspec_docs(complex_pipeline)
-
-        assert isinstance(docs, str)
-        assert "x[i] -> values[i]" in docs
-
-
 class TestMCPServerBuilding:
     """Test MCP server building functionality."""
 
@@ -147,6 +73,83 @@ class TestMCPServerBuilding:
 
         # Should not raise ImportError
         assert callable(build_mcp_server)
+
+    def test_run_mcp_server_exists(self):
+        """Test that run_mcp_server function exists."""
+        from pipefunc.mcp import run_mcp_server
+
+        # Should not raise ImportError
+        assert callable(run_mcp_server)
+
+
+class TestMCPInternalHelpers:
+    """Test MCP internal helper functions."""
+
+    def test_get_pipeline_documentation(self, simple_pipeline):
+        """Test pipeline documentation generation."""
+        from pipefunc.mcp import _get_pipeline_documentation
+
+        docs = _get_pipeline_documentation(simple_pipeline)
+        assert isinstance(docs, str)
+        assert len(docs) > 0
+
+    def test_get_pipeline_info_summary(self, simple_pipeline):
+        """Test pipeline info summary generation."""
+        from pipefunc.mcp import _get_pipeline_info_summary
+
+        summary = _get_pipeline_info_summary("Test Pipeline", simple_pipeline)
+        assert isinstance(summary, str)
+        assert "Pipeline Name: Test Pipeline" in summary
+        assert "Required Inputs:" in summary
+        assert "Outputs:" in summary
+
+    def test_get_mapspec_section_simple(self, simple_pipeline):
+        """Test mapspec section for simple pipeline."""
+        from pipefunc.mcp import _get_mapspec_section
+
+        section = _get_mapspec_section(simple_pipeline)
+        assert isinstance(section, str)
+        assert "None (This pipeline processes single values only)" in section
+
+    def test_get_mapspec_section_complex(self, complex_pipeline):
+        """Test mapspec section for complex pipeline."""
+        from pipefunc.mcp import _get_mapspec_section
+
+        section = _get_mapspec_section(complex_pipeline)
+        assert isinstance(section, str)
+        assert "mapspecs define how arrays are processed" in section
+
+    def test_get_input_format_section_simple(self, simple_pipeline):
+        """Test input format section for simple pipeline."""
+        from pipefunc.mcp import _get_input_format_section
+
+        section = _get_input_format_section(simple_pipeline)
+        assert isinstance(section, str)
+        assert "Single values only" in section
+
+    def test_get_input_format_section_complex(self, complex_pipeline):
+        """Test input format section for complex pipeline."""
+        from pipefunc.mcp import _get_input_format_section
+
+        section = _get_input_format_section(complex_pipeline)
+        assert isinstance(section, str)
+        assert "element-wise mapping" in section
+
+    def test_format_tool_description(self):
+        """Test tool description formatting."""
+        from pipefunc.mcp import _format_tool_description
+
+        description = _format_tool_description(
+            pipeline_info="Test info",
+            mapspec_section="Test mapspec",
+            input_format="Test format",
+            documentation="Test docs",
+        )
+        assert isinstance(description, str)
+        assert "Test info" in description
+        assert "Test mapspec" in description
+        assert "Test format" in description
+        assert "Test docs" in description
 
 
 class TestMCPIntegration:
@@ -181,15 +184,15 @@ class TestMCPIntegration:
 class TestMCPErrorHandling:
     """Test MCP error handling and edge cases."""
 
-    def test_format_pipeline_description_empty(self):
-        """Test pipeline description with empty pipeline."""
-        from pipefunc.mcp import format_pipeline_description
+    def test_empty_pipeline_handling(self):
+        """Test handling of empty pipeline."""
+        from pipefunc.mcp import _get_pipeline_info_summary
 
         empty_pipeline = Pipeline([])
-        description = format_pipeline_description(empty_pipeline)
+        summary = _get_pipeline_info_summary("Empty", empty_pipeline)
 
-        assert isinstance(description, str)
-        assert "No functions" in description or "Pipeline Name:" in description
+        assert isinstance(summary, str)
+        assert "Pipeline Name: Empty" in summary
 
     def test_missing_dependencies_handling(self):
         """Test that missing dependencies are handled in requires."""
@@ -201,16 +204,17 @@ class TestMCPErrorHandling:
 
     def test_pipeline_with_no_outputs(self):
         """Test handling of pipeline with no outputs."""
-        from pipefunc.mcp import format_pipeline_description
+        from pipefunc.mcp import _get_pipeline_info_summary
 
-        # Create a function with no explicit output
-        @pipefunc()  # No output_name specified
+        # Create a function with minimal configuration
+        @pipefunc(output_name="dummy_output")
         def dummy_func(x: int) -> int:
             return x
 
         pipeline = Pipeline([dummy_func])
-        description = format_pipeline_description(pipeline)
-        assert isinstance(description, str)
+        summary = _get_pipeline_info_summary("Test", pipeline)
+        assert isinstance(summary, str)
+        assert "dummy_output" in summary
 
 
 class TestMCPRealExecution:
@@ -227,7 +231,7 @@ class TestMCPRealExecution:
         # Check that we got results
         assert "sum_result" in results
         # The sum should be 2*1 + 2*2 + 2*3 = 12
-        assert results["sum_result"].store == 12.0
+        assert results["sum_result"].output == 12.0
 
     def test_pipeline_mixed_mapspecs(self):
         """Test pipeline with mixed mapspecs (element-wise and reduction)."""
@@ -251,4 +255,25 @@ class TestMCPRealExecution:
 
         assert "combined" in results
         # doubled: [2, 4], tripled: [3, 6], combined: 2+4+3+6 = 15
-        assert results["combined"].store == 15.0
+        assert results["combined"].output == 15.0
+
+    def test_pipeline_constants_template_access(self):
+        """Test that MCP constants and templates are accessible."""
+        from pipefunc.mcp import (
+            _MAPSPEC_INPUT_FORMAT,
+            _NO_MAPSPEC_INPUT_FORMAT,
+            _PIPEFUNC_INSTRUCTIONS,
+            _PIPELINE_DESCRIPTION_TEMPLATE,
+        )
+
+        # Test that all constants are strings
+        assert isinstance(_PIPEFUNC_INSTRUCTIONS, str)
+        assert isinstance(_PIPELINE_DESCRIPTION_TEMPLATE, str)
+        assert isinstance(_NO_MAPSPEC_INPUT_FORMAT, str)
+        assert isinstance(_MAPSPEC_INPUT_FORMAT, str)
+
+        # Test that they contain expected content
+        assert "MCP server" in _PIPEFUNC_INSTRUCTIONS
+        assert "PIPELINE INFORMATION" in _PIPELINE_DESCRIPTION_TEMPLATE
+        assert "Single values only" in _NO_MAPSPEC_INPUT_FORMAT
+        assert "element-wise mapping" in _MAPSPEC_INPUT_FORMAT
