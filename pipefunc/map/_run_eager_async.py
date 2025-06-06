@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 
     from pipefunc import Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
-    from pipefunc._widgets.progress_simple import SimpleProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._result import ResultDict
@@ -52,7 +52,7 @@ def run_map_eager_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
@@ -208,7 +208,7 @@ async def _eager_scheduler_loop_async(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,
@@ -259,7 +259,7 @@ async def _process_completed_futures_async(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None,

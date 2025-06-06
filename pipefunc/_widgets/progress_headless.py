@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pipefunc.map._progress import Status
 
 
-class SimpleProgressTracker(ProgressTrackerBase):
+class HeadlessProgressTracker(ProgressTrackerBase):
     """Simple progress tracker without a UI.
 
     This is useful for running pipelines in a non-interactive environment.

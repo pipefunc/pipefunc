@@ -13,9 +13,9 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from pipefunc import PipeFunc
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
-    from pipefunc._widgets.progress_simple import SimpleProgressTracker
 
     from ._result import StoreType
 
@@ -84,8 +84,8 @@ class Status:
 
 
 def _progress_tracker_implementation(
-    show_progress: Literal[True, "rich", "ipywidgets"] | None,
-) -> Literal["rich", "ipywidgets"] | None:
+    show_progress: Literal[True, "rich", "ipywidgets", "headless"] | None,
+) -> Literal["rich", "ipywidgets", "headless"] | None:
     if isinstance(show_progress, str):
         return show_progress
     if show_progress is True:
@@ -93,8 +93,7 @@ def _progress_tracker_implementation(
             return "ipywidgets"
         if is_installed("rich"):
             return "rich"
-        msg = "No progress bar implementation found. Please install 'ipywidgets' or 'rich'."  # pragma: no cover
-        raise ModuleNotFoundError(msg)  # pragma: no cover
+        return "headless"
     if (
         show_progress is None and is_running_in_ipynb() and is_installed("ipywidgets")
     ):  # pragma: no cover
@@ -106,9 +105,9 @@ def _progress_tracker_implementation(
 def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
-    show_progress: bool | Literal["rich", "ipywidgets"] | None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
     in_async: bool,  # noqa: FBT001
-) -> IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None:
+) -> IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None:
     if show_progress is False:
         return None
     implementation = _progress_tracker_implementation(show_progress)
@@ -119,6 +118,10 @@ def init_tracker(
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
         from pipefunc._widgets.progress_ipywidgets import (  # type: ignore[assignment]
             IPyWidgetsProgressTracker as ProgressTracker,
+        )
+    elif implementation == "headless":
+        from pipefunc._widgets.progress_headless import (  # type: ignore[assignment]
+            HeadlessProgressTracker as ProgressTracker,
         )
     else:
         return None
