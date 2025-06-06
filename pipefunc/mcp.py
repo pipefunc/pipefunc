@@ -202,7 +202,7 @@ def build_mcp_server(
 ) -> fastmcp.FastMCP:
     """Build the MCP server for the pipeline."""
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
-    from fastmcp import Context, FastMCP
+    from fastmcp import FastMCP
     from fastmcp.utilities.types import get_cached_typeadapter
 
     # Generate all pipeline information sections
@@ -231,7 +231,6 @@ def build_mcp_server(
     )
 
     def execute_pipeline(
-        ctx: Context,  # noqa: ARG001
         input: Model,  # type: ignore[valid-type] # noqa: A002
         parallel: bool = True,  # noqa: FBT001, FBT002
         run_folder: str | None = None,

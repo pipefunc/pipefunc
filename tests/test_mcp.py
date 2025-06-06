@@ -55,7 +55,7 @@ class TestMCPServerBuilding:
         assert hasattr(mcp, "add_tool")
         tools = await mcp.get_tools()
         f = tools["execute_pipeline"].fn
-        result = f(None, {"x": 1, "y": 2})
+        result = f({"x": 1, "y": 2})
         assert result == "{'result': {'output': 3, 'shape': None}}"
 
     def test_build_mcp_server_with_version(self, simple_pipeline):
