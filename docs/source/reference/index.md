@@ -22,6 +22,7 @@ pipefunc.cache
 pipefunc.helpers
 pipefunc.resources
 pipefunc.lazy
+pipefunc.mcp
 pipefunc.sweep
 pipefunc.testing
 pipefunc.typing
