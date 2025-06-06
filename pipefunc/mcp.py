@@ -203,11 +203,11 @@ def build_mcp_server(
 
     Parameters
     ----------
-    pipeline : Pipeline
+    pipeline
         A Pipefunc Pipeline object containing the computational workflow to expose.
         The pipeline's functions, parameters, and mapspecs will be automatically
         analyzed to generate the MCP tool interface.
-    version : str, default "1.0.0"
+    version
         Version string for the MCP server. Used for client compatibility and
         server identification.
 
@@ -216,7 +216,7 @@ def build_mcp_server(
     fastmcp.FastMCP
         A configured FastMCP server instance ready to run. The server includes:
         - Automatic parameter validation using Pydantic models
-        - Rich documentation with pipeline diagrams and parameter descriptions
+        - Documentation based on the pipeline's functions doc-strings and parameter annotations
         - Parallel execution capabilities
         - JSON-serializable output formatting
 
@@ -269,9 +269,7 @@ def build_mcp_server(
     **Pipeline Requirements:**
 
     Your pipeline should be properly configured with:
-    - Well-defined input/output parameters
-    - Optional mapspecs for array processing
-    - Proper type annotations for automatic validation
+    - JSON serializable inputs with proper type annotations
 
     ```python
     from pipefunc import pipefunc, Pipeline
@@ -287,7 +285,6 @@ def build_mcp_server(
     Notes
     -----
     - The server automatically handles type validation using the pipeline's Pydantic model
-    - Array inputs are processed according to the pipeline's mapspecs
     - Output arrays are converted to JSON-compatible lists
     - Parallel execution is enabled by default but can be disabled per request
 
