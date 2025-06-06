@@ -19,7 +19,7 @@ CORE CONCEPTS:
 - Parameter Sweeps: Process multiple input combinations efficiently
 
 EXECUTION PARAMETERS:
-- input: Dictionary with parameter values (single values or arrays)
+- inputs: Dictionary with parameter values (single values or arrays)
 - parallel: Boolean (default true) - enables parallel execution
 - run_folder: Optional string - directory to save intermediate results
 
@@ -58,7 +58,7 @@ PIPELINE DESCRIPTION:
 """
 
 _PIPELINE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline with input values. This method works for both single values and arrays/lists.
+Execute the pipeline with inputs. This method works for both single values and arrays/lists.
 
 PIPELINE INFORMATION:
 {pipeline_info}
@@ -315,14 +315,14 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     @mcp.tool(name="execute_pipeline", description=description)
     async def execute_pipeline(
         ctx: fastmcp.Context,
-        input: Model,  # type: ignore[valid-type] # noqa: A002
+        inputs: Model,  # type: ignore[valid-type]
         parallel: bool = True,  # noqa: FBT001, FBT002
         run_folder: str | None = None,
     ) -> str:
-        """Execute pipeline with input values (works for both single values and arrays)."""
-        await ctx.info(f"Executing pipeline {pipeline.name=} with input: {input}")
+        """Execute pipeline with inputs (works for both single values and arrays)."""
+        await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")
         result = pipeline.map(
-            inputs=input,
+            inputs=inputs,
             parallel=parallel,
             run_folder=run_folder,
         )
