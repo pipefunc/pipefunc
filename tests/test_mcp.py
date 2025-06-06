@@ -47,25 +47,19 @@ class TestMCPServerBuilding:
 
     def test_build_mcp_server_simple(self, simple_pipeline):
         """Test building MCP server for simple pipeline."""
-        try:
-            from pipefunc.mcp import build_mcp_server
+        from pipefunc.mcp import build_mcp_server
 
-            result = build_mcp_server(simple_pipeline)
-            assert result is not None
-            assert hasattr(result, "add_tool")
-        except Exception as e:  # noqa: BLE001
-            pytest.skip(f"MCP server building failed: {e}")
+        result = build_mcp_server(simple_pipeline)
+        assert result is not None
+        assert hasattr(result, "add_tool")
 
     def test_build_mcp_server_with_version(self, simple_pipeline):
         """Test building MCP server with custom version."""
-        try:
-            from pipefunc.mcp import build_mcp_server
+        from pipefunc.mcp import build_mcp_server
 
-            result = build_mcp_server(simple_pipeline, version="2.0.0")
-            assert result is not None
-            assert hasattr(result, "add_tool")
-        except Exception as e:  # noqa: BLE001
-            pytest.skip(f"MCP server building failed: {e}")
+        result = build_mcp_server(simple_pipeline, version="2.0.0")
+        assert result is not None
+        assert hasattr(result, "add_tool")
 
     def test_build_mcp_server_imports(self):
         """Test that build_mcp_server handles missing imports gracefully."""
