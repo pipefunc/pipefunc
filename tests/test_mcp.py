@@ -45,21 +45,26 @@ def complex_pipeline():
 class TestMCPServerBuilding:
     """Test MCP server building functionality."""
 
-    def test_build_mcp_server_simple(self, simple_pipeline):
+    @pytest.mark.asyncio
+    async def test_build_mcp_server_simple(self, simple_pipeline):
         """Test building MCP server for simple pipeline."""
         from pipefunc.mcp import build_mcp_server
 
-        result = build_mcp_server(simple_pipeline)
-        assert result is not None
-        assert hasattr(result, "add_tool")
+        mcp = build_mcp_server(simple_pipeline)
+        assert mcp is not None
+        assert hasattr(mcp, "add_tool")
+        tools = await mcp.get_tools()
+        f = tools["execute_pipeline"].fn
+        result = f(None, {"x": 1, "y": 2})
+        assert result == "{'result': {'output': 3, 'shape': None}}"
 
     def test_build_mcp_server_with_version(self, simple_pipeline):
         """Test building MCP server with custom version."""
         from pipefunc.mcp import build_mcp_server
 
-        result = build_mcp_server(simple_pipeline, version="2.0.0")
-        assert result is not None
-        assert hasattr(result, "add_tool")
+        mcp = build_mcp_server(simple_pipeline, version="2.0.0")
+        assert mcp is not None
+        assert hasattr(mcp, "add_tool")
 
     def test_build_mcp_server_imports(self):
         """Test that build_mcp_server handles missing imports gracefully."""
