@@ -70,7 +70,7 @@ docs = [
     "pipefunc[all]",
 ]
 all = [
-    "pipefunc[adaptive,autodoc,cli,pandas,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
+    "pipefunc[adaptive,autodoc,cli,pandas,mcp,plotting,profiling,pydantic,rich,widgets,xarray,zarr]",
 ]
 dev = [ # all + dev deps
     "black[jupyter]",
