@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
+    from pipefunc._widgets.progress_simple import SimpleProgressTracker
 
     from ._result import StoreType
 
@@ -107,7 +108,7 @@ def init_tracker(
     functions: list[PipeFunc],
     show_progress: bool | Literal["rich", "ipywidgets"] | None,
     in_async: bool,  # noqa: FBT001
-) -> IPyWidgetsProgressTracker | RichProgressTracker | None:
+) -> IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None:
     if show_progress is False:
         return None
     implementation = _progress_tracker_implementation(show_progress)

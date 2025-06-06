@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
+    from pipefunc._widgets.progress_simple import SimpleProgressTracker
     from pipefunc.cache import _CacheBase
 
     from ._result import ResultDict
@@ -261,7 +262,7 @@ class _FunctionTracker:
         fixed_indices: dict[str, int | slice] | None,
         executor: dict[OUTPUT_TYPE, Executor] | None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-        progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+        progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
         return_results: bool,  # noqa: FBT001
         cache: _CacheBase | None,
         multi_run_manager: MultiRunManager | None = None,
@@ -390,7 +391,7 @@ def _eager_scheduler_loop(
     outputs: ResultDict,
     fixed_indices: dict[str, int | slice] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
 ) -> None:
@@ -438,7 +439,7 @@ def _process_completed_futures(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
 ) -> None:
@@ -481,7 +482,7 @@ def _update_dependencies_and_submit(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | SimpleProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,
