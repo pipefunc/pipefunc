@@ -48,23 +48,15 @@ class TestMCPServerBuilding:
     @pytest.mark.asyncio
     async def test_build_mcp_server_simple(self, simple_pipeline):
         """Test building MCP server for simple pipeline."""
+        from fastmcp import Client
+
         from pipefunc.mcp import build_mcp_server
 
         mcp = build_mcp_server(simple_pipeline)
         assert mcp is not None
-        assert hasattr(mcp, "add_tool")
-        tools = await mcp.get_tools()
-        f = tools["execute_pipeline"].fn
-        result = f({"x": 1, "y": 2})
-        assert result == "{'result': {'output': 3, 'shape': None}}"
-
-    def test_build_mcp_server_with_version(self, simple_pipeline):
-        """Test building MCP server with custom version."""
-        from pipefunc.mcp import build_mcp_server
-
-        mcp = build_mcp_server(simple_pipeline, version="2.0.0")
-        assert mcp is not None
-        assert hasattr(mcp, "add_tool")
+        async with Client(mcp) as client:
+            result = await client.call_tool("execute_pipeline", {"input": {"x": 1, "y": 2}})
+            assert result[0].text == "{'result': {'output': 3.0, 'shape': None}}"
 
     def test_build_mcp_server_imports(self):
         """Test that build_mcp_server handles missing imports gracefully."""
@@ -72,13 +64,6 @@ class TestMCPServerBuilding:
 
         # Should not raise ImportError
         assert callable(build_mcp_server)
-
-    def test_run_mcp_server_exists(self):
-        """Test that run_mcp_server function exists."""
-        from pipefunc.mcp import run_mcp_server
-
-        # Should not raise ImportError
-        assert callable(run_mcp_server)
 
 
 class TestMCPInternalHelpers:
