@@ -4,7 +4,6 @@ import logging
 from typing import Literal
 
 import fastmcp
-from fastmcp.utilities.types import get_cached_typeadapter
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
@@ -225,6 +224,7 @@ def build_mcp_server(
         ),
     )
 
+    @mcp.tool(name="execute_pipeline", description=description)
     def execute_pipeline(
         input: Model,  # type: ignore[valid-type] # noqa: A002
         parallel: bool = True,  # noqa: FBT001, FBT002
@@ -249,18 +249,6 @@ def build_mcp_server(
             }
         return str(output)
 
-    # This prevents the error:
-    # PydanticUserError: `TypeAdapter[<function build_mcp_server.<locals>.execute_pipeline at ...>]`
-    # is not fully defined; you should define `<function build_mcp_server.<locals>.execute_pipeline at ...>`
-    # and all referenced types, then call `.rebuild()` on the instance.
-    # This seems hacky, but it works. It also needs to be called inside of the body of this function.
-    get_cached_typeadapter(execute_pipeline).json_schema()
-    tool = fastmcp.tools.Tool.from_function(
-        execute_pipeline,
-        name="execute_pipeline",
-        description=description,
-    )
-    mcp.add_tool(tool)
     return mcp
 
 
