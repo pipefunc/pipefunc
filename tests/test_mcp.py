@@ -55,7 +55,7 @@ async def test_build_mcp_server_simple(simple_pipeline):
     mcp = build_mcp_server(simple_pipeline)
     assert mcp is not None
     async with Client(mcp) as client:
-        result = await client.call_tool("execute_pipeline", {"input": {"x": 1, "y": 2}})
+        result = await client.call_tool("execute_pipeline", {"inputs": {"x": 1, "y": 2}})
         assert result[0].text == "{'result': {'output': 3.0, 'shape': None}}"
 
 
