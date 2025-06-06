@@ -130,6 +130,12 @@ class Pipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+    name
+        A name for the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
+    description
+        A description of the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
 
     Notes
     -----
@@ -175,6 +181,8 @@ class Pipeline:
         validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | Resources | None = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -183,6 +191,8 @@ class Pipeline:
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
+        self.name = name
+        self.description = description
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -1878,6 +1888,8 @@ class Pipeline:
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
             "validate_type_annotations": self.validate_type_annotations,
+            "name": self.name,
+            "description": self.description,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
