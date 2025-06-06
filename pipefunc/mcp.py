@@ -270,7 +270,7 @@ def run_mcp_server(
     pipeline: Pipeline,
     transport: Literal["stdio", "sse", "streamable-http"] = "stdio",
     version: str = "1.0.0",
-) -> None:
+) -> None:  # pragma: no cover
     """Run the MCP server using stdio transport."""
     mcp = build_mcp_server(pipeline, version=version)
     mcp.run(transport=transport)
