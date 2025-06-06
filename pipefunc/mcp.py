@@ -194,7 +194,109 @@ def build_mcp_server(
     pipeline: Pipeline,
     version: str = "1.0.0",
 ) -> fastmcp.FastMCP:
-    """Build the MCP server for the pipeline."""
+    """Build an MCP (Model Context Protocol) server for a Pipefunc pipeline.
+
+    This function creates a FastMCP server that exposes your Pipefunc pipeline as an
+    MCP tool, allowing AI assistants and other MCP clients to execute your computational
+    workflows. The server automatically generates parameter validation, documentation,
+    and provides parallel execution capabilities.
+
+    Parameters
+    ----------
+    pipeline : Pipeline
+        A Pipefunc Pipeline object containing the computational workflow to expose.
+        The pipeline's functions, parameters, and mapspecs will be automatically
+        analyzed to generate the MCP tool interface.
+    version : str, default "1.0.0"
+        Version string for the MCP server. Used for client compatibility and
+        server identification.
+
+    Returns
+    -------
+    fastmcp.FastMCP
+        A configured FastMCP server instance ready to run. The server includes:
+        - Automatic parameter validation using Pydantic models
+        - Rich documentation with pipeline diagrams and parameter descriptions
+        - Parallel execution capabilities
+        - JSON-serializable output formatting
+
+    Examples
+    --------
+    **Basic Usage:**
+
+    Create and run an MCP server from a pipeline:
+
+    ```python
+    # my_mcp.py
+    from physics_pipeline import pipeline_charge
+    from pipefunc.mcp import build_mcp_server
+
+    if __name__ == "__main__":  # Important to use this 'if' for parallel execution!
+        mcp = build_mcp_server(pipeline_charge)
+        mcp.run(path="/charge", port=8000, transport="streamable-http")
+    ```
+
+    **Client Configuration:**
+
+    Register the server with an MCP client (e.g., Cursor IDE ``.cursor/mcp.json``):
+
+    ```json
+    {
+      "mcpServers": {
+        "physics-simulation": {
+          "url": "http://127.0.0.1:8000/charge"
+        }
+      }
+    }
+    ```
+
+    **Alternative Transport Methods:**
+
+    ```python
+    # HTTP server (recommended for development)
+    mcp = build_mcp_server(pipeline)
+    mcp.run(path="/api", port=8000, transport="streamable-http")
+
+    # Standard I/O (for CLI integration)
+    mcp = build_mcp_server(pipeline)
+    mcp.run(transport="stdio")
+
+    # Server-Sent Events
+    mcp = build_mcp_server(pipeline)
+    mcp.run(transport="sse")
+    ```
+
+    **Pipeline Requirements:**
+
+    Your pipeline should be properly configured with:
+    - Well-defined input/output parameters
+    - Optional mapspecs for array processing
+    - Proper type annotations for automatic validation
+
+    ```python
+    from pipefunc import pipefunc, Pipeline
+
+    @pipefunc(output_name="result")
+    def calculate(x: float, y: float) -> float:
+        return x * y + 2
+
+    pipeline = Pipeline([calculate])
+    mcp = build_mcp_server(pipeline, version="1.0.0")
+    ```
+
+    Notes
+    -----
+    - The server automatically handles type validation using the pipeline's Pydantic model
+    - Array inputs are processed according to the pipeline's mapspecs
+    - Output arrays are converted to JSON-compatible lists
+    - Parallel execution is enabled by default but can be disabled per request
+
+    See Also
+    --------
+    run_mcp_server : Convenience function to build and run server in one call
+    Pipeline.map : The underlying method used to execute pipeline workflows
+
+    """
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
 
     # Generate all pipeline information sections
