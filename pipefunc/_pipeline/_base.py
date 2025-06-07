@@ -841,7 +841,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
-            - ``"headless"``: No progress bar, but the progress is still tracked.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
@@ -1001,7 +1001,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
-            - ``"headless"``: No progress bar, but the progress is still tracked.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
