@@ -383,6 +383,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         async_map = pipeline.map_async(
             inputs=inputs,
             run_folder=actual_run_folder,
+            show_progress="headless",
         )
         job_registry[job_id] = {
             "async_map": async_map,
@@ -407,20 +408,19 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
 
         # Get progress information if available
         progress_info = None
-        if job["async_map"].progress is not None:
-            progress_dict = job["async_map"].progress.progress_dict
-            progress_info = {}
-            for output_name, status in progress_dict.items():
-                elapsed_time = status.elapsed_time()
-                remaining_time = status.remaining_time(elapsed_time=elapsed_time)
-                progress_info[str(output_name)] = {
-                    "progress": float(status.progress),
-                    "n_completed": int(status.n_completed),
-                    "n_total": int(status.n_total),
-                    "n_failed": int(status.n_failed),
-                    "elapsed_time": float(elapsed_time) if elapsed_time is not None else None,
-                    "remaining_time": float(remaining_time) if remaining_time is not None else None,
-                }
+        progress_dict = job["async_map"].progress.progress_dict
+        progress_info = {}
+        for output_name, status in progress_dict.items():
+            elapsed_time = status.elapsed_time()
+            remaining_time = status.remaining_time(elapsed_time=elapsed_time)
+            progress_info[str(output_name)] = {
+                "progress": float(status.progress),
+                "n_completed": int(status.n_completed),
+                "n_total": int(status.n_total),
+                "n_failed": int(status.n_failed),
+                "elapsed_time": float(elapsed_time) if elapsed_time is not None else None,
+                "remaining_time": float(remaining_time) if remaining_time is not None else None,
+            }
 
         result_info = {
             "job_id": job_id,
