@@ -37,11 +37,13 @@ class HeadlessProgressTracker(ProgressTrackerBase):
 
     def update_progress(self, _: Any = None, *, force: bool = False) -> None:
         """Update the progress values."""
+        # no-op
 
     def _mark_completed(self) -> None:
-        self._completed = True
+        """Mark the progress as completed."""
+        # no-op
 
-    def _cancel_calculation(self, _: Any) -> None:
+    def _cancel_calculation(self, _: Any) -> None:  # pragma: no cover
         """Cancel the ongoing calculation."""
         if self.task is not None:
             self.task.cancel()
