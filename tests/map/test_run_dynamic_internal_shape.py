@@ -224,7 +224,7 @@ def test_2d_internal_shape(
         {"a": [0, 0]},
         run_folder=tmp_path,
         cleanup=False,
-        show_progress="ipywidgets",
+        show_progress="headless",
         return_results=return_results,
         scheduling_strategy=scheduling_strategy,
         parallel=False,
