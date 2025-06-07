@@ -53,5 +53,5 @@ class HeadlessProgressTracker(ProgressTrackerBase):
         # no-op
 
     def display(self) -> None:
-        """Display the progress bars using Rich Live display."""
+        """Display the progress bars."""
         # no-op
