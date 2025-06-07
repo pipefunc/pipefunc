@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from pipefunc import PipeFunc
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
 
@@ -83,8 +84,8 @@ class Status:
 
 
 def _progress_tracker_implementation(
-    show_progress: Literal[True, "rich", "ipywidgets"] | None,
-) -> Literal["rich", "ipywidgets"] | None:
+    show_progress: Literal[True, "rich", "ipywidgets", "headless"] | None,
+) -> Literal["rich", "ipywidgets", "headless"] | None:
     if isinstance(show_progress, str):
         return show_progress
     if show_progress is True:
@@ -105,9 +106,9 @@ def _progress_tracker_implementation(
 def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
-    show_progress: bool | Literal["rich", "ipywidgets"] | None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
     in_async: bool,  # noqa: FBT001
-) -> IPyWidgetsProgressTracker | RichProgressTracker | None:
+) -> IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None:
     if show_progress is False:
         return None
     implementation = _progress_tracker_implementation(show_progress)
@@ -118,6 +119,10 @@ def init_tracker(
         requires("ipywidgets", reason="show_progress", extras="ipywidgets")
         from pipefunc._widgets.progress_ipywidgets import (  # type: ignore[assignment]
             IPyWidgetsProgressTracker as ProgressTracker,
+        )
+    elif implementation == "headless":
+        from pipefunc._widgets.progress_headless import (  # type: ignore[assignment]
+            HeadlessProgressTracker as ProgressTracker,
         )
     else:
         return None
