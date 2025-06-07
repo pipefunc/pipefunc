@@ -749,7 +749,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -841,6 +841,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
@@ -910,7 +911,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
@@ -1000,6 +1001,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
