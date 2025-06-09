@@ -727,7 +727,7 @@ def _list_historical_runs(folder: str = "runs", max_runs: int | None = None) -> 
     for run_entry in runs["runs"]:
         try:
             run_info = RunInfo.load(run_entry["run_folder"])
-        except Exception:  # noqa: BLE001, S112
+        except Exception:  # noqa: BLE001, S112  # pragma: no cover
             continue  # Skip directories that don't contain valid run info
         runs["total_count"] += 1
         run_info_json = json.loads(run_info_path.read_text())
