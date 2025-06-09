@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 import fastmcp
+import pydantic
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
@@ -208,7 +209,7 @@ def _format_tool_description(
     )
 
 
-def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.FastMCP:  # noqa: PLR0915
+def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.FastMCP:
     """Build an MCP (Model Context Protocol) server for a Pipefunc pipeline.
 
     This function creates a FastMCP server that exposes your Pipefunc pipeline as an
@@ -361,23 +362,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         run_folder: str | None = None,
     ) -> str:
         """Execute pipeline with inputs (works for both single values and arrays)."""
-        await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")
-        result = pipeline.map(
-            inputs=inputs,
-            parallel=parallel,
-            run_folder=run_folder,
-        )
-        await ctx.info(f"Pipeline {pipeline.name=} executed")
-        # Convert ResultDict to a more readable format
-        output = {}
-        for key, result_obj in result.items():
-            output[key] = {
-                "output": result_obj.output.tolist()
-                if hasattr(result_obj.output, "tolist")
-                else result_obj.output,
-                "shape": getattr(result_obj.output, "shape", None),
-            }
-        return str(output)
+        return await _execute_pipeline(pipeline, ctx, inputs, parallel, run_folder)
 
     @mcp.tool(name="start_pipeline_async")
     async def start_pipeline_async(
@@ -386,117 +371,169 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         run_folder: str | None = None,
     ) -> str:
         """Start async pipeline execution and return a job ID."""
-        job_id = str(uuid.uuid4())
-        actual_run_folder = run_folder or f"runs/job_{job_id}"
-
-        await ctx.info(
-            f"Starting async pipeline {pipeline.name=} with job_id={job_id} and run_folder={actual_run_folder}",
-        )
-
-        # Store the AsyncMap object in the global registry
-        async_map = pipeline.map_async(
-            inputs=inputs,
-            run_folder=actual_run_folder,
-            show_progress="headless",
-        )
-        job_registry[job_id] = JobInfo(
-            runner=async_map,
-            started_at=datetime.now(tz=timezone.utc),
-            run_folder=actual_run_folder,
-            status="running",
-            pipeline_name=pipeline.name or "Unnamed Pipeline",
-        )
-
-        await ctx.info(f"Started async job {job_id} in folder {actual_run_folder}")
-        return str({"job_id": job_id, "run_folder": actual_run_folder})
+        return await _start_pipeline_async(pipeline, ctx, inputs, run_folder)
 
     @mcp.tool(name="check_job_status")
     async def check_job_status(ctx: fastmcp.Context, job_id: str) -> str:  # noqa: ARG001
         """Check status of a running pipeline job."""
-        job = job_registry.get(job_id)
-        if not job:
-            return str({"error": "Job not found"})
-
-        task = job.runner.task
-        is_done = task.done()
-
-        # Get progress information if available
-        assert job.runner.progress is not None
-        progress_dict = job.runner.progress.progress_dict
-        progress_info = {}
-        for output_name, status in progress_dict.items():
-            elapsed_time = status.elapsed_time()
-            remaining_time = status.remaining_time(elapsed_time=elapsed_time)
-            progress_info[str(output_name)] = {
-                "progress": status.progress,
-                "n_completed": status.n_completed,
-                "n_total": status.n_total,
-                "n_failed": status.n_failed,
-                "elapsed_time": elapsed_time if elapsed_time is not None else None,
-                "remaining_time": remaining_time if remaining_time is not None else None,
-            }
-
-        result_info = {
-            "job_id": job_id,
-            "pipeline_name": job.pipeline_name,
-            "status": "completed" if is_done else "running",
-            "progress": progress_info,
-            "run_folder": job.run_folder,
-            "started_at": job.started_at.isoformat(),
-            "error": str(task.exception()) if is_done and task.exception() else None,
-        }
-
-        # If job is completed, get the results
-        if is_done and not task.exception():
-            pipeline_result = task.result()
-            output = {}
-            for key, result_obj in pipeline_result.items():
-                output[key] = {
-                    "output": result_obj.output.tolist()
-                    if hasattr(result_obj.output, "tolist")
-                    else result_obj.output,
-                    "shape": getattr(result_obj.output, "shape", None),
-                }
-            result_info["results"] = output
-
-        return str(result_info)
+        return await _check_job_status(job_id)
 
     @mcp.tool(name="cancel_job")
     async def cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
         """Cancel a running pipeline job."""
-        job = job_registry.get(job_id)
-        if not job:
-            return str({"error": "Job not found"})
-
-        task = job.runner.task
-        if not task.done():
-            task.cancel()
-            job.status = "cancelled"
-            await ctx.info(f"Cancelled job {job_id}")
-            return str({"status": "cancelled", "job_id": job_id})
-        return str({"error": "Job not found or already completed", "job_id": job_id})
+        return await _cancel_job(ctx, job_id)
 
     @mcp.tool(name="list_jobs")
     async def list_jobs(ctx: fastmcp.Context) -> str:  # noqa: ARG001
         """List all pipeline jobs with their current status."""
-        if not job_registry:
-            return str({"jobs": [], "total_count": 0})
-
-        jobs_info = []
-        for job_id, job in job_registry.items():
-            task = job.runner.task
-            is_done = task.done()
-
-            job_info = {
-                "job_id": job_id,
-                "pipeline_name": job.pipeline_name,
-                "status": job.status,
-                "run_folder": job.run_folder,
-                "started_at": job.started_at.isoformat(),
-                "has_error": is_done and task.exception() is not None,
-            }
-            jobs_info.append(job_info)
-
-        return str({"jobs": jobs_info, "total_count": len(jobs_info)})
+        return await _list_jobs()
 
     return mcp
+
+
+async def _execute_pipeline(
+    pipeline: Pipeline,
+    ctx: fastmcp.Context,
+    inputs: pydantic.BaseModel,  # type: ignore[valid-type]
+    parallel: bool = True,  # noqa: FBT001, FBT002
+    run_folder: str | None = None,
+) -> str:
+    """Execute pipeline with inputs."""
+    await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")
+    result = pipeline.map(
+        inputs=inputs,
+        parallel=parallel,
+        run_folder=run_folder,
+    )
+    await ctx.info(f"Pipeline {pipeline.name=} executed")
+    # Convert ResultDict to a more readable format
+    output = {}
+    for key, result_obj in result.items():
+        output[key] = {
+            "output": result_obj.output.tolist()
+            if hasattr(result_obj.output, "tolist")
+            else result_obj.output,
+            "shape": getattr(result_obj.output, "shape", None),
+        }
+    return str(output)
+
+
+async def _start_pipeline_async(
+    pipeline: Pipeline,
+    ctx: fastmcp.Context,
+    inputs: pydantic.BaseModel,  # type: ignore[valid-type]
+    run_folder: str | None = None,
+) -> str:
+    """Start async pipeline execution and return a job ID."""
+    job_id = str(uuid.uuid4())
+    actual_run_folder = run_folder or f"runs/job_{job_id}"
+
+    await ctx.info(
+        f"Starting async pipeline {pipeline.name=} with job_id={job_id} and run_folder={actual_run_folder}",
+    )
+
+    # Store the AsyncMap object in the global registry
+    async_map = pipeline.map_async(
+        inputs=inputs,
+        run_folder=actual_run_folder,
+        show_progress="headless",
+    )
+    job_registry[job_id] = JobInfo(
+        runner=async_map,
+        started_at=datetime.now(tz=timezone.utc),
+        run_folder=actual_run_folder,
+        status="running",
+        pipeline_name=pipeline.name or "Unnamed Pipeline",
+    )
+
+    await ctx.info(f"Started async job {job_id} in folder {actual_run_folder}")
+    return str({"job_id": job_id, "run_folder": actual_run_folder})
+
+
+async def _check_job_status(job_id: str) -> str:
+    """Check status of a running pipeline job."""
+    job = job_registry.get(job_id)
+    if not job:
+        return str({"error": "Job not found"})
+
+    task = job.runner.task
+    is_done = task.done()
+
+    # Get progress information if available
+    assert job.runner.progress is not None
+    progress_dict = job.runner.progress.progress_dict
+    progress_info = {}
+    for output_name, status in progress_dict.items():
+        elapsed_time = status.elapsed_time()
+        remaining_time = status.remaining_time(elapsed_time=elapsed_time)
+        progress_info[str(output_name)] = {
+            "progress": status.progress,
+            "n_completed": status.n_completed,
+            "n_total": status.n_total,
+            "n_failed": status.n_failed,
+            "elapsed_time": elapsed_time if elapsed_time is not None else None,
+            "remaining_time": remaining_time if remaining_time is not None else None,
+        }
+
+    result_info = {
+        "job_id": job_id,
+        "pipeline_name": job.pipeline_name,
+        "status": "completed" if is_done else "running",
+        "progress": progress_info,
+        "run_folder": job.run_folder,
+        "started_at": job.started_at.isoformat(),
+        "error": str(task.exception()) if is_done and task.exception() else None,
+    }
+
+    # If job is completed, get the results
+    if is_done and not task.exception():
+        pipeline_result = task.result()
+        output = {}
+        for key, result_obj in pipeline_result.items():
+            output[key] = {
+                "output": result_obj.output.tolist()
+                if hasattr(result_obj.output, "tolist")
+                else result_obj.output,
+                "shape": getattr(result_obj.output, "shape", None),
+            }
+        result_info["results"] = output
+
+    return str(result_info)
+
+
+async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
+    """Cancel a running pipeline job."""
+    job = job_registry.get(job_id)
+    if not job:
+        return str({"error": "Job not found"})
+
+    task = job.runner.task
+    if not task.done():
+        task.cancel()
+        job.status = "cancelled"
+        await ctx.info(f"Cancelled job {job_id}")
+        return str({"status": "cancelled", "job_id": job_id})
+    return str({"error": "Job not found or already completed", "job_id": job_id})
+
+
+async def _list_jobs() -> str:
+    """List all pipeline jobs with their current status."""
+    if not job_registry:
+        return str({"jobs": [], "total_count": 0})
+
+    jobs_info = []
+    for job_id, job in job_registry.items():
+        task = job.runner.task
+        is_done = task.done()
+
+        job_info = {
+            "job_id": job_id,
+            "pipeline_name": job.pipeline_name,
+            "status": job.status,
+            "run_folder": job.run_folder,
+            "started_at": job.started_at.isoformat(),
+            "has_error": is_done and task.exception() is not None,
+        }
+        jobs_info.append(job_info)
+
+    return str({"jobs": jobs_info, "total_count": len(jobs_info)})
