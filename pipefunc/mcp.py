@@ -150,6 +150,14 @@ Key concepts:
 - Single values work regardless of mapspecs
 """
 
+_PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA = """\
+This tool returns a job ID and run folder.
+Use the job ID to:
+- check_job_status: Monitor progress and get results when complete
+- list_jobs: See all running/completed jobs
+- cancel_job: Stop a running job
+"""
+
 
 def _get_pipeline_documentation(pipeline: Pipeline) -> str:
     """Generate formatted pipeline documentation tables using Rich."""
@@ -374,7 +382,10 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     pipeline_description = pipeline.description or _DEFAULT_PIPELINE_DESCRIPTION
 
     # Format description using the template
-    tool_description = _format_tool_description(pipeline)
+    execute_pipeline_tool_description = _format_tool_description(pipeline)
+    async_execute_pipeline_tool_description = (
+        execute_pipeline_tool_description + "\n\n" + _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA
+    )
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
@@ -384,7 +395,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         **fast_mcp_kwargs,
     )
 
-    @mcp.tool(name="execute_pipeline_sync", description=tool_description)
+    @mcp.tool(name="execute_pipeline_sync", description=execute_pipeline_tool_description)
     async def execute_pipeline_sync(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
@@ -399,7 +410,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         """
         return await _execute_pipeline_sync(pipeline, ctx, inputs, parallel, run_folder)
 
-    @mcp.tool(name="execute_pipeline_async", description=tool_description)
+    @mcp.tool(name="execute_pipeline_async", description=async_execute_pipeline_tool_description)
     async def execute_pipeline_async(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
