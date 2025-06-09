@@ -448,19 +448,16 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
 
         # If job is completed, get the results
         if is_done and not task.exception():
-            try:
-                pipeline_result = task.result()
-                output = {}
-                for key, result_obj in pipeline_result.items():
-                    output[key] = {
-                        "output": result_obj.output.tolist()
-                        if hasattr(result_obj.output, "tolist")
-                        else result_obj.output,
-                        "shape": getattr(result_obj.output, "shape", None),
-                    }
-                result_info["results"] = output
-            except Exception as e:  # noqa: BLE001
-                result_info["error"] = f"Error getting results: {e!s}"
+            pipeline_result = task.result()
+            output = {}
+            for key, result_obj in pipeline_result.items():
+                output[key] = {
+                    "output": result_obj.output.tolist()
+                    if hasattr(result_obj.output, "tolist")
+                    else result_obj.output,
+                    "shape": getattr(result_obj.output, "shape", None),
+                }
+            result_info["results"] = output
 
         return str(result_info)
 
