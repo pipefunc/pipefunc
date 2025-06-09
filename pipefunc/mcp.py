@@ -218,7 +218,7 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
         post = (
             " (used as input)" if _is_root_mapspec(mapspec, root_args) else " (intermediate step)"
         )
-        lines.append(f"  {i}. {mapspec}{post}")
+        lines.append(f"  {i}. `{mapspec}`{post}")
 
     lines.extend(
         [
