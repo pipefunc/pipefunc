@@ -540,7 +540,7 @@ async def _execute_pipeline_async(
         started_at=datetime.now(tz=timezone.utc),
         run_folder=actual_run_folder,
         status="running",
-        pipeline_name=pipeline.name or "Unnamed Pipeline",
+        pipeline_name=pipeline.name or _DEFAULT_PIPELINE_NAME,
     )
 
     await ctx.info(f"Started async job {job_id} in folder {actual_run_folder}")
