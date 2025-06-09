@@ -83,6 +83,21 @@ def slow_pipeline():
     return Pipeline([slow_computation, aggregate])
 
 
+@pytest.fixture
+def mixed_input_pipeline() -> Pipeline:
+    """Create a pipeline with both array inputs (mapspec) and scalar inputs (non-mapspec)."""
+
+    @pipefunc(output_name="scaled_values", mapspec="x[i] -> scaled_values[i]")
+    def scale_values(x: float, scale_factor: float) -> float:
+        return x * scale_factor
+
+    @pipefunc(output_name="final_result")
+    def process_scaled(scaled_values: Array) -> float:
+        return float(sum(scaled_values))
+
+    return Pipeline([scale_values, process_scaled])
+
+
 # Test MCP server building functionality.
 
 
@@ -538,3 +553,18 @@ def test_pipeline_with_no_outputs() -> None:
     summary = _get_pipeline_info_summary("Test", pipeline)
     assert isinstance(summary, str)
     assert "dummy_output" in summary
+
+
+def test_input_format_section_with_mixed_inputs(mixed_input_pipeline: Pipeline) -> None:
+    """Test input format section generation with both array and scalar inputs."""
+    from pipefunc.mcp import _get_input_format_section
+
+    result = _get_input_format_section(mixed_input_pipeline)
+
+    # Should contain the specific lines we want to test
+    assert "Required Array Inputs:" in result
+    assert "Constant Inputs:" in result
+    assert "The following parameters are provided as single, constant values:" in result
+    assert "- `x`" in result  # array input
+    assert "- `scale_factor`" in result  # scalar input
+    assert "This pipeline is designed for array-based parameter sweeps." in result

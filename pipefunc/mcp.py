@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 import fastmcp
 import pydantic
+from rich.console import Console
 
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
@@ -141,7 +142,6 @@ IMPORTANT:
 def _get_pipeline_documentation(pipeline: Pipeline) -> str:
     """Generate formatted pipeline documentation tables using Rich."""
     requires("rich", "griffe", reason="mcp", extras="autodoc")
-    from rich.console import Console
 
     doc = PipelineDocumentation.from_pipeline(pipeline)
     tables = format_pipeline_docs(doc, print_table=False, emojis=False)
@@ -184,7 +184,7 @@ def _get_input_format_section(pipeline: Pipeline) -> str:
 
     for param in sorted(root_args):
         param_type = param_ann.get(param)
-        if isinstance(param_type, str):
+        if isinstance(param_type, str):  # pragma: no cover
             param_type = None
 
         if param in required_array_inputs:
