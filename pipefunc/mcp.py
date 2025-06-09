@@ -4,6 +4,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 import fastmcp
@@ -15,6 +16,10 @@ from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
+from pipefunc.map._run_info import RunInfo
+from pipefunc.map._shapes import shape_is_resolved
+from pipefunc.map._storage_array._base import StorageBase
+from pipefunc.map._storage_array._file import FileArray
 
 
 @dataclass
@@ -455,6 +460,11 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         """List all pipeline jobs with their current status."""
         return await _list_jobs()
 
+    @mcp.tool(name="run_info")
+    def run_info(run_folder: str) -> dict[str, Any]:
+        """Get information about a pipeline run."""
+        return _run_info(run_folder)
+
     return mcp
 
 
@@ -599,3 +609,51 @@ async def _list_jobs() -> str:
         jobs_info.append(job_info)
 
     return str({"jobs": jobs_info, "total_count": len(jobs_info)})
+
+
+def _progress_info(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
+    outputs = {}
+    store = run_info.init_store()
+    all_complete = True
+    for output_name in run_info.all_output_names:
+        data = store[output_name]
+        if isinstance(data, StorageBase):
+            assert isinstance(data, FileArray)
+            size: int | str
+            progress: float | str
+            if shape_is_resolved(data.shape):
+                size = data.size
+                progress = 1.0 - sum(data.mask_linear()) / size
+            else:
+                size = "unknown"
+                progress = "unknown"
+            nbytes = sum(f.stat().st_size for f in data.folder.rglob("*") if f.is_file())
+        elif isinstance(data, Path):
+            if data.exists():
+                progress = 1.0
+                nbytes = data.stat().st_size
+            else:
+                progress = 0.0
+                nbytes = 0
+        else:  # pragma: no cover
+            msg = f"Should not happen: {type(data)}"
+            raise RuntimeError(msg)  # noqa: TRY004
+        complete = progress == 1.0
+        all_complete = all_complete and complete
+        outputs[output_name] = {
+            "progress": progress,
+            "complete": complete,
+            "bytes": nbytes,
+        }
+    return outputs, all_complete
+
+
+def _run_info(run_folder: str) -> dict[str, Any]:
+    try:
+        run_info = RunInfo.load(run_folder)
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+    assert isinstance(run_info, RunInfo)
+    outputs, all_complete = _progress_info(run_info)
+    run_info_json = json.loads(run_info.path(run_folder).read_text())
+    return {"run_info": run_info_json, "outputs": outputs, "all_complete": all_complete}
