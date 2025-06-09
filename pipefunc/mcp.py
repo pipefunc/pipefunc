@@ -39,47 +39,52 @@ See https://pipefunc.readthedocs.io/en/latest/ and https://github.com/pipefunc/p
 
 <general>
 CORE CONCEPTS:
-- Pipeline: Sequence of interconnected functions forming a computational workflow
-- MapSpec: String syntax defining how arrays map between functions
+- Pipeline: A sequence of interconnected Python functions forming a computational workflow. Dependencies are handled automatically.
+- MapSpec: A string (e.g., "x[i] -> y[i]") that defines how arrays are mapped between functions, enabling powerful, parallel parameter sweeps.
 
 EXECUTION MODES:
 Two execution modes are available:
 
-1. **Synchronous Execution** (execute_pipeline_sync):
+1. Synchronous (execute_pipeline_sync):
    - Blocks until completion and returns results immediately
-   - Use when you need results right away for small-to-medium pipelines
-   - Best for interactive use and when results fit in memory
+   - Ideal for single calculations, small datasets, and interactive use.
 
-2. **Asynchronous Execution** (execute_pipeline_async):
-   - Returns immediately with a job ID for tracking
-   - Use for long-running pipelines or when you need progress monitoring
-   - Check progress with check_job_status, cancel with cancel_job
-   - Results are retrieved when job completes
-   - Best for large pipelines, batch processing, and background execution
+2. Asynchronous (execute_pipeline_async):
+   - Returns a `job_id` immediately for tracking background execution.
+   - Ideal for large datasets, long-running computations, and parameter sweeps.
+   - Workflow: Start job -> Get `job_id` -> Check status.
    - IMPORTANT: Always IMMEDIATELY check the job status with check_job_status after starting a new job!
+
+JOB MANAGEMENT (for Async):
+- `check_job_status(job_id)`: Monitor progress and get results when complete.
+- `list_jobs()`: See all running/completed jobs.
+- `cancel_job(job_id)`: Stop a running job.
 
 EXECUTION PARAMETERS:
 - inputs: Dictionary with parameter values (single values or arrays)
 - parallel: Boolean (default true) - enables parallel execution
 - run_folder: Optional string - directory to save intermediate results
 
-INPUT FORMATS:
-1. Single values: {{"param1": 5, "param2": 10}} - executes once with these values
-2. Array sweeps: {{"param1": [1,2,3], "param2": [4,5]}} - creates parameter combinations based on mapspec
-3. Mixed: {{"data": [1,2,3], "constant": 10}} - arrays are swept, single values used for all iterations
+MAPSPEC REFERENCE:
+`MapSpec` is the key to unlocking parallel execution and parameter sweeps.
 
-MAPSPEC SYNTAX:
-- General syntax: "input_name[index] -> output_name[index]"
-- "x[i] -> y[i]": Element-wise processing (same array length)
-- "a[i], b[j] -> result[i,j]": Cross-product (all combinations)
-- "x[i], y[i] -> z[i]": Zipped processing (paired elements)
-- "x[i, :] -> y[i]": Reduction across dimension
-- "... -> x[i]": Dynamic array generation
+Basic Syntax:
+`"input1[index1], input2[index2] -> output1[index3]"`
 
-MAPSPEC INDEX RULES:
-- Same index letter ([i], [i]): Elements processed together (zipped)
-- Different indices ([i], [j]): Create cross-product combinations
-- No indices: Single values used for all iterations
+Index Rules (How to control sweeps):
+- Different Indices (`a[i]`, `b[j]`): Creates a cross-product. The pipeline runs for every combination of elements from `a` and `b`.
+- Same Index (`x[i]`, `y[i]`): Zips the inputs. The pipeline pairs elements `x[0]` with `y[0]`, `x[1]` with `y[1]`, etc. The arrays must have the same length.
+- No Index: A single value is treated as a constant and used in every computation of the sweep.
+
+Common `MapSpec` Patterns & Examples:
+- `"x[i] -> y[i]"`: Element-wise. Processes each element of `x` independently.
+  - *Example Input*: `{"x": [1, 2, 3]}`
+- `"x[i], y[i] -> z[i]"`: Zipped. Pairs elements from `x` and `y`.
+  - *Example Input*: `{"x": [1, 2], "y": [10, 20]}`
+- `"a[i], b[j] -> c[i, j]"`: Cross-product. Combines every element of `a` with every element of `b`.
+  - *Example Input*: `{"a": [1, 2], "b": [10, 20]}` results in 4 runs.
+- `"x[i, :] -> y[i]"`: Reduction. Aggregates data across a dimension (the `:`). This is typically an internal pipeline step.
+- `"... -> x[i]"`: Dynamic Axis Generation. A function that generates an array from a scalar input. This is typically an internal pipeline step.
 
 OUTPUT FORMAT:
 Returns dictionary with all pipeline outputs. Each output contains:
@@ -92,16 +97,10 @@ JOB MANAGEMENT:
 - cancel_job: Stop a running job
 
 </general>
-
-PIPELINE DESCRIPTION:
-{pipeline_description}
 """
 
 _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline with inputs.
-
-PIPELINE NAME:
-{pipeline_name}
+Execute the pipeline '{pipeline_name}' with inputs.
 
 PIPELINE DESCRIPTION:
 {pipeline_description}
@@ -112,45 +111,10 @@ PIPELINE INFORMATION:
 MAPSPEC DEFINITIONS:
 {mapspec_section}
 
-INPUT FORMAT:
-{input_format}
-
 DETAILED PIPELINE DOCUMENTATION:
 {documentation}
 """
 
-_NO_MAPSPEC_INPUT_FORMAT = """\
-Single values only:
-  {"a": 5, "b": 10, "x": 2}
-  → Each parameter gets a single value
-
-This will execute the pipeline once with these specific values and return the result.
-"""
-
-_MAPSPEC_INPUT_FORMAT = """\
-
-1. Simple element-wise mapping:
-   {"x": [1, 2, 3, 4]}
-   → If function has mapspec "x[i] -> y[i]", this will process each x value independently
-
-2. Cross-product of inputs:
-   {"a": [1, 2], "b": [10, 20]}
-   → If functions have mapspecs like "a[i], b[j] -> result[i, j]", this creates all combinations
-
-3. Zipped inputs (same index):
-   {"x": [1, 2, 3], "y": [4, 5, 6]}
-   → If function has mapspec "x[i], y[i] -> z[i]", this pairs x[0] with y[0], x[1] with y[1], etc.
-
-4. Mixed single values and arrays:
-   {"data": [1, 2, 3, 4], "multiplier": 10}
-   → Arrays are mapped over, single values are used for all iterations
-
-Key concepts:
-- mapspec defines how inputs map to outputs (e.g., "x[i] -> y[i]" means element-wise)
-- Arrays with same index letter (like [i]) are processed together
-- Arrays with different indices (like [i] and [j]) create cross-products
-- Single values work regardless of mapspecs
-"""
 
 _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA = """\
 This tool returns a job ID and run folder.
@@ -205,38 +169,26 @@ def _is_root_mapspec(mapspec: MapSpec, root_args: tuple[str, ...]) -> bool:
 
 
 def _get_mapspec_section(pipeline: Pipeline) -> str:
-    """Generate mapspec information section."""
+    """Generate the pipeline-specific mapspec information section."""
     mapspecs = pipeline.mapspecs(ordered=True)
     if not mapspecs:
-        return "None (This pipeline processes single values only)"
+        return "This pipeline does not use array processing (`mapspec`). It only accepts single values for inputs."
 
-    lines = [
-        "The following mapspecs define how arrays are processed:",
-    ]
+    lines = ["The following rules define how arrays are processed in this pipeline:"]
     root_args = pipeline.root_args()
     for i, mapspec in enumerate(mapspecs, 1):
-        post = (
-            " (used as input)" if _is_root_mapspec(mapspec, root_args) else " (intermediate step)"
+        context = (
+            " (driven by your inputs)"
+            if _is_root_mapspec(mapspec, root_args)
+            else " (internal processing step)"
         )
-        lines.append(f"  {i}. {mapspec}{post}")
+        lines.append(f"  {i}. `{mapspec}`{context}")
 
-    lines.extend(
-        [
-            "",
-            "Mapspec Legend:",
-            "- Parameters with [i], [j], etc. represent array dimensions",
-            "- Same index letter (e.g., [i]) means elements are processed together (zipped)",
-            "- Different indices (e.g., [i] and [j]) create cross-products",
-        ],
+    # Add a tip pointing to the general documentation
+    lines.append(
+        "\nFor general `MapSpec` syntax and patterns, please refer to the main server instructions.",
     )
-
     return "\n".join(lines)
-
-
-def _get_input_format_section(pipeline: Pipeline) -> str:
-    """Generate input format examples section."""
-    mapspecs = pipeline.mapspecs_as_strings
-    return _MAPSPEC_INPUT_FORMAT if mapspecs else _NO_MAPSPEC_INPUT_FORMAT
 
 
 def _format_tool_description(pipeline: Pipeline) -> str:
@@ -246,13 +198,11 @@ def _format_tool_description(pipeline: Pipeline) -> str:
     documentation = _get_pipeline_documentation(pipeline)
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
-    input_format = _get_input_format_section(pipeline)
     return _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE.format(
         pipeline_name=pipeline_name,
         pipeline_description=pipeline_description,
         pipeline_info=pipeline_info,
         mapspec_section=mapspec_section,
-        input_format=input_format,
         documentation=documentation,
     )
 
@@ -392,19 +342,22 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
 
     # Generate all pipeline information sections
     pipeline_name = pipeline.name or _DEFAULT_PIPELINE_NAME
-    pipeline_description = pipeline.description or _DEFAULT_PIPELINE_DESCRIPTION
 
     # Format description using the template
+    server_instructions = _PIPEFUNC_INSTRUCTIONS
     execute_pipeline_tool_description = _format_tool_description(pipeline)
     async_execute_pipeline_tool_description = (
         execute_pipeline_tool_description + "\n\n" + _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA
     )
+    print(server_instructions)
+    print("-" * 100)
+    print(async_execute_pipeline_tool_description)
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
     mcp = fastmcp.FastMCP(
         name=pipeline_name,
-        instructions=_PIPEFUNC_INSTRUCTIONS.format(pipeline_description=pipeline_description),
+        instructions=server_instructions,
         **fast_mcp_kwargs,
     )
 
