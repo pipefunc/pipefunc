@@ -552,6 +552,8 @@ def test_format_tool_description() -> None:
     from pipefunc.mcp import _format_tool_description
 
     description = _format_tool_description(
+        pipeline_name="Test Pipeline",
+        pipeline_description="Test description",
         pipeline_info="Test info",
         mapspec_section="Test mapspec",
         input_format="Test format",

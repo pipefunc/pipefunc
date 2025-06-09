@@ -29,62 +29,14 @@ class JobInfo:
 job_registry: dict[str, JobInfo] = {}
 
 _PIPEFUNC_INSTRUCTIONS = """\
-This MCP server executes Pipefunc computational pipelines.
-Pipefunc creates function pipelines as DAGs where functions are automatically connected based on input/output dependencies.
+This MCP server executes pipefunc computational pipelines.
+pipefunc creates function pipelines as DAGs where functions are automatically connected based on input/output dependencies.
+See https://pipefunc.readthedocs.io/en/latest/ and https://github.com/pipefunc/pipefunc for more information.
 
+<general>
 CORE CONCEPTS:
 - Pipeline: Sequence of interconnected functions forming a computational workflow
 - MapSpec: String syntax defining how arrays map between functions
-- Parallel Execution: Automatically parallelizes computations across parameter combinations
-- Parameter Sweeps: Process multiple input combinations efficiently
-
-EXECUTION PARAMETERS:
-- inputs: Dictionary with parameter values (single values or arrays)
-- parallel: Boolean (default true) - enables parallel execution
-- run_folder: Optional string - directory to save intermediate results
-
-INPUT FORMATS:
-1. Single values: {{"param1": 5, "param2": 10}} - executes once with these values
-2. Array sweeps: {{"param1": [1,2,3], "param2": [4,5]}} - creates parameter combinations based on mapspec
-3. Mixed: {{"data": [1,2,3], "constant": 10}} - arrays are swept, single values used for all iterations
-
-MAPSPEC SYNTAX:
-- "x[i] -> y[i]": Element-wise processing (same array length)
-- "a[i], b[j] -> result[i,j]": Cross-product (all combinations)
-- "x[i], y[i] -> z[i]": Zipped processing (paired elements)
-- "x[i,:] -> y[i]": Reduction across dimension
-- "... -> x[i]": Dynamic array generation
-
-INDEX RULES:
-- Same index letter ([i], [i]): Elements processed together (zipped)
-- Different indices ([i], [j]): Create cross-product combinations
-- No indices: Single values used for all iterations
-
-OUTPUT FORMAT:
-Returns dictionary with all pipeline outputs. Each output contains:
-- "output": Computed result (converted to JSON-compatible format)
-- "shape": Array dimensions (if applicable)
-
-EXECUTION MODES:
-- parallel=true: Functions execute concurrently, faster for large sweeps
-- parallel=false: Sequential execution, more reliable for custom objects, better for debugging
-
-COMMON ISSUES:
-- Shape mismatches: Verify mapspec definitions match expected array dimensions
-- Type errors: Ensure input types match function parameter types
-
-PIPELINE DESCRIPTION:
-{pipeline_description}
-"""
-
-_PIPELINE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline with inputs. This method works for both single values and arrays/lists.
-
-PIPELINE INFORMATION:
-{pipeline_info}
-
-MAPSPEC DEFINITIONS:
-{mapspec_section}
 
 EXECUTION MODES:
 Two execution modes are available:
@@ -100,6 +52,60 @@ Two execution modes are available:
    - Check progress with check_job_status, cancel with cancel_job
    - Results are retrieved when job completes
    - Best for large pipelines, batch processing, and background execution
+
+EXECUTION PARAMETERS:
+- inputs: Dictionary with parameter values (single values or arrays)
+- parallel: Boolean (default true) - enables parallel execution
+- run_folder: Optional string - directory to save intermediate results
+
+INPUT FORMATS:
+1. Single values: {{"param1": 5, "param2": 10}} - executes once with these values
+2. Array sweeps: {{"param1": [1,2,3], "param2": [4,5]}} - creates parameter combinations based on mapspec
+3. Mixed: {{"data": [1,2,3], "constant": 10}} - arrays are swept, single values used for all iterations
+
+MAPSPEC SYNTAX:
+- General syntax: "input_name[index] -> output_name[index]"
+- "x[i] -> y[i]": Element-wise processing (same array length)
+- "a[i], b[j] -> result[i,j]": Cross-product (all combinations)
+- "x[i], y[i] -> z[i]": Zipped processing (paired elements)
+- "x[i, :] -> y[i]": Reduction across dimension
+- "... -> x[i]": Dynamic array generation
+
+MAPSPEC INDEX RULES:
+- Same index letter ([i], [i]): Elements processed together (zipped)
+- Different indices ([i], [j]): Create cross-product combinations
+- No indices: Single values used for all iterations
+
+OUTPUT FORMAT:
+Returns dictionary with all pipeline outputs. Each output contains:
+- "output": Computed result (converted to JSON-compatible format)
+- "shape": Array dimensions (if applicable)
+
+JOB MANAGEMENT:
+- check_job_status: Monitor progress and get results when complete
+- list_jobs: See all running/completed jobs
+- cancel_job: Stop a running job
+
+</general>
+
+PIPELINE DESCRIPTION:
+{pipeline_description}
+"""
+
+_PIPELINE_DESCRIPTION_TEMPLATE = """\
+Execute the pipeline with inputs. This method works for both single values and arrays/lists.
+
+PIPELINE NAME:
+{pipeline_name}
+
+PIPELINE DESCRIPTION:
+{pipeline_description}
+
+PIPELINE INFORMATION:
+{pipeline_info}
+
+MAPSPEC DEFINITIONS:
+{mapspec_section}
 
 INPUT FORMAT:
 {input_format}
@@ -210,6 +216,8 @@ def _get_input_format_section(pipeline: Pipeline) -> str:
 
 
 def _format_tool_description(
+    pipeline_name: str | None,
+    pipeline_description: str | None,
     pipeline_info: str,
     mapspec_section: str,
     input_format: str,
@@ -217,6 +225,8 @@ def _format_tool_description(
 ) -> str:
     """Format a complete tool description using the template."""
     return _PIPELINE_DESCRIPTION_TEMPLATE.format(
+        pipeline_name=pipeline_name,
+        pipeline_description=pipeline_description,
         pipeline_info=pipeline_info,
         mapspec_section=mapspec_section,
         input_format=input_format,
@@ -359,13 +369,16 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
 
     # Generate all pipeline information sections
     pipeline_name = pipeline.name or "Unnamed Pipeline"
+    pipeline_description = pipeline.description or "No description provided."
     documentation = _get_pipeline_documentation(pipeline)
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
     input_format = _get_input_format_section(pipeline)
 
     # Format description using the template
-    description = _format_tool_description(
+    tool_description = _format_tool_description(
+        pipeline_name=pipeline_name,
+        pipeline_description=pipeline_description,
         pipeline_info=pipeline_info,
         mapspec_section=mapspec_section,
         input_format=input_format,
@@ -376,13 +389,11 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     Model.model_rebuild()  # Ensure all type references are resolved
     mcp = fastmcp.FastMCP(
         name=pipeline_name,
-        instructions=_PIPEFUNC_INSTRUCTIONS.format(
-            pipeline_description=pipeline.description or "No description provided.",
-        ),
+        instructions=_PIPEFUNC_INSTRUCTIONS.format(pipeline_description=pipeline_description),
         **fast_mcp_kwargs,
     )
 
-    @mcp.tool(name="execute_pipeline_sync", description=description)
+    @mcp.tool(name="execute_pipeline_sync", description=tool_description)
     async def execute_pipeline_sync(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
