@@ -80,6 +80,8 @@ class Status:
         if elapsed_time == 0:
             return None
         progress = self.progress
+        if progress == 0:
+            return None
         return (1.0 - progress) * (elapsed_time / progress)
 
 
