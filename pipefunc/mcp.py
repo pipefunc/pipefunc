@@ -171,10 +171,10 @@ def _get_pipeline_documentation(pipeline: Pipeline) -> str:
     from rich.console import Console
 
     doc = PipelineDocumentation.from_pipeline(pipeline)
-    tables = format_pipeline_docs(doc, print_table=False)
+    tables = format_pipeline_docs(doc, print_table=False, emojis=False)
     assert tables is not None
 
-    console = Console(no_color=True)
+    console = Console(force_terminal=False)
     with console.capture() as capture:
         for table in tables:
             console.print(table, "\n")
