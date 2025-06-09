@@ -11,6 +11,7 @@ import pydantic
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
+from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
 
 
@@ -152,10 +153,14 @@ Key concepts:
 
 _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA = """\
 This tool returns a job ID and run folder.
+
 Use the job ID to:
 - check_job_status: Monitor progress and get results when complete
 - list_jobs: See all running/completed jobs
 - cancel_job: Stop a running job
+
+IMPORTANT:
+- Whenever starting a new job, ALWAYS immediately check the job status with check_job_status.
 """
 
 
@@ -193,18 +198,26 @@ def _get_pipeline_info_summary(pipeline_name: str, pipeline: Pipeline) -> str:
     return "\n".join(lines)
 
 
+def _is_root_mapspec(mapspec: MapSpec, root_args: tuple[str, ...]) -> bool:
+    """Check if a mapspec is a root mapspec."""
+    return any(arg in mapspec.input_names for arg in root_args)
+
+
 def _get_mapspec_section(pipeline: Pipeline) -> str:
     """Generate mapspec information section."""
-    mapspecs = pipeline.mapspecs_as_strings
+    mapspecs = pipeline.mapspecs(ordered=True)
     if not mapspecs:
         return "None (This pipeline processes single values only)"
 
     lines = [
         "The following mapspecs define how arrays are processed:",
     ]
-
+    root_args = pipeline.root_args()
     for i, mapspec in enumerate(mapspecs, 1):
-        lines.append(f"  {i}. {mapspec}")
+        post = (
+            " (used as input)" if _is_root_mapspec(mapspec, root_args) else " (intermediate step)"
+        )
+        lines.append(f"  {i}. {mapspec}{post}")
 
     lines.extend(
         [
@@ -213,7 +226,6 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
             "- Parameters with [i], [j], etc. represent array dimensions",
             "- Same index letter (e.g., [i]) means elements are processed together (zipped)",
             "- Different indices (e.g., [i] and [j]) create cross-products",
-            "- Parameters without indices are used as single values for all iterations",
         ],
     )
 
