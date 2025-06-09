@@ -622,7 +622,7 @@ async def _list_jobs() -> str:
     return str({"jobs": jobs_info, "total_count": len(jobs_info)})
 
 
-def _progress_info(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
+def _progress_info_from_disk(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
     outputs = {}
     store = run_info.init_store()
     all_complete = True
@@ -665,6 +665,6 @@ def _run_info(run_folder: str) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001  # pragma: no cover
         return {"error": str(e)}
     assert isinstance(run_info, RunInfo)
-    outputs, all_complete = _progress_info(run_info)
+    outputs, all_complete = _progress_info_from_disk(run_info)
     run_info_json = json.loads(run_info.path(run_folder).read_text())
     return {"run_info": run_info_json, "outputs": outputs, "all_complete": all_complete}
