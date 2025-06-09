@@ -2210,6 +2210,8 @@ class Pipeline:
 
             * ``topological``: Display functions in topological order.
             * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+        emojis
+            Whether to use emojis in the documentation.
 
         See Also
         --------
