@@ -33,135 +33,120 @@ _DEFAULT_PIPELINE_NAME = "Unnamed Pipeline"
 _DEFAULT_PIPELINE_DESCRIPTION = "No description provided."
 
 _PIPEFUNC_INSTRUCTIONS = """\
-This MCP server executes pipefunc computational pipelines.
-pipefunc creates function pipelines as DAGs where functions are automatically connected based on input/output dependencies.
-See https://pipefunc.readthedocs.io/en/latest/ and https://github.com/pipefunc/pipefunc for more information.
+WHAT THIS DOES:
+This tool runs computational workflows.
+It executes a pipeline of connected Python functions, automatically managing dependencies and parallel execution for complex simulations and calculations.
 
-<general>
-CORE CONCEPTS:
-- Pipeline: Sequence of interconnected functions forming a computational workflow
-- MapSpec: String syntax defining how arrays map between functions
+PIPELINE OVERVIEW:
+{pipeline_description}
+
+QUICK START:
+- For single calculations or small datasets: Use execute_pipeline_sync (returns results immediately)
+- For large computations or parameter sweeps: Use execute_pipeline_async (returns job ID for tracking)
+
+HOW TO USE IT:
+Most users start with single-value inputs to get familiar with the pipeline:
+- Provide all required parameters as single values
+- Get back computed results immediately
+- Scale up to arrays when you need multiple calculations
 
 EXECUTION MODES:
-Two execution modes are available:
 
 1. **Synchronous Execution** (execute_pipeline_sync):
    - Blocks until completion and returns results immediately
-   - Use when you need results right away for small-to-medium pipelines
-   - Best for interactive use and when results fit in memory
+   - Best for single calculations, small datasets, and interactive use
+   - Results fit in memory and complete quickly
 
 2. **Asynchronous Execution** (execute_pipeline_async):
-   - Returns immediately with a job ID for tracking
-   - Use for long-running pipelines or when you need progress monitoring
-   - Check progress with check_job_status, cancel with cancel_job
-   - Results are retrieved when job completes
-   - Best for large pipelines, batch processing, and background execution
-   - IMPORTANT: Always IMMEDIATELY check the job status with check_job_status after starting a new job!
+   - Returns immediately with a job ID for progress tracking
+   - Best for large datasets, parameter sweeps, and long-running computations
+   - Monitor progress with check_job_status, cancel with cancel_job
+   - IMPORTANT: Always IMMEDIATELY check job status after starting a new job!
 
-EXECUTION PARAMETERS:
-- inputs: Dictionary with parameter values (single values or arrays)
-- parallel: Boolean (default true) - enables parallel execution
-- run_folder: Optional string - directory to save intermediate results
-
-INPUT FORMATS:
-1. Single values: {{"param1": 5, "param2": 10}} - executes once with these values
-2. Array sweeps: {{"param1": [1,2,3], "param2": [4,5]}} - creates parameter combinations based on mapspec
-3. Mixed: {{"data": [1,2,3], "constant": 10}} - arrays are swept, single values used for all iterations
-
-MAPSPEC SYNTAX:
-- General syntax: "input_name[index] -> output_name[index]"
-- "x[i] -> y[i]": Element-wise processing (same array length)
-- "a[i], b[j] -> result[i,j]": Cross-product (all combinations)
-- "x[i], y[i] -> z[i]": Zipped processing (paired elements)
-- "x[i, :] -> y[i]": Reduction across dimension
-- "... -> x[i]": Dynamic array generation
-
-MAPSPEC INDEX RULES:
-- Same index letter ([i], [i]): Elements processed together (zipped)
-- Different indices ([i], [j]): Create cross-product combinations
-- No indices: Single values used for all iterations
+MONITORING PROGRESS:
+- check_job_status: Monitor progress and get results when complete
+- list_jobs: See all running/completed jobs
+- cancel_job: Stop a running job
 
 OUTPUT FORMAT:
 Returns dictionary with all pipeline outputs. Each output contains:
 - "output": Computed result (converted to JSON-compatible format)
 - "shape": Array dimensions (if applicable)
 
-JOB MANAGEMENT:
-- check_job_status: Monitor progress and get results when complete
-- list_jobs: See all running/completed jobs
-- cancel_job: Stop a running job
-
-</general>
-
-PIPELINE DESCRIPTION:
-{pipeline_description}
+For detailed documentation: https://pipefunc.readthedocs.io/en/latest/
 """
 
 _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline with inputs.
+Execute the {pipeline_name} pipeline with your inputs.
 
-PIPELINE NAME:
-{pipeline_name}
-
-PIPELINE DESCRIPTION:
+PIPELINE PURPOSE:
 {pipeline_description}
 
-PIPELINE INFORMATION:
-{pipeline_info}
-
-MAPSPEC DEFINITIONS:
-{mapspec_section}
-
-INPUT FORMAT:
+BASIC USAGE:
+Start with single values for each required parameter:
 {input_format}
 
-DETAILED PIPELINE DOCUMENTATION:
+PIPELINE DETAILS:
+{pipeline_info}
+
+ADVANCED ARRAY PROCESSING:
+{mapspec_section}
+
+DETAILED REFERENCE:
 {documentation}
 """
 
 _NO_MAPSPEC_INPUT_FORMAT = """\
-Single values only:
-  {"a": 5, "b": 10, "x": 2}
-  → Each parameter gets a single value
+This pipeline processes single values only. Provide one value for each parameter:
 
-This will execute the pipeline once with these specific values and return the result.
+Example (using placeholder names - replace with actual parameter names):
+  {"param1": 5, "param2": 10, "param3": 2}
+
+The pipeline will execute once with these exact values and return the computed results.
 """
 
 _MAPSPEC_INPUT_FORMAT = """\
+This pipeline can process both single values and arrays for efficient batch computations.
 
-1. Simple element-wise mapping:
-   {"x": [1, 2, 3, 4]}
-   → If function has mapspec "x[i] -> y[i]", this will process each x value independently
+SIMPLE START - Single values (recommended first try):
+  {"param1": 5, "param2": 10}
+  → Executes pipeline once with these exact values
 
-2. Cross-product of inputs:
-   {"a": [1, 2], "b": [10, 20]}
-   → If functions have mapspecs like "a[i], b[j] -> result[i, j]", this creates all combinations
+SCALING UP - Array processing:
+Based on this pipeline's mapspec configuration, you can also provide arrays:
 
-3. Zipped inputs (same index):
-   {"x": [1, 2, 3], "y": [4, 5, 6]}
-   → If function has mapspec "x[i], y[i] -> z[i]", this pairs x[0] with y[0], x[1] with y[1], etc.
+1. ELEMENT-WISE: Arrays processed independently
+   {"array_param": [1, 2, 3, 4]}
+   → Processes each array element separately
 
-4. Mixed single values and arrays:
-   {"data": [1, 2, 3, 4], "multiplier": 10}
-   → Arrays are mapped over, single values are used for all iterations
+2. COMBINATIONS: Create parameter combinations
+   {"param_a": [1, 2], "param_b": [10, 20]}
+   → Creates all combinations based on the pipeline's mapspec rules
 
-Key concepts:
-- mapspec defines how inputs map to outputs (e.g., "x[i] -> y[i]" means element-wise)
-- Arrays with same index letter (like [i]) are processed together
-- Arrays with different indices (like [i] and [j]) create cross-products
-- Single values work regardless of mapspecs
+3. MIXED: Combine arrays and single values
+   {"array_data": [1, 2, 3], "constant": 10}
+   → Arrays are processed in batches, single values used for all iterations
+
+MAPSPEC RULES FOR THIS PIPELINE:
+- Same index [i]: Arrays processed together (zipped/paired)
+- Different indices [i], [j]: Creates all combinations (cross-product)
+- Single values: Work with any mapspec configuration
 """
 
 _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA = """\
-This tool returns a job ID and run folder.
 
-Use the job ID to:
+ASYNC EXECUTION WORKFLOW:
+1. Start job → Get job ID and run folder
+2. IMMEDIATELY check status with check_job_status
+3. Monitor progress periodically
+4. Retrieve results when complete
+
+JOB MANAGEMENT TOOLS:
 - check_job_status: Monitor progress and get results when complete
 - list_jobs: See all running/completed jobs
-- cancel_job: Stop a running job
+- cancel_job: Stop a running job if needed
 
-IMPORTANT:
-- Whenever starting a new job, ALWAYS immediately check the job status with check_job_status.
+💡 IMPORTANT: Always check job status immediately after starting - this provides progress info and catches any startup errors.
 """
 
 
@@ -190,12 +175,22 @@ def _get_pipeline_info_summary(pipeline_name: str, pipeline: Pipeline) -> str:
         return ", ".join(info[key]) if info[key] else "None"
 
     lines = [
-        f"Pipeline Name: {pipeline_name}",
-        f"Required Inputs: {_format('required_inputs')}",
-        f"Optional Inputs: {_format('optional_inputs')}",
-        f"Outputs: {_format('outputs')}",
-        f"Intermediate Outputs: {_format('intermediate_outputs')}",
+        f"Pipeline: {pipeline_name}",
+        f"Required Parameters: {_format('required_inputs')}",
     ]
+
+    if info["optional_inputs"]:
+        lines.append(f"Optional Parameters: {_format('optional_inputs')}")
+
+    lines.extend(
+        [
+            f"Main Output: {_format('outputs')}",
+        ],
+    )
+
+    if info["intermediate_outputs"]:
+        lines.append(f"Intermediate Results Available: {_format('intermediate_outputs')}")
+
     return "\n".join(lines)
 
 
@@ -208,25 +203,28 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
     """Generate mapspec information section."""
     mapspecs = pipeline.mapspecs(ordered=True)
     if not mapspecs:
-        return "None (This pipeline processes single values only)"
+        return "This pipeline processes single values only - no array processing is configured."
 
     lines = [
-        "The following mapspecs define how arrays are processed:",
+        "For users who need batch processing, this pipeline supports arrays through mapspec:",
     ]
     root_args = pipeline.root_args()
     for i, mapspec in enumerate(mapspecs, 1):
-        post = (
-            " (used as input)" if _is_root_mapspec(mapspec, root_args) else " (intermediate step)"
-        )
-        lines.append(f"  {i}. `{mapspec}`{post}")
+        if _is_root_mapspec(mapspec, root_args):
+            context = " → Controls how you can provide input arrays"
+        else:
+            context = " → Internal processing step"
+        lines.append(f"  {i}. `{mapspec}`{context}")
 
     lines.extend(
         [
             "",
-            "Mapspec Legend:",
-            "- Parameters with [i], [j], etc. represent array dimensions",
-            "- Same index letter (e.g., [i]) means elements are processed together (zipped)",
-            "- Different indices (e.g., [i] and [j]) create cross-products",
+            "What this means for your inputs:",
+            "- Parameters with [i] are processed together (paired/zipped)",
+            "- Parameters with [j] create combinations with [i] parameters",
+            "- Single values work with any mapspec and are used for all array elements",
+            "",
+            "💡 Tip: Start with single values, then experiment with arrays once familiar with the pipeline.",
         ],
     )
 
@@ -399,12 +397,17 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     async_execute_pipeline_tool_description = (
         execute_pipeline_tool_description + "\n\n" + _PIPELINE_ASYNC_EXECUTE_DESCRIPTION_EXTRA
     )
+    server_instructions = _PIPEFUNC_INSTRUCTIONS.format(pipeline_description=pipeline_description)
+    print(server_instructions)
+    print("-" * 100)
+    print(async_execute_pipeline_tool_description)
+    return None
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
     mcp = fastmcp.FastMCP(
         name=pipeline_name,
-        instructions=_PIPEFUNC_INSTRUCTIONS.format(pipeline_description=pipeline_description),
+        instructions=server_instructions,
         **fast_mcp_kwargs,
     )
 
