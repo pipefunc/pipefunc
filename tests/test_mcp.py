@@ -701,3 +701,34 @@ def test_input_format_section_with_mixed_inputs(mixed_input_pipeline: Pipeline) 
     assert "- `x`" in result  # array input
     assert "- `scale_factor`" in result  # scalar input
     assert "This pipeline is designed for array-based parameter sweeps." in result
+
+
+@pytest.mark.asyncio
+async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -> None:
+    """Test list_historical_runs."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import _list_historical_runs, build_mcp_server
+
+    runs = _list_historical_runs(str(tmp_path))
+    assert runs["total_count"] == 0
+    assert runs["scanned_directories"] == 0
+    assert runs["runs"] == []
+
+    async with Client(build_mcp_server(simple_pipeline)) as client:
+        result = await client.call_tool(
+            "execute_pipeline_sync",
+            {
+                "inputs": {"x": 5, "y": 10},
+                "run_folder": str(tmp_path / "run_folder"),
+            },
+        )
+        assert "result" in result[0].text
+        runs_reply = await client.call_tool("list_historical_runs", {"folder": str(tmp_path)})
+        runs = json.loads(runs_reply[0].text)
+        assert "runs" in runs
+        assert len(runs["runs"]) == 1, runs
+        assert runs["runs"][0]["last_modified"] is not None
+        assert runs["runs"][0]["all_complete"] is True
+        assert runs["runs"][0]["total_outputs"] == 1
+        assert runs["runs"][0]["completed_outputs"] == 1

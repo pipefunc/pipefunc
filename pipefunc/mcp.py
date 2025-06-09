@@ -708,6 +708,8 @@ def _list_historical_runs(folder: str = "runs", max_runs: int | None = None) -> 
         if not run_folder.is_dir():
             continue
         run_info_path = RunInfo.path(str(run_folder))
+        if not run_info_path.exists():
+            continue
         mod_time = datetime.fromtimestamp(run_info_path.stat().st_mtime)  # noqa: DTZ006
         run_entry: _RunEntry = {  # type: ignore[typeddict-item]
             "last_modified": mod_time.isoformat(),
