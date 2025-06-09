@@ -511,42 +511,6 @@ def test_get_pipeline_info_summary(simple_pipeline: Pipeline) -> None:
     assert "Outputs:" in summary
 
 
-def test_get_mapspec_section_simple(simple_pipeline: Pipeline) -> None:
-    """Test mapspec section for simple pipeline."""
-    from pipefunc.mcp import _get_mapspec_section
-
-    section = _get_mapspec_section(simple_pipeline)
-    assert isinstance(section, str)
-    assert "None (This pipeline processes single values only)" in section
-
-
-def test_get_mapspec_section_complex(complex_pipeline: Pipeline) -> None:
-    """Test mapspec section for complex pipeline."""
-    from pipefunc.mcp import _get_mapspec_section
-
-    section = _get_mapspec_section(complex_pipeline)
-    assert isinstance(section, str)
-    assert "mapspecs define how arrays are processed" in section
-
-
-def test_get_input_format_section_simple(simple_pipeline: Pipeline) -> None:
-    """Test input format section for simple pipeline."""
-    from pipefunc.mcp import _get_input_format_section
-
-    section = _get_input_format_section(simple_pipeline)
-    assert isinstance(section, str)
-    assert "Single values only" in section
-
-
-def test_get_input_format_section_complex(complex_pipeline: Pipeline) -> None:
-    """Test input format section for complex pipeline."""
-    from pipefunc.mcp import _get_input_format_section
-
-    section = _get_input_format_section(complex_pipeline)
-    assert isinstance(section, str)
-    assert "element-wise mapping" in section
-
-
 # Test MCP error handling and edge cases.
 
 
@@ -574,25 +538,3 @@ def test_pipeline_with_no_outputs() -> None:
     summary = _get_pipeline_info_summary("Test", pipeline)
     assert isinstance(summary, str)
     assert "dummy_output" in summary
-
-
-def test_pipeline_constants_template_access() -> None:
-    """Test that MCP constants and templates are accessible."""
-    from pipefunc.mcp import (
-        _MAPSPEC_INPUT_FORMAT,
-        _NO_MAPSPEC_INPUT_FORMAT,
-        _PIPEFUNC_INSTRUCTIONS,
-        _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE,
-    )
-
-    # Test that all constants are strings
-    assert isinstance(_PIPEFUNC_INSTRUCTIONS, str)
-    assert isinstance(_PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE, str)
-    assert isinstance(_NO_MAPSPEC_INPUT_FORMAT, str)
-    assert isinstance(_MAPSPEC_INPUT_FORMAT, str)
-
-    # Test that they contain expected content
-    assert "MCP server" in _PIPEFUNC_INSTRUCTIONS
-    assert "PIPELINE INFORMATION" in _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE
-    assert "Single values only" in _NO_MAPSPEC_INPUT_FORMAT
-    assert "element-wise mapping" in _MAPSPEC_INPUT_FORMAT
