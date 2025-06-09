@@ -425,11 +425,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     ) -> str:
         """Execute pipeline synchronously and return results immediately.
 
-        This uses pipeline.map() which blocks until all computations are complete,
-        then returns the final results. Best for small-to-medium pipelines when
-        you need results right away.
-
-        The function is async only to support ctx.info() calls for logging.
+        Blocks until completion. Best for small-to-medium pipelines.
         """
         return await _execute_pipeline_sync(pipeline, ctx, inputs, parallel, run_folder)
 
@@ -439,16 +435,9 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         inputs: Model,  # type: ignore[valid-type]
         run_folder: str | None = None,
     ) -> str:
-        """Start pipeline execution asynchronously and return job tracking info immediately.
+        """Start pipeline execution asynchronously and return job_id immediately.
 
-        This uses pipeline.map_async() which returns immediately with job_id and run_folder.
-        The actual computation runs in the background and can be tracked with check_job_status().
-
-        Best for long-running pipelines, large parameter sweeps, and when you need progress
-        monitoring or cancellation capabilities.
-
-        Returns job_id for tracking with other job management tools (check_job_status,
-        cancel_job, list_jobs).
+        Returns job_id for tracking. Best for long-running pipelines and parameter sweeps.
         """
         return await _execute_pipeline_async(pipeline, ctx, inputs, run_folder)
 
@@ -457,15 +446,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         description="Check status of an active pipeline job started by execute_pipeline_async in this MCP session. Only works for jobs in the current session's registry, not previous sessions.",
     )
     async def check_job_status(job_id: str) -> str:
-        """Check status of an active pipeline job started by execute_pipeline_async.
-
-        This only works for jobs currently tracked in this MCP session's job registry.
-        Use run_info() to inspect any run folder, including completed runs from
-        previous sessions.
-
-        Returns detailed progress information, execution times, and final results
-        when the job completes.
-        """
+        """Check status of active jobs from current session only."""
         return await _check_job_status(job_id)
 
     @mcp.tool(
@@ -474,11 +455,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         " Only works for jobs started by execute_pipeline_async in the current session.",
     )
     async def cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
-        """Cancel an active pipeline job started by execute_pipeline_async.
-
-        This only works for jobs currently tracked in this MCP session's job registry.
-        Cannot cancel jobs from previous sessions or completed jobs.
-        """
+        """Cancel active jobs from current session only."""
         return await _cancel_job(ctx, job_id)
 
     @mcp.tool(
@@ -487,12 +464,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         " Only shows jobs from execute_pipeline_async in the current session, not previous sessions or other executions.",
     )
     async def list_jobs() -> str:
-        """List all active pipeline jobs tracked in this MCP session.
-
-        This only shows jobs started by execute_pipeline_async in the current session.
-        Does not include jobs from previous MCP sessions or other pipeline executions.
-        Use run_info() to inspect specific run folders from any source.
-        """
+        """List active jobs from current session only."""
         return await _list_jobs()
 
     @mcp.tool(
@@ -502,20 +474,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         " Universal inspection tool.",
     )
     def run_info(run_folder: str) -> dict[str, Any]:
-        """Get information about any pipeline run folder on disk.
-
-        This can inspect ANY run folder, including:
-        - Runs from previous MCP sessions
-        - Runs from other pipeline executions
-        - Completed, failed, or partially completed runs
-        - Runs created by direct pipeline.map() calls
-
-        Unlike check_job_status(), this doesn't require the run to be tracked
-        in the current session's job registry.
-
-        Returns pipeline structure (mapspecs, shapes), file progress information,
-        and completion status for all outputs.
-        """
+        """Inspect any run folder on disk, works across sessions."""
         return _run_info(run_folder)
 
     return mcp
