@@ -41,7 +41,7 @@ def parse_mcp_response(response_text: str) -> dict:
 
 
 @pytest.fixture
-def simple_pipeline():
+def simple_pipeline() -> Pipeline:
     """Create a simple pipeline for testing."""
 
     @pipefunc(output_name="result")
@@ -52,7 +52,7 @@ def simple_pipeline():
 
 
 @pytest.fixture
-def complex_pipeline():
+def complex_pipeline() -> Pipeline:
     """Create a complex pipeline with mapspecs for testing."""
 
     @pipefunc(output_name="values", mapspec="x[i] -> values[i]")
@@ -87,7 +87,7 @@ def slow_pipeline():
 
 
 @pytest.mark.asyncio
-async def test_build_mcp_server_simple(simple_pipeline):
+async def test_build_mcp_server_simple(simple_pipeline: Pipeline) -> None:
     """Test building MCP server for simple pipeline."""
     from fastmcp import Client
 
@@ -104,7 +104,7 @@ async def test_build_mcp_server_simple(simple_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_start_pipeline_async_simple(simple_pipeline):
+async def test_start_pipeline_async_simple(simple_pipeline: Pipeline) -> None:
     """Test starting an async pipeline job."""
     from fastmcp import Client
 
@@ -127,7 +127,7 @@ async def test_start_pipeline_async_simple(simple_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_check_job_status_completed(simple_pipeline):
+async def test_check_job_status_completed(simple_pipeline: Pipeline) -> None:
     """Test checking status of a completed job."""
     from fastmcp import Client
 
@@ -142,7 +142,7 @@ async def test_check_job_status_completed(simple_pipeline):
 
         # Wait for job to complete with retry logic
         max_wait = 2  # seconds
-        waited = 0
+        waited = 0.0
         status_info = None
         while waited < max_wait:
             status_result = await client.call_tool("check_job_status", {"job_id": job_id})
@@ -164,7 +164,7 @@ async def test_check_job_status_completed(simple_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_check_job_status_with_progress(slow_pipeline):
+async def test_check_job_status_with_progress(slow_pipeline: Pipeline) -> None:
     """Test checking status of a job with progress tracking."""
     from fastmcp import Client
 
@@ -190,7 +190,7 @@ async def test_check_job_status_with_progress(slow_pipeline):
 
         # Wait for completion with retry logic
         max_wait = 3  # seconds
-        waited = 0
+        waited = 0.0
         final_status_info = None
         while waited < max_wait:
             final_status_result = await client.call_tool("check_job_status", {"job_id": job_id})
@@ -216,7 +216,7 @@ async def test_check_job_status_with_progress(slow_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_list_jobs_empty():
+async def test_list_jobs_empty() -> None:
     """Test listing jobs when no jobs exist."""
     from fastmcp import Client
 
@@ -235,7 +235,7 @@ async def test_list_jobs_empty():
 
 
 @pytest.mark.asyncio
-async def test_list_jobs_with_multiple_jobs(simple_pipeline):
+async def test_list_jobs_with_multiple_jobs(simple_pipeline: Pipeline) -> None:
     """Test listing multiple jobs."""
     from fastmcp import Client
 
@@ -281,7 +281,7 @@ async def test_list_jobs_with_multiple_jobs(simple_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_cancel_job(slow_pipeline):
+async def test_cancel_job(slow_pipeline: Pipeline) -> None:
     """Test cancelling a running job."""
     from fastmcp import Client
 
@@ -311,7 +311,7 @@ async def test_cancel_job(slow_pipeline):
 
 
 @pytest.mark.asyncio
-async def test_cancel_nonexistent_job(simple_pipeline):
+async def test_cancel_nonexistent_job(simple_pipeline: Pipeline) -> None:
     """Test cancelling a job that doesn't exist."""
     from fastmcp import Client
 
@@ -325,6 +325,41 @@ async def test_cancel_nonexistent_job(simple_pipeline):
 
         assert "error" in cancel_info
         assert cancel_info["error"] == "Job not found"
+
+
+@pytest.mark.asyncio
+async def test_cancel_completed_job(simple_pipeline: Pipeline) -> None:
+    """Test cancelling a job that has already completed."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import build_mcp_server
+
+    mcp = build_mcp_server(simple_pipeline)
+    async with Client(mcp) as client:
+        # Start a simple job that completes quickly
+        start_result = await client.call_tool("start_pipeline_async", {"inputs": {"x": 1, "y": 2}})
+        job_info = parse_mcp_response(start_result[0].text)
+        job_id = job_info["job_id"]
+
+        # Wait for job to complete
+        max_wait = 2  # seconds
+        waited = 0.0
+        while waited < max_wait:
+            status_result = await client.call_tool("check_job_status", {"job_id": job_id})
+            status_info = parse_mcp_response(status_result[0].text)
+            if status_info["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+            waited += 0.01
+
+        # Now try to cancel the completed job
+        cancel_result = await client.call_tool("cancel_job", {"job_id": job_id})
+        cancel_info = parse_mcp_response(cancel_result[0].text)
+
+        # Should get the "already completed" error message
+        assert "error" in cancel_info
+        assert cancel_info["error"] == "Job not found or already completed"
+        assert cancel_info["job_id"] == job_id
 
 
 @pytest.mark.asyncio
@@ -382,7 +417,7 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
 
 
 @pytest.mark.asyncio
-async def test_end_to_end_async_workflow(complex_pipeline):
+async def test_end_to_end_async_workflow(complex_pipeline: Pipeline) -> None:
     """Test complete end-to-end async workflow."""
     from fastmcp import Client
 
@@ -416,7 +451,7 @@ async def test_end_to_end_async_workflow(complex_pipeline):
 
         # 4. Wait for completion
         max_wait = 3  # seconds
-        waited = 0
+        waited = 0.0
         status_info = None
         while waited < max_wait:
             status_result = await client.call_tool("check_job_status", {"job_id": job_id})
@@ -450,7 +485,7 @@ async def test_end_to_end_async_workflow(complex_pipeline):
 # Test MCP internal helper functions
 
 
-def test_get_pipeline_documentation(simple_pipeline):
+def test_get_pipeline_documentation(simple_pipeline: Pipeline) -> None:
     """Test pipeline documentation generation."""
     from pipefunc.mcp import _get_pipeline_documentation
 
@@ -459,7 +494,7 @@ def test_get_pipeline_documentation(simple_pipeline):
     assert len(docs) > 0
 
 
-def test_get_pipeline_info_summary(simple_pipeline):
+def test_get_pipeline_info_summary(simple_pipeline: Pipeline) -> None:
     """Test pipeline info summary generation."""
     from pipefunc.mcp import _get_pipeline_info_summary
 
@@ -470,7 +505,7 @@ def test_get_pipeline_info_summary(simple_pipeline):
     assert "Outputs:" in summary
 
 
-def test_get_mapspec_section_simple(simple_pipeline):
+def test_get_mapspec_section_simple(simple_pipeline: Pipeline) -> None:
     """Test mapspec section for simple pipeline."""
     from pipefunc.mcp import _get_mapspec_section
 
@@ -479,7 +514,7 @@ def test_get_mapspec_section_simple(simple_pipeline):
     assert "None (This pipeline processes single values only)" in section
 
 
-def test_get_mapspec_section_complex(complex_pipeline):
+def test_get_mapspec_section_complex(complex_pipeline: Pipeline) -> None:
     """Test mapspec section for complex pipeline."""
     from pipefunc.mcp import _get_mapspec_section
 
@@ -488,7 +523,7 @@ def test_get_mapspec_section_complex(complex_pipeline):
     assert "mapspecs define how arrays are processed" in section
 
 
-def test_get_input_format_section_simple(simple_pipeline):
+def test_get_input_format_section_simple(simple_pipeline: Pipeline) -> None:
     """Test input format section for simple pipeline."""
     from pipefunc.mcp import _get_input_format_section
 
@@ -497,7 +532,7 @@ def test_get_input_format_section_simple(simple_pipeline):
     assert "Single values only" in section
 
 
-def test_get_input_format_section_complex(complex_pipeline):
+def test_get_input_format_section_complex(complex_pipeline: Pipeline) -> None:
     """Test input format section for complex pipeline."""
     from pipefunc.mcp import _get_input_format_section
 
@@ -506,7 +541,7 @@ def test_get_input_format_section_complex(complex_pipeline):
     assert "element-wise mapping" in section
 
 
-def test_format_tool_description():
+def test_format_tool_description() -> None:
     """Test tool description formatting."""
     from pipefunc.mcp import _format_tool_description
 
@@ -526,7 +561,7 @@ def test_format_tool_description():
 # Test MCP error handling and edge cases.
 
 
-def test_empty_pipeline_handling():
+def test_empty_pipeline_handling() -> None:
     """Test handling of empty pipeline."""
     from pipefunc.mcp import _get_pipeline_info_summary
 
@@ -537,7 +572,7 @@ def test_empty_pipeline_handling():
     assert "Pipeline Name: Empty" in summary
 
 
-def test_pipeline_with_no_outputs():
+def test_pipeline_with_no_outputs() -> None:
     """Test handling of pipeline with no outputs."""
     from pipefunc.mcp import _get_pipeline_info_summary
 
@@ -552,7 +587,7 @@ def test_pipeline_with_no_outputs():
     assert "dummy_output" in summary
 
 
-def test_pipeline_constants_template_access():
+def test_pipeline_constants_template_access() -> None:
     """Test that MCP constants and templates are accessible."""
     from pipefunc.mcp import (
         _MAPSPEC_INPUT_FORMAT,
