@@ -624,7 +624,7 @@ def _progress_info(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
             if shape_is_resolved(data.shape):
                 size = data.size
                 progress = 1.0 - sum(data.mask_linear()) / size
-            else:
+            else:  # pragma: no cover
                 size = "unknown"
                 progress = "unknown"
             nbytes = sum(f.stat().st_size for f in data.folder.rglob("*") if f.is_file())
@@ -651,7 +651,7 @@ def _progress_info(run_info: RunInfo) -> tuple[dict[str, Any], bool]:
 def _run_info(run_folder: str) -> dict[str, Any]:
     try:
         run_info = RunInfo.load(run_folder)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001  # pragma: no cover
         return {"error": str(e)}
     assert isinstance(run_info, RunInfo)
     outputs, all_complete = _progress_info(run_info)

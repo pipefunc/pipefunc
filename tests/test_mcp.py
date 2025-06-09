@@ -526,6 +526,139 @@ def test_get_pipeline_info_summary(simple_pipeline: Pipeline) -> None:
     assert "Outputs:" in summary
 
 
+# Test run_info functionality
+
+
+@pytest.mark.asyncio
+async def test_run_info_with_completed_run(simple_pipeline: Pipeline, tmp_path: Path) -> None:
+    """Test run_info with a completed pipeline run."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import build_mcp_server
+
+    mcp = build_mcp_server(simple_pipeline)
+    async with Client(mcp) as client:
+        # Create a custom run folder
+        custom_folder = tmp_path / "test_run_info"
+
+        # Execute pipeline synchronously to ensure completion
+        await client.call_tool(
+            "execute_pipeline_sync",
+            {"inputs": {"x": 5, "y": 10}, "run_folder": str(custom_folder)},
+        )
+
+        # Test run_info on the completed run
+        result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
+        info = parse_mcp_response(result[0].text)
+
+        # Verify structure
+        assert "run_info" in info
+        assert "outputs" in info
+        assert "all_complete" in info
+
+        # Check run_info content
+        run_info = info["run_info"]
+        assert "all_output_names" in run_info
+        assert "result" in run_info["all_output_names"]
+        assert "mapspecs_as_strings" in run_info
+        assert "storage" in run_info
+        assert "pipefunc_version" in run_info
+
+        # Check outputs progress
+        outputs = info["outputs"]
+        assert "result" in outputs
+        result_output = outputs["result"]
+        assert "progress" in result_output
+        assert "complete" in result_output
+        assert "bytes" in result_output
+        assert result_output["complete"] is True
+        assert result_output["progress"] == 1.0
+        assert result_output["bytes"] > 0
+
+        # Should be all complete
+        assert info["all_complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_info_with_complex_pipeline(complex_pipeline: Pipeline, tmp_path: Path) -> None:
+    """Test run_info with a complex pipeline that has multiple outputs."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import build_mcp_server
+
+    mcp = build_mcp_server(complex_pipeline)
+    async with Client(mcp) as client:
+        custom_folder = tmp_path / "test_complex_run_info"
+
+        # Execute pipeline with array inputs
+        await client.call_tool(
+            "execute_pipeline_sync",
+            {"inputs": {"x": [1, 2, 3]}, "run_folder": str(custom_folder)},
+        )
+
+        # Test run_info
+        result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
+        info = parse_mcp_response(result[0].text)
+
+        # Verify multiple outputs
+        run_info = info["run_info"]
+        expected_outputs = ["values", "sum_result"]
+        for output_name in expected_outputs:
+            assert output_name in run_info["all_output_names"]
+
+        # Check mapspecs are present
+        assert len(run_info["mapspecs_as_strings"]) > 0
+
+        # Check all outputs are tracked
+        outputs = info["outputs"]
+        for output_name in expected_outputs:
+            assert output_name in outputs
+            output_info = outputs[output_name]
+            assert output_info["complete"] is True
+            assert output_info["progress"] == 1.0
+            assert output_info["bytes"] > 0
+
+        assert info["all_complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_info_with_async_incomplete_run(slow_pipeline: Pipeline, tmp_path: Path) -> None:
+    """Test run_info with an async pipeline that might still be running."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import build_mcp_server
+
+    mcp = build_mcp_server(slow_pipeline)
+    async with Client(mcp) as client:
+        custom_folder = tmp_path / "test_async_run_info"
+
+        # Start async job with large input to potentially catch it while running
+        start_result = await client.call_tool(
+            "execute_pipeline_async",
+            {"inputs": {"x": [1, 2, 3, 4, 5]}, "run_folder": str(custom_folder)},
+        )
+        job_info = parse_mcp_response(start_result[0].text)
+        assert "job_id" in job_info
+        # Immediately check run_info (might catch it while running)
+        result = await client.call_tool("run_info", {"run_folder": str(custom_folder)})
+        info = parse_mcp_response(result[0].text)
+
+        # Should have the basic structure even if running
+        assert "run_info" in info
+        assert "outputs" in info
+        assert "all_complete" in info
+
+        # Check that outputs structure is valid
+        outputs = info["outputs"]
+        for output_info in outputs.values():
+            assert "progress" in output_info
+            assert "complete" in output_info
+            assert "bytes" in output_info
+            assert isinstance(output_info["progress"], (int, float))
+            assert isinstance(output_info["complete"], bool)
+            assert isinstance(output_info["bytes"], int)
+
+
 # Test MCP error handling and edge cases.
 
 
