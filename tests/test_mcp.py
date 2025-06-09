@@ -87,7 +87,7 @@ def slow_pipeline():
 
 
 @pytest.mark.asyncio
-async def test_build_mcp_server_simple(simple_pipeline: Pipeline) -> None:
+async def test_execute_pipeline_sync_simple(simple_pipeline: Pipeline) -> None:
     """Test building MCP server for simple pipeline."""
     from fastmcp import Client
 
@@ -96,7 +96,7 @@ async def test_build_mcp_server_simple(simple_pipeline: Pipeline) -> None:
     mcp = build_mcp_server(simple_pipeline)
     assert mcp is not None
     async with Client(mcp) as client:
-        result = await client.call_tool("execute_pipeline", {"inputs": {"x": 1, "y": 2}})
+        result = await client.call_tool("execute_pipeline_sync", {"inputs": {"x": 1, "y": 2}})
         assert result[0].text == "{'result': {'output': 3.0, 'shape': None}}"
 
 
@@ -104,7 +104,7 @@ async def test_build_mcp_server_simple(simple_pipeline: Pipeline) -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_pipeline_async_simple(simple_pipeline: Pipeline) -> None:
+async def test_execute_pipeline_async_simple(simple_pipeline: Pipeline) -> None:
     """Test starting an async pipeline job."""
     from fastmcp import Client
 
@@ -113,7 +113,7 @@ async def test_start_pipeline_async_simple(simple_pipeline: Pipeline) -> None:
     mcp = build_mcp_server(simple_pipeline)
     async with Client(mcp) as client:
         # Start async job
-        result = await client.call_tool("start_pipeline_async", {"inputs": {"x": 5, "y": 10}})
+        result = await client.call_tool("execute_pipeline_async", {"inputs": {"x": 5, "y": 10}})
 
         response = parse_mcp_response(result[0].text)
         assert "job_id" in response
@@ -136,7 +136,10 @@ async def test_check_job_status_completed(simple_pipeline: Pipeline) -> None:
     mcp = build_mcp_server(simple_pipeline)
     async with Client(mcp) as client:
         # Start async job
-        start_result = await client.call_tool("start_pipeline_async", {"inputs": {"x": 3, "y": 7}})
+        start_result = await client.call_tool(
+            "execute_pipeline_async",
+            {"inputs": {"x": 3, "y": 7}},
+        )
         job_info = parse_mcp_response(start_result[0].text)
         job_id = job_info["job_id"]
 
@@ -174,7 +177,7 @@ async def test_check_job_status_with_progress(slow_pipeline: Pipeline) -> None:
     async with Client(mcp) as client:
         # Start async job with multiple inputs to create observable progress
         start_result = await client.call_tool(
-            "start_pipeline_async",
+            "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4, 5]}},
         )
         job_info = parse_mcp_response(start_result[0].text)
@@ -250,7 +253,7 @@ async def test_list_jobs_with_multiple_jobs(simple_pipeline: Pipeline) -> None:
         job_ids = []
         for i in range(3):
             start_result = await client.call_tool(
-                "start_pipeline_async",
+                "execute_pipeline_async",
                 {"inputs": {"x": i, "y": i + 1}},
             )
             job_info = parse_mcp_response(start_result[0].text)
@@ -291,7 +294,7 @@ async def test_cancel_job(slow_pipeline: Pipeline) -> None:
     async with Client(mcp) as client:
         # Start a job with multiple inputs to make it run longer
         start_result = await client.call_tool(
-            "start_pipeline_async",
+            "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}},
         )
         job_info = parse_mcp_response(start_result[0].text)
@@ -337,7 +340,10 @@ async def test_cancel_completed_job(simple_pipeline: Pipeline) -> None:
     mcp = build_mcp_server(simple_pipeline)
     async with Client(mcp) as client:
         # Start a simple job that completes quickly
-        start_result = await client.call_tool("start_pipeline_async", {"inputs": {"x": 1, "y": 2}})
+        start_result = await client.call_tool(
+            "execute_pipeline_async",
+            {"inputs": {"x": 1, "y": 2}},
+        )
         job_info = parse_mcp_response(start_result[0].text)
         job_id = job_info["job_id"]
 
@@ -390,7 +396,7 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
     async with Client(mcp) as client:
         custom_folder = tmp_path / "test_custom_run"
         start_result = await client.call_tool(
-            "start_pipeline_async",
+            "execute_pipeline_async",
             {"inputs": {"x": 1, "y": 2}, "run_folder": custom_folder},
         )
         job_info = parse_mcp_response(start_result[0].text)
@@ -430,7 +436,7 @@ async def test_end_to_end_async_workflow(complex_pipeline: Pipeline) -> None:
     async with Client(mcp) as client:
         # 1. Start async job
         start_result = await client.call_tool(
-            "start_pipeline_async",
+            "execute_pipeline_async",
             {"inputs": {"x": [1, 2, 3, 4]}},
         )
         job_info = parse_mcp_response(start_result[0].text)

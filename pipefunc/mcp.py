@@ -89,12 +89,12 @@ MAPSPEC DEFINITIONS:
 EXECUTION MODES:
 Two execution modes are available:
 
-1. **Synchronous Execution** (execute_pipeline):
+1. **Synchronous Execution** (execute_pipeline_sync):
    - Blocks until completion and returns results immediately
    - Use when you need results right away for small-to-medium pipelines
    - Best for interactive use and when results fit in memory
 
-2. **Asynchronous Execution** (start_pipeline_async):
+2. **Asynchronous Execution** (execute_pipeline_async):
    - Returns immediately with a job ID for tracking
    - Use for long-running pipelines or when you need progress monitoring
    - Check progress with check_job_status, cancel with cancel_job
@@ -314,7 +314,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     The server provides tools for asynchronous pipeline execution with job management::
 
         # Start an async job
-        start_pipeline_async(inputs={"x": [1, 2, 3], "y": [4, 5, 6]})
+        execute_pipeline_async(inputs={"x": [1, 2, 3], "y": [4, 5, 6]})
         # Returns: {"job_id": "uuid-string", "run_folder": "runs/job_uuid-string"}
 
         # Check job status and progress
@@ -332,11 +332,11 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
 
     The server provides two execution patterns:
 
-    1. **Synchronous execution** (``execute_pipeline``):
+    1. **Synchronous execution** (``execute_pipeline_sync``):
        Uses ``pipeline.map()`` - blocks until completion, returns results immediately.
        Best for small-to-medium pipelines when you need results right away.
 
-    2. **Asynchronous execution** (``start_pipeline_async``):
+    2. **Asynchronous execution** (``execute_pipeline_async``):
        Uses ``pipeline.map_async()`` - returns immediately with job tracking.
        Best for long-running pipelines, background processing, and when you need
        progress monitoring or cancellation capabilities.
@@ -382,8 +382,8 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         **fast_mcp_kwargs,
     )
 
-    @mcp.tool(name="execute_pipeline", description=description)
-    async def execute_pipeline(
+    @mcp.tool(name="execute_pipeline_sync", description=description)
+    async def execute_pipeline_sync(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
         parallel: bool = True,  # noqa: FBT001, FBT002
@@ -395,10 +395,10 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         then returns the final results. The function is async only to support
         ctx.info() calls for logging.
         """
-        return await _execute_pipeline(pipeline, ctx, inputs, parallel, run_folder)
+        return await _execute_pipeline_sync(pipeline, ctx, inputs, parallel, run_folder)
 
-    @mcp.tool(name="start_pipeline_async")
-    async def start_pipeline_async(
+    @mcp.tool(name="execute_pipeline_async")
+    async def execute_pipeline_async(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
         run_folder: str | None = None,
@@ -409,7 +409,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         object that can be tracked and awaited separately. The actual computation
         runs in the background.
         """
-        return await _start_pipeline_async(pipeline, ctx, inputs, run_folder)
+        return await _execute_pipeline_async(pipeline, ctx, inputs, run_folder)
 
     @mcp.tool(name="check_job_status")
     async def check_job_status(job_id: str) -> str:
@@ -429,7 +429,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     return mcp
 
 
-async def _execute_pipeline(
+async def _execute_pipeline_sync(
     pipeline: Pipeline,
     ctx: fastmcp.Context,
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
@@ -455,7 +455,7 @@ async def _execute_pipeline(
     return str(output)
 
 
-async def _start_pipeline_async(
+async def _execute_pipeline_async(
     pipeline: Pipeline,
     ctx: fastmcp.Context,
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
