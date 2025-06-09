@@ -178,7 +178,6 @@ def _get_input_format_section(pipeline: Pipeline) -> str:
     mapspec_inputs = pipeline.mapspec_names
     required_array_inputs = sorted(root_args & mapspec_inputs)
 
-    # --- Generate a concrete example JSON ---
     example_dict: dict[str, Any] = {}
     type_defaults = {int: 0, float: 0.0, str: "example", bool: False}
     param_ann = pipeline.parameter_annotations
@@ -190,7 +189,6 @@ def _get_input_format_section(pipeline: Pipeline) -> str:
 
         if param in required_array_inputs:
             item_type_default = type_defaults.get(param_type, "item")  # type: ignore[arg-type]
-
             example_dict[param] = [item_type_default, item_type_default]
         else:
             example_dict[param] = type_defaults.get(param_type, "value")  # type: ignore[arg-type]
