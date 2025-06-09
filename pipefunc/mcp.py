@@ -720,7 +720,6 @@ def _list_historical_runs(folder: str = "runs", max_runs: int | None = None) -> 
     # Sort by modification time (newest first)
     runs["runs"].sort(key=operator.itemgetter("last_modified"), reverse=True)
 
-    # Limit results if requested
     if max_runs is not None and max_runs > 0:
         runs["runs"] = runs["runs"][:max_runs]
 
