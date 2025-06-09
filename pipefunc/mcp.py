@@ -15,6 +15,7 @@ from rich.console import Console
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
+from pipefunc.map import load_all_outputs, load_outputs
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
 from pipefunc.map._run_info import RunInfo
@@ -487,6 +488,14 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         """List all historical pipeline runs from disk, sorted by modification time."""
         return _list_historical_runs(folder, max_runs)
 
+    @mcp.tool(
+        name="load_outputs",
+        description="Load outputs from a pipeline run folder. Works across all sessions and executions.",
+    )
+    def load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
+        """Load outputs from a pipeline run folder."""
+        return _load_outputs(run_folder, output_names)
+
     return mcp
 
 
@@ -748,3 +757,12 @@ def _run_info(run_folder: str) -> dict[str, Any]:
     outputs, all_complete = _progress_info_from_disk(run_info)
     run_info_json = json.loads(run_info.path(run_folder).read_text())
     return {"run_info": run_info_json, "outputs": outputs, "all_complete": all_complete}
+
+
+def _load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
+    try:
+        if output_names is None:
+            return load_all_outputs(run_folder=run_folder)
+        return load_outputs(*output_names, run_folder=run_folder)
+    except Exception as e:  # noqa: BLE001  # pragma: no cover
+        return {"error": str(e)}

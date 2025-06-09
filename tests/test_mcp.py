@@ -740,3 +740,33 @@ async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -
         assert runs2["runs"][0]["all_complete"] is True
         assert runs2["runs"][0]["total_outputs"] == 1
         assert runs2["runs"][0]["completed_outputs"] == 1
+
+
+@pytest.mark.asyncio
+async def test_load_outputs(simple_pipeline: Pipeline, tmp_path: Path) -> None:
+    """Test list_historical_runs."""
+    from fastmcp import Client
+
+    from pipefunc.mcp import build_mcp_server
+
+    async with Client(build_mcp_server(simple_pipeline)) as client:
+        result = await client.call_tool(
+            "execute_pipeline_sync",
+            {
+                "inputs": {"x": 5, "y": 10},
+                "run_folder": str(tmp_path / "run_folder"),
+            },
+        )
+        assert "result" in result[0].text
+        outputs = await client.call_tool(
+            "load_outputs",
+            {"run_folder": str(tmp_path / "run_folder")},
+        )
+        assert "result" in outputs[0].text
+        assert json.loads(outputs[0].text) == {"result": 15.0}
+
+        output = await client.call_tool(
+            "load_outputs",
+            {"run_folder": str(tmp_path / "run_folder"), "output_names": ["result"]},
+        )
+        assert json.loads(output[0].text) == 15.0
