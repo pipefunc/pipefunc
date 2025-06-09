@@ -710,12 +710,17 @@ async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -
 
     from pipefunc.mcp import _list_historical_runs, build_mcp_server
 
-    runs = _list_historical_runs(str(tmp_path))
-    assert runs["total_count"] == 0
-    assert runs["scanned_directories"] == 0
-    assert runs["runs"] == []
+    runs2 = _list_historical_runs(str(tmp_path))
+    assert runs2["total_count"] == 0
+    assert runs2["scanned_directories"] == 0
+    assert runs2["runs"] == []
 
     async with Client(build_mcp_server(simple_pipeline)) as client:
+        # Does not yet exist
+        runs_reply1 = await client.call_tool("list_historical_runs", {"folder": str(tmp_path)})
+        runs1 = json.loads(runs_reply1[0].text)
+        assert "runs" in runs1
+        assert len(runs1["runs"]) == 0
         result = await client.call_tool(
             "execute_pipeline_sync",
             {
@@ -724,11 +729,14 @@ async def test_list_historical_runs(simple_pipeline: Pipeline, tmp_path: Path) -
             },
         )
         assert "result" in result[0].text
-        runs_reply = await client.call_tool("list_historical_runs", {"folder": str(tmp_path)})
-        runs = json.loads(runs_reply[0].text)
-        assert "runs" in runs
-        assert len(runs["runs"]) == 1, runs
-        assert runs["runs"][0]["last_modified"] is not None
-        assert runs["runs"][0]["all_complete"] is True
-        assert runs["runs"][0]["total_outputs"] == 1
-        assert runs["runs"][0]["completed_outputs"] == 1
+        runs_reply2 = await client.call_tool(
+            "list_historical_runs",
+            {"folder": str(tmp_path), "max_runs": 100},
+        )
+        runs2 = json.loads(runs_reply2[0].text)
+        assert "runs" in runs2
+        assert len(runs2["runs"]) == 1
+        assert runs2["runs"][0]["last_modified"] is not None
+        assert runs2["runs"][0]["all_complete"] is True
+        assert runs2["runs"][0]["total_outputs"] == 1
+        assert runs2["runs"][0]["completed_outputs"] == 1

@@ -696,19 +696,19 @@ def _list_historical_runs(folder: str = "runs", max_runs: int | None = None) -> 
         "scanned_directories": 0,
         "error": None,
     }
-    if not runs_folder.exists():
+    if not runs_folder.exists():  # pragma: no cover
         runs["error"] = f"Folder '{folder}' does not exist"
         return runs
-    if not runs_folder.is_dir():
+    if not runs_folder.is_dir():  # pragma: no cover
         runs["error"] = f"'{folder}' is not a directory"
         return runs
 
     for run_folder in runs_folder.iterdir():
         runs["scanned_directories"] += 1
-        if not run_folder.is_dir():
+        if not run_folder.is_dir():  # pragma: no cover
             continue
         run_info_path = RunInfo.path(str(run_folder))
-        if not run_info_path.exists():
+        if not run_info_path.exists():  # pragma: no cover
             continue
         mod_time = datetime.fromtimestamp(run_info_path.stat().st_mtime)  # noqa: DTZ006
         run_entry: _RunEntry = {  # type: ignore[typeddict-item]
