@@ -28,6 +28,9 @@ class JobInfo:
 # Global job registry to track async pipeline executions (UUID -> JobInfo)
 job_registry: dict[str, JobInfo] = {}
 
+_DEFAULT_PIPELINE_NAME = "Unnamed Pipeline"
+_DEFAULT_PIPELINE_DESCRIPTION = "No description provided."
+
 _PIPEFUNC_INSTRUCTIONS = """\
 This MCP server executes pipefunc computational pipelines.
 pipefunc creates function pipelines as DAGs where functions are automatically connected based on input/output dependencies.
@@ -215,15 +218,14 @@ def _get_input_format_section(pipeline: Pipeline) -> str:
     return _MAPSPEC_INPUT_FORMAT if mapspecs else _NO_MAPSPEC_INPUT_FORMAT
 
 
-def _format_tool_description(
-    pipeline_name: str | None,
-    pipeline_description: str | None,
-    pipeline_info: str,
-    mapspec_section: str,
-    input_format: str,
-    documentation: str,
-) -> str:
+def _format_tool_description(pipeline: Pipeline) -> str:
     """Format a complete tool description using the template."""
+    pipeline_name = pipeline.name or "Unnamed Pipeline"
+    pipeline_description = pipeline.description or "No description provided."
+    documentation = _get_pipeline_documentation(pipeline)
+    pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
+    mapspec_section = _get_mapspec_section(pipeline)
+    input_format = _get_input_format_section(pipeline)
     return _PIPELINE_DESCRIPTION_TEMPLATE.format(
         pipeline_name=pipeline_name,
         pipeline_description=pipeline_description,
@@ -368,22 +370,11 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     requires("mcp", "rich", "griffe", reason="mcp", extras="mcp")
 
     # Generate all pipeline information sections
-    pipeline_name = pipeline.name or "Unnamed Pipeline"
-    pipeline_description = pipeline.description or "No description provided."
-    documentation = _get_pipeline_documentation(pipeline)
-    pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
-    mapspec_section = _get_mapspec_section(pipeline)
-    input_format = _get_input_format_section(pipeline)
+    pipeline_name = pipeline.name or _DEFAULT_PIPELINE_NAME
+    pipeline_description = pipeline.description or _DEFAULT_PIPELINE_DESCRIPTION
 
     # Format description using the template
-    tool_description = _format_tool_description(
-        pipeline_name=pipeline_name,
-        pipeline_description=pipeline_description,
-        pipeline_info=pipeline_info,
-        mapspec_section=mapspec_section,
-        input_format=input_format,
-        documentation=documentation,
-    )
+    tool_description = _format_tool_description(pipeline)
 
     Model = pipeline.pydantic_model()  # noqa: N806
     Model.model_rebuild()  # Ensure all type references are resolved
@@ -408,7 +399,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         """
         return await _execute_pipeline_sync(pipeline, ctx, inputs, parallel, run_folder)
 
-    @mcp.tool(name="execute_pipeline_async")
+    @mcp.tool(name="execute_pipeline_async", description=tool_description)
     async def execute_pipeline_async(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]

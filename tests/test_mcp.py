@@ -547,25 +547,6 @@ def test_get_input_format_section_complex(complex_pipeline: Pipeline) -> None:
     assert "element-wise mapping" in section
 
 
-def test_format_tool_description() -> None:
-    """Test tool description formatting."""
-    from pipefunc.mcp import _format_tool_description
-
-    description = _format_tool_description(
-        pipeline_name="Test Pipeline",
-        pipeline_description="Test description",
-        pipeline_info="Test info",
-        mapspec_section="Test mapspec",
-        input_format="Test format",
-        documentation="Test docs",
-    )
-    assert isinstance(description, str)
-    assert "Test info" in description
-    assert "Test mapspec" in description
-    assert "Test format" in description
-    assert "Test docs" in description
-
-
 # Test MCP error handling and edge cases.
 
 
