@@ -86,6 +86,21 @@ PIPELINE INFORMATION:
 MAPSPEC DEFINITIONS:
 {mapspec_section}
 
+EXECUTION MODES:
+Two execution modes are available:
+
+1. **Synchronous Execution** (execute_pipeline):
+   - Blocks until completion and returns results immediately
+   - Use when you need results right away for small-to-medium pipelines
+   - Best for interactive use and when results fit in memory
+
+2. **Asynchronous Execution** (start_pipeline_async):
+   - Returns immediately with a job ID for tracking
+   - Use for long-running pipelines or when you need progress monitoring
+   - Check progress with check_job_status, cancel with cancel_job
+   - Results are retrieved when job completes
+   - Best for large pipelines, batch processing, and background execution
+
 INPUT FORMAT:
 {input_format}
 
@@ -313,6 +328,19 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         list_jobs()
         # Returns summary of all jobs with their status
 
+    **Execution Modes:**
+
+    The server provides two execution patterns:
+
+    1. **Synchronous execution** (``execute_pipeline``):
+       Uses ``pipeline.map()`` - blocks until completion, returns results immediately.
+       Best for small-to-medium pipelines when you need results right away.
+
+    2. **Asynchronous execution** (``start_pipeline_async``):
+       Uses ``pipeline.map_async()`` - returns immediately with job tracking.
+       Best for long-running pipelines, background processing, and when you need
+       progress monitoring or cancellation capabilities.
+
     Notes
     -----
     - The server automatically handles type validation using the pipeline's Pydantic model
@@ -361,7 +389,12 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         parallel: bool = True,  # noqa: FBT001, FBT002
         run_folder: str | None = None,
     ) -> str:
-        """Execute pipeline with inputs (works for both single values and arrays)."""
+        """Execute pipeline synchronously and return results.
+
+        This uses pipeline.map() which blocks until all computations are complete,
+        then returns the final results. The function is async only to support
+        ctx.info() calls for logging.
+        """
         return await _execute_pipeline(pipeline, ctx, inputs, parallel, run_folder)
 
     @mcp.tool(name="start_pipeline_async")
@@ -370,11 +403,16 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         inputs: Model,  # type: ignore[valid-type]
         run_folder: str | None = None,
     ) -> str:
-        """Start async pipeline execution and return a job ID."""
+        """Start pipeline execution asynchronously and return job tracking info.
+
+        This uses pipeline.map_async() which returns immediately with an AsyncMap
+        object that can be tracked and awaited separately. The actual computation
+        runs in the background.
+        """
         return await _start_pipeline_async(pipeline, ctx, inputs, run_folder)
 
     @mcp.tool(name="check_job_status")
-    async def check_job_status(ctx: fastmcp.Context, job_id: str) -> str:  # noqa: ARG001
+    async def check_job_status(job_id: str) -> str:
         """Check status of a running pipeline job."""
         return await _check_job_status(job_id)
 
@@ -384,7 +422,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
         return await _cancel_job(ctx, job_id)
 
     @mcp.tool(name="list_jobs")
-    async def list_jobs(ctx: fastmcp.Context) -> str:  # noqa: ARG001
+    async def list_jobs() -> str:
         """List all pipeline jobs with their current status."""
         return await _list_jobs()
 
@@ -398,7 +436,6 @@ async def _execute_pipeline(
     parallel: bool = True,  # noqa: FBT001, FBT002
     run_folder: str | None = None,
 ) -> str:
-    """Execute pipeline with inputs."""
     await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")
     result = pipeline.map(
         inputs=inputs,
@@ -424,7 +461,6 @@ async def _start_pipeline_async(
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
     run_folder: str | None = None,
 ) -> str:
-    """Start async pipeline execution and return a job ID."""
     job_id = str(uuid.uuid4())
     actual_run_folder = run_folder or f"runs/job_{job_id}"
 
@@ -451,7 +487,6 @@ async def _start_pipeline_async(
 
 
 async def _check_job_status(job_id: str) -> str:
-    """Check status of a running pipeline job."""
     job = job_registry.get(job_id)
     if not job:
         return str({"error": "Job not found"})
@@ -502,7 +537,6 @@ async def _check_job_status(job_id: str) -> str:
 
 
 async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
-    """Cancel a running pipeline job."""
     job = job_registry.get(job_id)
     if not job:
         return str({"error": "Job not found"})
@@ -517,7 +551,6 @@ async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
 
 
 async def _list_jobs() -> str:
-    """List all pipeline jobs with their current status."""
     if not job_registry:
         return str({"jobs": [], "total_count": 0})
 
