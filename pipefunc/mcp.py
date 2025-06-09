@@ -15,7 +15,7 @@ from rich.console import Console
 from pipefunc._pipeline._autodoc import PipelineDocumentation, format_pipeline_docs
 from pipefunc._pipeline._base import Pipeline
 from pipefunc._utils import requires
-from pipefunc.map import load_outputs
+from pipefunc.map import load_all_outputs, load_outputs
 from pipefunc.map._mapspec import MapSpec
 from pipefunc.map._run_eager_async import AsyncMap
 from pipefunc.map._run_info import RunInfo
@@ -761,9 +761,8 @@ def _run_info(run_folder: str) -> dict[str, Any]:
 
 def _load_outputs(run_folder: str, output_names: list[str] | None = None) -> dict[str, Any]:
     try:
-        run_info = RunInfo.load(run_folder)
+        if output_names is None:
+            return load_all_outputs(run_folder=run_folder)
+        return load_outputs(*output_names, run_folder=run_folder)
     except Exception as e:  # noqa: BLE001  # pragma: no cover
         return {"error": str(e)}
-    if output_names is None:
-        output_names = list(run_info.all_output_names)
-    return load_outputs(*output_names, run_folder=run_folder)
