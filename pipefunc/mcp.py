@@ -56,6 +56,7 @@ Two execution modes are available:
    - Check progress with check_job_status, cancel with cancel_job
    - Results are retrieved when job completes
    - Best for large pipelines, batch processing, and background execution
+   - IMPORTANT: Always IMMEDIATELY check the job status with check_job_status after starting a new job!
 
 EXECUTION PARAMETERS:
 - inputs: Dictionary with parameter values (single values or arrays)
