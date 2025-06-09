@@ -582,17 +582,17 @@ def test_pipeline_constants_template_access() -> None:
         _MAPSPEC_INPUT_FORMAT,
         _NO_MAPSPEC_INPUT_FORMAT,
         _PIPEFUNC_INSTRUCTIONS,
-        _PIPELINE_DESCRIPTION_TEMPLATE,
+        _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE,
     )
 
     # Test that all constants are strings
     assert isinstance(_PIPEFUNC_INSTRUCTIONS, str)
-    assert isinstance(_PIPELINE_DESCRIPTION_TEMPLATE, str)
+    assert isinstance(_PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE, str)
     assert isinstance(_NO_MAPSPEC_INPUT_FORMAT, str)
     assert isinstance(_MAPSPEC_INPUT_FORMAT, str)
 
     # Test that they contain expected content
     assert "MCP server" in _PIPEFUNC_INSTRUCTIONS
-    assert "PIPELINE INFORMATION" in _PIPELINE_DESCRIPTION_TEMPLATE
+    assert "PIPELINE INFORMATION" in _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE
     assert "Single values only" in _NO_MAPSPEC_INPUT_FORMAT
     assert "element-wise mapping" in _MAPSPEC_INPUT_FORMAT

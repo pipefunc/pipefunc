@@ -95,8 +95,8 @@ PIPELINE DESCRIPTION:
 {pipeline_description}
 """
 
-_PIPELINE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline with inputs. This method works for both single values and arrays/lists.
+_PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE = """\
+Execute the pipeline with inputs.
 
 PIPELINE NAME:
 {pipeline_name}
@@ -226,7 +226,7 @@ def _format_tool_description(pipeline: Pipeline) -> str:
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
     input_format = _get_input_format_section(pipeline)
-    return _PIPELINE_DESCRIPTION_TEMPLATE.format(
+    return _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE.format(
         pipeline_name=pipeline_name,
         pipeline_description=pipeline_description,
         pipeline_info=pipeline_info,
