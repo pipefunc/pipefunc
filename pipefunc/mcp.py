@@ -38,11 +38,11 @@ pipefunc creates function pipelines as DAGs where functions are automatically co
 See https://pipefunc.readthedocs.io/en/latest/ and https://github.com/pipefunc/pipefunc for more information.
 
 <general>
-CORE CONCEPTS:
+## CORE CONCEPTS:
 - Pipeline: A sequence of interconnected Python functions forming a computational workflow. Dependencies are handled automatically.
 - MapSpec: A string (e.g., "x[i] -> y[i]") that defines how arrays are mapped between functions, enabling powerful, parallel parameter sweeps.
 
-EXECUTION MODES:
+## EXECUTION MODES:
 Two execution modes are available:
 
 1. Synchronous (execute_pipeline_sync):
@@ -55,17 +55,17 @@ Two execution modes are available:
    - Workflow: Start job -> Get `job_id` -> Check status.
    - IMPORTANT: Always IMMEDIATELY check the job status with check_job_status after starting a new job!
 
-JOB MANAGEMENT (for Async):
+## JOB MANAGEMENT (for Async):
 - `check_job_status(job_id)`: Monitor progress and get results when complete.
 - `list_jobs()`: See all running/completed jobs.
 - `cancel_job(job_id)`: Stop a running job.
 
-EXECUTION PARAMETERS:
+## EXECUTION PARAMETERS:
 - inputs: Dictionary with parameter values (single values or arrays)
 - parallel: Boolean (default true) - enables parallel execution
 - run_folder: Optional string - directory to save intermediate results
 
-MAPSPEC REFERENCE:
+## MAPSPEC REFERENCE:
 `MapSpec` is the key to unlocking parallel execution and parameter sweeps.
 
 Basic Syntax:
@@ -86,12 +86,12 @@ Common `MapSpec` Patterns & Examples:
 - `"x[i, :] -> y[i]"`: Reduction. Aggregates data across a dimension (the `:`). This is typically an internal pipeline step.
 - `"... -> x[i]"`: Dynamic Axis Generation. A function that generates an array from a scalar input. This is typically an internal pipeline step.
 
-OUTPUT FORMAT:
+## OUTPUT FORMAT:
 Returns dictionary with all pipeline outputs. Each output contains:
 - "output": Computed result (converted to JSON-compatible format)
 - "shape": Array dimensions (if applicable)
 
-JOB MANAGEMENT:
+## JOB MANAGEMENT:
 - check_job_status: Monitor progress and get results when complete
 - list_jobs: See all running/completed jobs
 - cancel_job: Stop a running job
@@ -102,16 +102,19 @@ JOB MANAGEMENT:
 _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE = """\
 Execute the pipeline '{pipeline_name}' with inputs.
 
-PIPELINE DESCRIPTION:
+## PIPELINE DESCRIPTION:
 {pipeline_description}
 
-PIPELINE INFORMATION:
+## PIPELINE INFORMATION:
 {pipeline_info}
 
-MAPSPEC DEFINITIONS:
+## INPUT FORMAT:
+{input_format}
+
+## MAPSPEC DEFINITIONS:
 {mapspec_section}
 
-DETAILED PIPELINE DOCUMENTATION:
+## DETAILED PIPELINE DOCUMENTATION:
 {documentation}
 """
 
@@ -163,6 +166,57 @@ def _get_pipeline_info_summary(pipeline_name: str, pipeline: Pipeline) -> str:
     return "\n".join(lines)
 
 
+def _get_input_format_section(pipeline: Pipeline) -> str:
+    """Dynamically generate the input format and usage section."""
+    import json
+
+    root_args = set(pipeline.root_args())
+    mapspec_inputs = pipeline.mapspec_names
+
+    # Identify which root inputs MUST be arrays
+    required_array_inputs = sorted(root_args & mapspec_inputs)
+    scalar_inputs = sorted(root_args - mapspec_inputs)
+
+    # Generate a concrete example JSON
+    example_dict: dict[str, Any] = {}
+    type_defaults = {int: 0, float: 0.0, str: "example", bool: False}
+    param_ann = pipeline.parameter_annotations
+
+    for param in sorted(root_args):
+        # We need to handle cases where annotation is a string or not present
+        param_type = param_ann.get(param)
+        if isinstance(param_type, str):  # Handle forward references if any
+            param_type = None  # Treat as unknown
+
+        if param in required_array_inputs:
+            item_type_default = type_defaults.get(param_type, "item")  # type: ignore[arg-type]
+            example_dict[param] = [item_type_default, item_type_default]
+        else:
+            example_dict[param] = type_defaults.get(param_type, "value")  # type: ignore[arg-type]
+
+    example_str = json.dumps(example_dict)
+
+    # Build the descriptive text based on pipeline structure
+    lines = []
+    if required_array_inputs:
+        lines.append("This pipeline requires specific inputs to be arrays for parameter sweeps.")
+        lines.append("\nRequired Array Inputs:")
+        lines.append("The following parameters MUST be provided as arrays (or nested lists):")
+        lines.extend([f"- `{name}`" for name in required_array_inputs])
+
+        if scalar_inputs:
+            lines.append("\nConstant Inputs:")
+            lines.append("The following parameters are provided as single, constant values:")
+            lines.extend([f"- `{name}`" for name in scalar_inputs])
+    else:
+        lines.append("This pipeline can be run with single values.")
+
+    lines.append("\nExample `inputs` JSON:")
+    lines.append(f"```json\n{example_str}\n```")
+
+    return "\n".join(lines)
+
+
 def _is_root_mapspec(mapspec: MapSpec, root_args: tuple[str, ...]) -> bool:
     """Check if a mapspec is a root mapspec."""
     return any(arg in mapspec.input_names for arg in root_args)
@@ -193,15 +247,17 @@ def _get_mapspec_section(pipeline: Pipeline) -> str:
 
 def _format_tool_description(pipeline: Pipeline) -> str:
     """Format a complete tool description using the template."""
-    pipeline_name = pipeline.name or "Unnamed Pipeline"
-    pipeline_description = pipeline.description or "No description provided."
+    pipeline_name = pipeline.name or _DEFAULT_PIPELINE_NAME
+    pipeline_description = pipeline.description or _DEFAULT_PIPELINE_DESCRIPTION
     documentation = _get_pipeline_documentation(pipeline)
     pipeline_info = _get_pipeline_info_summary(pipeline_name, pipeline)
+    input_format_section = _get_input_format_section(pipeline)
     mapspec_section = _get_mapspec_section(pipeline)
     return _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE.format(
         pipeline_name=pipeline_name,
         pipeline_description=pipeline_description,
         pipeline_info=pipeline_info,
+        input_format=input_format_section,
         mapspec_section=mapspec_section,
         documentation=documentation,
     )
