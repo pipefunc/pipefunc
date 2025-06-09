@@ -83,6 +83,21 @@ def slow_pipeline():
     return Pipeline([slow_computation, aggregate])
 
 
+@pytest.fixture
+def mixed_input_pipeline() -> Pipeline:
+    """Create a pipeline with both array inputs (mapspec) and scalar inputs (non-mapspec)."""
+
+    @pipefunc(output_name="scaled_values", mapspec="x[i] -> scaled_values[i]")
+    def scale_values(x: float, scale_factor: float) -> float:
+        return x * scale_factor
+
+    @pipefunc(output_name="final_result")
+    def process_scaled(scaled_values: Array) -> float:
+        return float(sum(scaled_values))
+
+    return Pipeline([scale_values, process_scaled])
+
+
 # Test MCP server building functionality.
 
 
@@ -511,42 +526,6 @@ def test_get_pipeline_info_summary(simple_pipeline: Pipeline) -> None:
     assert "Outputs:" in summary
 
 
-def test_get_mapspec_section_simple(simple_pipeline: Pipeline) -> None:
-    """Test mapspec section for simple pipeline."""
-    from pipefunc.mcp import _get_mapspec_section
-
-    section = _get_mapspec_section(simple_pipeline)
-    assert isinstance(section, str)
-    assert "None (This pipeline processes single values only)" in section
-
-
-def test_get_mapspec_section_complex(complex_pipeline: Pipeline) -> None:
-    """Test mapspec section for complex pipeline."""
-    from pipefunc.mcp import _get_mapspec_section
-
-    section = _get_mapspec_section(complex_pipeline)
-    assert isinstance(section, str)
-    assert "mapspecs define how arrays are processed" in section
-
-
-def test_get_input_format_section_simple(simple_pipeline: Pipeline) -> None:
-    """Test input format section for simple pipeline."""
-    from pipefunc.mcp import _get_input_format_section
-
-    section = _get_input_format_section(simple_pipeline)
-    assert isinstance(section, str)
-    assert "Single values only" in section
-
-
-def test_get_input_format_section_complex(complex_pipeline: Pipeline) -> None:
-    """Test input format section for complex pipeline."""
-    from pipefunc.mcp import _get_input_format_section
-
-    section = _get_input_format_section(complex_pipeline)
-    assert isinstance(section, str)
-    assert "element-wise mapping" in section
-
-
 # Test MCP error handling and edge cases.
 
 
@@ -576,23 +555,16 @@ def test_pipeline_with_no_outputs() -> None:
     assert "dummy_output" in summary
 
 
-def test_pipeline_constants_template_access() -> None:
-    """Test that MCP constants and templates are accessible."""
-    from pipefunc.mcp import (
-        _MAPSPEC_INPUT_FORMAT,
-        _NO_MAPSPEC_INPUT_FORMAT,
-        _PIPEFUNC_INSTRUCTIONS,
-        _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE,
-    )
+def test_input_format_section_with_mixed_inputs(mixed_input_pipeline: Pipeline) -> None:
+    """Test input format section generation with both array and scalar inputs."""
+    from pipefunc.mcp import _get_input_format_section
 
-    # Test that all constants are strings
-    assert isinstance(_PIPEFUNC_INSTRUCTIONS, str)
-    assert isinstance(_PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE, str)
-    assert isinstance(_NO_MAPSPEC_INPUT_FORMAT, str)
-    assert isinstance(_MAPSPEC_INPUT_FORMAT, str)
+    result = _get_input_format_section(mixed_input_pipeline)
 
-    # Test that they contain expected content
-    assert "MCP server" in _PIPEFUNC_INSTRUCTIONS
-    assert "PIPELINE INFORMATION" in _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE
-    assert "Single values only" in _NO_MAPSPEC_INPUT_FORMAT
-    assert "element-wise mapping" in _MAPSPEC_INPUT_FORMAT
+    # Should contain the specific lines we want to test
+    assert "Required Array Inputs:" in result
+    assert "Constant Inputs:" in result
+    assert "The following parameters are provided as single, constant values:" in result
+    assert "- `x`" in result  # array input
+    assert "- `scale_factor`" in result  # scalar input
+    assert "This pipeline is designed for array-based parameter sweeps." in result
