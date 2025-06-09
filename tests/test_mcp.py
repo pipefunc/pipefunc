@@ -73,7 +73,7 @@ def slow_pipeline():
 
     @pipefunc(output_name="slow_result", mapspec="x[i] -> slow_result[i]")
     def slow_computation(x: float) -> float:
-        time.sleep(0.1)  # Small delay to make async behavior observable
+        time.sleep(0.01)  # Small delay to make async behavior observable
         return x**2
 
     @pipefunc(output_name="final_result")
@@ -141,7 +141,7 @@ async def test_check_job_status_completed(simple_pipeline):
         job_id = job_info["job_id"]
 
         # Wait for job to complete with retry logic
-        max_wait = 5  # seconds
+        max_wait = 2  # seconds
         waited = 0
         status_info = None
         while waited < max_wait:
@@ -149,8 +149,8 @@ async def test_check_job_status_completed(simple_pipeline):
             status_info = parse_mcp_response(status_result[0].text)
             if status_info["status"] == "completed":
                 break
-            await asyncio.sleep(0.2)
-            waited += 0.2
+            await asyncio.sleep(0.01)
+            waited += 0.01
 
         assert status_info is not None
         assert status_info["job_id"] == job_id
@@ -189,7 +189,7 @@ async def test_check_job_status_with_progress(slow_pipeline):
         assert "progress" in status_info
 
         # Wait for completion with retry logic
-        max_wait = 10  # seconds
+        max_wait = 3  # seconds
         waited = 0
         final_status_info = None
         while waited < max_wait:
@@ -200,8 +200,8 @@ async def test_check_job_status_with_progress(slow_pipeline):
                 pytest.skip("Response parsing failed due to complex numpy arrays")
             if final_status_info["status"] == "completed":
                 break
-            await asyncio.sleep(0.5)
-            waited += 0.5
+            await asyncio.sleep(0.01)
+            waited += 0.01
 
         assert final_status_info is not None
         # Skip test if parsing failed due to complex numpy arrays
@@ -257,7 +257,7 @@ async def test_list_jobs_with_multiple_jobs(simple_pipeline):
             job_ids.append(job_info["job_id"])
 
         # Wait for jobs to complete
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.02)
 
         # List all jobs
         list_result = await client.call_tool("list_jobs", {})
@@ -363,7 +363,7 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
         assert job_info["run_folder"] == str(custom_folder)
 
         # Wait for completion and check status
-        max_wait = 5  # seconds
+        max_wait = 2  # seconds
         waited = 0.0
         status_info = None
         while waited < max_wait:
@@ -374,8 +374,8 @@ async def test_async_job_with_custom_run_folder(simple_pipeline: Pipeline, tmp_p
             status_info = parse_mcp_response(status_result[0].text)
             if status_info["status"] in ["completed", "cancelled"]:
                 break
-            await asyncio.sleep(0.2)
-            waited += 0.2
+            await asyncio.sleep(0.01)
+            waited += 0.01
 
         assert status_info is not None
         assert status_info["run_folder"] == str(custom_folder)
@@ -415,7 +415,7 @@ async def test_end_to_end_async_workflow(complex_pipeline):
         assert job_id in job_ids
 
         # 4. Wait for completion
-        max_wait = 10  # seconds
+        max_wait = 3  # seconds
         waited = 0
         status_info = None
         while waited < max_wait:
@@ -426,8 +426,8 @@ async def test_end_to_end_async_workflow(complex_pipeline):
                 pytest.skip("Response parsing failed due to complex numpy arrays")
             if status_info["status"] == "completed":
                 break
-            await asyncio.sleep(0.5)
-            waited += 0.5
+            await asyncio.sleep(0.01)
+            waited += 0.01
 
         # 5. Verify final results
         assert status_info is not None
