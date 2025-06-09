@@ -100,21 +100,21 @@ Returns dictionary with all pipeline outputs. Each output contains:
 """
 
 _PIPELINE_EXECUTE_DESCRIPTION_TEMPLATE = """\
-Execute the pipeline '{pipeline_name}' with inputs.
+Executes the '{pipeline_name}' pipeline.
 
-## PIPELINE DESCRIPTION:
+## 1. Pipeline Purpose
 {pipeline_description}
 
-## PIPELINE INFORMATION:
+## 2. Pipeline Information
 {pipeline_info}
 
-## INPUT FORMAT:
-{input_format}
+## 3. How to Provide Inputs
+{input_format_section}
 
-## MAPSPEC DEFINITIONS:
+## 4. How Arrays are Processed (`MapSpec` rules)
 {mapspec_section}
 
-## DETAILED PIPELINE DOCUMENTATION:
+## 5. Detailed Parameter and Output Reference
 {documentation}
 """
 
