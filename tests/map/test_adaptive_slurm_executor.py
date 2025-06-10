@@ -342,11 +342,13 @@ async def test_with_nested_pipefunc(
 @pytest.mark.asyncio
 async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> None:
     @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
-    def double_it(x: int) -> int:
-        return 2 * x
+    def double_it(x: int, b: np.ndarray) -> int:
+        return 2 * x + b.sum()
 
     x = np.random.random((10, 10))  # noqa: NPY002
+    b = np.random.random((10, 10))  # noqa: NPY002
     assert x.nbytes > 100
+    assert b.nbytes > 100
     pipeline = Pipeline([double_it])
     with (
         mock.patch("pipefunc.map._run_info.is_slurm_executor", return_value=True),
@@ -354,7 +356,7 @@ async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> 
         pytest.warns(UserWarning, match="dumping to disk instead of serializing"),
     ):
         # Set executor to anything not None to trigger the right branch
-        runner = pipeline.map_async({"x": x}, tmp_path, executor=ThreadPoolExecutor())
+        runner = pipeline.map_async({"x": x, "b": b}, tmp_path, executor=ThreadPoolExecutor())
         result = await runner.task
         assert result["y"].output.shape == x.shape
         assert isinstance(runner.run_info.inputs["x"], FileArray)
