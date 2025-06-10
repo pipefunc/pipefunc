@@ -88,7 +88,7 @@ class RunInfo:
             else:
                 _compare_to_previous_run_info(pipeline, run_folder, inputs, internal_shapes)
         _check_inputs(pipeline, inputs)
-        _maybe_inputs_to_disk(pipeline, inputs, run_folder, executor)
+        _maybe_inputs_to_disk_for_slurm(pipeline, inputs, run_folder, executor)
         shapes, masks = map_shapes(pipeline, inputs, internal_shapes)
         resolved_shapes = shapes.copy()
         return cls(
@@ -259,7 +259,7 @@ class RunInfo:
 _MAX_SIZE_BYTES_INPUT = 100 * 1024
 
 
-def _maybe_inputs_to_disk(
+def _maybe_inputs_to_disk_for_slurm(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     run_folder: Path | None,
@@ -268,6 +268,9 @@ def _maybe_inputs_to_disk(
     """If `run_folder` is set, dump inputs to disk if large serialization required.
 
     Only relevant if the input is used in a slurm executor.
+
+    This automatically applies the fix described in
+    https://github.com/pipefunc/pipefunc/blob/fbab121d/docs/source/concepts/slurm.md?plain=1#L263-L366
     """
     if run_folder is None:
         return
