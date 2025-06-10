@@ -353,6 +353,7 @@ async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> 
         mock.patch("pipefunc.map._run_info._MAX_SIZE_BYTES_INPUT", new=100),
         pytest.warns(UserWarning, match="dumping to disk instead of serializing"),
     ):
+        # Set executor to anything not None to trigger the right branch
         runner = pipeline.map_async({"x": x}, tmp_path, executor=ThreadPoolExecutor())
         result = await runner.task
         assert result["y"].output.shape == x.shape

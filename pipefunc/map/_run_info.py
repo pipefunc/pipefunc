@@ -255,8 +255,8 @@ class RunInfo:
             self.dump()
 
 
-# Max size for inputs in bytes (500 kB)
-_MAX_SIZE_BYTES_INPUT = 500 * 1024
+# Max size for inputs in bytes (100 kB)
+_MAX_SIZE_BYTES_INPUT = 100 * 1024
 
 
 def _maybe_inputs_to_disk(
