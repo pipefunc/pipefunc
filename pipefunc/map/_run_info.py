@@ -267,7 +267,7 @@ def _maybe_inputs_to_disk_for_slurm(
 ) -> None:
     """If `run_folder` is set, dump inputs to disk if large serialization required.
 
-    Only relevant if the input is used in a slurm executor.
+    Only relevant if the input is used in a SlurmExecutor.
 
     This automatically applies the fix described in
     https://github.com/pipefunc/pipefunc/blob/fbab121d/docs/source/concepts/slurm.md?plain=1#L263-L366
