@@ -341,7 +341,7 @@ async def test_with_nested_pipefunc(
 
 @pytest.mark.asyncio
 async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> None:
-    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]", resources_scope="element")
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
     def double_it(x: int, b: np.ndarray) -> int:
         return 2 * x + b.sum()
 
