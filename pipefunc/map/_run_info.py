@@ -277,9 +277,10 @@ def _maybe_inputs_to_disk(
         dumped = cloudpickle.dumps(value)
         if len(dumped) < _MAX_SIZE_BYTES_INPUT:
             continue
-        print(
+        warnings.warn(
             f"Input `{input_name}` is too large ({len(dumped) / 1024} kB), "
             "dumping to disk instead of serializing.",
+            stacklevel=2,
         )
         input_path = _input_path(input_name, run_folder)
         path = input_path.with_suffix("")
