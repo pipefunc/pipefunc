@@ -467,6 +467,6 @@ def _input_used_in_slurm_executor(
     for output_name in dependents:
         func = pipeline[output_name]
         ex = _executor_for_func(func, executor)
-        if is_slurm_executor(ex):
+        if is_slurm_executor(ex) and func.resources_scope == "element":
             return True
     return False
