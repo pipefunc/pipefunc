@@ -76,6 +76,7 @@ def prepare_run(
         pipeline,
         inputs,
         internal_shapes,
+        executor=executor,
         storage=_expand_output_name_in_storage(pipeline, storage),
         cleanup=cleanup,
     )

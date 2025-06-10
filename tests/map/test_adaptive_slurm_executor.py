@@ -9,12 +9,14 @@ from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 
 import adaptive
+import numpy as np
 import pytest
 from adaptive_scheduler import RunManager, SlurmExecutor, SlurmTask
 from adaptive_scheduler._executor import TaskID
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
 from pipefunc.map._result import ResultDict
+from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -335,3 +337,26 @@ async def test_with_nested_pipefunc(
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
+
+
+@pytest.mark.asyncio
+async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i, j] -> y[i, j]")
+    def double_it(x: int, b: np.ndarray) -> int:
+        return 2 * x + b.sum()
+
+    x = np.random.random((10, 10))  # noqa: NPY002
+    b = np.random.random((10, 10))  # noqa: NPY002
+    assert x.nbytes > 100
+    assert b.nbytes > 100
+    pipeline = Pipeline([double_it])
+    with (
+        mock.patch("pipefunc.map._run_info.is_slurm_executor", return_value=True),
+        mock.patch("pipefunc.map._run_info._MAX_SIZE_BYTES_INPUT", new=100),
+        pytest.warns(UserWarning, match="dumping to disk instead of serializing"),
+    ):
+        # Set executor to anything not None to trigger the right branch
+        runner = pipeline.map_async({"x": x, "b": b}, tmp_path, executor=ThreadPoolExecutor())
+        result = await runner.task
+        assert result["y"].output.shape == x.shape
+        assert isinstance(runner.run_info.inputs["x"], FileArray)
