@@ -152,7 +152,7 @@ class RunInfo:
         if self.run_folder is None:  # pragma: no cover
             msg = "Cannot get `input_paths` without `run_folder`."
             raise ValueError(msg)
-        return _input_paths(self.inputs, self.run_folder)
+        return {k: _input_path(k, self.run_folder) for k in self.inputs}
 
     @property
     def defaults_path(self) -> Path:
@@ -271,18 +271,18 @@ def _maybe_inputs_to_disk(
     """
     if run_folder is None:
         return
-    input_paths = _input_paths(inputs, run_folder)
     for input_name, value in inputs.items():
+        if not _input_used_in_slurm_executor(pipeline, input_name, executor):
+            continue
         dumped = cloudpickle.dumps(value)
         if len(dumped) < _MAX_SIZE_BYTES_INPUT:
-            continue
-        if not _input_used_in_slurm_executor(pipeline, input_name, executor):
             continue
         print(
             f"Input `{input_name}` is too large ({len(dumped) / 1024} kB), "
             "dumping to disk instead of serializing.",
         )
-        path = input_paths[input_name].with_suffix("")
+        input_path = _input_path(input_name, run_folder)
+        path = input_path.with_suffix("")
         new_value: FileArray | FileValue
         if input_name in pipeline.mapspec_names:
             new_value = FileArray.from_data(value, path)
@@ -423,10 +423,6 @@ def _output_path(output_name: str, run_folder: Path) -> Path:
 
 def _input_path(input_name: str, run_folder: Path) -> Path:
     return run_folder / "inputs" / f"{input_name}.cloudpickle"
-
-
-def _input_paths(inputs: dict[str, Any], run_folder: Path) -> dict[str, Path]:
-    return {k: _input_path(k, run_folder) for k in inputs}
 
 
 def _defaults_path(run_folder: Path) -> Path:
