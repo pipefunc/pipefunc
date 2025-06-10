@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from pipefunc import PipeFunc, Pipeline
     from pipefunc._pipeline._types import OUTPUT_TYPE, StorageType
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
+    from pipefunc._widgets.progress_headless import HeadlessProgressTracker
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
@@ -75,7 +76,7 @@ def run_map(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -168,6 +169,7 @@ def run_map(
           Shown only if in a Jupyter notebook and `ipywidgets` is installed.
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
+        - ``"headless"``: No progress bar, but the progress is still tracked internally.
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
@@ -222,7 +224,7 @@ def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # no
 class AsyncMap:
     task: asyncio.Task[ResultDict]
     run_info: RunInfo
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
 
@@ -266,7 +268,7 @@ def run_map_async(
     cleanup: bool = True,
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
-    show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+    show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -357,6 +359,7 @@ def run_map_async(
           Shown only if in a Jupyter notebook and `ipywidgets` is installed.
         - ``"rich"``: Force `rich` progress bar (text-based).
           Shown only if `rich` is installed.
+        - ``"headless"``: No progress bar, but the progress is still tracked internally.
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
@@ -842,7 +845,7 @@ def _submit(
     func: Callable[..., Any],
     executor: Executor,
     status: Status | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     chunksize: int,
     *args: Any,
 ) -> Future:
@@ -945,7 +948,7 @@ def _maybe_parallel_map(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     status: Status | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
 ) -> list[Any]:
     if not indices:
         return []
@@ -967,7 +970,7 @@ def _maybe_parallel_map(
 def _wrap_with_status_update(
     func: Callable[..., Any],
     status: Status,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker,
 ) -> Callable[..., Any]:
     def wrapped(*args: Any) -> Any:
         status.mark_in_progress()
@@ -982,7 +985,7 @@ def _wrap_with_status_update(
 def _maybe_execute_single(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     status: Status | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     func: PipeFunc,
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
@@ -1045,7 +1048,7 @@ def _run_and_process_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
 ) -> None:
@@ -1072,7 +1075,7 @@ async def _run_and_process_generation_async(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor],
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
@@ -1130,7 +1133,10 @@ def _submit_func(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None = None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None = None,
+    progress: IPyWidgetsProgressTracker
+    | RichProgressTracker
+    | HeadlessProgressTracker
+    | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
@@ -1198,7 +1204,7 @@ def _submit_generation(
     fixed_indices: dict[str, int | slice] | None,
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
-    progress: IPyWidgetsProgressTracker | RichProgressTracker | None,
+    progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:

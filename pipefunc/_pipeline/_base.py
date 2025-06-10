@@ -130,6 +130,12 @@ class Pipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+    name
+        A name for the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
+    description
+        A description of the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
 
     Notes
     -----
@@ -175,6 +181,8 @@ class Pipeline:
         validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | Resources | None = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Pipeline class for managing and executing a sequence of functions."""
         self.functions: list[PipeFunc] = []
@@ -183,6 +191,8 @@ class Pipeline:
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
+        self.name = name
+        self.description = description
         for f in functions:
             if isinstance(f, tuple):
                 f, mapspec = f  # noqa: PLW2901
@@ -739,7 +749,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
@@ -831,6 +841,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
@@ -900,7 +911,7 @@ class Pipeline:
         cleanup: bool = True,
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
-        show_progress: bool | Literal["rich", "ipywidgets"] | None = None,
+        show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> AsyncMap:
@@ -990,6 +1001,7 @@ class Pipeline:
               Shown only if in a Jupyter notebook and `ipywidgets` is installed.
             - ``"rich"``: Force `rich` progress bar (text-based).
               Shown only if `rich` is installed.
+            - ``"headless"``: No progress bar, but the progress is still tracked internally.
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
@@ -1878,6 +1890,8 @@ class Pipeline:
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
             "validate_type_annotations": self.validate_type_annotations,
+            "name": self.name,
+            "description": self.description,
         }
         assert_complete_kwargs(kwargs, Pipeline.__init__, skip={"self", "scope"})
         kwargs.update(update)
@@ -2196,6 +2210,8 @@ class Pipeline:
 
             * ``topological``: Display functions in topological order.
             * ``alphabetical``: Display functions in alphabetical order (using ``output_name``).
+        emojis
+            Whether to use emojis in the documentation.
 
         See Also
         --------

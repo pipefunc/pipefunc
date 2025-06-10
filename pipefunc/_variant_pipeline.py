@@ -80,6 +80,12 @@ class VariantPipeline:
         the resources are not set. Either a dict or a `pipefunc.resources.Resources`
         instance can be provided. If provided, the resources in the `PipeFunc`
         instances are updated with the default resources.
+    name
+        A name for the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
+    description
+        A description of the pipeline. If provided, it will be used to generate e.g., docs
+        and MCP server descriptions.
 
     Examples
     --------
@@ -166,6 +172,8 @@ class VariantPipeline:
         validate_type_annotations: bool = True,
         scope: str | None = None,
         default_resources: dict[str, Any] | None = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         """Initialize a VariantPipeline."""
         self.functions = functions
@@ -178,6 +186,8 @@ class VariantPipeline:
         self.validate_type_annotations = validate_type_annotations
         self.scope = scope
         self.default_resources = default_resources
+        self.name = name
+        self.description = description
         if not self.variants_mapping():
             msg = "No variants found in the pipeline. Use a regular `Pipeline` instead."
             raise ValueError(msg)
@@ -337,6 +347,8 @@ class VariantPipeline:
             "scope": self.scope,
             "default_resources": self.default_resources,
             "default_variant": self.default_variant,
+            "name": self.name,
+            "description": self.description,
         }
         assert_complete_kwargs(original_kwargs, VariantPipeline.__init__, skip={"self"})
         original_kwargs.update(kwargs)

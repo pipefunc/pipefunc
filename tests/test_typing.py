@@ -546,7 +546,7 @@ U = TypeVar("U", bound=int)
         (Optional[int], "Union[int, NoneType]"),  # noqa: UP007
         (list[int], "list[int]"),
         (dict[str, int], "dict[str, int]"),
-        (tuple[int, str, float], "tuple[int, str, float]"),
+        (tuple[int, str, float], "tuple[int, str, float]"),  # type: ignore[list-item]
         (Callable[[int, str], bool], "Callable[[int, str], bool]"),
         (Literal[1, 2, 3], "Literal[1, 2, 3]"),
         (T, "T"),
@@ -554,9 +554,9 @@ U = TypeVar("U", bound=int)
         (U, "U"),
         (Generic[T], "Generic[T]"),
         (Annotated[int, "metadata"], "Annotated[int, metadata]"),
-        (np.ndarray, "ndarray"),
-        (Array[int], "Array[int]"),
-        (np.ndarray[Any, np.dtype[np.object_]], "Array"),
+        (np.ndarray, "ndarray"),  # type: ignore[list-item]
+        (Array[int], "Array[int]"),  # type: ignore[list-item]
+        (np.ndarray[Any, np.dtype[np.object_]], "Array"),  # type: ignore[list-item]
         (Annotated[np.ndarray[Any, np.dtype[np.object_]], ArrayElementType[int]], "Array[int]"),
         (Union[int, Union[str, float]], "Union[int, str, float]"),  # noqa: UP007
         (list[tuple[int, str]], "list[tuple[int, str]]"),
