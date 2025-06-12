@@ -95,7 +95,6 @@ async def test_dynamic_internal_shape_async(
         executor=ThreadPoolExecutor(),
         storage="dict",
     )
-    assert runner.task is not None
     results = await runner.task
     expected_sum = 12
     expected_y = [0, 2, 4, 6]
