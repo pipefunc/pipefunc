@@ -228,9 +228,9 @@ class AsyncMap:
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
+    _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
+    _show_widgets: bool
     _task: asyncio.Task[ResultDict] | None = None
-    _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]] | None = None
-    _show_widgets: bool = True
 
     @property
     def task(self) -> asyncio.Task[ResultDict]:
@@ -270,9 +270,6 @@ class AsyncMap:
         if self._task is not None:
             warnings.warn("Task is already running.", stacklevel=2)
             return self
-        if self._run_pipeline is None:
-            msg = "AsyncMap is not configured to be started manually."
-            raise RuntimeError(msg)
 
         self._task = asyncio.create_task(self._run_pipeline())
         if self.progress is not None:
