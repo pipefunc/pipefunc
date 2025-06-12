@@ -912,8 +912,10 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
+        display_widgets: bool = True,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        start: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -1005,6 +1007,9 @@ class Pipeline:
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
+        display_widgets
+            Whether to call ``IPython.display.display(...)`` on widgets.
+            Ignored if **outside** of a Jupyter notebook.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -1020,6 +1025,9 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        start
+            Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
+            `start()` method on the `AsyncMap` instance is called.
 
         See Also
         --------
@@ -1055,7 +1063,9 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            display_widgets=display_widgets,
             return_results=return_results,
+            start=start,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
