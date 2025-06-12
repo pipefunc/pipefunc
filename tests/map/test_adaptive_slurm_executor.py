@@ -360,3 +360,41 @@ async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> 
         result = await runner.task
         assert result["y"].output.shape == x.shape
         assert isinstance(runner.run_info.inputs["x"], FileArray)
+
+
+@pytest.mark.asyncio
+async def test_setting_executor_type_in_resources(pipeline: Pipeline, tmp_path: Path) -> None:
+    @pipefunc(
+        output_name="y",
+        mapspec="x[i] -> y[i]",
+        resources={"cpus_per_node": 2, "nodes": 2, "extra_args": {"executor_type": "ipyparallel"}},
+    )
+    def double_it(x: int) -> int:
+        assert isinstance(x, int)
+        return 2 * x
+
+    pipeline = Pipeline([double_it])
+    executor_instance = MockSlurmExecutor(cores_per_node=1)
+    with mock.patch(
+        "pipefunc.map._adaptive_scheduler_slurm_executor._new_slurm_executor",
+        autospec=True,
+    ) as mock_new_executor:
+        # When _new_slurm_executor is called, return our executor instance.
+        mock_new_executor.return_value = executor_instance
+        runner = pipeline.map_async(
+            {"x": range(10)},
+            tmp_path,
+            executor=executor_instance,
+        )
+        await runner.task
+        # Check that _new_slurm_executor was called with the expected arguments
+        mock_new_executor.assert_called_once()
+        call_args = mock_new_executor.call_args
+
+        # Check that the first argument is the executor instance
+        assert call_args[0][0] == executor_instance
+
+        # Check the keyword arguments we care about
+        assert call_args.kwargs["executor_type"] == "ipyparallel"
+        assert call_args.kwargs["cores_per_node"] == 2
+        assert call_args.kwargs["nodes"] == 2
