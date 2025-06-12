@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -11,6 +12,9 @@ from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from pipefunc.map._result import ResultDict
+    from pipefunc.map._run import AsyncMap
 
 __all__ = [
     "FileArray",  # To keep in the same namespace as FileValue
@@ -189,3 +193,67 @@ class FileValue:
         path.parent.mkdir(parents=True, exist_ok=True)
         dump(data, path)
         return cls(path=path)
+
+
+async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
+    """Run AsyncMap objects with a limit on simultaneous executions.
+
+    Parameters
+    ----------
+    async_maps
+        `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
+    max_concurrent
+        Maximum number of concurrent jobs
+
+    Returns
+    -------
+        List of results from each AsyncMap's task
+
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def run_with_semaphore(async_map: AsyncMap) -> ResultDict:
+        async with semaphore:
+            async_map.start()
+            return await async_map.task
+
+    tasks = [run_with_semaphore(async_map) for async_map in async_maps]
+    return await asyncio.gather(*tasks)
+
+
+def launch_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+) -> asyncio.Task[list[ResultDict]]:
+    """Launch a collection of map operations to run concurrently in the background.
+
+    This is a user-friendly, non-blocking wrapper around ``gather_maps``.
+    It immediately returns an ``asyncio.Task`` object, which can be awaited
+    later to retrieve the results. This is ideal for use in interactive
+    environments like Jupyter notebooks.
+
+    Parameters
+    ----------
+    async_maps
+        `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
+    max_concurrent
+        Maximum number of map operations to run at the same time.
+
+    Returns
+    -------
+    asyncio.Task
+        A task handle representing the background execution of the maps.
+        ``await`` this task to get the list of results.
+
+    Examples
+    --------
+    >>> # In a Jupyter notebook cell:
+    >>> task = launch_maps(runners, max_concurrent=2)
+
+    >>> # In a later cell:
+    >>> results = await task
+    >>> print("Computation finished!")
+
+    """
+    coro = gather_maps(*async_maps, max_concurrent=max_concurrent)
+    return asyncio.create_task(coro)
