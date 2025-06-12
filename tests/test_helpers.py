@@ -3,7 +3,7 @@ import inspect
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
-from pipefunc.helpers import collect_kwargs, get_attribute_factory
+from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
 
 
 def test_collect_kwargs() -> None:
@@ -127,3 +127,20 @@ def test_get_attribute_factory_return_annotation_inference() -> None:
     assert sig.return_annotation == inspect.Parameter.empty
     obj = MyClass(data=42, name="example")
     assert f(obj) == 42
+
+
+@pytest.mark.asyncio
+async def test_launch_maps() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([double_it])
+    inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
+    runners = [
+        pipeline.map_async(inputs, start=False, display_widgets=False) for inputs in inputs_dicts
+    ]
+    task = launch_maps(*runners, max_concurrent=1)
+    result0, result1 = await task
+    assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
+    assert result1["y"].output.tolist() == [12, 14, 16, 18, 20]

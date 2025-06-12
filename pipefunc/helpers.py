@@ -11,7 +11,7 @@ from pipefunc._utils import dump, load
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable
 
     from pipefunc.map._result import ResultDict
     from pipefunc.map._run import AsyncMap
@@ -195,13 +195,13 @@ class FileValue:
         return cls(path=path)
 
 
-async def gather_maps(async_maps: Iterable[AsyncMap], max_concurrent: int = 1) -> list[ResultDict]:
+async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
     Parameters
     ----------
     async_maps
-        Iterable of AsyncMap objects with start() method
+        AsyncMap objects with start() method
     max_concurrent
         Maximum number of concurrent jobs
 
@@ -222,7 +222,7 @@ async def gather_maps(async_maps: Iterable[AsyncMap], max_concurrent: int = 1) -
 
 
 def launch_maps(
-    async_maps: Iterable[AsyncMap],
+    *async_maps: AsyncMap,
     max_concurrent: int = 1,
 ) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
@@ -235,7 +235,7 @@ def launch_maps(
     Parameters
     ----------
     async_maps
-        Iterable of AsyncMap objects created with ``pipeline.map_async(start=False)``.
+        `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of map operations to run at the same time.
 
@@ -255,5 +255,5 @@ def launch_maps(
     >>> print("Computation finished!")
 
     """
-    coro = gather_maps(async_maps, max_concurrent=max_concurrent)
+    coro = gather_maps(*async_maps, max_concurrent=max_concurrent)
     return asyncio.create_task(coro)
