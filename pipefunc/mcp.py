@@ -562,6 +562,7 @@ async def _check_job_status(job_id: str) -> str:
         return str({"error": "Job not found"})
 
     task = job.runner.task
+    assert task is not None
     is_done = task.done()
 
     # Get progress information if available
@@ -579,7 +580,7 @@ async def _check_job_status(job_id: str) -> str:
             "elapsed_time": elapsed_time if elapsed_time is not None else None,
             "remaining_time": remaining_time if remaining_time is not None else None,
         }
-
+    assert task is not None
     result_info = {
         "job_id": job_id,
         "pipeline_name": job.pipeline_name,
@@ -612,6 +613,7 @@ async def _cancel_job(ctx: fastmcp.Context, job_id: str) -> str:
         return str({"error": "Job not found"})
 
     task = job.runner.task
+    assert task is not None
     if not task.done():
         task.cancel()
         job.status = "cancelled"
@@ -627,6 +629,7 @@ async def _list_jobs() -> str:
     jobs_info = []
     for job_id, job in job_registry.items():
         task = job.runner.task
+        assert task is not None
         is_done = task.done()
         job_info = {
             "job_id": job_id,

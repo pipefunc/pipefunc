@@ -162,6 +162,7 @@ async def test_adaptive_slurm_executor(
         show_progress="ipywidgets",
         scheduling_strategy=scheduling_strategy,
     )
+    assert runner.task is not None
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result) == 3
@@ -242,6 +243,7 @@ async def test_pipeline_no_resources(
         executor=ex,  # type: ignore[arg-type]
         show_progress="ipywidgets",
     )
+    assert runner.task is not None
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result) == 3
@@ -297,6 +299,7 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
     # Now rerun the test with without mocking to see if it works
     # This will actually submit jobs to the mock scheduler.
     runner = pipeline.map_async({"y": range(10)}, executor=executor_instance)
+    assert runner.task is not None
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
@@ -334,6 +337,7 @@ async def test_with_nested_pipefunc(
         tmp_path,
         executor=MockSlurmExecutor() if use_mock else SlurmExecutor(),
     )
+    assert runner.task is not None
     result = await runner.task
     assert isinstance(result, ResultDict)
     assert len(result["z"].output) == 10
@@ -357,6 +361,7 @@ async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> 
     ):
         # Set executor to anything not None to trigger the right branch
         runner = pipeline.map_async({"x": x, "b": b}, tmp_path, executor=ThreadPoolExecutor())
+        assert runner.task is not None
         result = await runner.task
         assert result["y"].output.shape == x.shape
         assert isinstance(runner.run_info.inputs["x"], FileArray)
@@ -386,6 +391,7 @@ async def test_setting_executor_type_in_resources(pipeline: Pipeline, tmp_path: 
             tmp_path,
             executor=executor_instance,
         )
+        assert runner.task is not None
         await runner.task
         # Check that _new_slurm_executor was called with the expected arguments
         mock_new_executor.assert_called_once()
