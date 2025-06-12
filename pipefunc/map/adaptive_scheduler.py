@@ -253,6 +253,9 @@ def __extra_scheduler(resources: Resources) -> list[str]:
         extra_scheduler.append(f"--time={resources.time}")
     if resources.extra_args:
         for key, value in resources.extra_args.items():
+            if key == "executor_type":
+                # This is handled separately in _executor_type
+                continue
             extra_scheduler.append(f"--{key}={value}")
     return extra_scheduler
 
@@ -274,6 +277,9 @@ def _executor_type(
 
 
 def __executor_type(resources: Resources) -> EXECUTOR_TYPES:
+    executor_type = resources.extra_args.get("executor_type")
+    if executor_type is not None:
+        return resources.extra_args["executor_type"]
     return "sequential" if resources.parallelization_mode == "internal" else "process-pool"
 
 
