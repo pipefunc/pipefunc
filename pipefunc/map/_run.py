@@ -229,6 +229,7 @@ class AsyncMap:
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
     _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
+    _display_widgets: bool
     _task: asyncio.Task[ResultDict] | None = None
 
     @property
@@ -274,7 +275,8 @@ class AsyncMap:
         if self.progress is not None:
             self.progress.attach_task(self._task)
         self.status_widget = maybe_async_task_status_widget(self._task)
-        self.display()
+        if self._display_widgets:
+            self.display()
         return self
 
 
@@ -294,6 +296,7 @@ def run_map_async(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    display_widgets: bool = True,
     start: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -388,6 +391,9 @@ def run_map_async(
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
+    display_widgets
+        Whether to call ``IPython.display.display(...)`` on widgets.
+        Ignored if **outside** of a Jupyter notebook.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -436,7 +442,7 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start)
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start, display_widgets)
 
 
 def _finalize_run_map_async(
@@ -444,6 +450,7 @@ def _finalize_run_map_async(
     prep: Prepared,
     multi_run_manager: MultiRunManager | None,
     start: bool,  # noqa: FBT001
+    display_widgets: bool,  # noqa: FBT001
 ) -> AsyncMap:
     async_map = AsyncMap(
         run_info=prep.run_info,
@@ -451,6 +458,7 @@ def _finalize_run_map_async(
         multi_run_manager=multi_run_manager,
         status_widget=None,
         _run_pipeline=run_pipeline,
+        _display_widgets=display_widgets,
     )
     if start:
         async_map.start()
