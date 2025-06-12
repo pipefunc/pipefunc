@@ -224,19 +224,23 @@ def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # no
 class AsyncMap:
     """An object returned by `run_map_async` to manage an asynchronous pipeline execution."""
 
-    task: asyncio.Task[ResultDict] | None
     run_info: RunInfo
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
+    _task: asyncio.Task[ResultDict] | None = None
     _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]] | None = None
     _show_widgets: bool = True
 
-    def result(self) -> ResultDict:
-        """Wait for the pipeline to complete and return the results."""
-        if self.task is None:
+    @property
+    def task(self) -> asyncio.Task[ResultDict]:
+        if self._task is None:
             msg = "The task has not been started. Call `start()` first."
             raise RuntimeError(msg)
+        return self._task
+
+    def result(self) -> ResultDict:
+        """Wait for the pipeline to complete and return the results."""
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -263,17 +267,17 @@ class AsyncMap:
 
     def start(self) -> AsyncMap:
         """Start the pipeline execution."""
-        if self.task is not None:
+        if self._task is not None:
             warnings.warn("Task is already running.", stacklevel=2)
             return self
         if self._run_pipeline is None:
             msg = "AsyncMap is not configured to be started manually."
             raise RuntimeError(msg)
 
-        self.task = asyncio.create_task(self._run_pipeline())
+        self._task = asyncio.create_task(self._run_pipeline())
         if self.progress is not None:
-            self.progress.attach_task(self.task)
-        self.status_widget = maybe_async_task_status_widget(self.task)
+            self.progress.attach_task(self._task)
+        self.status_widget = maybe_async_task_status_widget(self._task)
         if self._show_widgets:
             self.display()
         return self
@@ -452,7 +456,6 @@ def _finalize_run_map_async(
     display_widgets: bool,  # noqa: FBT001
 ) -> AsyncMap:
     async_map = AsyncMap(
-        task=None,
         run_info=prep.run_info,
         progress=prep.progress,
         multi_run_manager=multi_run_manager,

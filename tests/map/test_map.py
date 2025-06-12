@@ -1614,7 +1614,13 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
         scheduling_strategy=scheduling_strategy,
         executor=ThreadPoolExecutor(),
         start=False,
-    ).start()
+    )
+    with pytest.raises(RuntimeError, match="The task has not been started."):
+        async_map.task  # noqa: B018
+    async_map.start()
+    with pytest.warns(UserWarning, match="Task is already running"):
+        async_map.start()
+
     # Test that the progress tracker is working
     progress = async_map.progress
     assert isinstance(progress, IPyWidgetsProgressTracker)
