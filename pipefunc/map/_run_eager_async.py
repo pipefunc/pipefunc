@@ -53,7 +53,6 @@ def run_map_eager_async(
     fixed_indices: dict[str, int | slice] | None = None,
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
-    display_widgets: bool = True,
     return_results: bool = True,
     start: bool = True,
 ) -> AsyncMap:
@@ -154,9 +153,6 @@ def run_map_eager_async(
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
-    display_widgets
-        Whether to call ``IPython.display.display(...)`` on widgets.
-        Ignored if **outside** of a Jupyter notebook.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
@@ -205,7 +201,7 @@ def run_map_eager_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start, display_widgets)
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start)
 
 
 async def _eager_scheduler_loop_async(
