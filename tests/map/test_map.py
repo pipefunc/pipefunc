@@ -1628,7 +1628,6 @@ async def test_map_async_with_progress(scheduling_strategy: Literal["generation"
     progress._first_auto_update_interval = 0.0
     progress._toggle_auto_update()  # Turn off auto update
     progress._toggle_auto_update()  # Turn on auto update
-    assert async_map.task is not None
     result = await async_map.task
     assert result["r"].output == 12
 
