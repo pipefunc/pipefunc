@@ -580,7 +580,6 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
         except Exception as e:
             handle_error(e, func, selected)
             # handle_error raises but mypy doesn't know that
-            raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -1020,10 +1019,9 @@ def _execute_single(
     def compute_fn() -> Any:
         try:
             return func(**kwargs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             handle_error(e, func, kwargs)
             # handle_error raises but mypy doesn't know that
-            raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 

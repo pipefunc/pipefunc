@@ -2510,7 +2510,6 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     except Exception as e:
         handle_error(e, func, func_args)
         # handle_error raises but mypy doesn't know that
-        raise  # pragma: no cover
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:
