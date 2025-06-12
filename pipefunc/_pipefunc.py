@@ -37,6 +37,7 @@ from pipefunc._utils import (
     is_pydantic_base_model,
     requires,
 )
+from pipefunc.exceptions import PipeFuncError
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -704,7 +705,7 @@ class PipeFunc(Generic[T]):
                     f" with the arguments `{args=}` and `{kwargs=}`.",
                 )
                 self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
-                raise
+                raise PipeFuncError(e, self.error_snapshot.metadata()) from e
 
         if self.debug:
             _default_debug_printer(self, result, kwargs)
@@ -1495,6 +1496,16 @@ class ErrorSnapshot:
         from IPython.display import HTML, display
 
         display(HTML(f"<pre>{self}</pre>"))
+
+    def metadata(self) -> dict[str, Any]:
+        """Return the metadata of the error snapshot."""
+        return {
+            "timestamp": self.timestamp,
+            "user": self.user,
+            "machine": self.machine,
+            "ip_address": self.ip_address,
+            "current_directory": self.current_directory,
+        }
 
 
 def _validate_identifier(name: str, value: Any) -> None:
