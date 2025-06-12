@@ -261,11 +261,11 @@ class AsyncMap:
         else:
             print("⚠️ Display is only supported in Jupyter notebooks.")
 
-    def start(self) -> None:
+    def start(self) -> AsyncMap:
         """Start the pipeline execution."""
         if self.task is not None:
             warnings.warn("Task is already running.", stacklevel=2)
-            return
+            return self
         if self._run_pipeline is None:
             msg = "AsyncMap is not configured to be started manually."
             raise RuntimeError(msg)
@@ -276,6 +276,7 @@ class AsyncMap:
         self.status_widget = maybe_async_task_status_widget(self.task)
         if self._show_widgets:
             self.display()
+        return self
 
 
 def run_map_async(
