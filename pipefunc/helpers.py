@@ -201,7 +201,7 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
     Parameters
     ----------
     async_maps
-        AsyncMap objects with start() method
+        `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of concurrent jobs
 
