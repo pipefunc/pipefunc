@@ -29,7 +29,7 @@ def maybe_async_task_status_widget(task: asyncio.Task) -> AsyncTaskStatusWidget 
         return None
     from pipefunc._widgets.async_status_widget import AsyncTaskStatusWidget
 
-    widget = AsyncTaskStatusWidget()
+    widget = AsyncTaskStatusWidget(display=False)
     widget.attach_task(task)
     return widget
 
