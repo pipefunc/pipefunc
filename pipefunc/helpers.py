@@ -229,29 +229,26 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
 
     async def run_with_semaphore(index: int, async_map: AsyncMap) -> ResultDict:
         async with semaphore:
-            if tabs is not None:
+            if tabs is not None and async_map._display_widgets:
                 # Cannot use output_context here, because it is not thread-safe
                 # See https://github.com/jupyter-widgets/ipywidgets/issues/3993
                 from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
 
-                if not async_map._display_widgets:  # pragma: no cover
-                    async_map.start()
-                else:
-                    # Disable `display` on the first call to `start`
-                    async_map._display_widgets = False
-                    async_map.start()
-                    widgets = []
-                    if async_map.status_widget is not None:  # pragma: no cover
-                        widgets.append(async_map.status_widget.widget)
-                    if isinstance(async_map.progress, IPyWidgetsProgressTracker):
-                        widgets.append(async_map.progress._style())
-                        widgets.append(async_map.progress._widgets)
-                    if async_map.multi_run_manager is not None:  # pragma: no cover
-                        widgets.append(async_map.multi_run_manager.info())
-                    for widget in widgets:
-                        tabs.outputs[index].append_display_data(widget)
-                    if widgets:
-                        tabs.show_output(index)
+                # Disable `display` on the first call to `start`
+                async_map._display_widgets = False
+                async_map.start()
+                widgets = []
+                if async_map.status_widget is not None:  # pragma: no cover
+                    widgets.append(async_map.status_widget.widget)
+                if isinstance(async_map.progress, IPyWidgetsProgressTracker):
+                    widgets.append(async_map.progress._style())
+                    widgets.append(async_map.progress._widgets)
+                if async_map.multi_run_manager is not None:  # pragma: no cover
+                    widgets.append(async_map.multi_run_manager.info())
+                for widget in widgets:
+                    tabs.outputs[index].append_display_data(widget)
+                if widgets:
+                    tabs.show_output(index)
             else:
                 async_map.start()
             return await async_map.task
