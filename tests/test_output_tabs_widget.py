@@ -1,3 +1,5 @@
+import pytest
+
 from pipefunc._widgets.output_tabs import OutputTabs
 
 
@@ -15,3 +17,6 @@ def test_output_tabs_widget() -> None:
         print("World")
     with tabs.output_context(2):
         print("!")
+
+    with pytest.raises(ValueError, match="Index 42 out of range"), tabs.output_context(42):
+        pass
