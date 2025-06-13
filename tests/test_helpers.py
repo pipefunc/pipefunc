@@ -1,9 +1,12 @@
+import importlib.util
 import inspect
 
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_collect_kwargs() -> None:
@@ -130,7 +133,11 @@ def test_get_attribute_factory_return_annotation_inference() -> None:
 
 
 @pytest.mark.asyncio
-async def test_launch_maps() -> None:
+@pytest.mark.parametrize("tab_widget", [True, False])
+async def test_launch_maps(tab_widget: bool) -> None:  # noqa: FBT001
+    if tab_widget and not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
@@ -140,7 +147,7 @@ async def test_launch_maps() -> None:
     runners = [
         pipeline.map_async(inputs, start=False, display_widgets=False) for inputs in inputs_dicts
     ]
-    task = launch_maps(*runners, max_concurrent=1)
+    task = launch_maps(*runners, max_concurrent=1, tab_widget=tab_widget)
     result0, result1 = await task
     assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
     assert result1["y"].output.tolist() == [12, 14, 16, 18, 20]
