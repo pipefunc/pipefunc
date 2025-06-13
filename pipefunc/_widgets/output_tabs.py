@@ -48,9 +48,6 @@ class OutputTabs:
 
     def set_tab_status(self, index: int, status: Literal["running", "completed", "failed"]) -> None:
         """Sets the tab status using CSS classes on the widget itself."""
-        if index >= len(self.tab.titles):
-            return
-
         # Update stored status and CSS classes
         old_status = self._tab_statuses.get(index)
         self._tab_statuses[index] = status
