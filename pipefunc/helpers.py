@@ -263,10 +263,7 @@ async def gather_maps(
     return await asyncio.gather(*tasks)
 
 
-def launch_maps(
-    *async_maps: AsyncMap,
-    max_concurrent: int = 1,
-) -> asyncio.Task[list[ResultDict]]:
+def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
 
     This is a user-friendly, non-blocking wrapper around ``gather_maps``.
