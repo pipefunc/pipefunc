@@ -1,5 +1,6 @@
 import importlib.util
 import inspect
+from unittest.mock import patch
 
 import pytest
 
@@ -147,7 +148,8 @@ async def test_launch_maps(tab_widget: bool) -> None:  # noqa: FBT001
     runners = [
         pipeline.map_async(inputs, start=False, display_widgets=False) for inputs in inputs_dicts
     ]
-    task = launch_maps(*runners, max_concurrent=1, tab_widget=tab_widget)
+    with patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True):
+        task = launch_maps(*runners, max_concurrent=1, tab_widget=tab_widget)
     result0, result1 = await task
     assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
     assert result1["y"].output.tolist() == [12, 14, 16, 18, 20]
