@@ -145,10 +145,8 @@ async def test_launch_maps(tab_widget: bool) -> None:  # noqa: FBT001
 
     pipeline = Pipeline([double_it])
     inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
-    runners = [
-        pipeline.map_async(inputs, start=False, display_widgets=False) for inputs in inputs_dicts
-    ]
     with patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True):
+        runners = [pipeline.map_async(inputs, start=False) for inputs in inputs_dicts]
         task = launch_maps(*runners, max_concurrent=1, tab_widget=tab_widget)
     result0, result1 = await task
     assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
