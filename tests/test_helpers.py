@@ -182,6 +182,9 @@ async def test_launch_maps_already_running() -> None:
 
 @pytest.mark.asyncio
 async def test_launch_maps_with_output_tabs_failed() -> None:
+    if not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
