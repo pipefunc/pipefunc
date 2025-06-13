@@ -243,6 +243,9 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
                 if isinstance(async_map.progress, IPyWidgetsProgressTracker):
                     widgets.append(async_map.progress._style())
                     widgets.append(async_map.progress._widgets)
+                elif async_map.progress is not None:  # pragma: no cover
+                    msg = "Only `show_progress='ipywidgets'` is supported in this tab widget."
+                    widgets.append(msg)
                 if async_map.multi_run_manager is not None:  # pragma: no cover
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
