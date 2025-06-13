@@ -3,20 +3,21 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-import IPython
-import ipywidgets
-
 if TYPE_CHECKING:
     from collections.abc import Generator
 
 
 class OutputTabs:
     def __init__(self, num_maps: int) -> None:
-        self.outputs: list[ipywidgets.Output] = [ipywidgets.Output() for _ in range(num_maps)]
-        self._visible_outputs: dict[ipywidgets.Output, bool] = dict.fromkeys(self.outputs, False)
-        self.tab: ipywidgets.Tab = ipywidgets.Tab(children=[])
+        from ipywidgets import Output, Tab
+
+        self.outputs: list[Output] = [Output() for _ in range(num_maps)]
+        self._visible_outputs: dict[Output, bool] = dict.fromkeys(self.outputs, False)
+        self.tab: Tab = Tab(children=[])
 
     def display(self) -> None:
+        import IPython
+
         IPython.display.display(self.tab)
 
     def show_output(self, index: int) -> None:

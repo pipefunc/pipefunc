@@ -7,7 +7,7 @@ import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import dump, load
+from pipefunc._utils import dump, load, requires
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -217,6 +217,7 @@ async def gather_maps(
 
     """
     if tab_widget:
+        requires("ipywidgets", reason="tab_widget=True", extras="widgets")
         from pipefunc._widgets.output_tabs import OutputTabs
 
         tabs = OutputTabs(len(async_maps))
