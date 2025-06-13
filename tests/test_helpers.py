@@ -1,5 +1,6 @@
 import importlib.util
 import inspect
+import re
 from unittest.mock import patch
 
 import pytest
@@ -158,3 +159,20 @@ async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
     result0, result1 = await task
     assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
     assert result1["y"].output.tolist() == [12, 14, 16, 18, 20]
+
+
+@pytest.mark.asyncio
+async def test_launch_maps_already_running() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([double_it])
+    runner = pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=True)
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(
+            "`pipeline.map_async(..., start=False)` must be called before `launch_maps`.",
+        ),
+    ):
+        await launch_maps(runner)
