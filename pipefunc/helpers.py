@@ -195,7 +195,11 @@ class FileValue:
         return cls(path=path)
 
 
-async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
+async def gather_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+    tab_widget: bool = True,
+) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
     Parameters
@@ -204,26 +208,56 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of concurrent jobs
+    tab_widget
+        Whether to display a tab widget with the status of the maps.
 
     Returns
     -------
         List of results from each AsyncMap's task
 
     """
+    if tab_widget:
+        from pipefunc._widgets.output_tabs import OutputTabs
+
+        tabs = OutputTabs(len(async_maps))
+        tabs.display()
+    else:
+        tabs = None
+
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    async def run_with_semaphore(async_map: AsyncMap) -> ResultDict:
+    async def run_with_semaphore(index: int, async_map: AsyncMap) -> ResultDict:
         async with semaphore:
-            async_map.start()
+            if tabs is not None:
+                from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+
+                # Cannot use output_context here, because it is not thread-safe
+                # See https://github.com/jupyter-widgets/ipywidgets/issues/3993
+                async_map._display_widgets = False
+                async_map.start()
+                widgets = []
+                if async_map.status_widget is not None:
+                    widgets.append(async_map.status_widget.widget)
+                if isinstance(async_map.progress, IPyWidgetsProgressTracker):
+                    widgets.append(async_map.progress._style())
+                    widgets.append(async_map.progress._widgets)
+                if async_map.multi_run_manager is not None:
+                    widgets.append(async_map.multi_run_manager.info())
+                for widget in widgets:
+                    tabs.outputs[index].append_display_data(widget)
+                tabs.show_output(index)
+            else:
+                async_map.start()
             return await async_map.task
 
-    tasks = [run_with_semaphore(async_map) for async_map in async_maps]
+    tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
     return await asyncio.gather(*tasks)
 
 
 def launch_maps(
     *async_maps: AsyncMap,
     max_concurrent: int = 1,
+    tab_widget: bool = True,
 ) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
 
@@ -238,6 +272,8 @@ def launch_maps(
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of map operations to run at the same time.
+    tab_widget
+        Whether to display a tab widget with the status of the maps.
 
     Returns
     -------
@@ -255,5 +291,5 @@ def launch_maps(
     >>> print("Computation finished!")
 
     """
-    coro = gather_maps(*async_maps, max_concurrent=max_concurrent)
+    coro = gather_maps(*async_maps, max_concurrent=max_concurrent, tab_widget=tab_widget)
     return asyncio.create_task(coro)

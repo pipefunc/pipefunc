@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-class MultiMaps:
+class OutputTabs:
     def __init__(self, num_maps: int) -> None:
         self.outputs: list[ipywidgets.Output] = [ipywidgets.Output() for _ in range(num_maps)]
         self._visible_outputs: dict[ipywidgets.Output, bool] = dict.fromkeys(self.outputs, False)
