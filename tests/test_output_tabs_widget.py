@@ -18,5 +18,5 @@ def test_output_tabs_widget() -> None:
     with tabs.output_context(2):
         print("!")
 
-    with pytest.raises(ValueError, match="Index 42 out of range"), tabs.output_context(42):
+    with pytest.raises(IndexError, match="Index 42 out of range"), tabs.output_context(42):
         pass
