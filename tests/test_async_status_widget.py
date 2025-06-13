@@ -341,14 +341,13 @@ async def test_update_interval_adjustment():
 @pytest.mark.asyncio
 async def test_maybe_async_task_status_widget_no_ipynb():
     """Test maybe_async_task_status_widget when not in ipynb."""
-    with patch("pipefunc._utils.is_running_in_ipynb", return_value=False):
 
-        async def test_task():
-            return "done"
+    async def test_task():
+        return "done"
 
-        task = asyncio.create_task(test_task())
-        widget = maybe_async_task_status_widget(task)
-        assert widget is None
+    task = asyncio.create_task(test_task())
+    widget = maybe_async_task_status_widget(task)
+    assert widget is None
 
 
 @pytest.mark.asyncio
