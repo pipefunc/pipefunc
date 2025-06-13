@@ -148,6 +148,8 @@ async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
     inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
 
     with (
+        # This first patch is meant to ensure that maybe_async_task_status_widget
+        # returns a widget, however, for some unknown reason, the patch is not working.
         patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True),
         patch("pipefunc.map._progress.is_running_in_ipynb", return_value=True),
     ):
