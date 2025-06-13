@@ -6,57 +6,8 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-_BASE_CSS = """
-<style id="output-tabs-base-css">
-.lm-TabBar-tab {
-    transition: background-color 0.3s ease, border-left 0.3s ease;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.8; }
-    50% { opacity: 1; }
-}
-
-/* Tab status styles using nth-child selectors and widget state classes */
-"""
-
-_TAB_CSS_TEMPLATE = """
-/* Tab {i} styles */
-.tab-{i}-running .lm-TabBar-content li:nth-child({nth_child}) {{
-    background: var(--jp-warn-color3) !important;
-    animation: pulse 2s infinite;
-}}
-.tab-{i}-running .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
-    background: var(--jp-layout-color1) !important;
-    border-left: 3px solid var(--jp-warn-color1) !important;
-    animation: pulse 2s infinite;
-}}
-.tab-{i}-completed .lm-TabBar-content li:nth-child({nth_child}) {{
-    background: var(--jp-success-color3) !important;
-}}
-.tab-{i}-completed .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
-    background: var(--jp-layout-color1) !important;
-    border-left: 3px solid var(--jp-success-color1) !important;
-}}
-.tab-{i}-failed .lm-TabBar-content li:nth-child({nth_child}) {{
-    background: var(--jp-error-color3) !important;
-}}
-.tab-{i}-failed .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
-    background: var(--jp-layout-color1) !important;
-    border-left: 3px solid var(--jp-error-color1) !important;
-}}
-"""
-
 # Status symbols mapping
 _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
-
-
-def _generate_tab_css(num_outputs: int) -> str:
-    """Generate CSS for tab status styling based on the number of outputs."""
-    css_parts = [_BASE_CSS]
-    css_parts.extend(_TAB_CSS_TEMPLATE.format(i=i, nth_child=i + 1) for i in range(num_outputs))
-    css_parts.append("</style>")
-    return "".join(css_parts)
 
 
 class OutputTabs:
@@ -129,3 +80,53 @@ class OutputTabs:
         with self.outputs[index]:
             yield
         self.show_output(index)
+
+
+_BASE_CSS = """
+<style id="output-tabs-base-css">
+.lm-TabBar-tab {
+    transition: background-color 0.3s ease, border-left 0.3s ease;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+/* Tab status styles using nth-child selectors and widget state classes */
+"""
+
+_TAB_CSS_TEMPLATE = """
+/* Tab {i} styles */
+.tab-{i}-running .lm-TabBar-content li:nth-child({nth_child}) {{
+    background: var(--jp-warn-color3) !important;
+    animation: pulse 2s infinite;
+}}
+.tab-{i}-running .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
+    background: var(--jp-layout-color1) !important;
+    border-left: 3px solid var(--jp-warn-color1) !important;
+    animation: pulse 2s infinite;
+}}
+.tab-{i}-completed .lm-TabBar-content li:nth-child({nth_child}) {{
+    background: var(--jp-success-color3) !important;
+}}
+.tab-{i}-completed .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
+    background: var(--jp-layout-color1) !important;
+    border-left: 3px solid var(--jp-success-color1) !important;
+}}
+.tab-{i}-failed .lm-TabBar-content li:nth-child({nth_child}) {{
+    background: var(--jp-error-color3) !important;
+}}
+.tab-{i}-failed .lm-TabBar-content li:nth-child({nth_child}).lm-mod-current {{
+    background: var(--jp-layout-color1) !important;
+    border-left: 3px solid var(--jp-error-color1) !important;
+}}
+"""
+
+
+def _generate_tab_css(num_outputs: int) -> str:
+    """Generate CSS for tab status styling based on the number of outputs."""
+    css_parts = [_BASE_CSS]
+    css_parts.extend(_TAB_CSS_TEMPLATE.format(i=i, nth_child=i + 1) for i in range(num_outputs))
+    css_parts.append("</style>")
+    return "".join(css_parts)
