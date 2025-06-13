@@ -201,4 +201,5 @@ async def test_launch_maps_with_output_tabs_failed() -> None:
     ):
         runners = [pipeline_double.map_async(inputs, start=False) for inputs in inputs_dicts]
         task = launch_maps(*runners, max_concurrent=3)
-    await task
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        await task
