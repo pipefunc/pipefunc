@@ -213,6 +213,11 @@ async def gather_maps(
         List of results from each AsyncMap's task
 
     """
+    for async_map in async_maps:
+        if async_map._task is not None:
+            msg = "`pipeline.map_async(..., start=False)` must be called before `launch_maps`."
+            raise RuntimeError(msg)
+
     tab_widget = any(async_map._display_widgets for async_map in async_maps)
     if tab_widget:
         requires("ipywidgets", reason="tab_widget=True", extras="widgets")
@@ -239,7 +244,7 @@ async def gather_maps(
                     async_map._display_widgets = False
                     async_map.start()
                     widgets = []
-                    if async_map.status_widget is not None:
+                    if async_map.status_widget is not None:  # pragma: no cover
                         widgets.append(async_map.status_widget.widget)
                     if isinstance(async_map.progress, IPyWidgetsProgressTracker):
                         widgets.append(async_map.progress._style())

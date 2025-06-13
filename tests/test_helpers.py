@@ -134,9 +134,9 @@ def test_get_attribute_factory_return_annotation_inference() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tab_widget", [True, False])
-async def test_launch_maps(tab_widget: bool) -> None:  # noqa: FBT001
-    if tab_widget and not has_ipywidgets:
+@pytest.mark.parametrize("output_tabs", [True, False])
+async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
+    if output_tabs and not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
 
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
@@ -151,7 +151,7 @@ async def test_launch_maps(tab_widget: bool) -> None:  # noqa: FBT001
         patch("pipefunc.map._progress.is_running_in_ipynb", return_value=True),
     ):
         runners = [
-            pipeline.map_async(inputs, start=False, display_widgets=tab_widget)
+            pipeline.map_async(inputs, start=False, display_widgets=output_tabs)
             for inputs in inputs_dicts
         ]
         task = launch_maps(*runners, max_concurrent=1)
