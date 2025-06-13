@@ -246,7 +246,8 @@ async def gather_maps(
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
                     tabs.outputs[index].append_display_data(widget)
-                tabs.show_output(index)
+                if widgets:
+                    tabs.show_output(index)
             else:
                 async_map.start()
             return await async_map.task
