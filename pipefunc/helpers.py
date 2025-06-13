@@ -244,7 +244,7 @@ async def gather_maps(
                     if isinstance(async_map.progress, IPyWidgetsProgressTracker):
                         widgets.append(async_map.progress._style())
                         widgets.append(async_map.progress._widgets)
-                    if async_map.multi_run_manager is not None:
+                    if async_map.multi_run_manager is not None:  # pragma: no cover
                         widgets.append(async_map.multi_run_manager.info())
                     for widget in widgets:
                         tabs.outputs[index].append_display_data(widget)
