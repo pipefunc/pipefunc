@@ -195,10 +195,7 @@ class FileValue:
         return cls(path=path)
 
 
-async def gather_maps(
-    *async_maps: AsyncMap,
-    max_concurrent: int = 1,
-) -> list[ResultDict]:
+async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
     Parameters
