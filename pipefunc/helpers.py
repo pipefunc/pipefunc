@@ -196,8 +196,8 @@ class FileValue:
         return cls(path=path)
 
 
-def _setup_automatic_tab_updates(tabs: OutputTabs, async_maps: tuple[AsyncMap, ...]) -> None:
-    def create_callback(tab_index: int) -> Callable[[asyncio.Task[ResultDict]], None]:
+def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
+    def create_callback() -> Callable[[asyncio.Task[ResultDict]], None]:
         def callback(task: asyncio.Task[ResultDict]) -> None:
             if task.exception() is not None:
                 tabs.set_tab_status(tab_index, "failed")
@@ -207,9 +207,8 @@ def _setup_automatic_tab_updates(tabs: OutputTabs, async_maps: tuple[AsyncMap, .
         return callback
 
     # Set initial status to running and add callbacks
-    for i, async_map in enumerate(async_maps):
-        tabs.set_tab_status(i, "running")
-        async_map.task.add_done_callback(create_callback(i))
+    tabs.set_tab_status(tab_index, "running")
+    async_map.task.add_done_callback(create_callback())
 
 
 async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
@@ -269,16 +268,13 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
                     tabs.outputs[index].append_display_data(widget)
                 if widgets:
                     tabs.show_output(index)
+                _setup_automatic_tab_updates(index, tabs, async_map)
             else:
                 async_map.start()
+
             return await async_map.task
 
     tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
-
-    # Set up automatic tab status updates
-    if tabs is not None:
-        _setup_automatic_tab_updates(tabs, async_maps)
-
     return await asyncio.gather(*tasks)
 
 
