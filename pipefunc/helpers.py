@@ -232,7 +232,7 @@ async def gather_maps(
                 # See https://github.com/jupyter-widgets/ipywidgets/issues/3993
                 from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
 
-                if not async_map._display_widgets:
+                if not async_map._display_widgets:  # pragma: no cover
                     async_map.start()
                 else:
                     # Disable `display` on the first call to `start`

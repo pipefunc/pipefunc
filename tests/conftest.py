@@ -1,18 +1,7 @@
 import importlib.util
 import warnings
-from contextlib import suppress
 
 collect_ignore_glob = []
-
-
-with suppress(ImportError):
-    # To avoid https://github.com/holoviz/pyviz_comms/issues/137
-    # Remove once https://github.com/holoviz/pyviz_comms/pull/138 is merged
-    import builtins
-
-    from IPython import get_ipython
-
-    builtins.get_ipython = get_ipython  # type: ignore[attr-defined]
 
 
 def skip_if_missing(name: str, match: str | None = None) -> None:
