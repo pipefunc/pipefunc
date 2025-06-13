@@ -327,7 +327,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         ]
         return widgets.VBox(children, layout=widgets.Layout(max_width="700px"))
 
-    def display(self) -> None:
+    def _style(self) -> IPython.display.HTML:
         style = textwrap.dedent(
             """
             <style>
@@ -430,5 +430,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         for hue in hues:
             style += _scope_background_color_css(hue)
         style += "</style>"
-        IPython.display.display(IPython.display.HTML(style))
-        IPython.display.display(self._widgets)
+        return IPython.display.HTML(style)
+
+    def display(self) -> None:
+        IPython.display.display(self._style(), self._widgets)

@@ -1,9 +1,14 @@
+import importlib.util
 import inspect
+import re
+from unittest.mock import patch
 
 import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
+
+has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
 
 
 def test_collect_kwargs() -> None:
@@ -130,17 +135,46 @@ def test_get_attribute_factory_return_annotation_inference() -> None:
 
 
 @pytest.mark.asyncio
-async def test_launch_maps() -> None:
+@pytest.mark.parametrize("output_tabs", [True, False])
+async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
+    if output_tabs and not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
 
     pipeline = Pipeline([double_it])
     inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
-    runners = [
-        pipeline.map_async(inputs, start=False, display_widgets=False) for inputs in inputs_dicts
-    ]
-    task = launch_maps(*runners, max_concurrent=1)
+
+    with (
+        # This first patch is meant to ensure that maybe_async_task_status_widget
+        # returns a widget, however, for some unknown reason, the patch is not working.
+        patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True),
+        patch("pipefunc.map._progress.is_running_in_ipynb", return_value=True),
+    ):
+        runners = [
+            pipeline.map_async(inputs, start=False, display_widgets=output_tabs)
+            for inputs in inputs_dicts
+        ]
+        task = launch_maps(*runners, max_concurrent=1)
     result0, result1 = await task
     assert result0["y"].output.tolist() == [2, 4, 6, 8, 10]
     assert result1["y"].output.tolist() == [12, 14, 16, 18, 20]
+
+
+@pytest.mark.asyncio
+async def test_launch_maps_already_running() -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline = Pipeline([double_it])
+    runner = pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=True)
+    with pytest.raises(
+        RuntimeError,
+        match=re.escape(
+            "`pipeline.map_async(..., start=False)` must be called before `launch_maps`.",
+        ),
+    ):
+        await launch_maps(runner)

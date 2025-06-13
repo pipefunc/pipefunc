@@ -7,7 +7,7 @@ import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import dump, load
+from pipefunc._utils import dump, load, requires
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -210,21 +210,57 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
         List of results from each AsyncMap's task
 
     """
+    for async_map in async_maps:
+        if async_map._task is not None:
+            msg = "`pipeline.map_async(..., start=False)` must be called before `launch_maps`."
+            raise RuntimeError(msg)
+
+    tab_widget = any(async_map._display_widgets for async_map in async_maps)
+    if tab_widget:
+        requires("ipywidgets", reason="tab_widget=True", extras="widgets")
+        from pipefunc._widgets.output_tabs import OutputTabs
+
+        tabs = OutputTabs(len(async_maps))
+        tabs.display()
+    else:
+        tabs = None
+
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    async def run_with_semaphore(async_map: AsyncMap) -> ResultDict:
+    async def run_with_semaphore(index: int, async_map: AsyncMap) -> ResultDict:
         async with semaphore:
-            async_map.start()
+            if tabs is not None and async_map._display_widgets:
+                # Cannot use output_context here, because it is not thread-safe
+                # See https://github.com/jupyter-widgets/ipywidgets/issues/3993
+                from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
+
+                # Disable `display` on the first call to `start`
+                async_map._display_widgets = False
+                async_map.start()
+                widgets = []
+                if async_map.status_widget is not None:  # pragma: no cover
+                    widgets.append(async_map.status_widget.widget)
+                if isinstance(async_map.progress, IPyWidgetsProgressTracker):
+                    widgets.append(async_map.progress._style())
+                    widgets.append(async_map.progress._widgets)
+                elif async_map.progress is not None:  # pragma: no cover
+                    msg = "Only `show_progress='ipywidgets'` is supported in this tab widget."
+                    widgets.append(msg)
+                if async_map.multi_run_manager is not None:  # pragma: no cover
+                    widgets.append(async_map.multi_run_manager.info())
+                for widget in widgets:
+                    tabs.outputs[index].append_display_data(widget)
+                if widgets:
+                    tabs.show_output(index)
+            else:
+                async_map.start()
             return await async_map.task
 
-    tasks = [run_with_semaphore(async_map) for async_map in async_maps]
+    tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
     return await asyncio.gather(*tasks)
 
 
-def launch_maps(
-    *async_maps: AsyncMap,
-    max_concurrent: int = 1,
-) -> asyncio.Task[list[ResultDict]]:
+def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
 
     This is a user-friendly, non-blocking wrapper around ``gather_maps``.
