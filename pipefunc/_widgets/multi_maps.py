@@ -12,23 +12,23 @@ if TYPE_CHECKING:
 
 class MultiMaps:
     def __init__(self, num_maps: int) -> None:
-        self.outputs = [ipywidgets.Output() for _ in range(num_maps)]
-        self.visible_outputs = {hash(output): False for output in self.outputs}
-        self.tab = ipywidgets.Tab(children=[])
+        self.outputs: list[ipywidgets.Output] = [ipywidgets.Output() for _ in range(num_maps)]
+        self._visible_outputs: dict[ipywidgets.Output, bool] = dict.fromkeys(self.outputs, False)
+        self.tab: ipywidgets.Tab = ipywidgets.Tab(children=[])
 
     def display(self) -> None:
         IPython.display.display(self.tab)
 
     def show_output(self, index: int) -> None:
-        self.visible_outputs[hash(self.outputs[index])] = True
+        self._visible_outputs[self.outputs[index]] = True
         self._sync()
 
     def hide_output(self, index: int) -> None:
-        self.visible_outputs[hash(self.outputs[index])] = False
+        self._visible_outputs[self.outputs[index]] = False
         self._sync()
 
     def _sync(self) -> None:
-        children = [output for output in self.outputs if self.visible_outputs[hash(output)]]
+        children = [output for output in self.outputs if self._visible_outputs[output]]
         self.tab.children = children
         for i_tab, output in enumerate(self.tab.children):
             index = self.outputs.index(output)
@@ -41,3 +41,4 @@ class MultiMaps:
             raise IndexError(msg)
         with self.outputs[index]:
             yield
+        self.show_output(index)
