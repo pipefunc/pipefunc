@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
 _BASE_CSS = """
 <style id="output-tabs-base-css">
 .lm-TabBar-tab {
@@ -19,7 +20,7 @@ _BASE_CSS = """
 /* Tab status styles using nth-child selectors and widget state classes */
 """
 
-_BASE_CSS_TEMPLATE = """
+_TAB_CSS_TEMPLATE = """
 /* Tab {i} styles */
 .tab-{i}-running .lm-TabBar-content li:nth-child({nth_child}) {{
     background: var(--jp-warn-color3) !important;
@@ -46,14 +47,16 @@ _BASE_CSS_TEMPLATE = """
 }}
 """
 
+# Status symbols mapping
+_STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
+
 
 def _generate_tab_css(num_outputs: int) -> str:
     """Generate CSS for tab status styling based on the number of outputs."""
-    base_css = _BASE_CSS
-    for i in range(num_outputs):
-        nth_child = i + 1  # CSS nth-child is 1-indexed
-        base_css += _BASE_CSS_TEMPLATE.format(i=i, nth_child=nth_child)
-    return base_css
+    css_parts = [_BASE_CSS]
+    css_parts.extend(_TAB_CSS_TEMPLATE.format(i=i, nth_child=i + 1) for i in range(num_outputs))
+    css_parts.append("</style>")
+    return "".join(css_parts)
 
 
 class OutputTabs:
@@ -66,16 +69,13 @@ class OutputTabs:
         self._visible_outputs: dict[Output, bool] = dict.fromkeys(self.outputs, False)
         self.tab: Tab = Tab(children=[])
         self._tab_statuses: dict[int, str] = {}
-        self._num_outputs = num_outputs
 
     def display(self) -> None:
         """Display the ``ipywidgets.Tab`` widget."""
-        import IPython.display
+        from IPython.display import HTML, display
 
-        # Generate CSS dynamically based on number of outputs
-        css = _generate_tab_css(self._num_outputs)
-        html = IPython.display.HTML(css)
-        IPython.display.display(html, self.tab)
+        css = _generate_tab_css(len(self.outputs))
+        display(HTML(css), self.tab)
 
     def show_output(self, index: int) -> None:
         """Show the output at the given index."""
@@ -100,34 +100,25 @@ class OutputTabs:
         if index >= len(self.tab.titles):
             return
 
-        # Store status
+        # Update stored status and CSS classes
         old_status = self._tab_statuses.get(index)
         self._tab_statuses[index] = status
-
-        # Update the title with status symbol
-        current_title = self.tab.titles[index]
-        clean_title = current_title.replace("●", "").replace("✓", "").replace("✗", "").strip()
-
-        if status == "running":
-            self.tab.set_title(index, f"● {clean_title}")
-        elif status == "completed":
-            self.tab.set_title(index, f"✓ {clean_title}")
-        elif status == "failed":
-            self.tab.set_title(index, f"✗ {clean_title}")
-
-        # Update CSS classes on the widget
         self._update_tab_classes(index, old_status, status)
+
+        # Update title with status symbol
+        current_title = self.tab.titles[index]
+        # Remove any existing status symbols
+        for symbol in _STATUS_SYMBOLS.values():
+            current_title = current_title.replace(symbol, "").strip()
+
+        new_title = f"{_STATUS_SYMBOLS[status]} {current_title}"
+        self.tab.set_title(index, new_title)
 
     def _update_tab_classes(self, index: int, old_status: str | None, new_status: str) -> None:
         """Update CSS classes on the Tab widget to control individual tab styling."""
-        # Remove old status class if it exists
         if old_status:
-            old_class = f"tab-{index}-{old_status}"
-            self.tab.remove_class(old_class)
-
-        # Add new status class
-        new_class = f"tab-{index}-{new_status}"
-        self.tab.add_class(new_class)
+            self.tab.remove_class(f"tab-{index}-{old_status}")
+        self.tab.add_class(f"tab-{index}-{new_status}")
 
     @contextmanager
     def output_context(self, index: int) -> Generator[None, None, None]:
