@@ -22,7 +22,7 @@ async def test_widget_initialization():
     """Test widget initialization and basic properties."""
     widget = AsyncTaskStatusWidget(display=False)
     assert widget._status_html_widget is not None
-    assert widget._main_widget is not None
+    assert widget.widget is not None
     assert widget._traceback_widget is not None
     assert widget._traceback_button is not None
     assert widget._start_time <= time.monotonic()
@@ -286,7 +286,7 @@ async def test_widget_display_method():
 
     with patch("IPython.display.display") as mock_display:
         widget.display()
-        mock_display.assert_called_once_with(widget._main_widget)
+        mock_display.assert_called_once_with(widget.widget)
 
 
 @pytest.mark.asyncio

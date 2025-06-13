@@ -165,7 +165,7 @@ async def test_progress_tracker_display(mock_progress_dict: dict[OUTPUT_TYPE, St
     with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
         progress = IPyWidgetsProgressTracker(mock_progress_dict)
         progress.display()
-        assert mock_display.call_count == 2  # display on HTML and VBox
+        assert mock_display.call_count == 1  # display on HTML and VBox
 
 
 @pytest.mark.asyncio
@@ -197,7 +197,7 @@ async def test_progress_tracker_color_by_scope():
     assert len(borders) == 3  # 3 different scopes, foo, bar, None
     with patch("pipefunc._widgets.progress_ipywidgets.IPython.display.display") as mock_display:
         progress.display()
-        assert mock_display.call_count == 2
+        assert mock_display.call_count == 1
 
 
 def test_progress_tracker_mark_completed_with_errors(
