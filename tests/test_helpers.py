@@ -178,3 +178,31 @@ async def test_launch_maps_already_running() -> None:
         ),
     ):
         await launch_maps(runner)
+
+
+@pytest.mark.asyncio
+async def test_launch_maps_with_output_tabs_failed() -> None:
+    if not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def double_it(x: int) -> int:
+        return 2 * x
+
+    pipeline_double = Pipeline([double_it])
+
+    inputs_dicts = [
+        {"x": [1, 2]},
+        {"x": [6, 7, 8, 9, object()]},
+        {"x": [10, 11, 12, 13, 14]},
+    ]
+    with (
+        # This first patch is meant to ensure that maybe_async_task_status_widget
+        # returns a widget, however, for some unknown reason, the patch is not working.
+        patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True),
+        patch("pipefunc.map._progress.is_running_in_ipynb", return_value=True),
+    ):
+        runners = [pipeline_double.map_async(inputs, start=False) for inputs in inputs_dicts]
+        task = launch_maps(*runners, max_concurrent=3)
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        await task

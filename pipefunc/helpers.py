@@ -13,6 +13,7 @@ from pipefunc.map._storage_array._file import FileArray
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from pipefunc._widgets.output_tabs import OutputTabs
     from pipefunc.map._result import ResultDict
     from pipefunc.map._run import AsyncMap
 
@@ -195,6 +196,21 @@ class FileValue:
         return cls(path=path)
 
 
+def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
+    def create_callback() -> Callable[[asyncio.Task[ResultDict]], None]:
+        def callback(task: asyncio.Task[ResultDict]) -> None:
+            if task.exception() is not None:
+                tabs.set_tab_status(tab_index, "failed")
+            else:
+                tabs.set_tab_status(tab_index, "completed")
+
+        return callback
+
+    # Set initial status to running and add callbacks
+    tabs.set_tab_status(tab_index, "running")
+    async_map.task.add_done_callback(create_callback())
+
+
 async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
@@ -252,8 +268,10 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
                     tabs.outputs[index].append_display_data(widget)
                 if widgets:
                     tabs.show_output(index)
+                _setup_automatic_tab_updates(index, tabs, async_map)
             else:
                 async_map.start()
+
             return await async_map.task
 
     tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
