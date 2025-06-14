@@ -48,14 +48,11 @@ class OutputTabs:
 
     def set_tab_status(self, index: int, status: Literal["running", "completed", "failed"]) -> None:
         """Sets the tab status using CSS classes on the widget itself."""
-        # Update stored status and CSS classes
         old_status = self._tab_statuses.get(index)
         self._tab_statuses[index] = status
         self._update_tab_classes(index, old_status, status)
 
-        # Update title with status symbol
         current_title = self.tab.titles[index]
-        # Remove any existing status symbols
         for symbol in _STATUS_SYMBOLS.values():
             current_title = current_title.replace(symbol, "").strip()
 
