@@ -118,6 +118,7 @@ if __name__ == "__main__":
         "adaptive",
         "autodoc",
         "cli",
+        "mcp",
         "pandas",
         "plotting",
         "profiling",
