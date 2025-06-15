@@ -20,6 +20,8 @@ dependencies:
   # optional-dependencies: cli
   - pydantic
   - rich-argparse
+  # optional-dependencies: mcp
+  - fastmcp
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
