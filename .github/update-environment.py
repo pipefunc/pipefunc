@@ -9,7 +9,7 @@ import tomllib
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PIP_ONLY_DEPS: set[str] = set()
+PIP_ONLY_DEPS: set[str] = {"fastmcp"}
 REPLACE_DEPS: dict[str, str] = {
     "graphviz": "python-graphviz",
 }

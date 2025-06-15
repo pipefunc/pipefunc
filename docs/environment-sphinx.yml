@@ -21,7 +21,6 @@ dependencies:
   - pydantic
   - rich-argparse
   # optional-dependencies: mcp
-  - fastmcp
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -57,3 +56,5 @@ dependencies:
   - nltk
   - scikit-image
   - seaborn
+  - pip:
+    - fastmcp
