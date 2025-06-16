@@ -49,23 +49,13 @@ class OutputTabs:
 
         self.tab.children = children
         for i_tab, output in enumerate(self.tab.children):
-            original_index = self.outputs.index(output)
-
-            # Update title with status if it's not already correct
-            status = self._tab_statuses.get(original_index)
-            current_title = self.tab.get_title(i_tab)
-            new_title = str(original_index)
-            if status:
-                new_title = f"{_STATUS_SYMBOLS[status]} {original_index}"
-
-            if current_title != new_title:
-                self.tab.set_title(i_tab, new_title)
+            index = self.outputs.index(output)
+            if not self.tab.titles[i_tab]:
+                self.tab.set_title(i_tab, str(index))
 
     def set_tab_status(self, index: int, status: Literal["running", "completed", "failed"]) -> None:
         """Sets the tab status using CSS classes on the widget itself."""
         old_status = self._tab_statuses.get(index)
-        if old_status == "completed" and status != "completed" and index in self._completed_indices:
-            self._completed_indices.remove(index)
         self._tab_statuses[index] = status
         self._update_tab_classes(index, old_status, status)
 
@@ -75,18 +65,14 @@ class OutputTabs:
             self._enforce_max_completed_tabs()
 
         # If the tab for 'index' is not visible, don't try to change its title
-        output_to_update = self.outputs[index]
-        if output_to_update not in self.tab.children:
+        output = self.outputs[index]
+        if output not in self.tab.children:
             return
 
-        tab_index = self.tab.children.index(output_to_update)
-        current_title = self.tab.get_title(tab_index) or ""
+        tab_index = self.tab.children.index(output)
+        current_title = self.tab.titles[tab_index]
         for symbol in _STATUS_SYMBOLS.values():
             current_title = current_title.replace(symbol, "").strip()
-
-        # Fallback to index if title is empty
-        if not current_title:
-            current_title = str(index)
 
         new_title = f"{_STATUS_SYMBOLS[status]} {current_title}"
         self.tab.set_title(tab_index, new_title)
