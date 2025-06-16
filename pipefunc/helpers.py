@@ -211,7 +211,11 @@ def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: As
     async_map.task.add_done_callback(create_callback())
 
 
-async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
+async def gather_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+    max_completed_tabs: int | None = None,
+) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
     Parameters
@@ -220,6 +224,9 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of concurrent jobs
+    max_completed_tabs
+        Maximum number of completed tabs to show. If ``None``, all completed tabs
+        are shown. Only used if ``display_widgets=True``.
 
     Returns
     -------
@@ -236,7 +243,7 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
         requires("ipywidgets", reason="tab_widget=True", extras="widgets")
         from pipefunc._widgets.output_tabs import OutputTabs
 
-        tabs = OutputTabs(len(async_maps))
+        tabs = OutputTabs(len(async_maps), max_completed_tabs)
         tabs.display()
     else:
         tabs = None
@@ -278,7 +285,11 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
     return await asyncio.gather(*tasks)
 
 
-def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[list[ResultDict]]:
+def launch_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+    max_completed_tabs: int | None = None,
+) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
 
     This is a user-friendly, non-blocking wrapper around ``gather_maps``.
@@ -292,6 +303,9 @@ def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of map operations to run at the same time.
+    max_completed_tabs
+        Maximum number of completed tabs to show. If ``None``, all completed tabs
+        are shown. Only used if ``display_widgets=True``.
 
     Returns
     -------
@@ -309,5 +323,9 @@ def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[
     >>> print("Computation finished!")
 
     """
-    coro = gather_maps(*async_maps, max_concurrent=max_concurrent)
+    coro = gather_maps(
+        *async_maps,
+        max_concurrent=max_concurrent,
+        max_completed_tabs=max_completed_tabs,
+    )
     return asyncio.create_task(coro)

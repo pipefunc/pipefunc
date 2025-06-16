@@ -13,13 +13,15 @@ _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
 class OutputTabs:
     """A ``ipywidgets.Tab`` widget that contains ``ipywidgets.Output`` widgets."""
 
-    def __init__(self, num_outputs: int) -> None:
+    def __init__(self, num_outputs: int, max_completed_tabs: int | None = None) -> None:
         from ipywidgets import Output, Tab
 
         self.outputs: list[Output] = [Output() for _ in range(num_outputs)]
         self._visible_outputs: dict[Output, bool] = dict.fromkeys(self.outputs, False)
         self.tab: Tab = Tab(children=[])
         self._tab_statuses: dict[int, str] = {}
+        self._max_completed_tabs = max_completed_tabs
+        self._completed_indices: list[int] = []
 
     def display(self) -> None:
         """Display the ``ipywidgets.Tab`` widget."""
@@ -40,24 +42,68 @@ class OutputTabs:
 
     def _sync(self) -> None:
         children = [output for output in self.outputs if self._visible_outputs[output]]
+
+        # Check if children have changed to avoid flicker
+        if self.tab.children == tuple(children):
+            return
+
         self.tab.children = children
         for i_tab, output in enumerate(self.tab.children):
-            index = self.outputs.index(output)
-            if not self.tab.titles[i_tab]:
-                self.tab.set_title(i_tab, str(index))
+            original_index = self.outputs.index(output)
+
+            # Update title with status if it's not already correct
+            status = self._tab_statuses.get(original_index)
+            current_title = self.tab.get_title(i_tab)
+            new_title = str(original_index)
+            if status:
+                new_title = f"{_STATUS_SYMBOLS[status]} {original_index}"
+
+            if current_title != new_title:
+                self.tab.set_title(i_tab, new_title)
 
     def set_tab_status(self, index: int, status: Literal["running", "completed", "failed"]) -> None:
         """Sets the tab status using CSS classes on the widget itself."""
         old_status = self._tab_statuses.get(index)
+        if old_status == "completed" and status != "completed" and index in self._completed_indices:
+            self._completed_indices.remove(index)
         self._tab_statuses[index] = status
         self._update_tab_classes(index, old_status, status)
 
-        current_title = self.tab.titles[index]
+        if status == "completed":
+            if index not in self._completed_indices:
+                self._completed_indices.append(index)
+            self._enforce_max_completed_tabs()
+
+        # If the tab for 'index' is not visible, don't try to change its title
+        output_to_update = self.outputs[index]
+        if output_to_update not in self.tab.children:
+            return
+
+        tab_index = self.tab.children.index(output_to_update)
+        current_title = self.tab.get_title(tab_index) or ""
         for symbol in _STATUS_SYMBOLS.values():
             current_title = current_title.replace(symbol, "").strip()
 
+        # Fallback to index if title is empty
+        if not current_title:
+            current_title = str(index)
+
         new_title = f"{_STATUS_SYMBOLS[status]} {current_title}"
-        self.tab.set_title(index, new_title)
+        self.tab.set_title(tab_index, new_title)
+
+    def _enforce_max_completed_tabs(self) -> None:
+        """Hide oldest completed tabs if more than ``max_completed_tabs`` are visible."""
+        if self._max_completed_tabs is None:
+            return
+
+        visible_completed = [
+            i for i in self._completed_indices if self._visible_outputs[self.outputs[i]]
+        ]
+
+        if len(visible_completed) > self._max_completed_tabs:
+            num_to_hide = len(visible_completed) - self._max_completed_tabs
+            for i in visible_completed[:num_to_hide]:
+                self._visible_outputs[self.outputs[i]] = False
 
     def _update_tab_classes(self, index: int, old_status: str | None, new_status: str) -> None:
         """Update CSS classes on the Tab widget to control individual tab styling."""
