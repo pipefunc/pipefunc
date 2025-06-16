@@ -90,6 +90,7 @@ class OutputTabs:
             num_to_hide = len(visible_completed) - self._max_completed_tabs
             for i in visible_completed[:num_to_hide]:
                 self._visible_outputs[self.outputs[i]] = False
+        self._sync()
 
     def _update_tab_classes(self, index: int, old_status: str | None, new_status: str) -> None:
         """Update CSS classes on the Tab widget to control individual tab styling."""
