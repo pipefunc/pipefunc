@@ -196,18 +196,18 @@ class FileValue:
         return cls(path=path)
 
 
-def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
+def _setup_automatic_tab_updates(index_output: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
     def create_callback() -> Callable[[asyncio.Task[ResultDict]], None]:
         def callback(task: asyncio.Task[ResultDict]) -> None:
             if task.exception() is not None:
-                tabs.set_tab_status(tab_index, "failed")
+                tabs.set_tab_status(index_output, "failed")
             else:
-                tabs.set_tab_status(tab_index, "completed")
+                tabs.set_tab_status(index_output, "completed")
 
         return callback
 
     # Set initial status to running and add callbacks
-    tabs.set_tab_status(tab_index, "running")
+    tabs.set_tab_status(index_output, "running")
     async_map.task.add_done_callback(create_callback())
 
 
