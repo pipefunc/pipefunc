@@ -272,7 +272,7 @@ async def gather_maps(
                 if async_map.multi_run_manager is not None:  # pragma: no cover
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
-                    tabs.outputs[index].append_display_data(widget)
+                    tabs.output(index).append_display_data(widget)
                 if widgets:
                     tabs.show_output(index)
                 _setup_automatic_tab_updates(index, tabs, async_map)

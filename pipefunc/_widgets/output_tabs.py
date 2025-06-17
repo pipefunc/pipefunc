@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from itertools import count
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -34,13 +35,14 @@ class OutputTabs:
         self._tabs: list[_OutputTab] = [_OutputTab(i) for i in range(num_outputs)]
         self.tab: Tab = Tab(children=[])
         self._max_completed_tabs = max_completed_tabs
-        self._completion_counter = 0
-        self._applied_css_classes: set[str] = set()
+        self._completion_counter = count()
 
-    @property
-    def outputs(self) -> list[Output]:
-        """The list of `ipywidgets.Output` widgets."""
-        return [tab.widget for tab in self._tabs]
+    def output(self, index_output: int) -> Output:
+        """Get the `ipywidgets.Output` widget at the given index_output."""
+        if not 0 <= index_output < len(self._tabs):
+            msg = f"Index {index_output} out of range for {len(self._tabs)} outputs"
+            raise IndexError(msg)
+        return self._tabs[index_output].widget
 
     def display(self) -> None:
         """Display the ``ipywidgets.Tab`` widget."""
@@ -72,7 +74,7 @@ class OutputTabs:
                 classes.append(f"tab-{i}-{status}")
 
         self.tab.children = tuple(tab.widget for tab in visible_tabs)
-        self.tab._dom_classes = classes
+        self.tab._dom_classes = classes  # Sets all classes at once
         self.tab.titles = tuple(titles)
 
     def set_tab_status(
@@ -84,8 +86,7 @@ class OutputTabs:
         tab = self._tabs[index_output]
         tab.status = status
         if status == "completed" and tab.completion_order is None:
-            tab.completion_order = self._completion_counter
-            self._completion_counter += 1
+            tab.completion_order = next(self._completion_counter)
         self._sync()
 
     def _enforce_max_completed_tabs(self) -> None:
