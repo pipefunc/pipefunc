@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from itertools import count
 from typing import TYPE_CHECKING, Literal
 
@@ -13,17 +14,21 @@ if TYPE_CHECKING:
 _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
 
 
+def _output() -> Output:
+    from ipywidgets import Output
+
+    return Output()
+
+
+@dataclass
 class _OutputTab:
     """A simple data class to hold the state of a single output tab."""
 
-    def __init__(self, index: int) -> None:
-        from ipywidgets import Output
-
-        self.widget: Output = Output()
-        self.index: int = index  # The original, stable index
-        self.visible: bool = False
-        self.status: str | None = None
-        self.completion_order: int | None = None  # To track the order of completion
+    index: int
+    widget: Output = field(default_factory=_output)
+    visible: bool = False
+    status: str | None = None
+    completion_order: int | None = None
 
 
 class OutputTabs:
@@ -62,6 +67,8 @@ class OutputTabs:
         self._sync()
 
     def _sync(self) -> None:
+        current_index = self.tab.selected_index
+        current_output = self.tab.children[current_index] if current_index is not None else None
         self._enforce_max_completed_tabs()
         visible_tabs = [tab for tab in self._tabs if tab.visible]
         classes = []
@@ -72,10 +79,10 @@ class OutputTabs:
             titles.append(title)
             if status:
                 classes.append(f"tab-{i}-{status}")
-
-        self.tab.children = tuple(tab.widget for tab in visible_tabs)
-        self.tab._dom_classes = classes  # Sets all classes at once
-        self.tab.titles = tuple(titles)
+        children = tuple(tab.widget for tab in visible_tabs)
+        new_index = children.index(current_output) if current_output in children else 0
+        self.tab.children, self.tab._dom_classes, self.tab.titles = (children, classes, titles)
+        self.tab.selected_index = new_index
 
     def set_tab_status(
         self,
