@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from ipywidgets import Output, Tab
+    from ipywidgets import Output
 
 # Status symbols mapping
 _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
@@ -54,7 +54,8 @@ class OutputTabs:
         from IPython.display import HTML, display
 
         css = _generate_tab_css(len(self._tabs))
-        display(HTML(css), self.tab)
+        display(HTML(css))
+        display(self.tab)
 
     def show_output(self, index_output: int) -> None:
         """Show the output at the given index_output."""
@@ -80,9 +81,21 @@ class OutputTabs:
             if status:
                 classes.append(f"tab-{i}-{status}")
         children = tuple(tab.widget for tab in visible_tabs)
-        new_index = children.index(current_output) if current_output in children else 0
-        self.tab.children, self.tab._dom_classes, self.tab.titles = (children, classes, titles)
-        self.tab.selected_index = new_index
+        if not children:
+            new_index = None
+        elif current_output in children:
+            new_index = children.index(current_output)
+        else:
+            new_index = 0
+
+        if self.tab.children != children:
+            self.tab.children = children
+        if self.tab._dom_classes != classes:
+            self.tab._dom_classes = classes
+        if self.tab.titles != titles:
+            self.tab.titles = titles
+        if self.tab.selected_index != new_index:
+            self.tab.selected_index = new_index
 
     def set_tab_status(
         self,
