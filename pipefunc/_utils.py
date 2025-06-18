@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
 import cloudpickle
 import numpy as np
+import pandas as pd
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
@@ -475,7 +476,7 @@ def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
     of the same length. The recursion stops and returns the shape found so far
     if it encounters:
 
-    - A non-list element.
+    - A non-list or non-tuple element.
     - A level where not all elements are lists.
     - A level where lists have varying lengths.
     - A level where sub-structures have different shapes.
@@ -483,14 +484,17 @@ def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
     if isinstance(x, np.ndarray):
         return x.shape
 
-    if not isinstance(x, list):
+    if isinstance(x, (range, pd.Series)):
+        x = list(x)
+
+    if not isinstance(x, (list, tuple)):
         return ()
 
     if not x:
         return (0,)
 
     # If not all items are lists, we can only determine the first dimension
-    if not all(isinstance(item, list) for item in x):
+    if not all(isinstance(item, (list, tuple)) for item in x):
         return (len(x),)
 
     # All items are lists, check if they have the same length

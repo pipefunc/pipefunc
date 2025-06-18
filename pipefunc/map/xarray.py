@@ -109,6 +109,7 @@ def _xarray(
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
     data = data_loader(output_name)
+    data = maybe_to_array(data)
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
@@ -128,7 +129,7 @@ def _xarray(
             continue
 
         if not isinstance(array, np.ndarray):
-            array = _to_array(array, infer_shape(array))
+            array = maybe_to_array(array)
 
         array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
@@ -155,8 +156,13 @@ def _xarray(
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
 
-def _to_array(x: list[Any], shape: tuple[int, ...]) -> np.ndarray:
+def maybe_to_array(x: Any) -> np.ndarray | Any:
     """Convert an iterable to an array."""
+    if isinstance(x, np.ndarray):
+        return x
+    shape = infer_shape(x)
+    if shape == ():
+        return x
     arr = np.empty(shape, dtype=object)
     arr[:] = x
     return arr
