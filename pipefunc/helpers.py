@@ -6,6 +6,7 @@ import asyncio
 import importlib.util
 import inspect
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -295,6 +296,12 @@ def _maybe_output_tabs(
     if has_ipywidgets and display_widgets and is_running_in_ipynb():
         requires("ipywidgets", reason="tab_widget=True", extras="widgets")
         from pipefunc._widgets.output_tabs import OutputTabs
+
+        if max_completed_tabs and os.environ.get("VSCODE_PID") is not None:  # pragma: no cover
+            warnings.warn(
+                "`max_completed_tabs` is buggy in VS Code Jupyter notebook environment.",
+                stacklevel=2,
+            )
 
         tabs = OutputTabs(len(async_maps), max_completed_tabs)
         tabs.display()
