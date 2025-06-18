@@ -48,9 +48,9 @@ class VariantPipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
-    suppress_error_log
+    print_error
         Flag indicating whether errors raised during the function execution should
-        be logged to the console.
+        be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
@@ -170,7 +170,7 @@ class VariantPipeline:
         default_variant: str | dict[str | None, str] | None = None,
         lazy: bool = False,
         debug: bool | None = None,
-        suppress_error_log: bool | None = None,
+        print_error: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
@@ -185,7 +185,7 @@ class VariantPipeline:
         self.default_variant = default_variant
         self.lazy = lazy
         self.debug = debug
-        self.suppress_error_log = suppress_error_log
+        self.print_error = print_error
         self.profile = profile
         self.cache_type = cache_type
         self.cache_kwargs = cache_kwargs
@@ -278,7 +278,7 @@ class VariantPipeline:
             new_functions,  # type: ignore[arg-type]
             lazy=kwargs.get("lazy", self.lazy),
             debug=kwargs.get("debug", self.debug),
-            suppress_error_log=kwargs.get("suppress_error_log", self.suppress_error_log),
+            print_error=kwargs.get("print_error", self.print_error),
             profile=kwargs.get("profile", self.profile),
             cache_type=kwargs.get("cache_type", self.cache_type),
             cache_kwargs=kwargs.get("cache_kwargs", self.cache_kwargs),
@@ -347,7 +347,7 @@ class VariantPipeline:
             "functions": self.functions,
             "lazy": self.lazy,
             "debug": self.debug,
-            "suppress_error_log": self.suppress_error_log,
+            "print_error": self.print_error,
             "profile": self.profile,
             "cache_type": self.cache_type,
             "cache_kwargs": self.cache_kwargs,

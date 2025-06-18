@@ -91,9 +91,9 @@ class PipeFunc(Generic[T]):
         Profiling is only available for sequential execution.
     debug
         Flag indicating whether debug information should be printed.
-    suppress_error_log
+    print_error
         Flag indicating whether errors raised during the function execution should
-        be logged to the console.
+        be printed.
     cache
         Flag indicating whether the wrapped function should be cached.
     mapspec
@@ -212,7 +212,7 @@ class PipeFunc(Generic[T]):
         bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
-        suppress_error_log: bool = False,
+        print_error: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -233,7 +233,7 @@ class PipeFunc(Generic[T]):
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
-        self.suppress_error_log = suppress_error_log
+        self.print_error = print_error
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
         self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
@@ -641,7 +641,7 @@ class PipeFunc(Generic[T]):
             "defaults": self._defaults,
             "bound": self._bound,
             "profile": self._profile,
-            "suppress_error_log": self.suppress_error_log,
+            "print_error": self.print_error,
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
@@ -705,7 +705,7 @@ class PipeFunc(Generic[T]):
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
-                if not self.suppress_error_log:
+                if not self.print_error:
                     print(
                         f"An error occurred while calling the function `{self.__name__}`"
                         f" with the arguments `{args=}` and `{kwargs=}`.",
@@ -977,7 +977,7 @@ def pipefunc(
     bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
-    suppress_error_log: bool = False,
+    print_error: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -1022,9 +1022,9 @@ def pipefunc(
         Flag indicating whether the decorated function should be profiled.
     debug
         Flag indicating whether debug information should be printed.
-    suppress_error_log
+    print_error
         Flag indicating whether errors raised during the function execution should
-        be logged to the console.
+        be printed.
     cache
         Flag indicating whether the decorated function should be cached.
     mapspec
@@ -1151,7 +1151,7 @@ def pipefunc(
             bound=bound,
             profile=profile,
             debug=debug,
-            suppress_error_log=suppress_error_log,
+            print_error=print_error,
             cache=cache,
             mapspec=mapspec,
             internal_shape=internal_shape,
@@ -1276,7 +1276,7 @@ class NestedPipeFunc(PipeFunc):
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
-        self.suppress_error_log = False
+        self.print_error = False
         self._renames: dict[str, str] = renames or {}
         self._bound: dict[str, Any] = bound or {}
         self._defaults: dict[str, Any] = {
