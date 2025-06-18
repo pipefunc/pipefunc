@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +13,8 @@ from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from ipywidgets import Widget
 
     from pipefunc._widgets.output_tabs import OutputTabs
     from pipefunc.map._result import ResultDict
@@ -265,6 +268,7 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
                 if async_map.multi_run_manager is not None:  # pragma: no cover
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
+                    _register_widget(widget)
                     tabs.outputs[index].append_display_data(widget)
                 if widgets:
                     tabs.show_output(index)
@@ -276,6 +280,25 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
 
     tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
     return await asyncio.gather(*tasks)
+
+
+def _register_widget(widget: Widget) -> None:  # pragma: no cover
+    """Register widget in VS Code to work around widget rendering bug.
+
+    This is a workaround for VS Code Jupyter notebook environment where
+    widgets created and immediately used in append_display_data() without
+    being displayed first don't get properly registered in the widget state.
+
+    See: https://github.com/microsoft/vscode-jupyter/issues/16739
+    """
+    if os.environ.get("VSCODE_PID") is None:
+        return
+
+    from IPython.display import display
+    from ipywidgets import Output
+
+    with Output():
+        display(widget)
 
 
 def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[list[ResultDict]]:
