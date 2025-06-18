@@ -2162,12 +2162,15 @@ class Pipeline:
             pipeline.drop(f=f)
 
         if inputs is not None:
-            new_root_args = set(pipeline.topological_generations.root_args)
-            if not new_root_args.issubset(inputs):
+            # subtract inputs with default values as they are not required
+            new_required_root_args = set(pipeline.topological_generations.root_args) - set(
+                pipeline.defaults.keys(),
+            )
+            if not new_required_root_args.issubset(inputs):
                 outputs = {f.output_name for f in pipeline.functions}
                 msg = (
                     f"Cannot construct a partial pipeline with `{outputs=}`"
-                    f" and `{inputs=}`, it would require `{new_root_args}`."
+                    f" and `{inputs=}`, it would require `{new_required_root_args}`."
                 )
                 raise ValueError(msg)
 
