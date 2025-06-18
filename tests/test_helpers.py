@@ -206,6 +206,6 @@ async def test_launch_maps_with_output_tabs_failed() -> None:
         patch("pipefunc.helpers.is_running_in_ipynb", return_value=True),
     ):
         runners = [pipeline_double.map_async(inputs, start=False) for inputs in inputs_dicts]
-        task = launch_maps(*runners, max_concurrent=3)
+        task = launch_maps(*runners, max_concurrent=3, max_completed_tabs=1)
     with pytest.raises(TypeError, match="unsupported operand type"):
         await task
