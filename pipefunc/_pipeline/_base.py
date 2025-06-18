@@ -2163,9 +2163,8 @@ class Pipeline:
 
         if inputs is not None:
             # subtract inputs with default values as they are not required
-            new_required_root_args = set(pipeline.topological_generations.root_args) - set(
-                pipeline.defaults.keys(),
-            )
+            root_args = set(pipeline.topological_generations.root_args)
+            new_required_root_args = root_args - pipeline.defaults.keys()
             if not new_required_root_args.issubset(inputs):
                 outputs = {f.output_name for f in pipeline.functions}
                 msg = (
