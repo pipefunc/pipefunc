@@ -641,6 +641,7 @@ class PipeFunc(Generic[T]):
             "defaults": self._defaults,
             "bound": self._bound,
             "profile": self._profile,
+            "suppress_error_log": self.suppress_error_log,
             "debug": self.debug,
             "cache": self.cache,
             "mapspec": self.mapspec,
@@ -1275,6 +1276,7 @@ class NestedPipeFunc(PipeFunc):
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
+        self.suppress_error_log = False
         self._renames: dict[str, str] = renames or {}
         self._bound: dict[str, Any] = bound or {}
         self._defaults: dict[str, Any] = {

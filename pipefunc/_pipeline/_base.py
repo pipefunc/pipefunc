@@ -99,7 +99,6 @@ class Pipeline:
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
     suppress_error_log
-    suppress_error_log
         Flag indicating whether errors raised during the function execution should
         be logged to the console.
         If ``None``, the value of each PipeFunc's debug attribute is used.
@@ -1919,6 +1918,7 @@ class Pipeline:
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
+            "suppress_error_log": self._suppress_error_log,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
