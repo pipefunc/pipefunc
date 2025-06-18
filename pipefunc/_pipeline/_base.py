@@ -101,7 +101,7 @@ class Pipeline:
     print_error
         Flag indicating whether errors raised during the function execution should
         be printed.
-        If ``None``, the value of each PipeFunc's debug attribute is used.
+        If ``None``, the value of each PipeFunc's print_error attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
