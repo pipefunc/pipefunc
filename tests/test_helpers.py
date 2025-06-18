@@ -201,6 +201,7 @@ async def test_launch_maps_with_output_tabs_failed() -> None:
         # returns a widget, however, for some unknown reason, the patch is not working.
         patch("pipefunc._widgets.helpers.is_running_in_ipynb", return_value=True),
         patch("pipefunc.map._progress.is_running_in_ipynb", return_value=True),
+        patch("pipefunc.helpers.is_running_in_ipynb", return_value=True),
     ):
         runners = [pipeline_double.map_async(inputs, start=False) for inputs in inputs_dicts]
         task = launch_maps(*runners, max_concurrent=3)
