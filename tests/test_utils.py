@@ -14,6 +14,7 @@ from pipefunc._utils import (
     format_function_call,
     format_kwargs,
     handle_error,
+    infer_shape,
     is_classmethod,
     is_min_version,
     is_pydantic_base_model,
@@ -348,3 +349,15 @@ def test_is_classmethod() -> None:
     assert not is_classmethod(lambda x: x)
     assert not is_classmethod(1)  # type: ignore[arg-type]
     assert not is_classmethod("method")  # type: ignore[arg-type]
+
+
+def test_infer_shape() -> None:
+    assert infer_shape([1, 2, 3]) == (3,)
+    assert infer_shape([[1, 2, 3], [4, 5, 6]]) == (2, 3)
+    assert infer_shape([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == (3, 3)
+    assert infer_shape([[1, 2, 3], [4, 5, 6]]) == (2, 3)
+    assert infer_shape([[[1], [2], [3]], [4, 5, 6]]) == (2, 3)
+    assert infer_shape([[1, 2, 3], [[4], [5], [6]]]) == (2, 3)
+    assert infer_shape([[1], [2], [3]]) == (3, 1)
+    assert infer_shape([[[1]], [[2]], [3]]) == (3, 1)
+    assert infer_shape([[[1]], [[2]], [[3]]]) == (3, 1, 1)

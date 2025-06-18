@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from pipefunc._utils import infer_shape
+
 from ._load import load_outputs, maybe_load_data
 from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
 from ._run_info import RunInfo
@@ -120,12 +122,13 @@ def _xarray(
         if name in inputs:
             array = inputs[name]
             array = maybe_load_data(array)
-            if not isinstance(array, np.ndarray):
-                array = _to_array(array, (len(array),))
         elif load_intermediate:
             array = data_loader(name)
         else:
             continue
+
+        if not isinstance(array, np.ndarray):
+            array = _to_array(array, infer_shape(array))
 
         array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
