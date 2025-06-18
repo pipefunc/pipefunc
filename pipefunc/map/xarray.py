@@ -26,6 +26,19 @@ if TYPE_CHECKING:
     from ._result import ResultDict
 
 
+def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str, ...]]) -> Any:
+    """Reshape N-D array to match mapspec dimensionality using object arrays."""
+    dims = axes_mapping.get(name)
+    if dims and isinstance(array, np.ndarray) and array.ndim > len(dims):
+        expected_prefix = array.shape[: len(dims)]
+        if array.shape[: len(dims)] == expected_prefix:
+            new_array = np.empty(expected_prefix, dtype=object)
+            for index in np.ndindex(expected_prefix):
+                new_array[index] = array[index]
+            return new_array
+    return array
+
+
 def load_xarray(
     output_name: str,
     mapspecs: list[MapSpec],
@@ -110,6 +123,7 @@ def _xarray(
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
+    data = _reshape_if_needed(data, output_name, axes_mapping)
     coord_mapping: dict[tuple[str, ...], dict[str, list[Any]]] = defaultdict(
         lambda: defaultdict(list),
     )
@@ -126,6 +140,7 @@ def _xarray(
         else:
             continue
 
+        array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
             coord_mapping[axes][name].append(array)
 
