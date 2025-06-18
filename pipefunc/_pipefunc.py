@@ -705,7 +705,7 @@ class PipeFunc(Generic[T]):
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
-                if not self.print_error:
+                if self.print_error:
                     print(
                         f"An error occurred while calling the function `{self.__name__}`"
                         f" with the arguments `{args=}` and `{kwargs=}`.",
