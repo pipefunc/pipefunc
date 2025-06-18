@@ -30,6 +30,10 @@ class _OutputTab:
     status: str | None = None
     completion_order: int | None = None
 
+    @property
+    def title(self) -> str:
+        return f"{_STATUS_SYMBOLS[self.status]} {self.index}" if self.status else str(self.index)
+
 
 class OutputTabs:
     """A ``ipywidgets.Tab`` widget that contains ``ipywidgets.Output`` widgets."""
@@ -73,10 +77,7 @@ class OutputTabs:
         self._enforce_max_completed_tabs()
         visible_tabs = [tab for tab in self._tabs if tab.visible]
         classes = [f"tab-{i}-{tab.status}" for i, tab in enumerate(visible_tabs) if tab.status]
-        titles = [
-            f"{_STATUS_SYMBOLS[tab.status]} {tab.index}" if tab.status else str(tab.index)
-            for tab in visible_tabs
-        ]
+        titles = [tab.title for tab in visible_tabs]
         children = tuple(tab.widget for tab in visible_tabs)
 
         if not children:
