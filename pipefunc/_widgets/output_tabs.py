@@ -121,10 +121,8 @@ class OutputTabs:
     @contextmanager
     def output_context(self, index_output: int) -> Generator[None, None, None]:
         """Context manager to show the output at the given index_output."""
-        if not 0 <= index_output < len(self._tabs):
-            msg = f"Index {index_output} out of range for {len(self._tabs)} outputs"
-            raise IndexError(msg)
-        with self._tabs[index_output].widget:
+        output = self.output(index_output)
+        with output:
             yield
         self.show_output(index_output)
 
