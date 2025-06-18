@@ -26,19 +26,6 @@ if TYPE_CHECKING:
     from ._result import ResultDict
 
 
-def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str, ...]]) -> Any:
-    """Reshape N-D array to match mapspec dimensionality using object arrays."""
-    dims = axes_mapping.get(name)
-    if dims and isinstance(array, np.ndarray) and array.ndim > len(dims):
-        expected_prefix = array.shape[: len(dims)]
-        if array.shape[: len(dims)] == expected_prefix:
-            new_array = np.empty(expected_prefix, dtype=object)
-            for index in np.ndindex(expected_prefix):
-                new_array[index] = array[index]
-            return new_array
-    return array
-
-
 def load_xarray(
     output_name: str,
     mapspecs: list[MapSpec],
@@ -170,6 +157,19 @@ def _to_array(x: list[Any], shape: tuple[int, ...]) -> np.ndarray:
     arr = np.empty(shape, dtype=object)
     arr[:] = x
     return arr
+
+
+def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str, ...]]) -> Any:
+    """Reshape N-D array to match mapspec dimensionality using object arrays."""
+    dims = axes_mapping.get(name)
+    if dims and isinstance(array, np.ndarray) and array.ndim > len(dims):
+        expected_prefix = array.shape[: len(dims)]
+        if array.shape[: len(dims)] == expected_prefix:
+            new_array = np.empty(expected_prefix, dtype=object)
+            for index in np.ndindex(expected_prefix):
+                new_array[index] = array[index]
+            return new_array
+    return array
 
 
 def _xarray_dataset(

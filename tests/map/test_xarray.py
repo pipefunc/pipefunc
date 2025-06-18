@@ -331,3 +331,19 @@ def test_1d_mapspec_returns_2d_array() -> None:
     ds = results.to_xarray()
     assert "y" in ds.coords
     assert "z" in ds.data_vars
+
+
+def test_1d_mapspec_returns_2d_list_of_lists() -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f() -> list[list[float]]:
+        return [[1, 2, 3] for _ in range(10)]
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map(inputs={})
+    ds = results.to_xarray()
+    assert "y" in ds.coords
+    assert "z" in ds.data_vars
