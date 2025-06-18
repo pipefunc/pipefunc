@@ -98,6 +98,10 @@ class Pipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
+        If ``None``, the value of each PipeFunc's print_error attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
@@ -175,6 +179,7 @@ class Pipeline:
         *,
         lazy: bool = False,
         debug: bool | None = None,
+        print_error: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
@@ -188,6 +193,7 @@ class Pipeline:
         self.functions: list[PipeFunc] = []
         self.lazy = lazy
         self._debug = debug
+        self._print_error = print_error
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
@@ -284,6 +290,19 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
+    @property
+    def print_error(self) -> bool | None:
+        """Flag indicating whether errors raised during the function execution should be printed."""
+        return self._print_error
+
+    @print_error.setter
+    def print_error(self, value: bool | None) -> None:
+        """Set the print_error flag for the pipeline and all functions."""
+        self._print_error = value
+        if value is not None:
+            for f in self.functions:
+                f.print_error = value
+
     def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -327,6 +346,9 @@ class Pipeline:
 
         if self.debug is not None:
             f.debug = self.debug
+
+        if self.print_error is not None:
+            f.print_error = self.print_error
 
         self._clear_internal_cache()  # reset cache
         self.validate()
@@ -1896,6 +1918,7 @@ class Pipeline:
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
+            "print_error": self._print_error,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,

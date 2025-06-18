@@ -698,18 +698,28 @@ def test_unhashable_defaults() -> None:
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
-def test_set_debug_and_profile() -> None:
+def test_overwrite_flags() -> None:
     @pipefunc(output_name="c")
-    def f(a, b):
+    def func(a, b):
         return a + b
 
+    f = func.copy()
     pipeline = Pipeline([f])
     assert not f.debug
     assert not f.profile
+    assert f.print_error
     pipeline.debug = True
     pipeline.profile = True
+    pipeline.print_error = False
     assert pipeline["c"].debug
     assert pipeline["c"].profile
+    assert not pipeline["c"].print_error
+
+    f = func.copy()
+    pipeline = Pipeline([f], debug=True, profile=True, print_error=False)
+    assert pipeline["c"].debug
+    assert pipeline["c"].profile
+    assert not pipeline["c"].print_error
 
 
 def test_nesting_funcs_with_bound() -> None:
