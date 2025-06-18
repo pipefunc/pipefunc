@@ -694,19 +694,19 @@ def test_overwrite_flags() -> None:
     pipeline = Pipeline([f])
     assert not f.debug
     assert not f.profile
-    assert not f.suppress_error_log
+    assert f.print_error
     pipeline.debug = True
     pipeline.profile = True
-    pipeline.suppress_error_log = True
+    pipeline.print_error = False
     assert pipeline["c"].debug
     assert pipeline["c"].profile
-    assert pipeline["c"].suppress_error_log
+    assert not pipeline["c"].print_error
 
     f = func.copy()
-    pipeline = Pipeline([f], debug=True, profile=True, suppress_error_log=True)
+    pipeline = Pipeline([f], debug=True, profile=True, print_error=False)
     assert pipeline["c"].debug
     assert pipeline["c"].profile
-    assert pipeline["c"].suppress_error_log
+    assert not pipeline["c"].print_error
 
 
 def test_nesting_funcs_with_bound() -> None:

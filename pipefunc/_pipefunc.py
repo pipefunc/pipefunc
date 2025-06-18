@@ -212,7 +212,7 @@ class PipeFunc(Generic[T]):
         bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
-        print_error: bool = False,
+        print_error: bool = True,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -977,7 +977,7 @@ def pipefunc(
     bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
-    print_error: bool = False,
+    print_error: bool = True,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -1276,7 +1276,7 @@ class NestedPipeFunc(PipeFunc):
         self.variant: dict[str | None, str] = _ensure_variant(variant)
         self._output_picker = None
         self._profile = False
-        self.print_error = False
+        self.print_error = True
         self._renames: dict[str, str] = renames or {}
         self._bound: dict[str, Any] = bound or {}
         self._defaults: dict[str, Any] = {
