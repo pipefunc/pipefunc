@@ -685,11 +685,12 @@ def test_unhashable_defaults() -> None:
 
 
 @pytest.mark.skipif(not has_psutil, reason="psutil not installed")
-def test_set_overwrite_attributes() -> None:
+def test_overwrite_flags() -> None:
     @pipefunc(output_name="c")
-    def f(a, b):
+    def func(a, b):
         return a + b
 
+    f = func.copy()
     pipeline = Pipeline([f])
     assert not f.debug
     assert not f.profile
@@ -697,6 +698,12 @@ def test_set_overwrite_attributes() -> None:
     pipeline.debug = True
     pipeline.profile = True
     pipeline.suppress_error_log = True
+    assert pipeline["c"].debug
+    assert pipeline["c"].profile
+    assert pipeline["c"].suppress_error_log
+
+    f = func.copy()
+    pipeline = Pipeline([f], debug=True, profile=True, suppress_error_log=True)
     assert pipeline["c"].debug
     assert pipeline["c"].profile
     assert pipeline["c"].suppress_error_log
