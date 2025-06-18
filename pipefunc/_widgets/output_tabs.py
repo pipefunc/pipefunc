@@ -72,15 +72,13 @@ class OutputTabs:
         current_output = self.tab.children[current_index] if current_index is not None else None
         self._enforce_max_completed_tabs()
         visible_tabs = [tab for tab in self._tabs if tab.visible]
-        classes = []
-        titles = []
-        for i, tab in enumerate(visible_tabs):
-            status = tab.status
-            title = f"{_STATUS_SYMBOLS[status]} {tab.index}" if status else str(tab.index)
-            titles.append(title)
-            if status:
-                classes.append(f"tab-{i}-{status}")
+        classes = [f"tab-{i}-{tab.status}" for i, tab in enumerate(visible_tabs) if tab.status]
+        titles = [
+            f"{_STATUS_SYMBOLS[tab.status]} {tab.index}" if tab.status else str(tab.index)
+            for tab in visible_tabs
+        ]
         children = tuple(tab.widget for tab in visible_tabs)
+
         if not children:
             new_index = None
         elif current_output in children:
