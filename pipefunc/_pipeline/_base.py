@@ -98,6 +98,11 @@ class Pipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
+    suppress_error_log
+    suppress_error_log
+        Flag indicating whether errors raised during the function execution should
+        be logged to the console.
+        If ``None``, the value of each PipeFunc's debug attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
@@ -175,6 +180,7 @@ class Pipeline:
         *,
         lazy: bool = False,
         debug: bool | None = None,
+        suppress_error_log: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
@@ -188,6 +194,7 @@ class Pipeline:
         self.functions: list[PipeFunc] = []
         self.lazy = lazy
         self._debug = debug
+        self._suppress_error_log = suppress_error_log
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
@@ -284,6 +291,19 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
+    @property
+    def suppress_error_log(self) -> bool | None:
+        """Flag indicating whether errors raised during the function execution should be logged to the console."""
+        return self._suppress_error_log
+
+    @suppress_error_log.setter
+    def suppress_error_log(self, value: bool | None) -> None:
+        """Set the suppress_error_log flag for the pipeline and all functions."""
+        self._suppress_error_log = value
+        if value is not None:
+            for f in self.functions:
+                f.suppress_error_log = value
+
     def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -327,6 +347,9 @@ class Pipeline:
 
         if self.debug is not None:
             f.debug = self.debug
+
+        if self.suppress_error_log is not None:
+            f.suppress_error_log = self.suppress_error_log
 
         self._clear_internal_cache()  # reset cache
         self.validate()

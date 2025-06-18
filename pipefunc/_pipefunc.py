@@ -91,6 +91,9 @@ class PipeFunc(Generic[T]):
         Profiling is only available for sequential execution.
     debug
         Flag indicating whether debug information should be printed.
+    suppress_error_log
+        Flag indicating whether errors raised during the function execution should
+        be logged to the console.
     cache
         Flag indicating whether the wrapped function should be cached.
     mapspec
@@ -209,6 +212,7 @@ class PipeFunc(Generic[T]):
         bound: dict[str, Any] | None = None,
         profile: bool = False,
         debug: bool = False,
+        suppress_error_log: bool = False,
         cache: bool = False,
         mapspec: str | MapSpec | None = None,
         internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -229,6 +233,7 @@ class PipeFunc(Generic[T]):
         self.__name__ = _get_name(func)
         self._output_name: OUTPUT_TYPE = output_name
         self.debug = debug
+        self.suppress_error_log = suppress_error_log
         self.cache = cache
         self.mapspec = _maybe_mapspec(mapspec)
         self.internal_shape: int | Literal["?"] | ShapeTuple | None = internal_shape
@@ -699,10 +704,11 @@ class PipeFunc(Generic[T]):
             try:
                 result = self.func(*args, **kwargs)
             except Exception as e:
-                print(
-                    f"An error occurred while calling the function `{self.__name__}`"
-                    f" with the arguments `{args=}` and `{kwargs=}`.",
-                )
+                if not self.suppress_error_log:
+                    print(
+                        f"An error occurred while calling the function `{self.__name__}`"
+                        f" with the arguments `{args=}` and `{kwargs=}`.",
+                    )
                 self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
                 raise
 
@@ -970,6 +976,7 @@ def pipefunc(
     bound: dict[str, Any] | None = None,
     profile: bool = False,
     debug: bool = False,
+    suppress_error_log: bool = False,
     cache: bool = False,
     mapspec: str | MapSpec | None = None,
     internal_shape: int | Literal["?"] | ShapeTuple | None = None,
@@ -1014,6 +1021,9 @@ def pipefunc(
         Flag indicating whether the decorated function should be profiled.
     debug
         Flag indicating whether debug information should be printed.
+    suppress_error_log
+        Flag indicating whether errors raised during the function execution should
+        be logged to the console.
     cache
         Flag indicating whether the decorated function should be cached.
     mapspec
@@ -1140,6 +1150,7 @@ def pipefunc(
             bound=bound,
             profile=profile,
             debug=debug,
+            suppress_error_log=suppress_error_log,
             cache=cache,
             mapspec=mapspec,
             internal_shape=internal_shape,
