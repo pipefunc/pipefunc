@@ -595,6 +595,19 @@ def test_subpipeline() -> None:
         pipeline.subpipeline()
 
 
+def test_subpipeline_with_defaults() -> None:
+    @pipefunc(output_name=("c", "d"))
+    def f(a: int, b: int = 1):
+        return a + b, 1
+
+    @pipefunc(output_name="z")
+    def g(c, d):
+        return c + d
+
+    pipeline = Pipeline([f, g])
+    pipeline.subpipeline({"a"}, {"z"})
+
+
 def test_nest_all() -> None:
     @pipefunc(output_name="c")
     def f(a, b):
