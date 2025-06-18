@@ -88,14 +88,12 @@ class OutputTabs:
         else:
             new_index = 0
 
-        if self.tab.children != children:
-            self.tab.children = children
-        if self.tab._dom_classes != classes:
-            self.tab._dom_classes = classes
-        if self.tab.titles != titles:
-            self.tab.titles = titles
-        if self.tab.selected_index != new_index:
-            self.tab.selected_index = new_index
+        self.tab.children, self.tab._dom_classes, self.tab.titles, self.tab.selected_index = (
+            children,
+            classes,
+            titles,
+            new_index,
+        )
 
     def set_tab_status(
         self,
