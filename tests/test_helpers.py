@@ -134,17 +134,21 @@ def test_get_attribute_factory_return_annotation_inference() -> None:
     assert f(obj) == 42
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("output_tabs", [True, False])
-async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
-    if output_tabs and not has_ipywidgets:
-        pytest.skip("ipywidgets not installed")
-
+@pytest.fixture
+def pipeline() -> Pipeline:
     @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
     def double_it(x: int) -> int:
         return 2 * x
 
-    pipeline = Pipeline([double_it])
+    return Pipeline([double_it])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_tabs", [True, False])
+async def test_launch_maps(output_tabs: bool, pipeline: Pipeline) -> None:  # noqa: FBT001
+    if output_tabs and not has_ipywidgets:
+        pytest.skip("ipywidgets not installed")
+
     inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
 
     with (
@@ -164,12 +168,7 @@ async def test_launch_maps(output_tabs: bool) -> None:  # noqa: FBT001
 
 
 @pytest.mark.asyncio
-async def test_launch_maps_already_running() -> None:
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double_it(x: int) -> int:
-        return 2 * x
-
-    pipeline = Pipeline([double_it])
+async def test_launch_maps_already_running(pipeline: Pipeline) -> None:
     runner = pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=True)
     with pytest.raises(
         RuntimeError,
@@ -181,15 +180,9 @@ async def test_launch_maps_already_running() -> None:
 
 
 @pytest.mark.asyncio
-async def test_launch_maps_with_output_tabs_failed() -> None:
+async def test_launch_maps_with_output_tabs_failed(pipeline: Pipeline) -> None:
     if not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
-
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double_it(x: int) -> int:
-        return 2 * x
-
-    pipeline_double = Pipeline([double_it])
 
     inputs_dicts = [
         {"x": [1, 2]},
@@ -205,7 +198,17 @@ async def test_launch_maps_with_output_tabs_failed() -> None:
         # Shows OutputTabs
         patch("pipefunc.helpers.is_running_in_ipynb", return_value=True),
     ):
-        runners = [pipeline_double.map_async(inputs, start=False) for inputs in inputs_dicts]
+        runners = [pipeline.map_async(inputs, start=False) for inputs in inputs_dicts]
         task = launch_maps(*runners, max_concurrent=3, max_completed_tabs=1)
     with pytest.raises(TypeError, match="unsupported operand type"):
         await task
+
+
+def test_validate_async_maps(pipeline: Pipeline) -> None:
+    inputs_dicts = [{"x": [1, 2, 3, 4, 5]}, {"x": [6, 7, 8, 9, 10]}]
+    runners = [pipeline.map_async(inputs, start=False) for inputs in inputs_dicts]
+    with pytest.raises(ValueError, match="It seems you passed a list or tuple"):
+        launch_maps(runners)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="requires at least one `AsyncMap` object"):
+        launch_maps()

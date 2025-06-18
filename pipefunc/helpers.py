@@ -239,6 +239,7 @@ async def gather_maps(
         List of results from each AsyncMap's task
 
     """
+    _validate_async_maps(async_maps)
     for async_map in async_maps:
         if async_map._task is not None:
             msg = "`pipeline.map_async(..., start=False)` must be called before `launch_maps`."
@@ -366,6 +367,7 @@ def launch_maps(
     >>> print("Computation finished!")
 
     """
+    _validate_async_maps(async_maps)
     tabs = _maybe_output_tabs(async_maps, max_completed_tabs)
     coro = gather_maps(
         *async_maps,
@@ -374,3 +376,17 @@ def launch_maps(
         _tabs=tabs,
     )
     return asyncio.create_task(coro)
+
+
+def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
+    caller_name = inspect.stack()[1].function
+    if len(async_maps) == 0:
+        msg = f"`{caller_name}` requires at least one `AsyncMap` object."
+        raise ValueError(msg)
+    if len(async_maps) == 1 and isinstance(async_maps[0], tuple | list):
+        msg = (
+            f"It seems you passed a list or tuple of `AsyncMap` objects as a single argument to `{caller_name}`. "
+            "Instead, you should unpack the sequence into individual arguments. "
+            f"For example, use `{caller_name}(*my_async_maps)` instead of `{caller_name}(my_async_maps)`."
+        )
+        raise ValueError(msg)
