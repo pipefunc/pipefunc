@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
     from ipywidgets import Output
 
-# Status symbols mapping
 _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
 
 
