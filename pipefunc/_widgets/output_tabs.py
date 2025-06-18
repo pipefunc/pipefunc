@@ -79,7 +79,7 @@ class OutputTabs:
         titles = [tab.title for tab in visible_tabs]
         children = tuple(tab.widget for tab in visible_tabs)
 
-        if not children:
+        if not children:  # pragma: no cover
             new_index = None
         elif current_output in children:
             new_index = children.index(current_output)
