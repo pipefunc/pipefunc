@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import inspect
 import os
 from pathlib import Path
@@ -281,7 +282,8 @@ async def gather_maps(
 
 def _maybe_output_tabs(async_maps: Sequence[AsyncMap]) -> OutputTabs | None:
     display_widgets = any(async_map._display_widgets for async_map in async_maps)
-    if display_widgets and is_running_in_ipynb():
+    has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+    if has_ipywidgets and display_widgets and is_running_in_ipynb():
         requires("ipywidgets", reason="tab_widget=True", extras="widgets")
         from pipefunc._widgets.output_tabs import OutputTabs
 
