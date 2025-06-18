@@ -1,79 +1,130 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from itertools import count
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-# Status symbols mapping
+    from ipywidgets import Output
+
 _STATUS_SYMBOLS = {"running": "●", "completed": "✓", "failed": "✗"}
+
+
+def _output() -> Output:
+    from ipywidgets import Output
+
+    return Output()
+
+
+@dataclass
+class _OutputTab:
+    """A simple data class to hold the state of a single output tab."""
+
+    index: int
+    widget: Output = field(default_factory=_output)
+    visible: bool = False
+    status: str | None = None
+    completion_order: int | None = None
+
+    @property
+    def title(self) -> str:
+        return f"{_STATUS_SYMBOLS[self.status]} {self.index}" if self.status else str(self.index)
 
 
 class OutputTabs:
     """A ``ipywidgets.Tab`` widget that contains ``ipywidgets.Output`` widgets."""
 
-    def __init__(self, num_outputs: int) -> None:
-        from ipywidgets import Output, Tab
+    def __init__(self, num_outputs: int, max_completed_tabs: int | None = None) -> None:
+        from ipywidgets import Tab
 
-        self.outputs: list[Output] = [Output() for _ in range(num_outputs)]
-        self._visible_outputs: dict[Output, bool] = dict.fromkeys(self.outputs, False)
+        self._tabs: list[_OutputTab] = [_OutputTab(i) for i in range(num_outputs)]
         self.tab: Tab = Tab(children=[])
-        self._tab_statuses: dict[int, str] = {}
+        self._max_completed_tabs = max_completed_tabs
+        self._completion_counter = count()
+
+    def output(self, index_output: int) -> Output:
+        """Get the `ipywidgets.Output` widget at the given index_output."""
+        if not 0 <= index_output < len(self._tabs):
+            msg = f"Index {index_output} out of range for {len(self._tabs)} outputs"
+            raise IndexError(msg)
+        return self._tabs[index_output].widget
 
     def display(self) -> None:
         """Display the ``ipywidgets.Tab`` widget."""
         from IPython.display import HTML, display
 
-        css = _generate_tab_css(len(self.outputs))
-        display(HTML(css), self.tab)
+        css = _generate_tab_css(len(self._tabs))
+        display(HTML(css))
+        display(self.tab)
 
-    def show_output(self, index: int) -> None:
-        """Show the output at the given index."""
-        self._visible_outputs[self.outputs[index]] = True
+    def show_output(self, index_output: int) -> None:
+        """Show the output at the given index_output."""
+        self._tabs[index_output].visible = True
         self._sync()
 
-    def hide_output(self, index: int) -> None:
-        """Hide the output at the given index."""
-        self._visible_outputs[self.outputs[index]] = False
+    def hide_output(self, index_output: int) -> None:
+        """Hide the output at the given index_output."""
+        self._tabs[index_output].visible = False
         self._sync()
 
     def _sync(self) -> None:
-        children = [output for output in self.outputs if self._visible_outputs[output]]
-        self.tab.children = children
-        for i_tab, output in enumerate(self.tab.children):
-            index = self.outputs.index(output)
-            if not self.tab.titles[i_tab]:
-                self.tab.set_title(i_tab, str(index))
+        current_index = self.tab.selected_index
+        current_output = self.tab.children[current_index] if current_index is not None else None
+        self._enforce_max_completed_tabs()
+        visible_tabs = [tab for tab in self._tabs if tab.visible]
+        classes = [f"tab-{i}-{tab.status}" for i, tab in enumerate(visible_tabs) if tab.status]
+        titles = [tab.title for tab in visible_tabs]
+        children = tuple(tab.widget for tab in visible_tabs)
 
-    def set_tab_status(self, index: int, status: Literal["running", "completed", "failed"]) -> None:
+        if not children:  # pragma: no cover
+            new_index = None
+        elif current_output in children:
+            new_index = children.index(current_output)
+        else:
+            new_index = 0
+
+        self.tab.children, self.tab._dom_classes, self.tab.titles, self.tab.selected_index = (
+            children,
+            classes,
+            titles,
+            new_index,
+        )
+
+    def set_tab_status(
+        self,
+        index_output: int,
+        status: Literal["running", "completed", "failed"],
+    ) -> None:
         """Sets the tab status using CSS classes on the widget itself."""
-        old_status = self._tab_statuses.get(index)
-        self._tab_statuses[index] = status
-        self._update_tab_classes(index, old_status, status)
+        tab = self._tabs[index_output]
+        tab.status = status
+        if status == "completed" and tab.completion_order is None:
+            tab.completion_order = next(self._completion_counter)
+        self._sync()
 
-        current_title = self.tab.titles[index]
-        for symbol in _STATUS_SYMBOLS.values():
-            current_title = current_title.replace(symbol, "").strip()
+    def _enforce_max_completed_tabs(self) -> None:
+        """Hide oldest completed tabs if more than ``max_completed_tabs`` are visible."""
+        if self._max_completed_tabs is None:
+            return
 
-        new_title = f"{_STATUS_SYMBOLS[status]} {current_title}"
-        self.tab.set_title(index, new_title)
-
-    def _update_tab_classes(self, index: int, old_status: str | None, new_status: str) -> None:
-        """Update CSS classes on the Tab widget to control individual tab styling."""
-        if old_status:
-            self.tab.remove_class(f"tab-{index}-{old_status}")
-        self.tab.add_class(f"tab-{index}-{new_status}")
+        visible_completed = [t for t in self._tabs if t.visible and t.status == "completed"]
+        if len(visible_completed) > self._max_completed_tabs:
+            # Sort by completion order to find the oldest
+            visible_completed.sort(key=lambda t: t.completion_order)  # type: ignore[arg-type,return-value]
+            num_to_hide = len(visible_completed) - self._max_completed_tabs
+            for tab_to_hide in visible_completed[:num_to_hide]:
+                tab_to_hide.visible = False
 
     @contextmanager
-    def output_context(self, index: int) -> Generator[None, None, None]:
-        """Context manager to show the output at the given index."""
-        if not 0 <= index < len(self.outputs):
-            msg = f"Index {index} out of range for {len(self.outputs)} outputs"
-            raise IndexError(msg)
-        with self.outputs[index]:
+    def output_context(self, index_output: int) -> Generator[None, None, None]:
+        """Context manager to show the output at the given index_output."""
+        output = self.output(index_output)
+        with output:
             yield
-        self.show_output(index)
+        self.show_output(index_output)
 
 
 _BASE_CSS = """

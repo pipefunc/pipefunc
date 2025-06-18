@@ -6,6 +6,7 @@ import asyncio
 import importlib.util
 import inspect
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -200,24 +201,25 @@ class FileValue:
         return cls(path=path)
 
 
-def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
+def _setup_automatic_tab_updates(index_output: int, tabs: OutputTabs, async_map: AsyncMap) -> None:
     def create_callback() -> Callable[[asyncio.Task[ResultDict]], None]:
         def callback(task: asyncio.Task[ResultDict]) -> None:
             if task.exception() is not None:
-                tabs.set_tab_status(tab_index, "failed")
+                tabs.set_tab_status(index_output, "failed")
             else:
-                tabs.set_tab_status(tab_index, "completed")
+                tabs.set_tab_status(index_output, "completed")
 
         return callback
 
     # Set initial status to running and add callbacks
-    tabs.set_tab_status(tab_index, "running")
+    tabs.set_tab_status(index_output, "running")
     async_map.task.add_done_callback(create_callback())
 
 
 async def gather_maps(
     *async_maps: AsyncMap,
     max_concurrent: int = 1,
+    max_completed_tabs: int | None = None,
     _tabs: OutputTabs | None = None,
 ) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
@@ -228,6 +230,9 @@ async def gather_maps(
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of concurrent jobs
+    max_completed_tabs
+        Maximum number of completed tabs to show. If ``None``, all completed tabs
+        are shown. Only used if ``display_widgets=True``.
 
     Returns
     -------
@@ -240,7 +245,9 @@ async def gather_maps(
             raise RuntimeError(msg)
 
     if _tabs is None:  # Prefer to get from the caller (in sync context), otherwise create it here
-        _tabs = _maybe_output_tabs(async_maps)
+        _tabs = _maybe_output_tabs(async_maps, max_completed_tabs)
+    else:
+        _tabs._max_completed_tabs = max_completed_tabs
 
     semaphore = asyncio.Semaphore(max_concurrent)
 
@@ -267,7 +274,7 @@ async def gather_maps(
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
                     _register_widget(widget)
-                    _tabs.outputs[index].append_display_data(widget)
+                    _tabs.output(index).append_display_data(widget)
                 if widgets:
                     _tabs.show_output(index)
                 _setup_automatic_tab_updates(index, _tabs, async_map)
@@ -280,14 +287,23 @@ async def gather_maps(
     return await asyncio.gather(*tasks)
 
 
-def _maybe_output_tabs(async_maps: Sequence[AsyncMap]) -> OutputTabs | None:
+def _maybe_output_tabs(
+    async_maps: Sequence[AsyncMap],
+    max_completed_tabs: int | None,
+) -> OutputTabs | None:
     display_widgets = any(async_map._display_widgets for async_map in async_maps)
     has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
     if has_ipywidgets and display_widgets and is_running_in_ipynb():
         requires("ipywidgets", reason="tab_widget=True", extras="widgets")
         from pipefunc._widgets.output_tabs import OutputTabs
 
-        tabs = OutputTabs(len(async_maps))
+        if max_completed_tabs and os.environ.get("VSCODE_PID") is not None:  # pragma: no cover
+            warnings.warn(
+                "`max_completed_tabs` is buggy in VS Code Jupyter notebook environment.",
+                stacklevel=2,
+            )
+
+        tabs = OutputTabs(len(async_maps), max_completed_tabs)
         tabs.display()
         return tabs
     return None
@@ -312,7 +328,11 @@ def _register_widget(widget: Widget) -> None:  # pragma: no cover
         display(widget)
 
 
-def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[list[ResultDict]]:
+def launch_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+    max_completed_tabs: int | None = None,
+) -> asyncio.Task[list[ResultDict]]:
     """Launch a collection of map operations to run concurrently in the background.
 
     This is a user-friendly, non-blocking wrapper around ``gather_maps``.
@@ -326,6 +346,9 @@ def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[
         `AsyncMap` objects created with ``pipeline.map_async(..., start=False)``.
     max_concurrent
         Maximum number of map operations to run at the same time.
+    max_completed_tabs
+        Maximum number of completed tabs to show. If ``None``, all completed tabs
+        are shown. Only used if ``display_widgets=True``.
 
     Returns
     -------
@@ -343,6 +366,11 @@ def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[
     >>> print("Computation finished!")
 
     """
-    tabs = _maybe_output_tabs(async_maps)
-    coro = gather_maps(*async_maps, max_concurrent=max_concurrent, _tabs=tabs)
+    tabs = _maybe_output_tabs(async_maps, max_completed_tabs)
+    coro = gather_maps(
+        *async_maps,
+        max_concurrent=max_concurrent,
+        max_completed_tabs=max_completed_tabs,
+        _tabs=tabs,
+    )
     return asyncio.create_task(coro)
