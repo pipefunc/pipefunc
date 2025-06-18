@@ -8,11 +8,11 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._utils import dump, load, requires
+from pipefunc._utils import dump, is_running_in_ipynb, load, requires
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from ipywidgets import Widget
 
@@ -214,7 +214,11 @@ def _setup_automatic_tab_updates(tab_index: int, tabs: OutputTabs, async_map: As
     async_map.task.add_done_callback(create_callback())
 
 
-async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[ResultDict]:
+async def gather_maps(
+    *async_maps: AsyncMap,
+    max_concurrent: int = 1,
+    _tabs: OutputTabs | None = None,
+) -> list[ResultDict]:
     """Run AsyncMap objects with a limit on simultaneous executions.
 
     Parameters
@@ -234,21 +238,14 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
             msg = "`pipeline.map_async(..., start=False)` must be called before `launch_maps`."
             raise RuntimeError(msg)
 
-    tab_widget = any(async_map._display_widgets for async_map in async_maps)
-    if tab_widget:
-        requires("ipywidgets", reason="tab_widget=True", extras="widgets")
-        from pipefunc._widgets.output_tabs import OutputTabs
-
-        tabs = OutputTabs(len(async_maps))
-        tabs.display()
-    else:
-        tabs = None
+    if _tabs is None:  # Prefer to get from the caller (in sync context), otherwise create it here
+        _tabs = _maybe_output_tabs(async_maps)
 
     semaphore = asyncio.Semaphore(max_concurrent)
 
     async def run_with_semaphore(index: int, async_map: AsyncMap) -> ResultDict:
         async with semaphore:
-            if tabs is not None and async_map._display_widgets:
+            if _tabs is not None and async_map._display_widgets:
                 # Cannot use output_context here, because it is not thread-safe
                 # See https://github.com/jupyter-widgets/ipywidgets/issues/3993
                 from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
@@ -269,10 +266,10 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
                     widgets.append(async_map.multi_run_manager.info())
                 for widget in widgets:
                     _register_widget(widget)
-                    tabs.outputs[index].append_display_data(widget)
+                    _tabs.outputs[index].append_display_data(widget)
                 if widgets:
-                    tabs.show_output(index)
-                _setup_automatic_tab_updates(index, tabs, async_map)
+                    _tabs.show_output(index)
+                _setup_automatic_tab_updates(index, _tabs, async_map)
             else:
                 async_map.start()
 
@@ -280,6 +277,18 @@ async def gather_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> list[Re
 
     tasks = [run_with_semaphore(index, async_map) for index, async_map in enumerate(async_maps)]
     return await asyncio.gather(*tasks)
+
+
+def _maybe_output_tabs(async_maps: Sequence[AsyncMap]) -> OutputTabs | None:
+    display_widgets = any(async_map._display_widgets for async_map in async_maps)
+    if display_widgets and is_running_in_ipynb():
+        requires("ipywidgets", reason="tab_widget=True", extras="widgets")
+        from pipefunc._widgets.output_tabs import OutputTabs
+
+        tabs = OutputTabs(len(async_maps))
+        tabs.display()
+        return tabs
+    return None
 
 
 def _register_widget(widget: Widget) -> None:  # pragma: no cover
@@ -332,5 +341,6 @@ def launch_maps(*async_maps: AsyncMap, max_concurrent: int = 1) -> asyncio.Task[
     >>> print("Computation finished!")
 
     """
-    coro = gather_maps(*async_maps, max_concurrent=max_concurrent)
+    tabs = _maybe_output_tabs(async_maps)
+    coro = gather_maps(*async_maps, max_concurrent=max_concurrent, _tabs=tabs)
     return asyncio.create_task(coro)
