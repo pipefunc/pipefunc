@@ -105,7 +105,6 @@ def _slurm_executor_for_map(
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     func = process_index.keywords["func"]
     executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
-    _prune_executor_kwargs(executor_kwargs)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)  # type: ignore[assignment]
     return _new_slurm_executor(executor, **executor_kwargs)
 
@@ -118,16 +117,9 @@ def _slurm_executor_for_single(
     resources: Resources | None = (
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
-    executor_kwargs = _adaptive_scheduler_resource_dict(resources)
-    _prune_executor_kwargs(executor_kwargs)
+    executor_kwargs = _adaptive_scheduler_resource_dict(resources, clear=True)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)
-
-
-def _prune_executor_kwargs(kwargs: dict[str, Any]) -> None:
-    # Do not pass executor_type if it is None.
-    if kwargs.get("executor_type", False) is None:
-        del kwargs["executor_type"]
 
 
 def _adaptive_scheduler_imported() -> bool:
@@ -189,14 +181,15 @@ def _map_slurm_executor_kwargs(
             return kwargs
         assert func.resources_scope == "map"
         # Use the single static resource dict.
-        kwargs.update(_adaptive_scheduler_resource_dict(resources))
+        scheduler_resources = _adaptive_scheduler_resource_dict(resources, clear=True)
+        kwargs.update(scheduler_resources)
         return kwargs
 
     # Now resources is callable.
     if func.resources_scope == "map":
         # Call the callable only once.
         evaluated_resources = _resources_from_process_index(process_index, seq[0])
-        scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources)
+        scheduler_resources = _adaptive_scheduler_resource_dict(evaluated_resources, clear=True)
         kwargs.update(scheduler_resources)
         return kwargs
     assert func.resources_scope == "element"
@@ -223,19 +216,30 @@ def _new_slurm_executor(
     return executor(**kwargs)
 
 
-def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, Any]:
+def _adaptive_scheduler_resource_dict(
+    resources: Resources | None,
+    *,
+    clear: bool = False,
+) -> dict[str, Any]:
     if resources is None:
         return {}
     assert _adaptive_scheduler_imported()
     from .adaptive_scheduler import __executor_type, __extra_scheduler
 
-    return {
+    kwargs = {
         "extra_scheduler": __extra_scheduler(resources),
         "executor_type": __executor_type(resources),
         "cores_per_node": resources.cpus_per_node or resources.cpus,
         "nodes": resources.nodes or 1,
         "partition": resources.partition,
     }
+    if not clear:
+        return kwargs
+    # Remove None or [] values
+    # NOTE: Should not happen for `resources_scope == "element"`
+    # because they are cleaned in `_list_of_dicts_to_dict_of_tuples`
+    # which assumes that all dicts have the same keys.
+    return {k: v for k, v in kwargs.items() if v}
 
 
 def _resources_from_process_index(
@@ -266,6 +270,7 @@ T = TypeVar("T")
 def _list_of_dicts_to_dict_of_tuples(
     list_of_dicts: list[dict[str, T]],
 ) -> dict[str, tuple[T, ...]]:
+    # Assume that all dicts have the same keys.
     tuples = {k: tuple(d[k] for d in list_of_dicts) for k in list_of_dicts[0]}
     # Remove keys with all None or [] values
     return {k: v for k, v in tuples.items() if any(v)}

@@ -5,6 +5,7 @@ import shutil
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
 from unittest import mock
 
@@ -23,6 +24,33 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 has_slurm = shutil.which("srun") is not None
+
+
+@pytest.fixture(autouse=True)
+def patch_slurm_partitions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch `slurm_partitions` to avoid `StopIteration`."""
+    if has_slurm:
+        return
+
+    def slurm_partitions():
+        return {"default": 1}
+
+    monkeypatch.setattr(
+        "adaptive_scheduler._server_support.slurm_run.slurm_partitions",
+        slurm_partitions,
+    )
+    monkeypatch.setattr(
+        "adaptive_scheduler._scheduler.slurm.slurm_partitions",
+        slurm_partitions,
+    )
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda x: "/usr/bin/squeue" if x == "squeue" else None,
+    )
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="", stderr="", returncode=0),  # noqa: ARG005
+    )
 
 
 class MockScheduler:
@@ -400,3 +428,21 @@ async def test_setting_executor_type_in_resources(pipeline: Pipeline, tmp_path: 
         assert call_args.kwargs["executor_type"] == "ipyparallel"
         assert call_args.kwargs["cores_per_node"] == 2
         assert call_args.kwargs["nodes"] == 2
+
+
+@pytest.mark.asyncio
+async def test_slurm_executor_simple(
+    pipeline: Pipeline,
+    tmp_path: Path,
+):
+    runner = pipeline.map_async(
+        {"x": range(10)},
+        tmp_path,
+        executor=SlurmExecutor(),
+    )
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(runner.task, timeout=0.2)
+
+    # Give the event loop a moment to process the cancellation
+    await asyncio.sleep(0)
+    assert runner.task.cancelled()
