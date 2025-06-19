@@ -126,7 +126,7 @@ def _slurm_executor_for_single(
 
 def _prune_executor_kwargs(kwargs: dict[str, Any]) -> None:
     # Do not pass executor_type if it is None.
-    if kwargs["executor_type"] is None:
+    if kwargs.get("executor_type", False) is None:
         del kwargs["executor_type"]
 
 
