@@ -108,12 +108,9 @@ def _xarray(
     load_intermediate: bool = True,
 ) -> xr.DataArray:
     """Load and represent the data as an `xarray.DataArray`."""
-    data = data_loader(output_name)
-    data = maybe_to_array(data)
     all_dependencies = trace_dependencies(mapspecs)
     target_dependencies = all_dependencies.get(output_name, {})
     axes_mapping = mapspec_axes(mapspecs)
-    data = _reshape_if_needed(data, output_name, axes_mapping)
     coord_mapping: dict[tuple[str, ...], dict[str, list[Any]]] = defaultdict(
         lambda: defaultdict(list),
     )
@@ -128,9 +125,7 @@ def _xarray(
         else:
             continue
 
-        if not isinstance(array, np.ndarray):
-            array = maybe_to_array(array)
-
+        array = maybe_to_array(array)
         array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
             coord_mapping[axes][name].append(array)
@@ -152,6 +147,10 @@ def _xarray(
             else:
                 array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
         coords[name] = (axes, array)
+
+    data = data_loader(output_name)
+    data = maybe_to_array(data)
+    data = _reshape_if_needed(data, output_name, axes_mapping)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
