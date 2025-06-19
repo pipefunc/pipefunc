@@ -22,6 +22,7 @@ import numpy as np
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
+    import pandas as pd
     import pydantic
     from griffe import DocstringSection
 
@@ -466,3 +467,48 @@ def is_classmethod(func: Callable) -> bool:
 def clip(x: float, min_value: float, max_value: float) -> float:
     """Clip a value to a range."""
     return max(min_value, min(x, max_value))
+
+
+def create_multiindex(
+    arrays: list[Any],
+    *,
+    names: list[str],
+) -> pd.MultiIndex:
+    """Create a pandas MultiIndex, with a fallback for unhashable types.
+
+    Attempts to use `pandas.MultiIndex.from_arrays`, which is fast but requires
+    hashable elements. If that fails with a `TypeError`, it falls back to a
+    slower method that manually factorizes each array, which supports
+    unhashable types.
+
+    For the fallback method to work correctly with custom objects, they must
+    implement the `__eq__` method for equality comparison.
+
+    Parameters
+    ----------
+    arrays
+        List of array-likes to form the levels of the MultiIndex.
+    names
+        Names for the levels in the MultiIndex.
+
+    Returns
+    -------
+        A pandas MultiIndex object.
+
+    """
+    import pandas as pd
+
+    try:
+        # Fast path for hashable types
+        return pd.MultiIndex.from_arrays(arrays, names=names)
+    except TypeError:
+        # Slow path for unhashable types.
+        # This path assumes that items within each array are unique.
+        codes = [range(len(arr)) for arr in arrays]
+        levels = [pd.Index(arr) for arr in arrays]
+        return pd.MultiIndex(
+            levels=levels,
+            codes=codes,
+            names=names,
+            verify_integrity=False,
+        )

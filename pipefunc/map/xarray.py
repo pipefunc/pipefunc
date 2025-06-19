@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from pipefunc._utils import create_multiindex
+
 from ._load import load_outputs, maybe_load_data
 from ._mapspec import MapSpec, mapspec_axes, trace_dependencies
 from ._run_info import RunInfo
@@ -144,7 +146,7 @@ def _xarray(
                 for i in np.ndindex(shape):
                     array[i] = tuple(arr[i] for arr in arrays)
             else:
-                array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
+                array = create_multiindex(arrays, names=names)
         coords[name] = (axes, array)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
