@@ -105,6 +105,7 @@ def _slurm_executor_for_map(
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     func = process_index.keywords["func"]
     executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
+    _prune_executor_kwargs(executor_kwargs)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)  # type: ignore[assignment]
     return _new_slurm_executor(executor, **executor_kwargs)
 
@@ -118,8 +119,15 @@ def _slurm_executor_for_single(
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
     executor_kwargs = _adaptive_scheduler_resource_dict(resources)
+    _prune_executor_kwargs(executor_kwargs)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)
+
+
+def _prune_executor_kwargs(kwargs: dict[str, Any]) -> None:
+    # Do not pass executor_type if it is None.
+    if kwargs.get("executor_type", False) is None:
+        del kwargs["executor_type"]
 
 
 def _adaptive_scheduler_imported() -> bool:
