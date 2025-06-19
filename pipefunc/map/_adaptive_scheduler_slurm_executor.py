@@ -106,6 +106,7 @@ def _slurm_executor_for_map(
     func = process_index.keywords["func"]
     executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)  # type: ignore[assignment]
+    _prune_executor_kwargs(executor_kwargs)
     return _new_slurm_executor(executor, **executor_kwargs)
 
 
@@ -118,8 +119,15 @@ def _slurm_executor_for_single(
         func.resources(kwargs) if callable(func.resources) else func.resources  # type: ignore[has-type]
     )
     executor_kwargs = _adaptive_scheduler_resource_dict(resources)
+    _prune_executor_kwargs(executor_kwargs)
     executor_kwargs["name"] = _slurm_name(func.output_name, executor)
     return _new_slurm_executor(executor, **executor_kwargs)
+
+
+def _prune_executor_kwargs(kwargs: dict[str, Any]) -> None:
+    # Do not pass executor_type if it is None.
+    if kwargs["executor_type"] is None:
+        del kwargs["executor_type"]
 
 
 def _adaptive_scheduler_imported() -> bool:
@@ -221,18 +229,15 @@ def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, 
     assert _adaptive_scheduler_imported()
     from .adaptive_scheduler import __executor_type, __extra_scheduler
 
-    extra_scheduler = __extra_scheduler(resources)
-    executor_type = __executor_type(resources)
-    kwargs: dict[str, Any] = {
+    kwargs = {
+        "extra_scheduler": __extra_scheduler(resources),
         "cores_per_node": resources.cpus_per_node or resources.cpus,
         "nodes": resources.nodes or 1,
+        "partition": resources.partition,
     }
-    if executor_type is not None:  # Executor type cannot be None
+    executor_type = __executor_type(resources)
+    if executor_type is not None:
         kwargs["executor_type"] = executor_type
-    if extra_scheduler:
-        kwargs["extra_scheduler"] = extra_scheduler
-    if resources.partition is not None:
-        kwargs["partition"] = resources.partition
     return kwargs
 
 
