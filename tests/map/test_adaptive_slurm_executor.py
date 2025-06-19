@@ -73,35 +73,13 @@ class MockSlurmTask(SlurmTask):
     def __init__(
         self,
         executor: MockSlurmExecutor,
-        thread_future: asyncio.Future[Any],
+        thread_future: Future[Any],
     ) -> None:
         super().__init__(
             executor=executor,
             task_id=TaskID(0, 0),  # dummy task_id since we don't use it
         )
         self._thread_future = thread_future
-
-    async def _background_check(self) -> None:
-        """Check the thread future for completion."""
-        while not self.done():
-            self._get()
-            await asyncio.sleep(0.1)  # can be shorter for tests
-
-    def _get(self) -> Any | None:
-        """Check if the thread future is done and set our result."""
-        if self.done():
-            return self._result
-
-        if self._thread_future.done():
-            try:
-                result = self._thread_future.result()
-            except Exception as e:
-                self.set_exception(e)
-                raise
-            else:
-                self.set_result(result)
-                return result
-        return None
 
 
 @dataclass
@@ -110,15 +88,34 @@ class MockSlurmExecutor(SlurmExecutor):
 
     _finalized: bool = False
     _thread_pool: ThreadPoolExecutor = field(default_factory=ThreadPoolExecutor)
-    _futures: list[Future] = field(default_factory=list)
+    _mock_tasks: list[MockSlurmTask] = field(default_factory=list)
 
     def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> MockSlurmTask:
         if kwargs:
             msg = "Keyword arguments are not supported"
             raise ValueError(msg)
         fut = self._thread_pool.submit(fn, *args)
-        self._futures.append(fut)
-        return MockSlurmTask(executor=self, thread_future=fut)  # type: ignore[arg-type]
+        task = MockSlurmTask(executor=self, thread_future=fut)
+        self._mock_tasks.append(task)
+        self._all_tasks.append(task)
+        return task
+
+    async def _monitor_files(self) -> None:
+        """Override the file monitoring to check thread futures instead."""
+        while self._run_manager is not None:
+            await asyncio.sleep(0.01)  # Check more frequently for tests
+
+            if self._run_manager.task is not None and self._run_manager.task.cancelled():
+                break
+
+            # Check all mock tasks
+            for task in self._mock_tasks:
+                if not task.done() and task._thread_future.done():
+                    try:
+                        result = task._thread_future.result()
+                        task.set_result(result)
+                    except Exception as e:  # noqa: BLE001
+                        task.set_exception(e)
 
     def finalize(
         self,
@@ -130,6 +127,10 @@ class MockSlurmExecutor(SlurmExecutor):
             raise RuntimeError(msg)
         self._finalized = True
         self._run_manager = _dummy_run_manager()
+
+        # Start the file monitoring task (which now monitors thread futures)
+        self._file_monitor_task = asyncio.create_task(self._monitor_files())
+
         return self._run_manager
 
     def new(
@@ -433,6 +434,8 @@ async def test_slurm_executor_simple(
     pipeline: Pipeline,
     tmp_path: Path,
 ):
+    if not has_slurm:
+        pytest.skip("Slurm not available")
     runner = pipeline.map_async(
         {"x": range(10)},
         tmp_path,
