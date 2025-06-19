@@ -131,10 +131,7 @@ class MockSlurmExecutor(SlurmExecutor):
             raise RuntimeError(msg)
         self._finalized = True
         self._run_manager = _dummy_run_manager()
-
-        # Start the file monitoring task (which now monitors thread futures)
         self._file_monitor_task = asyncio.create_task(self._monitor_files())
-
         return self._run_manager
 
     def new(
