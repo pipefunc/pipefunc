@@ -254,8 +254,6 @@ def _create_multiindex(
     hashable elements. If that fails with a `TypeError`, it falls back to assuming
     that items within each array are unique.
     """
-    import pandas as pd
-
     try:
         return pd.MultiIndex.from_arrays(arrays, names=names)
     except TypeError:
