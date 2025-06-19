@@ -221,13 +221,19 @@ def _adaptive_scheduler_resource_dict(resources: Resources | None) -> dict[str, 
     assert _adaptive_scheduler_imported()
     from .adaptive_scheduler import __executor_type, __extra_scheduler
 
-    return {
-        "extra_scheduler": __extra_scheduler(resources),
-        "executor_type": __executor_type(resources),
+    extra_scheduler = __extra_scheduler(resources)
+    executor_type = __executor_type(resources)
+    kwargs: dict[str, Any] = {
         "cores_per_node": resources.cpus_per_node or resources.cpus,
         "nodes": resources.nodes or 1,
-        "partition": resources.partition,
     }
+    if executor_type is not None:  # Executor type cannot be None
+        kwargs["executor_type"] = executor_type
+    if extra_scheduler:
+        kwargs["extra_scheduler"] = extra_scheduler
+    if resources.partition is not None:
+        kwargs["partition"] = resources.partition
+    return kwargs
 
 
 def _resources_from_process_index(
