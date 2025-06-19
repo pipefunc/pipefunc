@@ -22,7 +22,6 @@ import numpy as np
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
-    import pandas as pd
     import pydantic
     from griffe import DocstringSection
 
@@ -469,46 +468,46 @@ def clip(x: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(x, max_value))
 
 
-def create_multiindex(
-    arrays: list[Any],
-    *,
-    names: list[str],
-) -> pd.MultiIndex:
-    """Create a pandas MultiIndex, with a fallback for unhashable types.
+def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
+    """Infer the shape of a nested structure.
 
-    Attempts to use `pandas.MultiIndex.from_arrays`, which is fast but requires
-    hashable elements. If that fails with a `TypeError`, it falls back to a
-    slower method that manually factorizes each array, which supports
-    unhashable types.
+    This function recursively determines the shape of nested lists, tuples,
+    or NumPy arrays. The recursion continues as long as all elements at a given
+    level are lists/tuples of the same length and have the same sub-shape.
 
-    For the fallback method to work correctly with custom objects, they must
-    implement the `__eq__` method for equality comparison.
-
-    Parameters
-    ----------
-    arrays
-        List of array-likes to form the levels of the MultiIndex.
-    names
-        Names for the levels in the MultiIndex.
-
-    Returns
-    -------
-        A pandas MultiIndex object.
-
+    If the structure is ragged (i.e., elements at a level have different
+    lengths or different sub-shapes), the shape up to that point is returned.
     """
-    import pandas as pd
+    if isinstance(x, np.ndarray):
+        return x.shape
 
-    try:
-        # Fast path for hashable types
-        return pd.MultiIndex.from_arrays(arrays, names=names)
-    except TypeError:
-        # Slow path for unhashable types.
-        # This path assumes that items within each array are unique.
-        codes = [range(len(arr)) for arr in arrays]
-        levels = [pd.Index(arr) for arr in arrays]
-        return pd.MultiIndex(
-            levels=levels,
-            codes=codes,
-            names=names,
-            verify_integrity=False,
-        )
+    if isinstance(x, range):
+        x = list(x)
+
+    if not isinstance(x, (list, tuple)):
+        return ()
+
+    if not x:
+        return (0,)
+
+    # If not all items are lists, we can only determine the first dimension
+    if not all(isinstance(item, (list, tuple)) for item in x):
+        return (len(x),)
+
+    # All items are lists, check if they have the same length
+    first_len = len(x[0])
+    if not all(len(item) == first_len for item in x):
+        return (len(x),)
+
+    if first_len == 0:
+        return (len(x), 0)
+
+    # Recursively find the shape of sub-lists
+    sub_shapes = [infer_shape(item) for item in x]
+
+    # Check if all sub-shapes are identical
+    first_sub_shape = sub_shapes[0]
+    if not all(s == first_sub_shape for s in sub_shapes[1:]):
+        return (len(x), first_len)
+
+    return (len(x), *first_sub_shape)
