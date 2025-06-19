@@ -74,12 +74,10 @@ class MockSlurmTask(SlurmTask):
         self,
         executor: MockSlurmExecutor,
         thread_future: asyncio.Future[Any],
-        min_load_interval: float = 1.0,
     ) -> None:
         super().__init__(
             executor=executor,
             task_id=TaskID(0, 0),  # dummy task_id since we don't use it
-            min_load_interval=min_load_interval,
         )
         self._thread_future = thread_future
 
