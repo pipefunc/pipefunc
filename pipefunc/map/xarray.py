@@ -170,14 +170,15 @@ def _maybe_to_array(x: Any) -> np.ndarray | Any:
 def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str, ...]]) -> Any:
     """Reshape N-D array to match mapspec dimensionality using object arrays."""
     dims = axes_mapping.get(name)
-    if dims and isinstance(array, np.ndarray) and array.ndim > len(dims):
-        expected_prefix = array.shape[: len(dims)]
-        if array.shape[: len(dims)] == expected_prefix:
-            new_array = np.empty(expected_prefix, dtype=object)
-            for index in np.ndindex(expected_prefix):
-                new_array[index] = array[index]
-            return new_array
-    return array
+    if not isinstance(array, np.ndarray) or not dims or array.ndim <= len(dims):
+        return array
+    expected_prefix = array.shape[: len(dims)]
+    if array.shape[: len(dims)] != expected_prefix:
+        return array
+    new_array = np.empty(expected_prefix, dtype=object)
+    for index in np.ndindex(expected_prefix):
+        new_array[index] = array[index]
+    return new_array
 
 
 def _xarray_dataset(
