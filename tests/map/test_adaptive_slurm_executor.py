@@ -68,7 +68,11 @@ def _dummy_run_manager() -> RunManager:
 
 
 class MockSlurmTask(SlurmTask):
-    """A mock task that wraps a ThreadPoolExecutor future."""
+    """A mock task that wraps a ThreadPoolExecutor future.
+
+    This is simpler than trying to mock all the learner file infrastructure
+    that the plain SlurmTask expects.
+    """
 
     def __init__(
         self,
@@ -97,7 +101,7 @@ class MockSlurmExecutor(SlurmExecutor):
         fut = self._thread_pool.submit(fn, *args)
         task = MockSlurmTask(executor=self, thread_future=fut)
         self._mock_tasks.append(task)
-        self._all_tasks.append(task)
+        self._all_tasks.append(task)  # Needed for parent class tracking
         return task
 
     async def _monitor_files(self) -> None:
