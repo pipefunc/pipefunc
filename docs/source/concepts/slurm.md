@@ -193,7 +193,7 @@ from adaptive_scheduler import SlurmExecutor
     output_name="y",
     mapspec="x[i] -> y[i]",
     resources={"cpus": 8},
-    resources_scope="map",  # Important: this must be "map"
+    resources_scope="map",  # Important: this must be "map" (default)
 )
 def process_item(x):
     return x + 1
