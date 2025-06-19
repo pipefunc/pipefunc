@@ -181,7 +181,8 @@ async def test_adaptive_mock_slurm_executor(
         pytest.skip("Slurm not available")
     ex = SlurmExecutor(cores_per_node=1) if not use_mock else MockSlurmExecutor(cores_per_node=1)
     fut = ex.submit(lambda x: x, "echo 'Hello World'")
-    ex.finalize()
+    rm = ex.finalize()
+    assert rm.scheduler.executor_type is not None
     await fut
 
 
