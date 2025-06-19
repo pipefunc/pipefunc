@@ -466,3 +466,48 @@ def is_classmethod(func: Callable) -> bool:
 def clip(x: float, min_value: float, max_value: float) -> float:
     """Clip a value to a range."""
     return max(min_value, min(x, max_value))
+
+
+def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
+    """Infer the shape of a nested structure.
+
+    This function recursively determines the shape of nested lists, tuples,
+    or NumPy arrays. The recursion continues as long as all elements at a given
+    level are lists/tuples of the same length and have the same sub-shape.
+
+    If the structure is ragged (i.e., elements at a level have different
+    lengths or different sub-shapes), the shape up to that point is returned.
+    """
+    if isinstance(x, np.ndarray):
+        return x.shape
+
+    if isinstance(x, range):
+        x = list(x)
+
+    if not isinstance(x, (list, tuple)):
+        return ()
+
+    if not x:
+        return (0,)
+
+    # If not all items are lists, we can only determine the first dimension
+    if not all(isinstance(item, (list, tuple)) for item in x):
+        return (len(x),)
+
+    # All items are lists, check if they have the same length
+    first_len = len(x[0])
+    if not all(len(item) == first_len for item in x):
+        return (len(x),)
+
+    if first_len == 0:
+        return (len(x), 0)
+
+    # Recursively find the shape of sub-lists
+    sub_shapes = [infer_shape(item) for item in x]
+
+    # Check if all sub-shapes are identical
+    first_sub_shape = sub_shapes[0]
+    if not all(s == first_sub_shape for s in sub_shapes[1:]):
+        return (len(x), first_len)
+
+    return (len(x), *first_sub_shape)

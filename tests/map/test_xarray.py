@@ -315,3 +315,35 @@ def test_2d_mapspec_with_nested_array() -> None:
     assert df.y.iloc[1].tolist() == [[3, 4], [5, 6]]
     assert df.y.iloc[2].tolist() == [[4, 5], [6, 7]]
     assert df.y.iloc[3].tolist() == [[5, 6], [7, 8]]
+
+
+def test_1d_mapspec_returns_2d_array() -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f() -> npt.NDArray[np.float64]:
+        return np.ones((10, 3))
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map(inputs={})
+    ds = results.to_xarray()
+    assert "y" in ds.coords
+    assert "z" in ds.data_vars
+
+
+def test_1d_mapspec_returns_2d_list_of_lists() -> None:
+    @pipefunc(output_name="y", mapspec="... -> y[i]")
+    def f() -> list[list[float]]:
+        return [[1, 2, 3] for _ in range(10)]
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y) -> int:
+        return sum(y)
+
+    pipeline = Pipeline([f, g])
+    results = pipeline.map(inputs={})
+    ds = results.to_xarray()
+    assert "y" in ds.coords
+    assert "z" in ds.data_vars

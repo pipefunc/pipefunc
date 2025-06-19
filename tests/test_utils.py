@@ -14,6 +14,7 @@ from pipefunc._utils import (
     format_function_call,
     format_kwargs,
     handle_error,
+    infer_shape,
     is_classmethod,
     is_min_version,
     is_pydantic_base_model,
@@ -348,3 +349,45 @@ def test_is_classmethod() -> None:
     assert not is_classmethod(lambda x: x)
     assert not is_classmethod(1)  # type: ignore[arg-type]
     assert not is_classmethod("method")  # type: ignore[arg-type]
+
+
+def test_infer_shape() -> None:
+    """Test the infer_shape function with various inputs."""
+    # Test with a simple list
+    assert infer_shape([1, 2, 3]) == (3,)
+
+    # Test with a nested list
+    assert infer_shape([[1, 2], [3, 4]]) == (2, 2)
+    assert infer_shape([[1], [2], [3]]) == (3, 1)
+    assert infer_shape([[[1]], [[2]], [[3]]]) == (3, 1, 1)
+
+    # Test with a ragged lists
+    assert infer_shape([[[1], [2], [3]], [4, 5, 6]]) == (2, 3)
+    assert infer_shape([[1, 2, 3], [[4], [5], [6]]]) == (2, 3)
+    assert infer_shape([[[1]], [[2]], [3]]) == (3, 1)
+    assert infer_shape([[1], [2, 3]]) == (2,)
+
+    # Test with an empty list
+    assert infer_shape([]) == (0,)
+
+    # Test with a list of empty lists
+    assert infer_shape([[], []]) == (2, 0)
+
+    # Test with a NumPy array
+    assert infer_shape(np.array([[1, 2], [3, 4]])) == (2, 2)
+
+    # Test with a range object
+    assert infer_shape(range(5)) == (5,)
+
+    # Test with a scalar value
+    assert infer_shape(123) == ()
+
+    # Test with a string
+    assert infer_shape("hello") == ()
+
+    # Test with mixed list/tuple
+    assert infer_shape(([1, 2], (3, 4))) == (2, 2)
+    assert infer_shape(((1, 2), [3, 4])) == (2, 2)
+
+    # Test with different sub-shapes
+    assert infer_shape([[[1]], [[2, 3]]]) == (2, 1)
