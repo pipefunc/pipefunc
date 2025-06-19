@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeGuard, TypeVar, get_args
 
 import cloudpickle
 import numpy as np
-import pandas as pd
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
@@ -484,7 +483,7 @@ def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
     if isinstance(x, np.ndarray):
         return x.shape
 
-    if isinstance(x, (range, pd.Series)):
+    if isinstance(x, range):
         x = list(x)
 
     if not isinstance(x, (list, tuple)):
