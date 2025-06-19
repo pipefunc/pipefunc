@@ -469,16 +469,14 @@ def clip(x: float, min_value: float, max_value: float) -> float:
 
 
 def infer_shape(x: Any) -> tuple[int, ...]:  # noqa: PLR0911
-    """Recursively determine the shape of a nested list.
+    """Infer the shape of a nested structure.
 
-    A dimension is considered valid only if all elements at that level are lists
-    of the same length. The recursion stops and returns the shape found so far
-    if it encounters:
+    This function recursively determines the shape of nested lists, tuples,
+    or NumPy arrays. The recursion continues as long as all elements at a given
+    level are lists/tuples of the same length and have the same sub-shape.
 
-    - A non-list or non-tuple element.
-    - A level where not all elements are lists.
-    - A level where lists have varying lengths.
-    - A level where sub-structures have different shapes.
+    If the structure is ragged (i.e., elements at a level have different
+    lengths or different sub-shapes), the shape up to that point is returned.
     """
     if isinstance(x, np.ndarray):
         return x.shape
