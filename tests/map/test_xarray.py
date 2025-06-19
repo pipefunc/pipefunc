@@ -363,11 +363,16 @@ def test_unhashable_types() -> None:
         return y
 
     pipeline = Pipeline([f])
+    xs = [Unhashable(1), Unhashable(2), Unhashable(3)]
     results = pipeline.map(
-        inputs={"x": [Unhashable(1), Unhashable(2), Unhashable(3)], "y": [1, 2, 3]},
+        inputs={"x": xs, "y": [1, 2, 3]},
         parallel=False,
         storage="dict",
     )
     ds = results.to_xarray()
     assert "x:y" in ds.coords
     assert "z" in ds.data_vars
+    df = results.to_dataframe()
+    assert df.x.tolist() == xs
+    assert df.y.tolist() == [1, 2, 3]
+    assert df.z.tolist() == [1, 2, 3]
