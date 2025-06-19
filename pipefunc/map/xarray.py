@@ -172,11 +172,9 @@ def _reshape_if_needed(array: Any, name: str, axes_mapping: dict[str, tuple[str,
     dims = axes_mapping.get(name)
     if not isinstance(array, np.ndarray) or not dims or array.ndim <= len(dims):
         return array
-    expected_prefix = array.shape[: len(dims)]
-    if array.shape[: len(dims)] != expected_prefix:
-        return array
-    new_array = np.empty(expected_prefix, dtype=object)
-    for index in np.ndindex(expected_prefix):
+    expected_shape = array.shape[: len(dims)]
+    new_array = np.empty(expected_shape, dtype=object)
+    for index in np.ndindex(expected_shape):
         new_array[index] = array[index]
     return new_array
 
