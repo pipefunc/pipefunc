@@ -125,7 +125,7 @@ def _xarray(
         else:
             continue
 
-        array = maybe_to_array(array)
+        array = _maybe_to_array(array)
         array = _reshape_if_needed(array, name, axes_mapping)
         if axes == axes_mapping[name]:
             coord_mapping[axes][name].append(array)
@@ -149,13 +149,13 @@ def _xarray(
         coords[name] = (axes, array)
 
     data = data_loader(output_name)
-    data = maybe_to_array(data)
+    data = _maybe_to_array(data)
     data = _reshape_if_needed(data, output_name, axes_mapping)
 
     return xr.DataArray(data, coords=coords, dims=axes_mapping[output_name], name=output_name)
 
 
-def maybe_to_array(x: Any) -> np.ndarray | Any:
+def _maybe_to_array(x: Any) -> np.ndarray | Any:
     """Convert an iterable to an array."""
     if isinstance(x, np.ndarray):
         return x
