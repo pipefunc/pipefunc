@@ -347,3 +347,32 @@ def test_1d_mapspec_returns_2d_list_of_lists() -> None:
     ds = results.to_xarray()
     assert "y" in ds.coords
     assert "z" in ds.data_vars
+
+
+def test_unhashable_types() -> None:
+    class Unhashable:
+        def __init__(self, value):
+            self.value = value
+
+        def __hash__(self):
+            msg = "Unhashable"
+            raise TypeError(msg)
+
+    @pipefunc(output_name="z", mapspec="x[i], y[i] -> z[i]")
+    def f(x: Unhashable, y: int) -> int:
+        return y
+
+    pipeline = Pipeline([f])
+    xs = [Unhashable(1), Unhashable(2), Unhashable(3)]
+    results = pipeline.map(
+        inputs={"x": xs, "y": [1, 2, 3]},
+        parallel=False,
+        storage="dict",
+    )
+    ds = results.to_xarray()
+    assert "x:y" in ds.coords
+    assert "z" in ds.data_vars
+    df = results.to_dataframe()
+    assert df.x.tolist() == xs
+    assert df.y.tolist() == [1, 2, 3]
+    assert df.z.tolist() == [1, 2, 3]

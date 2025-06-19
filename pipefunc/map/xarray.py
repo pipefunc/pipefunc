@@ -145,7 +145,7 @@ def _xarray(
                 for i in np.ndindex(shape):
                     array[i] = tuple(arr[i] for arr in arrays)
             else:
-                array = pd.MultiIndex.from_arrays(arrays, names=names)  # type: ignore[arg-type]
+                array = _create_multiindex(arrays, names=names)
         coords[name] = (axes, array)
 
     data = data_loader(output_name)
@@ -241,3 +241,28 @@ def xarray_dataset_to_dataframe(ds: xr.Dataset) -> pd.DataFrame:
         if isinstance(df[col].iloc[0], DimensionlessArray):
             df[col] = df[col].apply(lambda x: x.arr)
     return _split_tuple_columns(df)
+
+
+def _create_multiindex(
+    arrays: list[Any],
+    *,
+    names: list[str],
+) -> pd.MultiIndex:
+    """Create a pandas MultiIndex, with a fallback for unhashable types.
+
+    Attempts to use `pandas.MultiIndex.from_arrays`, which is fast but requires
+    hashable elements. If that fails with a `TypeError`, it falls back to assuming
+    that items within each array are unique.
+    """
+    try:
+        return pd.MultiIndex.from_arrays(arrays, names=names)
+    except TypeError:
+        # This path assumes that items within each array are unique.
+        codes = [range(len(arr)) for arr in arrays]
+        levels = [pd.Index(arr) for arr in arrays]
+        return pd.MultiIndex(
+            levels=levels,
+            codes=codes,
+            names=names,
+            verify_integrity=False,
+        )
