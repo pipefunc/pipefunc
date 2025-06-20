@@ -4,6 +4,7 @@ import asyncio
 import functools
 import itertools
 import math
+import sys
 import time
 import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
@@ -18,8 +19,8 @@ import numpy.typing as npt
 from pipefunc._utils import (
     at_least_tuple,
     dump,
+    format_function_call,
     get_ncores,
-    handle_error,
     is_running_in_ipynb,
     prod,
 )
@@ -1093,6 +1094,24 @@ def _execute_single(
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
+
+
+def handle_error(
+    e: Exception,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    return_error: bool = False,  # noqa: FBT001, FBT002
+) -> ErrorSnapshot | None:
+    """Handle an error that occurred while executing a function."""
+    if return_error:
+        return ErrorSnapshot(function=func.func, exception=e, args=(), kwargs=kwargs)
+    call_str = format_function_call(func.__name__, (), kwargs)
+    msg = f"Error occurred while executing function `{call_str}`."
+    if sys.version_info < (3, 11):  # pragma: no cover
+        original_msg = e.args[0] if e.args else ""
+        raise type(e)(original_msg + msg) from e
+    e.add_note(msg)
+    raise  # noqa: PLE0704
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:

@@ -25,9 +25,6 @@ if TYPE_CHECKING:
     import pydantic
     from griffe import DocstringSection
 
-    from pipefunc._pipefunc import PipeFunc
-    from pipefunc.exceptions import ErrorSnapshot
-
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
     """Convert x to a tuple if it is not already a tuple."""
@@ -87,26 +84,6 @@ def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) ->
     if kwargs:
         return f"{func_name}({format_kwargs(kwargs)})"
     return f"{func_name}()"
-
-
-def handle_error(
-    e: Exception,
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    return_error: bool = False,  # noqa: FBT001, FBT002
-) -> ErrorSnapshot | None:
-    """Handle an error that occurred while executing a function."""
-    if return_error:
-        from pipefunc.exceptions import ErrorSnapshot
-
-        return ErrorSnapshot(function=func.func, exception=e, args=(), kwargs=kwargs)
-    call_str = format_function_call(func.__name__, (), kwargs)
-    msg = f"Error occurred while executing function `{call_str}`."
-    if sys.version_info < (3, 11):  # pragma: no cover
-        original_msg = e.args[0] if e.args else ""
-        raise type(e)(original_msg + msg) from e
-    e.add_note(msg)
-    raise  # noqa: PLE0704
 
 
 def prod(iterable: Iterable[int]) -> int:
