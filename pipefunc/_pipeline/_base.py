@@ -1170,6 +1170,10 @@ class Pipeline:
             if arg not in func._bound and arg not in self.output_to_func
         }
 
+    @functools.cached_property
+    def scopes(self) -> set[str]:
+        return {scope for func in self.functions for scope in func.parameter_scopes}
+
     def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
         """Retrieve defaults for a function, including those set by other functions."""
         if r := self._internal_cache.func_defaults.get(func.output_name):
@@ -1185,7 +1189,12 @@ class Pipeline:
         self._internal_cache.func_defaults[func.output_name] = defaults
         return defaults
 
-    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+    def update_defaults(
+        self,
+        defaults: dict[str, Any | dict[str, Any]],
+        *,
+        overwrite: bool = False,
+    ) -> None:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
@@ -1204,7 +1213,31 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
+        # Split up defaults into flat keys e.g. 'a', 'scope.a'
+        # and scope keys {'scope': 'a'} -> 'scope.a'.
+        # (The parameterscopes and parameter names present in a pipeline are always disjoint)
+
+        unscoped_defaults = {
+            parameter: val for parameter, val in defaults.items() if parameter not in self.scopes
+        }
+
+        scoped_defaults = {
+            parameter: val
+            for f in self.functions
+            for parameter, val in f._flatten_scopes(
+                {scope: defaults[scope] for scope in f.parameter_scopes & defaults.keys()},
+            ).items()
+        }
+
+        if overlap := unscoped_defaults.keys() & scoped_defaults.keys():
+            overlap_str = ", ".join(sorted(overlap))
+            msg = f"The parameter names: `{overlap_str}`. Have been defined flattened and scope-keyed."
+            raise ValueError(msg)
+
+        defaults = {**unscoped_defaults, **scoped_defaults}
+
         unused = set(defaults.keys())
+
         for f in self.functions:
             update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
             unused -= set(update.keys())

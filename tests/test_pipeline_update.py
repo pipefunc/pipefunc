@@ -286,3 +286,90 @@ def test_update_scope_from_faq() -> None:
     results = pipeline.map(inputs=kwargs, parallel=False, storage="dict")
     assert results["baz.z"].output == 15
     assert pipeline(foo={"a": 1, "b": 2}, bar={"a": 3}, b=4) == 15
+
+
+def test_update_scoped_defaults() -> None:
+    def f(val: int, a: int = 1) -> int:
+        return val + a
+
+    @pipefunc("g", scope="scope")
+    def g(val: int, b: int = 2) -> int:
+        return val * b
+
+    @pipefunc("g")
+    def h(val: int, b: int = 2) -> int:
+        return val - b
+
+    pipeline = Pipeline([PipeFunc(f, "f", scope="scope"), PipeFunc(f, "f"), g, h])
+
+    assert pipeline["scope.f"].defaults == {"scope.a": 1}
+    assert pipeline["scope.g"].defaults == {"scope.b": 2}
+    assert pipeline["f"].defaults == {"a": 1}
+    assert pipeline["g"].defaults == {"b": 2}
+
+    # Only update unscoped values
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 3, "b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 1}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 2}
+    assert updated_pipeline["f"].defaults == {"a": 3}
+    assert updated_pipeline["g"].defaults == {"b": 4}
+
+    # Only update scoped values as scope-keyed
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"scope": {"a": 3, "b": 4}})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 1}
+    assert updated_pipeline["g"].defaults == {"b": 2}
+
+    # Only update scoped values as flat-keyed
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"scope.a": 3, "scope.b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 1}
+    assert updated_pipeline["g"].defaults == {"b": 2}
+
+    # Update both methods simultaneously
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 10, "b": 20, "scope": {"a": 3, "b": 4}})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 10}
+    assert updated_pipeline["g"].defaults == {"b": 20}
+
+    updated_pipeline = pipeline.copy()
+    updated_pipeline.update_defaults({"a": 10, "b": 20, "scope.a": 3, "scope.b": 4})
+
+    assert updated_pipeline["scope.f"].defaults == {"scope.a": 3}
+    assert updated_pipeline["scope.g"].defaults == {"scope.b": 4}
+    assert updated_pipeline["f"].defaults == {"a": 10}
+    assert updated_pipeline["g"].defaults == {"b": 20}
+
+    # Try to update a value scope based and flat
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="The parameter names: `scope.a`. Have been defined flattened and scope-keyed.",
+    ):
+        updated_pipeline.update_defaults({"scope.a": 1, "scope": {"a": 1}})
+
+    # Try to update a non-existing scope/value
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `DOES_NOT_EXIST`. These are not settable defaults.",
+    ):
+        updated_pipeline.update_defaults({"DOES_NOT_EXIST": 1})
+
+    updated_pipeline = pipeline.copy()
+    with pytest.raises(
+        ValueError,
+        match="Unused keyword arguments: `scope.DOES_NOT_EXIST`. These are not settable defaults.",
+    ):
+        updated_pipeline.update_defaults({"scope": {"DOES_NOT_EXIST": 1}})
