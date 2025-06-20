@@ -25,6 +25,7 @@ from pipefunc._utils import (
 )
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
+from pipefunc.exceptions import ErrorContainer
 
 from ._adaptive_scheduler_slurm_executor import (
     is_slurm_executor,
@@ -626,11 +627,18 @@ def _run_iteration(
     continue_on_error: bool,  # noqa: FBT001
     cache: _CacheBase | None,
 ) -> Any:
+    for value in selected.values():
+        if isinstance(value, ErrorContainer):
+            return ErrorContainer(
+                exception=TypeError(f"Upstream error: {value}"),
+                kwargs=selected,
+            )
+
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
-            error = handle_error(e, func, selected, continue_on_error)
+            error = handle_error(e, func, selected, return_error=continue_on_error)
             if error is None:
                 # handle_error raises but mypy doesn't know that
                 raise  # pragma: no cover
@@ -666,8 +674,8 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
     *,
     return_results: bool = True,
-    force_dump: bool = False,
     continue_on_error: bool = False,
+    force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
     output = _run_iteration(func, selected, continue_on_error, cache)

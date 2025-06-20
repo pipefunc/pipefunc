@@ -13,7 +13,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
-from pipefunc.errors import ErrorContainer
+from pipefunc.exceptions import ErrorContainer
 from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes

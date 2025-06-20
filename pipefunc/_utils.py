@@ -7,6 +7,7 @@ import inspect
 import logging
 import math
 import operator
+import socket
 import sys
 import warnings
 from collections.abc import Callable
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     import pydantic
     from griffe import DocstringSection
 
-    from pipefunc.errors import ErrorContainer
+    from pipefunc.exceptions import ErrorContainer
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -95,7 +96,7 @@ def handle_error(
 ) -> ErrorContainer | None:
     """Handle an error that occurred while executing a function."""
     if return_error:
-        from pipefunc.errors import ErrorContainer
+        from pipefunc.exceptions import ErrorContainer
 
         return ErrorContainer(exception=e, kwargs=kwargs)
     call_str = format_function_call(func.__name__, (), kwargs)
@@ -217,6 +218,18 @@ def assert_complete_kwargs(
         valid_kwargs -= set(skip)
     missing = valid_kwargs - set(kwargs)
     assert not missing, f"Missing required kwargs: {missing}"
+
+
+def get_local_ip() -> str:
+    try:
+        # Create a socket to connect to a remote host
+        # This helps in getting the network interface's IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # This does not actually connect to '8.8.8.8', it is simply used to find the local IP
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:  # noqa: BLE001  # pragma: no cover
+        return "unknown"
 
 
 def is_running_in_ipynb() -> bool:

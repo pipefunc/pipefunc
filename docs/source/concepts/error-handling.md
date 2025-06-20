@@ -20,7 +20,7 @@ kernelspec:
 :depth: 2
 ```
 
-## What is the `ErrorSnapshot` feature in `pipefunc`?
+## `ErrorSnapshot`: Capturing Detailed Error Information
 
 The {class}`~pipefunc.ErrorSnapshot` feature captures detailed information about errors occurring during the execution of a `PipeFunc`. It aids in debugging by storing snapshots of error states, including the function, exception details, arguments, timestamp, and environment. This snapshot can be used to reproduce the error and examine the error context.
 
@@ -88,7 +88,7 @@ except Exception:
 
 ## Continue on Error in `pipeline.map`
 
-When running a `pipeline.map`, you can use the `continue_on_error` argument to allow the pipeline to continue executing even if some iterations fail. When an error occurs, it will be caught and stored in an {class}`~pipefunc.errors.ErrorContainer` object, which will be placed in the output instead of the result.
+When running a `pipeline.map`, you can use the `continue_on_error` argument to allow the pipeline to continue executing even if some iterations fail. When an error occurs, it will be caught and stored in an {class}`~pipefunc.exceptions.ErrorContainer` object, which will be placed in the output instead of the result.
 
 **Example:**
 

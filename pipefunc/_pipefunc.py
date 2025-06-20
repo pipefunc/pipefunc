@@ -32,7 +32,7 @@ from pipefunc._utils import (
     is_pydantic_base_model,
     requires,
 )
-from pipefunc.errors import ErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
