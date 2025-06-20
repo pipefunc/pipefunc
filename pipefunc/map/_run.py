@@ -4,7 +4,6 @@ import asyncio
 import functools
 import itertools
 import math
-import sys
 import time
 import warnings
 from concurrent.futures import Executor, Future, ProcessPoolExecutor
@@ -16,10 +15,10 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
     dump,
-    format_function_call,
     get_ncores,
     is_running_in_ipynb,
     prod,
@@ -641,9 +640,9 @@ def _run_iteration(
         try:
             return func(**selected)
         except Exception as e:
-            error = handle_error(e, func, selected, return_error=continue_on_error)
+            error = handle_pipefunc_error(e, func, selected, return_error=continue_on_error)
             if error is None:
-                # handle_error raises but mypy doesn't know that
+                # handle_pipefunc_error raises but mypy doesn't know that
                 raise  # pragma: no cover
             return error
 
@@ -1089,29 +1088,11 @@ def _execute_single(
         try:
             return func(**kwargs)
         except Exception as e:
-            handle_error(e, func, kwargs)
-            # handle_error raises but mypy doesn't know that
+            handle_pipefunc_error(e, func, kwargs)
+            # handle_pipefunc_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
-
-
-def handle_error(
-    e: Exception,
-    func: PipeFunc,
-    kwargs: dict[str, Any],
-    return_error: bool = False,  # noqa: FBT001, FBT002
-) -> ErrorSnapshot | None:
-    """Handle an error that occurred while executing a function."""
-    if return_error:
-        return ErrorSnapshot(function=func.func, exception=e, args=(), kwargs=kwargs)
-    call_str = format_function_call(func.__name__, (), kwargs)
-    msg = f"Error occurred while executing function `{call_str}`."
-    if sys.version_info < (3, 11):  # pragma: no cover
-        original_msg = e.args[0] if e.args else ""
-        raise type(e)(original_msg + msg) from e
-    e.add_note(msg)
-    raise  # noqa: PLE0704
 
 
 def _load_data(kwargs: dict[str, Any]) -> None:

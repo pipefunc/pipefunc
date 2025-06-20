@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import networkx as nx
 
 from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
@@ -41,7 +42,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import AsyncMap, handle_error, run_map, run_map_async
+from pipefunc.map._run import AsyncMap, run_map, run_map_async
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.map._run_eager_async import run_map_eager_async
 from pipefunc.resources import Resources
@@ -2583,8 +2584,8 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     try:
         return func(**func_args)
     except Exception as e:
-        handle_error(e, func, func_args)
-        # handle_error raises but mypy doesn't know that
+        handle_pipefunc_error(e, func, func_args)
+        # handle_pipefunc_error raises but mypy doesn't know that
         raise  # pragma: no cover
 
 
