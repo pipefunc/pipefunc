@@ -25,6 +25,7 @@ from pipefunc._utils import (
 )
 from pipefunc._widgets.helpers import maybe_async_task_status_widget
 from pipefunc.cache import HybridCache, to_hashable
+from pipefunc.exceptions import ErrorSnapshot
 
 from ._adaptive_scheduler_slurm_executor import (
     is_slurm_executor,
@@ -78,6 +79,7 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    continue_on_error: bool = False,
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -177,6 +179,10 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    continue_on_error
+        If ``True``, the pipeline will continue to run even if some of the iterations
+        fail. The failed iterations will be replaced with an `ErrorSnapshot` object.
+        If ``False``, the pipeline will raise an exception on the first error.
 
     """
     prep = prepare_run(
@@ -208,6 +214,7 @@ def run_map(
                 chunksizes=prep.chunksizes,
                 progress=prep.progress,
                 return_results=return_results,
+                continue_on_error=continue_on_error,
                 cache=prep.pipeline.cache,
             )
     return _finalize_run_map(prep, persist_memory)
@@ -298,6 +305,7 @@ def run_map_async(
     return_results: bool = True,
     display_widgets: bool = True,
     start: bool = True,
+    continue_on_error: bool = False,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -401,6 +409,10 @@ def run_map_async(
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
+    continue_on_error
+        If ``True``, the pipeline will continue to run even if some of the iterations
+        fail. The failed iterations will be replaced with an `ErrorSnapshot` object.
+        If ``False``, the pipeline will raise an exception on the first error.
 
     """
     prep = prepare_run(
@@ -438,6 +450,7 @@ def run_map_async(
                     return_results=return_results,
                     cache=prep.pipeline.cache,
                     multi_run_manager=multi_run_manager,
+                    continue_on_error=continue_on_error,
                 )
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
@@ -608,14 +621,30 @@ def _get_or_set_cache(
 _EVALUATED_RESOURCES = "__pipefunc_internal_evaluated_resources__"
 
 
-def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase | None) -> Any:
+def _run_iteration(
+    func: PipeFunc,
+    selected: dict[str, Any],
+    continue_on_error: bool,  # noqa: FBT001
+    cache: _CacheBase | None,
+) -> Any:
+    for value in selected.values():
+        if isinstance(value, ErrorSnapshot):
+            return ErrorSnapshot(
+                function=func.func,
+                exception=TypeError(f"Upstream error: {value}"),
+                args=(),
+                kwargs=selected,
+            )
+
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
-            handle_pipefunc_error(e, func, selected)
-            # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+            error = handle_pipefunc_error(e, func, selected, return_error=continue_on_error)
+            if error is None:
+                # handle_pipefunc_error raises but mypy doesn't know that
+                raise  # pragma: no cover
+            return error
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -647,10 +676,11 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
     *,
     return_results: bool = True,
+    continue_on_error: bool = False,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
-    output = _run_iteration(func, selected, cache)
+    output = _run_iteration(func, selected, continue_on_error, cache)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -822,6 +852,7 @@ def _prepare_submit_map_spec(
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
     return_results: bool,  # noqa: FBT001
+    continue_on_error: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -838,6 +869,7 @@ def _prepare_submit_map_spec(
         arrays=arrays,
         cache=cache,
         return_results=return_results,
+        continue_on_error=continue_on_error,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -1085,6 +1117,7 @@ def _run_and_process_generation(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None = None,
 ) -> None:
     tasks = _submit_generation(
@@ -1096,6 +1129,7 @@ def _run_and_process_generation(
         chunksizes,
         progress,
         return_results,
+        continue_on_error,
         cache,
     )
     _process_generation(generation, tasks, store, outputs, run_info, return_results)
@@ -1114,6 +1148,7 @@ async def _run_and_process_generation_async(
     return_results: bool,
     cache: _CacheBase | None = None,
     multi_run_manager: MultiRunManager | None = None,
+    continue_on_error: bool = False,
 ) -> None:
     tasks = _submit_generation(
         run_info,
@@ -1124,6 +1159,7 @@ async def _run_and_process_generation_async(
         chunksizes,
         progress,
         return_results,
+        continue_on_error,
         cache,
     )
     maybe_finalize_slurm_executors(generation, executor, multi_run_manager)
@@ -1173,6 +1209,7 @@ def _submit_func(
     | HeadlessProgressTracker
     | None = None,
     return_results: bool = True,  # noqa: FBT001, FBT002
+    continue_on_error: bool = False,  # noqa: FBT001, FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
@@ -1187,6 +1224,7 @@ def _submit_func(
             fixed_indices,
             status,
             return_results,
+            continue_on_error,
             cache,
         )
         r = _maybe_parallel_map(
@@ -1241,6 +1279,7 @@ def _submit_generation(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,  # noqa: FBT001
+    continue_on_error: bool,  # noqa: FBT001
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1253,6 +1292,7 @@ def _submit_generation(
             chunksizes,
             progress,
             return_results,
+            continue_on_error,
             cache,
         )
         for func in generation
