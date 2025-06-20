@@ -1213,13 +1213,13 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
-        if overlap := defaults.keys() & {
-            parameter
-            for f in self.functions
-            for parameter in f._flatten_scopes(
-                {scope: defaults[scope] for scope in defaults.keys() & f.parameter_scopes},
-            )
-        }:
+        if overlap := defaults.keys() & self._flatten_scopes(
+            {
+                scope: scoped_defaults
+                for scope, scoped_defaults in defaults.items()
+                if scope in self.scopes
+            },
+        ):
             overlap_str = ", ".join(sorted(overlap))
             msg = f"The parameter names: `{overlap_str}`. Have been defined flattened and scope-keyed."
             raise ValueError(msg)
