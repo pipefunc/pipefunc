@@ -173,6 +173,56 @@ Here, for each iteration of the simulation, the lambda inspects the voltage valu
 
 ---
 
+### Splitting a `map` into Multiple Jobs
+
+By default, `resources_scope="map"` creates a single SLURM job that processes all items in the input iterable, using internal parallelization (e.g., a `ProcessPoolExecutor` if `executor_type="process-pool"` (default)) based on the `cpus` requested.
+
+However, for very large iterables, you might want to split the work into a fixed number of SLURM jobs instead of one giant job.
+You can achieve this by setting the `size_per_learner` argument when creating the `SlurmExecutor`.
+This will chunk the input iterable and create one job per chunk.
+
+**Example:**
+
+Suppose you want to process 100 items, but you want to split them into two SLURM jobs, each handling 50 items.
+
+```python
+from pipefunc import Pipeline, pipefunc
+from adaptive_scheduler import SlurmExecutor
+
+@pipefunc(
+    output_name="y",
+    mapspec="x[i] -> y[i]",
+    resources={"cpus": 8},
+    resources_scope="map",  # Important: this must be "map" (default)
+)
+def process_item(x):
+    return x + 1
+
+pipeline = Pipeline([process_item])
+
+# By setting size_per_learner=50, adaptive_scheduler will create
+# two jobs for the 100 items in the input.
+executor = SlurmExecutor(size_per_learner=50)
+
+runner = pipeline.map_async(
+    inputs={"x": range(100)},
+    run_folder="my_run_folder",
+    executor=executor,
+)
+# result = await runner.task
+```
+
+In this scenario:
+
+- `pipefunc` sees a `map` scope and tells `adaptive_scheduler` to process `range(100)`.
+- The `SlurmExecutor`'s `size_per_learner=50` argument instructs it to break the 100 items into chunks of 50.
+- This results in **two** SLURM jobs being submitted.
+- Each job is allocated 8 CPUs and will process its 50 items using an internal `ProcessPoolExecutor` with 8 workers.
+
+This gives you fine-grained control over job submission without changing your function's code.
+
+---
+
 ## Functions Managing Their Own Parallelization
 
 Sometimes you want the SLURM job to have resources allocated while allowing your function to control its own parallelism internally.

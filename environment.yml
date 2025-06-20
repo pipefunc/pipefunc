@@ -29,8 +29,6 @@ dependencies:
   - matplotlib
   # optional-dependencies: profiling
   - psutil
-  # optional-dependencies: pydantic
-  # optional-dependencies: rich
   # optional-dependencies: widgets
   - graphviz-anywidget>=0.7.0
   - ipywidgets
@@ -48,3 +46,5 @@ dependencies:
   - pytest-xdist
   - pytest
   - versioningit
+  - pip:
+    - fastmcp

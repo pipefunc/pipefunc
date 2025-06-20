@@ -9,7 +9,7 @@ import tomllib
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-PIP_ONLY_DEPS: set[str] = set()
+PIP_ONLY_DEPS: set[str] = {"fastmcp"}
 REPLACE_DEPS: dict[str, str] = {
     "graphviz": "python-graphviz",
 }
@@ -37,11 +37,10 @@ def write_deps(deps: Iterable[str], added_deps: set[str], label: str = "", inden
     """Write dependencies with optional label."""
     deps_str = ""
     space = " " * indent
-    if label:
+    to_add = [dep for dep in deps if dep not in added_deps]
+    if to_add and label:
         deps_str += f"  # {label}\n"
-    for dep in deps:
-        if dep in added_deps:
-            continue
+    for dep in to_add:
         deps_str += f"{space}- {dep}\n"
         added_deps.add(dep)
     return deps_str
@@ -118,6 +117,7 @@ if __name__ == "__main__":
         "adaptive",
         "autodoc",
         "cli",
+        "mcp",
         "pandas",
         "plotting",
         "profiling",

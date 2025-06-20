@@ -90,6 +90,7 @@ Some key things to note:
 - Applying a scope to a parameter that is already in a scope will _replace_ the existing scope with the new one.
 - Using scopes makes it possible to use the same parameter names in different contexts without conflicts.
 - Scopes are purely a naming mechanism and do not affect the actual function execution.
+- **Scope names and parameter names cannot overlap**. For example, you cannot have both a scope named `"data"` and a parameter named `"data"`, as this would create ambiguity when using the nested dictionary syntax `{"data": {...}}`.
 
 Parameter scopes are a convenient way to organize complex pipelines and make them more readable by grouping related parameters together.
 They also help avoid naming conflicts and make it easier to reason about the data flow between functions.

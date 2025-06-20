@@ -222,13 +222,25 @@ def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # no
 
 @dataclass
 class AsyncMap:
-    task: asyncio.Task[ResultDict]
+    """An object returned by `run_map_async` to manage an asynchronous pipeline execution."""
+
     run_info: RunInfo
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None
     multi_run_manager: MultiRunManager | None
     status_widget: AsyncTaskStatusWidget | None
+    _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
+    _display_widgets: bool
+    _task: asyncio.Task[ResultDict] | None = None
+
+    @property
+    def task(self) -> asyncio.Task[ResultDict]:
+        if self._task is None:
+            msg = "The task has not been started. Call `start()` first."
+            raise RuntimeError(msg)
+        return self._task
 
     def result(self) -> ResultDict:
+        """Wait for the pipeline to complete and return the results."""
         if is_running_in_ipynb():  # pragma: no cover
             if self.task.done():
                 return self.task.result()
@@ -253,6 +265,20 @@ class AsyncMap:
         else:
             print("⚠️ Display is only supported in Jupyter notebooks.")
 
+    def start(self) -> AsyncMap:
+        """Start the pipeline execution."""
+        if self._task is not None:
+            warnings.warn("Task is already running.", stacklevel=2)
+            return self
+
+        self._task = asyncio.create_task(self._run_pipeline())
+        if self.progress is not None:
+            self.progress.attach_task(self._task)
+        self.status_widget = maybe_async_task_status_widget(self._task)
+        if self._display_widgets:
+            self.display()
+        return self
+
 
 def run_map_async(
     pipeline: Pipeline,
@@ -270,6 +296,8 @@ def run_map_async(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    display_widgets: bool = True,
+    start: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -363,10 +391,16 @@ def run_map_async(
         - ``None`` (default): Shows `ipywidgets` progress bar *only if*
           running in a Jupyter notebook and `ipywidgets` is installed.
           Otherwise, no progress bar is shown.
+    display_widgets
+        Whether to call ``IPython.display.display(...)`` on widgets.
+        Ignored if **outside** of a Jupyter notebook.
     return_results
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    start
+        Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
+        `start()` method on the `AsyncMap` instance is called.
 
     """
     prep = prepare_run(
@@ -408,26 +442,27 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager)
+    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start, display_widgets)
 
 
 def _finalize_run_map_async(
     run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
     prep: Prepared,
     multi_run_manager: MultiRunManager | None,
+    start: bool,  # noqa: FBT001
+    display_widgets: bool,  # noqa: FBT001
 ) -> AsyncMap:
-    task = asyncio.create_task(run_pipeline())
-    if prep.progress is not None:
-        prep.progress.attach_task(task)
-
-    status_widget = maybe_async_task_status_widget(task)
-    if is_running_in_ipynb():  # pragma: no cover
-        if prep.progress is not None:
-            prep.progress.display()
-        if multi_run_manager is not None:
-            multi_run_manager.display()
-
-    return AsyncMap(task, prep.run_info, prep.progress, multi_run_manager, status_widget)
+    async_map = AsyncMap(
+        run_info=prep.run_info,
+        progress=prep.progress,
+        multi_run_manager=multi_run_manager,
+        status_widget=None,
+        _run_pipeline=run_pipeline,
+        _display_widgets=display_widgets,
+    )
+    if start:
+        async_map.start()
+    return async_map
 
 
 def _maybe_persist_memory(
@@ -653,7 +688,7 @@ def _update_array(
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        if force_dump or (array.dump_in_subprocess != in_post_process):
+        if force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]

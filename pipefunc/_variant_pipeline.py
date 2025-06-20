@@ -48,6 +48,10 @@ class VariantPipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
+        If ``None``, the value of each PipeFunc's print_error attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
@@ -166,6 +170,7 @@ class VariantPipeline:
         default_variant: str | dict[str | None, str] | None = None,
         lazy: bool = False,
         debug: bool | None = None,
+        print_error: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
@@ -180,6 +185,7 @@ class VariantPipeline:
         self.default_variant = default_variant
         self.lazy = lazy
         self.debug = debug
+        self.print_error = print_error
         self.profile = profile
         self.cache_type = cache_type
         self.cache_kwargs = cache_kwargs
@@ -272,6 +278,7 @@ class VariantPipeline:
             new_functions,  # type: ignore[arg-type]
             lazy=kwargs.get("lazy", self.lazy),
             debug=kwargs.get("debug", self.debug),
+            print_error=kwargs.get("print_error", self.print_error),
             profile=kwargs.get("profile", self.profile),
             cache_type=kwargs.get("cache_type", self.cache_type),
             cache_kwargs=kwargs.get("cache_kwargs", self.cache_kwargs),
@@ -340,6 +347,7 @@ class VariantPipeline:
             "functions": self.functions,
             "lazy": self.lazy,
             "debug": self.debug,
+            "print_error": self.print_error,
             "profile": self.profile,
             "cache_type": self.cache_type,
             "cache_kwargs": self.cache_kwargs,
@@ -507,10 +515,28 @@ class VariantPipeline:
 
     def __getattr__(self, name: str) -> None:
         if name in Pipeline.__dict__:
+            unresolved = {
+                group: variants
+                for group, variants in self.variants_mapping().items()
+                if len(variants) > 1
+            }
+
+            if unresolved:
+                parts = []
+                if None in unresolved:
+                    parts.append(f"variants {unresolved[None]}")
+                parts.extend(
+                    f"variant group `{g} = {v}`" for g, v in unresolved.items() if g is not None
+                )
+                variants_info = f" The {' and '.join(parts)} are not yet resolved."
+            else:
+                variants_info = ""
+
             msg = (
                 "This is a `VariantPipeline`, not a `Pipeline`."
-                " Use `pipeline.with_variant(...)` to select a variant first."
-                f" Then call `variant_pipeline.{name}` again."
+                f"{variants_info}"
+                " Use `VariantPipeline.with_variant(...)` to instanciate a Pipeline first."
+                f" Then access `Pipeline.{name}` again."
             )
             raise AttributeError(msg)
         default_msg = f"'VariantPipeline' object has no attribute '{name}'"

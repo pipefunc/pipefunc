@@ -98,6 +98,10 @@ class Pipeline:
     debug
         Flag indicating whether debug information should be printed.
         If ``None``, the value of each PipeFunc's debug attribute is used.
+    print_error
+        Flag indicating whether errors raised during the function execution should
+        be printed.
+        If ``None``, the value of each PipeFunc's print_error attribute is used.
     profile
         Flag indicating whether profiling information should be collected.
         If ``None``, the value of each PipeFunc's profile attribute is used.
@@ -175,6 +179,7 @@ class Pipeline:
         *,
         lazy: bool = False,
         debug: bool | None = None,
+        print_error: bool | None = None,
         profile: bool | None = None,
         cache_type: Literal["lru", "hybrid", "disk", "simple"] | None = None,
         cache_kwargs: dict[str, Any] | None = None,
@@ -188,6 +193,7 @@ class Pipeline:
         self.functions: list[PipeFunc] = []
         self.lazy = lazy
         self._debug = debug
+        self._print_error = print_error
         self._profile = profile
         self._default_resources: Resources | None = Resources.maybe_from_dict(default_resources)  # type: ignore[assignment]
         self.validate_type_annotations = validate_type_annotations
@@ -284,6 +290,19 @@ class Pipeline:
             for f in self.functions:
                 f.debug = value
 
+    @property
+    def print_error(self) -> bool | None:
+        """Flag indicating whether errors raised during the function execution should be printed."""
+        return self._print_error
+
+    @print_error.setter
+    def print_error(self, value: bool | None) -> None:
+        """Set the print_error flag for the pipeline and all functions."""
+        self._print_error = value
+        if value is not None:
+            for f in self.functions:
+                f.print_error = value
+
     def add(self, f: PipeFunc | Callable, mapspec: str | MapSpec | None = None) -> PipeFunc:
         """Add a function to the pipeline.
 
@@ -327,6 +346,9 @@ class Pipeline:
 
         if self.debug is not None:
             f.debug = self.debug
+
+        if self.print_error is not None:
+            f.print_error = self.print_error
 
         self._clear_internal_cache()  # reset cache
         self.validate()
@@ -704,6 +726,7 @@ class Pipeline:
 
         """
         self._validate_run_output_name(kwargs, output_name)
+        self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
@@ -912,8 +935,10 @@ class Pipeline:
         fixed_indices: dict[str, int | slice] | None = None,
         auto_subpipeline: bool = False,
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
+        display_widgets: bool = True,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        start: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -1005,6 +1030,9 @@ class Pipeline:
             - ``None`` (default): Shows `ipywidgets` progress bar *only if*
               running in a Jupyter notebook and `ipywidgets` is installed.
               Otherwise, no progress bar is shown.
+        display_widgets
+            Whether to call ``IPython.display.display(...)`` on widgets.
+            Ignored if **outside** of a Jupyter notebook.
         return_results
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
@@ -1020,6 +1048,9 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        start
+            Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
+            `start()` method on the `AsyncMap` instance is called.
 
         See Also
         --------
@@ -1055,7 +1086,9 @@ class Pipeline:
             fixed_indices=fixed_indices,
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
+            display_widgets=display_widgets,
             return_results=return_results,
+            start=start,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:
@@ -1138,6 +1171,10 @@ class Pipeline:
             if arg not in func._bound and arg not in self.output_to_func
         }
 
+    @functools.cached_property
+    def scopes(self) -> set[str]:
+        return {scope for func in self.functions for scope in func.parameter_scopes}
+
     def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
         """Retrieve defaults for a function, including those set by other functions."""
         if r := self._internal_cache.func_defaults.get(func.output_name):
@@ -1153,7 +1190,12 @@ class Pipeline:
         self._internal_cache.func_defaults[func.output_name] = defaults
         return defaults
 
-    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+    def update_defaults(
+        self,
+        defaults: dict[str, Any | dict[str, Any]],
+        *,
+        overwrite: bool = False,
+    ) -> None:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
@@ -1172,6 +1214,9 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
+        self._validate_scoped_parameters(defaults)
+
+        defaults = self._flatten_scopes(defaults)
         unused = set(defaults.keys())
         for f in self.functions:
             update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
@@ -1312,6 +1357,22 @@ class Pipeline:
             raise ValueError(msg)
         self._clear_internal_cache()
         self.validate()
+
+    def _validate_scoped_parameters(self, kwargs: dict[str, Any]) -> None:
+        """Validate that scoped parameters are not defined in both flattened and nested formats."""
+        if overlap := kwargs.keys() & self._flatten_scopes(
+            {
+                scope: scoped_kwargs
+                for scope, scoped_kwargs in kwargs.items()
+                if scope in self.scopes
+            },
+        ):
+            overlap_str = ", ".join(sorted(overlap))
+            msg = (
+                f"Conflicting definitions for `{overlap_str}`:"
+                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
+            )
+            raise ValueError(msg)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
@@ -1886,6 +1947,7 @@ class Pipeline:
             "lazy": self.lazy,
             "debug": self._debug,
             "profile": self._profile,
+            "print_error": self._print_error,
             "cache_type": self._cache_type,
             "cache_kwargs": self._cache_kwargs,
             "default_resources": self._default_resources,
@@ -2152,12 +2214,14 @@ class Pipeline:
             pipeline.drop(f=f)
 
         if inputs is not None:
-            new_root_args = set(pipeline.topological_generations.root_args)
-            if not new_root_args.issubset(inputs):
+            # subtract inputs with default values as they are not required
+            root_args = set(pipeline.topological_generations.root_args)
+            new_required_root_args = root_args - pipeline.defaults.keys()
+            if not new_required_root_args.issubset(inputs):
                 outputs = {f.output_name for f in pipeline.functions}
                 msg = (
                     f"Cannot construct a partial pipeline with `{outputs=}`"
-                    f" and `{inputs=}`, it would require `{new_root_args}`."
+                    f" and `{inputs=}`, it would require `{new_required_root_args}`."
                 )
                 raise ValueError(msg)
 

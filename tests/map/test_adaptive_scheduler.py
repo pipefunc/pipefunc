@@ -63,7 +63,6 @@ def test_slurm_run_setup(tmp_path: Path) -> None:
         "cores_per_node",
         "extra_scheduler",
         "partition",
-        "executor_type",
     }
 
     run(info)

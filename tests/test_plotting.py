@@ -23,6 +23,17 @@ has_graphviz_exec = shutil.which("dot") is not None
 
 
 @pytest.fixture(autouse=True)
+def patch_pyviz_comms():
+    # To avoid https://github.com/holoviz/pyviz_comms/issues/137
+    # Remove once https://github.com/holoviz/pyviz_comms/pull/138 is merged
+    try:
+        with patch("pyviz_comms._in_ipython", new=False) as mock_in_ipython:
+            yield mock_in_ipython
+    except ImportError:
+        yield
+
+
+@pytest.fixture(autouse=True)
 def patched_show():
     if not has_matplotlib:
         yield

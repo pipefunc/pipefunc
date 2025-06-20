@@ -228,7 +228,7 @@ if __name__ == "__main__":
     compare_param_descriptions(
         pipefunc.Pipeline.map,
         pipefunc.Pipeline.map_async,
-        allow_missing=["parallel"],
+        allow_missing=["parallel", "start", "display_widgets"],
         allow_discrepancy=["executor"],
     )
 

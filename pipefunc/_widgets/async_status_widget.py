@@ -107,7 +107,7 @@ class AsyncTaskStatusWidget:
         self._traceback_button.on_click(self._toggle_traceback)
 
         # Create main container
-        self._main_widget = ipywidgets.VBox(
+        self.widget = ipywidgets.VBox(
             [self._status_html_widget, self._traceback_button, self._traceback_widget],
         )
 
@@ -299,7 +299,7 @@ class AsyncTaskStatusWidget:
 
     def display(self) -> None:
         """Display the widget in the current cell."""
-        IPython.display.display(self._main_widget)
+        IPython.display.display(self.widget)
 
     def attach_task(self, task: asyncio.Task) -> None:
         """Attach the widget to a task for monitoring.
