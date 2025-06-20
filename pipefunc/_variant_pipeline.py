@@ -534,7 +534,7 @@ class VariantPipeline:
 
             msg = (
                 "This is a `VariantPipeline`, not a `Pipeline`."
-                f"({unresolved_variants_info})"
+                f"{unresolved_variants_info}"
                 " Use `VariantPipeline.with_variant(...)` to instanciate a Pipeline first."
                 f" Then access `Pipeline.{name}` again."
             )
