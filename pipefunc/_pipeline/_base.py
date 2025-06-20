@@ -1221,13 +1221,14 @@ class Pipeline:
             },
         ):
             overlap_str = ", ".join(sorted(overlap))
-            msg = f"The parameter names: `{overlap_str}`. Have been defined flattened and scope-keyed."
+            msg = (
+                f"Conflicting definitions for `{overlap_str}`:"
+                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
+            )
             raise ValueError(msg)
 
         defaults = self._flatten_scopes(defaults)
-
         unused = set(defaults.keys())
-
         for f in self.functions:
             update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
             unused -= set(update.keys())

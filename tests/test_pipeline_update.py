@@ -355,7 +355,7 @@ def test_update_scoped_defaults() -> None:
     updated_pipeline = pipeline.copy()
     with pytest.raises(
         ValueError,
-        match="The parameter names: `scope.a`. Have been defined flattened and scope-keyed.",
+        match="Conflicting definitions for `scope.a`: found both flattened",
     ):
         updated_pipeline.update_defaults({"scope.a": 1, "scope": {"a": 1}})
 
