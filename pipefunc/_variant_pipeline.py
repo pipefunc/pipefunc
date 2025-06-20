@@ -515,10 +515,28 @@ class VariantPipeline:
 
     def __getattr__(self, name: str) -> None:
         if name in Pipeline.__dict__:
+            unresolved = {
+                group: variants
+                for group, variants in self.variants_mapping().items()
+                if len(variants) > 1
+            }
+
+            if unresolved:
+                parts = []
+                if None in unresolved:
+                    parts.append(f"variants {unresolved[None]}")
+                parts.extend(
+                    f"variant group `{g} = {v}`" for g, v in unresolved.items() if g is not None
+                )
+                variants_info = f" The {' and '.join(parts)} are not yet resolved."
+            else:
+                variants_info = ""
+
             msg = (
                 "This is a `VariantPipeline`, not a `Pipeline`."
-                " Use `pipeline.with_variant(...)` to select a variant first."
-                f" Then call `variant_pipeline.{name}` again."
+                f"{variants_info}"
+                " Use `VariantPipeline.with_variant(...)` to instanciate a Pipeline first."
+                f" Then access `Pipeline.{name}` again."
             )
             raise AttributeError(msg)
         default_msg = f"'VariantPipeline' object has no attribute '{name}'"
