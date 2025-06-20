@@ -85,3 +85,29 @@ except Exception:
 ```
 
 {class}`~pipefunc.ErrorSnapshot` is very useful for debugging complex pipelines, making it easy to replicate and understand issues as they occur.
+
+## Continue on Error in `pipeline.map`
+
+When running a `pipeline.map`, you can use the `continue_on_error` argument to allow the pipeline to continue executing even if some iterations fail. When an error occurs, it will be caught and stored in an {class}`~pipefunc.errors.ErrorContainer` object, which will be placed in the output instead of the result.
+
+**Example:**
+
+```python
+from pipefunc import Pipeline, pipefunc
+import numpy as np
+
+@pipefunc(output_name="c", mapspec="a[i] -> c[i]")
+def f(a):
+    if a < 0:
+        raise ValueError("a cannot be negative")
+    return a * 2
+
+pipeline = Pipeline([f])
+results = pipeline.map({"a": [1, -1, 2]}, continue_on_error=True)
+output = results["c"].output
+assert output[0] == 2
+assert isinstance(output[1], ErrorContainer)
+assert output[2] == 4
+```
+
+This allows you to process large datasets where some data points might be corrupted or cause errors, without failing the entire pipeline run. You can then inspect the results to find the `ErrorContainer` objects and debug the specific iterations that failed.

@@ -53,6 +53,7 @@ def run_map_eager(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    continue_on_error: bool = False,
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
@@ -156,6 +157,10 @@ def run_map_eager(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    continue_on_error
+        If ``True``, the pipeline will continue to run even if some of the iterations
+        fail. The failed iterations will be replaced with an `ErrorContainer` object.
+        If ``False``, the pipeline will raise an exception on the first error.
 
     """
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
@@ -189,6 +194,7 @@ def run_map_eager(
             chunksizes=prep.chunksizes,
             progress=prep.progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
             cache=prep.pipeline.cache,
         )
     return _finalize_run_map(prep, persist_memory)
@@ -265,6 +271,7 @@ class _FunctionTracker:
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
         progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
         return_results: bool,  # noqa: FBT001
+        continue_on_error: bool,  # noqa: FBT001
         cache: _CacheBase | None,
         multi_run_manager: MultiRunManager | None = None,
     ) -> None:
@@ -278,6 +285,7 @@ class _FunctionTracker:
             chunksizes,
             progress,
             return_results,
+            continue_on_error,
             cache,
         )
         self.tasks[func] = kwargs_task
@@ -394,6 +402,7 @@ def _eager_scheduler_loop(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None,
 ) -> None:
     """Dynamically submit tasks for functions as soon as they are ready."""
@@ -410,6 +419,7 @@ def _eager_scheduler_loop(
             chunksizes,
             progress,
             return_results,
+            continue_on_error,
             cache,
         )
 
@@ -426,6 +436,7 @@ def _eager_scheduler_loop(
             chunksizes=chunksizes,
             progress=progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
             cache=cache,
         )
 
@@ -442,6 +453,7 @@ def _process_completed_futures(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None,
 ) -> None:
     """Process completed futures and schedule new tasks."""
@@ -469,6 +481,7 @@ def _process_completed_futures(
             chunksizes=chunksizes,
             progress=progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
             cache=cache,
         )
 
@@ -485,6 +498,7 @@ def _update_dependencies_and_submit(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,
 ) -> None:
@@ -502,6 +516,7 @@ def _update_dependencies_and_submit(
                 chunksizes,
                 progress,
                 return_results,
+                continue_on_error,
                 cache,
                 multi_run_manager,
             )

@@ -775,6 +775,7 @@ class Pipeline:
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        continue_on_error: bool = False,
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -883,6 +884,10 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        continue_on_error
+            If ``True``, the pipeline will continue to run even if some of the iterations
+            fail. The failed iterations will be replaced with an `ErrorContainer` object.
+            If ``False``, the pipeline will raise an exception on the first error.
 
         See Also
         --------
@@ -918,6 +923,7 @@ class Pipeline:
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
         )
 
     def map_async(
@@ -939,6 +945,7 @@ class Pipeline:
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
         start: bool = True,
+        continue_on_error: bool = False,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -1051,6 +1058,10 @@ class Pipeline:
         start
             Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
             `start()` method on the `AsyncMap` instance is called.
+        continue_on_error
+            If ``True``, the pipeline will continue to run even if some of the iterations
+            fail. The failed iterations will be replaced with an `ErrorContainer` object.
+            If ``False``, the pipeline will raise an exception on the first error.
 
         See Also
         --------
@@ -1089,6 +1100,7 @@ class Pipeline:
             display_widgets=display_widgets,
             return_results=return_results,
             start=start,
+            continue_on_error=continue_on_error,
         )
 
     def arg_combinations(self, output_name: OUTPUT_TYPE) -> set[tuple[str, ...]]:

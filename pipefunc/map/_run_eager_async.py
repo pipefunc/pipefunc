@@ -56,6 +56,7 @@ def run_map_eager_async(
     display_widgets: bool = True,
     return_results: bool = True,
     start: bool = True,
+    continue_on_error: bool = False,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.
 
@@ -164,6 +165,10 @@ def run_map_eager_async(
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
+    continue_on_error
+        If ``True``, the pipeline will continue to run even if some of the iterations
+        fail. The failed iterations will be replaced with an `ErrorContainer` object.
+        If ``False``, the pipeline will raise an exception on the first error.
 
     """
     prep = prepare_run(
@@ -199,6 +204,7 @@ def run_map_eager_async(
                 chunksizes=prep.chunksizes,
                 progress=prep.progress,
                 return_results=return_results,
+                continue_on_error=continue_on_error,
                 cache=prep.pipeline.cache,
                 multi_run_manager=multi_run_manager,
             )
@@ -219,6 +225,7 @@ async def _eager_scheduler_loop_async(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None = None,
 ) -> None:
@@ -236,6 +243,7 @@ async def _eager_scheduler_loop_async(
             chunksizes,
             progress,
             return_results,
+            continue_on_error,
             cache,
             multi_run_manager,
         )
@@ -253,6 +261,7 @@ async def _eager_scheduler_loop_async(
             chunksizes=chunksizes,
             progress=progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
             cache=cache,
             multi_run_manager=multi_run_manager,
         )
@@ -270,6 +279,7 @@ async def _process_completed_futures_async(
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
     return_results: bool,
+    continue_on_error: bool,
     cache: _CacheBase | None,
     multi_run_manager: MultiRunManager | None,
 ) -> None:
@@ -304,6 +314,7 @@ async def _process_completed_futures_async(
             chunksizes=chunksizes,
             progress=progress,
             return_results=return_results,
+            continue_on_error=continue_on_error,
             cache=cache,
             multi_run_manager=multi_run_manager,
         )

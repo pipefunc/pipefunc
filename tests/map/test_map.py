@@ -13,6 +13,7 @@ import pytest
 
 from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._utils import prod
+from pipefunc.errors import ErrorContainer
 from pipefunc.map._load import load_all_outputs, load_dataframe, load_outputs, load_xarray_dataset
 from pipefunc.map._mapspec import trace_dependencies
 from pipefunc.map._prepare import _reduced_axes
@@ -1530,6 +1531,44 @@ def test_map_func_exception():
         match=re.escape("Error occurred while executing function `f(x=1)`"),
     ):
         pipeline.map({"x": 1}, None, parallel=False, storage="dict")
+
+
+def test_continue_on_error(tmp_path: Path) -> None:
+    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+    def f(x: int) -> int:
+        if x < 0:
+            msg = f"Negative value: {x}"
+            raise ValueError(msg)
+        return x + 1
+
+    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+    def g(y: int) -> int:
+        return y * 2
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, -1, 2, -2]}
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        continue_on_error=True,
+        parallel=False,
+        storage="dict",
+    )
+    y = results["y"].output
+    assert y[0] == 2
+    assert isinstance(y[1], ErrorContainer)
+    assert "Negative value: -1" in str(y[1].exception)
+    assert y[2] == 3
+    assert isinstance(y[3], ErrorContainer)
+    assert "Negative value: -2" in str(y[3].exception)
+
+    z = results["z"].output
+    assert z[0] == 4
+    assert isinstance(z[1], ErrorContainer)
+    assert "Negative value: -1" in str(z[1].exception)
+    assert z[2] == 6
+    assert isinstance(z[3], ErrorContainer)
+    assert "Negative value: -2" in str(z[3].exception)
 
 
 @pytest.mark.parametrize("dim", [3, "?"])
