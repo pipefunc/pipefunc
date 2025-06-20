@@ -62,6 +62,7 @@ def prepare_run(
         msg = "Cannot use an executor without `parallel=True`."
         raise ValueError(msg)
     inputs = maybe_pydantic_model_to_dict(inputs)
+    pipeline._validate_scoped_parameters(inputs)
     inputs = pipeline._flatten_scopes(inputs)
     if auto_subpipeline or output_names is not None:
         pipeline = pipeline.subpipeline(set(inputs), output_names)

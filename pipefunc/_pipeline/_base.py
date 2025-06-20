@@ -726,6 +726,7 @@ class Pipeline:
 
         """
         self._validate_run_output_name(kwargs, output_name)
+        self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
@@ -1170,6 +1171,10 @@ class Pipeline:
             if arg not in func._bound and arg not in self.output_to_func
         }
 
+    @functools.cached_property
+    def scopes(self) -> set[str]:
+        return {scope for func in self.functions for scope in func.parameter_scopes}
+
     def _func_defaults(self, func: PipeFunc) -> dict[str, Any]:
         """Retrieve defaults for a function, including those set by other functions."""
         if r := self._internal_cache.func_defaults.get(func.output_name):
@@ -1185,7 +1190,12 @@ class Pipeline:
         self._internal_cache.func_defaults[func.output_name] = defaults
         return defaults
 
-    def update_defaults(self, defaults: dict[str, Any], *, overwrite: bool = False) -> None:
+    def update_defaults(
+        self,
+        defaults: dict[str, Any | dict[str, Any]],
+        *,
+        overwrite: bool = False,
+    ) -> None:
         """Update defaults to the provided keyword arguments.
 
         Automatically traverses the pipeline graph to find all functions that
@@ -1204,6 +1214,9 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
+        self._validate_scoped_parameters(defaults)
+
+        defaults = self._flatten_scopes(defaults)
         unused = set(defaults.keys())
         for f in self.functions:
             update = {k: v for k, v in defaults.items() if k in f.parameters if k not in f.bound}
@@ -1344,6 +1357,22 @@ class Pipeline:
             raise ValueError(msg)
         self._clear_internal_cache()
         self.validate()
+
+    def _validate_scoped_parameters(self, kwargs: dict[str, Any]) -> None:
+        """Validate that scoped parameters are not defined in both flattened and nested formats."""
+        if overlap := kwargs.keys() & self._flatten_scopes(
+            {
+                scope: scoped_kwargs
+                for scope, scoped_kwargs in kwargs.items()
+                if scope in self.scopes
+            },
+        ):
+            overlap_str = ", ".join(sorted(overlap))
+            msg = (
+                f"Conflicting definitions for `{overlap_str}`:"
+                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
+            )
+            raise ValueError(msg)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
