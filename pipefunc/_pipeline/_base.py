@@ -1213,28 +1213,18 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
-        # Split up defaults into flat keys e.g. 'a', 'scope.a'
-        # and scope keys {'scope': 'a'} -> 'scope.a'.
-        # (The parameterscopes and parameter names present in a pipeline are always disjoint)
-
-        unscoped_defaults = {
-            parameter: val for parameter, val in defaults.items() if parameter not in self.scopes
-        }
-
-        scoped_defaults = {
-            parameter: val
+        if overlap := defaults.keys() & {
+            parameter
             for f in self.functions
-            for parameter, val in f._flatten_scopes(
-                {scope: defaults[scope] for scope in f.parameter_scopes & defaults.keys()},
-            ).items()
-        }
-
-        if overlap := unscoped_defaults.keys() & scoped_defaults.keys():
+            for parameter in f._flatten_scopes(
+                {scope: defaults[scope] for scope in defaults.keys() & f.parameter_scopes},
+            )
+        }:
             overlap_str = ", ".join(sorted(overlap))
             msg = f"The parameter names: `{overlap_str}`. Have been defined flattened and scope-keyed."
             raise ValueError(msg)
 
-        defaults = {**unscoped_defaults, **scoped_defaults}
+        defaults = self._flatten_scopes(defaults)
 
         unused = set(defaults.keys())
 
