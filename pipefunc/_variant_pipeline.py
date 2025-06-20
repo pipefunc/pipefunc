@@ -515,26 +515,26 @@ class VariantPipeline:
 
     def __getattr__(self, name: str) -> None:
         if name in Pipeline.__dict__:
-            unresolved_variants = {
+            unresolved = {
                 group: variants
                 for group, variants in self.variants_mapping().items()
                 if len(variants) > 1
             }
-            unresolved_variants_info = ""
 
-            if variants := unresolved_variants.pop(None, None):
-                unresolved_variants_info += f" The variants {variants} are not yet resolved."
-            if unresolved_variants:
-                unresolved_groups_str = ", ".join(
-                    [f"{group} = {variants}" for group, variants in unresolved_variants.items()],
+            if unresolved:
+                parts = []
+                if None in unresolved:
+                    parts.append(f"variants {unresolved[None]}")
+                parts.extend(
+                    f"variant group `{g} = {v}`" for g, v in unresolved.items() if g is not None
                 )
-                unresolved_variants_info += (
-                    f" The variant group(s) {unresolved_groups_str} are not yet resolved."
-                )
+                variants_info = f" The {' and '.join(parts)} are not yet resolved."
+            else:
+                variants_info = ""
 
             msg = (
                 "This is a `VariantPipeline`, not a `Pipeline`."
-                f"{unresolved_variants_info}"
+                f"{variants_info}"
                 " Use `VariantPipeline.with_variant(...)` to instanciate a Pipeline first."
                 f" Then access `Pipeline.{name}` again."
             )
