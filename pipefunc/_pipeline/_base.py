@@ -28,7 +28,6 @@ from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
-    handle_error,
     is_installed,
     is_running_in_ipynb,
     requires,
@@ -42,7 +41,7 @@ from pipefunc.map._mapspec import (
     mapspec_dimensions,
     validate_consistent_axes,
 )
-from pipefunc.map._run import AsyncMap, run_map, run_map_async
+from pipefunc.map._run import AsyncMap, handle_error, run_map, run_map_async
 from pipefunc.map._run_eager import run_map_eager
 from pipefunc.map._run_eager_async import run_map_eager_async
 from pipefunc.resources import Resources

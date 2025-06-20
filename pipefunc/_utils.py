@@ -86,17 +86,6 @@ def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) ->
     return f"{func_name}()"
 
 
-def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
-    """Handle an error that occurred while executing a function."""
-    call_str = format_function_call(func.__name__, (), kwargs)
-    msg = f"Error occurred while executing function `{call_str}`."
-    if sys.version_info < (3, 11):  # pragma: no cover
-        original_msg = e.args[0] if e.args else ""
-        raise type(e)(original_msg + msg) from e
-    e.add_note(msg)
-    raise  # noqa: PLE0704
-
-
 def prod(iterable: Iterable[int]) -> int:
     """Return the product of an iterable."""
     return functools.reduce(operator.mul, iterable, 1)
