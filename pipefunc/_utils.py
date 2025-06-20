@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     import pydantic
     from griffe import DocstringSection
 
-    from pipefunc.exceptions import ErrorContainer
+    from pipefunc._pipefunc import PipeFunc
+    from pipefunc.exceptions import ErrorSnapshot
 
 
 def at_least_tuple(x: Any) -> tuple[Any, ...]:
@@ -90,15 +91,15 @@ def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) ->
 
 def handle_error(
     e: Exception,
-    func: Callable,
+    func: PipeFunc,
     kwargs: dict[str, Any],
     return_error: bool = False,  # noqa: FBT001, FBT002
-) -> ErrorContainer | None:
+) -> ErrorSnapshot | None:
     """Handle an error that occurred while executing a function."""
     if return_error:
-        from pipefunc.exceptions import ErrorContainer
+        from pipefunc.exceptions import ErrorSnapshot
 
-        return ErrorContainer(exception=e, kwargs=kwargs)
+        return ErrorSnapshot(function=func.func, exception=e, args=(), kwargs=kwargs)
     call_str = format_function_call(func.__name__, (), kwargs)
     msg = f"Error occurred while executing function `{call_str}`."
     if sys.version_info < (3, 11):  # pragma: no cover

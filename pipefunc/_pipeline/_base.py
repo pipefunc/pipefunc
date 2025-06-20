@@ -886,7 +886,7 @@ class Pipeline:
               with varied execution times.
         continue_on_error
             If ``True``, the pipeline will continue to run even if some of the iterations
-            fail. The failed iterations will be replaced with an `ErrorContainer` object.
+            fail. The failed iterations will be replaced with an `ErrorSnapshot` object.
             If ``False``, the pipeline will raise an exception on the first error.
 
         See Also
@@ -1060,7 +1060,7 @@ class Pipeline:
             `start()` method on the `AsyncMap` instance is called.
         continue_on_error
             If ``True``, the pipeline will continue to run even if some of the iterations
-            fail. The failed iterations will be replaced with an `ErrorContainer` object.
+            fail. The failed iterations will be replaced with an `ErrorSnapshot` object.
             If ``False``, the pipeline will raise an exception on the first error.
 
         See Also

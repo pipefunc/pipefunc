@@ -154,7 +154,7 @@ This section has been moved to [Error Handling](./concepts/error-handling.md).
 
 ## How to continue evaluation of a `Pipeline` if one of the iterations fails?
 
-By default, `pipefunc` will stop the execution of a `pipeline.map` call if one of the iterations fails. However, you can change this behavior by setting the `continue_on_error` argument to `True`. In this case, the failed iterations will be replaced with an `ErrorContainer` object, and the pipeline will continue to run. This is useful for large pipelines where you want to get as many results as possible, even if some of the iterations fail.
+By default, `pipefunc` will stop the execution of a `pipeline.map` call if one of the iterations fails. However, you can change this behavior by setting the `continue_on_error` argument to `True`. In this case, the failed iterations will be replaced with an `ErrorSnapshot` object, and the pipeline will continue to run. This is useful for large pipelines where you want to get as many results as possible, even if some of the iterations fail.
 
 ## What is the overhead / efficiency / performance of `pipefunc`?
 

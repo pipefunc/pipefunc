@@ -98,34 +98,17 @@ class ErrorSnapshot:
 
         display(HTML(f"<pre>{self}</pre>"))
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Return the state of the error snapshot for serialization."""
+        state = self.__dict__.copy()
+        for key in ["function", "exception", "args", "kwargs"]:
+            if key in state:
+                state[key] = cloudpickle.dumps(state[key])
+        return state
 
-@dataclass
-class ErrorContainer:
-    """A container that represents an error in a function call."""
-
-    exception: Exception
-    kwargs: dict[str, Any]
-    traceback: str = field(init=False)
-
-    def __post_init__(self) -> None:
-        """Initialize the error container with a formatted traceback."""
-        tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__,
-        )
-        self.traceback = "".join(tb)
-
-    def __str__(self) -> str:
-        """Return a string representation of the error container."""
-        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
-        return (
-            "ErrorContainer:\n"
-            "---------------\n"
-            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
-            f"- 💥 Exception message: {self.exception}\n"
-            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
-            "\n"
-            "📄 Or see the full stored traceback using `error_container.traceback`.\n"
-            "🔍 Inspect `error_container.kwargs`."
-        )
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Set the state of the error snapshot from a serialized state."""
+        for key in ["function", "exception", "args", "kwargs"]:
+            if key in state:
+                state[key] = cloudpickle.loads(state[key])
+        self.__dict__.update(state)

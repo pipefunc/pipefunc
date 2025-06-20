@@ -159,7 +159,7 @@ def run_map_eager(
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
     continue_on_error
         If ``True``, the pipeline will continue to run even if some of the iterations
-        fail. The failed iterations will be replaced with an `ErrorContainer` object.
+        fail. The failed iterations will be replaced with an `ErrorSnapshot` object.
         If ``False``, the pipeline will raise an exception on the first error.
 
     """

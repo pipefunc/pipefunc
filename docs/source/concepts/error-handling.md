@@ -88,7 +88,7 @@ except Exception:
 
 ## Continue on Error in `pipeline.map`
 
-When running a `pipeline.map`, you can use the `continue_on_error` argument to allow the pipeline to continue executing even if some iterations fail. When an error occurs, it will be caught and stored in an {class}`~pipefunc.exceptions.ErrorContainer` object, which will be placed in the output instead of the result.
+When running a `pipeline.map`, you can use the `continue_on_error` argument to allow the pipeline to continue executing even if some iterations fail. When an error occurs, it will be caught and stored in an {class}`~pipefunc.exceptions.ErrorSnapshot` object, which will be placed in the output instead of the result.
 
 **Example:**
 
@@ -106,8 +106,8 @@ pipeline = Pipeline([f])
 results = pipeline.map({"a": [1, -1, 2]}, continue_on_error=True)
 output = results["c"].output
 assert output[0] == 2
-assert isinstance(output[1], ErrorContainer)
+assert isinstance(output[1], ErrorSnapshot)
 assert output[2] == 4
 ```
 
-This allows you to process large datasets where some data points might be corrupted or cause errors, without failing the entire pipeline run. You can then inspect the results to find the `ErrorContainer` objects and debug the specific iterations that failed.
+This allows you to process large datasets where some data points might be corrupted or cause errors, without failing the entire pipeline run. You can then inspect the results to find the `ErrorSnapshot` objects and debug the specific iterations that failed.
