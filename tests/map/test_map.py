@@ -1571,6 +1571,44 @@ def test_continue_on_error(tmp_path: Path) -> None:
     assert "Negative value: -2" in str(z[3].exception)
 
 
+def test_continue_on_error_tuple_output(tmp_path: Path) -> None:
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def f(x: int) -> int:
+        if x < 0:
+            msg = f"Negative value: {x}"
+            raise ValueError(msg)
+        return x + 1
+
+    @pipefunc(output_name="z", mapspec="y1[i], y2[i] -> z[i]")
+    def g(y1: int, y2: int) -> int:
+        return y1 + y2
+
+    pipeline = Pipeline([f, g])
+    inputs = {"x": [1, -1, 2, -2]}
+    results = pipeline.map(
+        inputs,
+        run_folder=tmp_path,
+        continue_on_error=True,
+        parallel=False,
+        storage="dict",
+    )
+    y1 = results["y1"].output
+    assert y1[0] == 2
+    assert isinstance(y1[1], ErrorSnapshot)
+    assert "Negative value: -1" in str(y1[1].exception)
+    assert y1[2] == 3
+    assert isinstance(y1[3], ErrorSnapshot)
+    assert "Negative value: -2" in str(y1[3].exception)
+
+    y2 = results["y2"].output
+    assert y2[0] == 2
+    assert isinstance(y2[1], ErrorSnapshot)
+    assert "Negative value: -1" in str(y2[1].exception)
+    assert y2[2] == 3
+    assert isinstance(y2[3], ErrorSnapshot)
+    assert "Negative value: -2" in str(y2[3].exception)
+
+
 @pytest.mark.parametrize("dim", [3, "?"])
 def test_internal_shape_in_pipefunc(dim: int | Literal["?"]):
     @pipefunc(output_name="y", mapspec="... -> y[i]", internal_shape=(dim,))
