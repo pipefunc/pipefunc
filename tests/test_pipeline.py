@@ -1266,3 +1266,19 @@ def test_file_array_as_input(tmp_path: Path) -> None:
 
     results = pipeline.map(inputs, parallel=False, storage="dict", run_folder=tmp_path / "run")
     assert results["y"].output.tolist() == [70, 71]
+
+
+def test_run_with_overlapping_scopes() -> None:
+    @pipefunc(output_name="y", scope="scope")
+    def f(a, b):
+        return a + b
+
+    pipeline = Pipeline([f])
+    r = pipeline.run("scope.y", kwargs={"scope.a": 1, "scope.b": 2})
+    assert r == 3
+
+    with pytest.raises(
+        ValueError,
+        match="Conflicting definitions for `scope.a`: found both flattened",
+    ):
+        pipeline.run("scope.y", kwargs={"scope.a": 1, "scope": {"a": 2}, "scope.b": 3})

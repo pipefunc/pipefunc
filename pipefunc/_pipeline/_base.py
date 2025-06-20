@@ -726,6 +726,7 @@ class Pipeline:
 
         """
         self._validate_run_output_name(kwargs, output_name)
+        self._validate_scoped_parameters(kwargs)
         flat_scope_kwargs = self._flatten_scopes(kwargs)
 
         all_results: dict[OUTPUT_TYPE, Any] = flat_scope_kwargs.copy()  # type: ignore[assignment]
@@ -1213,19 +1214,7 @@ class Pipeline:
             defaults will be added to the existing defaults.
 
         """
-        if overlap := defaults.keys() & self._flatten_scopes(
-            {
-                scope: scoped_defaults
-                for scope, scoped_defaults in defaults.items()
-                if scope in self.scopes
-            },
-        ):
-            overlap_str = ", ".join(sorted(overlap))
-            msg = (
-                f"Conflicting definitions for `{overlap_str}`:"
-                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
-            )
-            raise ValueError(msg)
+        self._validate_scoped_parameters(defaults)
 
         defaults = self._flatten_scopes(defaults)
         unused = set(defaults.keys())
@@ -1368,6 +1357,22 @@ class Pipeline:
             raise ValueError(msg)
         self._clear_internal_cache()
         self.validate()
+
+    def _validate_scoped_parameters(self, kwargs: dict[str, Any]) -> None:
+        """Validate that scoped parameters are not defined in both flattened and nested formats."""
+        if overlap := kwargs.keys() & self._flatten_scopes(
+            {
+                scope: scoped_kwargs
+                for scope, scoped_kwargs in kwargs.items()
+                if scope in self.scopes
+            },
+        ):
+            overlap_str = ", ".join(sorted(overlap))
+            msg = (
+                f"Conflicting definitions for `{overlap_str}`:"
+                " found both flattened ('scope.param') and nested ({'scope': {'param': ...}}) formats."
+            )
+            raise ValueError(msg)
 
     def _flatten_scopes(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         flat_scope_kwargs = kwargs
