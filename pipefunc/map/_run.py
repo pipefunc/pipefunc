@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
     dump,
     get_ncores,
-    handle_error,
     is_running_in_ipynb,
     prod,
 )
@@ -613,8 +613,8 @@ def _run_iteration(func: PipeFunc, selected: dict[str, Any], cache: _CacheBase |
         try:
             return func(**selected)
         except Exception as e:
-            handle_error(e, func, selected)
-            # handle_error raises but mypy doesn't know that
+            handle_pipefunc_error(e, func, selected)
+            # handle_pipefunc_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
@@ -1056,8 +1056,8 @@ def _execute_single(
         try:
             return func(**kwargs)
         except Exception as e:
-            handle_error(e, func, kwargs)
-            # handle_error raises but mypy doesn't know that
+            handle_pipefunc_error(e, func, kwargs)
+            # handle_pipefunc_error raises but mypy doesn't know that
             raise  # pragma: no cover
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)

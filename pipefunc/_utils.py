@@ -1,3 +1,5 @@
+"""General utility functions, should not import anything from pipefunc."""
+
 from __future__ import annotations
 
 import contextlib
