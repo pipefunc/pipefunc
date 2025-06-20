@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
@@ -34,7 +34,7 @@ from pipefunc._utils import (
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc.exceptions import UnusedParametersError
+from pipefunc.exceptions import ErrorSnapshot, UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     MapSpec,
