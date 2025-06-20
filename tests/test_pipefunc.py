@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipefunc import NestedPipeFunc, PipeFunc, pipefunc
-from pipefunc._pipefunc import ErrorSnapshot
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.resources import Resources
 
 if TYPE_CHECKING:
