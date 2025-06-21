@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE
     from pipefunc.resources import Resources
 
+    from ._types import Index, Indices
+
 
 def validate_slurm_executor(
     executor: dict[OUTPUT_TYPE, Executor] | None,
@@ -59,7 +61,7 @@ def maybe_update_slurm_executor_map(
     ex: Executor,
     executor: dict[OUTPUT_TYPE, Executor],
     process_index: functools.partial[tuple[Any, ...]],
-    indices: list[int],
+    indices: Indices,
 ) -> Executor:
     if is_slurm_executor(ex) or _is_slurm_executor_type(ex):
         ex = _slurm_executor_for_map(ex, process_index, indices)
@@ -101,7 +103,7 @@ def _is_slurm_executor_type(executor: Executor | None) -> TypeGuard[type[SlurmEx
 def _slurm_executor_for_map(
     executor: SlurmExecutor | type[SlurmExecutor],
     process_index: functools.partial[tuple[Any, ...]],
-    indices: list[int],
+    indices: Indices,
 ) -> Executor:  # Actually SlurmExecutor, but mypy doesn't like it
     func = process_index.keywords["func"]
     executor_kwargs = _map_slurm_executor_kwargs(func, process_index, indices)
@@ -161,7 +163,7 @@ def _slurm_name(output_name: OUTPUT_TYPE, executor: SlurmExecutor | type[SlurmEx
 def _map_slurm_executor_kwargs(
     func: PipeFunc,
     process_index: functools.partial[tuple[Any, ...]],
-    seq: list[int],
+    seq: Indices,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = {}
     if func.resources_scope == "element":
@@ -244,7 +246,7 @@ def _adaptive_scheduler_resource_dict(
 
 def _resources_from_process_index(
     process_index: functools.partial[tuple[Any, ...]],
-    index: int,
+    index: Index,
 ) -> Resources | None:
     from ._run import _EVALUATED_RESOURCES, _select_kwargs_and_eval_resources
     # Import here to avoid circular imports
