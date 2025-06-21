@@ -1687,6 +1687,7 @@ class Pipeline:
         graphviz_kwargs: dict[str, Any] | None = None,
         show_legend: bool = True,
         include_full_mapspec: bool = False,
+        extra_lines: dict[OUTPUT_TYPE, str] | None = None,
         return_type: Literal["graphviz", "html"] | None = None,
     ) -> graphviz.Digraph | IPython.display.HTML:
         """Visualize the pipeline as a directed graph using Graphviz.
@@ -1718,6 +1719,9 @@ class Pipeline:
             Whether to show the legend in the graph visualization.
         include_full_mapspec
             Whether to include the full mapspec as a separate line in the `PipeFunc` labels.
+        extra_lines
+            Dictionary mapping output names to additional text that will be displayed as extra
+            lines in the node labels.
         return_type
             The format to return the visualization in.
             If ``'html'``, the visualization is returned as a `IPython.display.html`,
@@ -1746,6 +1750,7 @@ class Pipeline:
             graphviz_kwargs=graphviz_kwargs,
             show_legend=show_legend,
             include_full_mapspec=include_full_mapspec,
+            extra_lines=extra_lines,
             return_type=return_type,
         )
 
