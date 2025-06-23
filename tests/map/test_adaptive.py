@@ -100,7 +100,7 @@ def test_simple_from_step(tmp_path: Path, storage: str) -> None:
 
 
 @pytest.mark.parametrize("return_output", [True, False])
-def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> None:  # noqa: FBT001
+def test_create_learners_loading_data(tmp_path: Path, return_output: bool) -> None:
     counters = {"add": 0, "take_sum": 0}
 
     @pipefunc(output_name="z")

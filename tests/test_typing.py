@@ -349,6 +349,7 @@ def test_is_type_compatible_with_generics_incoming_generic():
 def test_is_type_compatible_with_unresolvable():
     with pytest.warns(UserWarning, match="Unresolvable type"):
         assert is_type_compatible(Unresolvable("UndefinedType"), int)
+    with pytest.warns(UserWarning, match="Unresolvable type"):
         assert is_type_compatible(int, Unresolvable("UndefinedType"))
 
 
@@ -385,7 +386,7 @@ def test_safe_get_type_hints_generic_type():
 
     expected = {
         "a": list[int],
-        "b": Optional[str],  # noqa: UP007
+        "b": Optional[str],  # noqa: UP045
         "return": NoneType,
     }
     assert safe_get_type_hints(func) == expected
@@ -543,7 +544,7 @@ U = TypeVar("U", bound=int)
         (MockUnresolvable("UnresolvedType"), "UnresolvedType"),
         (ForwardRef("FutureType"), "FutureType"),
         (Union[int, str], "Union[int, str]"),  # noqa: UP007
-        (Optional[int], "Union[int, NoneType]"),  # noqa: UP007
+        (Optional[int], "Union[int, NoneType]"),  # noqa: UP045
         (list[int], "list[int]"),
         (dict[str, int], "dict[str, int]"),
         (tuple[int, str, float], "tuple[int, str, float]"),  # type: ignore[list-item]

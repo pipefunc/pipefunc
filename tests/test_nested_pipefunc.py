@@ -828,7 +828,7 @@ def test_nestedpipefunc_with_default_and_bound() -> None:
         return float(x + len(y))
 
     @pipefunc("final")
-    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT002
         return f"{intermediate}_{z}"
 
     # Bind one of the inputs
@@ -847,7 +847,7 @@ def test_nestedpipefunc_annotations_with_renames_and_defaults() -> None:
         return float(x + len(y))
 
     @pipefunc("final")
-    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT001, FBT002
+    def func2(intermediate: float, z: bool = True) -> str:  # noqa: FBT002
         return f"{intermediate}_{z}"
 
     # Rename an input and an output, provide new default

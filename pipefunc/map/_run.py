@@ -213,7 +213,7 @@ def run_map(
     return _finalize_run_map(prep, persist_memory)
 
 
-def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:  # noqa: FBT001
+def _finalize_run_map(prep: Prepared, persist_memory: bool) -> ResultDict:
     if prep.progress is not None:  # final update
         prep.progress.update_progress(force=True)
     _maybe_persist_memory(prep.store, persist_memory)
@@ -449,8 +449,8 @@ def _finalize_run_map_async(
     run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]],
     prep: Prepared,
     multi_run_manager: MultiRunManager | None,
-    start: bool,  # noqa: FBT001
-    display_widgets: bool,  # noqa: FBT001
+    start: bool,
+    display_widgets: bool,
 ) -> AsyncMap:
     async_map = AsyncMap(
         run_info=prep.run_info,
@@ -467,7 +467,7 @@ def _finalize_run_map_async(
 
 def _maybe_persist_memory(
     store: dict[str, StoreType],
-    persist_memory: bool,  # noqa: FBT001
+    persist_memory: bool,
 ) -> None:
     if persist_memory:  # Only relevant for memory based storage
         for arr in store.values():
@@ -569,7 +569,7 @@ def _select_kwargs_and_eval_resources(
 def _init_result_arrays(
     output_name: OUTPUT_TYPE,
     shape: ShapeTuple,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> list[np.ndarray] | None:
     if not return_results or not shape_is_resolved(shape):
         return None
@@ -795,7 +795,7 @@ def _existing_and_missing_indices(
 @contextmanager
 def _maybe_executor(
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    parallel: bool,  # noqa: FBT001
+    parallel: bool,
 ) -> Generator[dict[OUTPUT_TYPE, Executor] | None, None, None]:
     if executor is None and parallel:
         with ProcessPoolExecutor() as new_executor:  # shuts down the executor after use
@@ -821,7 +821,7 @@ def _prepare_submit_map_spec(
     store: dict[str, StoreType],
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -1137,7 +1137,7 @@ def _process_generation(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     for func in generation:
         _outputs = _process_task(func, tasks[func], store, run_info, return_results)
@@ -1152,7 +1152,7 @@ async def _process_generation_async(
     store: dict[str, StoreType],
     outputs: ResultDict,
     run_info: RunInfo,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> None:
     for func in generation:
         _outputs = await _process_task_async(func, tasks[func], store, run_info, return_results)
@@ -1172,7 +1172,7 @@ def _submit_func(
     | RichProgressTracker
     | HeadlessProgressTracker
     | None = None,
-    return_results: bool = True,  # noqa: FBT001, FBT002
+    return_results: bool = True,  # noqa: FBT002
     cache: _CacheBase | None = None,
 ) -> _KwargsTask:
     kwargs = _func_kwargs(func, run_info, store)
@@ -1240,7 +1240,7 @@ def _submit_generation(
     executor: dict[OUTPUT_TYPE, Executor] | None,
     chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
     progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
     cache: _CacheBase | None = None,
 ) -> dict[PipeFunc, _KwargsTask]:
     return {
@@ -1265,7 +1265,7 @@ def _output_from_mapspec_task(
     args: _MapSpecArgs,
     outputs_list: list[list[Any]],
     run_info: RunInfo,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> tuple[np.ndarray, ...] | None:
     arrays: tuple[StorageBase, ...] = tuple(
         store[name]  # type: ignore[misc]
@@ -1344,7 +1344,7 @@ def _process_task(
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
     run_info: RunInfo,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> ResultDict | None:
     kwargs, task = kwargs_task
     if func.requires_mapping:
@@ -1375,7 +1375,7 @@ def _maybe_resolve_shapes_from_map(
     store: dict[str, StoreType],
     args: _MapSpecArgs,
     outputs: list[Any],
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> tuple[int, ...]:
     for output, name in zip(outputs, at_least_tuple(func.output_name)):
         array = store[name]
@@ -1393,7 +1393,7 @@ async def _process_task_async(
     kwargs_task: _KwargsTask,
     store: dict[str, StoreType],
     run_info: RunInfo,
-    return_results: bool,  # noqa: FBT001
+    return_results: bool,
 ) -> ResultDict | None:
     kwargs, task = kwargs_task
     loop = asyncio.get_event_loop()

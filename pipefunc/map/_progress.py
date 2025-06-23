@@ -109,7 +109,7 @@ def init_tracker(
     store: dict[str, StoreType],
     functions: list[PipeFunc],
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None,
-    in_async: bool,  # noqa: FBT001
+    in_async: bool,
 ) -> IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None:
     if show_progress is False:
         return None

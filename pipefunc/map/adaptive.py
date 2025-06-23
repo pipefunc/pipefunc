@@ -539,7 +539,7 @@ def _maybe_iterate_axes(
     pipeline: Pipeline,
     inputs: dict[str, Any],
     fixed_indices: dict[str, int | slice] | None,
-    split_independent_axes: bool,  # noqa: FBT001
+    split_independent_axes: bool,
     internal_shapes: UserShapeDict | None,
 ) -> Generator[dict[str, int | slice] | None, None, None]:
     if fixed_indices:

@@ -493,7 +493,7 @@ class Electrostatics:
 
 
 @pytest.mark.parametrize("with_multiple_outputs", [False, True])
-def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:  # noqa: FBT001
+def test_pyiida_example(with_multiple_outputs: bool, tmp_path: Path) -> None:
     @pipefunc(output_name="geo")
     def make_geometry(x: float, y: float) -> Geometry:
         return Geometry(x, y)
