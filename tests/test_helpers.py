@@ -145,7 +145,7 @@ def pipeline() -> Pipeline:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("output_tabs", [True, False])
-async def test_launch_maps(output_tabs: bool, pipeline: Pipeline) -> None:  # noqa: FBT001
+async def test_launch_maps(output_tabs: bool, pipeline: Pipeline) -> None:
     if output_tabs and not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
 

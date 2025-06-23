@@ -277,7 +277,7 @@ def is_object_array_type(tp: Any) -> bool:
     return False
 
 
-class Unresolvable:
+class Unresolvable:  # noqa: PLW1641
     """Class to represent an unresolvable type hint."""
 
     def __init__(self, type_str: str) -> None:
@@ -297,7 +297,7 @@ class Unresolvable:
 
 def safe_get_type_hints(
     func: Callable[..., Any],
-    include_extras: bool = False,  # noqa: FBT001, FBT002
+    include_extras: bool = False,  # noqa: FBT002
 ) -> dict[str, Any]:
     """Safely get type hints for a function, resolving forward references."""
     try:

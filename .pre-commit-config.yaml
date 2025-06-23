@@ -20,7 +20,7 @@ repos:
     rev: "v1.16.1"
     hooks:
       - id: mypy
-        exclude: ipynb_filter.py|docs/source/conf.py
+        exclude: ipynb_filter.py|docs/source/conf.py|noxfile.py
         additional_dependencies:
           - types-setuptools
           - pandas-stubs

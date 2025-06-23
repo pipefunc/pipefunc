@@ -179,6 +179,7 @@ ignore = [
     "D107",    # Missing docstring in `__init__`
     "B905",    # `zip()` without an explicit `strict=` parameter
     "PLC0415", # `import` should be at the top-level of a file
+    "FBT001",  # Boolean-typed positional argument in function definition
 ]
 
 [tool.ruff.lint.per-file-ignores]

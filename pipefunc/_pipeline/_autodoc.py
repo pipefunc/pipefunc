@@ -205,9 +205,9 @@ def _output_name_text(output_name: OUTPUT_TYPE) -> Text:
 def _create_parameters_table(
     doc: PipelineDocumentation,
     box: Any,
-    skip_optional: bool,  # noqa: FBT001
-    skip_intermediate: bool,  # noqa: FBT001
-    emojis: bool,  # noqa: FBT001
+    skip_optional: bool,
+    skip_intermediate: bool,
+    emojis: bool,
 ) -> Table:
     """Creates the parameters table."""
     from rich.table import Table
@@ -250,8 +250,8 @@ def _create_parameter_row(
     param_descs: list[str],
     defaults: dict[str, Any],
     p_annotations: dict[str, Any],
-    skip_optional: bool,  # noqa: FBT001
-    emojis: bool,  # noqa: FBT001
+    skip_optional: bool,
+    emojis: bool,
 ) -> list[Text]:
     """Creates a row for the parameters table."""
     from rich.text import Text

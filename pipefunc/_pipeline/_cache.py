@@ -18,7 +18,7 @@ _CACHE_KEY_TYPE: TypeAlias = tuple[OUTPUT_TYPE, tuple[tuple[str, Any], ...]]
 
 def create_cache(
     cache_type: Literal["lru", "hybrid", "disk", "simple"] | None,
-    lazy: bool,  # noqa: FBT001
+    lazy: bool,
     cache_kwargs: dict[str, Any] | None,
 ) -> LRUCache | HybridCache | DiskCache | SimpleCache | None:
     if cache_type is None:
@@ -114,9 +114,9 @@ def get_result_from_cache(
     cache_key: _CACHE_KEY_TYPE | None,
     output_name: OUTPUT_TYPE,
     all_results: dict[OUTPUT_TYPE, Any],
-    full_output: bool,  # noqa: FBT001
+    full_output: bool,
     used_parameters: set[str | None],
-    lazy: bool = False,  # noqa: FBT002, FBT001
+    lazy: bool = False,  # noqa: FBT002
 ) -> tuple[bool, bool]:
     from ._base import _update_all_results
 

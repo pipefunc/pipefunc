@@ -179,7 +179,7 @@ def _generate_node_label(
     hints: dict[str, type],
     defaults: dict[str, Any] | None,
     arg_mapspec: dict[str, str],
-    include_full_mapspec: bool,  # noqa: FBT001
+    include_full_mapspec: bool,
 ) -> str:
     """Generate a Graphviz-compatible HTML-like label for a graph node including type annotations and default values."""
 
