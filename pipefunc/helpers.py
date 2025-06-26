@@ -26,7 +26,9 @@ __all__ = [
     "FileArray",  # To keep in the same namespace as FileValue
     "FileValue",
     "collect_kwargs",
+    "gather_maps",
     "get_attribute_factory",
+    "launch_maps",
 ]
 
 
