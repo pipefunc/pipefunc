@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import dump, is_running_in_ipynb, load, requires
-from pipefunc.map._adaptive_scheduler_slurm_executor import is_slurm_executor
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -410,6 +409,8 @@ def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
 
 
 def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap]) -> None:
+    from pipefunc.map._adaptive_scheduler_slurm_executor import is_slurm_executor
+
     cnt: Counter[str] = Counter()
     for am in async_maps:
         executors = am._prepared.executor
