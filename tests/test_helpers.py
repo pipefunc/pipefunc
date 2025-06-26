@@ -9,6 +9,7 @@ from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+has_adaptive_scheduler = importlib.util.find_spec("adaptive_scheduler") is not None
 
 
 def test_collect_kwargs() -> None:
@@ -214,6 +215,7 @@ def test_validate_async_maps(pipeline: Pipeline) -> None:
         launch_maps()
 
 
+@pytest.mark.skipif(not has_adaptive_scheduler, reason="adaptive_scheduler not installed")
 @pytest.mark.asyncio
 async def test_validate_async_maps_slurm_executor_name(pipeline: Pipeline) -> None:
     from adaptive_scheduler import SlurmExecutor
