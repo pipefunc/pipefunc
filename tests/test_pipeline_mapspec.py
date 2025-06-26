@@ -411,7 +411,7 @@ def test_replace_none_in_axes() -> None:
 
 
 @pytest.mark.parametrize("show_progress", [True, False])
-def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:  # noqa: FBT001
+def test_zero_sizes_list_with_progress_bar(show_progress: bool) -> None:
     if show_progress and not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
 

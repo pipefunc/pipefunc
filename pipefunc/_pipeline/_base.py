@@ -573,7 +573,7 @@ class Pipeline:
         func: PipeFunc,
         flat_scope_kwargs: dict[str, Any],
         all_results: dict[OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
+        full_output: bool,
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
         # Used in _run
@@ -2560,7 +2560,7 @@ def _update_all_results(
     r: Any,
     output_name: OUTPUT_TYPE,
     all_results: dict[OUTPUT_TYPE, Any],
-    lazy: bool,  # noqa: FBT001
+    lazy: bool,
 ) -> None:
     if isinstance(func.output_name, tuple):
         assert func.output_picker is not None
@@ -2578,7 +2578,7 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
+def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     if lazy:
         return _LazyFunction(func, kwargs=func_args)
     try:

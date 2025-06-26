@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 def validate_slurm_executor(
     executor: dict[OUTPUT_TYPE, Executor] | None,
-    in_async: bool,  # noqa: FBT001
+    in_async: bool,
 ) -> None:
     if executor is None or in_async or not _adaptive_scheduler_imported():
         return

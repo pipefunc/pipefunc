@@ -122,7 +122,7 @@ def test_format_args_empty() -> None:
     assert format_function_call("func1", args, kwargs) == "func1('foo', func2='func2(arg)')"
 
 
-class CustomObject:
+class CustomObject:  # noqa: PLW1641
     def __init__(self, value):
         self.value = value
 
@@ -232,7 +232,7 @@ def test_equal_dicts() -> None:
     d12 = {"a": {"a": np.array([1, 2, 4])}}
     assert not equal_dicts(d11, d12, verbose=True)
 
-    class A:
+    class A:  # noqa: PLW1641
         def __eq__(self, other):
             msg = "Error"
             raise RuntimeError(msg)

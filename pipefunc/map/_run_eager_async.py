@@ -211,7 +211,14 @@ def run_map_eager_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start, display_widgets)
+    return _finalize_run_map_async(
+        _run_pipeline,
+        prep,
+        multi_run_manager,
+        start,
+        display_widgets,
+        prep,
+    )
 
 
 async def _eager_scheduler_loop_async(

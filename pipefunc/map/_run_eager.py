@@ -270,8 +270,8 @@ class _FunctionTracker:
         executor: dict[OUTPUT_TYPE, Executor] | None,
         chunksizes: int | dict[OUTPUT_TYPE, int | Callable[[int], int] | None] | None,
         progress: IPyWidgetsProgressTracker | RichProgressTracker | HeadlessProgressTracker | None,
-        return_results: bool,  # noqa: FBT001
-        continue_on_error: bool,  # noqa: FBT001
+        return_results: bool,
+        continue_on_error: bool,
         cache: _CacheBase | None,
         multi_run_manager: MultiRunManager | None = None,
     ) -> None:

@@ -6,7 +6,7 @@ from pipefunc._adaptive import to_adaptive_learner
 
 
 @pytest.mark.parametrize("full_output", [False, True])
-def test_adaptive_run(full_output: bool):  # noqa: FBT001
+def test_adaptive_run(full_output: bool):
     @pipefunc(output_name="c", cache=True)
     def f_c(a, b):
         return a + b
