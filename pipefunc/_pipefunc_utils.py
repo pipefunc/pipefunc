@@ -15,7 +15,7 @@ def handle_pipefunc_error(
     e: Exception,
     func: PipeFunc,
     kwargs: dict[str, Any],
-    return_error: bool = False,  # noqa: FBT001, FBT002
+    return_error: bool = False,  # noqa: FBT002
 ) -> ErrorSnapshot | None:
     """Handle an error that occurred while executing a PipeFunc."""
     if return_error:
