@@ -427,7 +427,8 @@ def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap], caller_name: 
     violations = [name for name, count in cnt.items() if count > 1]
     if violations:
         msg = (
-            f"All `map_async`s provided to `{caller_name}` that use a `SlurmExecutor` must have instances with a unique `name`. "
+            f"All `map_async`s provided to `{caller_name}` that use a `SlurmExecutor`"
+            " must have instances with a unique `name`."
             f" Currently, the following names are used multiple times: {violations}."
             " Use `SlurmExecutor(name=...)` to set a unique name."
         )

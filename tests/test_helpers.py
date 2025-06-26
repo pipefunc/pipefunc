@@ -233,7 +233,8 @@ async def test_validate_async_maps_slurm_executor_name(pipeline: Pipeline) -> No
         patch("adaptive_scheduler._scheduler.slurm.slurm_partitions", return_value={"default": 1}),
         pytest.raises(
             ValueError,
-            match="All `map_async`s that use a `SlurmExecutor` must have instances with a unique `name`.",
+            match="All `map_async`s provided to `launch_maps` that use a `SlurmExecutor`"
+            " must have instances with a unique `name`.",
         ),
     ):
         await launch_maps(*runners)
