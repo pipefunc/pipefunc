@@ -383,6 +383,12 @@ def launch_maps(
 
 def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
     caller_name = inspect.stack()[1].function
+    _validate_async_maps_length(async_maps, caller_name)
+    _validate_unique_run_folders(async_maps, caller_name)
+    _validate_slurm_executor_names(async_maps, caller_name)
+
+
+def _validate_async_maps_length(async_maps: Sequence[AsyncMap], caller_name: str) -> None:
     if len(async_maps) == 0:
         msg = f"`{caller_name}` requires at least one `AsyncMap` object."
         raise ValueError(msg)
@@ -394,7 +400,8 @@ def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
         )
         raise ValueError(msg)
 
-    # All `run_folder`s must be unique unless it is None
+
+def _validate_unique_run_folders(async_maps: Sequence[AsyncMap], caller_name: str) -> None:
     run_folders = [
         am.run_info.run_folder for am in async_maps if am.run_info.run_folder is not None
     ]
@@ -405,10 +412,8 @@ def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
         )
         raise ValueError(msg)
 
-    _validate_slurm_executor_names(async_maps)
 
-
-def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap]) -> None:
+def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap], caller_name: str) -> None:
     from pipefunc.map._adaptive_scheduler_slurm_executor import is_slurm_executor
 
     cnt: Counter[str] = Counter()
@@ -422,7 +427,7 @@ def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap]) -> None:
     violations = [name for name, count in cnt.items() if count > 1]
     if violations:
         msg = (
-            f"All `map_async`s that use a `SlurmExecutor` must have instances with a unique `name`. "
+            f"All `map_async`s provided to `{caller_name}` that use a `SlurmExecutor` must have instances with a unique `name`. "
             f" Currently, the following names are used multiple times: {violations}."
             " Use `SlurmExecutor(name=...)` to set a unique name."
         )
