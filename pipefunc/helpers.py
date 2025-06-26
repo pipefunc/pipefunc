@@ -7,10 +7,12 @@ import importlib.util
 import inspect
 import os
 import warnings
+from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pipefunc._utils import dump, is_running_in_ipynb, load, requires
+from pipefunc.map._adaptive_scheduler_slurm_executor import is_slurm_executor
 from pipefunc.map._storage_array._file import FileArray
 
 if TYPE_CHECKING:
@@ -390,5 +392,37 @@ def _validate_async_maps(async_maps: Sequence[AsyncMap]) -> None:
             f"It seems you passed a list or tuple of `AsyncMap` objects as a single argument to `{caller_name}`. "
             "Instead, you should unpack the sequence into individual arguments. "
             f"For example, use `{caller_name}(*my_async_maps)` instead of `{caller_name}(my_async_maps)`."
+        )
+        raise ValueError(msg)
+
+    # All `run_folder`s must be unique unless it is None
+    run_folders = [
+        am.run_info.run_folder for am in async_maps if am.run_info.run_folder is not None
+    ]
+    if len(run_folders) != len(set(run_folders)):
+        msg = (
+            f"All `run_folder`s must be unique among the provided `AsyncMap` objects in `{caller_name}` "
+            "unless they are None."
+        )
+        raise ValueError(msg)
+
+    _validate_slurm_executor_names(async_maps)
+
+
+def _validate_slurm_executor_names(async_maps: Sequence[AsyncMap]) -> None:
+    cnt: Counter[str] = Counter()
+    for am in async_maps:
+        executors = am._prepared.executor
+        if executors is None:
+            continue
+        for v in executors.values():
+            if is_slurm_executor(v):
+                cnt[v.name] += 1
+    violations = [name for name, count in cnt.items() if count > 1]
+    if violations:
+        msg = (
+            f"All `map_async`s that use a `SlurmExecutor` must have instances with a unique `name`. "
+            f" Currently, the following names are used multiple times: {violations}."
+            " Use `SlurmExecutor(name=...)` to set a unique name."
         )
         raise ValueError(msg)

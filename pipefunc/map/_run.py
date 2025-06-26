@@ -230,6 +230,7 @@ class AsyncMap:
     status_widget: AsyncTaskStatusWidget | None
     _run_pipeline: Callable[[], Coroutine[Any, Any, ResultDict]]
     _display_widgets: bool
+    _prepared: Prepared
     _task: asyncio.Task[ResultDict] | None = None
 
     @property
@@ -442,7 +443,14 @@ def run_map_async(
         _maybe_persist_memory(prep.store, persist_memory)
         return prep.outputs
 
-    return _finalize_run_map_async(_run_pipeline, prep, multi_run_manager, start, display_widgets)
+    return _finalize_run_map_async(
+        _run_pipeline,
+        prep,
+        multi_run_manager,
+        start,
+        display_widgets,
+        prep,
+    )
 
 
 def _finalize_run_map_async(
@@ -451,6 +459,7 @@ def _finalize_run_map_async(
     multi_run_manager: MultiRunManager | None,
     start: bool,
     display_widgets: bool,
+    prepared: Prepared,
 ) -> AsyncMap:
     async_map = AsyncMap(
         run_info=prep.run_info,
@@ -459,6 +468,7 @@ def _finalize_run_map_async(
         status_widget=None,
         _run_pipeline=run_pipeline,
         _display_widgets=display_widgets,
+        _prepared=prepared,
     )
     if start:
         async_map.start()

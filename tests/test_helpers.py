@@ -212,3 +212,35 @@ def test_validate_async_maps(pipeline: Pipeline) -> None:
 
     with pytest.raises(ValueError, match="requires at least one `AsyncMap` object"):
         launch_maps()
+
+
+@pytest.mark.asyncio
+async def test_validate_async_maps_slurm_executor_name(pipeline: Pipeline) -> None:
+    from adaptive_scheduler import SlurmExecutor
+
+    executor = SlurmExecutor(name="test", partition="default", nodes=1, cores_per_node=1)
+    runners = [
+        pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=False, executor=executor)
+        for _ in range(2)
+    ]
+    with (
+        patch(
+            "adaptive_scheduler._server_support.slurm_run.slurm_partitions",
+            return_value={"default": 1},
+        ),
+        patch("adaptive_scheduler._scheduler.slurm.slurm_partitions", return_value={"default": 1}),
+        pytest.raises(
+            ValueError,
+            match="All `map_async`s that use a `SlurmExecutor` must have instances with a unique `name`.",
+        ),
+    ):
+        await launch_maps(*runners)
+
+
+def test_unique_run_folders(pipeline: Pipeline) -> None:
+    runners = [
+        pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=False, run_folder="test")
+        for _ in range(2)
+    ]
+    with pytest.raises(ValueError, match="All `run_folder`s must be unique"):
+        launch_maps(*runners)
