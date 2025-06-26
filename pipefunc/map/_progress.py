@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from pipefunc._utils import at_least_tuple, is_installed, is_running_in_ipynb, requires
+from pipefunc.exceptions import ErrorSnapshot
 
 from ._shapes import shape_is_resolved
 from ._storage_array._base import StorageBase
@@ -47,7 +48,10 @@ class Status:
         n: int = 1,
     ) -> None:
         self.n_in_progress -= n
-        if future is not None and future.exception() is not None:
+        if future is not None and (
+            future.exception() is not None or isinstance(future.result(), ErrorSnapshot)
+        ):
+            # TODO: Future is tuple of ErrorSnapshots and correct results
             self.n_failed += n
         else:
             self.n_completed += n

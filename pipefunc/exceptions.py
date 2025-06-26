@@ -97,3 +97,18 @@ class ErrorSnapshot:
         from IPython.display import HTML, display
 
         display(HTML(f"<pre>{self}</pre>"))
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Return the state of the error snapshot for serialization."""
+        state = self.__dict__.copy()
+        for key in ["function", "exception", "args", "kwargs"]:
+            if key in state:
+                state[key] = cloudpickle.dumps(state[key])
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Set the state of the error snapshot from a serialized state."""
+        for key in ["function", "exception", "args", "kwargs"]:
+            if key in state:
+                state[key] = cloudpickle.loads(state[key])
+        self.__dict__.update(state)
