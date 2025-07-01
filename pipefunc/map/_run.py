@@ -1331,11 +1331,22 @@ def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
         storage.internal_shape = internal_shape
 
 
-def _result(x: Any | Future, func: PipeFunc, kwargs: dict[str, Any]) -> Any:
+def _result(
+    x: Any | Future,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
     if isinstance(x, Future):
         try:
             return x.result()
         except Exception as e:
+            if index is not None:
+                assert run_info is not None
+                shape = run_info.resolved_shapes[func.output_name]
+                mask = run_info.shape_masks[func.output_name]
+                kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
             handle_pipefunc_error(e, func, kwargs)
             raise  # pragma: no cover
     return x
@@ -1376,7 +1387,7 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
-        chunk_outputs_list = [_result(x, func, kwargs) for x in r]
+        chunk_outputs_list = [_result(x, func, kwargs, i, run_info) for i, x in enumerate(r)]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
