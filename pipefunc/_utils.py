@@ -96,7 +96,7 @@ def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
         original_msg = e.args[0] if e.args else ""
         raise type(e)(original_msg + msg) from e
     e.add_note(msg)
-    raise e
+    raise  # noqa: PLE0704
 
 
 def prod(iterable: Iterable[int]) -> int:
