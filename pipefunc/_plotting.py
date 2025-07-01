@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 _empty = inspect.Parameter.empty
 MAX_LABEL_LENGTH = 20
+_AUTO_GROUP_ARGS_THRESHOLD = 10
 
 
 def _get_graph_layout(graph: nx.DiGraph) -> dict:
@@ -579,7 +580,7 @@ def visualize_graphviz_widget(
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
     *,
-    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    orient: Literal["TB", "LR", "BT", "RL"] = "TB",
     graphviz_kwargs: dict[str, Any] | None = None,
 ) -> ipywidgets.VBox:
     """Create an interactive visualization of the pipeline as a directed graph.
@@ -634,12 +635,23 @@ def visualize_graphviz_widget(
         orient=orient,
         graphviz_kwargs=graphviz_kwargs,
     )
-    initial_dot_source = _rerender_gv_source(graph, defaults, orient, graphviz_kwargs)
+    group_args = _group_args(graph)
+    initial_dot_source = _rerender_gv_source(
+        graph,
+        defaults,
+        orient,
+        graphviz_kwargs,
+        group_args=group_args,
+    )
     return graphviz_widget(
         dot_source=initial_dot_source,
         extra_controls_factory=factory,
         controls=True,
     )
+
+
+def _group_args(graph: nx.DiGraph) -> bool:
+    return len(graph.nodes) > _AUTO_GROUP_ARGS_THRESHOLD
 
 
 def _rerender_gv_source(
@@ -648,7 +660,7 @@ def _rerender_gv_source(
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     *,
-    group_args: bool = False,
+    group_args: bool,
     hide_default_args: bool = False,
     collapse_scopes: bool | Sequence[str] = False,
 ) -> str:
@@ -670,8 +682,8 @@ def _extra_controls_factory(  # noqa: PLR0915
     *,
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None,
-    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
-    graphviz_kwargs: dict[str, Any] | None = None,
+    orient: Literal["TB", "LR", "BT", "RL"],
+    graphviz_kwargs: dict[str, Any] | None,
 ) -> ipywidgets.HBox:
     """Extra widgets for the graphviz widget."""
     import ipywidgets
@@ -704,12 +716,13 @@ def _extra_controls_factory(  # noqa: PLR0915
         final_widgets.append(hide_defaults_toggle)
 
     # Group args
+    group_args = _group_args(graph)
     group_args_toggle = ipywidgets.ToggleButton(
-        value=False,
-        description="Group args",
+        value=group_args,
+        description="Ungroup args" if group_args else "Group args",
         tooltip="Group arguments into a single node",
-        icon="plus-square-o",
-        button_style="info",
+        icon="plus-square-o" if group_args else "minus-square-o",
+        button_style="success" if group_args else "info",
         layout=ipywidgets.Layout(width="auto"),
     )
     final_widgets.append(group_args_toggle)

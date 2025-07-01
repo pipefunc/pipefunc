@@ -1752,7 +1752,7 @@ class Pipeline:
     def visualize_graphviz_widget(
         self,
         *,
-        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        orient: Literal["TB", "LR", "BT", "RL"] = "TB",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
         """Create an interactive visualization of the pipeline as a directed graph.
