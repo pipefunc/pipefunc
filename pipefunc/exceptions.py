@@ -61,9 +61,9 @@ class ErrorSnapshot:
     exception: Exception
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
+    traceback: str = field(init=False)
 
     # Metadata
-    traceback: str = field(init=False)
     timestamp: str = field(default_factory=_timestamp)
     user: str = field(default_factory=getpass.getuser)
     machine: str = field(default_factory=platform.node)
@@ -124,7 +124,6 @@ class ErrorSnapshot:
     def metadata(self) -> dict[str, Any]:
         """Return the metadata of the error snapshot."""
         return {
-            "traceback": self.traceback,
             "timestamp": self.timestamp,
             "user": self.user,
             "machine": self.machine,
