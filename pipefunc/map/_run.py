@@ -1331,6 +1331,21 @@ def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
         storage.internal_shape = internal_shape
 
 
+def _maybe_select_kwargs_for_index(
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> dict[str, Any]:
+    # For use in `_result` and `_result_async`
+    if index is not None:
+        assert run_info is not None
+        shape = run_info.resolved_shapes[func.output_name]
+        mask = run_info.shape_masks[func.output_name]
+        kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
+    return kwargs
+
+
 def _result(
     x: Any | Future,
     func: PipeFunc,
@@ -1342,19 +1357,26 @@ def _result(
         try:
             return x.result()
         except Exception as e:
-            if index is not None:
-                assert run_info is not None
-                shape = run_info.resolved_shapes[func.output_name]
-                mask = run_info.shape_masks[func.output_name]
-                # This is a map, so we need to select the kwargs for this index
-                kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
+            kwargs = _maybe_select_kwargs_for_index(func, kwargs, index, run_info)
             handle_pipefunc_error(e, func, kwargs)
             raise  # pragma: no cover
     return x
 
 
-def _result_async(task: Future, loop: asyncio.AbstractEventLoop) -> asyncio.Future:
-    return asyncio.wrap_future(task, loop=loop)
+async def _result_async(
+    task: Future | Any,
+    loop: asyncio.AbstractEventLoop,
+    func: PipeFunc,
+    kwargs: dict[str, Any],
+    index: int | None = None,
+    run_info: RunInfo | None = None,
+) -> Any:
+    try:
+        return await asyncio.wrap_future(task, loop=loop)
+    except Exception as e:
+        kwargs = _maybe_select_kwargs_for_index(func, kwargs, index, run_info)
+        handle_pipefunc_error(e, func, kwargs)
+        raise  # pragma: no cover
 
 
 def _to_result_dict(
@@ -1438,7 +1460,7 @@ async def _process_task_async(
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
         r, args = task
-        futs = [_result_async(x, loop) for x in r]
+        futs = [_result_async(x, loop, func, kwargs, i, run_info) for i, x in enumerate(r)]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
@@ -1452,7 +1474,7 @@ async def _process_task_async(
         )
     else:
         assert isinstance(task, Future)
-        r = await _result_async(task, loop)
+        r = await _result_async(task, loop, func, kwargs)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None
