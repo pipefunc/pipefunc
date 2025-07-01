@@ -25,15 +25,15 @@ class UnusedParametersError(ValueError):
 
 
 class PipeFuncError(Exception):
-    """Wrapper exception that has the original exception and some data."""
+    """Wrapper exception that has the original exception and some metadata."""
 
     def __init__(
         self,
         original_exception: Exception,
-        data: Any,
+        metadata: Any,
     ) -> None:
         self.original_exception = original_exception
-        self._data_bytes = cloudpickle.dumps(data)
+        self._metadata_bytes = cloudpickle.dumps(metadata)
 
     def __str__(self) -> str:
         """Return a string representation of the exception."""
@@ -44,9 +44,9 @@ class PipeFuncError(Exception):
         return self.original_exception.__repr__()
 
     @functools.cached_property
-    def data(self) -> Any:
-        """Return the data that caused the error."""
-        return cloudpickle.loads(self._data_bytes)
+    def metadata(self) -> Any:
+        """Return the metadata that caused the error."""
+        return cloudpickle.loads(self._metadata_bytes)
 
 
 def _timestamp() -> str:
@@ -61,6 +61,8 @@ class ErrorSnapshot:
     exception: Exception
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
+
+    # Metadata
     traceback: str = field(init=False)
     timestamp: str = field(default_factory=_timestamp)
     user: str = field(default_factory=getpass.getuser)
@@ -122,6 +124,7 @@ class ErrorSnapshot:
     def metadata(self) -> dict[str, Any]:
         """Return the metadata of the error snapshot."""
         return {
+            "traceback": self.traceback,
             "timestamp": self.timestamp,
             "user": self.user,
             "machine": self.machine,

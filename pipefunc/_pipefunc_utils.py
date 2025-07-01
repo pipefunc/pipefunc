@@ -24,7 +24,7 @@ def handle_pipefunc_error(
             e.original_exception,
             args=(),
             kwargs=kwargs,
-            **e.data,
+            **e.metadata,
         )
         e = e.original_exception
     return handle_error(e, func, kwargs)
