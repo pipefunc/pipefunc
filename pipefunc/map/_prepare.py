@@ -155,7 +155,7 @@ def _cannot_be_parallelized(pipeline: Pipeline) -> bool:
 
 
 def _check_parallel(
-    parallel: bool,  # noqa: FBT001
+    parallel: bool,
     store: dict[str, StoreType],
     executor: Executor | dict[OUTPUT_TYPE, Executor] | None,
 ) -> None:

@@ -12,16 +12,12 @@ import contextlib
 import dataclasses
 import datetime
 import functools
-import getpass
 import inspect
 import os
-import platform
-import traceback
 import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, get_args, get_origin
 
 import cloudpickle
@@ -32,12 +28,11 @@ from pipefunc._utils import (
     at_least_tuple,
     clear_cached_properties,
     format_function_call,
-    get_local_ip,
     is_classmethod,
     is_pydantic_base_model,
     requires,
 )
-from pipefunc.exceptions import PipeFuncError
+from pipefunc.exceptions import ErrorSnapshot, PipeFuncError
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -45,8 +40,6 @@ from pipefunc.resources import Resources
 from pipefunc.typing import NoAnnotation, safe_get_type_hints
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pydantic
 
     from pipefunc import Pipeline
@@ -1435,90 +1428,6 @@ class _NestedFuncWrapper:
         if isinstance(self.output_name, str):
             return result_dict[self.output_name]
         return tuple(result_dict[name] for name in self.output_name)
-
-
-def _timestamp() -> str:
-    return datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-
-
-@dataclass
-class ErrorSnapshot:
-    """A snapshot that represents an error in a function call."""
-
-    function: Callable[..., Any]
-    exception: Exception
-    args: tuple[Any, ...]
-    kwargs: dict[str, Any]
-    traceback: str = field(init=False)
-    timestamp: str = field(default_factory=_timestamp)
-    user: str = field(default_factory=getpass.getuser)
-    machine: str = field(default_factory=platform.node)
-    ip_address: str = field(default_factory=get_local_ip)
-    current_directory: str = field(default_factory=os.getcwd)
-
-    def __post_init__(self) -> None:
-        tb = traceback.format_exception(
-            type(self.exception),
-            self.exception,
-            self.exception.__traceback__,
-        )
-        self.traceback = "".join(tb)
-
-    def __str__(self) -> str:
-        args_repr = ", ".join(repr(a) for a in self.args)
-        kwargs_repr = ", ".join(f"{k}={v!r}" for k, v in self.kwargs.items())
-        func_name = f"{self.function.__module__}.{self.function.__qualname__}"
-
-        return (
-            "ErrorSnapshot:\n"
-            "--------------\n"
-            f"- 🛠 Function: {func_name}\n"
-            f"- 🚨 Exception type: {type(self.exception).__name__}\n"
-            f"- 💥 Exception message: {self.exception}\n"
-            f"- 📋 Args: ({args_repr})\n"
-            f"- 🗂 Kwargs: {{{kwargs_repr}}}\n"
-            f"- 🕒 Timestamp: {self.timestamp}\n"
-            f"- 👤 User: {self.user}\n"
-            f"- 💻 Machine: {self.machine}\n"
-            f"- 📡 IP Address: {self.ip_address}\n"
-            f"- 📂 Current Directory: {self.current_directory}\n"
-            "\n"
-            "🔁 Reproduce the error by calling `error_snapshot.reproduce()`.\n"
-            "📄 Or see the full stored traceback using `error_snapshot.traceback`.\n"
-            "🔍 Inspect `error_snapshot.args` and `error_snapshot.kwargs`.\n"
-            "💾 Or save the error to a file using `error_snapshot.save_to_file(filename)`"
-            " and load it using `ErrorSnapshot.load_from_file(filename)`."
-        )
-
-    def reproduce(self) -> Any | None:
-        """Attempt to recreate the error by calling the function with stored arguments."""
-        return self.function(*self.args, **self.kwargs)
-
-    def save_to_file(self, filename: str | Path) -> None:
-        """Save the error snapshot to a file using cloudpickle."""
-        with open(filename, "wb") as f:  # noqa: PTH123
-            cloudpickle.dump(self, f)
-
-    @classmethod
-    def load_from_file(cls, filename: str | Path) -> ErrorSnapshot:
-        """Load an error snapshot from a file using cloudpickle."""
-        with open(filename, "rb") as f:  # noqa: PTH123
-            return cloudpickle.load(f)
-
-    def _ipython_display_(self) -> None:  # pragma: no cover
-        from IPython.display import HTML, display
-
-        display(HTML(f"<pre>{self}</pre>"))
-
-    def metadata(self) -> dict[str, Any]:
-        """Return the metadata of the error snapshot."""
-        return {
-            "timestamp": self.timestamp,
-            "user": self.user,
-            "machine": self.machine,
-            "ip_address": self.ip_address,
-            "current_directory": self.current_directory,
-        }
 
 
 def _validate_identifier(name: str, value: Any) -> None:

@@ -171,8 +171,8 @@ def pipeline() -> Pipeline:
 async def test_adaptive_slurm_executor(
     pipeline: Pipeline,
     tmp_path: Path,
-    use_mock: bool,  # noqa: FBT001
-    use_instance: bool,  # noqa: FBT001
+    use_mock: bool,
+    use_instance: bool,
     scheduling_strategy: Literal["eager", "generation"],
 ) -> None:
     if not has_slurm and not use_mock:
@@ -203,7 +203,7 @@ async def test_adaptive_slurm_executor(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("use_mock", [True, False])
 async def test_adaptive_mock_slurm_executor(
-    use_mock: bool,  # noqa: FBT001
+    use_mock: bool,
 ) -> None:
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
@@ -237,8 +237,8 @@ def test_slurm_executor_map_exception(
 @pytest.mark.parametrize("use_instance", [True, False])
 async def test_pipeline_no_resources(
     tmp_path: Path,
-    use_mock: bool,  # noqa: FBT001
-    use_instance: bool,  # noqa: FBT001
+    use_mock: bool,
+    use_instance: bool,
 ) -> None:
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
@@ -338,7 +338,7 @@ async def test_number_of_jobs_created_with_resources(resources, resources_scope)
 async def test_with_nested_pipefunc(
     tmp_path: Path,
     resources_scope: Literal["element", "map"],
-    use_mock: bool,  # noqa: FBT001
+    use_mock: bool,
 ):
     if not has_slurm and not use_mock:
         pytest.skip("Slurm not available")
@@ -383,10 +383,10 @@ async def test_inputs_serialized_to_disk(pipeline: Pipeline, tmp_path: Path) -> 
     with (
         mock.patch("pipefunc.map._run_info.is_slurm_executor", return_value=True),
         mock.patch("pipefunc.map._run_info._MAX_SIZE_BYTES_INPUT", new=100),
-        pytest.warns(UserWarning, match="dumping to disk instead of serializing"),
     ):
-        # Set executor to anything not None to trigger the right branch
-        runner = pipeline.map_async({"x": x, "b": b}, tmp_path, executor=ThreadPoolExecutor())
+        with pytest.warns(UserWarning, match="dumping to disk instead of serializing"):
+            # Set executor to anything not None to trigger the right branch
+            runner = pipeline.map_async({"x": x, "b": b}, tmp_path, executor=ThreadPoolExecutor())
         result = await runner.task
         assert result["y"].output.shape == x.shape
         assert isinstance(runner.run_info.inputs["x"], FileArray)

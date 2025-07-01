@@ -22,19 +22,19 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import networkx as nx
 
-from pipefunc._pipefunc import ErrorSnapshot, NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc import NestedPipeFunc, PipeFunc, _maybe_mapspec
+from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._profile import print_profiling_stats
 from pipefunc._utils import (
     assert_complete_kwargs,
     at_least_tuple,
     clear_cached_properties,
-    handle_error,
     is_installed,
     is_running_in_ipynb,
     requires,
 )
 from pipefunc.cache import DiskCache, HybridCache, LRUCache, SimpleCache
-from pipefunc.exceptions import UnusedParametersError
+from pipefunc.exceptions import ErrorSnapshot, UnusedParametersError
 from pipefunc.lazy import _LazyFunction, task_graph
 from pipefunc.map._mapspec import (
     MapSpec,
@@ -573,7 +573,7 @@ class Pipeline:
         func: PipeFunc,
         flat_scope_kwargs: dict[str, Any],
         all_results: dict[OUTPUT_TYPE, Any],
-        full_output: bool,  # noqa: FBT001
+        full_output: bool,
         used_parameters: set[str | None],
     ) -> dict[str, Any]:
         # Used in _run
@@ -1752,7 +1752,7 @@ class Pipeline:
     def visualize_graphviz_widget(
         self,
         *,
-        orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+        orient: Literal["TB", "LR", "BT", "RL"] = "TB",
         graphviz_kwargs: dict[str, Any] | None = None,
     ) -> ipywidgets.VBox:
         """Create an interactive visualization of the pipeline as a directed graph.
@@ -2548,7 +2548,7 @@ def _update_all_results(
     r: Any,
     output_name: OUTPUT_TYPE,
     all_results: dict[OUTPUT_TYPE, Any],
-    lazy: bool,  # noqa: FBT001
+    lazy: bool,
 ) -> None:
     if isinstance(func.output_name, tuple):
         assert func.output_picker is not None
@@ -2566,14 +2566,15 @@ def _update_all_results(
         all_results[func.output_name] = r
 
 
-def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:  # noqa: FBT001
+def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     if lazy:
         return _LazyFunction(func, kwargs=func_args)
     try:
         return func(**func_args)
     except Exception as e:
-        handle_error(e, func, func_args)
-        # handle_error raises but mypy doesn't know that
+        handle_pipefunc_error(e, func, func_args)
+        # handle_pipefunc_error raises but mypy doesn't know that
+        raise  # pragma: no cover
 
 
 def _names(nodes: Iterable[PipeFunc | str]) -> tuple[str, ...]:

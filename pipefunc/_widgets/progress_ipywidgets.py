@@ -228,7 +228,7 @@ class IPyWidgetsProgressTracker(ProgressTrackerBase):
         for button in self._buttons.values():
             button.disabled = True
 
-    def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
+    def _set_auto_update(self, value: bool) -> None:
         """Set the auto-update feature to the given value."""
         super()._set_auto_update(value)
         if not hasattr(self, "_buttons"):

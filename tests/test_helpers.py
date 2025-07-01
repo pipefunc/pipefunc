@@ -9,6 +9,7 @@ from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc.helpers import collect_kwargs, get_attribute_factory, launch_maps
 
 has_ipywidgets = importlib.util.find_spec("ipywidgets") is not None
+has_adaptive_scheduler = importlib.util.find_spec("adaptive_scheduler") is not None
 
 
 def test_collect_kwargs() -> None:
@@ -145,7 +146,7 @@ def pipeline() -> Pipeline:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("output_tabs", [True, False])
-async def test_launch_maps(output_tabs: bool, pipeline: Pipeline) -> None:  # noqa: FBT001
+async def test_launch_maps(output_tabs: bool, pipeline: Pipeline) -> None:
     if output_tabs and not has_ipywidgets:
         pytest.skip("ipywidgets not installed")
 
@@ -212,3 +213,37 @@ def test_validate_async_maps(pipeline: Pipeline) -> None:
 
     with pytest.raises(ValueError, match="requires at least one `AsyncMap` object"):
         launch_maps()
+
+
+@pytest.mark.skipif(not has_adaptive_scheduler, reason="adaptive_scheduler not installed")
+@pytest.mark.asyncio
+async def test_validate_async_maps_slurm_executor_name(pipeline: Pipeline) -> None:
+    from adaptive_scheduler import SlurmExecutor
+
+    executor = SlurmExecutor(name="test", partition="default", nodes=1, cores_per_node=1)
+    runners = [
+        pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=False, executor=executor)
+        for _ in range(2)
+    ]
+    with (
+        patch(
+            "adaptive_scheduler._server_support.slurm_run.slurm_partitions",
+            return_value={"default": 1},
+        ),
+        patch("adaptive_scheduler._scheduler.slurm.slurm_partitions", return_value={"default": 1}),
+        pytest.raises(
+            ValueError,
+            match="All `map_async`s provided to `launch_maps` that use a `SlurmExecutor`"
+            " must have instances with a unique `name`.",
+        ),
+    ):
+        await launch_maps(*runners)
+
+
+def test_unique_run_folders(pipeline: Pipeline) -> None:
+    runners = [
+        pipeline.map_async(inputs={"x": [1, 2, 3, 4, 5]}, start=False, run_folder="test")
+        for _ in range(2)
+    ]
+    with pytest.raises(ValueError, match="All `run_folder`s must be unique"):
+        launch_maps(*runners)

@@ -117,7 +117,7 @@ class ProgressTrackerBase(ABC):
         """Toggle the auto-update feature on or off."""
         self._set_auto_update(not self.auto_update)
 
-    def _set_auto_update(self, value: bool) -> None:  # noqa: FBT001
+    def _set_auto_update(self, value: bool) -> None:
         """Set the auto-update feature to the given value."""
         self.auto_update = value
         if self.auto_update:
@@ -126,7 +126,7 @@ class ProgressTrackerBase(ABC):
             self._auto_update_task.cancel()
             self._auto_update_task = None
 
-    def _should_throttle_update(self, force: bool) -> bool:  # noqa: FBT001
+    def _should_throttle_update(self, force: bool) -> bool:
         """Check if update should be throttled (only for sync mode)."""
         if self.in_async or force:
             return False

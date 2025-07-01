@@ -422,7 +422,7 @@ def build_mcp_server(pipeline: Pipeline, **fast_mcp_kwargs: Any) -> fastmcp.Fast
     async def execute_pipeline_sync(
         ctx: fastmcp.Context,
         inputs: Model,  # type: ignore[valid-type]
-        parallel: bool = True,  # noqa: FBT001, FBT002
+        parallel: bool = True,  # noqa: FBT002
         run_folder: str | None = None,
     ) -> str:
         """Execute pipeline synchronously and return results immediately.
@@ -503,7 +503,7 @@ async def _execute_pipeline_sync(
     pipeline: Pipeline,
     ctx: fastmcp.Context,
     inputs: pydantic.BaseModel,  # type: ignore[valid-type]
-    parallel: bool = True,  # noqa: FBT001, FBT002
+    parallel: bool = True,  # noqa: FBT002
     run_folder: str | None = None,
 ) -> str:
     await ctx.info(f"Executing pipeline {pipeline.name=} with inputs: {inputs}")

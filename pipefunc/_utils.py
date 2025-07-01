@@ -1,3 +1,5 @@
+"""General utility functions, should not import anything from pipefunc."""
+
 from __future__ import annotations
 
 import contextlib
@@ -88,20 +90,8 @@ def format_function_call(func_name: str, args: tuple, kwargs: dict[str, Any]) ->
 
 def handle_error(e: Exception, func: Callable, kwargs: dict[str, Any]) -> None:
     """Handle an error that occurred while executing a function."""
-    from pipefunc._pipefunc import ErrorSnapshot
-    from pipefunc.exceptions import PipeFuncError
-
     call_str = format_function_call(func.__name__, (), kwargs)
     msg = f"Error occurred while executing function `{call_str}`."
-    if isinstance(e, PipeFuncError):
-        func.error_snapshot = ErrorSnapshot(
-            func.func,
-            e.original_exception,
-            args=(),
-            kwargs=kwargs,
-            **e.data,
-        )
-        e = e.original_exception
     if sys.version_info < (3, 11):  # pragma: no cover
         original_msg = e.args[0] if e.args else ""
         raise type(e)(original_msg + msg) from e

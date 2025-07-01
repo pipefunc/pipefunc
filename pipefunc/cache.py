@@ -267,7 +267,7 @@ class HybridCache(_CacheBase):
         self._cache_lock = manager.Lock()
 
 
-def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:  # noqa: FBT001
+def _maybe_load(value: bytes | str, allow_cloudpickle: bool) -> Any:
     return cloudpickle.loads(value) if allow_cloudpickle else value
 
 
@@ -656,7 +656,7 @@ def memoize(
 
 def try_to_hashable(
     obj: Any,
-    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+    fallback_to_pickle: bool = True,  # noqa: FBT002
     unhashable_action: Literal["error", "warning", "ignore"] = "error",
     where: str = "function",
 ) -> Hashable | type[UnhashableError]:
@@ -713,7 +713,7 @@ def try_to_hashable(
 
 def _hashable_iterable(
     iterable: Iterable,
-    fallback_to_pickle: bool,  # noqa: FBT001
+    fallback_to_pickle: bool,
     *,
     sort: bool = False,
 ) -> tuple:
@@ -723,7 +723,7 @@ def _hashable_iterable(
 
 def _hashable_mapping(
     mapping: dict,
-    fallback_to_pickle: bool,  # noqa: FBT001
+    fallback_to_pickle: bool,
     *,
     sort: bool = False,
 ) -> tuple:
@@ -737,7 +737,7 @@ _HASH_MARKER = "__CONVERTED__"
 
 def to_hashable(  # noqa: C901, PLR0911, PLR0912
     obj: Any,
-    fallback_to_pickle: bool = True,  # noqa: FBT001, FBT002
+    fallback_to_pickle: bool = True,  # noqa: FBT002
 ) -> Any:
     """Convert any object to a hashable representation if not hashable yet.
 
