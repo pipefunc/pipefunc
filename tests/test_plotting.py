@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from pipefunc import NestedPipeFunc, Pipeline, pipefunc
+from pipefunc._plotting import _AUTO_GROUP_ARGS_THRESHOLD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -269,6 +270,7 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
     assert orient_dropdown is not None
 
     # Check that group args toggle is present
+    assert len(everything_pipeline.graph.nodes) > _AUTO_GROUP_ARGS_THRESHOLD
     group_args_toggle = next(
         (
             item
