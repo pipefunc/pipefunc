@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pipefunc.exceptions import ErrorSnapshot, PipeFuncError
+from pipefunc.exceptions import ErrorSnapshot
 
 from ._utils import handle_error
 
@@ -18,13 +18,6 @@ def handle_pipefunc_error(
     kwargs: dict[str, Any],
 ) -> None:
     """Handle an error that occurred while executing a PipeFunc."""
-    if isinstance(e, PipeFuncError):
-        func.error_snapshot = ErrorSnapshot(
-            func.func,
-            e.original_exception,
-            args=(),
-            kwargs=kwargs,
-            **e.metadata,
-        )
-        e = e.original_exception
+    renamed_kwargs = func._rename_to_native(kwargs)
+    func.error_snapshot = ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
     return handle_error(e, func, kwargs)

@@ -32,7 +32,7 @@ from pipefunc._utils import (
     is_pydantic_base_model,
     requires,
 )
-from pipefunc.exceptions import ErrorSnapshot, PipeFuncError
+from pipefunc.exceptions import ErrorSnapshot
 from pipefunc.lazy import evaluate_lazy
 from pipefunc.map._mapspec import ArraySpec, MapSpec, mapspec_axes
 from pipefunc.map._run import _EVALUATED_RESOURCES
@@ -709,7 +709,7 @@ class PipeFunc(Generic[T]):
                     )
                 renamed_kwargs = self._rename_to_native(kwargs)
                 self.error_snapshot = ErrorSnapshot(self.func, e, args, renamed_kwargs)
-                raise PipeFuncError(e, self.error_snapshot.metadata()) from e
+                raise
 
         if self.debug:
             _default_debug_printer(self, result, kwargs)
