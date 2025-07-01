@@ -1343,7 +1343,7 @@ def _maybe_select_kwargs_for_index(
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
-    return kwargs
+    return func._rename_to_native(kwargs)
 
 
 def _result(
