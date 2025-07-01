@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pipefunc._pipefunc import ErrorSnapshot
-from pipefunc.exceptions import PipeFuncError
+from pipefunc.exceptions import ErrorSnapshot, PipeFuncError
 
 from ._utils import handle_error
 
