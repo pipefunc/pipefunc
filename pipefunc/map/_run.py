@@ -1346,6 +1346,7 @@ def _result(
                 assert run_info is not None
                 shape = run_info.resolved_shapes[func.output_name]
                 mask = run_info.shape_masks[func.output_name]
+                # This is a map, so we need to select the kwargs for this index
                 kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
             handle_pipefunc_error(e, func, kwargs)
             raise  # pragma: no cover
