@@ -579,7 +579,7 @@ def visualize_graphviz_widget(
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None = None,
     *,
-    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
+    orient: Literal["TB", "LR", "BT", "RL"] = "TB",
     graphviz_kwargs: dict[str, Any] | None = None,
 ) -> ipywidgets.VBox:
     """Create an interactive visualization of the pipeline as a directed graph.
@@ -648,7 +648,7 @@ def _rerender_gv_source(
     orient: Literal["TB", "LR", "BT", "RL"] = "LR",
     graphviz_kwargs: dict[str, Any] | None = None,
     *,
-    group_args: bool = False,
+    group_args: bool = True,
     hide_default_args: bool = False,
     collapse_scopes: bool | Sequence[str] = False,
 ) -> str:
@@ -670,8 +670,8 @@ def _extra_controls_factory(  # noqa: PLR0915
     *,
     graph: nx.DiGraph,
     defaults: dict[str, Any] | None,
-    orient: Literal["TB", "LR", "BT", "RL"] = "LR",
-    graphviz_kwargs: dict[str, Any] | None = None,
+    orient: Literal["TB", "LR", "BT", "RL"],
+    graphviz_kwargs: dict[str, Any] | None,
 ) -> ipywidgets.HBox:
     """Extra widgets for the graphviz widget."""
     import ipywidgets
@@ -705,11 +705,11 @@ def _extra_controls_factory(  # noqa: PLR0915
 
     # Group args
     group_args_toggle = ipywidgets.ToggleButton(
-        value=False,
-        description="Group args",
+        value=True,
+        description="Ungroup args",
         tooltip="Group arguments into a single node",
-        icon="plus-square-o",
-        button_style="info",
+        icon="minus-square-o",
+        button_style="success",
         layout=ipywidgets.Layout(width="auto"),
     )
     final_widgets.append(group_args_toggle)

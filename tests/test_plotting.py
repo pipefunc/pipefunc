@@ -273,19 +273,19 @@ def test_plotting_widget(everything_pipeline: Pipeline) -> None:
         (
             item
             for item in extra_controls_hbox.children
-            if isinstance(item, ipywidgets.ToggleButton) and "Group args" in item.description
+            if isinstance(item, ipywidgets.ToggleButton) and "Ungroup args" in item.description
         ),
         None,
     )
     assert group_args_toggle is not None
-    assert group_args_toggle.value is False
-    assert group_args_toggle.description == "Group args"
-    assert group_args_toggle.icon == "plus-square-o"
-    assert group_args_toggle.button_style == "info"
-    group_args_toggle.value = True  # Simulate click
+    assert group_args_toggle.value is True
     assert group_args_toggle.description == "Ungroup args"
     assert group_args_toggle.icon == "minus-square-o"
     assert group_args_toggle.button_style == "success"
+    group_args_toggle.value = False  # Simulate click
+    assert group_args_toggle.description == "Group args"
+    assert group_args_toggle.icon == "plus-square-o"
+    assert group_args_toggle.button_style == "info"
 
 
 @pytest.mark.skipif(
