@@ -658,6 +658,9 @@ class PipeFunc(Generic[T]):
         # We assume that once it is set, it does not change during the lifetime of the object.
         return any(p.lazy for p in self._pipelines)
 
+    def _rename_to_native(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the wrapped function with the given arguments.
 
@@ -684,7 +687,7 @@ class PipeFunc(Generic[T]):
                 kwargs[p] = v
             args = ()
         kwargs = self.defaults | kwargs | self._bound
-        kwargs = {self._inverse_renames.get(k, k): v for k, v in kwargs.items()}
+        kwargs = self._rename_to_native(kwargs)
 
         with self._maybe_profiler():
             if self._evaluate_lazy:
@@ -704,7 +707,8 @@ class PipeFunc(Generic[T]):
                         f"An error occurred while calling the function `{self.__name__}`"
                         f" with the arguments `{args=}` and `{kwargs=}`.",
                     )
-                self.error_snapshot = ErrorSnapshot(self.func, e, args, kwargs)
+                renamed_kwargs = self._rename_to_native(kwargs)
+                self.error_snapshot = ErrorSnapshot(self.func, e, args, renamed_kwargs)
                 raise
 
         if self.debug:
