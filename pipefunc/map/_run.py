@@ -1331,19 +1331,21 @@ def _maybe_set_internal_shape(output: Any, storage: StorageBase) -> None:
         storage.internal_shape = internal_shape
 
 
-def _maybe_select_kwargs_for_index(
+def _raise_and_set_error_snapshot(
+    exc: Exception,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    *,
     index: int | None = None,
     run_info: RunInfo | None = None,
-) -> dict[str, Any]:
-    # For use in `_result` and `_result_async`
+) -> None:
     if index is not None:
-        assert run_info is not None
+        assert run_info is not None, "run_info required when index is provided"
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
-    return func._rename_to_native(kwargs)
+    kwargs = func._rename_to_native(kwargs)
+    handle_pipefunc_error(exc, func, kwargs)
 
 
 def _result(
@@ -1357,8 +1359,7 @@ def _result(
         try:
             return x.result()
         except Exception as e:
-            kwargs = _maybe_select_kwargs_for_index(func, kwargs, index, run_info)
-            handle_pipefunc_error(e, func, kwargs)
+            _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
             raise  # pragma: no cover
     return x
 
@@ -1374,8 +1375,7 @@ async def _result_async(
     try:
         return await asyncio.wrap_future(task, loop=loop)
     except Exception as e:
-        kwargs = _maybe_select_kwargs_for_index(func, kwargs, index, run_info)
-        handle_pipefunc_error(e, func, kwargs)
+        _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
         raise  # pragma: no cover
 
 
