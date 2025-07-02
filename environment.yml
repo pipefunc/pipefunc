@@ -20,6 +20,8 @@ dependencies:
   # optional-dependencies: cli
   - pydantic
   - rich-argparse
+  # optional-dependencies: mcp
+  - fastmcp<2.10.0
   # optional-dependencies: pandas
   - pandas
   # optional-dependencies: plotting
@@ -46,5 +48,3 @@ dependencies:
   - pytest-xdist
   - pytest
   - versioningit
-  - pip:
-    - fastmcp
