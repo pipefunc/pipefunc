@@ -95,16 +95,6 @@ class ErrorSnapshot:
         with open(filename, "rb") as f:  # noqa: PTH123
             return cloudpickle.load(f)
 
-    def metadata(self) -> dict[str, Any]:
-        """Return the metadata of the error snapshot."""
-        return {
-            "timestamp": self.timestamp,
-            "user": self.user,
-            "machine": self.machine,
-            "ip_address": self.ip_address,
-            "current_directory": self.current_directory,
-        }
-
     def _ipython_display_(self) -> None:  # pragma: no cover
         from IPython.display import HTML, display
 
