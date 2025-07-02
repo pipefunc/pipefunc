@@ -30,7 +30,7 @@ dependencies = ["cloudpickle", "networkx", "numpy"]
 adaptive = ["adaptive", "adaptive-scheduler>=2.14.0"]
 autodoc = ["griffe", "rich"]
 cli = ["griffe", "rich", "pydantic", "rich-argparse"]
-mcp = ["fastmcp", "rich", "griffe"]
+mcp = ["fastmcp<2.10.0", "rich", "griffe"]
 pandas = ["pandas"]
 # Prevent old holoviews resulting in broken env
 plotting = ["bokeh", "graphviz", "holoviews>=1.14.0", "matplotlib"]
@@ -76,6 +76,7 @@ dev = [ # all + dev deps
     "black[jupyter]",
     "mypy",
     "pre-commit",
+    "pre-commit-uv",
     "ruff",
     "versioningit",
     "pipefunc[all,test,docs]",

@@ -1974,3 +1974,30 @@ def test_pipeline_map_single_output_load_all_outputs(tmp_path: Path) -> None:
     assert r["y"].output.tolist() == [2, 3, 4]
     outputs = load_all_outputs(run_folder=tmp_path)
     assert outputs["y"].tolist() == [2, 3, 4]
+
+
+def test_error_snapshot_in_parallel_map():
+    @pipefunc(output_name="c", renames={"a": "b"})
+    def f(a):
+        if a < 0:
+            msg = "a cannot be negative"
+            raise ValueError(msg)
+        return a * 2
+
+    pipeline = Pipeline([f])
+    for parallel in [True, False]:
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.map(
+                {"b": -1},
+                parallel=parallel,
+                executor=ThreadPoolExecutor() if parallel else None,
+                storage="dict",
+            )
+        with pytest.raises(ValueError, match="a cannot be negative"):
+            pipeline.error_snapshot.reproduce()
+
+    pipeline["c"].error_snapshot = None
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.run("c", kwargs={"b": -1})
+    with pytest.raises(ValueError, match="a cannot be negative"):
+        pipeline.error_snapshot.reproduce()

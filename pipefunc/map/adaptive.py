@@ -404,6 +404,7 @@ def _execute_iteration_in_map_spec(
         mask,
         arrays,
         cache,
+        in_executor=True,
         force_dump=True,
     )
     if not return_output:
