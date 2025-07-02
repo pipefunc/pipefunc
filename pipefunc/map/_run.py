@@ -840,7 +840,7 @@ def _prepare_submit_map_spec(
     fixed_indices: dict[str, int | slice] | None,
     status: Status | None,
     return_results: bool,
-    executor: dict[OUTPUT_TYPE, Executor] | None,
+    in_executor: bool,
     cache: _CacheBase | None = None,
 ) -> _MapSpecArgs:
     assert isinstance(func.mapspec, MapSpec)
@@ -857,7 +857,7 @@ def _prepare_submit_map_spec(
         arrays=arrays,
         cache=cache,
         return_results=return_results,
-        in_executor=bool(executor),
+        in_executor=in_executor,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
     existing, missing = _existing_and_missing_indices(arrays, fixed_mask)  # type: ignore[arg-type]
@@ -1207,8 +1207,8 @@ def _submit_func(
             fixed_indices,
             status,
             return_results,
-            executor,
-            cache,
+            in_executor=bool(executor),
+            cache=cache,
         )
         r = _maybe_parallel_map(
             func,

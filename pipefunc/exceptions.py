@@ -36,8 +36,6 @@ class ErrorSnapshot:
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
     traceback: str = field(init=False)
-
-    # Metadata
     timestamp: str = field(default_factory=_timestamp)
     user: str = field(default_factory=getpass.getuser)
     machine: str = field(default_factory=platform.node)
