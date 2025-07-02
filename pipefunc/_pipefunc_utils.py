@@ -25,14 +25,13 @@ def handle_pipefunc_error(
     if is_installed("rich"):
         import rich
 
-        # Only print a brief hint about the error snapshot, since the full traceback follows
         rich.print(
             "\n💥 [bold red]Error snapshot attached![/bold red]\n"
             " Use [yellow]`pipeline.error_snapshot`[/yellow] to debug:\n"
             " [dim][yellow]`.reproduce()`[/yellow], [yellow]`.kwargs`[/yellow], "
             "[yellow]`.save_to_file()`[/yellow], [yellow]`.function`[/yellow], "
             "or just [yellow]`print()`[/yellow] it.[/dim]\n"
-            "[dim italic]↓ Scroll down to see the full traceback.[/dim italic]",
+            " [dim italic]↓ Scroll down to see the full traceback.[/dim italic]",
         )
 
     return handle_error(e, func, kwargs)
