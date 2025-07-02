@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import functools
 import getpass
 import os
 import platform
@@ -22,31 +21,6 @@ if TYPE_CHECKING:
 
 class UnusedParametersError(ValueError):
     """Exception raised when unused parameters are provided to a function."""
-
-
-class PipeFuncError(Exception):
-    """Wrapper exception that has the original exception and some metadata."""
-
-    def __init__(
-        self,
-        original_exception: Exception,
-        metadata: Any,
-    ) -> None:
-        self.original_exception = original_exception
-        self._metadata_bytes = cloudpickle.dumps(metadata)
-
-    def __str__(self) -> str:
-        """Return a string representation of the exception."""
-        return self.original_exception.__str__()
-
-    def __repr__(self) -> str:
-        """Return a string representation of the exception."""
-        return self.original_exception.__repr__()
-
-    @functools.cached_property
-    def metadata(self) -> Any:
-        """Return the metadata that caused the error."""
-        return cloudpickle.loads(self._metadata_bytes)
 
 
 def _timestamp() -> str:
