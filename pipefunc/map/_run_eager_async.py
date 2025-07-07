@@ -55,6 +55,7 @@ def run_map_eager_async(
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     display_widgets: bool = True,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
     start: bool = True,
 ) -> AsyncMap:
     """Asynchronously run a pipeline with eager scheduling for optimal parallelism.

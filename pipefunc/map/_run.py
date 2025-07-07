@@ -79,6 +79,7 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -194,6 +195,7 @@ def run_map(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
+        error_handling=error_handling,
         in_async=False,
     )
 
@@ -298,6 +300,7 @@ def run_map_async(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
     display_widgets: bool = True,
     start: bool = True,
 ) -> AsyncMap:

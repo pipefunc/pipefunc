@@ -774,6 +774,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
+        error_handling: Literal["raise", "continue"] = "raise",
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -918,6 +919,7 @@ class Pipeline:
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
             return_results=return_results,
+            error_handling=error_handling,
         )
 
     def map_async(
