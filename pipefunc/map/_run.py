@@ -632,13 +632,14 @@ def _run_iteration(
     def compute_fn() -> Any:
         try:
             return func(**selected)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             if not in_executor:
                 # If we are in the executor, we need to handle the error in `_result`
                 handle_pipefunc_error(e, func, selected, error_handling)
                 # handle_pipefunc_error raises if error_handling == "raise"
                 assert error_handling == "continue"
                 return func.error_snapshot
+            raise
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
