@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pipefunc._utils import is_installed
 from pipefunc.exceptions import ErrorSnapshot
@@ -17,11 +17,13 @@ def handle_pipefunc_error(
     e: Exception,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> None:
     """Handle an error that occurred while executing a PipeFunc."""
     renamed_kwargs = func._rename_to_native(kwargs)
     func.error_snapshot = ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
-
+    if error_handling == "continue":
+        return None
     if is_installed("rich"):
         import rich
 

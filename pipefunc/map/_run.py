@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
+    from pipefunc.exceptions import ErrorSnapshot
 
     from ._prepare import Prepared
     from ._progress import Status
@@ -623,16 +624,18 @@ def _run_iteration(
     selected: dict[str, Any],
     cache: _CacheBase | None,
     in_executor: bool,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
     def compute_fn() -> Any:
         try:
             return func(**selected)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             if not in_executor:
                 # If we are in the executor, we need to handle the error in `_result`
-                handle_pipefunc_error(e, func, selected)
-                # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+                handle_pipefunc_error(e, func, selected, error_handling)
+                # handle_pipefunc_error raises if error_handling == "raise"
+                assert error_handling == "continue"
+                return func.error_snapshot
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -664,11 +667,12 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
     *,
     in_executor: bool,
+    error_handling: Literal["raise", "continue"],
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
-    output = _run_iteration(func, selected, cache, in_executor)
+    output = _run_iteration(func, selected, cache, in_executor, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -857,6 +861,7 @@ def _prepare_submit_map_spec(
         arrays=arrays,
         cache=cache,
         in_executor=in_executor,
+        error_handling=run_info.error_handling,
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -1045,8 +1050,9 @@ def _maybe_execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
-    args = (func, kwargs, store, cache)  # args for _execute_single
+    args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -1063,6 +1069,7 @@ def _execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Load the output if it exists
     output, exists = _load_from_store(func.output_name, store, return_output=True)
@@ -1075,10 +1082,11 @@ def _execute_single(
     def compute_fn() -> Any:
         try:
             return func(**kwargs)
-        except Exception as e:
-            handle_pipefunc_error(e, func, kwargs)
-            # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+        except Exception as e:  # noqa: BLE001
+            handle_pipefunc_error(e, func, kwargs, error_handling)
+            # handle_pipefunc_error raises if error_handling == "raise"
+            assert error_handling == "continue"
+            return func.error_snapshot
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
@@ -1221,7 +1229,16 @@ def _submit_func(
         )
         task = r, args
     else:
-        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_execute_single(
+            executor,
+            status,
+            progress,
+            func,
+            kwargs,
+            store,
+            cache,
+            run_info.error_handling,
+        )
     return _KwargsTask(kwargs, task)
 
 
@@ -1335,32 +1352,38 @@ def _raise_and_set_error_snapshot(
     exc: Exception,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     *,
     index: int | None = None,
-    run_info: RunInfo | None = None,
-) -> None:
+) -> ErrorSnapshot | None:
     if index is not None:
         assert run_info is not None, "run_info required when index is provided"
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
     kwargs = func._rename_to_native(kwargs)
-    handle_pipefunc_error(exc, func, kwargs)
+    handle_pipefunc_error(exc, func, kwargs, run_info.error_handling)
+    # handle_pipefunc_error raises if error_handling == "raise"
+    assert run_info.error_handling == "continue"
+    return func.error_snapshot
 
 
 def _result(
     x: Any | Future,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     index: int | None = None,
-    run_info: RunInfo | None = None,
 ) -> Any:
     if isinstance(x, Future):
         try:
             return x.result()
-        except Exception as e:
-            _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
-            raise  # pragma: no cover
+        except Exception as e:  # noqa: BLE001
+            _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
+            # _raise_and_set_error_snapshot raises if error_handling == "raise"
+            assert run_info.error_handling == "continue"
+            return func.error_snapshot
+
     return x
 
 
@@ -1369,14 +1392,16 @@ async def _result_async(
     loop: asyncio.AbstractEventLoop,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     index: int | None = None,
-    run_info: RunInfo | None = None,
 ) -> Any:
     try:
         return await asyncio.wrap_future(task, loop=loop)
-    except Exception as e:
-        _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
-        raise  # pragma: no cover
+    except Exception as e:  # noqa: BLE001
+        _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
+        # _raise_and_set_error_snapshot raises if error_handling == "raise"
+        assert run_info.error_handling == "continue"
+        return func.error_snapshot
 
 
 def _to_result_dict(
@@ -1410,7 +1435,7 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
-        chunk_outputs_list = [_result(x, func, kwargs, i, run_info) for i, x in enumerate(r)]
+        chunk_outputs_list = [_result(x, func, kwargs, run_info, i) for i, x in enumerate(r)]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
@@ -1422,7 +1447,7 @@ def _process_task(
             return_results,
         )
     else:
-        r = _result(task, func, kwargs)
+        r = _result(task, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
@@ -1460,7 +1485,7 @@ async def _process_task_async(
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
         r, args = task
-        futs = [_result_async(x, loop, func, kwargs, i, run_info) for i, x in enumerate(r)]
+        futs = [_result_async(x, loop, func, kwargs, run_info, i) for i, x in enumerate(r)]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
@@ -1474,7 +1499,7 @@ async def _process_task_async(
         )
     else:
         assert isinstance(task, Future)
-        r = await _result_async(task, loop, func, kwargs)
+        r = await _result_async(task, loop, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None

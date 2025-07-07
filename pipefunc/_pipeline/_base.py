@@ -2572,7 +2572,7 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     try:
         return func(**func_args)
     except Exception as e:
-        handle_pipefunc_error(e, func, func_args)
+        handle_pipefunc_error(e, func, func_args, "raise")
         # handle_pipefunc_error raises but mypy doesn't know that
         raise  # pragma: no cover
 
