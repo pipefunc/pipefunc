@@ -36,11 +36,15 @@ def validate_consistent_defaults(
                     if default_value == arg_defaults[arg]:
                         continue
                 except Exception as e:  # noqa: BLE001
-                    warnings.warn(
-                        f"Could not compare default values for argument '{arg}' due to: {e!r}.",
-                        UserWarning,
-                        stacklevel=2,
+                    msg = (
+                        f"Could not compare default values for argument '{arg}' due to: {e!r}."
+                        " This might result in inconsistent default values if different values are"
+                        " provided for this argument in different functions."
+                        " pipefunc cannot guarantee this consistency. This may lead to unexpected"
+                        " behavior, as one of the default values will be chosen arbitrarily during"
+                        " execution."
                     )
+                    warnings.warn(msg, UserWarning, stacklevel=2)
                     continue
 
                 msg = (

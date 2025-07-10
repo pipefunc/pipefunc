@@ -111,15 +111,11 @@ def test_update_defaults_with_non_comparable_inputs() -> None:
     ):
         Pipeline([a, b])
 
-    @pipefunc(
-        "a",
-    )
+    @pipefunc("a")
     def a2(array: np.ndarray) -> np.ndarray:
         return array + 1
 
-    @pipefunc(
-        "b",
-    )
+    @pipefunc("b")
     def b2(array: np.ndarray, factor: float) -> np.ndarray:
         return array * factor
 
