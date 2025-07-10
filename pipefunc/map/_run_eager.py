@@ -53,6 +53,7 @@ def run_map_eager(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Eagerly schedule pipeline functions as soon as their dependencies are met.
 
