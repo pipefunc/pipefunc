@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import networkx as nx
@@ -30,13 +31,27 @@ def validate_consistent_defaults(
                 continue
             if arg not in arg_defaults:
                 arg_defaults[arg] = default_value
-            elif default_value != arg_defaults[arg]:
-                msg = (
-                    f"Inconsistent default values for argument '{arg}' in"
-                    " functions. Please make sure the shared input arguments have"
-                    " the same default value or are set only for one function."
-                )
-                raise ValueError(msg)
+            else:
+                try:
+                    equal = default_value == arg_defaults[arg]
+                except Exception as e:  # noqa: BLE001
+                    warnings.warn(
+                        f"Could not compare default values for argument '{arg}' in"
+                        f" functions '{f.__name__}' and '{output_to_func[arg].__name__}'"
+                        f" due to: {e!r}. This might be because the default value is"
+                        " not directly comparable.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                    continue
+
+                if not equal:
+                    msg = (
+                        f"Inconsistent default values for argument '{arg}' in"
+                        " functions. Please make sure the shared input arguments have"
+                        " the same default value or are set only for one function."
+                    )
+                    raise ValueError(msg)
 
 
 def validate_consistent_type_annotations(graph: nx.DiGraph) -> None:
