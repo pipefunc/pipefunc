@@ -16,6 +16,7 @@ from pipefunc._utils import (
     handle_error,
     infer_shape,
     is_classmethod,
+    is_installed,
     is_min_version,
     is_pydantic_base_model,
     load,
@@ -202,6 +203,22 @@ def test_is_equal_other_types() -> None:
     assert not _is_equal(1, 2)
     assert _is_equal("abc", "abc")
     assert not _is_equal("abc", "def")
+
+
+def test_equal_dicts_with_pandas() -> None:
+    """Test equal_dicts with pandas DataFrames."""
+    if not is_installed("pandas"):
+        pytest.skip("pandas not installed")
+    import pandas as pd
+
+    df1 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df2 = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
+    df3 = pd.DataFrame({"x": [1, 2], "y": [3, 5]})
+    d1 = {"a": df1}
+    d2 = {"a": df2}
+    d3 = {"a": df3}
+    assert equal_dicts(d1, d2)
+    assert not equal_dicts(d1, d3)
 
 
 def test_equal_dicts() -> None:

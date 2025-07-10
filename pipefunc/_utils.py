@@ -121,6 +121,11 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
         if len(a) != len(b):  # type: ignore[arg-type]
             return False
         return all(_is_equal(x, y) for x, y in zip(a, b))
+    if is_installed("pandas"):
+        import pandas as pd
+
+        if isinstance(a, pd.DataFrame):
+            return a.equals(b)
     return a == b
 
 
