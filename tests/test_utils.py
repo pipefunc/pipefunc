@@ -133,7 +133,7 @@ class CustomObject:  # noqa: PLW1641
         return False
 
 
-def testis_equal_dict() -> None:
+def test_is_equal_dict() -> None:
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
     assert is_equal(d1, d2)
@@ -146,7 +146,7 @@ def testis_equal_dict() -> None:
     assert not equal_dicts({"a": [1]}, {"b": (1,)}, verbose=True)
 
 
-def testis_equal_numpy_array() -> None:
+def test_is_equal_numpy_array() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([1, 2, 3])
     assert is_equal(a1, a2)
@@ -159,7 +159,7 @@ def testis_equal_numpy_array() -> None:
     assert is_equal(a4, a5)
 
 
-def testis_equal_set() -> None:
+def test_is_equal_set() -> None:
     s1 = {1, 2, 3}
     s2 = {1, 2, 3}
     assert is_equal(s1, s2)
@@ -168,7 +168,7 @@ def testis_equal_set() -> None:
     assert not is_equal(s1, s3)
 
 
-def testis_equal_list_and_tuple() -> None:
+def test_is_equal_list_and_tuple() -> None:
     assert not is_equal([1, 2, 3], (1, 2, 3))
     assert is_equal([1, 2, 3], [1, 2, 3])
     assert not is_equal([1, 2, 3], [1, 2, 4])
@@ -176,13 +176,13 @@ def testis_equal_list_and_tuple() -> None:
     assert not is_equal([1], [1, 2])
 
 
-def testis_equal_float() -> None:
+def test_is_equal_float() -> None:
     assert is_equal(1.0, 1.0)
     assert is_equal(1.0, 1.0000000001)
     assert not is_equal(1.0, 1.1)
 
 
-def testis_equal_custom_object() -> None:
+def test_is_equal_custom_object() -> None:
     obj1 = CustomObject(1)
     obj2 = CustomObject(1)
     assert is_equal(obj1, obj2)
@@ -191,14 +191,14 @@ def testis_equal_custom_object() -> None:
     assert not is_equal(obj1, obj3)
 
 
-def testis_equal_iterable() -> None:
+def test_is_equal_iterable() -> None:
     assert is_equal([1, 2, 3], [1, 2, 3])
     assert not is_equal([1, 2, 3], [1, 2, 4])
     assert is_equal((1, 2, 3), (1, 2, 3))
     assert not is_equal((1, 2, 3), (1, 2, 4))
 
 
-def testis_equal_other_types() -> None:
+def test_is_equal_other_types() -> None:
     assert is_equal(1, 1)
     assert not is_equal(1, 2)
     assert is_equal("abc", "abc")
