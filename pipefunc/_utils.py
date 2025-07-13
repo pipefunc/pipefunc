@@ -104,7 +104,11 @@ def prod(iterable: Iterable[int]) -> int:
     return functools.reduce(operator.mul, iterable, 1)
 
 
-def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
+def is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
+    """Check if two objects are equal.
+
+    Comparisons are done using the `==` operator, but special cases are handled.
+    """
     if type(a) is not type(b):
         return False
     if isinstance(a, dict):
@@ -120,7 +124,7 @@ def _is_equal(a: Any, b: Any) -> bool | None:  # noqa: PLR0911
     if isinstance(a, list | tuple):
         if len(a) != len(b):  # type: ignore[arg-type]
             return False
-        return all(_is_equal(x, y) for x, y in zip(a, b))
+        return all(is_equal(x, y) for x, y in zip(a, b))
     if is_installed("pandas"):
         import pandas as pd
 
@@ -150,7 +154,7 @@ def equal_dicts(d1: dict[str, Any], d2: dict[str, Any], *, verbose: bool = False
     for k, v1 in d1.items():
         v2 = d2[k]
         try:
-            equal = _is_equal(v1, v2)
+            equal = is_equal(v1, v2)
         except Exception:  # noqa: BLE001
             errors.append((k, v1, v2))
         else:
