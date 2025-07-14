@@ -187,7 +187,6 @@ The core functions for this are {func}`~pipefunc.helpers.launch_maps` and {func}
 Let's see an example:
 
 ```{code-cell} ipython3
-import asyncio
 from pipefunc import Pipeline, pipefunc
 from pipefunc.helpers import launch_maps
 
