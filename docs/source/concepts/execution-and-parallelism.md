@@ -196,9 +196,9 @@ def double_it(x: int) -> int:
 
 pipeline = Pipeline([double_it])
 
-# Define two different sets of inputs
+# Define two different sets of inputs with different sizes
 inputs1 = {"x": [1, 2, 3]}
-inputs2 = {"x": [4, 5, 6]}
+inputs2 = {"x": [4, 5, 6, 7]}
 
 # 1. Prepare the runners
 runners = [
