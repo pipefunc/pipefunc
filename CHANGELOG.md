@@ -5,6 +5,119 @@ If it is out of date, please run
 
 GITHUB_TOKEN=$(gh auth token) uv run .github/generate-release-notes.py
 
+## v0.85.2 (2025-07-15)
+
+### ✨ Enhancements
+
+- More comprehensive default value comparison with `is_equal` ([#860](https://github.com/pipefunc/pipefunc/pull/860))
+
+### 🐛 Bug Fixes
+
+- Consistently return None if error happens in `_is_equal` ([#863](https://github.com/pipefunc/pipefunc/pull/863))
+
+### 📚 Documentation
+
+- Add `pipefunc.helpers.launch_maps` to docs ([#862](https://github.com/pipefunc/pipefunc/pull/862))
+
+### 📊 Stats
+
+- `.md`: +78 lines, -0 lines
+- `.py`: +145 lines, -63 lines
+
+## v0.85.1 (2025-07-10)
+
+### 🐛 Bug Fixes
+
+- Cast to `bool` to prevent issues with custom equality methods ([#859](https://github.com/pipefunc/pipefunc/pull/859))
+- FIX Pipeline.update_defaults with inputs that do not support __eq__ ([#857](https://github.com/pipefunc/pipefunc/pull/857))
+
+### ✨ Enhancements
+
+- Allow comparing `pandas.DataFrame`s ([#858](https://github.com/pipefunc/pipefunc/pull/858))
+
+### 📊 Stats
+
+- `.py`: +71 lines, -2 lines
+
+## v0.85.0 (2025-07-08)
+
+### ✨ Enhancements
+
+- Add `pipeline.update_mapspec_axes` ([#855](https://github.com/pipefunc/pipefunc/pull/855))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#853](https://github.com/pipefunc/pipefunc/pull/853))
+
+### 📊 Stats
+
+- `.yaml`: +1 lines, -1 lines
+- `.py`: +92 lines, -0 lines
+
+## v0.84.0 (2025-07-02)
+
+### ✨ Enhancements
+
+- Keep `ErrorSnapshot` even when parallel ([#813](https://github.com/pipefunc/pipefunc/pull/813))
+- Add validation for inputs parameters to `gather_maps` ([#847](https://github.com/pipefunc/pipefunc/pull/847))
+
+### 🐛 Bug Fixes
+
+- Rename kwargs when creating `ErrorSnapshot` ([#851](https://github.com/pipefunc/pipefunc/pull/851))
+
+### 🔄 Pre-commit
+
+- [pre-commit.ci] pre-commit autoupdate ([#848](https://github.com/pipefunc/pipefunc/pull/848))
+- [pre-commit.ci] pre-commit autoupdate ([#845](https://github.com/pipefunc/pipefunc/pull/845))
+
+### 📚 Documentation
+
+- Measure overhead of `Pipeline.run` ([#850](https://github.com/pipefunc/pipefunc/pull/850))
+- Ensure that `gather_maps` and `launch_maps` are in the documentation ([#846](https://github.com/pipefunc/pipefunc/pull/846))
+
+### 🧹 Maintenance
+
+- Set `orient="TB"` and auto group args in plotting widget ([#849](https://github.com/pipefunc/pipefunc/pull/849))
+
+### 📊 Stats
+
+- `.py`: +352 lines, -126 lines
+- `.yaml`: +3 lines, -3 lines
+- `.yml`: +4 lines, -4 lines
+- `.md`: +49 lines, -5 lines
+- `.toml`: +4 lines, -1 lines
+
+## v0.83.0 (2025-06-20)
+
+### 🧹 Maintenance
+
+- Add typed `handle_pipefunc_error` function ([#844](https://github.com/pipefunc/pipefunc/pull/844))
+- Move `ErrorSnapshot` to `exceptions.py` ([#843](https://github.com/pipefunc/pipefunc/pull/843))
+
+### ✨ Enhancements
+
+- Add info about unresolved variants when `VariantPipeline.__getattr__` raises an `AttributeError` ([#841](https://github.com/pipefunc/pipefunc/pull/841))
+- Allow for a scope-keyed nested dictionary as `update_defaults` input ([#840](https://github.com/pipefunc/pipefunc/pull/840))
+
+### 🤖 CI
+
+- Fix labels in `.github/update-environment.py` script ([#839](https://github.com/pipefunc/pipefunc/pull/839))
+
+### 🧪 Testing
+
+- Update tests to new `adaptive-scheduler` ([#838](https://github.com/pipefunc/pipefunc/pull/838))
+
+### 📚 Documentation
+
+- Add documentation about "Splitting a `map` into Multiple Jobs" ([#837](https://github.com/pipefunc/pipefunc/pull/837))
+- Update `CHANGELOG.md` until v0.82.4 ([#836](https://github.com/pipefunc/pipefunc/pull/836))
+
+### 📊 Stats
+
+- `.py`: +345 lines, -131 lines
+- `.md`: +417 lines, -0 lines
+- `.yml`: +0 lines, -6 lines
+
 ## v0.82.4 (2025-06-19)
 
 ### ✨ Enhancements
