@@ -205,6 +205,20 @@ def test_is_equal_other_types() -> None:
     assert not is_equal("abc", "def")
 
 
+def test_is_equal_nested_error() -> None:
+    class ErrorOnEq:  # noqa: PLW1641
+        def __eq__(self, other):
+            msg = "Comparison error"
+            raise ValueError(msg)
+
+    obj1 = ErrorOnEq()
+    obj2 = ErrorOnEq()
+
+    assert is_equal([obj1], [obj2], on_error="return_none") is None
+    with pytest.raises(ValueError, match="Comparison error"):
+        is_equal([obj1], [obj2], on_error="raise")
+
+
 def test_equal_dicts_with_pandas() -> None:
     """Test equal_dicts with pandas DataFrames."""
     if not is_installed("pandas"):
@@ -256,6 +270,8 @@ def test_equal_dicts() -> None:
 
     with pytest.warns(Warning, match="Errors comparing keys"):
         assert equal_dicts({"a": A()}, {"a": A()}, verbose=True) is None
+    with pytest.raises(RuntimeError, match="Error"):
+        equal_dicts({"a": A()}, {"a": A()}, on_error="raise")
 
 
 def test_requires() -> None:
