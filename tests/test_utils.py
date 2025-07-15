@@ -8,7 +8,6 @@ import pytest
 
 from pipefunc._utils import (
     _cached_load,
-    _is_equal,
     equal_dicts,
     format_args,
     format_function_call,
@@ -16,6 +15,7 @@ from pipefunc._utils import (
     handle_error,
     infer_shape,
     is_classmethod,
+    is_equal,
     is_installed,
     is_min_version,
     is_pydantic_base_model,
@@ -136,10 +136,10 @@ class CustomObject:  # noqa: PLW1641
 def test_is_equal_dict() -> None:
     d1 = {"a": 1, "b": 2}
     d2 = {"a": 1, "b": 2}
-    assert _is_equal(d1, d2)
+    assert is_equal(d1, d2)
 
     d3 = {"a": 1, "b": 3}
-    assert not _is_equal(d1, d3)
+    assert not is_equal(d1, d3)
 
     assert not equal_dicts({"a": 1}, {"a": 1, "b": 3}, verbose=True)
     assert not equal_dicts({"a": 1}, {"b": 1}, verbose=True)
@@ -149,60 +149,60 @@ def test_is_equal_dict() -> None:
 def test_is_equal_numpy_array() -> None:
     a1 = np.array([1, 2, 3])
     a2 = np.array([1, 2, 3])
-    assert _is_equal(a1, a2)
+    assert is_equal(a1, a2)
 
     a3 = np.array([1, 2, 4])
-    assert not _is_equal(a1, a3)
+    assert not is_equal(a1, a3)
 
     a4 = np.array([1, 2, np.nan])
     a5 = np.array([1, 2, np.nan])
-    assert _is_equal(a4, a5)
+    assert is_equal(a4, a5)
 
 
 def test_is_equal_set() -> None:
     s1 = {1, 2, 3}
     s2 = {1, 2, 3}
-    assert _is_equal(s1, s2)
+    assert is_equal(s1, s2)
 
     s3 = {1, 2, 4}
-    assert not _is_equal(s1, s3)
+    assert not is_equal(s1, s3)
 
 
 def test_is_equal_list_and_tuple() -> None:
-    assert not _is_equal([1, 2, 3], (1, 2, 3))
-    assert _is_equal([1, 2, 3], [1, 2, 3])
-    assert not _is_equal([1, 2, 3], [1, 2, 4])
-    assert _is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
-    assert not _is_equal([1], [1, 2])
+    assert not is_equal([1, 2, 3], (1, 2, 3))
+    assert is_equal([1, 2, 3], [1, 2, 3])
+    assert not is_equal([1, 2, 3], [1, 2, 4])
+    assert is_equal([np.array([1, 2, 3])], [np.array([1, 2, 3])])
+    assert not is_equal([1], [1, 2])
 
 
 def test_is_equal_float() -> None:
-    assert _is_equal(1.0, 1.0)
-    assert _is_equal(1.0, 1.0000000001)
-    assert not _is_equal(1.0, 1.1)
+    assert is_equal(1.0, 1.0)
+    assert is_equal(1.0, 1.0000000001)
+    assert not is_equal(1.0, 1.1)
 
 
 def test_is_equal_custom_object() -> None:
     obj1 = CustomObject(1)
     obj2 = CustomObject(1)
-    assert _is_equal(obj1, obj2)
+    assert is_equal(obj1, obj2)
 
     obj3 = CustomObject(2)
-    assert not _is_equal(obj1, obj3)
+    assert not is_equal(obj1, obj3)
 
 
 def test_is_equal_iterable() -> None:
-    assert _is_equal([1, 2, 3], [1, 2, 3])
-    assert not _is_equal([1, 2, 3], [1, 2, 4])
-    assert _is_equal((1, 2, 3), (1, 2, 3))
-    assert not _is_equal((1, 2, 3), (1, 2, 4))
+    assert is_equal([1, 2, 3], [1, 2, 3])
+    assert not is_equal([1, 2, 3], [1, 2, 4])
+    assert is_equal((1, 2, 3), (1, 2, 3))
+    assert not is_equal((1, 2, 3), (1, 2, 4))
 
 
 def test_is_equal_other_types() -> None:
-    assert _is_equal(1, 1)
-    assert not _is_equal(1, 2)
-    assert _is_equal("abc", "abc")
-    assert not _is_equal("abc", "def")
+    assert is_equal(1, 1)
+    assert not is_equal(1, 2)
+    assert is_equal("abc", "abc")
+    assert not is_equal("abc", "def")
 
 
 def test_is_equal_nested_error() -> None:
@@ -214,9 +214,9 @@ def test_is_equal_nested_error() -> None:
     obj1 = ErrorOnEq()
     obj2 = ErrorOnEq()
 
-    assert _is_equal([obj1], [obj2], on_error="return_none") is None
+    assert is_equal([obj1], [obj2], on_error="return_none") is None
     with pytest.raises(ValueError, match="Comparison error"):
-        _is_equal([obj1], [obj2], on_error="raise")
+        is_equal([obj1], [obj2], on_error="raise")
 
 
 def test_equal_dicts_with_pandas() -> None:

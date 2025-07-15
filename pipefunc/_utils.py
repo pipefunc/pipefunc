@@ -104,7 +104,7 @@ def prod(iterable: Iterable[int]) -> int:
     return functools.reduce(operator.mul, iterable, 1)
 
 
-def _is_equal(  # noqa: PLR0911, PLR0912
+def is_equal(  # noqa: PLR0911, PLR0912
     a: Any,
     b: Any,
     *,
@@ -147,7 +147,7 @@ def _is_equal(  # noqa: PLR0911, PLR0912
         if isinstance(a, list | tuple):
             if len(a) != len(b):  # type: ignore[arg-type]
                 return False
-            results = [_is_equal(x, y, on_error=on_error) for x, y in zip(a, b)]
+            results = [is_equal(x, y, on_error=on_error) for x, y in zip(a, b)]
             if None in results:
                 return None
             return all(results)
@@ -189,7 +189,7 @@ def equal_dicts(
     errors = []
     for k, v1 in d1.items():
         v2 = d2[k]
-        equal = _is_equal(v1, v2, on_error=on_error)
+        equal = is_equal(v1, v2, on_error=on_error)
         if equal is None:
             errors.append((k, v1, v2))
         elif not equal:
