@@ -108,7 +108,8 @@ In this case, `f.resources` is a callable that takes a dictionary of input argum
 The `f.resources` callable is invoked with the dictionary of input arguments to determine the resources for that specific execution.
 
 ```{code-cell} ipython3
-print(f"Resources: {f.resources({"x": 2, "y": 3})}")
+r = f.resources({"x": 2, "y": 3})
+print(f"Resources: {r}")
 ```
 
 You can also set the `Resources` dynamically in a `Pipeline`:

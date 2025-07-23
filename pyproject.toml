@@ -58,6 +58,7 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-book-theme",
     "sphinx-copybutton",
+    "sphinx-llms-txt",
     "sphinx-notfound-page",
     "sphinx-togglebutton",
     "sphinx",
