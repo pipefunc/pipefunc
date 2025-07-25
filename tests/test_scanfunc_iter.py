@@ -294,3 +294,72 @@ class TestScanIterFunc:
         # With offset=10, scale=2: [12, 14, 16]
         expected = np.array([12, 14, 16])
         assert np.array_equal(result, expected)
+
+    def test_xs_parameter_missing(self):
+        """Test error when xs parameter is specified but not provided."""
+
+        @PipeFunc.scan_iter(output_name="with_xs", xs="data")
+        def needs_data(data: list[int], scale: int = 2):
+            for x in data:
+                yield x * scale
+
+        pipeline = Pipeline([needs_data])
+
+        # Should raise ValueError when xs parameter is missing
+        with pytest.raises(ValueError, match="Missing value for argument `data`"):
+            pipeline.run("with_xs", kwargs={"scale": 3})  # Missing 'data'
+
+    def test_generator_with_return_in_stopiteration(self):
+        """Test generator that returns value via StopIteration."""
+
+        @PipeFunc.scan_iter(output_name="with_stop_return", return_final_only=False)
+        def gen_with_stop_return(n: int):
+            total = 0
+            for i in range(n):
+                total += i
+                yield total
+            # This will NOT be captured, Python generators don't support return values this way
+            # unless we explicitly catch the StopIteration exception
+
+        pipeline = Pipeline([gen_with_stop_return])
+        result = pipeline.run("with_stop_return", kwargs={"n": 3})
+
+        # Should only include yielded values, not the return value
+        # because we're not explicitly catching StopIteration
+        expected = np.array([0, 1, 3])
+        assert np.array_equal(result, expected)
+
+    def test_xs_parameter_in_wrapper(self):
+        """Test that xs parameter check happens at wrapper level."""
+
+        # Create a ScanIterFunc with xs parameter
+        def gen_with_xs(data: list[int]):
+            for x in data:
+                yield x * 2
+
+        func = ScanIterFunc(
+            func=gen_with_xs,
+            output_name="test_xs",
+            xs="data",
+        )
+
+        # Call the wrapper directly without the xs parameter
+        with pytest.raises(ValueError, match="Required parameter 'data' not provided"):
+            func._create_wrapper()()
+
+    def test_generator_func_property(self):
+        """Test access to underlying generator function."""
+
+        @PipeFunc.scan_iter(output_name="test_prop")
+        def my_generator(n: int):
+            for i in range(n):
+                yield i * 2
+
+        # Check that we can access the original generator function
+        assert hasattr(my_generator, "generator_func")
+        assert my_generator.generator_func.__name__ == "my_generator"
+
+        # Test that it's callable and is the original function
+        gen = my_generator.generator_func(n=3)
+        values = list(gen)
+        assert values == [0, 2, 4]
