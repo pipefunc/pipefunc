@@ -737,7 +737,10 @@ def _update_array(
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        # Always dump error objects, or follow normal dump rules
+        # Error objects bypass XOR logic and dump immediately when created because:
+        # 1. They short-circuit execution (subsequent functions skip when seeing errors)
+        # 2. Without immediate dump, the XOR logic could prevent saving them entirely
+        # Normal values use XOR to dump exactly once (subprocess OR main process)
         is_error_object = isinstance(_output, (ErrorSnapshot, PropagatedErrorSnapshot))
         if is_error_object or force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
