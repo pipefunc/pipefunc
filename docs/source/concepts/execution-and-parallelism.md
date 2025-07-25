@@ -167,3 +167,81 @@ Post-execution hooks are particularly useful for:
 
 Note that hooks are executed synchronously after the function returns but before the result is passed to the next function in the pipeline.
 They should be kept lightweight to avoid impacting performance.
+
+## Running multiple `map` calls concurrently
+
+In some scenarios, you might need to run `pipeline.map` multiple times with different sets of inputs or even with different pipelines.
+`pipefunc` provides a convenient way to manage and execute these concurrent map operations, giving you control over the degree of parallelism.
+This is particularly useful when dealing with tasks that have varying computational requirements or when you want to orchestrate a series of related but independent parameter sweeps.
+
+The core functions for this are {func}`~pipefunc.helpers.launch_maps` and {func}`~pipefunc.helpers.gather_maps`.
+
+**The workflow is as follows:**
+
+1.  Create a list of `AsyncMap` runners by calling {meth}`~pipefunc.Pipeline.map_async` with `start=False`. This prepares the map operations without immediately executing them.
+2.  Pass these runners to `launch_maps` or `gather_maps` to execute them.
+
+- {func}`~pipefunc.helpers.launch_maps`: A non-blocking function ideal for interactive environments like Jupyter. It starts the execution in the background and returns an `asyncio.Task` that you can `await` later.
+- {func}`~pipefunc.helpers.gather_maps`: A blocking `async` function that runs the maps and waits for all of them to complete before returning.
+
+Let's see an example:
+
+```{code-cell} ipython3
+from pipefunc import Pipeline, pipefunc
+from pipefunc.helpers import launch_maps
+
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def double_it(x: int) -> int:
+    return 2 * x
+
+pipeline = Pipeline([double_it])
+
+# Define two different sets of inputs with different sizes
+inputs1 = {"x": [1, 2, 3]}
+inputs2 = {"x": [4, 5, 6, 7]}
+
+# 1. Prepare the runners
+runners = [
+    pipeline.map_async(inputs1, start=False),
+    pipeline.map_async(inputs2, start=False),
+]
+
+# 2. Launch the maps concurrently
+# This will run at most 2 maps at the same time.
+task = launch_maps(*runners, max_concurrent=2)
+```
+
+In a Jupyter notebook, `launch_maps` will automatically display a tabbed widget to monitor the progress of each map operation.
+
+To get the results, you can `await` the task in a later cell:
+
+```{code-cell} ipython3
+# In a new cell
+results = await task
+print(results[0]["y"].output)
+print(results[1]["y"].output)
+```
+
+### Controlling Concurrency
+
+The `max_concurrent` parameter in `launch_maps` and `gather_maps` controls how many of the `map` operations are allowed to run at the same time. For example, if you have 10 map operations to run but set `max_concurrent=3`, only three will execute in parallel at any given time.
+
+### Sequential Execution
+
+If you want to run the maps one after another, simply set `max_concurrent=1`.
+
+```python
+task = launch_maps(*runners, max_concurrent=1)
+```
+
+This is useful when subsequent map operations might depend on the resources freed up by preceding ones, or when you want to avoid overloading a system.
+
+### Why run maps concurrently?
+
+This feature is beneficial in several situations:
+
+- **Heterogeneous Workloads**: When you have map operations with different input sizes or computational costs.
+- **Resource Constraints**: When the design of your `pipefunc`s requires that all maps produce arrays of the same shape, but your tasks naturally have different input sizes. Running them as separate map calls allows you to handle this.
+- **Complex Workflows**: For orchestrating multiple, independent parameter sweeps as part of a larger computational experiment.
+
+By using `launch_maps`, you can manage these complex scenarios with simple, readable code while retaining fine-grained control over the execution.

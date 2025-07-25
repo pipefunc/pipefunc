@@ -15,6 +15,7 @@ from __future__ import annotations
 import functools
 import inspect
 import os
+import re
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -1271,6 +1272,32 @@ class Pipeline:
             unused_str = ", ".join(sorted(unused))
             msg = f"Unused keyword arguments: `{unused_str}`. These are not settable renames."
             raise ValueError(msg)
+        self.validate()
+
+    def update_mapspec_axes(self, renames: dict[str, str]) -> None:
+        """Update the axes in the `MapSpec`s for the pipeline.
+
+        Parameters
+        ----------
+        renames
+            A dictionary mapping old axis names to new axis names.
+
+        """
+        current_axes = {axis for axes in self.mapspec_axes.values() for axis in axes}
+        if renames.keys() - current_axes:
+            unknown = set(renames.keys()) - current_axes
+            msg = f"Unknown axes to rename: {unknown}. Available axes: {current_axes}"
+            raise ValueError(msg)
+
+        for f in self.functions:
+            if f.mapspec is None:
+                continue
+            mapspec_str = str(f.mapspec)
+            for old, new in renames.items():
+                mapspec_str = re.sub(rf"\b{old}\b", new, mapspec_str)
+            f.mapspec = MapSpec.from_string(mapspec_str)
+
+        self._clear_internal_cache()
         self.validate()
 
     def update_scope(

@@ -96,6 +96,64 @@ def test_update_defaults_and_renames_with_pipeline() -> None:
     assert pipeline("y") == 4 * 666
 
 
+def test_update_defaults_with_non_comparable_inputs() -> None:
+    class CustomType:  # noqa: PLW1641
+        def __eq__(self, _) -> bool:
+            msg = "Cannot compare CustomType instances"
+            raise ValueError(msg)
+
+    @pipefunc("a", defaults={"array": CustomType()})
+    def a(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b", defaults={"array": CustomType()})
+    def b(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.warns(
+        UserWarning,
+        match="Could not compare default values for argument 'array'",
+    ):
+        Pipeline([a, b])
+
+    @pipefunc("a")
+    def a2(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b")
+    def b2(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.warns(
+        UserWarning,
+        match="Could not compare default values for argument 'array'",
+    ):
+        Pipeline([a2, b2]).update_defaults({"array": CustomType()})
+
+
+def test_update_defaults_with_nd_array() -> None:
+    @pipefunc("a", defaults={"array": np.array([1, 2, 3])})
+    def a(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b", defaults={"array": np.array([4, 5, 6])})
+    def b(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    with pytest.raises(ValueError, match="Inconsistent default values for argument 'array'"):
+        Pipeline([a, b])
+
+    @pipefunc("a")
+    def a2(array: np.ndarray) -> np.ndarray:
+        return array + 1
+
+    @pipefunc("b")
+    def b2(array: np.ndarray, factor: float) -> np.ndarray:
+        return array * factor
+
+    Pipeline([a2, b2]).update_defaults({"array": np.array([4, 5, 6])})
+
+
 def test_update_renames_pipeline() -> None:
     @pipefunc(output_name="c", renames={"a": "a1"})
     def f(a, b):
