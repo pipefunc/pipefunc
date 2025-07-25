@@ -119,3 +119,7 @@ docs/source/*results
 docs/source/*run_folder*
 .codspeed
 .env*
+
+# Test output directories
+test_optimizer/
+test_scan_map/
