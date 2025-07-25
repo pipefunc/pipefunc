@@ -9,8 +9,10 @@ We successfully implemented error handling with `error_handling="continue"` opti
 3. **Mapspec Error Handling**: Fixed issues with parallel execution where errors in chunks weren't properly handled
 4. **Object Arrays**: Arrays now use object dtype when error_handling="continue" to store mixed types
 5. **Error Propagation**: Errors properly propagate through pipelines, with downstream functions skipping when they receive error inputs
+6. **Parallel Execution Fix**: Added custom pickling methods using cloudpickle to enable proper serialization of error objects in parallel execution
+7. **Code Refactoring**: Extracted common error handling logic into reusable functions in `_error_handling.py` module
 
-The implementation works correctly in both sequential and parallel modes, though tests with locally-defined functions have pickling issues in parallel mode (a Python limitation, not our implementation).
+The implementation works correctly in both sequential and parallel modes. All tests pass with both `parallel=False` and `parallel=True`.
 
 ## Overview
 
@@ -64,13 +66,17 @@ Based on the git diff, the following has been implemented:
 - [x] Handle mapspec operations with error values properly
 - [x] Define behavior: functions skip execution when receiving ErrorSnapshot inputs
 
-### Phase 4: Testing & Documentation (In Progress)
+### Phase 4: Testing & Documentation (Complete)
 - [x] Write comprehensive tests for error handling scenarios
-- [x] Test parallel execution with errors (tests written, pickling issues with local functions)
+- [x] Test parallel execution with errors (fixed with custom pickling)
 - [x] Test various mapspec patterns with errors
+- [x] Fix parallel execution pickling issues
+- [x] Refactor code to follow DRY principle
+
+### Future Work
 - [ ] Update documentation and examples
 - [ ] Handle ErrorSnapshot serialization for storage backends (zarr, disk)
-- [ ] Handle reduction operations with partial errors
+- [ ] Optimize performance for object dtype arrays
 
 ## Key Technical Challenges
 
