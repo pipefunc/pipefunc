@@ -23,7 +23,7 @@ def test_single_function_error_continue():
     pipeline = Pipeline([may_fail])
 
     # Test with error_handling="continue"
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue")
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
 
     y_output = result["y"].output
     assert isinstance(y_output, np.ndarray)
@@ -80,7 +80,7 @@ def test_multiple_errors_single_function():
 
     pipeline = Pipeline([may_fail_multiple])
 
-    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue")
+    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue", parallel=False)
 
     # Check y has errors at correct positions
     y = result["y"].output
@@ -109,11 +109,11 @@ def test_error_handling_raise_default():
 
     # Should raise exception with default error_handling
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]})  # error_handling="raise" is default
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, parallel=False)  # error_handling="raise" is default
 
     # Explicit error_handling="raise" should also raise
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise")
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise", parallel=False)
 
 
 # Test 5: Test 2D mapspec with errors
@@ -129,7 +129,11 @@ def test_2d_mapspec_with_errors():
 
     pipeline = Pipeline([compute])
 
-    result = pipeline.map({"x": [1, 2, 3], "y": [2, 3, 4]}, error_handling="continue")
+    result = pipeline.map(
+        {"x": [1, 2, 3], "y": [2, 3, 4]},
+        error_handling="continue",
+        parallel=False,
+    )
 
     # Check matrix
     matrix = result["matrix"].output
@@ -162,14 +166,14 @@ def test_no_mapspec_single_error():
     pipeline = Pipeline([may_fail])
 
     # With single value that causes error
-    result = pipeline.map({"a": 5}, error_handling="continue")
+    result = pipeline.map({"a": 5}, error_handling="continue", parallel=False)
 
     # Should get ErrorSnapshot as output
     assert isinstance(result["b"].output, ErrorSnapshot)
     assert "Cannot process a=5" in str(result["b"].output.exception)
 
     # With value that doesn't cause error
-    result_ok = pipeline.map({"a": 3}, error_handling="continue")
+    result_ok = pipeline.map({"a": 3}, error_handling="continue", parallel=False)
     assert result_ok["b"].output == 6
 
 
@@ -185,7 +189,7 @@ def test_error_snapshot_attributes():
         return x * 10
 
     pipeline = Pipeline([fail_with_info])
-    result = pipeline.map({"x": [1, 2, 3]}, error_handling="continue")
+    result = pipeline.map({"x": [1, 2, 3]}, error_handling="continue", parallel=False)
 
     error = result["y"].output[1]
     assert isinstance(error, ErrorSnapshot)
@@ -222,11 +226,11 @@ def test_caching_with_errors():
     pipeline = Pipeline([cached_may_fail], cache_type="simple")
 
     # First run
-    result1 = pipeline.map({"x": [1, 2, 3, 4]}, error_handling="continue")
+    result1 = pipeline.map({"x": [1, 2, 3, 4]}, error_handling="continue", parallel=False)
     first_call_count = call_count
 
     # Second run - should use cache
-    result2 = pipeline.map({"x": [1, 2, 3, 4]}, error_handling="continue")
+    result2 = pipeline.map({"x": [1, 2, 3, 4]}, error_handling="continue", parallel=False)
 
     # Function should not be called again
     assert call_count == first_call_count
