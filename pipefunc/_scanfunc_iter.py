@@ -164,17 +164,10 @@ class ScanIterFunc(PipeFunc[T]):
             results = []
             last_value = None
 
-            try:
-                for value in gen:
-                    last_value = value
-                    if not self.return_final_only:
-                        results.append(value)
-            except StopIteration as e:
-                # Handle return value from generator if any
-                if hasattr(e, "value") and e.value is not None:
-                    last_value = e.value
-                    if not self.return_final_only:
-                        results.append(e.value)
+            for value in gen:
+                last_value = value
+                if not self.return_final_only:
+                    results.append(value)
 
             # Return appropriate result
             if self.return_final_only:
