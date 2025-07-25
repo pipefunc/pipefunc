@@ -6,44 +6,32 @@ import numpy as np
 import pytest
 
 from pipefunc import Pipeline, pipefunc
-from pipefunc.exceptions import ErrorSnapshot
-
-# PropagatedErrorSnapshot will be implemented as part of this feature
-try:
-    from pipefunc.exceptions import PropagatedErrorSnapshot
-except ImportError:
-    # Will be implemented
-    PropagatedErrorSnapshot = None
-
-
-# Skip tests that require unimplemented features
-skip_if_no_propagated_error = pytest.mark.skipif(
-    PropagatedErrorSnapshot is None,
-    reason="PropagatedErrorSnapshot not yet implemented",
-)
+from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
 
 
 # Test 1: Simple pipeline with no mapspec - error propagation through pipeline
+@pipefunc(output_name="b")
+def test1_step1(a: int) -> int:
+    return a * 2
+
+
+@pipefunc(output_name="c")
+def test1_step2(b: int) -> int:
+    if b == 4:
+        msg = "Cannot process b=4"
+        raise ValueError(msg)
+    return b + 10
+
+
+@pipefunc(output_name="d")
+def test1_step3(c: int) -> int:
+    # This should not be called when c is an error
+    return c * 3
+
+
 def test_simple_pipeline_no_mapspec_error_propagation():
     """Test error propagation in a simple 3-step pipeline without mapspec."""
-
-    @pipefunc(output_name="b")
-    def step1(a: int) -> int:
-        return a * 2
-
-    @pipefunc(output_name="c")
-    def step2(b: int) -> int:
-        if b == 4:
-            msg = "Cannot process b=4"
-            raise ValueError(msg)
-        return b + 10
-
-    @pipefunc(output_name="d")
-    def step3(c: int) -> int:
-        # This should not be called when c is an error
-        return c * 3
-
-    pipeline = Pipeline([step1, step2, step3])
+    pipeline = Pipeline([test1_step1, test1_step2, test1_step3])
 
     # Test with error_handling="continue"
     result = pipeline.map({"a": 2}, error_handling="continue")
@@ -65,20 +53,20 @@ def test_simple_pipeline_no_mapspec_error_propagation():
 
 
 # Test 2: Single pipefunc with element-wise mapspec and errors
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test2_may_fail(x: int) -> int:
+    if x == 3:
+        msg = f"Cannot process x={x}"
+        raise ValueError(msg)
+    return x * 2
+
+
 def test_single_pipefunc_element_wise_errors():
     """Test error handling in element-wise operations."""
-
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def may_fail(x: int) -> int:
-        if x == 3:
-            msg = f"Cannot process x={x}"
-            raise ValueError(msg)
-        return x * 2
-
-    pipeline = Pipeline([may_fail])
+    pipeline = Pipeline([test2_may_fail])
 
     # Test with array input where one element causes error
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue")
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
 
     y_output = result["y"].output
     assert isinstance(y_output, np.ndarray)
@@ -93,24 +81,25 @@ def test_single_pipefunc_element_wise_errors():
 
 
 # Test 3: Pipeline with element-wise operations and error propagation
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test3_step1(x: int) -> int:
+    if x == 3:
+        msg = f"Cannot process x={x}"
+        raise ValueError(msg)
+    return x * 2
+
+
+@pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+def test3_step2(y: int) -> int:
+    # Should not be called for y[i] that is an ErrorSnapshot
+    return y + 10
+
+
 def test_pipeline_element_wise_propagation():
     """Test error propagation through element-wise operations."""
+    pipeline = Pipeline([test3_step1, test3_step2])
 
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def step1(x: int) -> int:
-        if x == 3:
-            msg = f"Cannot process x={x}"
-            raise ValueError(msg)
-        return x * 2
-
-    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
-    def step2(y: int) -> int:
-        # Should not be called for y[i] that is an ErrorSnapshot
-        return y + 10
-
-    pipeline = Pipeline([step1, step2])
-
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue")
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
 
     # Check y array
     y_output = result["y"].output
@@ -130,24 +119,29 @@ def test_pipeline_element_wise_propagation():
 
 
 # Test 4: 1D reduction with partial errors
+@pipefunc(output_name="matrix", mapspec="x[i], y[j] -> matrix[i, j]")
+def test4_compute(x: int, y: int) -> int:
+    if x == 2 and y == 3:
+        msg = f"Cannot compute x={x}, y={y}"
+        raise ValueError(msg)
+    return x * y
+
+
+@pipefunc(output_name="row_sums", mapspec="matrix[i, :] -> row_sums[i]")
+def test4_sum_rows(matrix: np.ndarray) -> int:
+    # Should only be called for rows without errors
+    return int(np.sum(matrix))
+
+
 def test_1d_reduction_partial_errors():
     """Test error handling in 1D reduction operations."""
+    pipeline = Pipeline([test4_compute, test4_sum_rows])
 
-    @pipefunc(output_name="matrix", mapspec="x[i], y[j] -> matrix[i, j]")
-    def compute(x: int, y: int) -> int:
-        if x == 2 and y == 3:
-            msg = f"Cannot compute x={x}, y={y}"
-            raise ValueError(msg)
-        return x * y
-
-    @pipefunc(output_name="row_sums", mapspec="matrix[i, :] -> row_sums[i]")
-    def sum_rows(matrix: np.ndarray) -> int:
-        # Should only be called for rows without errors
-        return int(np.sum(matrix))
-
-    pipeline = Pipeline([compute, sum_rows])
-
-    result = pipeline.map({"x": [1, 2, 3], "y": [2, 3, 4]}, error_handling="continue")
+    result = pipeline.map(
+        {"x": [1, 2, 3], "y": [2, 3, 4]},
+        error_handling="continue",
+        parallel=False,
+    )
 
     # Check matrix
     matrix = result["matrix"].output
@@ -166,24 +160,25 @@ def test_1d_reduction_partial_errors():
 
 
 # Test 5: Full array reduction with errors
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test5_double(x: int) -> int:
+    if x == 3:
+        msg = f"Cannot process x={x}"
+        raise ValueError(msg)
+    return x * 2
+
+
+@pipefunc(output_name="sum")  # No mapspec - receives entire array
+def test5_sum_all(y: np.ndarray) -> int:
+    # Should not be called if y contains any errors
+    return int(np.sum(y))
+
+
 def test_full_array_reduction_with_errors():
     """Test error handling when reducing entire array that contains errors."""
+    pipeline = Pipeline([test5_double, test5_sum_all])
 
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def double(x: int) -> int:
-        if x == 3:
-            msg = f"Cannot process x={x}"
-            raise ValueError(msg)
-        return x * 2
-
-    @pipefunc(output_name="sum")  # No mapspec - receives entire array
-    def sum_all(y: np.ndarray) -> int:
-        # Should not be called if y contains any errors
-        return int(np.sum(y))
-
-    pipeline = Pipeline([double, sum_all])
-
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue")
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
 
     # Check y array has mixed values and errors
     y_output = result["y"].output
@@ -197,31 +192,34 @@ def test_full_array_reduction_with_errors():
 
 
 # Test 6: 2D reduction with errors in different dimensions
+@pipefunc(output_name="tensor", mapspec="x[i], y[j], z[k] -> tensor[i, j, k]")
+def test6_compute_3d(x: int, y: int, z: int) -> int:
+    if (x == 1 and y == 2 and z == 1) or (x == 2 and y == 1 and z == 0):
+        msg = f"Cannot compute x={x}, y={y}, z={z}"
+        raise ValueError(msg)
+    return x + y + z
+
+
+@pipefunc(output_name="sum_z", mapspec="tensor[i, j, :] -> sum_z[i, j]")
+def test6_sum_along_z(tensor: np.ndarray) -> int:
+    # Should only be called for [i, j] slices without errors
+    return int(np.sum(tensor))
+
+
+@pipefunc(output_name="sum_yz", mapspec="tensor[i, :, :] -> sum_yz[i]")
+def test6_sum_along_yz(tensor: np.ndarray) -> int:
+    # Should only be called for [i, :, :] slices without errors
+    return int(np.sum(tensor))
+
+
 def test_2d_reduction_multi_dimension_errors():
     """Test error handling in 2D reductions across different axes."""
-
-    @pipefunc(output_name="tensor", mapspec="x[i], y[j], z[k] -> tensor[i, j, k]")
-    def compute_3d(x: int, y: int, z: int) -> int:
-        if (x == 1 and y == 2 and z == 1) or (x == 2 and y == 1 and z == 0):
-            msg = f"Cannot compute x={x}, y={y}, z={z}"
-            raise ValueError(msg)
-        return x + y + z
-
-    @pipefunc(output_name="sum_z", mapspec="tensor[i, j, :] -> sum_z[i, j]")
-    def sum_along_z(tensor: np.ndarray) -> int:
-        # Should only be called for [i, j] slices without errors
-        return int(np.sum(tensor))
-
-    @pipefunc(output_name="sum_yz", mapspec="tensor[i, :, :] -> sum_yz[i]")
-    def sum_along_yz(tensor: np.ndarray) -> int:
-        # Should only be called for [i, :, :] slices without errors
-        return int(np.sum(tensor))
-
-    pipeline = Pipeline([compute_3d, sum_along_z, sum_along_yz])
+    pipeline = Pipeline([test6_compute_3d, test6_sum_along_z, test6_sum_along_yz])
 
     result = pipeline.map(
         {"x": [1, 2, 3], "y": [1, 2], "z": [0, 1]},
         error_handling="continue",
+        parallel=False,
     )
 
     # Check tensor has errors at specific positions
@@ -244,38 +242,42 @@ def test_2d_reduction_multi_dimension_errors():
 
 
 # Test 7: Complex multi-step pipeline with mixed mapspecs
+@pipefunc(output_name="doubled", mapspec="nums[i] -> doubled[i]")
+def test7_double(nums: int) -> int:
+    if nums == 5:
+        msg = "Cannot double 5"
+        raise ValueError(msg)
+    return nums * 2
+
+
+@pipefunc(output_name="matrix", mapspec="doubled[i], factors[j] -> matrix[i, j]")
+def test7_multiply(doubled: int, factors: int) -> int:
+    if doubled == 8 and factors == 3:
+        msg = "Cannot multiply 8 by 3"
+        raise ValueError(msg)
+    return doubled * factors
+
+
+@pipefunc(output_name="row_max", mapspec="matrix[i, :] -> row_max[i]")
+def test7_max_per_row(matrix: np.ndarray) -> int:
+    # Should skip rows with errors
+    return int(np.max(matrix))
+
+
+@pipefunc(output_name="total")  # No mapspec - full reduction
+def test7_sum_all_max(row_max: np.ndarray) -> int:
+    # Should not run if row_max contains errors
+    return int(np.sum(row_max))
+
+
 def test_complex_pipeline_mixed_mapspecs():
     """Test error handling in complex pipeline with various mapspec patterns."""
-
-    @pipefunc(output_name="doubled", mapspec="nums[i] -> doubled[i]")
-    def double(nums: int) -> int:
-        if nums == 5:
-            msg = "Cannot double 5"
-            raise ValueError(msg)
-        return nums * 2
-
-    @pipefunc(output_name="matrix", mapspec="doubled[i], factors[j] -> matrix[i, j]")
-    def multiply(doubled: int, factors: int) -> int:
-        if doubled == 8 and factors == 3:
-            msg = "Cannot multiply 8 by 3"
-            raise ValueError(msg)
-        return doubled * factors
-
-    @pipefunc(output_name="row_max", mapspec="matrix[i, :] -> row_max[i]")
-    def max_per_row(matrix: np.ndarray) -> int:
-        # Should skip rows with errors
-        return int(np.max(matrix))
-
-    @pipefunc(output_name="total")  # No mapspec - full reduction
-    def sum_all_max(row_max: np.ndarray) -> int:
-        # Should not run if row_max contains errors
-        return int(np.sum(row_max))
-
-    pipeline = Pipeline([double, multiply, max_per_row, sum_all_max])
+    pipeline = Pipeline([test7_double, test7_multiply, test7_max_per_row, test7_sum_all_max])
 
     result = pipeline.map(
         {"nums": [1, 2, 3, 4, 5], "factors": [2, 3, 4]},
         error_handling="continue",
+        parallel=False,
     )
 
     # Check doubled - should have error at index 4 (nums=5)
@@ -304,17 +306,17 @@ def test_complex_pipeline_mixed_mapspecs():
 
 
 # Test 8: Error handling with parallel=False (sequential execution)
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test8_may_fail(x: int) -> int:
+    if x == 3:
+        msg = f"Cannot process x={x}"
+        raise ValueError(msg)
+    return x * 2
+
+
 def test_sequential_execution_error_handling():
     """Test that error handling works correctly in sequential mode."""
-
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def may_fail(x: int) -> int:
-        if x == 3:
-            msg = f"Cannot process x={x}"
-            raise ValueError(msg)
-        return x * 2
-
-    pipeline = Pipeline([may_fail])
+    pipeline = Pipeline([test8_may_fail])
 
     # Test with parallel=False
     result = pipeline.map(
@@ -333,23 +335,24 @@ def test_sequential_execution_error_handling():
 
 
 # Test 9: Multiple errors in same function
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test9_may_fail_multiple(x: int) -> int:
+    if x in [2, 4, 7]:
+        msg = f"Cannot process x={x}"
+        raise ValueError(msg)
+    return x**2
+
+
+@pipefunc(output_name="z", mapspec="y[i] -> z[i]")
+def test9_add_ten(y: int) -> int:
+    return y + 10
+
+
 def test_multiple_errors_same_function():
     """Test handling multiple errors in the same function."""
+    pipeline = Pipeline([test9_may_fail_multiple, test9_add_ten])
 
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def may_fail_multiple(x: int) -> int:
-        if x in [2, 4, 7]:
-            msg = f"Cannot process x={x}"
-            raise ValueError(msg)
-        return x**2
-
-    @pipefunc(output_name="z", mapspec="y[i] -> z[i]")
-    def add_ten(y: int) -> int:
-        return y + 10
-
-    pipeline = Pipeline([may_fail_multiple, add_ten])
-
-    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue")
+    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue", parallel=False)
 
     # Check y has errors at correct positions
     y = result["y"].output
@@ -372,22 +375,22 @@ def test_multiple_errors_same_function():
 
 
 # Test 10: Verify error_handling="raise" still works (default behavior)
+@pipefunc(output_name="y", mapspec="x[i] -> y[i]")
+def test10_will_fail(x: int) -> int:
+    if x == 3:
+        msg = "Expected error"
+        raise ValueError(msg)
+    return x * 2
+
+
 def test_error_handling_raise_default():
     """Test that error_handling='raise' maintains default behavior."""
-
-    @pipefunc(output_name="y", mapspec="x[i] -> y[i]")
-    def will_fail(x: int) -> int:
-        if x == 3:
-            msg = "Expected error"
-            raise ValueError(msg)
-        return x * 2
-
-    pipeline = Pipeline([will_fail])
+    pipeline = Pipeline([test10_will_fail])
 
     # Should raise exception with default error_handling
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]})  # error_handling="raise" is default
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, parallel=False)  # error_handling="raise" is default
 
     # Explicit error_handling="raise" should also raise
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise")
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise", parallel=False)

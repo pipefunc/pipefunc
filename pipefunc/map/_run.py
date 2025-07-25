@@ -629,16 +629,49 @@ def _run_iteration(
     in_executor: bool,
     error_handling: Literal["raise", "continue"],
 ) -> Any:
+    # Early error detection when error_handling == "continue"
+    if error_handling == "continue":
+        from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+        # Check if any input is an ErrorSnapshot
+        error_info = {}
+        for param_name, value in selected.items():
+            if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
+                # Input parameter is itself an error
+                error_info[param_name] = {"type": "full", "error": value}
+            elif isinstance(value, np.ndarray) and value.dtype == object:
+                # Check if array contains any ErrorSnapshot objects
+                error_mask = np.array(
+                    [isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in value.flat],
+                )
+                if error_mask.any():
+                    error_info[param_name] = {
+                        "type": "partial",
+                        "shape": value.shape,
+                        "error_indices": np.where(error_mask.reshape(value.shape)),
+                        "error_count": error_mask.sum(),
+                    }
+
+        if error_info:
+            return PropagatedErrorSnapshot(
+                error_info=error_info,
+                skipped_function=func,
+                reason="input_contains_errors",
+                attempted_kwargs={k: v for k, v in selected.items() if k not in error_info},
+            )
+
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
-            if not in_executor:
-                # If we are in the executor, we need to handle the error in `_result`
-                handle_pipefunc_error(e, func, selected, error_handling)
-                # handle_pipefunc_error raises if error_handling == "raise"
-                assert error_handling == "continue"
-                return func.error_snapshot
+            handle_pipefunc_error(e, func, selected, error_handling)
+            # handle_pipefunc_error raises if error_handling == "raise"
+            if error_handling == "continue":
+                # Create ErrorSnapshot directly to avoid issues in executor context
+                from pipefunc.exceptions import ErrorSnapshot
+
+                renamed_kwargs = func._rename_to_native(selected)
+                return ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
             raise
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
@@ -929,6 +962,12 @@ def _process_chunk(
     chunk: list[int],
     process_index: functools.partial[tuple[Any, ...]],
 ) -> list[Any]:
+    """Process a chunk of indices.
+
+    When error_handling='continue', exceptions are handled within process_index
+    and it returns tuples containing ErrorSnapshots. When error_handling='raise',
+    exceptions are propagated.
+    """
     return list(map(process_index, chunk))
 
 
@@ -1084,6 +1123,42 @@ def _execute_single(
     _load_data(kwargs)
 
     def compute_fn() -> Any:
+        # Early error detection for non-mapspec operations
+        if error_handling == "continue":
+            from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+            # Check if any input is an ErrorSnapshot
+            error_info = {}
+            for param_name, value in kwargs.items():
+                if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
+                    error_info[param_name] = {"type": "full", "error": value}
+                elif isinstance(value, np.ndarray) and value.dtype == object:
+                    # Check if array contains any ErrorSnapshots
+                    error_mask = np.array(
+                        [
+                            isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot))
+                            for v in value.flat
+                        ],
+                    )
+                    if error_mask.any():
+                        error_info[param_name] = {
+                            "type": "partial",
+                            "shape": value.shape,
+                            "error_count": error_mask.sum(),
+                        }
+
+            if error_info:
+                # Create a PropagatedErrorSnapshot since we have error inputs
+                propagated_error = PropagatedErrorSnapshot(
+                    error_info=error_info,
+                    skipped_function=func,
+                    reason="input_is_error"
+                    if any(info["type"] == "full" for info in error_info.values())
+                    else "array_contains_errors",
+                    attempted_kwargs={k: v for k, v in kwargs.items() if k not in error_info},
+                )
+                return propagated_error
+
         try:
             return func(**kwargs)
         except Exception as e:  # noqa: BLE001
@@ -1381,11 +1456,24 @@ def _result(
 ) -> Any:
     if isinstance(x, Future):
         try:
-            return x.result()
+            result = x.result()
+            # For mapspec operations, the result should be a list of tuples
+            # If we get a single tuple, wrap it in a list for consistency
+            if func.requires_mapping and isinstance(result, tuple) and not isinstance(result, list):
+                return [result]
+            return result  # noqa: TRY300
         except Exception as e:  # noqa: BLE001
             _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
             # _raise_and_set_error_snapshot raises if error_handling == "raise"
             assert run_info.error_handling == "continue"
+            # For mapspec operations, we need to return a list even for errors
+            if func.requires_mapping:
+                # We don't know which specific element in the chunk failed,
+                # so we return a list with a single tuple containing ErrorSnapshot(s)
+                # This is a limitation of chunk-based parallel execution
+                # The tuple is needed because _pick_output returns a tuple of outputs
+                error_tuple = tuple(func.error_snapshot for _ in at_least_tuple(func.output_name))
+                return [error_tuple]
             return func.error_snapshot
 
     return x

@@ -97,3 +97,45 @@ class ErrorSnapshot:
         from IPython.display import HTML, display
 
         display(HTML(f"<pre>{self}</pre>"))
+
+
+@dataclass
+class PropagatedErrorSnapshot:
+    """Represents a function that was skipped due to upstream errors."""
+
+    error_info: dict[str, dict[str, Any]]  # parameter -> error details
+    skipped_function: Callable[..., Any]
+    reason: str  # "input_is_error", "array_contains_errors", etc.
+    attempted_kwargs: dict[str, Any]  # kwargs that were not errors
+    timestamp: str = field(default_factory=_timestamp)
+
+    def get_root_causes(self) -> list[ErrorSnapshot]:
+        """Extract all original ErrorSnapshot objects."""
+        root_causes = []
+        for info in self.error_info.values():
+            if info["type"] == "full":
+                error = info["error"]
+                if isinstance(error, PropagatedErrorSnapshot):
+                    root_causes.extend(error.get_root_causes())
+                else:
+                    root_causes.append(error)
+            elif info["type"] == "partial":
+                # Would need to extract from the array
+                # For now, we don't store the full array, just metadata
+                pass
+        return root_causes
+
+    def __str__(self) -> str:
+        func_name = getattr(self.skipped_function, "__name__", str(self.skipped_function))
+        error_summary = []
+        for param, info in self.error_info.items():
+            if info["type"] == "full":
+                error_summary.append(f"{param} (complete failure)")
+            else:
+                error_summary.append(f"{param} ({info['error_count']} errors in array)")
+
+        return (
+            f"PropagatedErrorSnapshot: Function '{func_name}' was skipped\n"
+            f"Reason: {self.reason}\n"
+            f"Errors in: {', '.join(error_summary)}"
+        )
