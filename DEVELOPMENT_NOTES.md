@@ -93,4 +93,3 @@ Refactored the error handling code to follow the DRY (Don't Repeat Yourself) pri
 
 1. **Storage Backends**: ErrorSnapshot serialization for zarr/disk storage not yet implemented
 2. **Performance**: Object dtype arrays may have performance implications for large datasets
-3. **Reduction Operations**: Complex reduction operations with partial errors need careful handling
