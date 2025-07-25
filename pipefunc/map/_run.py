@@ -730,12 +730,16 @@ def _update_array(
     # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
+    from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
     output_key = None
     has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        if force_dump or (array.dump_in_subprocess ^ in_post_process):
+        # Always dump error objects, or follow normal dump rules
+        is_error_object = isinstance(_output, (ErrorSnapshot, PropagatedErrorSnapshot))
+        if is_error_object or force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
