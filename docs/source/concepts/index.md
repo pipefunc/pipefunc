@@ -19,6 +19,7 @@ Adaptive integration <adaptive-integration>
 Testing <testing>
 Overhead and Efficiency <overhead-and-efficiency.md>
 Parameter Sweeps <parameter-sweeps>
+ScanFunc: Iterative Execution <scanfunc>
 ```
 
 ```{admonition} Getting Started
@@ -53,6 +54,7 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Testing](./testing):** Best practices for testing, including mocking functions in pipelines.
 - **[Overhead and Efficiency](./overhead-and-efficiency):** Measure the performance overhead of `pipefunc`.
 - **[Parameter Sweeps](./parameter-sweeps):** Construct parameter sweeps and optimize execution with `pipefunc.sweep`.
+- **[ScanFunc: Iterative Execution](./scanfunc):** Build iterative algorithms with state management using `ScanFunc` for optimization, simulations, and sequential processing.
 
 ## Contributing
 
