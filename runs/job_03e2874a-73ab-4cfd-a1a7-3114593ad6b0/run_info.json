@@ -1,0 +1,41 @@
+{
+    "all_output_names": [
+        "sum_result",
+        "values"
+    ],
+    "shapes": {
+        "x": [
+            4
+        ],
+        "values": [
+            4
+        ]
+    },
+    "resolved_shapes": {
+        "x": [
+            4
+        ],
+        "values": [
+            4
+        ]
+    },
+    "internal_shapes": null,
+    "shape_masks": {
+        "x": [
+            true
+        ],
+        "values": [
+            true
+        ]
+    },
+    "run_folder": "runs/job_03e2874a-73ab-4cfd-a1a7-3114593ad6b0",
+    "mapspecs_as_strings": [
+        "x[i] -> values[i]"
+    ],
+    "storage": "file_array",
+    "pipefunc_version": "0.85.2.dev11+feature.scanfunc.implementation.g12caa93e.dirty",
+    "input_paths": {
+        "x": "runs/job_03e2874a-73ab-4cfd-a1a7-3114593ad6b0/inputs/x.cloudpickle"
+    },
+    "defaults_path": "runs/job_03e2874a-73ab-4cfd-a1a7-3114593ad6b0/defaults/defaults.cloudpickle"
+}

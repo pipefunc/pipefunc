@@ -1,0 +1,40 @@
+{
+    "all_output_names": [
+        "y"
+    ],
+    "shapes": {
+        "x": [
+            5
+        ],
+        "y": [
+            5
+        ]
+    },
+    "resolved_shapes": {
+        "x": [
+            5
+        ],
+        "y": [
+            5
+        ]
+    },
+    "internal_shapes": null,
+    "shape_masks": {
+        "x": [
+            true
+        ],
+        "y": [
+            true
+        ]
+    },
+    "run_folder": "test",
+    "mapspecs_as_strings": [
+        "x[i] -> y[i]"
+    ],
+    "storage": "file_array",
+    "pipefunc_version": "0.85.2.dev11+feature.scanfunc.implementation.g12caa93e.dirty",
+    "input_paths": {
+        "x": "test/inputs/x.cloudpickle"
+    },
+    "defaults_path": "test/defaults/defaults.cloudpickle"
+}

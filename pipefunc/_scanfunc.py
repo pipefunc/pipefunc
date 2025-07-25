@@ -205,12 +205,12 @@ class ScanFunc(PipeFunc[T]):
         bound_kwargs = dict(bound.arguments)
 
         # Extract xs from bound arguments
-        xs_key = self._renames.get(self.xs, self.xs)
-        if xs_key not in bound_kwargs:
-            msg = f"Required parameter '{xs_key}' (xs) not provided"
+        # The xs parameter uses the internal name, not the renamed name
+        if self.xs not in bound_kwargs:
+            msg = f"Required parameter '{self.xs}' (xs) not provided"
             raise ValueError(msg)
 
-        xs_values = bound_kwargs.pop(xs_key)
+        xs_values = bound_kwargs.pop(self.xs)
 
         # Initialize carry with remaining bound arguments
         carry = dict(bound_kwargs)
@@ -274,8 +274,7 @@ class ScanFunc(PipeFunc[T]):
     def carry(self) -> dict[str, Any] | None:
         """Get the final carry dict from the last execution.
 
-        Returns None if the function hasn't been executed yet or
-        if return_intermediate is True.
+        Returns None if the function hasn't been executed yet.
         """
         if hasattr(self, "_last_carry"):
             return self._last_carry
