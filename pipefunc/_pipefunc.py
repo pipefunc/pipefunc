@@ -965,6 +965,228 @@ class PipeFunc(Generic[T]):
             return f"{name}-{pipefunc_hash}"
         return name
 
+    @staticmethod
+    def scan(
+        output_name: OUTPUT_TYPE,
+        xs: str,
+        *,
+        return_intermediate: bool = True,
+        output_picker: Callable[[Any, str], Any] | None = None,
+        renames: dict[str, str] | None = None,
+        defaults: dict[str, Any] | None = None,
+        bound: dict[str, Any] | None = None,
+        profile: bool = False,
+        debug: bool = False,
+        print_error: bool = True,
+        cache: bool = False,
+        mapspec: str | MapSpec | None = None,
+        internal_shape: int | Literal["?"] | ShapeTuple | None = None,
+        post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
+        resources: dict
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None = None,
+        resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
+        scope: str | None = None,
+        variant: str | dict[str | None, str] | None = None,
+    ) -> Callable[[Callable[..., tuple[dict[str, Any], Any]]], Any]:
+        """Decorator to create a ScanFunc from a function.
+
+        The decorated function should return a tuple of (carry, output) where:
+        - carry: dict that will be merged with kwargs for next iteration
+        - output: the output value for this iteration (can be None)
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the output of the scan operation.
+        xs
+            The name of the parameter containing the list/array to iterate over.
+        return_intermediate
+            Whether to return intermediate results. If True (default), returns
+            an array of all outputs. If False, returns only the final carry dict.
+        output_picker
+            Function to pick specific outputs from return value.
+        renames
+            Mapping of parameter names to rename in the function signature.
+        defaults
+            Default values for parameters.
+        bound
+            Parameters bound to specific values.
+        profile
+            Whether to profile execution time.
+        debug
+            Whether to print debug information.
+        print_error
+            Whether to print error messages.
+        cache
+            Whether to cache function results.
+        mapspec
+            MapSpec specification for array processing.
+        internal_shape
+            Shape specification for internal arrays.
+        post_execution_hook
+            Hook function called after execution.
+        resources
+            Resource requirements for execution.
+        resources_variable
+            Variable name for resources in function signature.
+        resources_scope
+            Scope for resource allocation (map or element level).
+        scope
+            Parameter scope specification.
+        variant
+            Variant specification for conditional execution.
+
+        Returns
+        -------
+        decorator
+            A decorator that creates a ScanFunc instance.
+
+        Examples
+        --------
+        >>> @PipeFunc.scan(output_name="trajectory", xs="time_steps")
+        ... def simulate(t: float, y: float = 1.0, dt: float = 0.1) -> tuple[dict[str, Any], float]:
+        ...     y_next = y - y * dt  # Simple decay
+        ...     carry = {"y": y_next}
+        ...     return carry, y_next
+
+        """
+        from pipefunc._scanfunc import scan as scan_decorator
+
+        return scan_decorator(
+            output_name=output_name,
+            xs=xs,
+            return_intermediate=return_intermediate,
+            output_picker=output_picker,
+            renames=renames,
+            defaults=defaults,
+            bound=bound,
+            profile=profile,
+            debug=debug,
+            print_error=print_error,
+            cache=cache,
+            mapspec=mapspec,
+            internal_shape=internal_shape,
+            post_execution_hook=post_execution_hook,
+            resources=resources,
+            resources_variable=resources_variable,
+            resources_scope=resources_scope,
+            scope=scope,
+            variant=variant,
+        )
+
+    @staticmethod
+    def scan_iter(
+        output_name: OUTPUT_TYPE,
+        *,
+        xs: str | None = None,
+        return_final_only: bool = False,
+        output_picker: Callable[[Any, str], Any] | None = None,
+        renames: dict[str, str] | None = None,
+        defaults: dict[str, Any] | None = None,
+        bound: dict[str, Any] | None = None,
+        profile: bool = False,
+        debug: bool = False,
+        print_error: bool = True,
+        cache: bool = False,
+        mapspec: str | MapSpec | None = None,
+        internal_shape: int | Literal["?"] | ShapeTuple | None = None,
+        post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
+        resources: dict
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None = None,
+        resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
+        scope: str | None = None,
+        variant: str | dict[str | None, str] | None = None,
+    ) -> Callable[[Callable[..., Any]], Any]:
+        """Decorator to create a generator-based scan function.
+
+        This provides a more Pythonic way to create iterative algorithms
+        using generator functions with yield statements.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the output of the scan operation.
+        xs
+            Optional name of the parameter containing the list/array to iterate over.
+        return_final_only
+            If True, only return the final yielded value.
+        output_picker
+            Function to pick specific outputs from return value.
+        renames
+            Mapping of parameter names to rename in the function signature.
+        defaults
+            Default values for parameters.
+        bound
+            Parameters bound to specific values.
+        profile
+            Whether to profile execution time.
+        debug
+            Whether to print debug information.
+        print_error
+            Whether to print error messages.
+        cache
+            Whether to cache function results.
+        mapspec
+            MapSpec specification for array processing.
+        internal_shape
+            Shape specification for internal arrays.
+        post_execution_hook
+            Hook function called after execution.
+        resources
+            Resource requirements for execution.
+        resources_variable
+            Variable name for resources in function signature.
+        resources_scope
+            Scope for resource allocation (map or element level).
+        scope
+            Parameter scope specification.
+        variant
+            Variant specification for conditional execution.
+
+        Returns
+        -------
+        decorator
+            A decorator that creates a ScanIterFunc instance.
+
+        Examples
+        --------
+        >>> @PipeFunc.scan_iter(output_name="cumsum")
+        ... def accumulator(values: list[int], total: int = 0):
+        ...     for x in values:
+        ...         total += x
+        ...         yield total
+
+        """
+        from pipefunc._scanfunc_iter import scan_iter as scan_iter_decorator
+
+        return scan_iter_decorator(
+            output_name=output_name,
+            xs=xs,
+            return_final_only=return_final_only,
+            output_picker=output_picker,
+            renames=renames,
+            defaults=defaults,
+            bound=bound,
+            profile=profile,
+            debug=debug,
+            print_error=print_error,
+            cache=cache,
+            mapspec=mapspec,
+            internal_shape=internal_shape,
+            post_execution_hook=post_execution_hook,
+            resources=resources,
+            resources_variable=resources_variable,
+            resources_scope=resources_scope,
+            scope=scope,
+            variant=variant,
+        )
+
 
 def pipefunc(
     output_name: OUTPUT_TYPE,
