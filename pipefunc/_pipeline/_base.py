@@ -775,6 +775,7 @@ class Pipeline:
         auto_subpipeline: bool = False,
         show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
         return_results: bool = True,
+        error_handling: Literal["raise", "continue"] = "raise",
         scheduling_strategy: Literal["generation", "eager"] = "generation",
     ) -> ResultDict:
         """Run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -873,6 +874,11 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        error_handling
+            How to handle errors during function execution:
+
+            - ``"raise"`` (default): Stop execution on first error and raise exception
+            - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
         scheduling_strategy
             Strategy for scheduling pipeline function execution:
 
@@ -919,6 +925,7 @@ class Pipeline:
             auto_subpipeline=auto_subpipeline,
             show_progress=show_progress,
             return_results=return_results,
+            error_handling=error_handling,
         )
 
     def map_async(
@@ -2599,7 +2606,7 @@ def _execute_func(func: PipeFunc, func_args: dict[str, Any], lazy: bool) -> Any:
     try:
         return func(**func_args)
     except Exception as e:
-        handle_pipefunc_error(e, func, func_args)
+        handle_pipefunc_error(e, func, func_args, "raise")
         # handle_pipefunc_error raises but mypy doesn't know that
         raise  # pragma: no cover
 
