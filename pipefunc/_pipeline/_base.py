@@ -2039,6 +2039,75 @@ class Pipeline:
         self.add(nested_func)
         return nested_func
 
+    def _validate_scan_output_nodes(self, output_nodes: set[OUTPUT_TYPE] | None) -> set[str]:
+        """Validate and normalize output nodes for scan operation."""
+        if output_nodes is None:
+            output_nodes = {node for node, degree in self.graph.out_degree() if degree == 0}
+
+        # Validate output_nodes are in the pipeline
+        all_outputs = self.all_output_names
+        invalid_outputs = output_nodes - all_outputs
+        if invalid_outputs:
+            msg = f"Output nodes {invalid_outputs} not found in pipeline. Available: {all_outputs}"
+            raise ValueError(msg)
+        
+        return {str(node) for node in output_nodes}
+
+    def _create_scan_signature(self, original_sig: inspect.Signature) -> inspect.Signature:
+        """Create a new signature for the scan function."""
+        params = list(original_sig.parameters.values())
+        
+        # Convert parameters to be compatible with scan function
+        sig_params = []
+        for param in params:
+            # All parameters become positional or keyword
+            sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
+        
+        return inspect.Signature(sig_params)
+
+    def _create_pipeline_scan_function(
+        self,
+        output_nodes_list: list[str],
+        signature: inspect.Signature,
+    ) -> Callable[..., tuple[dict[str, Any], Any]]:
+        """Create the scan function that executes the pipeline."""
+        def pipeline_scan_body(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], Any]:
+            # Bind arguments to get proper parameter values
+            bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
+
+            # Convert bound arguments to kwargs for pipeline
+            pipeline_kwargs = dict(bound.arguments)
+
+            # Run the pipeline with current kwargs
+            results = {}
+            for output_node in output_nodes_list:
+                results[output_node] = self.run(
+                    output_node,
+                    kwargs=pipeline_kwargs,
+                    full_output=False,
+                )
+
+            # For nested pipeline scan, we need to return carry based on pipeline outputs
+            # The carry should contain the values that will be used in the next iteration
+            carry = {}
+
+            # If y_next is in the outputs, use it as the next y value
+            if "y_next" in results:
+                carry["y"] = results["y_next"]
+
+            # The output is what we want to track
+            if len(output_nodes_list) == 1:
+                output = results[output_nodes_list[0]]
+            else:
+                output = results
+
+            return carry, output
+
+        # Set the signature on the function
+        setattr(pipeline_scan_body, "__signature__", signature)  # type: ignore[attr-defined]
+        return pipeline_scan_body
+
     def nest_funcs_scan(
         self,
         output_name: OUTPUT_TYPE,
@@ -2098,94 +2167,18 @@ class Pipeline:
         """
         from pipefunc._scanfunc import scan as scan_decorator
 
-        if output_nodes is None:
-            output_nodes = {node for node, degree in self.graph.out_degree() if degree == 0}
-
-        # Validate output_nodes are in the pipeline
-        all_outputs = self.all_output_names
-        invalid_outputs = output_nodes - all_outputs
-        if invalid_outputs:
-            msg = f"Output nodes {invalid_outputs} not found in pipeline. Available: {all_outputs}"
-            raise ValueError(msg)
+        # Validate and normalize output nodes
+        validated_output_nodes = self._validate_scan_output_nodes(output_nodes)
 
         def decorator(func: Callable[..., tuple[dict[str, Any], Any]]) -> Any:
-            # Get the original function signature to preserve parameter names
+            # Get the original function signature and create scan signature
             original_sig = inspect.signature(func)
+            scan_signature = self._create_scan_signature(original_sig)
 
-            # Create a function that runs the pipeline and extracts the outputs
-            # We need to dynamically create a function with the same signature as the original
-            params = list(original_sig.parameters.values())
-
-            # Build parameter string for exec
-            param_parts = []
-            param_names = []
-            for param in params:
-                param_names.append(param.name)
-                if param.default == inspect.Parameter.empty:
-                    param_parts.append(param.name)
-                else:
-                    # Use repr for the default value
-                    param_parts.append(f"{param.name}={param.default!r}")
-
-            # Create the pipeline scan body function with the proper signature
-            # Build the function signature dynamically to preserve parameter info
-            sig_params = []
-            for param in params:
-                # Convert to a parameter compatible with the new function
-                if param.default == inspect.Parameter.empty:
-                    sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
-                else:
-                    sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
-
-            # Create new signature for the pipeline scan body
-            new_signature = inspect.Signature(sig_params)
-
-            def create_pipeline_scan_body(
-                pipeline: Pipeline,
-                output_nodes_list: list[str],
-                _param_names: list[str],  # Unused but kept for API consistency
-            ) -> Callable[..., tuple[dict[str, Any], Any]]:
-                def pipeline_scan_body(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], Any]:
-                    # Bind arguments to get proper parameter values
-                    bound = new_signature.bind(*args, **kwargs)
-                    bound.apply_defaults()
-
-                    # Convert bound arguments to kwargs for pipeline
-                    pipeline_kwargs = dict(bound.arguments)
-
-                    # Run the pipeline with current kwargs
-                    results = {}
-                    for output_node in output_nodes_list:
-                        results[output_node] = pipeline.run(
-                            output_node,
-                            kwargs=pipeline_kwargs,
-                            full_output=False,
-                        )
-
-                    # For nested pipeline scan, we need to return carry based on pipeline outputs
-                    # The carry should contain the values that will be used in the next iteration
-                    carry = {}
-
-                    # If y_next is in the outputs, use it as the next y value
-                    if "y_next" in results:
-                        carry["y"] = results["y_next"]
-
-                    # The output is what we want to track
-                    if len(output_nodes_list) == 1:
-                        output = results[output_nodes_list[0]]
-                    else:
-                        output = results
-
-                    return carry, output
-
-                # Set the signature on the function
-                pipeline_scan_body.__signature__ = new_signature  # type: ignore[attr-defined]
-                return pipeline_scan_body
-
-            pipeline_scan_body = create_pipeline_scan_body(
-                self,
-                [str(node) for node in output_nodes],
-                param_names,
+            # Create the pipeline scan function
+            output_nodes_list = list(validated_output_nodes)
+            pipeline_scan_body = self._create_pipeline_scan_function(
+                output_nodes_list, scan_signature
             )
 
             # Set function metadata
