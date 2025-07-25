@@ -134,7 +134,7 @@ class ScanFunc(PipeFunc[T]):
         wrapper_func = self._create_scan_wrapper()
 
         # Initialize parent PipeFunc with wrapper function
-        super().__init__(  # type: ignore[misc]
+        super().__init__(  # type: ignore[arg-type] # Complex generic wrapper function
             func=wrapper_func,
             output_name=output_name,
             output_picker=output_picker,
@@ -182,7 +182,7 @@ class ScanFunc(PipeFunc[T]):
         scan_wrapper.__name__ = self._scan_func.__name__
         scan_wrapper.__doc__ = self._scan_func.__doc__
         # Note: Setting __signature__ at runtime for inspect.signature() to work correctly
-        scan_wrapper.__signature__ = self._wrapper_signature
+        scan_wrapper.__signature__ = self._wrapper_signature  # type: ignore[attr-defined]
 
         return scan_wrapper
 
@@ -250,7 +250,8 @@ class ScanFunc(PipeFunc[T]):
             renamed_carry: dict[str, Any] = {}
             for key, value in new_carry.items():
                 renamed_key = self._renames.get(key, key)
-                renamed_carry[renamed_key] = value
+                if renamed_key is not None:  # Handle case where renames might return None
+                    renamed_carry[renamed_key] = value
             carry.update(renamed_carry)
 
             # Store intermediate result if needed
@@ -283,7 +284,7 @@ class ScanFunc(PipeFunc[T]):
     def __getstate__(self) -> dict[str, Any]:
         """Custom pickling to avoid circular references."""
         # Build state manually to avoid the wrapper function that has a closure on self
-        state = {
+        return {
             # Core PipeFunc attributes (copy from parent without the problematic func)
             "_output_name": self._output_name,
             "debug": self.debug,
@@ -309,7 +310,6 @@ class ScanFunc(PipeFunc[T]):
             "_x_param_name": self._x_param_name,
             "_carry_param_names": self._carry_param_names,
         }
-        return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Custom unpickling to restore the scan wrapper."""
@@ -387,7 +387,7 @@ class ScanFunc(PipeFunc[T]):
         scan_kwargs.update(update)
 
         # Create new ScanFunc instance
-        return ScanFunc(**scan_kwargs)  # type: ignore[misc]
+        return ScanFunc(**scan_kwargs)  # type: ignore[arg-type]
 
 
 def scan(

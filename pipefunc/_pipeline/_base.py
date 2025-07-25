@@ -2127,8 +2127,6 @@ class Pipeline:
                     # Use repr for the default value
                     param_parts.append(f"{param.name}={param.default!r}")
 
-            params_str = ", ".join(param_parts)
-
             # Create the pipeline scan body function with the proper signature
             # Build the function signature dynamically to preserve parameter info
             sig_params = []
@@ -2142,8 +2140,12 @@ class Pipeline:
             # Create new signature for the pipeline scan body
             new_signature = inspect.Signature(sig_params)
 
-            def create_pipeline_scan_body(pipeline, output_nodes_list, param_names):
-                def pipeline_scan_body(*args, **kwargs):
+            def create_pipeline_scan_body(
+                pipeline: Pipeline,
+                output_nodes_list: list[str],
+                _param_names: list[str],  # Unused but kept for API consistency
+            ) -> Callable[..., tuple[dict[str, Any], Any]]:
+                def pipeline_scan_body(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], Any]:
                     # Bind arguments to get proper parameter values
                     bound = new_signature.bind(*args, **kwargs)
                     bound.apply_defaults()
@@ -2177,10 +2179,14 @@ class Pipeline:
                     return carry, output
 
                 # Set the signature on the function
-                pipeline_scan_body.__signature__ = new_signature
+                pipeline_scan_body.__signature__ = new_signature  # type: ignore[attr-defined]
                 return pipeline_scan_body
 
-            pipeline_scan_body = create_pipeline_scan_body(self, list(output_nodes), param_names)
+            pipeline_scan_body = create_pipeline_scan_body(
+                self,
+                [str(node) for node in output_nodes],
+                param_names,
+            )
 
             # Set function metadata
             if function_name:

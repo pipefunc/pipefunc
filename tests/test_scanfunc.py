@@ -132,7 +132,7 @@ class TestScanFunc:
         )
         def rk2_scan(t: float, y: float = 1.0, dt: float = 0.1) -> tuple[dict[str, Any], float]:
             # This will be replaced by the nested pipeline execution
-            pass
+            return {}, 0.0
 
         time_steps = np.linspace(0, 1, 11)
         pipeline = Pipeline([rk2_scan])
@@ -149,7 +149,8 @@ class TestScanFunc:
         @PipeFunc.scan(output_name="result", xs="values")
         def failing_scan(x: int, count: int = 0) -> tuple[dict[str, Any], int]:
             if x > 5:
-                raise ValueError(f"Value {x} is too large!")
+                msg = f"Value {x} is too large!"
+                raise ValueError(msg)
             carry = {"count": count + 1}
             return carry, count + 1
 
