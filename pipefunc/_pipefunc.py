@@ -1006,8 +1006,38 @@ class PipeFunc(Generic[T]):
         return_intermediate
             Whether to return intermediate results. If True (default), returns
             an array of all outputs. If False, returns only the final carry dict.
-        **kwargs
-            Additional parameters passed to ScanFunc constructor.
+        output_picker
+            Function to pick specific outputs from return value.
+        renames
+            Mapping of parameter names to rename in the function signature.
+        defaults
+            Default values for parameters.
+        bound
+            Parameters bound to specific values.
+        profile
+            Whether to profile execution time.
+        debug
+            Whether to print debug information.
+        print_error
+            Whether to print error messages.
+        cache
+            Whether to cache function results.
+        mapspec
+            MapSpec specification for array processing.
+        internal_shape
+            Shape specification for internal arrays.
+        post_execution_hook
+            Hook function called after execution.
+        resources
+            Resource requirements for execution.
+        resources_variable
+            Variable name for resources in function signature.
+        resources_scope
+            Scope for resource allocation (map or element level).
+        scope
+            Parameter scope specification.
+        variant
+            Variant specification for conditional execution.
 
         Returns
         -------

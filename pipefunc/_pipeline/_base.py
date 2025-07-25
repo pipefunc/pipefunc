@@ -2050,19 +2050,18 @@ class Pipeline:
         if invalid_outputs:
             msg = f"Output nodes {invalid_outputs} not found in pipeline. Available: {all_outputs}"
             raise ValueError(msg)
-        
+
         return {str(node) for node in output_nodes}
 
     def _create_scan_signature(self, original_sig: inspect.Signature) -> inspect.Signature:
         """Create a new signature for the scan function."""
         params = list(original_sig.parameters.values())
-        
+
         # Convert parameters to be compatible with scan function
-        sig_params = []
-        for param in params:
-            # All parameters become positional or keyword
-            sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
-        
+        sig_params = [
+            param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD) for param in params
+        ]
+
         return inspect.Signature(sig_params)
 
     def _create_pipeline_scan_function(
@@ -2071,6 +2070,7 @@ class Pipeline:
         signature: inspect.Signature,
     ) -> Callable[..., tuple[dict[str, Any], Any]]:
         """Create the scan function that executes the pipeline."""
+
         def pipeline_scan_body(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], Any]:
             # Bind arguments to get proper parameter values
             bound = signature.bind(*args, **kwargs)
@@ -2097,15 +2097,12 @@ class Pipeline:
                 carry["y"] = results["y_next"]
 
             # The output is what we want to track
-            if len(output_nodes_list) == 1:
-                output = results[output_nodes_list[0]]
-            else:
-                output = results
+            output = results[output_nodes_list[0]] if len(output_nodes_list) == 1 else results
 
             return carry, output
 
         # Set the signature on the function
-        setattr(pipeline_scan_body, "__signature__", signature)  # type: ignore[attr-defined]
+        pipeline_scan_body.__signature__ = signature  # type: ignore[attr-defined]
         return pipeline_scan_body
 
     def nest_funcs_scan(
@@ -2154,8 +2151,38 @@ class Pipeline:
         return_intermediate
             Whether to return intermediate results. If True (default), returns
             an array of all outputs. If False, returns only the final carry dict.
-        **kwargs
-            Additional parameters passed to ScanFunc constructor.
+        output_picker
+            Function to pick specific outputs from return value.
+        renames
+            Mapping of parameter names to rename in the function signature.
+        defaults
+            Default values for parameters.
+        bound
+            Parameters bound to specific values.
+        profile
+            Whether to profile execution time.
+        debug
+            Whether to print debug information.
+        print_error
+            Whether to print error messages.
+        cache
+            Whether to cache function results.
+        mapspec
+            MapSpec specification for array processing.
+        internal_shape
+            Shape specification for internal arrays.
+        post_execution_hook
+            Hook function called after execution.
+        resources
+            Resource requirements for execution.
+        resources_variable
+            Variable name for resources in function signature.
+        resources_scope
+            Scope for resource allocation (map or element level).
+        scope
+            Parameter scope specification.
+        variant
+            Variant specification for conditional execution.
         function_name
             Optional name for the generated function.
 
@@ -2178,7 +2205,8 @@ class Pipeline:
             # Create the pipeline scan function
             output_nodes_list = list(validated_output_nodes)
             pipeline_scan_body = self._create_pipeline_scan_function(
-                output_nodes_list, scan_signature
+                output_nodes_list,
+                scan_signature,
             )
 
             # Set function metadata
