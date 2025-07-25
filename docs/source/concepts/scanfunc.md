@@ -16,6 +16,10 @@ kernelspec:
 
 > Build iterative algorithms with state management similar to `jax.lax.scan`
 
+:::{note}
+A new generator-based approach `scan_iter` is now available that provides a more Pythonic API. See the [scan_iter documentation](scan-iter.md) or the [comparison guide](scanfunc-comparison.md) to learn more.
+:::
+
 ```{try-notebook}
 ```
 

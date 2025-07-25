@@ -20,6 +20,8 @@ Testing <testing>
 Overhead and Efficiency <overhead-and-efficiency.md>
 Parameter Sweeps <parameter-sweeps>
 ScanFunc: Iterative Execution <scanfunc>
+scan_iter: Generator-Based Iteration <scan-iter>
+ScanFunc vs scan_iter Comparison <scanfunc-comparison>
 ```
 
 ```{admonition} Getting Started
@@ -55,6 +57,8 @@ Below are the key concepts discussed in this section. Click on any topic to lear
 - **[Overhead and Efficiency](./overhead-and-efficiency):** Measure the performance overhead of `pipefunc`.
 - **[Parameter Sweeps](./parameter-sweeps):** Construct parameter sweeps and optimize execution with `pipefunc.sweep`.
 - **[ScanFunc: Iterative Execution](./scanfunc):** Build iterative algorithms with state management using `ScanFunc` for optimization, simulations, and sequential processing.
+- **[scan_iter: Generator-Based Iteration](./scan-iter):** Use natural Python generators for iterative algorithms with a cleaner, more intuitive API.
+- **[ScanFunc vs scan_iter Comparison](./scanfunc-comparison):** Compare the current `ScanFunc` with the new generator-based `scan_iter` to choose the right approach.
 
 ## Contributing
 
