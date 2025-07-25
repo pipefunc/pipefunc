@@ -2039,6 +2039,208 @@ class Pipeline:
         self.add(nested_func)
         return nested_func
 
+    def _validate_scan_output_nodes(self, output_nodes: set[OUTPUT_TYPE] | None) -> set[str]:
+        """Validate and normalize output nodes for scan operation."""
+        if output_nodes is None:
+            output_nodes = {node for node, degree in self.graph.out_degree() if degree == 0}
+
+        # Validate output_nodes are in the pipeline
+        all_outputs = self.all_output_names
+        invalid_outputs = output_nodes - all_outputs
+        if invalid_outputs:
+            msg = f"Output nodes {invalid_outputs} not found in pipeline. Available: {all_outputs}"
+            raise ValueError(msg)
+
+        return {str(node) for node in output_nodes}
+
+    def _create_scan_signature(self, original_sig: inspect.Signature) -> inspect.Signature:
+        """Create a new signature for the scan function."""
+        params = list(original_sig.parameters.values())
+
+        # Convert parameters to be compatible with scan function
+        sig_params = [
+            param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD) for param in params
+        ]
+
+        return inspect.Signature(sig_params)
+
+    def _create_pipeline_scan_function(
+        self,
+        output_nodes_list: list[str],
+        signature: inspect.Signature,
+    ) -> Callable[..., tuple[dict[str, Any], Any]]:
+        """Create the scan function that executes the pipeline."""
+
+        def pipeline_scan_body(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], Any]:
+            # Bind arguments to get proper parameter values
+            bound = signature.bind(*args, **kwargs)
+            bound.apply_defaults()
+
+            # Convert bound arguments to kwargs for pipeline
+            pipeline_kwargs = dict(bound.arguments)
+
+            # Run the pipeline with current kwargs
+            results = {}
+            for output_node in output_nodes_list:
+                results[output_node] = self.run(
+                    output_node,
+                    kwargs=pipeline_kwargs,
+                    full_output=False,
+                )
+
+            # For nested pipeline scan, we need to return carry based on pipeline outputs
+            # The carry should contain the values that will be used in the next iteration
+            carry = {}
+
+            # If y_next is in the outputs, use it as the next y value
+            if "y_next" in results:
+                carry["y"] = results["y_next"]
+
+            # The output is what we want to track
+            output = results[output_nodes_list[0]] if len(output_nodes_list) == 1 else results
+
+            return carry, output
+
+        # Set the signature on the function
+        pipeline_scan_body.__signature__ = signature  # type: ignore[attr-defined]
+        return pipeline_scan_body
+
+    def nest_funcs_scan(
+        self,
+        output_name: OUTPUT_TYPE,
+        xs: str,
+        output_nodes: set[OUTPUT_TYPE] | None = None,
+        *,
+        return_intermediate: bool = True,
+        output_picker: Callable[[Any, str], Any] | None = None,
+        renames: dict[str, str] | None = None,
+        defaults: dict[str, Any] | None = None,
+        bound: dict[str, Any] | None = None,
+        profile: bool | None = None,
+        debug: bool | None = None,
+        print_error: bool | None = None,
+        cache: bool | None = None,
+        mapspec: str | MapSpec | None = None,
+        internal_shape: int | Literal["?"] | tuple[int | Literal["?"], ...] | None = None,
+        post_execution_hook: Callable[[PipeFunc, Any, dict[str, Any]], None] | None = None,
+        resources: dict
+        | Resources
+        | Callable[[dict[str, Any]], Resources | dict[str, Any]]
+        | None = None,
+        resources_variable: str | None = None,
+        resources_scope: Literal["map", "element"] = "map",
+        scope: str | None = None,
+        variant: str | dict[str | None, str] | None = None,
+        function_name: str | None = None,
+    ) -> Callable:
+        """Create a ScanFunc decorator that uses this pipeline for iteration.
+
+        This allows using a pipeline as the body of a scan operation, where the
+        pipeline is executed for each element in xs with carry values updated
+        between iterations.
+
+        Parameters
+        ----------
+        output_name
+            The identifier for the output of the scan operation.
+        xs
+            The name of the parameter containing the list/array to iterate over.
+        output_nodes
+            Set of output names from the pipeline to include in the result.
+            If None, uses the pipeline's leaf nodes.
+        return_intermediate
+            Whether to return intermediate results. If True (default), returns
+            an array of all outputs. If False, returns only the final carry dict.
+        output_picker
+            Function to pick specific outputs from return value.
+        renames
+            Mapping of parameter names to rename in the function signature.
+        defaults
+            Default values for parameters.
+        bound
+            Parameters bound to specific values.
+        profile
+            Whether to profile execution time.
+        debug
+            Whether to print debug information.
+        print_error
+            Whether to print error messages.
+        cache
+            Whether to cache function results.
+        mapspec
+            MapSpec specification for array processing.
+        internal_shape
+            Shape specification for internal arrays.
+        post_execution_hook
+            Hook function called after execution.
+        resources
+            Resource requirements for execution.
+        resources_variable
+            Variable name for resources in function signature.
+        resources_scope
+            Scope for resource allocation (map or element level).
+        scope
+            Parameter scope specification.
+        variant
+            Variant specification for conditional execution.
+        function_name
+            Optional name for the generated function.
+
+        Returns
+        -------
+        decorator
+            A decorator that creates a ScanFunc using this pipeline.
+
+        """
+        from pipefunc._scanfunc import scan as scan_decorator
+
+        # Validate and normalize output nodes
+        validated_output_nodes = self._validate_scan_output_nodes(output_nodes)
+
+        def decorator(func: Callable[..., tuple[dict[str, Any], Any]]) -> Any:
+            # Get the original function signature and create scan signature
+            original_sig = inspect.signature(func)
+            scan_signature = self._create_scan_signature(original_sig)
+
+            # Create the pipeline scan function
+            output_nodes_list = list(validated_output_nodes)
+            pipeline_scan_body = self._create_pipeline_scan_function(
+                output_nodes_list,
+                scan_signature,
+            )
+
+            # Set function metadata
+            if function_name:
+                pipeline_scan_body.__name__ = function_name
+            else:
+                pipeline_scan_body.__name__ = func.__name__
+            pipeline_scan_body.__doc__ = func.__doc__
+
+            # Create the ScanFunc
+            return scan_decorator(
+                output_name=output_name,
+                xs=xs,
+                return_intermediate=return_intermediate,
+                output_picker=output_picker,
+                renames=renames,
+                defaults=defaults,
+                bound=bound,
+                profile=profile if profile is not None else bool(self.profile),
+                debug=debug if debug is not None else bool(self.debug),
+                print_error=print_error if print_error is not None else bool(self.print_error),
+                cache=cache if cache is not None else self.cache is not None,
+                mapspec=mapspec,
+                internal_shape=internal_shape,
+                post_execution_hook=post_execution_hook,
+                resources=resources,
+                resources_variable=resources_variable,
+                resources_scope=resources_scope,
+                scope=scope,
+                variant=variant,
+            )(pipeline_scan_body)
+
+        return decorator
+
     def join(self, *pipelines: Pipeline | PipeFunc) -> Pipeline:
         """Join multiple pipelines into a single new pipeline.
 
