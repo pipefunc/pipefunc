@@ -8,12 +8,13 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import cloudpickle
+import numpy as np
 
 from pipefunc._pipefunc import PipeFunc
-from pipefunc.map._mapspec import MapSpec
 
 if TYPE_CHECKING:
     from pipefunc._pipeline._types import OUTPUT_TYPE
+    from pipefunc.map._mapspec import MapSpec
     from pipefunc.map._types import ShapeTuple
     from pipefunc.resources import Resources
 
@@ -112,79 +113,31 @@ class ScanFunc(PipeFunc[T]):
         self.xs = xs
         self.return_intermediate = return_intermediate
         self._scan_func = func
-        self._x_param_name = list(inspect.signature(func).parameters.keys())[0]
 
-        # Fix the parameters to include xs instead of x first
-        self._update_parameters_for_scan()
+        # Get the parameter names from the scan function
+        sig = inspect.signature(func)
+        params = list(sig.parameters.keys())
+        if not params:
+            msg = "Scan function must have at least one parameter"
+            raise ValueError(msg)
+        self._x_param_name = params[0]
 
-        # Store a reference to the ScanFunc instance
-        # This will be set after super().__init__
-        self._scanfunc_instance = None
+        # Get all other parameter names (these will be carry parameters)
+        self._carry_param_names = params[1:]
 
-        # Create a wrapper function with the correct signature dynamically
-        sig = inspect.Signature(list(self._scan_parameters.values()))
+        # Create the wrapper function that will be called by pipefunc
+        # NOTE: Don't use @functools.wraps here because it copies the original
+        # function signature, but we need the wrapper to have the modified signature
+        def scan_wrapper(**kwargs: Any) -> Any:
+            return self._execute_scan(**kwargs)
 
-        # Build parameter string for exec - need to order parameters correctly
-        # First params without defaults, then params with defaults
-        param_parts_no_default = []
-        param_parts_with_default = []
-        var_positional = None
-        var_keyword = None
-
-        for param in sig.parameters.values():
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                var_positional = f"*{param.name}"
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                var_keyword = f"**{param.name}"
-            elif param.default == inspect.Parameter.empty:
-                param_parts_no_default.append(param.name)
-            else:
-                # Use repr for the default value
-                param_parts_with_default.append(f"{param.name}={param.default!r}")
-
-        # Combine in correct order
-        all_parts = param_parts_no_default + param_parts_with_default
-        if var_positional:
-            all_parts.append(var_positional)
-        if var_keyword:
-            all_parts.append(var_keyword)
-
-        params_str = ", ".join(all_parts)
-
-        # Build kwargs dict for calling _execute_scan
-        kwargs_parts = []
-        for param in sig.parameters.values():
-            if param.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                kwargs_parts.append(f"'{param.name}': {param.name}")
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                # Include the **kwargs in the call
-                kwargs_parts.append(f"**{param.name}")
-
-        kwargs_str = "{" + ", ".join(kwargs_parts) + "}"
-
-        # Create the wrapper function dynamically
-        func_code = f"""
-def scan_wrapper({params_str}):
-    if hasattr(scan_wrapper, '_scanfunc_instance') and scan_wrapper._scanfunc_instance:
-        return scan_wrapper._scanfunc_instance._execute_scan(**{kwargs_str})
-    raise RuntimeError("ScanFunc instance not set")
-"""
-
-        # Execute the code to create the function
-        local_vars = {}
-        exec(func_code, {}, local_vars)
-        scan_wrapper = local_vars["scan_wrapper"]
-
-        # Copy function metadata
+        # Set the wrapper name for debugging
         scan_wrapper.__name__ = func.__name__
         scan_wrapper.__doc__ = func.__doc__
-        scan_wrapper.__signature__ = sig
 
-        dummy_func = scan_wrapper
-
-        # Initialize parent PipeFunc with dummy function
+        # Initialize parent PipeFunc with wrapper function
         super().__init__(
-            func=dummy_func,
+            func=scan_wrapper,
             output_name=output_name,
             output_picker=output_picker,
             renames=renames,
@@ -204,56 +157,38 @@ def scan_wrapper({params_str}):
             variant=variant,
         )
 
-        # Now set the reference to self in the wrapper function
-        dummy_func._scanfunc_instance = self
+    @functools.cached_property
+    def original_parameters(self) -> dict[str, inspect.Parameter]:
+        """Return the scan wrapper parameters."""
+        # Get the original scan function parameters
+        sig = inspect.signature(self._scan_func)
+        params = dict(sig.parameters)
 
-    def _update_parameters_for_scan(self):
-        """Update the function parameters to use xs instead of x."""
-        # Override the original_parameters cached property
-        original_sig = inspect.signature(self._scan_func)
-        params = list(original_sig.parameters.values())
+        # Remove the first parameter (x) and add xs
+        params.pop(self._x_param_name)
 
-        # Find and remove the first parameter (x)
-        x_param_idx = None
-        for i, param in enumerate(params):
-            if param.name == self._x_param_name:
-                x_param_idx = i
-                break
-
-        if x_param_idx is not None:
-            params.pop(x_param_idx)
-
-        # Add xs as a parameter (make sure it's before any VAR_KEYWORD)
-        xs_param = inspect.Parameter(
+        # Add xs parameter
+        params[self.xs] = inspect.Parameter(
             self.xs,
             inspect.Parameter.KEYWORD_ONLY,
             annotation=list,
-            default=inspect.Parameter.empty,
         )
 
-        # Find where to insert xs (before any VAR_KEYWORD)
-        insert_idx = len(params)
-        for i, param in enumerate(params):
-            if param.kind == inspect.Parameter.VAR_KEYWORD:
-                insert_idx = i
-                break
+        return params
 
-        params.insert(insert_idx, xs_param)
-
-        # Create new parameters dict preserving order
-        self._scan_parameters = {p.name: p for p in params}
-
-    @functools.cached_property
-    def original_parameters(self) -> dict[str, inspect.Parameter]:
-        """Return the original parameters with xs instead of x."""
-        return self._scan_parameters.copy()
+    @property
+    def parameters(self) -> tuple[str, ...]:
+        """Return the parameter names for the scan function."""
+        # This is what pipefunc uses to know what parameters the function needs
+        return tuple(self.original_parameters.keys())
 
     def _execute_scan(self, **kwargs: Any) -> Any:
         """Execute the scan operation."""
         # Extract xs from kwargs
         xs_key = self._renames.get(self.xs, self.xs)
         if xs_key not in kwargs:
-            raise ValueError(f"Required parameter '{xs_key}' (xs) not provided")
+            msg = f"Required parameter '{xs_key}' (xs) not provided"
+            raise ValueError(msg)
 
         xs_values = kwargs.pop(xs_key)
 
@@ -281,16 +216,14 @@ def scan_wrapper({params_str}):
             result = self._scan_func(**original_kwargs)
 
             if not isinstance(result, tuple) or len(result) != 2:
-                raise ValueError(
-                    f"Scan function must return tuple of (carry, output), got {type(result)}",
-                )
+                msg = f"Scan function must return tuple of (carry, output), got {type(result)}"
+                raise ValueError(msg)
 
             new_carry, output = result
 
             if not isinstance(new_carry, dict):
-                raise ValueError(
-                    f"Carry must be a dict, got {type(new_carry)}",
-                )
+                msg = f"Carry must be a dict, got {type(new_carry)}"
+                raise ValueError(msg)
 
             # Update carry for next iteration
             # Apply renames to carry keys
@@ -311,8 +244,6 @@ def scan_wrapper({params_str}):
         if self.return_intermediate:
             if intermediate_results:
                 # Convert to appropriate array type
-                import numpy as np
-
                 return np.array(intermediate_results)
             return np.array([])
         # Return final carry
@@ -329,111 +260,117 @@ def scan_wrapper({params_str}):
             return self._last_carry
         return None
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """Custom pickling to avoid circular references."""
-        # Get all instance variables except the problematic ones
-        state = {k: v for k, v in self.__dict__.items() if k not in ("func", "_pipelines")}
-
-        # Create a simple placeholder function for pickling
-        def placeholder_func(**kwargs):
-            raise RuntimeError("This is a placeholder function")
-
-        placeholder_func.__name__ = self._scan_func.__name__
-        placeholder_func.__doc__ = self._scan_func.__doc__
-
-        # Store the placeholder function
-        state["func"] = cloudpickle.dumps(placeholder_func)
-
-        # Store scan-specific attributes explicitly
-        state["_scan_func"] = self._scan_func
-        state["_x_param_name"] = self._x_param_name
-        state["xs"] = self.xs
-        state["return_intermediate"] = self.return_intermediate
-        state["_scan_parameters"] = self._scan_parameters
-
-        # Resources need special handling
-        state["resources"] = (
-            cloudpickle.dumps(self.resources) if self.resources is not None else None
-        )
+        # Build state manually to avoid the wrapper function that has a closure on self
+        state = {
+            # Core PipeFunc attributes (copy from parent without the problematic func)
+            "_output_name": self._output_name,
+            "debug": self.debug,
+            "print_error": self.print_error,
+            "cache": self.cache,
+            "mapspec": self.mapspec,
+            "internal_shape": self.internal_shape,
+            "post_execution_hook": self.post_execution_hook,
+            "_output_picker": self._output_picker,
+            "_profile": self._profile,
+            "_renames": self._renames,
+            "_defaults": self._defaults,
+            "_bound": self._bound,
+            "resources": self.resources,
+            "resources_variable": self.resources_variable,
+            "resources_scope": self.resources_scope,
+            "variant": self.variant,
+            # ScanFunc specific attributes
+            "xs": self.xs,
+            "return_intermediate": self.return_intermediate,
+            "_scan_func": cloudpickle.dumps(self._scan_func),
+            "_x_param_name": self._x_param_name,
+            "_carry_param_names": self._carry_param_names,
+        }
 
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         """Custom unpickling to restore the scan wrapper."""
-        # Extract scan-specific attributes
-        self._scan_func = state.pop("_scan_func")
-        self._x_param_name = state.pop("_x_param_name")
-        self.xs = state.pop("xs")
-        self.return_intermediate = state.pop("return_intermediate")
-        self._scan_parameters = state.pop("_scan_parameters")
+        # Restore scan-specific attributes
+        self.xs = state["xs"]
+        self.return_intermediate = state["return_intermediate"]
+        self._scan_func = cloudpickle.loads(state["_scan_func"])
+        self._x_param_name = state["_x_param_name"]
+        self._carry_param_names = state["_carry_param_names"]
 
-        # Create a wrapper function with the correct signature dynamically
-        sig = inspect.Signature(list(self._scan_parameters.values()))
+        # Restore core PipeFunc attributes manually
+        self._output_name = state["_output_name"]
+        self.debug = state["debug"]
+        self.print_error = state["print_error"]
+        self.cache = state["cache"]
+        self.mapspec = state["mapspec"]
+        self.internal_shape = state["internal_shape"]
+        self.post_execution_hook = state["post_execution_hook"]
+        self._output_picker = state["_output_picker"]
+        self._profile = state["_profile"]
+        self._renames = state["_renames"]
+        self._defaults = state["_defaults"]
+        self._bound = state["_bound"]
+        self.resources = state["resources"]
+        self.resources_variable = state["resources_variable"]
+        self.resources_scope = state["resources_scope"]
+        self.variant = state["variant"]
 
-        # Build parameter string for exec - need to order parameters correctly
-        # First params without defaults, then params with defaults
-        param_parts_no_default = []
-        param_parts_with_default = []
-        var_positional = None
-        var_keyword = None
+        # Create a new wrapper function
+        # NOTE: Don't use @functools.wraps here because it copies the original
+        # function signature, but we need the wrapper to have the modified signature
+        def scan_wrapper(**kwargs: Any) -> Any:
+            return self._execute_scan(**kwargs)
 
-        for param in sig.parameters.values():
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                var_positional = f"*{param.name}"
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                var_keyword = f"**{param.name}"
-            elif param.default == inspect.Parameter.empty:
-                param_parts_no_default.append(param.name)
-            else:
-                # Use repr for the default value
-                param_parts_with_default.append(f"{param.name}={param.default!r}")
-
-        # Combine in correct order
-        all_parts = param_parts_no_default + param_parts_with_default
-        if var_positional:
-            all_parts.append(var_positional)
-        if var_keyword:
-            all_parts.append(var_keyword)
-
-        params_str = ", ".join(all_parts)
-
-        # Build kwargs dict for calling _execute_scan
-        kwargs_parts = []
-        for param in sig.parameters.values():
-            if param.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                kwargs_parts.append(f"'{param.name}': {param.name}")
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                # Include the **kwargs in the call
-                kwargs_parts.append(f"**{param.name}")
-
-        kwargs_str = "{" + ", ".join(kwargs_parts) + "}"
-
-        # Create the wrapper function dynamically
-        func_code = f"""
-def scan_wrapper({params_str}):
-    if hasattr(scan_wrapper, '_scanfunc_instance') and scan_wrapper._scanfunc_instance:
-        return scan_wrapper._scanfunc_instance._execute_scan(**{kwargs_str})
-    raise RuntimeError("ScanFunc instance not set")
-"""
-
-        # Execute the code to create the function
-        local_vars = {}
-        exec(func_code, {}, local_vars)
-        scan_wrapper = local_vars["scan_wrapper"]
-
-        # Copy function metadata
+        # Set the wrapper name for debugging
         scan_wrapper.__name__ = self._scan_func.__name__
         scan_wrapper.__doc__ = self._scan_func.__doc__
-        scan_wrapper.__signature__ = sig
 
-        # Store the function in state for parent class
-        state["func"] = cloudpickle.dumps(scan_wrapper)
+        # Set the wrapper function
+        self.func = scan_wrapper
 
-        # Call parent __setstate__
-        super().__setstate__(state)
+        # Initialize other PipeFunc attributes that might not be in state
+        self._pipelines: list = []
+        self.profiling_stats = None
+        self.error_snapshot = None
+        self.__name__ = scan_wrapper.__name__
 
-        # Set the reference to self in the wrapper
-        self.func._scanfunc_instance = self
+        # Initialize inverse renames
+        self._inverse_renames = {v: k for k, v in self._renames.items()}
+
+    def copy(self, **update: Any) -> ScanFunc:
+        """Create a copy of the ScanFunc instance, preserving scan-specific attributes."""
+        # Get the scan-specific arguments
+        scan_kwargs = {
+            "func": self._scan_func,  # Use original scan function, not wrapper
+            "output_name": self._output_name,
+            "xs": self.xs,
+            "return_intermediate": self.return_intermediate,
+            "output_picker": self._output_picker,
+            "renames": self._renames,
+            "defaults": self._defaults,
+            "bound": self._bound,
+            "profile": self._profile,
+            "debug": self.debug,
+            "print_error": self.print_error,
+            "cache": self.cache,
+            "mapspec": self.mapspec,
+            "internal_shape": self.internal_shape,
+            "post_execution_hook": self.post_execution_hook,
+            "resources": self.resources,
+            "resources_variable": self.resources_variable,
+            "resources_scope": self.resources_scope,
+            "scope": None,  # Let the new instance handle scope
+            "variant": self.variant,
+        }
+
+        # Apply any updates
+        scan_kwargs.update(update)
+
+        # Create new ScanFunc instance
+        return ScanFunc(**scan_kwargs)
 
 
 def scan(

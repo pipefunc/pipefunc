@@ -2129,38 +2129,58 @@ class Pipeline:
 
             params_str = ", ".join(param_parts)
 
-            # Create the pipeline scan body function dynamically
-            func_code = f"""
-def pipeline_scan_body({params_str}):
-    # Collect all parameters into kwargs
-    pipeline_kwargs = {{{", ".join(f"'{name}': {name}" for name in param_names)}}}
+            # Create the pipeline scan body function with the proper signature
+            # Build the function signature dynamically to preserve parameter info
+            sig_params = []
+            for param in params:
+                # Convert to a parameter compatible with the new function
+                if param.default == inspect.Parameter.empty:
+                    sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
+                else:
+                    sig_params.append(param.replace(kind=inspect.Parameter.POSITIONAL_OR_KEYWORD))
 
-    # Run the pipeline with current kwargs
-    results = {{}}
-    for output_node in output_nodes:
-        results[output_node] = self.run(output_node, kwargs=pipeline_kwargs, full_output=False)
+            # Create new signature for the pipeline scan body
+            new_signature = inspect.Signature(sig_params)
 
-    # For nested pipeline scan, we need to return carry based on pipeline outputs
-    # The carry should contain the values that will be used in the next iteration
-    carry = {{}}
+            def create_pipeline_scan_body(pipeline, output_nodes_list, param_names):
+                def pipeline_scan_body(*args, **kwargs):
+                    # Bind arguments to get proper parameter values
+                    bound = new_signature.bind(*args, **kwargs)
+                    bound.apply_defaults()
 
-    # If y_next is in the outputs, use it as the next y value
-    if 'y_next' in results:
-        carry['y'] = results['y_next']
+                    # Convert bound arguments to kwargs for pipeline
+                    pipeline_kwargs = dict(bound.arguments)
 
-    # The output is what we want to track
-    if len(output_nodes) == 1:
-        output = results[next(iter(output_nodes))]
-    else:
-        output = results
+                    # Run the pipeline with current kwargs
+                    results = {}
+                    for output_node in output_nodes_list:
+                        results[output_node] = pipeline.run(
+                            output_node,
+                            kwargs=pipeline_kwargs,
+                            full_output=False,
+                        )
 
-    return carry, output
-"""
+                    # For nested pipeline scan, we need to return carry based on pipeline outputs
+                    # The carry should contain the values that will be used in the next iteration
+                    carry = {}
 
-            # Execute the code to create the function with access to self and output_nodes
-            local_vars = {"self": self, "output_nodes": output_nodes}
-            exec(func_code, globals(), local_vars)
-            pipeline_scan_body = local_vars["pipeline_scan_body"]
+                    # If y_next is in the outputs, use it as the next y value
+                    if "y_next" in results:
+                        carry["y"] = results["y_next"]
+
+                    # The output is what we want to track
+                    if len(output_nodes_list) == 1:
+                        output = results[output_nodes_list[0]]
+                    else:
+                        output = results
+
+                    return carry, output
+
+                # Set the signature on the function
+                pipeline_scan_body.__signature__ = new_signature
+                return pipeline_scan_body
+
+            pipeline_scan_body = create_pipeline_scan_body(self, list(output_nodes), param_names)
 
             # Set function metadata
             if function_name:

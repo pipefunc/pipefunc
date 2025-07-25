@@ -11,6 +11,22 @@ from pipefunc import PipeFunc, Pipeline, pipefunc
 from pipefunc._scanfunc import ScanFunc
 
 
+# Module-level functions for multiprocessing tests
+@pipefunc(output_name="values", mapspec="batch_id[i] -> values[i]")
+def generate_values(batch_id: int) -> list[int]:
+    """Generate values based on batch_id for testing."""
+    start = batch_id * 3 + 1
+    return [start, start + 1, start + 2]
+
+
+@PipeFunc.scan(output_name="cumsum", xs="values", mapspec="values[i] -> cumsum[i]")
+def cumulative_sum(x: int, total: int = 0) -> tuple[dict[str, Any], int]:
+    """Cumulative sum scan function for testing."""
+    new_total = total + x
+    carry = {"total": new_total}
+    return carry, new_total
+
+
 class TestScanFunc:
     """Test basic ScanFunc functionality."""
 
@@ -71,20 +87,6 @@ class TestScanFunc:
 
     def test_scan_with_pipeline_map(self):
         """Test scan integrated with pipeline.map for parallel execution."""
-
-        # First create a function that produces values for each batch
-        @pipefunc(output_name="values", mapspec="batch_id[i] -> values[i]")
-        def generate_values(batch_id: int) -> list[int]:
-            # Generate values based on batch_id
-            start = batch_id * 3 + 1
-            return [start, start + 1, start + 2]
-
-        @PipeFunc.scan(output_name="cumsum", xs="values", mapspec="values[i] -> cumsum[i]")
-        def cumulative_sum(x: int, total: int = 0) -> tuple[dict[str, Any], int]:
-            new_total = total + x
-            carry = {"total": new_total}
-            return carry, new_total
-
         # Multiple batches
         inputs = {
             "batch_id": [0, 1, 2],  # This will generate [1,2,3], [4,5,6], [7,8,9]
