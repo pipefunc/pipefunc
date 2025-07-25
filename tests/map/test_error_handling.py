@@ -404,3 +404,302 @@ def test_error_handling_raise_default(parallel):
     # Explicit error_handling="raise" should also raise
     with pytest.raises(ValueError, match="Expected error"):
         pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise", parallel=parallel)
+
+
+def test_tuple_output_with_error_handling():
+    """Test that error handling works with tuple output names."""
+
+    @pipefunc(output_name=("y1", "y2"), mapspec="x[i] -> y1[i], y2[i]")
+    def process_tuple(x: int) -> tuple[int, int]:
+        if x == 3:
+            msg = f"Cannot process {x}"
+            raise ValueError(msg)
+        return x * 2, x * 3
+
+    @pipefunc(output_name="z", mapspec="y1[i], y2[i] -> z[i]")
+    def combine(y1: int, y2: int) -> int:
+        return y1 + y2
+
+    pipeline = Pipeline([process_tuple, combine])
+
+    # Test with error_handling="continue"
+    result = pipeline.map(
+        {"x": [1, 2, 3, 4, 5]},
+        error_handling="continue",
+    )
+
+    # Check y1 output
+    y1 = result["y1"].output
+    assert isinstance(y1, np.ndarray)
+    assert y1.dtype == object
+    assert list(y1[:2]) == [2, 4]
+    assert isinstance(y1[2], ErrorSnapshot)
+    assert list(y1[3:]) == [8, 10]
+
+    # Check y2 output
+    y2 = result["y2"].output
+    assert isinstance(y2, np.ndarray)
+    assert y2.dtype == object
+    assert list(y2[:2]) == [3, 6]
+    assert isinstance(y2[2], ErrorSnapshot)
+    assert list(y2[3:]) == [12, 15]
+
+    # Check z output - should have PropagatedErrorSnapshot at index 2
+    z = result["z"].output
+    assert isinstance(z, np.ndarray)
+    assert z.dtype == object
+    assert list(z[:2]) == [5, 10]  # 2+3=5, 4+6=10
+    assert isinstance(z[2], PropagatedErrorSnapshot)
+    assert list(z[3:]) == [20, 25]  # 8+12=20, 10+15=25
+
+
+def test_tuple_output_with_mapspec_reduction():
+    """Test tuple outputs with reduction mapspecs."""
+
+    @pipefunc(
+        output_name=("matrix1", "matrix2"),
+        mapspec="x[i], y[j] -> matrix1[i, j], matrix2[i, j]",
+    )
+    def compute_matrices(x: int, y: int) -> tuple[int, int]:
+        if x == 2 and y == 2:
+            msg = f"Cannot compute for x={x}, y={y}"
+            raise ValueError(msg)
+        return x * y, x + y
+
+    @pipefunc(output_name="row_sums1", mapspec="matrix1[i, :] -> row_sums1[i]")
+    def sum_rows1(matrix1: np.ndarray) -> int:
+        return np.sum(matrix1)
+
+    @pipefunc(output_name="row_sums2", mapspec="matrix2[i, :] -> row_sums2[i]")
+    def sum_rows2(matrix2: np.ndarray) -> int:
+        return np.sum(matrix2)
+
+    pipeline = Pipeline([compute_matrices, sum_rows1, sum_rows2])
+
+    result = pipeline.map(
+        {"x": [1, 2, 3], "y": [1, 2, 3]},
+        error_handling="continue",
+    )
+
+    # Check matrix1
+    matrix1 = result["matrix1"].output
+    expected_matrix1 = np.array(
+        [
+            [1, 2, 3],
+            [2, None, 6],  # Error at [1,1]
+            [3, 6, 9],
+        ],
+        dtype=object,
+    )
+
+    for i in range(3):
+        for j in range(3):
+            if i == 1 and j == 1:
+                assert isinstance(matrix1[i, j], ErrorSnapshot)
+            else:
+                assert matrix1[i, j] == expected_matrix1[i, j]
+
+    # Check matrix2
+    matrix2 = result["matrix2"].output
+    expected_matrix2 = np.array(
+        [
+            [2, 3, 4],
+            [3, None, 5],  # Error at [1,1]
+            [4, 5, 6],
+        ],
+        dtype=object,
+    )
+
+    for i in range(3):
+        for j in range(3):
+            if i == 1 and j == 1:
+                assert isinstance(matrix2[i, j], ErrorSnapshot)
+            else:
+                assert matrix2[i, j] == expected_matrix2[i, j]
+
+    # Check row_sums1
+    row_sums1 = result["row_sums1"].output
+    assert row_sums1[0] == 6  # 1+2+3
+    assert isinstance(row_sums1[1], PropagatedErrorSnapshot)  # Row contains error
+    assert row_sums1[2] == 18  # 3+6+9
+
+    # Check row_sums2
+    row_sums2 = result["row_sums2"].output
+    assert row_sums2[0] == 9  # 2+3+4
+    assert isinstance(row_sums2[1], PropagatedErrorSnapshot)  # Row contains error
+    assert row_sums2[2] == 15  # 4+5+6
+
+
+def test_tuple_output_with_output_picker():
+    """Test tuple outputs with custom output picker."""
+
+    def custom_picker(result, key):
+        """Custom output picker function."""
+        # If result is an error, return it as-is for all outputs
+        from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+        if isinstance(result, (ErrorSnapshot, PropagatedErrorSnapshot)):
+            return result
+
+        if key == "out1":
+            return result[0]
+        if key == "out2":
+            return result[1]
+        msg = f"Unknown output: {key}"
+        raise KeyError(msg)
+
+    @pipefunc(
+        output_name=("out1", "out2"),
+        mapspec="x[i] -> out1[i], out2[i]",
+        output_picker=custom_picker,
+    )
+    def picker_func(x: int) -> tuple[int, int]:
+        if x == 2:
+            msg = f"Error at {x}"
+            raise ValueError(msg)
+        return (x * 10, x * 20)  # Return as tuple
+
+    pipeline = Pipeline([picker_func])
+
+    result = pipeline.map(
+        {"x": [1, 2, 3]},
+        error_handling="continue",
+        parallel=False,  # Custom picker is not picklable
+    )
+
+    out1 = result["out1"].output
+    out2 = result["out2"].output
+
+    assert out1[0] == 10
+    assert isinstance(out1[1], ErrorSnapshot)
+    assert out1[2] == 30
+
+    assert out2[0] == 20
+    assert isinstance(out2[1], ErrorSnapshot)
+    assert out2[2] == 60
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_tuple_output_parallel_execution(parallel):
+    """Test tuple outputs with error handling in parallel execution."""
+
+    @pipefunc(output_name=("a", "b"), mapspec="x[i] -> a[i], b[i]")
+    def parallel_func(x: int) -> tuple[int, int]:
+        if x in [2, 4]:
+            msg = f"Error at {x}"
+            raise ValueError(msg)
+        return x**2, x**3
+
+    pipeline = Pipeline([parallel_func])
+
+    # Test with parallel=True
+    result = pipeline.map(
+        {"x": list(range(6))},
+        error_handling="continue",
+        parallel=parallel,
+    )
+
+    a = result["a"].output
+    b = result["b"].output
+
+    expected_a = [0, 1, None, 9, None, 25]
+    expected_b = [0, 1, None, 27, None, 125]
+
+    for i in range(6):
+        if i in [2, 4]:
+            assert isinstance(a[i], ErrorSnapshot)
+            assert isinstance(b[i], ErrorSnapshot)
+        else:
+            assert a[i] == expected_a[i]
+            assert b[i] == expected_b[i]
+
+
+def test_tuple_output_with_complex_mapspec():
+    """Test complex mapspec patterns with tuple outputs."""
+
+    @pipefunc(output_name=("y1", "y2", "y3"), mapspec="x[i], z[j] -> y1[i, j], y2[i, j], y3[i, j]")
+    def complex_func(x: int, z: int) -> tuple[int, int, int]:
+        if x == 1 and z == 2:
+            msg = "Special error case"
+            raise ValueError(msg)
+        return x + z, x * z, x - z
+
+    @pipefunc(output_name="sum_all")
+    def sum_all_arrays(y1: np.ndarray, y2: np.ndarray, y3: np.ndarray) -> int:
+        return np.sum(y1) + np.sum(y2) + np.sum(y3)
+
+    pipeline = Pipeline([complex_func, sum_all_arrays])
+
+    result = pipeline.map(
+        {"x": [0, 1, 2], "z": [1, 2, 3]},
+        error_handling="continue",
+    )
+
+    # Check individual outputs
+    y1 = result["y1"].output
+    y2 = result["y2"].output
+    y3 = result["y3"].output
+
+    # y1 should be x + z
+    assert y1[0, 0] == 1  # 0+1
+    assert y1[0, 1] == 2  # 0+2
+    assert y1[0, 2] == 3  # 0+3
+    assert y1[1, 0] == 2  # 1+1
+    assert isinstance(y1[1, 1], ErrorSnapshot)  # Error case
+    assert y1[1, 2] == 4  # 1+3
+    assert y1[2, 0] == 3  # 2+1
+    assert y1[2, 1] == 4  # 2+2
+    assert y1[2, 2] == 5  # 2+3
+    # y2 should be x * z
+    assert y2[0, 0] == 0  # 0*1
+    assert y2[0, 1] == 0  # 0*2
+    assert y2[0, 2] == 0  # 0*3
+    assert y2[1, 0] == 1  # 1*1
+    assert isinstance(y2[1, 1], ErrorSnapshot)  # Error case
+    assert y2[1, 2] == 3  # 1*3
+    assert y2[2, 0] == 2  # 2*1
+    assert y2[2, 1] == 4  # 2*2
+    assert y2[2, 2] == 6  # 2*3
+    # y3 should be x - z
+    assert y3[0, 0] == -1  # 0-1
+    assert y3[0, 1] == -2  # 0-2
+    assert y3[0, 2] == -3  # 0-3
+    assert y3[1, 0] == 0  # 1-1
+    assert isinstance(y3[1, 1], ErrorSnapshot)  # Error case
+    assert y3[1, 2] == -2  # 1-3
+    assert y3[2, 0] == 1  # 2-1
+    assert y3[2, 1] == 0  # 2-2
+    assert y3[2, 2] == -1  # 2-3
+
+    # sum_all should be PropagatedErrorSnapshot because y1, y2, y3 contain errors
+    sum_all = result["sum_all"].output
+    assert isinstance(sum_all, PropagatedErrorSnapshot)
+
+
+def test_edge_case_single_error_in_tuple():
+    """Test when only one output in a tuple fails (shouldn't happen with current impl)."""
+
+    # In the current implementation, if a function fails, all outputs fail together
+    # This test verifies that behavior
+
+    @pipefunc(output_name=("out1", "out2"), mapspec="x[i] -> out1[i], out2[i]")
+    def func(x: int) -> tuple[int, int]:
+        if x == 1:
+            msg = "Error"
+            raise ValueError(msg)
+        return x, x * 2
+
+    pipeline = Pipeline([func])
+    result = pipeline.map({"x": [0, 1, 2]}, error_handling="continue")
+
+    out1 = result["out1"].output
+    out2 = result["out2"].output
+
+    # Both outputs should have errors at the same index
+    assert out1[0] == 0
+    assert isinstance(out1[1], ErrorSnapshot)
+    assert out1[2] == 2
+
+    assert out2[0] == 0
+    assert isinstance(out2[1], ErrorSnapshot)  # Same error for both outputs
+    assert out2[2] == 4
