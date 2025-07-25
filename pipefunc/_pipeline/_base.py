@@ -874,6 +874,11 @@ class Pipeline:
             Whether to return the results of the pipeline. If ``False``, the pipeline is run
             without keeping the results in memory. Instead the results are only kept in the set
             ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+        error_handling
+            How to handle errors during function execution:
+
+            - ``"raise"`` (default): Stop execution on first error and raise exception
+            - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
         scheduling_strategy
             Strategy for scheduling pipeline function execution:
 

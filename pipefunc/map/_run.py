@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._error_handling import handle_error_inputs
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -179,6 +180,11 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
     prep = prepare_run(
@@ -403,6 +409,11 @@ def run_map_async(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
@@ -423,6 +434,7 @@ def run_map_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
+        error_handling=error_handling,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)
@@ -626,39 +638,13 @@ def _run_iteration(
     func: PipeFunc,
     selected: dict[str, Any],
     cache: _CacheBase | None,
-    in_executor: bool,
+    in_executor: bool,  # noqa: ARG001
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Early error detection when error_handling == "continue"
-    if error_handling == "continue":
-        from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
-
-        # Check if any input is an ErrorSnapshot
-        error_info = {}
-        for param_name, value in selected.items():
-            if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
-                # Input parameter is itself an error
-                error_info[param_name] = {"type": "full", "error": value}
-            elif isinstance(value, np.ndarray) and value.dtype == object:
-                # Check if array contains any ErrorSnapshot objects
-                error_mask = np.array(
-                    [isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in value.flat],
-                )
-                if error_mask.any():
-                    error_info[param_name] = {
-                        "type": "partial",
-                        "shape": value.shape,
-                        "error_indices": np.where(error_mask.reshape(value.shape)),
-                        "error_count": error_mask.sum(),
-                    }
-
-        if error_info:
-            return PropagatedErrorSnapshot(
-                error_info=error_info,
-                skipped_function=func,
-                reason="input_contains_errors",
-                attempted_kwargs={k: v for k, v in selected.items() if k not in error_info},
-            )
+    propagated_error = handle_error_inputs(selected, func, error_handling)
+    if propagated_error is not None:
+        return propagated_error
 
     def compute_fn() -> Any:
         try:
@@ -1124,40 +1110,9 @@ def _execute_single(
 
     def compute_fn() -> Any:
         # Early error detection for non-mapspec operations
-        if error_handling == "continue":
-            from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
-
-            # Check if any input is an ErrorSnapshot
-            error_info = {}
-            for param_name, value in kwargs.items():
-                if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
-                    error_info[param_name] = {"type": "full", "error": value}
-                elif isinstance(value, np.ndarray) and value.dtype == object:
-                    # Check if array contains any ErrorSnapshots
-                    error_mask = np.array(
-                        [
-                            isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot))
-                            for v in value.flat
-                        ],
-                    )
-                    if error_mask.any():
-                        error_info[param_name] = {
-                            "type": "partial",
-                            "shape": value.shape,
-                            "error_count": error_mask.sum(),
-                        }
-
-            if error_info:
-                # Create a PropagatedErrorSnapshot since we have error inputs
-                propagated_error = PropagatedErrorSnapshot(
-                    error_info=error_info,
-                    skipped_function=func,
-                    reason="input_is_error"
-                    if any(info["type"] == "full" for info in error_info.values())
-                    else "array_contains_errors",
-                    attempted_kwargs={k: v for k, v in kwargs.items() if k not in error_info},
-                )
-                return propagated_error
+        propagated_error = handle_error_inputs(kwargs, func, error_handling)
+        if propagated_error is not None:
+            return propagated_error
 
         try:
             return func(**kwargs)

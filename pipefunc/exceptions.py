@@ -100,16 +100,15 @@ class ErrorSnapshot:
 
     def __getstate__(self) -> dict[str, Any]:
         """Custom pickling to handle function references using cloudpickle."""
-        state = self.__dict__.copy()
-        # Use cloudpickle to serialize the function
-        state["function"] = cloudpickle.dumps(self.function)
-        return state
+        from pipefunc._error_handling import cloudpickle_function_state
+
+        return cloudpickle_function_state(self.__dict__.copy(), "function")
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Custom unpickling to restore function references."""
-        # Restore the function from cloudpickle
-        state["function"] = cloudpickle.loads(state["function"])
-        self.__dict__.update(state)
+        from pipefunc._error_handling import cloudunpickle_function_state
+
+        self.__dict__.update(cloudunpickle_function_state(state, "function"))
 
 
 @dataclass
@@ -156,17 +155,18 @@ class PropagatedErrorSnapshot:
 
     def __getstate__(self) -> dict[str, Any]:
         """Custom pickling to handle function references using cloudpickle."""
-        state = self.__dict__.copy()
-        # Use cloudpickle to serialize the skipped_function
-        state["skipped_function"] = cloudpickle.dumps(self.skipped_function)
+        from pipefunc._error_handling import cloudpickle_function_state
+
+        state = cloudpickle_function_state(self.__dict__.copy(), "skipped_function")
         # Also handle nested ErrorSnapshots in error_info
         state["error_info"] = self._pickle_error_info(self.error_info)
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Custom unpickling to restore function references."""
-        # Restore the skipped_function from cloudpickle
-        state["skipped_function"] = cloudpickle.loads(state["skipped_function"])
+        from pipefunc._error_handling import cloudunpickle_function_state
+
+        state = cloudunpickle_function_state(state, "skipped_function")
         # Restore error_info
         state["error_info"] = self._unpickle_error_info(state["error_info"])
         self.__dict__.update(state)

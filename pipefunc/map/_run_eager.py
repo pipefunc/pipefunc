@@ -157,6 +157,11 @@ def run_map_eager(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
     # Prepare the run (this call sets up the run folder, storage, progress, etc.)
@@ -175,6 +180,7 @@ def run_map_eager(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=False,
+        error_handling=error_handling,
     )
 
     dependency_info = _build_dependency_graph(prep.pipeline)
