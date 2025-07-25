@@ -98,6 +98,19 @@ class ErrorSnapshot:
 
         display(HTML(f"<pre>{self}</pre>"))
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Custom pickling to handle function references using cloudpickle."""
+        state = self.__dict__.copy()
+        # Use cloudpickle to serialize the function
+        state["function"] = cloudpickle.dumps(self.function)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Custom unpickling to restore function references."""
+        # Restore the function from cloudpickle
+        state["function"] = cloudpickle.loads(state["function"])
+        self.__dict__.update(state)
+
 
 @dataclass
 class PropagatedErrorSnapshot:
@@ -126,6 +139,7 @@ class PropagatedErrorSnapshot:
         return root_causes
 
     def __str__(self) -> str:
+        """Return a string representation of the propagated error snapshot."""
         func_name = getattr(self.skipped_function, "__name__", str(self.skipped_function))
         error_summary = []
         for param, info in self.error_info.items():
@@ -139,3 +153,46 @@ class PropagatedErrorSnapshot:
             f"Reason: {self.reason}\n"
             f"Errors in: {', '.join(error_summary)}"
         )
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Custom pickling to handle function references using cloudpickle."""
+        state = self.__dict__.copy()
+        # Use cloudpickle to serialize the skipped_function
+        state["skipped_function"] = cloudpickle.dumps(self.skipped_function)
+        # Also handle nested ErrorSnapshots in error_info
+        state["error_info"] = self._pickle_error_info(self.error_info)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Custom unpickling to restore function references."""
+        # Restore the skipped_function from cloudpickle
+        state["skipped_function"] = cloudpickle.loads(state["skipped_function"])
+        # Restore error_info
+        state["error_info"] = self._unpickle_error_info(state["error_info"])
+        self.__dict__.update(state)
+
+    def _pickle_error_info(
+        self,
+        error_info: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        """Helper to pickle error_info dict that may contain ErrorSnapshots."""
+        pickled_info = {}
+        for param, info in error_info.items():
+            pickled_info[param] = info.copy()
+            if info["type"] == "full" and "error" in info:
+                # The error might be an ErrorSnapshot or PropagatedErrorSnapshot
+                # Let their own __getstate__ handle it
+                pickled_info[param]["error"] = cloudpickle.dumps(info["error"])
+        return pickled_info
+
+    def _unpickle_error_info(
+        self,
+        pickled_info: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        """Helper to unpickle error_info dict."""
+        error_info = {}
+        for param, info in pickled_info.items():
+            error_info[param] = info.copy()
+            if info["type"] == "full" and "error" in info:
+                error_info[param]["error"] = cloudpickle.loads(info["error"])
+        return error_info

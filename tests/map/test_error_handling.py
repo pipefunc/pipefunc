@@ -29,12 +29,13 @@ def test1_step3(c: int) -> int:
     return c * 3
 
 
-def test_simple_pipeline_no_mapspec_error_propagation():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_simple_pipeline_no_mapspec_error_propagation(parallel):
     """Test error propagation in a simple 3-step pipeline without mapspec."""
     pipeline = Pipeline([test1_step1, test1_step2, test1_step3])
 
     # Test with error_handling="continue"
-    result = pipeline.map({"a": 2}, error_handling="continue")
+    result = pipeline.map({"a": 2}, error_handling="continue", parallel=parallel)
 
     # b should be 4
     assert result["b"].output == 4
@@ -61,12 +62,13 @@ def test2_may_fail(x: int) -> int:
     return x * 2
 
 
-def test_single_pipefunc_element_wise_errors():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_single_pipefunc_element_wise_errors(parallel):
     """Test error handling in element-wise operations."""
     pipeline = Pipeline([test2_may_fail])
 
     # Test with array input where one element causes error
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=parallel)
 
     y_output = result["y"].output
     assert isinstance(y_output, np.ndarray)
@@ -95,11 +97,12 @@ def test3_step2(y: int) -> int:
     return y + 10
 
 
-def test_pipeline_element_wise_propagation():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_pipeline_element_wise_propagation(parallel):
     """Test error propagation through element-wise operations."""
     pipeline = Pipeline([test3_step1, test3_step2])
 
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=parallel)
 
     # Check y array
     y_output = result["y"].output
@@ -133,14 +136,15 @@ def test4_sum_rows(matrix: np.ndarray) -> int:
     return int(np.sum(matrix))
 
 
-def test_1d_reduction_partial_errors():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_1d_reduction_partial_errors(parallel):
     """Test error handling in 1D reduction operations."""
     pipeline = Pipeline([test4_compute, test4_sum_rows])
 
     result = pipeline.map(
         {"x": [1, 2, 3], "y": [2, 3, 4]},
         error_handling="continue",
-        parallel=False,
+        parallel=parallel,
     )
 
     # Check matrix
@@ -174,11 +178,12 @@ def test5_sum_all(y: np.ndarray) -> int:
     return int(np.sum(y))
 
 
-def test_full_array_reduction_with_errors():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_full_array_reduction_with_errors(parallel):
     """Test error handling when reducing entire array that contains errors."""
     pipeline = Pipeline([test5_double, test5_sum_all])
 
-    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=False)
+    result = pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="continue", parallel=parallel)
 
     # Check y array has mixed values and errors
     y_output = result["y"].output
@@ -212,14 +217,15 @@ def test6_sum_along_yz(tensor: np.ndarray) -> int:
     return int(np.sum(tensor))
 
 
-def test_2d_reduction_multi_dimension_errors():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_2d_reduction_multi_dimension_errors(parallel):
     """Test error handling in 2D reductions across different axes."""
     pipeline = Pipeline([test6_compute_3d, test6_sum_along_z, test6_sum_along_yz])
 
     result = pipeline.map(
         {"x": [1, 2, 3], "y": [1, 2], "z": [0, 1]},
         error_handling="continue",
-        parallel=False,
+        parallel=parallel,
     )
 
     # Check tensor has errors at specific positions
@@ -270,14 +276,15 @@ def test7_sum_all_max(row_max: np.ndarray) -> int:
     return int(np.sum(row_max))
 
 
-def test_complex_pipeline_mixed_mapspecs():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_complex_pipeline_mixed_mapspecs(parallel):
     """Test error handling in complex pipeline with various mapspec patterns."""
     pipeline = Pipeline([test7_double, test7_multiply, test7_max_per_row, test7_sum_all_max])
 
     result = pipeline.map(
         {"nums": [1, 2, 3, 4, 5], "factors": [2, 3, 4]},
         error_handling="continue",
-        parallel=False,
+        parallel=parallel,
     )
 
     # Check doubled - should have error at index 4 (nums=5)
@@ -314,15 +321,16 @@ def test8_may_fail(x: int) -> int:
     return x * 2
 
 
-def test_sequential_execution_error_handling():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_sequential_execution_error_handling(parallel):
     """Test that error handling works correctly in sequential mode."""
     pipeline = Pipeline([test8_may_fail])
 
-    # Test with parallel=False
+    # Test with parallel parameter
     result = pipeline.map(
         {"x": [1, 2, 3, 4, 5]},
         error_handling="continue",
-        parallel=False,
+        parallel=parallel,
     )
 
     # Should still process all elements despite error
@@ -348,11 +356,12 @@ def test9_add_ten(y: int) -> int:
     return y + 10
 
 
-def test_multiple_errors_same_function():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_multiple_errors_same_function(parallel):
     """Test handling multiple errors in the same function."""
     pipeline = Pipeline([test9_may_fail_multiple, test9_add_ten])
 
-    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue", parallel=False)
+    result = pipeline.map({"x": list(range(1, 9))}, error_handling="continue", parallel=parallel)
 
     # Check y has errors at correct positions
     y = result["y"].output
@@ -383,14 +392,15 @@ def test10_will_fail(x: int) -> int:
     return x * 2
 
 
-def test_error_handling_raise_default():
+@pytest.mark.parametrize("parallel", [False, True])
+def test_error_handling_raise_default(parallel):
     """Test that error_handling='raise' maintains default behavior."""
     pipeline = Pipeline([test10_will_fail])
 
     # Should raise exception with default error_handling
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]}, parallel=False)  # error_handling="raise" is default
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, parallel=parallel)  # error_handling="raise" is default
 
     # Explicit error_handling="raise" should also raise
     with pytest.raises(ValueError, match="Expected error"):
-        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise", parallel=False)
+        pipeline.map({"x": [1, 2, 3, 4, 5]}, error_handling="raise", parallel=parallel)
