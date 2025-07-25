@@ -6,6 +6,7 @@ import functools
 import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from weakref import WeakSet
 
 import cloudpickle
 import numpy as np
@@ -114,30 +115,27 @@ class ScanFunc(PipeFunc[T]):
         self.return_intermediate = return_intermediate
         self._scan_func = func
 
-        # Get the parameter names from the scan function
-        sig = inspect.signature(func)
-        params = list(sig.parameters.keys())
-        if not params:
+        # Analyze the scan function signature
+        self._scan_signature = inspect.signature(func)
+        scan_params = list(self._scan_signature.parameters.values())
+        if not scan_params:
             msg = "Scan function must have at least one parameter"
             raise ValueError(msg)
-        self._x_param_name = params[0]
 
-        # Get all other parameter names (these will be carry parameters)
-        self._carry_param_names = params[1:]
+        # First parameter becomes 'x' in scan iterations
+        self._x_param = scan_params[0]
+        self._x_param_name = self._x_param.name
 
-        # Create the wrapper function that will be called by pipefunc
-        # NOTE: Don't use @functools.wraps here because it copies the original
-        # function signature, but we need the wrapper to have the modified signature
-        def scan_wrapper(**kwargs: Any) -> Any:
-            return self._execute_scan(**kwargs)
+        # Remaining parameters are carry parameters
+        self._carry_params = scan_params[1:]
+        self._carry_param_names = [p.name for p in self._carry_params]
 
-        # Set the wrapper name for debugging
-        scan_wrapper.__name__ = func.__name__
-        scan_wrapper.__doc__ = func.__doc__
+        # Create the wrapper function signature and implementation
+        wrapper_func = self._create_scan_wrapper()
 
         # Initialize parent PipeFunc with wrapper function
-        super().__init__(
-            func=scan_wrapper,
+        super().__init__(  # type: ignore[misc]
+            func=wrapper_func,
             output_name=output_name,
             output_picker=output_picker,
             renames=renames,
@@ -157,24 +155,41 @@ class ScanFunc(PipeFunc[T]):
             variant=variant,
         )
 
-    @functools.cached_property
-    def original_parameters(self) -> dict[str, inspect.Parameter]:
-        """Return the scan wrapper parameters."""
-        # Get the original scan function parameters
-        sig = inspect.signature(self._scan_func)
-        params = dict(sig.parameters)
+    def _create_scan_wrapper(self) -> Callable[..., Any]:
+        """Create the wrapper function with proper signature transformation."""
+        # Create new signature: remove x param, add xs param with carry params
+        wrapper_params = []
 
-        # Remove the first parameter (x) and add xs
-        params.pop(self._x_param_name)
+        # Add carry parameters (all except first)
+        wrapper_params.extend(self._carry_params)
 
         # Add xs parameter
-        params[self.xs] = inspect.Parameter(
+        xs_param = inspect.Parameter(
             self.xs,
             inspect.Parameter.KEYWORD_ONLY,
             annotation=list,
         )
+        wrapper_params.append(xs_param)
 
-        return params
+        # Create the wrapper signature
+        self._wrapper_signature = inspect.Signature(wrapper_params)
+
+        # Create wrapper function
+        def scan_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return self._execute_scan(*args, **kwargs)
+
+        # Set function metadata
+        scan_wrapper.__name__ = self._scan_func.__name__
+        scan_wrapper.__doc__ = self._scan_func.__doc__
+        # Note: Setting __signature__ at runtime for inspect.signature() to work correctly
+        scan_wrapper.__signature__ = self._wrapper_signature
+
+        return scan_wrapper
+
+    @functools.cached_property
+    def original_parameters(self) -> dict[str, inspect.Parameter]:
+        """Return the scan wrapper parameters."""
+        return dict(self._wrapper_signature.parameters)
 
     @property
     def parameters(self) -> tuple[str, ...]:
@@ -182,25 +197,30 @@ class ScanFunc(PipeFunc[T]):
         # This is what pipefunc uses to know what parameters the function needs
         return tuple(self.original_parameters.keys())
 
-    def _execute_scan(self, **kwargs: Any) -> Any:
+    def _execute_scan(self, *args: Any, **kwargs: Any) -> Any:
         """Execute the scan operation."""
-        # Extract xs from kwargs
+        # Bind arguments to signature for proper parameter handling
+        bound = self._wrapper_signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        bound_kwargs = dict(bound.arguments)
+
+        # Extract xs from bound arguments
         xs_key = self._renames.get(self.xs, self.xs)
-        if xs_key not in kwargs:
+        if xs_key not in bound_kwargs:
             msg = f"Required parameter '{xs_key}' (xs) not provided"
             raise ValueError(msg)
 
-        xs_values = kwargs.pop(xs_key)
+        xs_values = bound_kwargs.pop(xs_key)
 
-        # Initialize carry with remaining kwargs
-        carry = {k: v for k, v in kwargs.items()}
+        # Initialize carry with remaining bound arguments
+        carry = dict(bound_kwargs)
 
         # Track intermediate results if needed
         intermediate_results = []
 
         # Iterate over xs
         for x in xs_values:
-            # Prepare kwargs for this iteration
+            # Prepare kwargs for this iteration by copying carry
             iter_kwargs = carry.copy()
 
             # Map parameter names back to original if renamed
@@ -212,10 +232,10 @@ class ScanFunc(PipeFunc[T]):
             # Add current x value using the first parameter name
             original_kwargs[self._x_param_name] = x
 
-            # Call original function
+            # Call original scan function
             result = self._scan_func(**original_kwargs)
 
-            if not isinstance(result, tuple) or len(result) != 2:
+            if not isinstance(result, tuple) or len(result) != 2:  # noqa: PLR2004
                 msg = f"Scan function must return tuple of (carry, output), got {type(result)}"
                 raise ValueError(msg)
 
@@ -223,11 +243,11 @@ class ScanFunc(PipeFunc[T]):
 
             if not isinstance(new_carry, dict):
                 msg = f"Carry must be a dict, got {type(new_carry)}"
-                raise ValueError(msg)
+                raise TypeError(msg)
 
             # Update carry for next iteration
-            # Apply renames to carry keys
-            renamed_carry = {}
+            # Apply renames to carry keys if needed
+            renamed_carry: dict[str, Any] = {}
             for key, value in new_carry.items():
                 renamed_key = self._renames.get(key, key)
                 renamed_carry[renamed_key] = value
@@ -285,10 +305,10 @@ class ScanFunc(PipeFunc[T]):
             "xs": self.xs,
             "return_intermediate": self.return_intermediate,
             "_scan_func": cloudpickle.dumps(self._scan_func),
+            "_scan_signature": self._scan_signature,
             "_x_param_name": self._x_param_name,
             "_carry_param_names": self._carry_param_names,
         }
-
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -297,6 +317,7 @@ class ScanFunc(PipeFunc[T]):
         self.xs = state["xs"]
         self.return_intermediate = state["return_intermediate"]
         self._scan_func = cloudpickle.loads(state["_scan_func"])
+        self._scan_signature = state["_scan_signature"]
         self._x_param_name = state["_x_param_name"]
         self._carry_param_names = state["_carry_param_names"]
 
@@ -318,24 +339,20 @@ class ScanFunc(PipeFunc[T]):
         self.resources_scope = state["resources_scope"]
         self.variant = state["variant"]
 
-        # Create a new wrapper function
-        # NOTE: Don't use @functools.wraps here because it copies the original
-        # function signature, but we need the wrapper to have the modified signature
-        def scan_wrapper(**kwargs: Any) -> Any:
-            return self._execute_scan(**kwargs)
+        # Reconstruct parameter analysis from signature
+        scan_params = list(self._scan_signature.parameters.values())
+        self._x_param = scan_params[0]
+        self._carry_params = scan_params[1:]
 
-        # Set the wrapper name for debugging
-        scan_wrapper.__name__ = self._scan_func.__name__
-        scan_wrapper.__doc__ = self._scan_func.__doc__
-
-        # Set the wrapper function
-        self.func = scan_wrapper
+        # Recreate the wrapper function
+        wrapper_func = self._create_scan_wrapper()
+        self.func = wrapper_func
 
         # Initialize other PipeFunc attributes that might not be in state
-        self._pipelines: list = []
+        self._pipelines = WeakSet()
         self.profiling_stats = None
         self.error_snapshot = None
-        self.__name__ = scan_wrapper.__name__
+        self.__name__ = wrapper_func.__name__
 
         # Initialize inverse renames
         self._inverse_renames = {v: k for k, v in self._renames.items()}
@@ -370,7 +387,7 @@ class ScanFunc(PipeFunc[T]):
         scan_kwargs.update(update)
 
         # Create new ScanFunc instance
-        return ScanFunc(**scan_kwargs)
+        return ScanFunc(**scan_kwargs)  # type: ignore[misc]
 
 
 def scan(

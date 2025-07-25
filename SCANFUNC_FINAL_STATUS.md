@@ -89,7 +89,7 @@ def rk2_scan(t: float, y: float = 1.0, dt: float = 0.1):
 ## 🏆 Success Criteria Met
 
 ✅ **Functional**: ScanFunc works for all intended use cases
-✅ **Integrated**: Seamless pipeline and multiprocessing support  
+✅ **Integrated**: Seamless pipeline and multiprocessing support
 ✅ **Tested**: Comprehensive test coverage for core functionality
 ✅ **Maintainable**: Clean, well-documented code structure
 ✅ **Performant**: Efficient execution with proper resource management
