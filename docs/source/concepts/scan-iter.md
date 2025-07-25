@@ -278,15 +278,15 @@ def generate_sequences(seq_id: int, length: int = 5) -> list[int]:
 
 # Scan each sequence independently
 @PipeFunc.scan_iter(output_name="products", mapspec="sequences[i] -> products[i]")
-def running_product(values: list[int], initial: int = 1):
+def running_product(sequences: list[int], initial: int = 1):
     """Calculate running product for each sequence."""
     product = initial
-    for x in values:
+    for x in sequences:
         product *= x
         yield product
 
 # Run in parallel
-inputs = {"seq_id": [0, 1, 2], "length": [3, 4, 5]}
+inputs = {"seq_id": [0, 1, 2], "length": 5}  # Fixed length for all sequences
 pipeline = Pipeline([generate_sequences, running_product])
 results = pipeline.map(inputs, run_folder="parallel_scan_iter", parallel=False)
 
@@ -327,7 +327,7 @@ def power_iteration(matrix: np.ndarray, max_iters: int = 20, tol: float = 1e-6):
         yield v
 
 # Run power iteration on multiple matrices
-inputs = {"matrix_id": [0, 1, 2], "size": [3, 3, 3]}
+inputs = {"matrix_id": [0, 1, 2], "size": 3}  # Same size for all matrices
 pipeline = Pipeline([create_matrix, power_iteration])
 results = pipeline.map(inputs, run_folder="parallel_eigen", parallel=False)
 
