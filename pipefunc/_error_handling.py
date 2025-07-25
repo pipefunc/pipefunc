@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 import numpy as np
@@ -13,9 +14,40 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+@dataclass
+class ErrorInfo:
+    """Information about errors in a parameter."""
+
+    type: Literal["full", "partial"]
+    error: ErrorSnapshot | PropagatedErrorSnapshot | None = None
+    shape: tuple[int, ...] | None = None
+    error_indices: tuple[np.ndarray, ...] | None = None
+    error_count: int | None = None
+
+    @classmethod
+    def from_full_error(cls, error: ErrorSnapshot | PropagatedErrorSnapshot) -> ErrorInfo:
+        """Create ErrorInfo for a parameter that is entirely an error."""
+        return cls(type="full", error=error)
+
+    @classmethod
+    def from_partial_error(
+        cls,
+        shape: tuple[int, ...],
+        error_indices: tuple[np.ndarray, ...],
+        error_count: int,
+    ) -> ErrorInfo:
+        """Create ErrorInfo for an array containing some errors."""
+        return cls(
+            type="partial",
+            shape=shape,
+            error_indices=error_indices,
+            error_count=error_count,
+        )
+
+
 def check_for_error_inputs(
     kwargs: dict[str, Any],
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, ErrorInfo]:
     """Check if any input contains ErrorSnapshot objects.
 
     Parameters
@@ -25,7 +57,7 @@ def check_for_error_inputs(
 
     Returns
     -------
-        A dictionary mapping parameter names to error information.
+        A dictionary mapping parameter names to ErrorInfo objects.
         Empty if no errors are found.
 
     """
@@ -33,24 +65,23 @@ def check_for_error_inputs(
     for param_name, value in kwargs.items():
         if isinstance(value, (ErrorSnapshot, PropagatedErrorSnapshot)):
             # Input parameter is itself an error
-            error_info[param_name] = {"type": "full", "error": value}
+            error_info[param_name] = ErrorInfo.from_full_error(value)
         elif isinstance(value, np.ndarray) and value.dtype == object:
             # Check if array contains any ErrorSnapshot objects
             error_mask = np.array(
                 [isinstance(v, (ErrorSnapshot, PropagatedErrorSnapshot)) for v in value.flat],
             )
             if error_mask.any():
-                error_info[param_name] = {
-                    "type": "partial",
-                    "shape": value.shape,
-                    "error_indices": np.where(error_mask.reshape(value.shape)),  # type: ignore[dict-item]
-                    "error_count": error_mask.sum(),
-                }
+                error_info[param_name] = ErrorInfo.from_partial_error(
+                    shape=value.shape,
+                    error_indices=np.where(error_mask.reshape(value.shape)),
+                    error_count=error_mask.sum(),
+                )
     return error_info
 
 
 def create_propagated_error(
-    error_info: dict[str, dict[str, Any]],
+    error_info: dict[str, ErrorInfo],
     skipped_function: Callable[..., Any],
     kwargs: dict[str, Any],
     *,
@@ -61,7 +92,7 @@ def create_propagated_error(
     Parameters
     ----------
     error_info
-        Dictionary mapping parameter names to error details.
+        Dictionary mapping parameter names to ErrorInfo objects.
     skipped_function
         The function that was skipped due to errors.
     kwargs
@@ -75,9 +106,9 @@ def create_propagated_error(
 
     """
     # Determine the reason based on error types
-    if any(info["type"] == "full" for info in error_info.values()):
+    if any(info.type == "full" for info in error_info.values()):
         reason = "input_is_error"
-    elif any(info["type"] == "partial" for info in error_info.values()):
+    elif any(info.type == "partial" for info in error_info.values()):
         reason = "array_contains_errors"
     else:
         reason = default_reason
