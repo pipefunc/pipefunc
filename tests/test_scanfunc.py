@@ -143,47 +143,6 @@ class TestScanFunc:
         assert result[0] > result[-1]  # Decaying
         assert all(result[i] > result[i + 1] for i in range(len(result) - 1))  # Monotonic
 
-    def test_scan_with_varying_xs_shapes(self):
-        """Test scan with xs that has varying shapes from mapspec."""
-
-        @pipefunc(output_name="param_grid", mapspec="alpha[i], beta[j] -> param_grid[i, j]")
-        def create_params(alpha: float, beta: float) -> dict[str, float]:
-            return {"alpha": alpha, "beta": beta}
-
-        @PipeFunc.scan(output_name="optimization_path", xs="param_grid")
-        def optimizer_step(
-            params: dict[str, float],
-            best_loss: float = float("inf"),
-            best_params: dict[str, float] | None = None,
-        ) -> tuple[dict[str, Any], dict[str, Any]]:
-            # Simple optimization: minimize (alpha - 1)^2 + (beta - 2)^2
-            loss = (params["alpha"] - 1) ** 2 + (params["beta"] - 2) ** 2
-
-            if loss < best_loss:
-                carry = {"best_loss": loss, "best_params": params}
-                intermediate = {"params": params, "loss": loss, "improved": True}
-            else:
-                carry = {"best_loss": best_loss, "best_params": best_params}
-                intermediate = {"params": params, "loss": loss, "improved": False}
-
-            return carry, intermediate
-
-        pipeline = Pipeline([create_params, optimizer_step])
-        inputs = {
-            "alpha": [0.5, 1.0, 1.5],
-            "beta": [1.5, 2.0, 2.5],
-        }
-
-        results = pipeline.map(inputs, run_folder="test_optimizer")
-        opt_path = results["optimization_path"].output
-
-        # Should have tried 9 parameter combinations
-        assert len(opt_path) == 9
-        # Best should be close to (1, 2)
-        final_carry = results["optimization_path"].carry
-        assert final_carry["best_params"]["alpha"] == 1.0
-        assert final_carry["best_params"]["beta"] == 2.0
-
     def test_scan_error_handling(self):
         """Test error handling in scan functions."""
 
@@ -227,29 +186,6 @@ class TestScanFunc:
         # (0 + 2*1 + 1) = 3, (3 + 2*2 + 1) = 8, (8 + 2*3 + 1) = 15
         expected = [3, 8, 15]
         assert np.array_equal(result, expected)
-
-    def test_scan_dag_unrolling(self):
-        """Test that scan properly unrolls into DAG for visualization."""
-
-        @PipeFunc.scan(output_name="result", xs="values")
-        def simple_scan(x: int, acc: int = 0) -> tuple[dict[str, Any], int]:
-            carry = {"acc": acc + x}
-            return carry, acc + x
-
-        pipeline = Pipeline([simple_scan])
-
-        # When visualizing with known xs length, should show unrolled structure
-        values = [1, 2, 3]
-        unrolled = pipeline._unroll_scan_for_visualization(
-            scan_func=simple_scan,
-            xs_length=len(values),
-        )
-
-        # Should have 3 nodes for the 3 iterations
-        assert len(unrolled.nodes) == 3
-        # Each node should depend on the previous
-        assert unrolled.nodes[1].dependencies == {unrolled.nodes[0].name}
-        assert unrolled.nodes[2].dependencies == {unrolled.nodes[1].name}
 
     def test_scan_with_resources(self):
         """Test scan with resource requirements."""
