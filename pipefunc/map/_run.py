@@ -638,7 +638,7 @@ def _run_iteration(
     func: PipeFunc,
     selected: dict[str, Any],
     cache: _CacheBase | None,
-    in_executor: bool,  # noqa: ARG001
+    in_executor: bool,
     error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Early error detection when error_handling == "continue"
@@ -650,14 +650,15 @@ def _run_iteration(
         try:
             return func(**selected)
         except Exception as e:
-            handle_pipefunc_error(e, func, selected, error_handling)
-            # handle_pipefunc_error raises if error_handling == "raise"
-            if error_handling == "continue":
-                # Create ErrorSnapshot directly to avoid issues in executor context
-                from pipefunc.exceptions import ErrorSnapshot
-
-                renamed_kwargs = func._rename_to_native(selected)
-                return ErrorSnapshot(func.func, e, args=(), kwargs=renamed_kwargs)
+            if not in_executor:
+                # If we're NOT in an executor (sequential execution),
+                # handle the error immediately
+                handle_pipefunc_error(e, func, selected, error_handling)
+                # handle_pipefunc_error raises if error_handling == "raise"
+                if error_handling == "continue":
+                    return func.error_snapshot
+            # If we ARE in an executor (parallel execution),
+            # let the exception propagate to be handled in _result()
             raise
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
