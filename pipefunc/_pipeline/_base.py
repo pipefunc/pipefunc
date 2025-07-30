@@ -946,6 +946,7 @@ class Pipeline:
         display_widgets: bool = True,
         return_results: bool = True,
         scheduling_strategy: Literal["generation", "eager"] = "generation",
+        error_handling: Literal["raise", "continue"] = "raise",
         start: bool = True,
     ) -> AsyncMap:
         """Asynchronously run a pipeline with `MapSpec` functions for given ``inputs``.
@@ -1056,6 +1057,11 @@ class Pipeline:
               without waiting for entire generations to complete. Can improve performance
               by maximizing parallel execution, especially for complex dependency graphs
               with varied execution times.
+        error_handling
+            How to handle errors during function execution:
+
+            - ``"raise"`` (default): Stop execution on first error and raise exception
+            - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
         start
             Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
             `start()` method on the `AsyncMap` instance is called.
@@ -1096,6 +1102,7 @@ class Pipeline:
             show_progress=show_progress,
             display_widgets=display_widgets,
             return_results=return_results,
+            error_handling=error_handling,
             start=start,
         )
 
