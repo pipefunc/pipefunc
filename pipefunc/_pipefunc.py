@@ -1505,6 +1505,11 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
 
 def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
     """Default output picker function for tuples."""
+    # If output is an error, return it as-is for all output names
+    from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
+    if isinstance(output, (ErrorSnapshot, PropagatedErrorSnapshot)):
+        return output
     return output[output_name.index(name)]
 
 

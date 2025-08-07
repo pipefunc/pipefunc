@@ -7,7 +7,7 @@ import tempfile
 import warnings
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import cloudpickle
 import numpy as np
@@ -56,6 +56,7 @@ class RunInfo:
     run_folder: Path | None
     mapspecs_as_strings: list[str]
     storage: str | dict[OUTPUT_TYPE, str]
+    error_handling: Literal["raise", "continue"] = "raise"
     pipefunc_version: str = __version__
 
     def __post_init__(self) -> None:
@@ -79,6 +80,7 @@ class RunInfo:
         executor: dict[OUTPUT_TYPE, Executor] | None = None,
         storage: str | dict[OUTPUT_TYPE, str] | None,
         cleanup: bool = True,
+        error_handling: Literal["raise", "continue"] = "raise",
     ) -> RunInfo:
         storage, run_folder = _resolve_storage_and_run_folder(run_folder, storage)
         internal_shapes = _construct_internal_shapes(internal_shapes, pipeline)
@@ -102,6 +104,7 @@ class RunInfo:
             mapspecs_as_strings=pipeline.mapspecs_as_strings,
             run_folder=run_folder,
             storage=storage,
+            error_handling=error_handling,
         )
 
     def storage_class(self, output_name: OUTPUT_TYPE) -> type[StorageBase]:
