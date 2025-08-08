@@ -19,6 +19,16 @@ kernelspec:
 
 Missing something or is something unclear? Please [open an issue](https://github.com/pipefunc/pipefunc/issues/new)!
 
+## How to get AI / LLM help?
+
+Run this in the repository root:
+
+```bash
+uvx clip-files --files README.md docs/source/{tutorial.md,concepts/index.md,concepts/mapspec.md,concepts/execution-and-parallelism.md,concepts/function-io.md}
+```
+
+Then paste the clipboard contents into the LLM chat and ask your question.
+
 ## How is this different from Dask, AiiDA, Luigi, Prefect, Kedro, Apache Airflow, Snakemake, etc.?
 
 `pipefunc` fills a unique niche in the Python workflow ecosystem.
