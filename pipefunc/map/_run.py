@@ -1419,12 +1419,7 @@ def _result(
 ) -> Any:
     if isinstance(x, Future):
         try:
-            result = x.result()
-            # For mapspec operations, the result should be a list of tuples
-            # If we get a single tuple, wrap it in a list for consistency
-            if func.requires_mapping and isinstance(result, tuple) and not isinstance(result, list):
-                return [result]
-            return result  # noqa: TRY300
+            return x.result()
         except Exception as e:  # noqa: BLE001
             _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
             # _raise_and_set_error_snapshot raises if error_handling == "raise"
