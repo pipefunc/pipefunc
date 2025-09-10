@@ -43,6 +43,7 @@ dependencies:
   - coverage
   - pytest-asyncio
   - pytest-codspeed
+  - cffi<2.0.0
   - pytest-cov
   - pytest-timeout
   - pytest-xdist
