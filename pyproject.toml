@@ -44,7 +44,7 @@ test = [
     "coverage",
     "pytest-asyncio",
     "pytest-codspeed",
-    "cffi<2.0.0",  # Avoid cffi 2.0.0 which has no 3.13t wheel yet
+    "cffi<2.0.1",  # Avoid cffi 2.0.0 which has no 3.13t wheel yet
     "pytest-cov",
     "pytest-timeout",
     "pytest-xdist",
