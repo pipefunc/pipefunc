@@ -834,6 +834,14 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
+        # Check if the return type is a NamedTuple
+        if inspect.isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields"):
+            # It's a NamedTuple - extract type hints for each field
+            field_hints = safe_get_type_hints(hint, include_extras=True)
+            return {
+                name: field_hints.get(original_name, NoAnnotation)
+                for name, original_name in zip(self.output_name, hint._fields)
+            }
         return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
