@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
+from pipefunc._error_handling import handle_error_inputs
 from pipefunc._pipefunc_utils import handle_pipefunc_error
 from pipefunc._utils import (
     at_least_tuple,
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
     from pipefunc._widgets.progress_ipywidgets import IPyWidgetsProgressTracker
     from pipefunc._widgets.progress_rich import RichProgressTracker
     from pipefunc.cache import _CacheBase
+    from pipefunc.exceptions import ErrorSnapshot
 
     from ._prepare import Prepared
     from ._progress import Status
@@ -78,6 +80,7 @@ def run_map(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
 ) -> ResultDict:
     """Run a pipeline with `MapSpec` functions for given ``inputs``.
 
@@ -177,6 +180,11 @@ def run_map(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
 
     """
     prep = prepare_run(
@@ -193,6 +201,7 @@ def run_map(
         fixed_indices=fixed_indices,
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
+        error_handling=error_handling,
         in_async=False,
     )
 
@@ -297,6 +306,7 @@ def run_map_async(
     auto_subpipeline: bool = False,
     show_progress: bool | Literal["rich", "ipywidgets", "headless"] | None = None,
     return_results: bool = True,
+    error_handling: Literal["raise", "continue"] = "raise",
     display_widgets: bool = True,
     start: bool = True,
 ) -> AsyncMap:
@@ -399,6 +409,11 @@ def run_map_async(
         Whether to return the results of the pipeline. If ``False``, the pipeline is run
         without keeping the results in memory. Instead the results are only kept in the set
         ``storage``. This is useful for very large pipelines where the results do not fit into memory.
+    error_handling
+        How to handle errors during function execution:
+
+        - ``"raise"`` (default): Stop execution on first error and raise exception
+        - ``"continue"``: Continue execution, collecting errors as ErrorSnapshot objects
     start
         Whether to start the pipeline immediately. If ``False``, the pipeline is not started until the
         `start()` method on the `AsyncMap` instance is called.
@@ -419,6 +434,7 @@ def run_map_async(
         auto_subpipeline=auto_subpipeline,
         show_progress=show_progress,
         in_async=True,
+        error_handling=error_handling,
     )
 
     multi_run_manager = maybe_multi_run_manager(prep.executor)
@@ -623,16 +639,27 @@ def _run_iteration(
     selected: dict[str, Any],
     cache: _CacheBase | None,
     in_executor: bool,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
+    # Early error detection when error_handling == "continue"
+    propagated_error = handle_error_inputs(selected, func, error_handling)
+    if propagated_error is not None:
+        return propagated_error
+
     def compute_fn() -> Any:
         try:
             return func(**selected)
         except Exception as e:
             if not in_executor:
-                # If we are in the executor, we need to handle the error in `_result`
-                handle_pipefunc_error(e, func, selected)
-                # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+                # If we're NOT in an executor (sequential execution),
+                # handle the error immediately
+                handle_pipefunc_error(e, func, selected, error_handling)
+                # handle_pipefunc_error raises if error_handling == "raise"
+                if error_handling == "continue":
+                    return func.error_snapshot
+            # If we ARE in an executor (parallel execution),
+            # let the exception propagate to be handled in _result()
+            raise
 
     return _get_or_set_cache(func, selected, cache, compute_fn)
 
@@ -664,11 +691,12 @@ def _run_iteration_and_process(
     cache: _CacheBase | None = None,
     *,
     in_executor: bool,
+    error_handling: Literal["raise", "continue"],
     return_results: bool = True,
     force_dump: bool = False,
 ) -> tuple[Any, ...]:
     selected = _select_kwargs_and_eval_resources(func, kwargs, shape, shape_mask, index)
-    output = _run_iteration(func, selected, cache, in_executor)
+    output = _run_iteration(func, selected, cache, in_executor, error_handling)
     outputs = _pick_output(func, output)
     has_dumped = _update_array(
         func,
@@ -702,12 +730,19 @@ def _update_array(
     # we dump it in the executor. Otherwise, we dump it in the main process during the result array update.
     # We do this to offload the I/O and serialization overhead to the executor process if possible.
     assert isinstance(func.mapspec, MapSpec)
+    from pipefunc.exceptions import ErrorSnapshot, PropagatedErrorSnapshot
+
     output_key = None
     has_dumped = False
     for array, _output in zip(arrays, outputs):
         if not array.full_shape_is_resolved():
             _maybe_set_internal_shape(_output, array)
-        if force_dump or (array.dump_in_subprocess ^ in_post_process):
+        # Error objects bypass XOR logic and dump immediately when created because:
+        # 1. They short-circuit execution (subsequent functions skip when seeing errors)
+        # 2. Without immediate dump, the XOR logic could prevent saving them entirely
+        # Normal values use XOR to dump exactly once (subprocess OR main process)
+        is_error_object = isinstance(_output, (ErrorSnapshot, PropagatedErrorSnapshot))
+        if is_error_object or force_dump or (array.dump_in_subprocess ^ in_post_process):
             if output_key is None:  # Only calculate the output key if needed
                 external_shape = external_shape_from_mask(shape, shape_mask)
                 output_key = func.mapspec.output_key(external_shape, index)  # type: ignore[arg-type]
@@ -857,6 +892,7 @@ def _prepare_submit_map_spec(
         arrays=arrays,
         cache=cache,
         in_executor=in_executor,
+        error_handling=run_info.error_handling,
         return_results=return_results,
     )
     fixed_mask = _mask_fixed_axes(fixed_indices, func.mapspec, shape, mask)
@@ -920,6 +956,12 @@ def _process_chunk(
     chunk: list[int],
     process_index: functools.partial[tuple[Any, ...]],
 ) -> list[Any]:
+    """Process a chunk of indices.
+
+    When error_handling='continue', exceptions are handled within process_index
+    and it returns tuples containing ErrorSnapshots. When error_handling='raise',
+    exceptions are propagated.
+    """
     return list(map(process_index, chunk))
 
 
@@ -1045,8 +1087,9 @@ def _maybe_execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
-    args = (func, kwargs, store, cache)  # args for _execute_single
+    args = (func, kwargs, store, cache, error_handling)  # args for _execute_single
     ex = _executor_for_func(func, executor)
     if ex is not None:
         assert executor is not None
@@ -1063,6 +1106,7 @@ def _execute_single(
     kwargs: dict[str, Any],
     store: dict[str, StoreType],
     cache: _CacheBase | None,
+    error_handling: Literal["raise", "continue"],
 ) -> Any:
     # Load the output if it exists
     output, exists = _load_from_store(func.output_name, store, return_output=True)
@@ -1073,12 +1117,18 @@ def _execute_single(
     _load_data(kwargs)
 
     def compute_fn() -> Any:
+        # Early error detection for non-mapspec operations
+        propagated_error = handle_error_inputs(kwargs, func, error_handling)
+        if propagated_error is not None:
+            return propagated_error
+
         try:
             return func(**kwargs)
-        except Exception as e:
-            handle_pipefunc_error(e, func, kwargs)
-            # handle_pipefunc_error raises but mypy doesn't know that
-            raise  # pragma: no cover
+        except Exception as e:  # noqa: BLE001
+            handle_pipefunc_error(e, func, kwargs, error_handling)
+            # handle_pipefunc_error raises if error_handling == "raise"
+            assert error_handling == "continue"
+            return func.error_snapshot
 
     return _get_or_set_cache(func, kwargs, cache, compute_fn)
 
@@ -1221,7 +1271,16 @@ def _submit_func(
         )
         task = r, args
     else:
-        task = _maybe_execute_single(executor, status, progress, func, kwargs, store, cache)
+        task = _maybe_execute_single(
+            executor,
+            status,
+            progress,
+            func,
+            kwargs,
+            store,
+            cache,
+            run_info.error_handling,
+        )
     return _KwargsTask(kwargs, task)
 
 
@@ -1335,32 +1394,46 @@ def _raise_and_set_error_snapshot(
     exc: Exception,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     *,
     index: int | None = None,
-    run_info: RunInfo | None = None,
-) -> None:
+) -> ErrorSnapshot | None:
     if index is not None:
         assert run_info is not None, "run_info required when index is provided"
         shape = run_info.resolved_shapes[func.output_name]
         mask = run_info.shape_masks[func.output_name]
         kwargs = _select_kwargs_and_eval_resources(func, kwargs, shape, mask, index)
     kwargs = func._rename_to_native(kwargs)
-    handle_pipefunc_error(exc, func, kwargs)
+    handle_pipefunc_error(exc, func, kwargs, run_info.error_handling)
+    # handle_pipefunc_error raises if error_handling == "raise"
+    assert run_info.error_handling == "continue"
+    return func.error_snapshot
 
 
 def _result(
     x: Any | Future,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     index: int | None = None,
-    run_info: RunInfo | None = None,
 ) -> Any:
     if isinstance(x, Future):
         try:
             return x.result()
-        except Exception as e:
-            _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
-            raise  # pragma: no cover
+        except Exception as e:  # noqa: BLE001
+            _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
+            # _raise_and_set_error_snapshot raises if error_handling == "raise"
+            assert run_info.error_handling == "continue"
+            # For mapspec operations, we need to return a list even for errors
+            if func.requires_mapping:
+                # We don't know which specific element in the chunk failed,
+                # so we return a list with a single tuple containing ErrorSnapshot(s)
+                # This is a limitation of chunk-based parallel execution
+                # The tuple is needed because _pick_output returns a tuple of outputs
+                error_tuple = tuple(func.error_snapshot for _ in at_least_tuple(func.output_name))
+                return [error_tuple]
+            return func.error_snapshot
+
     return x
 
 
@@ -1369,14 +1442,16 @@ async def _result_async(
     loop: asyncio.AbstractEventLoop,
     func: PipeFunc,
     kwargs: dict[str, Any],
+    run_info: RunInfo,
     index: int | None = None,
-    run_info: RunInfo | None = None,
 ) -> Any:
     try:
         return await asyncio.wrap_future(task, loop=loop)
-    except Exception as e:
-        _raise_and_set_error_snapshot(e, func, kwargs, index=index, run_info=run_info)
-        raise  # pragma: no cover
+    except Exception as e:  # noqa: BLE001
+        _raise_and_set_error_snapshot(e, func, kwargs, run_info, index=index)
+        # _raise_and_set_error_snapshot raises if error_handling == "raise"
+        assert run_info.error_handling == "continue"
+        return func.error_snapshot
 
 
 def _to_result_dict(
@@ -1410,7 +1485,7 @@ def _process_task(
     kwargs, task = kwargs_task
     if func.requires_mapping:
         r, args = task
-        chunk_outputs_list = [_result(x, func, kwargs, i, run_info) for i, x in enumerate(r)]
+        chunk_outputs_list = [_result(x, func, kwargs, run_info, i) for i, x in enumerate(r)]
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
         output = _output_from_mapspec_task(
@@ -1422,7 +1497,7 @@ def _process_task(
             return_results,
         )
     else:
-        r = _result(task, func, kwargs)
+        r = _result(task, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
 
     if return_results:
@@ -1460,7 +1535,7 @@ async def _process_task_async(
     loop = asyncio.get_event_loop()
     if func.requires_mapping:
         r, args = task
-        futs = [_result_async(x, loop, func, kwargs, i, run_info) for i, x in enumerate(r)]
+        futs = [_result_async(x, loop, func, kwargs, run_info, i) for i, x in enumerate(r)]
         chunk_outputs_list = await asyncio.gather(*futs)
         # Flatten the list of chunked outputs
         chained_outputs_list = list(itertools.chain(*chunk_outputs_list))
@@ -1474,7 +1549,7 @@ async def _process_task_async(
         )
     else:
         assert isinstance(task, Future)
-        r = await _result_async(task, loop, func, kwargs)
+        r = await _result_async(task, loop, func, kwargs, run_info)
         output = _dump_single_output(func, r, store, run_info)
     if return_results:
         assert output is not None
