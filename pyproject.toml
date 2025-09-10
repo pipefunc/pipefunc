@@ -43,7 +43,7 @@ zarr = ["zarr>=2,<3", "numcodecs<0.16.0"]  # https://github.com/zarr-developers/
 test = [
     "coverage",
     "pytest-asyncio",
-    "pytest-codspeed",
+    "pytest-codspeed<4.0.0", # 4.0.0 depends on cffi=2.0.0 which has no 3.13t wheel yet
     "pytest-cov",
     "pytest-timeout",
     "pytest-xdist",
