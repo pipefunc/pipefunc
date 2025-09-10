@@ -834,6 +834,12 @@ class PipeFunc(Generic[T]):
             return {self.output_name: hint}
         if get_origin(hint) is tuple:
             return dict(zip(self.output_name, get_args(hint)))
+        if _is_named_tuple(hint):
+            field_hints = safe_get_type_hints(hint, include_extras=True)
+            return {
+                name: field_hints.get(original_name, NoAnnotation)
+                for name, original_name in zip(self.output_name, hint._fields)
+            }
         return dict.fromkeys(self.output_name, NoAnnotation)
 
     @functools.cached_property
@@ -1501,6 +1507,11 @@ def _validate_combinable_mapspecs(mapspecs: list[MapSpec | None]) -> None:
         if m.output_indices != first.output_indices:
             msg = f"Cannot combine MapSpecs with different output mappings. Mapspec: `{m}`"
             raise ValueError(msg)
+
+
+def _is_named_tuple(hint: Any) -> bool:
+    """Check if a type hint is a NamedTuple."""
+    return inspect.isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
 
 
 def _default_output_picker(output: Any, name: str, output_name: OUTPUT_TYPE) -> Any:
