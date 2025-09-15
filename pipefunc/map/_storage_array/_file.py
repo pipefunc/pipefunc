@@ -46,7 +46,7 @@ class FileArray(StorageBase):
         shape: ShapeTuple,
         internal_shape: ShapeTuple | None = None,
         shape_mask: tuple[bool, ...] | None = None,
-        irregular: bool = False,  # noqa: FBT001, FBT002
+        irregular: bool = False,  # noqa: FBT002
         *,
         filename_template: str = FILENAME_TEMPLATE,
     ) -> None:
